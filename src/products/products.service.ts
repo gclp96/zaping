@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateProductDto } from './dto/create-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -18,33 +19,28 @@ export class ProductsService {
     });
   }
 
-  create(companyId: string, data: any) {
+  create(companyId: string, dto: CreateProductDto) {
     return this.prisma.product.create({
       data: {
         companyId,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        sku: data.sku,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        name: data.name,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        description: data.description,
+        sku: dto.sku,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        category: data.category,
+        name: dto.name,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        barcode: data.barcode,
+        description: dto.description,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        cost: data.cost,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        price: data.price,
+        category: dto.category,
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        stock: data.stock,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        minStock: data.minStock,
+        barcode: dto.barcode,
+
+        cost: dto.cost,
+
+        price: dto.price,
+
+        stock: dto.stock,
+
+        minStock: dto.minStock,
       },
     });
   }
