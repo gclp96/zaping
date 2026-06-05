@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id                 String              @id @default(uuid())
+  companyId          String
+  sku                String
+  name               String
+  description        String?
+  category           String?
+  barcode            String?
+  cost               Float               @default(0)
+  price              Float               @default(0)
+  stock              Int                 @default(0)
+  minStock           Int                 @default(0)
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  inventoryMovements InventoryMovement[]
+  company            Company             @relation(fields: [companyId], references: [id])
+  purchaseItems      PurchaseItem[]
+  quoteItems         QuoteItem[]
+
+  @@unique([id, companyId])
+  saleItems SaleItem[]
+}
+
+model InventoryMovement {
+  id        String   @id @default(uuid())
+  companyId String
+  productId String
+  type      String
+  quantity  Int
+  balance Int?
+  referenceType String?
+  referenceId String?
+  notes     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  company   Company  @relation(fields: [companyId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  type        String
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id])
+  quotes      Quote[]
+
+  @@index([companyId])
+  sales Sale[]
+}
+
+model Quote {
+  id         String      @id @default(uuid())
+  companyId  String
+  customerId String
+  folio      String
+  subtotal   Float
+  iva        Float
+  total      Float
+  status     String      @default("DRAFT")
+  convertedToSale Boolean @default(false)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  company    Company     @relation(fields: [companyId], references: [id])
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  items      QuoteItem[]
+}
+
+model QuoteItem {
+  id        String  @id @default(uuid())
+  quoteId   String
+  productId String
+  quantity  Int
+  price     Float
+  subtotal  Float
+  product   Product @relation(fields: [productId], references: [id])
+  quote     Quote   @relation(fields: [quoteId], references: [id])
+}
+
+model Purchase {
+  id        String         @id @default(uuid())
+  companyId String
+  folio     String
+  supplier  String
+  subtotal  Float
+  iva       Float
+  total     Float
+  status    String         @default("DRAFT")
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  company   Company        @relation(fields: [companyId], references: [id])
+  items     PurchaseItem[]
+}
+
+model PurchaseItem {
+  id         String   @id @default(uuid())
+  purchaseId String
+  productId  String
+  quantity   Int
+  price      Float
+  subtotal   Float
+  product    Product  @relation(fields: [productId], references: [id])
+  purchase   Purchase @relation(fields: [purchaseId], references: [id])
+}
+
+model Company {
+  id                 String              @id @default(uuid())
+  name               String
+  tradeName          String?
+  rfc                String              @unique
+  email              String?
+  phone              String?
+  language           String              @default("es")
+  timezone           String              @default("America/Hermosillo")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  customers          Customer[]
+  inventoryMovements InventoryMovement[]
+  products           Product[]
+  purchases          Purchase[]
+  quotes             Quote[]
+  users              User[]
+
+  sales Sale[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  companyId    String
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String
+  locale       String   @default("es")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         String   @default("ADMIN")
+  company      Company  @relation(fields: [companyId], references: [id])
+}
+
+model Sale {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  folio String
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  subtotal Float
+  iva      Float
+  total    Float
+
+  status    String   @default("DRAFT")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items SaleItem[]
+}
+
+model SaleItem {
+  id        String  @id @default(uuid())
+
+  saleId    String
+  sale      Sale    @relation(fields: [saleId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity  Int
+
+  price     Float
+
+  subtotal  Float
+}
