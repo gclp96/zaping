@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import {
   Injectable,
   BadRequestException,
@@ -9,14 +8,15 @@ import PDFDocument from 'pdfkit';
 import { Response } from 'express';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { CreatePurchaseDto } from './dto/create-purchase.dto';
 
 @Injectable()
 export class PurchasesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(companyId: string, data: any) {
+  async create(companyId: string, dto: CreatePurchaseDto) {
     try {
-      if (!data.items || !Array.isArray(data.items)) {
+      if (!dto.items || !Array.isArray(dto.items)) {
         throw new BadRequestException('Debe enviar un arreglo items');
       }
 
@@ -31,10 +31,9 @@ export class PurchasesService {
         subtotal: number;
       }> = [];
 
-      for (const item of data.items) {
+      for (const item of dto.items) {
         const product = await this.prisma.product.findUnique({
           where: {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             id: item.productId,
           },
         });
@@ -50,9 +49,7 @@ export class PurchasesService {
         subtotal += itemSubtotal;
 
         purchaseItems.push({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           productId: item.productId,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           quantity: item.quantity,
           price: product.cost,
           subtotal: itemSubtotal,
@@ -65,8 +62,7 @@ export class PurchasesService {
       return await this.prisma.purchase.create({
         data: {
           companyId,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          supplier: data.supplier,
+          supplier: dto.supplier,
           folio,
           subtotal,
           iva,

@@ -16,15 +16,17 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 import { Response } from 'express';
 
+import { CreateQuoteDto } from './dto/create-quote.dto';
+
 @Controller('quotes')
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Request() req: any, @Body() body: any) {
+  create(@Request() req: any, @Body() dto: CreateQuoteDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.quotesService.create(req.user.companyId, body);
+    return this.quotesService.create(req.user.companyId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -8,20 +8,19 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import PDFDocument from 'pdfkit';
 import { Response } from 'express';
+import { CreateQuoteDto } from './dto/create-quote.dto';
+import { CreateQuoteItemDto } from './dto/create-quote-item.dto';
 
 @Injectable()
 export class QuotesService {
-  quotesService: any;
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(companyId: string, data: any) {
+  async create(companyId: string, dto: CreateQuoteDto) {
     const folio = `COT-${Date.now()}`;
 
     let subtotal = 0;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    for (const item of data.items) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    for (const item of dto.items) {
       subtotal += item.quantity * item.price;
     }
 
@@ -31,8 +30,7 @@ export class QuotesService {
     const quote = await this.prisma.quote.create({
       data: {
         companyId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        customerId: data.customerId,
+        customerId: dto.customerId,
 
         folio,
         subtotal,
@@ -40,15 +38,10 @@ export class QuotesService {
         total,
 
         items: {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          create: data.items.map((item: any) => ({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+          create: dto.items.map((item: CreateQuoteItemDto) => ({
             productId: item.productId,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             quantity: item.quantity,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             price: item.price,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             subtotal: item.quantity * item.price,
           })),
         },

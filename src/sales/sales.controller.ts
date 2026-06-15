@@ -15,15 +15,17 @@ import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SalesService } from './sales.service';
 
+import { CreateSaleDto } from './dto/create-sale.dto';
+
 @Controller('sales')
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Request() req: any, @Body() data: any) {
+  create(@Request() req: any, @Body() dto: CreateSaleDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.salesService.create(req.user.companyId, data);
+    return this.salesService.create(req.user.companyId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

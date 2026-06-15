@@ -16,15 +16,17 @@ import { PurchasesService } from './purchases.service';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+import { CreatePurchaseDto } from './dto/create-purchase.dto';
+
 @Controller('purchases')
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Request() req: any, @Body() data: any) {
+  create(@Request() req: any, @Body() dto: CreatePurchaseDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.purchasesService.create(req.user.companyId, data);
+    return this.purchasesService.create(req.user.companyId, dto);
   }
 
   @UseGuards(JwtAuthGuard)

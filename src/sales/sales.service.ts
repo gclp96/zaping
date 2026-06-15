@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Injectable, BadRequestException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,15 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { CreateSaleDto } from './dto/create-sale.dto';
 
 @Injectable()
 export class SalesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async create(companyId: string, data: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (!data.items || !Array.isArray(data.items)) {
+  async create(companyId: string, dto: CreateSaleDto) {
+    if (!dto.items || !Array.isArray(dto.items)) {
       throw new BadRequestException('Debe enviar un arreglo items');
     }
 
@@ -22,21 +20,17 @@ export class SalesService {
 
     let subtotal = 0;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    for (const item of data.items) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    for (const item of dto.items) {
       subtotal += item.quantity * item.price;
     }
 
     const iva = subtotal * 0.16;
     const total = subtotal + iva;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return this.prisma.sale.create({
       data: {
         companyId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        customerId: data.customerId,
+        customerId: dto.customerId,
 
         folio,
         subtotal,
@@ -44,8 +38,7 @@ export class SalesService {
         total,
 
         items: {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-          create: data.items.map((item: any) => ({
+          create: dto.items.map((item: any) => ({
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             productId: item.productId,
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
@@ -64,9 +57,7 @@ export class SalesService {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async findAll(companyId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return this.prisma.sale.findMany({
       where: {
         companyId,
@@ -89,7 +80,6 @@ export class SalesService {
   }
 
   async approve(companyId: string, id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const sale = await this.prisma.sale.findFirst({
       where: {
         id,
@@ -108,38 +98,29 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (sale.status === 'APPROVED') {
       throw new BadRequestException('La venta ya fue aprobada');
     }
 
     // Validar inventario disponible
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     for (const item of sale.items) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (item.product.stock < item.quantity) {
         throw new BadRequestException(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
           `Stock insuficiente para ${item.product.name}. Disponible: ${item.product.stock}`,
         );
       }
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return this.prisma.$transaction(async (tx) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       for (const item of sale.items) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         const newStock = item.product.stock - item.quantity;
 
         await tx.product.update({
           where: {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             id: item.productId,
           },
           data: {
             stock: {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
               decrement: item.quantity,
             },
           },
@@ -148,26 +129,21 @@ export class SalesService {
         await tx.inventoryMovement.create({
           data: {
             companyId,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             productId: item.productId,
 
             type: 'OUT',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             quantity: item.quantity,
 
             balance: newStock,
 
             referenceType: 'SALE',
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
             referenceId: sale.id,
 
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             notes: `Venta aprobada ${sale.folio}`,
           },
         });
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
       return tx.sale.update({
         where: {
           id,
@@ -180,7 +156,6 @@ export class SalesService {
   }
 
   async generatePDF(companyId: string, saleId: string, res: Response) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const sale = await this.prisma.sale.findFirst({
       where: {
         id: saleId,
@@ -206,7 +181,6 @@ export class SalesService {
 
     res.setHeader(
       'Content-Disposition',
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       `attachment; filename=venta-${sale.folio}.pdf`,
     );
 
@@ -230,11 +204,9 @@ export class SalesService {
 
     doc.fontSize(14);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Folio: ${sale.folio}`);
 
     doc.text(
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       `Fecha: ${sale.createdAt.toLocaleDateString('es-MX', {
         year: 'numeric',
         month: 'long',
@@ -242,7 +214,6 @@ export class SalesService {
       })}`,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Estado: ${sale.status}`);
 
     doc.moveDown();
@@ -250,13 +221,9 @@ export class SalesService {
     // Cliente
 
     doc.fontSize(16);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Cliente: ${sale.customer.name}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Contacto: ${sale.customer.contactName ?? ''}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Email: ${sale.customer.email}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Teléfono: ${sale.customer.phone}`);
 
     doc.moveDown();
@@ -268,15 +235,12 @@ export class SalesService {
 
     doc.moveDown();
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     sale.items.forEach((item) => {
       doc.fontSize(12);
 
       doc.text(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         `- ${item.product.name} | Cantidad: ${item.quantity} | Precio: $${item.price.toFixed(
           2,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         )} | Subtotal: $${item.subtotal.toFixed(2)}`,
       );
     });
@@ -287,11 +251,8 @@ export class SalesService {
 
     doc.fontSize(14);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Subtotal: $${sale.subtotal.toFixed(2)}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`IVA (16%): $${sale.iva.toFixed(2)}`);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     doc.text(`Total: $${sale.total.toFixed(2)}`);
 
     doc.end();
@@ -342,7 +303,6 @@ export class SalesService {
 
     const folio = `V-${Date.now()}`;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const sale = await this.prisma.sale.create({
       data: {
         companyId,
@@ -379,12 +339,10 @@ export class SalesService {
       },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return sale;
   }
 
   async cancel(companyId: string, saleId: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const sale = await this.prisma.sale.findFirst({
       where: {
         id: saleId,
@@ -396,17 +354,14 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (sale.status === 'APPROVED') {
       throw new BadRequestException('No se puede cancelar una venta aprobada');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (sale.status === 'CANCELLED') {
       throw new BadRequestException('La venta ya está cancelada');
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return this.prisma.sale.update({
       where: {
         id: saleId,
