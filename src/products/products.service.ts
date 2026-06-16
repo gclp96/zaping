@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
 
 @Injectable()
 export class ProductsService {
@@ -44,23 +45,29 @@ export class ProductsService {
       },
     });
   }
+  async findOne(productId: string, companyId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        companyId,
+      },
+    });
 
-  update(companyId: string, productId: string, data: any) {
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    return product;
+  }
+
+  async update(companyId: string, productId: string, dto: UpdateProductDto) {
+    await this.findOne(productId, companyId);
+
     return this.prisma.product.update({
       where: {
         id: productId,
       },
-
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      data,
-    });
-  }
-
-  remove(companyId: string, productId: string) {
-    return this.prisma.product.delete({
-      where: {
-        id: productId,
-      },
+      data: dto,
     });
   }
 
@@ -72,5 +79,15 @@ export class ProductsService {
     });
 
     return products.filter((product) => product.stock <= product.minStock);
+  }
+
+  async remove(companyId: string, productId: string) {
+    await this.findOne(productId, companyId);
+
+    return this.prisma.product.delete({
+      where: {
+        id: productId,
+      },
+    });
   }
 }

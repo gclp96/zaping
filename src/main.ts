@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -13,7 +14,9 @@ async function bootstrap() {
     }),
   );
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(3000);
 }
-// eslint-disable-next-line @typescript-eslint/no-floating-promises
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error(err);
+});

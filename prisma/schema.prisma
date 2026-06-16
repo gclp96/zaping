@@ -26,25 +26,25 @@ model Product {
   company            Company             @relation(fields: [companyId], references: [id])
   purchaseItems      PurchaseItem[]
   quoteItems         QuoteItem[]
+  saleItems          SaleItem[]
 
   @@unique([id, companyId])
-  saleItems SaleItem[]
 }
 
 model InventoryMovement {
-  id        String   @id @default(uuid())
-  companyId String
-  productId String
-  type      String
-  quantity  Int
-  balance Int?
+  id            String   @id @default(uuid())
+  companyId     String
+  productId     String
+  type          String
+  quantity      Int
+  balance       Int?
   referenceType String?
-  referenceId String?
-  notes     String?
-  createdBy String?
-  createdAt DateTime @default(now())
-  company   Company  @relation(fields: [companyId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id])
+  referenceId   String?
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  company       Company  @relation(fields: [companyId], references: [id])
+  product       Product  @relation(fields: [productId], references: [id])
 }
 
 model Customer {
@@ -60,26 +60,26 @@ model Customer {
   createdAt   DateTime @default(now())
   company     Company  @relation(fields: [companyId], references: [id])
   quotes      Quote[]
+  sales       Sale[]
 
   @@index([companyId])
-  sales Sale[]
 }
 
 model Quote {
-  id         String      @id @default(uuid())
-  companyId  String
-  customerId String
-  folio      String
-  subtotal   Float
-  iva        Float
-  total      Float
-  status     String      @default("DRAFT")
-  convertedToSale Boolean @default(false)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  company    Company     @relation(fields: [companyId], references: [id])
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  items      QuoteItem[]
+  id              String      @id @default(uuid())
+  companyId       String
+  customerId      String
+  folio           String
+  subtotal        Float
+  iva             Float
+  total           Float
+  status          String      @default("DRAFT")
+  convertedToSale Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  company         Company     @relation(fields: [companyId], references: [id])
+  customer        Customer    @relation(fields: [customerId], references: [id])
+  items           QuoteItem[]
 }
 
 model QuoteItem {
@@ -138,6 +138,8 @@ model Company {
   users              User[]
 
   sales Sale[]
+
+  suppliers Supplier[]
 }
 
 model User {
@@ -170,7 +172,7 @@ model Sale {
   iva      Float
   total    Float
 
-  status    String   @default("DRAFT")
+  status String @default("DRAFT")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -179,17 +181,38 @@ model Sale {
 }
 
 model SaleItem {
-  id        String  @id @default(uuid())
+  id String @id @default(uuid())
 
-  saleId    String
-  sale      Sale    @relation(fields: [saleId], references: [id])
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id])
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
 
-  quantity  Int
+  quantity Int
 
-  price     Float
+  price Float
 
-  subtotal  Float
+  subtotal Float
+}
+
+model Supplier {
+  id        String   @id @default(uuid())
+
+  companyId String
+
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@unique([companyId, name])
 }
