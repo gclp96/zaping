@@ -63,7 +63,7 @@ sus componentes iniciales en los módulos existentes.
 | ID | Componente | Estado | Prioridad |
 |---|---|---|---|
 | BC-001 | StatusBadge | ✅ Completed | Alta |
-| BC-002 | MoneyInput | ⬜ Pending | Alta |
+| BC-002 | MoneyInput | ✅ Completed | Alta |
 | BC-003 | DateInput | ⬜ Pending | Alta |
 | BC-004 | SupplierSelector | ⬜ Pending | Alta |
 | BC-005 | CustomerSelector | ⬜ Pending | Alta |
@@ -91,4 +91,4 @@ sus componentes iniciales en los módulos existentes.
 
 # Próximo Objetivo
 
-Documentar e implementar BC-002 MoneyInput.
+Documentar e implementar  BC-003 DateInput.
