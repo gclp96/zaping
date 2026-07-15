@@ -15,7 +15,7 @@
 |---|---|---|
 | M1 | Foundation v1.0 | ✅ Completado — 2026-07-11 |
 | M2 | Business Components Library | 🟢 En progreso |
-| M3 | Purchases Module | ⏳ Pendiente |
+| M3 | Purchases Module | 🟢 In Progress |
 | M4 | Quotes Module | ⏳ Pendiente |
 | M5 | Sales Module | ⏳ Pendiente |
 | M6 | MVP Comercial | ⏳ Pendiente |
@@ -34,7 +34,7 @@
 | ADR-001 | Arquitectura Multiempresa | ✅ Aceptado |
 | ADR-002 | Inventario basado en movimientos | ✅ Aceptado |
 | ADR-003 | Eliminación lógica | ✅ Aceptado |
-| ADR-004 | Estrategia UUID | ✅ Aceptado |
+| BC-004 | SupplierSelector | 🚧 Implemented — Pending integration | Alta |
 | ADR-005 | Arquitectura por capas | ✅ Aceptado |
 | ADR-006 | Arquitectura API First | ✅ Aceptado |
 | ADR-007 | Control de acceso basado en roles | ✅ Aceptado |
@@ -64,10 +64,14 @@ sus componentes iniciales en los módulos existentes.
 |---|---|---|---|
 | BC-001 | StatusBadge | ✅ Completed | Alta |
 | BC-002 | MoneyInput | ✅ Completed | Alta |
-| BC-003 | DateInput | ⬜ Pending | Alta |
-| BC-004 | SupplierSelector | ⬜ Pending | Alta |
+| BC-003 | DateInput | ⏸️ Deferred | Alta |
+| BC-004 | SupplierSelector | ✅ Completed | Alta |
 | BC-005 | CustomerSelector | ⬜ Pending | Alta |
-| BC-006 | ProductSelector | ⬜ Pending | Alta |
+| BC-006 | ProductSelector | ✅ Completed | Alta |
+
+BC-003 se difiere hasta definir e implementar un campo de fecha de negocio,
+como fecha de compra, vigencia de cotización o fecha estimada de entrega.
+No se crearán componentes sin un caso de uso real.
 
 ---
 
@@ -88,7 +92,7 @@ sus componentes iniciales en los módulos existentes.
 | ADR-002 | Architecture | Inventory Movements | ✅ Accepted     | Foundation | Critical  |
 | UI-014  | Component    | StatusBadge         | 🚧 Ready       | Sprint 09  | Medium    |
 | BC-001  | Business Component | StatusBadge   | ✅ Completed    | Sprint 09 | High |
+| FEAT-PUR-001 | Feature | Crear compra | ✅ Completed | Sprint 09 | High |
 
 # Próximo Objetivo
 
-Documentar e implementar  BC-003 DateInput.
