@@ -100,7 +100,14 @@ function formatDate(value: string): string {
 function getPurchaseStatusDescriptor(
   status: string,
 ): PurchaseStatusDescriptor {
-    if (status === 'CANCELLED') {
+    if (status === 'CONFIRMED') {
+    return {
+      label: 'Confirmada',
+      tone: 'success',
+    };
+  }
+
+  if (status === 'CANCELLED') {
     return {
       label: 'Cancelada',
       tone: 'danger',
@@ -130,6 +137,7 @@ const [pageLoading, setPageLoading] = useState(true);
 const [pageError, setPageError] = useState('');
 const [openModal, setOpenModal] = useState(false);
 const [saving, setSaving] = useState(false);
+const [ purchaseToView, setPurchaseToView ] = useState<Purchase | null>(null);
 
 const [supplierId, setSupplierId] = useState('');
 const [selectedProductId, setSelectedProductId] = useState('');
@@ -494,6 +502,14 @@ const tableData = purchases.map((purchase) => {
       ),
       actions: (
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPurchaseToView(purchase)}
+            >
+              ver
+            </Button>
+
           {purchase.status === 'DRAFT' ? (
             <>
               <Button
@@ -532,6 +548,7 @@ const tableData = purchases.map((purchase) => {
 
   return (
     <>
+      {/* Página de compras */}
       <PageContainer>
         <PageHeader
           title="Compras"
@@ -584,6 +601,7 @@ const tableData = purchases.map((purchase) => {
         )}
       </PageContainer>
 
+      {/* Crear compra */}
       <Modal
         isOpen={openModal}
         onClose={closeCreateModal}
@@ -785,7 +803,171 @@ const tableData = purchases.map((purchase) => {
           </Button>
           </div>
         </div>
-      </Modal>
+        </Modal>
+      
+      {/* Ver detalles de compra */}
+      <Modal
+        isOpen={purchaseToView !== null}
+        onClose={() => setPurchaseToView(null)}
+        title="Detalle de compra"
+      >
+        {purchaseToView ? (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 rounded-lg bg-gray-50 p-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Folio</p>
+                <p className="text-lg font-semibold">
+                  {purchaseToView.folio}
+                </p>
+
+                <p className="mt-3 text-sm text-gray-500">
+                  Fecha
+                </p>
+                <p className="font-medium">
+                  {formatDate(purchaseToView.createdAt)}
+                </p>
+              </div>
+
+              <div className="md:text-right">
+                {(() => {
+                  const statusDescriptor =
+                    getPurchaseStatusDescriptor(
+                      purchaseToView.status,
+                    );
+
+                  return (
+                    <StatusBadge
+                      label={statusDescriptor.label}
+                      tone={statusDescriptor.tone}
+                      ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
+                    />
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="mb-3 font-semibold">Proveedor</h3>
+
+              <p className="font-medium">
+                {purchaseToView.supplier.name}
+              </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left">
+                      Producto
+                    </th>
+                    <th className="px-3 py-2 text-right">
+                      Cantidad
+                    </th>
+                    <th className="px-3 py-2 text-right">
+                      Costo
+                    </th>
+                    <th className="px-3 py-2 text-right">
+                      Subtotal
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {purchaseToView.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-gray-200"
+                    >
+                      <td className="px-3 py-3">
+                        <p className="font-medium">
+                          {item.product.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {item.product.sku}
+                        </p>
+                      </td>
+
+                      <td className="px-3 py-3 text-right">
+                        {item.quantity}
+                      </td>
+
+                      <td className="px-3 py-3 text-right">
+                        {formatMoney(item.price)}
+                      </td>
+
+                      <td className="px-3 py-3 text-right font-medium">
+                        {formatMoney(item.subtotal)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="space-y-2 rounded-lg bg-gray-50 p-4">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatMoney(purchaseToView.subtotal)}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span>IVA (16%)</span>
+                <span>{formatMoney(purchaseToView.iva)}</span>
+              </div>
+
+              <div className="flex justify-between border-t border-gray-200 pt-2 text-lg font-semibold">
+                <span>Total</span>
+                <span>{formatMoney(purchaseToView.total)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setPurchaseToView(null)}
+              >
+                Cerrar
+              </Button>
+
+              {purchaseToView.status === 'DRAFT' ? (
+                <>
+                  <Button
+                    variant="success"
+                    onClick={() => {
+                      setPurchaseToApprove(purchaseToView);
+                      setPurchaseToView(null);
+                    }}
+                  >
+                    Aprobar
+                  </Button>
+
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setPurchaseToCancel(purchaseToView);
+                      setPurchaseToView(null);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </>
+              ) : null}
+
+              <Button
+                variant="outline"
+                loading={
+                  downloadingPurchaseId === purchaseToView.id
+                }
+                loadingText="Descargando..."
+                onClick={() => void handleDownloadPdf(purchaseToView)}
+              >
+                PDF
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        </Modal>
 
       <ConfirmDialog
         isOpen={purchaseToApprove !== null}
@@ -810,7 +992,7 @@ const tableData = purchases.map((purchase) => {
         }}
         onConfirm={() => void handleApprovePurchase()}
       />
-      <ConfirmDialog
+      <ConfirmDialog 
           isOpen={purchaseToCancel !== null}
           title="Cancelar compra"
           message={

@@ -93,6 +93,10 @@ No se crearán componentes sin un caso de uso real.
 | UI-014  | Component    | StatusBadge         | 🚧 Ready       | Sprint 09  | Medium    |
 | BC-001  | Business Component | StatusBadge   | ✅ Completed    | Sprint 09 | High |
 | FEAT-PUR-001 | Feature | Crear compra | ✅ Completed | Sprint 09 | High |
+| FEAT-PUR-002 | Feature | PDF de orden de compra | ✅ Completed | Sprint 09 | Medium |
+| FEAT-PUR-003 | Feature | Vista de detalle de compra | ✅ Completed | Sprint 09 | Medium |
 
 # Próximo Objetivo
 
+refinar el modulo Purchases:
+ADR-009
