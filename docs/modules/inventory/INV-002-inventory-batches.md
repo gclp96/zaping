@@ -2,7 +2,7 @@
 
 ## Estado
 
-En progreso
+Completado
 
 ## Objetivo
 
@@ -188,3 +188,26 @@ Distribución de responsabilidad:
 | Proveedor | Supplier / Purchase / InventoryBatch | El proveedor puede variar por compra o lote |
 | Lote | InventoryBatch | Cada existencia puede tener lote diferente |
 | Caducidad | InventoryBatch | Cada lote puede caducar en fecha diferente |
+
+## Resultado de implementación
+
+INV-002 fue implementado correctamente.
+
+Resultados:
+
+- Se agregó `Product.brand`.
+- Se creó el modelo `InventoryBatch`.
+- Se agregó relación entre Product e InventoryBatch.
+- Se agregó relación entre Company e InventoryBatch.
+- Se agregó relación entre Supplier e InventoryBatch.
+- Se agregó relación entre Purchase e InventoryBatch.
+- Se agregó `batchId` opcional en InventoryMovement.
+- Se agregó relación opcional entre InventoryMovement e InventoryBatch.
+- Se mantuvo Product.stock como resumen operativo.
+- La migración fue aplicada correctamente.
+- Prisma Client fue regenerado.
+- El backend compiló correctamente.
+
+## Estado final
+
+INV-002 se considera completado.
