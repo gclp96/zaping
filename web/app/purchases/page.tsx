@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -45,6 +45,24 @@ type PurchaseItem = {
   quantity: number;
   price: number;
   subtotal: number;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+  };
+};
+
+type InventoryMovement = {
+  balance: ReactNode;
+  id: string;
+  productId: string;
+  movementType: string;
+  quantity: number;
+  unitCost?: number | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  notes?: string | null;
+  createdAt: string;
   product: {
     id: string;
     sku: string;
@@ -139,6 +157,10 @@ const [openModal, setOpenModal] = useState(false);
 const [saving, setSaving] = useState(false);
 const [ purchaseToEdit, setPurchaseToEdit ] = useState<Purchase | null>(null);
 const [ purchaseToView, setPurchaseToView ] = useState<Purchase | null>(null);
+const [inventoryMovements, setInventoryMovements ] = useState<InventoryMovement[]>([]);
+
+const [movementsLoading, setMovementsLoading] = useState(false);
+const [movementsError, setMovementsError] = useState('');
 
 const [supplierId, setSupplierId] = useState('');
 const [selectedProductId, setSelectedProductId] = useState('');
@@ -525,6 +547,33 @@ async function handleDownloadPdf(purchase: Purchase) {
     }
   }
 
+async function openPurchaseDetail(purchase: Purchase) {
+  setPurchaseToView(purchase);
+  setInventoryMovements([]);
+  setMovementsError('');
+
+  try {
+    setMovementsLoading(true);
+
+    const response = await api.get<InventoryMovement[]>(
+      `/purchases/${purchase.id}/inventory-movements`,
+    );
+
+    setInventoryMovements(response.data);
+  } catch (error: unknown) {
+    console.error(error);
+
+    setMovementsError(
+      getApiErrorMessage(
+        error,
+        'No fue posible cargar los movimientos de inventario.',
+      ),
+    );
+  } finally {
+    setMovementsLoading(false);
+  }
+}
+
 const tableData = purchases.map((purchase) => {
     const statusDescriptor =
       getPurchaseStatusDescriptor(purchase.status);
@@ -548,9 +597,9 @@ const tableData = purchases.map((purchase) => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPurchaseToView(purchase)}
+            onClick={() => void openPurchaseDetail(purchase)}
             >
-              ver
+              Ver
             </Button>
 
           {purchase.status === 'DRAFT' ? (
@@ -861,7 +910,11 @@ const tableData = purchases.map((purchase) => {
       {/* Ver detalles de compra */}
       <Modal
         isOpen={purchaseToView !== null}
-        onClose={() => setPurchaseToView(null)}
+        onClose={() => {
+          setPurchaseToView(null);
+          setInventoryMovements([]);
+          setMovementsError('');
+        }}
         title="Detalle de compra"
       >
         {purchaseToView ? (
@@ -956,6 +1009,93 @@ const tableData = purchases.map((purchase) => {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="mb-3 font-semibold">
+                Movimientos de inventario
+              </h3>
+
+              {movementsLoading ? (
+                <p className="text-sm text-gray-500">
+                  Cargando movimientos...
+                </p>
+              ) : movementsError ? (
+                <p role="alert" className="text-sm text-red-600">
+                  {movementsError}
+                </p>
+              ) : inventoryMovements.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Esta compra no tiene movimientos de inventario asociados.
+                </p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left">
+                          Producto
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Tipo
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Cantidad
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Balance
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Costo
+                        </th>
+                        <th className="px-3 py-2 text-left">
+                          Fecha
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {inventoryMovements.map((movement) => (
+                        <tr
+                          key={movement.id}
+                          className="border-t borrder-gray-200"
+                          >
+                            <td className="px-3 py-3">
+                              <p className="font-medium">
+                                {movement.product.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {movement.product.sku}
+                              </p>
+                            </td>
+
+                            <td className="px-3 py-3">
+                              {movement.movementType}
+                            </td>
+
+                            <td className="px-3 py-3 text-right">
+                              {movement.quantity}
+                            </td>
+
+                            <td className="px-3 py-3 text-right">
+                              {movement.balance}
+                            </td>
+
+                            <td className="px-3 py-3 text-right">
+                              {movement.unitCost != null
+                                ? formatMoney(movement.unitCost)
+                                : '—'}
+                            </td>
+
+                            <td className="px-3 py-3">
+                              {formatDate(movement.createdAt)}
+                            </td>
+                          </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  </div>
+              )}
             </div>
 
             <div className="space-y-2 rounded-lg bg-gray-50 p-4">
