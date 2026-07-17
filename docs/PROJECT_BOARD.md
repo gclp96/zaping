@@ -83,25 +83,28 @@ No se crearán componentes sin un caso de uso real.
 
 ---
 
-| ID      | Tipo         | Nombre              | Estado         | Sprint     | Prioridad |
-| ------- | ------------ | ------------------- | -------------- | ---------- | --------- |
-| MOD-001 | Module       | Customers           | ✅ Released     | Sprint 05  | High      |
-| MOD-002 | Module       | Products            | ✅ Released     | Sprint 06  | High      |
-| MOD-003 | Module       | Inventory           | 🚧 In Progress | Sprint 09  | Critical  |
-| DOC-001 | Document     | Vision              | ✅ Approved     | Foundation | High      |
-| ADR-002 | Architecture | Inventory Movements | ✅ Accepted     | Foundation | Critical  |
-| UI-014  | Component    | StatusBadge         | 🚧 Ready       | Sprint 09  | Medium    |
-| BC-001  | Business Component | StatusBadge   | ✅ Completed    | Sprint 09 | High |
+| ID        | Tipo         | Nombre              | Estado         | Sprint     | Prioridad   |
+
+| MOD-001      | Module       | Customers           | ✅ Released     | Sprint 05  | High        |
+| MOD-002      | Module       | Products            | ✅ Released     | Sprint 06  | High        |
+| MOD-003      | Module       | Inventory           | 🚧 In Progress | Sprint 09  | Critical    |
+| DOC-001      | Document     | Vision              | ✅ Approved   | Foundation | High             |
+| ADR-002      | Architecture | Inventory Movements | ✅ Accepted   | Foundation | Critical       |
+| UI-014       | Component    | StatusBadge         | 🚧 Ready       | Sprint 09  | Medium   |
+| BC-001       | Business Component | StatusBadge   | ✅ Completed    | Sprint 09 | High      |
 | FEAT-PUR-001 | Feature | Crear compra | ✅ Completed | Sprint 09 | High |
 | FEAT-PUR-002 | Feature | PDF de orden de compra | ✅ Completed | Sprint 09 | Medium |
 | FEAT-PUR-003 | Feature | Vista de detalle de compra | ✅ Completed | Sprint 09 | Medium |
 | FEAT-PUR-004 | Feature | Editar compra en borrador | ✅ Completed | Sprint 09 | High |
 | FEAT-PUR-005 | Feature | Trazabilidad de movimientos por compra | ✅ Completed | Sprint 09 | Medium |
-| DOC-PUR-001 | Docs | Documentación final del módulo Compras | ✅ Completed | Sprint 09 | High |
-| Sprint 09 | Business Components + Purchases | ✅ Completed |
-| DOC-S09-001 | Docs | Cierre formal de Sprint 09 | ✅ Completed | Sprint 09 | High |
+| DOC-PUR-001  | Docs | Documentación final del módulo Compras | ✅ Completed | Sprint 09 | High |
+| Sprint 09    | Business Components + Purchases | ✅ Completed |
+| DOC-S09-001  | Docs | Cierre formal de Sprint 09 | ✅ Completed | Sprint 09 | High |
+| Sprint 10    | Inventory Advanced + Lotes + Caducidades | 🟡 Planned |
+| INV-001      | Feature | Kardex por producto | 🟡 Planned | Sprint 10 | High |
+| INV-002      | Architecture | Modelo de lotes y caducidades | 🟡 Planned | Sprint 10 | Critical |
+| INV-003      | Feature | Stock por lote | 🟡 Planned | Sprint 10 | High |
+| INV-004      | Feature | Movimientos ligados a lote | 🟡 Planned | Sprint 10 | High |
+| INV-005      | Feature | Alertas de caducidad | 🟡 Planned | Sprint 10 | Medium |
+| INV-006      | Feature | Preparar compras para recepción con lote | 🟡 Planned | Sprint 10 | High |
 
-# Próximo Objetivo
-
-refinar el modulo Purchases:
-ADR-009
