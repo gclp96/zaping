@@ -20,8 +20,9 @@ type Product = {
   id: string;
   sku: string;
   name: string;
-  description?: string;
-  barcode?: string;
+  description?: string | null;
+  brand?: string | null;
+  barcode?: string | null;
   cost: number;
   price: number;
   stock: number;
@@ -38,6 +39,7 @@ export default function ProductsPage() {
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState('');
   const [cost, setCost] = useState('');
   const [price, setPrice] = useState('');
@@ -102,6 +104,7 @@ if (
       sku: sku.trim(),
       name: name.trim(),
       description: description.trim() || undefined,
+      brand: brand.trim() || undefined,
       barcode: barcode.trim() || undefined,
       cost: costValue,
       price: priceValue,
@@ -121,6 +124,7 @@ if (
     setSku('');
     setName('');
     setDescription('');
+    setBrand('');
     setBarcode('');
     setCost('');
     setPrice('');
@@ -142,6 +146,7 @@ if (
     setSku(product.sku);
     setName(product.name);
     setDescription(product.description || '');
+    setBrand(product.brand || '');
     setBarcode(product.barcode || '');
     setCost(product.cost.toString());
     setPrice(product.price.toString());
@@ -216,6 +221,7 @@ async function fetchProducts() {
               setSku('');
               setName('');
               setDescription('');
+              setBrand('');
               setBarcode('');
               setCost('');
               setPrice('');
@@ -243,6 +249,7 @@ async function fetchProducts() {
             headers={[
               'SKU',
               'Nombre',
+              'Marca',
               'Precio',
               'Stock',
               'Acciones',
@@ -250,6 +257,7 @@ async function fetchProducts() {
             data={products.map((product) => ({
               sku: product.sku,
               name: product.name,
+              brand: product.name || '-',
               price: `$${product.price.toFixed(2)}`,
               stock: product.stock,
               actions: (
@@ -302,6 +310,12 @@ async function fetchProducts() {
           label="Descripción"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
+        />
+
+        <Input
+          label="Marca"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
         />
 
         <Input

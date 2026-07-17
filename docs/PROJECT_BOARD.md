@@ -100,11 +100,13 @@ No se crearán componentes sin un caso de uso real.
 | DOC-PUR-001  | Docs | Documentación final del módulo Compras | ✅ Completed | Sprint 09 | High |
 | Sprint 09    | Business Components + Purchases | ✅ Completed |
 | DOC-S09-001  | Docs | Cierre formal de Sprint 09 | ✅ Completed | Sprint 09 | High |
-| Sprint 10    | Inventory Advanced + Lotes + Caducidades | 🟡 Planned |
+
 | INV-001      | Feature | Kardex por producto | 🟡 Planned | Sprint 10 | High |
 | INV-002 | Architecture | Modelo de lotes y caducidades | ✅ Completed | Sprint 10 | Critical |
-| INV-003      | Feature | Stock por lote | 🟡 Planned | Sprint 10 | High |
+| INV-003A | Feature | Agregar marca al módulo Products | ✅ Completed | Sprint 10 | High |
 | INV-004      | Feature | Movimientos ligados a lote | 🟡 Planned | Sprint 10 | High |
 | INV-005      | Feature | Alertas de caducidad | 🟡 Planned | Sprint 10 | Medium |
 | INV-006      | Feature | Preparar compras para recepción con lote | 🟡 Planned | Sprint 10 | High |
+| Sprint 10    | Inventory Advanced + Lotes + Caducidades | 🟡 Planned |
+
 
