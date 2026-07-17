@@ -95,6 +95,7 @@ No se crearán componentes sin un caso de uso real.
 | FEAT-PUR-001 | Feature | Crear compra | ✅ Completed | Sprint 09 | High |
 | FEAT-PUR-002 | Feature | PDF de orden de compra | ✅ Completed | Sprint 09 | Medium |
 | FEAT-PUR-003 | Feature | Vista de detalle de compra | ✅ Completed | Sprint 09 | Medium |
+| FEAT-PUR-004 | Feature | Editar compra en borrador | ✅ Completed | Sprint 09 | High |
 
 # Próximo Objetivo
 

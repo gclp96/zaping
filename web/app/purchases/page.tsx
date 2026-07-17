@@ -137,6 +137,7 @@ const [pageLoading, setPageLoading] = useState(true);
 const [pageError, setPageError] = useState('');
 const [openModal, setOpenModal] = useState(false);
 const [saving, setSaving] = useState(false);
+const [ purchaseToEdit, setPurchaseToEdit ] = useState<Purchase | null>(null);
 const [ purchaseToView, setPurchaseToView ] = useState<Purchase | null>(null);
 
 const [supplierId, setSupplierId] = useState('');
@@ -229,8 +230,37 @@ function resetForm() {
 
 function openCreateModal() {
     resetForm();
+    setPurchaseToEdit(null);
     setOpenModal(true);
   }
+
+function openEditModal(purchase: Purchase) {
+  if (purchase.status !== 'DRAFT') {
+    return;
+  }
+
+  setPurchaseToEdit(purchase);
+
+  setSupplierId(purchase.supplier.id);
+  setSelectedProductId('');
+  setQuantity('1');
+
+  setItems(
+    purchase.items.map((item) => ({
+      productId: item.productId,
+      sku: item.product.sku,
+      name: item.product.name,
+      quantity: String(item.quantity),
+      unitCost: item.price,
+    })),
+  );
+
+  setSupplierError('');
+  setProductError('');
+  setItemsError('');
+
+  setOpenModal(true);
+}
 
 function closeCreateModal() {
     if (saving) {
@@ -238,6 +268,7 @@ function closeCreateModal() {
     }
 
     setOpenModal(false);
+    setPurchaseToEdit(null);
     resetForm();
   }
 
@@ -361,18 +392,29 @@ async function handleCreatePurchase() {
     try {
       setSaving(true);
 
-      await api.post('/purchases', {
+      const payload = {
         supplierId,
         items: items.map((item) => ({
           productId: item.productId,
           quantity: Number(item.quantity),
         })),
-      });
+      };
+
+      if (purchaseToEdit) {
+        await api.patch(
+          `\purchases/${purchaseToEdit.id}`,
+          payload,
+        );
+      } else {
+        await api.post('/purchases', payload)
+      }
 
       await loadPurchases();
 
       setOpenModal(false);
+      setPurchaseToEdit(null);
       resetForm();
+      
     } catch (error: unknown) {
       console.error(error);
 
@@ -500,6 +542,7 @@ const tableData = purchases.map((purchase) => {
           ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
         />
       ),
+
       actions: (
         <div className="flex flex-wrap gap-2">
           <Button
@@ -512,6 +555,14 @@ const tableData = purchases.map((purchase) => {
 
           {purchase.status === 'DRAFT' ? (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openEditModal(purchase)}
+              >
+                Editar
+              </Button>
+
               <Button
                 variant="success"
                 size="sm"
@@ -605,7 +656,7 @@ const tableData = purchases.map((purchase) => {
       <Modal
         isOpen={openModal}
         onClose={closeCreateModal}
-        title="Nueva compra"
+        title={purchaseToEdit ? 'Editar compra' : 'Nueva compra'}
       >
         <div className="space-y-6">
           <SupplierSelector
@@ -790,17 +841,19 @@ const tableData = purchases.map((purchase) => {
           </Button>
 
           <Button
-            loading={saving}
-            loadingText="Guardando..."
-            disabled={
-              saving ||
-              !supplierId ||
-              items.length === 0
-            }
-            onClick={() => void handleCreatePurchase()}
-          >
-            Crear compra
-          </Button>
+              loading={saving}
+              loadingText={
+                purchaseToEdit ? 'Guardando cambios...' : 'Guardando...'
+              }
+              disabled={
+                saving ||
+                !supplierId ||
+                items.length === 0
+              }
+              onClick={() => void handleCreatePurchase()}
+            >
+              {purchaseToEdit ? 'Guardar cambios' : 'Crear compra'}
+            </Button>
           </div>
         </div>
         </Modal>
@@ -932,6 +985,15 @@ const tableData = purchases.map((purchase) => {
 
               {purchaseToView.status === 'DRAFT' ? (
                 <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      openEditModal(purchaseToView);
+                      setPurchaseToView(null);
+                    }}
+                  >
+                    Editar
+                  </Button>
                   <Button
                     variant="success"
                     onClick={() => {
