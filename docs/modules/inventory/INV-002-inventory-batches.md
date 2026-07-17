@@ -82,6 +82,40 @@ El inventario debe permitir ubicar productos usando los datos más comunes en op
 - Número de lote.
 - Fecha de caducidad.
 
+Distribución de responsabilidad:
+
+| Dato | Modelo | Motivo |
+|---|---|---|
+| SKU | Product | Identifica el producto maestro dentro de la empresa |
+| Nombre / descripción corta | Product | Uso operativo en tablas, búsquedas y documentos |
+| Descripción técnica | Product | Información extendida del producto |
+| Marca | Product | La marca define el producto comercial |
+| Proveedor | Supplier / Purchase / InventoryBatch | El proveedor puede variar por compra o lote |
+| Lote | InventoryBatch | Cada existencia puede tener lote diferente |
+| Caducidad | InventoryBatch | Cada lote puede caducar en fecha diferente |
+
+## Consideración sobre marca
+
+La marca debe pertenecer al producto maestro.
+
+Ejemplo:
+
+```text
+Catéter 15 mm marca Terumo
+Catéter 15 mm marca Cordis
+
+## Datos operativos clave para suministros médicos
+
+El inventario debe permitir ubicar productos usando los datos más comunes en operación médica:
+
+- SKU o código interno del producto.
+- Nombre o descripción corta.
+- Descripción técnica.
+- Marca.
+- Proveedor.
+- Número de lote.
+- Fecha de caducidad.
+
 Campos recomendados adicionales:
 
 - brand
@@ -92,7 +126,7 @@ Proveedor
 Lote
 Fecha de caducidad
 
-## Product 
+## Product
 
 Representa el producto maestro.
 
@@ -116,8 +150,6 @@ Nombre: Catéter 15 mm
 Descripción: Catéter diagnóstico 15 mm estéril
 Marca: Terumo
 Stock total: 120
-
-## InventoryBatch
 
 Representa una existencia específica de un producto.
 
