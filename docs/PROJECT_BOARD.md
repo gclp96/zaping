@@ -98,6 +98,8 @@ No se crearán componentes sin un caso de uso real.
 | FEAT-PUR-004 | Feature | Editar compra en borrador | ✅ Completed | Sprint 09 | High |
 | FEAT-PUR-005 | Feature | Trazabilidad de movimientos por compra | ✅ Completed | Sprint 09 | Medium |
 | DOC-PUR-001 | Docs | Documentación final del módulo Compras | ✅ Completed | Sprint 09 | High |
+| Sprint 09 | Business Components + Purchases | ✅ Completed |
+| DOC-S09-001 | Docs | Cierre formal de Sprint 09 | ✅ Completed | Sprint 09 | High |
 
 # Próximo Objetivo
 
