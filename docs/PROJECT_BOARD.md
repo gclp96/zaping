@@ -104,7 +104,8 @@ No se crearán componentes sin un caso de uso real.
 | INV-001      | Feature | Kardex por producto | 🟡 Planned | Sprint 10 | High |
 | INV-002 | Architecture | Modelo de lotes y caducidades | ✅ Completed | Sprint 10 | Critical |
 | INV-003A | Feature | Agregar marca al módulo Products | ✅ Completed | Sprint 10 | High |
-| INV-003B | Architecture | Recepción de mercancía con lotes | 🟢 In Progress | Sprint 10 | Critical |
+| INV-003B | Architecture | Recepción de mercancía con lotes | ✅ Completed | Sprint 10 | Critical |
+| INV-003C | Data Model | Modelo Prisma de recepción de mercancía | ✅ Completed | Sprint 10 | Critical |
 | INV-004      | Feature | Movimientos ligados a lote | 🟡 Planned | Sprint 10 | High |
 | INV-005      | Feature | Alertas de caducidad | 🟡 Planned | Sprint 10 | Medium |
 | INV-006      | Feature | Preparar compras para recepción con lote | 🟡 Planned | Sprint 10 | High |

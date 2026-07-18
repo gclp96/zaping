@@ -2,7 +2,7 @@
 
 ## Estado
 
-En progreso
+Completado
 
 ## Objetivo
 
@@ -32,3 +32,30 @@ Aprobar compra
 Incrementar inventario
   ↓
 Crear InventoryMovement IN
+
+## Resultado de implementación de modelo Prisma
+
+Se implementó la base del modelo de recepción de mercancía.
+
+Resultados:
+
+- Se agregó `PurchaseStatus`.
+- `Purchase.status` ahora usa `PurchaseStatus`.
+- Se agregaron estados futuros:
+  - DRAFT
+  - CONFIRMED
+  - PARTIALLY_RECEIVED
+  - RECEIVED
+  - CANCELLED
+- Se creó `PurchaseReceipt`.
+- Se creó `PurchaseReceiptItem`.
+- Se relacionó `Purchase` con `PurchaseReceipt`.
+- Se relacionó `PurchaseItem` con `PurchaseReceiptItem`.
+- Se relacionó `InventoryBatch` con `PurchaseReceipt`.
+- Se relacionó `PurchaseReceiptItem` con `InventoryBatch`.
+- Se mantuvo compatibilidad con `InventoryBatch`.
+- La migración Prisma fue aplicada correctamente sin reset.
+
+## Estado final
+
+INV-003C se considera completado a nivel de modelo de datos.
