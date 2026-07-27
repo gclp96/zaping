@@ -1,11 +1,13 @@
-# 📋 Zaping ERP - Project Board
+# 📋 Zaping ERP — Project Board
 
+| Campo | Estado |
+|---|---|
 | Proyecto | Zaping ERP |
-|----------|------------|
-| Estado | 🟢 Desarrollo Activo |
+| Estado | 🟢 Desarrollo activo |
 | Versión | v0.9.0-alpha.1 |
-| Sprint Actual | Sprint 09 |
-| Milestone | Business Components Library |
+| Sprint actual | Sprint 09 |
+| Milestone actual | Core ERP — Compras e Inventario |
+| Última actualización | 2026-07-23 |
 
 ---
 
@@ -13,102 +15,155 @@
 
 | ID | Milestone | Estado |
 |---|---|---|
-| M1 | Foundation v1.0 | ✅ Completado — 2026-07-11 |
-| M2 | Business Components Library | 🟢 En progreso |
-| M3 | Purchases Module | 🟢 In Progress |
-| M4 | Quotes Module | ⏳ Pendiente |
-| M5 | Sales Module | ⏳ Pendiente |
+| M1 | Foundation | ✅ Completado |
+| M2 | Business Components Library | 🚧 En progreso |
+| M3 | Purchases Module | ✅ Completado |
+| M4 | Quotes Module | ⏳ Pendiente de cierre |
+| M5 | Sales Module | ⏳ Pendiente de cierre |
 | M6 | MVP Comercial | ⏳ Pendiente |
 
 ---
 
-# Foundation v1.0
-
-**Estado:** Completado  
-**Fecha de cierre:** 2026-07-11  
-
-## Decisiones aceptadas
-
-| ID | Decisión | Estado |
-|---|---|---|
-| ADR-001 | Arquitectura Multiempresa | ✅ Aceptado |
-| ADR-002 | Inventario basado en movimientos | ✅ Aceptado |
-| ADR-003 | Eliminación lógica | ✅ Aceptado |
-| BC-004 | SupplierSelector | 🚧 Implemented — Pending integration | Alta |
-| ADR-005 | Arquitectura por capas | ✅ Aceptado |
-| ADR-006 | Arquitectura API First | ✅ Aceptado |
-| ADR-007 | Control de acceso basado en roles | ✅ Aceptado |
-| ADR-008 | Desarrollo Documentation First | ✅ Aceptado |
-| ADR-009 | Arquitectura de Monolito Modular | ✅ Aceptado |
-| ADR-010 | Arquitectura de Componentes de Negocio | ✅ Aceptado |
-
-## Resultado
-
-Foundation v1.0 establece las bases obligatorias de arquitectura, seguridad,
-documentación, multi-tenancy, persistencia y organización del frontend.
-
-El siguiente milestone activo es Business Components Library.
-
-------------
-
 # Sprint 09
 
-## Objetivo
-
-Construir la primera versión de la Business Components Library e integrar
-sus componentes iniciales en los módulos existentes.
-
-## Business Components Library
+## Componentes de negocio
 
 | ID | Componente | Estado | Prioridad |
 |---|---|---|---|
-| BC-001 | StatusBadge | ✅ Completed | Alta |
-| BC-002 | MoneyInput | ✅ Completed | Alta |
-| BC-003 | DateInput | ⏸️ Deferred | Alta |
-| BC-004 | SupplierSelector | ✅ Completed | Alta |
-| BC-005 | CustomerSelector | ⬜ Pending | Alta |
-| BC-006 | ProductSelector | ✅ Completed | Alta |
-
-BC-003 se difiere hasta definir e implementar un campo de fecha de negocio,
-como fecha de compra, vigencia de cotización o fecha estimada de entrega.
-No se crearán componentes sin un caso de uso real.
+| BC-001 | StatusBadge | ✅ Implementado | Alta |
+| BC-002 | MoneyInput | ⬜ Pendiente | Alta |
+| BC-003 | DateInput | ⬜ Pendiente | Alta |
+| BC-004 | SupplierSelector | ✅ Implementado | Alta |
+| BC-005 | CustomerSelector | ⬜ Pendiente | Alta |
+| BC-006 | ProductSelector | ✅ Implementado | Alta |
 
 ---
 
-# Riesgos
+## Compras y recepción de mercancía
 
-- Definir correctamente la API de los selectores.
-- Evitar duplicación entre módulos.
-- Mantener consistencia del Design System.
+| ID | Funcionalidad | Estado | Prioridad |
+|---|---|---|---|
+| PUR-001 | Crear compras | ✅ Completado | Crítica |
+| PUR-002 | Editar compras en borrador | ✅ Completado | Alta |
+| PUR-003 | Confirmar compras | ✅ Completado | Crítica |
+| PUR-004 | Cancelar compras en borrador | ✅ Completado | Alta |
+| PUR-005 | Generar PDF de compra | ✅ Completado | Media |
+| PUR-006 | Consultar movimientos asociados | ✅ Completado | Alta |
+| PUR-007 | Recepciones parciales | ✅ Completado | Crítica |
+| PUR-008 | Recepciones completas | ✅ Completado | Crítica |
+| PUR-009 | Historial de recepciones | ✅ Completado | Alta |
+| PUR-010 | Formulario frontend de recepción | ✅ Completado | Crítica |
+| PUR-011 | Usuario responsable de recepción | ✅ Completado | Alta |
+| PUR-012 | Pruebas automatizadas del formulario frontend de recepción | ✅ Completado | Alta |
 
 ---
 
-| ID        | Tipo         | Nombre              | Estado         | Sprint     | Prioridad   |
+## Inventario y trazabilidad
 
-| MOD-001      | Module       | Customers           | ✅ Released     | Sprint 05  | High        |
-| MOD-002      | Module       | Products            | ✅ Released     | Sprint 06  | High        |
-| MOD-003      | Module       | Inventory           | 🚧 In Progress | Sprint 09  | Critical    |
-| DOC-001      | Document     | Vision              | ✅ Approved   | Foundation | High             |
-| ADR-002      | Architecture | Inventory Movements | ✅ Accepted   | Foundation | Critical       |
-| UI-014       | Component    | StatusBadge         | 🚧 Ready       | Sprint 09  | Medium   |
-| BC-001       | Business Component | StatusBadge   | ✅ Completed    | Sprint 09 | High      |
-| FEAT-PUR-001 | Feature | Crear compra | ✅ Completed | Sprint 09 | High |
-| FEAT-PUR-002 | Feature | PDF de orden de compra | ✅ Completed | Sprint 09 | Medium |
-| FEAT-PUR-003 | Feature | Vista de detalle de compra | ✅ Completed | Sprint 09 | Medium |
-| FEAT-PUR-004 | Feature | Editar compra en borrador | ✅ Completed | Sprint 09 | High |
-| FEAT-PUR-005 | Feature | Trazabilidad de movimientos por compra | ✅ Completed | Sprint 09 | Medium |
-| DOC-PUR-001  | Docs | Documentación final del módulo Compras | ✅ Completed | Sprint 09 | High |
-| Sprint 09    | Business Components + Purchases | ✅ Completed |
-| DOC-S09-001  | Docs | Cierre formal de Sprint 09 | ✅ Completed | Sprint 09 | High |
+| ID | Funcionalidad | Estado | Prioridad |
+|---|---|---|---|
+| INV-003A | Marca del producto | ✅ Completado | Media |
+| INV-003B | Lotes desde recepción de compra | ✅ Completado | Crítica |
+| INV-003C | Fecha de caducidad | ✅ Completado | Crítica |
+| INV-003D | Costo promedio ponderado por lote | ✅ Completado | Alta |
+| INV-003E | Movimiento `IN` por recepción | ✅ Completado | Crítica |
+| INV-003F | Incrementar stock únicamente al recibir | ✅ Completado | Crítica |
+| INV-004 | Consumo de lotes mediante FEFO | ⬜ Pendiente | Alta |
+| INV-005 | Números de serie | ⬜ Pendiente | Media |
 
-| INV-001      | Feature | Kardex por producto | 🟡 Planned | Sprint 10 | High |
-| INV-002 | Architecture | Modelo de lotes y caducidades | ✅ Completed | Sprint 10 | Critical |
-| INV-003A | Feature | Agregar marca al módulo Products | ✅ Completed | Sprint 10 | High |
-| INV-003B | Architecture | Recepción de mercancía con lotes | ✅ Completed | Sprint 10 | Critical |
-| INV-003C | Data Model | Modelo Prisma de recepción de mercancía | ✅ Completed | Sprint 10 | Critical |
-| INV-004      | Feature | Movimientos ligados a lote | 🟡 Planned | Sprint 10 | High |
-| INV-005      | Feature | Alertas de caducidad | 🟡 Planned | Sprint 10 | Medium |
-| INV-006      | Feature | Preparar compras para recepción con lote | 🟡 Planned | Sprint 10 | High |
-| Sprint 10    | Inventory Advanced + Lotes + Caducidades | 🟡 Planned |
+---
 
+# Validación técnica
 
+## Backend
+
+| Control | Resultado |
+|---|---|
+| Suites de prueba | ✅ 26 aprobadas |
+| Pruebas | ✅ 51 aprobadas |
+| ESLint | ✅ Sin errores |
+| Build | ✅ Correcto |
+| Migraciones Prisma | ✅ Aplicadas |
+| Prisma Client | ✅ Generado |
+
+## Frontend
+
+| Control | Resultado |
+|---|---|
+| Archivos de prueba | ✅ 7 aprobados |
+| Pruebas | ✅ 47 aprobadas |
+| ESLint | ✅ Sin errores |
+| Build | ✅ Correcto |
+| Pruebas manuales de recepción | ✅ 7 escenarios aprobados |
+
+---
+
+# Reglas de negocio validadas
+
+- Crear una compra no modifica el inventario.
+- Confirmar una compra no modifica el inventario.
+- El stock aumenta únicamente al registrar una recepción.
+- Se permiten recepciones parciales.
+- Se permiten recepciones completas.
+- No se puede recibir una cantidad mayor que la pendiente.
+- No se puede recibir una compra cancelada, en borrador o totalmente recibida.
+- Una fecha de caducidad requiere número de lote.
+- La caducidad no puede ser anterior a la recepción.
+- Un lote existente se actualiza sin duplicarse.
+- Cada movimiento conserva la referencia de la recepción.
+- Cada operación respeta el aislamiento mediante `companyId`.
+- El usuario responsable se obtiene del JWT autenticado.
+- La operación completa se ejecuta dentro de una transacción Prisma.
+
+---
+
+# Documentación
+
+| ID | Documento | Estado |
+|---|---|---|
+| DOC-001 | Product Vision | ✅ Aprobado |
+| DOC-002 | Product Requirements | ✅ Aprobado |
+| DOC-003 | Software Design | ✅ Aprobado |
+| DOC-004 | Architecture | ✅ Aprobado |
+| DOC-005 | Engineering Guide | ✅ Aprobado |
+| DOC-006 | Recepciones de Compra | ✅ Creado |
+| ADR-002 | Inventory Movements | ✅ Aceptado |
+| ADR-009 | Pendiente de revisión | ⏳ Pendiente |
+| ADR-010 | Pendiente de revisión | ⏳ Pendiente |
+
+---
+
+# Riesgos y deuda técnica
+
+- El endpoint de restablecimiento de contraseña continúa abierto para desarrollo.
+- Faltan permisos RBAC específicos para registrar recepciones.
+- No existe reversión ni cancelación de recepciones.
+- No existe flujo de devoluciones a proveedores.
+- Los listados de recepciones todavía no tienen paginación.
+- Algunas recepciones históricas no contienen usuario responsable.
+- La página de compras concentra demasiada lógica y deberá dividirse en componentes y hooks.
+
+---
+
+# Próximo objetivo
+
+# Próximo objetivo
+
+## PUR-013 — Refactor de PurchasesPage
+
+Objetivos:
+
+1. Separar el formulario de recepción en un componente.
+2. Separar el historial de recepciones.
+3. Extraer la lógica de recepción a un hook.
+4. Reducir el tamaño y responsabilidad de `page.tsx`.
+5. Mantener las 47 pruebas aprobadas durante el refactor.
+
+Después:
+
+```text
+Refactor de PurchasesPage
+→ Separar formulario de recepción
+→ Separar historial de recepciones
+→ Actualizar README
+→ Commit de cierre

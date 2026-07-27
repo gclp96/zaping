@@ -70,9 +70,52 @@ Incluye:
 
 ## Arquitectura objetivo
 
-```text
-Product
+Compra / Purchase
+  → qué se pidió
+
+Recepción / PurchaseReceipt
+  → qué llegó realmente
+
+Lote / InventoryBatch
+  → lote, caducidad y cantidad disponible
+
+Movimiento / InventoryMovement
+  → entrada real al inventario
+
+## Decisión sobre captura de lote y caducidad
+
+El número de lote y la fecha de caducidad no se capturan al crear la compra.
+
+Estos datos deben capturarse durante la recepción de mercancía, porque son datos proporcionados por el proveedor al entregar físicamente el producto.
+
+La compra representa lo solicitado.
+
+La recepción representa lo recibido.
+
+El lote representa la existencia física generada por esa recepción.
+
+## Flujo objetivo de compras con lotes
+
+Crear compra
   ↓
-InventoryBatch
+Aprobar compra
   ↓
-InventoryMovement
+Compra confirmada
+  ↓
+Recibir mercancía
+  ↓
+Capturar lote, caducidad y cantidad recibida
+  ↓
+Crear InventoryBatch
+  ↓
+Crear InventoryMovement IN
+  ↓
+Actualizar Product.stock
+
+
+## Nuevo bloque recomendado
+
+Antes de implementar `INV-003B`, debemos abrir una pieza de arquitectura:
+
+PUR-006 / INV-003B
+Recepción de mercancía con lotes

@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -53,7 +53,7 @@ type PurchaseItem = {
 };
 
 type InventoryMovement = {
-  balance: ReactNode;
+  balance: number;
   id: string;
   productId: string;
   movementType: string;
@@ -68,6 +68,61 @@ type InventoryMovement = {
     sku: string;
     name: string;
   };
+};
+
+type PurchaseReceiptItem = {
+  id: string;
+  purchaseItemId: string;
+  productId: string;
+  quantityReceived: number;
+  lotNumber?: string | null;
+  expirationDate?: string | null;
+  unitCost: number;
+  batchId?: string | null;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+  };
+  batch?: {
+    id: string;
+    lotNumber: string;
+    expirationDate?: string | null;
+    initialQuantity: number;
+    availableQuantity: number;
+    unitCost: number;
+  } | null;
+};
+
+type PurchaseReceipt = {
+  id: string;
+  purchaseId: string;
+  folio: string;
+  receivedAt: string;
+  receivedBy?: string | null;
+  notes?: string | null;
+  items: PurchaseReceiptItem[];
+  receivedByUser?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null
+};
+
+type PurchaseReceiptFormItem = {
+  purchaseItemId: string;
+  productId: string;
+  sku: string;
+  name: string;
+
+  orderedQuantity: number;
+  receivedQuantity: number;
+  pendingQuantity: number;
+
+  quantityReceived: string;
+  lotNumber: string;
+  expirationDate: string;
 };
 
 type Purchase = {
@@ -125,6 +180,20 @@ function getPurchaseStatusDescriptor(
     };
   }
 
+  if (status === 'PARTIALLY_RECEIVED') {
+    return {
+      label: 'Parcialmente recibida',
+      tone: 'warning',
+    };
+  }
+
+  if (status === 'RECEIVED') {
+    return {
+      label: 'Recibida',
+      tone: 'success'
+    };
+  }
+
   if (status === 'CANCELLED') {
     return {
       label: 'Cancelada',
@@ -147,39 +216,47 @@ function getPurchaseStatusDescriptor(
 
 export default function PurchasesPage() {
 
-const [purchases, setPurchases] = useState<Purchase[]>([]);
-const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-const [products, setProducts] = useState<Product[]>([]);
+const [ purchases, setPurchases ] = useState<Purchase[]>([]);
+const [ suppliers, setSuppliers ] = useState<Supplier[]>([]);
+const [ products, setProducts ] = useState<Product[]>([]);
 
-const [pageLoading, setPageLoading] = useState(true);
-const [pageError, setPageError] = useState('');
-const [openModal, setOpenModal] = useState(false);
-const [saving, setSaving] = useState(false);
+const [ pageLoading, setPageLoading ] = useState(true);
+const [ pageError, setPageError ] = useState('');
+const [ openModal, setOpenModal ] = useState(false);
+const [ saving, setSaving ] = useState(false);
 const [ purchaseToEdit, setPurchaseToEdit ] = useState<Purchase | null>(null);
 const [ purchaseToView, setPurchaseToView ] = useState<Purchase | null>(null);
-const [inventoryMovements, setInventoryMovements ] = useState<InventoryMovement[]>([]);
+const [ inventoryMovements, setInventoryMovements ] = useState<InventoryMovement[]>([]);
+const [ purchaseReceipts, setPurchaseReceipts ] = useState<PurchaseReceipt[]>([]);
+const [ purchaseToReceive, setPurchaseToReceive ] = useState<Purchase | null>(null);
+const [ receiptFormItems, setReceiptFormItems ] = useState<PurchaseReceiptFormItem[]>([]);
+const [ receiptNotes, setReceiptNotes ] = useState(' ');
+const [ receiptSaving, setReceiptSaving ] = useState(false);
+const [ receiptFormError, setReceiptFormError ] = useState('');
+const [ receiptsLoading, setReceiptsLoading ] = useState(false);
+const [ receiptsError, setReceiptsError ] = useState('');
 
-const [movementsLoading, setMovementsLoading] = useState(false);
-const [movementsError, setMovementsError] = useState('');
+const [ movementsLoading, setMovementsLoading ] = useState(false);
+const [ movementsError, setMovementsError ] = useState('');
 
-const [supplierId, setSupplierId] = useState('');
-const [selectedProductId, setSelectedProductId] = useState('');
-const [quantity, setQuantity] = useState('1');
-const [items, setItems] = useState<PurchaseFormItem[]>([]);
+const [ supplierId, setSupplierId ] = useState('');
+const [ selectedProductId, setSelectedProductId ] = useState('');
+const [ quantity, setQuantity ] = useState('1');
+const [ items, setItems ] = useState<PurchaseFormItem[]>([]);
 
-const [supplierError, setSupplierError] = useState('');
-const [productError, setProductError] = useState('');
-const [itemsError, setItemsError] = useState('');
+const [ supplierError, setSupplierError ] = useState('');
+const [ productError, setProductError ] = useState('');
+const [ itemsError, setItemsError ] = useState('');
 
-const [purchaseToCancel, setPurchaseToCancel] =
+const [ purchaseToCancel, setPurchaseToCancel ] =
   useState<Purchase | null>(null);
 
-const [cancelling, setCancelling] = useState(false);
+const [ cancelling, setCancelling ] = useState(false);
 
-const [purchaseToApprove, setPurchaseToApprove] =
+const [ purchaseToApprove, setPurchaseToApprove ] =
     useState<Purchase | null>(null);
-const [approving, setApproving] = useState(false);
-const [downloadingPurchaseId, setDownloadingPurchaseId] =
+const [ approving, setApproving ] = useState(false);
+const [ downloadingPurchaseId, setDownloadingPurchaseId ] =
     useState<string | null>(null);
 
 async function loadPurchases() {
@@ -424,7 +501,7 @@ async function handleCreatePurchase() {
 
       if (purchaseToEdit) {
         await api.patch(
-          `\purchases/${purchaseToEdit.id}`,
+          `/purchases/${purchaseToEdit.id}`,
           payload,
         );
       } else {
@@ -549,28 +626,228 @@ async function handleDownloadPdf(purchase: Purchase) {
 
 async function openPurchaseDetail(purchase: Purchase) {
   setPurchaseToView(purchase);
+
   setInventoryMovements([]);
   setMovementsError('');
 
-  try {
-    setMovementsLoading(true);
+  setPurchaseReceipts([]);
+  setReceiptsError('');
 
-    const response = await api.get<InventoryMovement[]>(
-      `/purchases/${purchase.id}/inventory-movements`,
-    );
+  setMovementsLoading(true);
+  setReceiptsError('');
 
-    setInventoryMovements(response.data);
-  } catch (error: unknown) {
+  setMovementsLoading(true);
+  setReceiptsLoading(true);
+
+  const [movementsResult, receiptsResult] =
+    await Promise.allSettled([
+      api.get<InventoryMovement[]>(
+        `/purchases/${purchase.id}/inventory-movements`,
+      ),
+      api.get<PurchaseReceipt[]>(
+        `/purchase-receipts/purchase/${purchase.id}`,
+      ),
+    ]);
+
+  if (movementsResult.status === 'fulfilled') {
+    setInventoryMovements(movementsResult.value.data);
+  } else {
+    const error: unknown = movementsResult.reason;
+
     console.error(error);
 
     setMovementsError(
       getApiErrorMessage(
         error,
-        'No fue posible cargar los movimientos de inventario.',
+        'No fue posible cargar los movimientos de iinventario.',
+      ),
+    );
+  }
+
+  if (receiptsResult.status === 'fulfilled') {
+    setPurchaseReceipts(receiptsResult.value.data);
+  } else {
+    const error: unknown = receiptsResult.reason;
+
+    console.error(error);
+
+    setReceiptsError(
+      getApiErrorMessage(
+        error,
+        'No fue posible cargar las recepciones de la compra.',
+      ),
+    );
+  }
+
+  setMovementsLoading(false);
+  setReceiptsLoading(false);
+}
+
+function openReceiptModal(purchase: Purchase) {
+  const formItems = purchase.items
+    .map((purchaseItem) => {
+      const receivedQuantity = purchaseReceipts.reduce(
+        (total, receipt) => {
+          const receivedFromReceipt = receipt.items
+            .filter(
+              (receiptItem) =>
+                receiptItem.purchaseItemId === purchaseItem.id,
+            )
+            .reduce(
+              (receiptTotal, receiptItem) =>
+                receiptTotal +
+                receiptItem.quantityReceived,
+              0,
+            );
+
+          return total + receivedFromReceipt;
+        },
+        0,
+      );
+
+      const pendingQuantity = Math.max(
+        purchaseItem.quantity - receivedQuantity,
+        0,
+      );
+
+      return {
+        purchaseItemId: purchaseItem.id,
+        productId: purchaseItem.productId,
+        sku: purchaseItem.product.sku,
+        name: purchaseItem.product.name,
+
+        orderedQuantity: purchaseItem.quantity,
+        receivedQuantity,
+        pendingQuantity,
+
+        quantityReceived: '',
+        lotNumber: '',
+        expirationDate: '',
+      };
+    })
+    .filter((item) => item.pendingQuantity > 0);
+
+  setPurchaseToReceive(purchase);
+  setReceiptFormItems(formItems);
+  setReceiptNotes('');
+  setReceiptFormError('');
+
+  setPurchaseToView(null);
+}
+
+function closeReceiptModal() {
+  if (receiptSaving) {
+    return;
+  }
+
+  setPurchaseToReceive(null);
+  setReceiptFormItems([]);
+  setReceiptNotes('');
+  setReceiptFormError('');
+}
+
+function handleReceiptItemChange(
+  purchaseItemId: string,
+  field:
+    | 'quantityReceived'
+    | 'lotNumber'
+    | 'expirationDate',
+  value: string,
+) {
+  setReceiptFormItems((currentItems) =>
+    currentItems.map((item) =>
+      item.purchaseItemId === purchaseItemId
+        ? {
+            ...item,
+            [field]: value,
+          }
+        : item,
+      ),
+    );
+
+    setReceiptFormError('');
+}
+
+async function handleCreateReceipt() {
+  if (!purchaseToReceive) {
+    return;
+  }
+
+  setReceiptFormError('');
+
+  const selectedItems = receiptFormItems.filter(
+    (item) => item.quantityReceived.trim() !== '',
+  );
+
+  if (selectedItems.length === 0) {
+    setReceiptFormError(
+      'Captura la cantidad recibida de al menos un producto.',
+    );
+    return;
+  }
+
+  const invalidQuantityItem = selectedItems.find((item) => {
+    const parsedQuantity = Number(item.quantityReceived);
+
+    return (
+      !Number.isInteger(parsedQuantity) ||
+      parsedQuantity < 1 ||
+      parsedQuantity > item.pendingQuantity
+    );
+  });
+
+  if (invalidQuantityItem) {
+    setReceiptFormError(
+      `La cantidad de ${invalidQuantityItem.name} debe ser un entero entre 1 y ${invalidQuantityItem.pendingQuantity}.`,
+    );
+    return;
+  }
+
+  const expirationWithoutLot = selectedItems.find(
+    (item) =>
+      item.expirationDate.trim() !== '' &&
+      item.lotNumber.trim() === '',
+  );
+
+  if (expirationWithoutLot) {
+    setReceiptFormError(
+      `Captura el número de lote de ${expirationWithoutLot.name} para registrar su caducidad.`,
+    );
+    return;
+  }
+
+  try {
+    setReceiptSaving(true);
+
+    await api.post('/purchase-receipts', {
+      purchaseId: purchaseToReceive.id,
+      notes: receiptNotes.trim() || undefined,
+      items: selectedItems.map((item) => ({
+        purchaseItemId: item.purchaseItemId,
+        quantityReceived: Number(item.quantityReceived),
+        lotNumber: item.lotNumber.trim() || undefined,
+        expirationDate:
+          item.expirationDate.trim() || undefined,
+      })),
+    });
+
+    await loadPurchases();
+
+    setPurchaseToReceive(null);
+    setReceiptFormItems([]);
+    setReceiptNotes('');
+    setReceiptFormError('');
+  } catch (error: unknown) {
+    console.error(error);
+
+    setReceiptFormError(
+      getApiErrorMessage(
+        error,
+        'No fue posible registrar la recepción.',
       ),
     );
   } finally {
-    setMovementsLoading(false);
+    setReceiptSaving(false);
   }
 }
 
@@ -595,11 +872,12 @@ const tableData = purchases.map((purchase) => {
       actions: (
         <div className="flex flex-wrap gap-2">
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
+            className="min-w-24"
             onClick={() => void openPurchaseDetail(purchase)}
             >
-              Ver
+              Ver detalle
             </Button>
 
           {purchase.status === 'DRAFT' ? (
@@ -631,15 +909,14 @@ const tableData = purchases.map((purchase) => {
           ) : null}
 
           <Button
-            variant="outline"
+            variant="primary"
             size="sm"
-            loading={
-              downloadingPurchaseId === purchase.id
-            }
+            className="min-w-24"
+            loading={downloadingPurchaseId === purchase.id}
             loadingText="Descargando..."
             onClick={() => void handleDownloadPdf(purchase)}
           >
-            PDF
+            Descargar PDF
           </Button>
         </div>
       ),
@@ -912,8 +1189,12 @@ const tableData = purchases.map((purchase) => {
         isOpen={purchaseToView !== null}
         onClose={() => {
           setPurchaseToView(null);
+
           setInventoryMovements([]);
           setMovementsError('');
+
+          setPurchaseReceipts([]);
+          setReceiptsError('');
         }}
         title="Detalle de compra"
       >
@@ -1013,6 +1294,150 @@ const tableData = purchases.map((purchase) => {
 
             <div className="rounded-lg border border-gray-200 p-4">
               <h3 className="mb-3 font-semibold">
+                Recepciones de mercancía
+              </h3>
+
+              {receiptsLoading ? (
+                <p className="text-sm text-gray-500">
+                  Cargando recepciones...
+                </p>
+              ) : receiptsError ? (
+                <p
+                  role="alert"
+                  className="text-sm text-red-600"
+                >
+                  {receiptsError}
+                </p>
+              ) : purchaseReceipts.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  Esta compra todavía no tiene recepciones registradas.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {purchaseReceipts.map((receipt) => (
+                    <div
+                      key={receipt.id}
+                      className="rounded-lg border border-gray-200"
+                    >
+                      <div className="flex flex-col gap-3 bg-gray-50 p-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <p className="font-semibold">
+                            {receipt.folio}
+                          </p>
+
+                          <p className="text-sm text-gray-500">
+                            Recibida el {formatDate(receipt.receivedAt)}
+                          </p>
+
+                          {receipt.notes ? (
+                            <p className="mt-2 text-sm text-gray-600">
+                              {receipt.notes}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="text-sm md:text-right">
+                          <p className="text-gray-500">
+                            Usuario responsable
+                          </p>
+
+                          <p>
+                            {receipt.receivedByUser ? (
+                              <>
+                                <p>
+                                  {receipt.receivedByUser.firstName}{' '}
+                                  {receipt.receivedByUser.lastName}
+                                </p>
+
+                                <p className="text-xs text-gray-500">
+                                  {receipt.receivedByUser.email}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="font-medium">
+                                No disponible
+                              </p>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-t border-gray-200 bg-white">
+                              <th className="px-3 py-2 text-left">
+                                Producto
+                              </th>
+
+                              <th className="px-3 py-2 text-right">
+                                Recibido
+                              </th>
+
+                              <th className="px-3 py-2 text-left">
+                                Lote
+                              </th>
+
+                              <th className="px-3 py-2 text-left">
+                                Caducidad
+                              </th>
+
+                              <th className="px-3 py-2 text-right">
+                                Costo
+                              </th>
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {receipt.items.map((receiptItem) => (
+                              <tr
+                                key={receiptItem.id}
+                                className="border-t border-gray-200"
+                              >
+                                <td className="px-3 py-3">
+                                  <p className="font-medium">
+                                    {receiptItem.product.name}
+                                  </p>
+
+                                  <p className="text-xs text-gray-500">
+                                    {receiptItem.product.sku}
+                                  </p>
+                                </td>
+
+                                <td className="px-3 py-3 text-right font-medium">
+                                  {receiptItem.quantityReceived}
+                                </td>
+
+                                <td className="px-3 py-3">
+                                  {receiptItem.lotNumber ??
+                                    receiptItem.batch?.lotNumber ??
+                                    '—'}
+                                </td>
+
+                                <td className="px-3 py-3">
+                                  {receiptItem.expirationDate
+                                    ? formatDate(
+                                        receiptItem.expirationDate,
+                                      )
+                                    : '—'}
+                                </td>
+
+                                <td className="px-3 py-3 text-right">
+                                  {formatMoney(receiptItem.unitCost)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h3 className="mb-3 font-semibold">
                 Movimientos de inventario
               </h3>
 
@@ -1058,7 +1483,7 @@ const tableData = purchases.map((purchase) => {
                       {inventoryMovements.map((movement) => (
                         <tr
                           key={movement.id}
-                          className="border-t borrder-gray-200"
+                          className="border-t border-gray-200"
                           >
                             <td className="px-3 py-3">
                               <p className="font-medium">
@@ -1115,14 +1540,7 @@ const tableData = purchases.map((purchase) => {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setPurchaseToView(null)}
-              >
-                Cerrar
-              </Button>
-
+            <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap justify-end gap-3 border-t border-gray-200 bg-white/95 px-6 py-4 backdrop-blur">
               {purchaseToView.status === 'DRAFT' ? (
                 <>
                   <Button
@@ -1156,20 +1574,239 @@ const tableData = purchases.map((purchase) => {
                 </>
               ) : null}
 
+              {purchaseToView.status === 'CONFIRMED' ||
+              purchaseToView.status === 'PARTIALLY_RECEIVED' ? (
+                <Button
+                variant="success"
+                className="min-w-44"
+                onClick={() => openReceiptModal(purchaseToView)}
+                >
+                  Registrar recepcion
+                </Button>
+              ) : null}
+
               <Button
-                variant="outline"
-                loading={
-                  downloadingPurchaseId === purchaseToView.id
-                }
+                variant="secondary"
+                className="min-w-28"
+                onClick={() => {
+                  setPurchaseToView(null);
+                  setInventoryMovements([]);
+                  setMovementsError('');
+                  setPurchaseReceipts([]);
+                  setReceiptsError('');
+                            }}
+              >
+                Cerrar
+              </Button>
+
+              <Button
+                variant="primary"
+                className="min-w-36"
+                loading={downloadingPurchaseId === purchaseToView.id}
                 loadingText="Descargando..."
                 onClick={() => void handleDownloadPdf(purchaseToView)}
               >
-                PDF
+                Descargar PDF
               </Button>
             </div>
           </div>
         ) : null}
         </Modal>
+
+        {/* Registrar recepción */}
+      <Modal
+        isOpen={purchaseToReceive !== null}
+        onClose={closeReceiptModal}
+        title={
+          purchaseToReceive
+            ? `Registrar recepción · ${purchaseToReceive.folio}`
+            : 'Registrar recepción'
+        }
+      >
+        {purchaseToReceive ? (
+          <div className="space-y-6">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <p className="text-sm text-gray-500">
+                Proveedor
+              </p>
+
+              <p className="font-semibold">
+                {purchaseToReceive.supplier.name}
+              </p>
+            </div>
+
+            {receiptFormItems.length === 0 ? (
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-sm text-gray-600">
+                  Esta compra ya fue recibida completamente.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full min-w-237.5 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-3 text-left">
+                        Producto
+                      </th>
+                      <th className="px-3 py-3 text-right">
+                        Comprado
+                      </th>
+                      <th className="px-3 py-3 text-right">
+                        Recibido
+                      </th>
+                      <th className="px-3 py-3 text-right">
+                        Pendiente
+                      </th>
+                      <th className="px-3 py-3 text-left">
+                        Recibir ahora
+                      </th>
+                      <th className="px-3 py-3 text-left">
+                        Lote
+                      </th>
+                      <th className="px-3 py-3 text-left">
+                        Caducidad
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {receiptFormItems.map((item) => (
+                      <tr
+                        key={item.purchaseItemId}
+                        className="border-t border-gray-200 align-top"
+                      >
+                        <td className="px-3 py-3">
+                          <p className="font-medium">
+                            {item.name}
+                          </p>
+
+                          <p className="text-xs text-gray-500">
+                            {item.sku}
+                          </p>
+                        </td>
+
+                        <td className="px-3 py-3 text-right">
+                          {item.orderedQuantity}
+                        </td>
+
+                        <td className="px-3 py-3 text-right">
+                          {item.receivedQuantity}
+                        </td>
+
+                        <td className="px-3 py-3 text-right font-semibold">
+                          {item.pendingQuantity}
+                        </td>
+
+                        <td className="w-36 px-3 py-3">
+                          <Input
+                            aria-label={`Cantidad recibida de ${item.name}`}
+                            type="number"
+                            min={1}
+                            max={item.pendingQuantity}
+                            step={1}
+                            value={item.quantityReceived}
+                            onChange={(event) =>
+                              handleReceiptItemChange(
+                                item.purchaseItemId,
+                                'quantityReceived',
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </td>
+
+                        <td className="w-48 px-3 py-3">
+                          <Input
+                            aria-label={`Lote de ${item.name}`}
+                            placeholder="Ej. LOTE-001"
+                            value={item.lotNumber}
+                            onChange={(event) =>
+                              handleReceiptItemChange(
+                                item.purchaseItemId,
+                                'lotNumber',
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </td>
+
+                        <td className="w-44 px-3 py-3">
+                          <Input
+                            aria-label={`Caducidad de ${item.name}`}
+                            type="date"
+                            value={item.expirationDate}
+                            onChange={(event) =>
+                              handleReceiptItemChange(
+                                item.purchaseItemId,
+                                'expirationDate',
+                                event.target.value,
+                              )
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div>
+              <label
+                htmlFor="receipt-notes"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Notas
+              </label>
+
+              <textarea
+                id="receipt-notes"
+                rows={3}
+                maxLength={1000}
+                value={receiptNotes}
+                placeholder="Observaciones de la recepción..."
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                onChange={(event) => {
+                  setReceiptNotes(event.target.value);
+                  setReceiptFormError('');
+                }}
+              />
+            </div>
+
+            {receiptFormError ? (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              >
+                {receiptFormError}
+              </p>
+            ) : null}
+
+            <div className="sticky bottom-0 -mx-6 flex justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4">
+              <Button
+                variant="secondary"
+                disabled={receiptSaving}
+                onClick={closeReceiptModal}
+              >
+                Cancelar
+              </Button>
+
+              <Button
+                variant="success"
+                loading={receiptSaving}
+                loadingText="Registrando..."
+                disabled={
+                  receiptSaving || receiptFormItems.length === 0
+                }
+                onClick={() => void handleCreateReceipt()}
+              >
+                Registrar recepción
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
 
       <ConfirmDialog
         isOpen={purchaseToApprove !== null}
@@ -1180,7 +1817,8 @@ const tableData = purchases.map((purchase) => {
             <span className="font-semibold">
               {purchaseToApprove?.folio}
             </span>
-            ? Esta acción incrementará el inventario.
+            ? La compra quedará confirmada y podrá recibir mercancía.
+            El inventario no cambiará hasta registrar una recepcion.
           </>
         }
         confirmText="Aprobar"

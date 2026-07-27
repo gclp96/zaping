@@ -211,3 +211,15 @@ Resultados:
 ## Estado final
 
 INV-002 se considera completado.
+
+## Decisión sobre captura de lote y caducidad
+
+El número de lote y la fecha de caducidad no se capturan al crear la compra.
+
+Estos datos deben capturarse durante la recepción de mercancía, porque son datos proporcionados por el proveedor al entregar físicamente el producto.
+
+La compra representa lo solicitado.
+
+La recepción representa lo recibido.
+
+El lote representa la existencia física generada por esa recepción.
