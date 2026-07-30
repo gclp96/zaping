@@ -7,7 +7,7 @@
 | Versión | v0.9.0-alpha.1 |
 | Sprint actual | Sprint 09 |
 | Milestone actual | Core ERP — Compras e Inventario |
-| Última actualización | 2026-07-23 |
+| Última actualización | 2026-07-30 |
 
 ---
 
@@ -56,6 +56,7 @@
 | PUR-011 | Usuario responsable de recepción | ✅ Completado | Alta |
 | PUR-012 | Pruebas automatizadas del formulario frontend de recepción | ✅ Completado | Alta |
 | PUR-013 | Refactor de PurchasesPage | ✅ Completado | Alta |
+| PUR-014 | Pruebas de acciones y formulario de compras | ✅ Completado | Alta |
 
 ---
 

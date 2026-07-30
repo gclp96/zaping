@@ -64,6 +64,12 @@ const purchase = {
   ],
 };
 
+const draftPurchase = {
+  ...purchase,
+  status: 'DRAFT',
+};
+
+
 const supplier = {
   id: 'supplier-1',
   name: 'Proveedor médico',
@@ -169,19 +175,6 @@ function configureApiMocks() {
 }
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  beforeEach(() => {
-    consoleErrorSpy = vi
-      .spyOn(console, 'error')
-      .mockImplementation(() => undefined);
-
-    vi.clearAllMocks();
-    configureApiMocks();
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    cleanup();
-  });
 
 describe('PurchasesPage — recepciones', () => {
   beforeEach(() => {
@@ -543,7 +536,7 @@ it('envía correctamente la recepción al backend', async () => {
   );
 });
 
-it('cierra el formulario y recarga las compras después de registrar la recepción', async () => {
+it('Cierra el formulario y recarga las compras después de registrar la recepción', async () => {
   const user = userEvent.setup();
 
   vi.mocked(api.post).mockResolvedValue({
@@ -712,3 +705,562 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
 
 });
 
+describe('PurchasesPage — formulario de compra', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    configureApiMocks();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+  it('crea una compra con el proveedor y producto seleccionados', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        id: 'purchase-2',
+        folio: 'OC-0002',
+      },
+    } as never);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText('OC-0001');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /nueva compra/i,
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /nueva compra/i,
+      }),
+    ).toBeTruthy();
+
+    const supplierSelect =
+      screen.getByLabelText(/proveedor/i);
+
+    const productSelect =
+      screen.getByLabelText(/producto/i);
+
+    const quantityInput = screen.getByRole(
+      'spinbutton',
+      {
+        name: /^cantidad$/i,
+      },
+    );
+
+    await user.selectOptions(
+      supplierSelect,
+      'supplier-1',
+    );
+
+    await user.selectOptions(
+      productSelect,
+      'product-1',
+    );
+
+    await user.clear(quantityInput);
+    await user.type(quantityInput, '3');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /agregar producto/i,
+      }),
+    );
+
+    expect(
+      screen.getByText('Producto médico'),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /crear compra/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/purchases',
+        {
+          supplierId: 'supplier-1',
+          items: [
+            {
+              productId: 'product-1',
+              quantity: 3,
+            },
+          ],
+        },
+      );
+    });
+  });
+
+  it('edita una compra en borrador y actualiza su cantidad', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(api.get).mockImplementation(
+      async (url) => {
+        const endpoint = String(url);
+
+        if (endpoint === '/purchases') {
+          return {
+            data: [draftPurchase],
+          } as never;
+        }
+
+        if (endpoint === '/suppliers') {
+          return {
+            data: [supplier],
+          } as never;
+        }
+
+        if (endpoint === '/products') {
+          return {
+            data: [product],
+          } as never;
+        }
+
+        throw new Error(
+          `Solicitud GET no configurada: ${endpoint}`,
+        );
+      },
+    );
+
+    vi.mocked(api.patch).mockResolvedValue({
+      data: {
+        ...draftPurchase,
+        items: [
+          {
+            ...draftPurchase.items[0],
+            quantity: 5,
+            subtotal: 500,
+          },
+        ],
+      },
+    } as never);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText('OC-0001');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /^editar$/i,
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /editar compra/i,
+      }),
+    ).toBeTruthy();
+
+    const quantityInput = screen.getByRole(
+      'spinbutton',
+      {
+        name: /cantidad de producto médico/i,
+      },
+    );
+
+    expect(
+      (quantityInput as HTMLInputElement).value,
+    ).toBe('10');
+
+    await user.clear(quantityInput);
+    await user.type(quantityInput, '5');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /guardar cambios/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith(
+        '/purchases/purchase-1',
+        {
+          supplierId: 'supplier-1',
+          items: [
+            {
+              productId: 'product-1',
+              quantity: 5,
+            },
+          ],
+        },
+      );
+    });
+
+    const purchasesRequests = vi
+      .mocked(api.get)
+      .mock.calls.filter(
+        ([url]) => String(url) === '/purchases',
+      );
+
+    expect(purchasesRequests).toHaveLength(2);
+  });
+
+  it('rechaza una cantidad inválida al agregar un producto', async () => {
+  const user = userEvent.setup();
+
+  render(<PurchasesPage />);
+
+  await screen.findByText('OC-0001');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /nueva compra/i,
+    }),
+  );
+
+  await screen.findByRole('heading', {
+    name: /nueva compra/i,
+  });
+
+  const productSelect =
+    screen.getByLabelText(/producto/i);
+
+  const quantityInput = screen.getByRole(
+    'spinbutton',
+    {
+      name: /^cantidad$/i,
+    },
+  );
+
+  await user.selectOptions(
+    productSelect,
+    'product-1',
+  );
+
+  await user.clear(quantityInput);
+  await user.type(quantityInput, '0');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /agregar producto/i,
+    }),
+  );
+
+  expect(
+    await screen.findByText(
+      'La cantidad debe ser un número entero mayor o igual a uno.',
+    ),
+  ).toBeTruthy();
+
+  expect(api.post).not.toHaveBeenCalled();
+
+  expect(
+    screen.queryByRole('spinbutton', {
+      name: /cantidad de producto médico/i,
+    }),
+  ).toBeNull();
+});
+});
+
+ describe('PurchasesPage — acciones de compra', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    configureApiMocks();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+  it('aprueba una compra en borrador y recarga las compras', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(api.get).mockImplementation(
+      async (url) => {
+        const endpoint = String(url);
+
+        if (endpoint === '/purchases') {
+          return {
+            data: [draftPurchase],
+          } as never;
+        }
+
+        if (endpoint === '/suppliers') {
+          return {
+            data: [supplier],
+          } as never;
+        }
+
+        if (endpoint === '/products') {
+          return {
+            data: [product],
+          } as never;
+        }
+
+        throw new Error(
+          `Solicitud GET no configurada: ${endpoint}`,
+        );
+      },
+    );
+
+    vi.mocked(api.patch).mockResolvedValue({
+      data: {
+        ...draftPurchase,
+        status: 'CONFIRMED',
+      },
+    } as never);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText('OC-0001');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: /^aprobar$/i,
+      }),
+    );
+
+    const dialogTitle = await screen.findByRole(
+      'heading',
+      {
+        name: /aprobar compra/i,
+      },
+    );
+
+    const dialog =
+      dialogTitle.parentElement?.parentElement;
+
+    expect(dialog).not.toBeNull();
+
+    await user.click(
+      within(dialog as HTMLElement).getByRole(
+        'button',
+        {
+          name: /^aprobar$/i,
+        },
+      ),
+    );
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith(
+        '/purchases/purchase-1/approve',
+      );
+    });
+
+    const purchasesRequests = vi
+      .mocked(api.get)
+      .mock.calls.filter(
+        ([url]) => String(url) === '/purchases',
+      );
+
+    expect(purchasesRequests).toHaveLength(2);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', {
+          name: /aprobar compra/i,
+        }),
+      ).toBeNull();
+    });
+  });
+
+  it('cancela una compra en borrador y recarga las compras', async () => {
+  const user = userEvent.setup();
+
+  vi.mocked(api.get).mockImplementation(
+    async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/purchases') {
+        return {
+          data: [draftPurchase],
+        } as never;
+      }
+
+      if (endpoint === '/suppliers') {
+        return {
+          data: [supplier],
+        } as never;
+      }
+
+      if (endpoint === '/products') {
+        return {
+          data: [product],
+        } as never;
+      }
+
+      throw new Error(
+        `Solicitud GET no configurada: ${endpoint}`,
+      );
+    },
+  );
+
+  vi.mocked(api.patch).mockResolvedValue({
+    data: {
+      ...draftPurchase,
+      status: 'CANCELLED',
+    },
+  } as never);
+
+  render(<PurchasesPage />);
+
+  await screen.findByText('OC-0001');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /^cancelar$/i,
+    }),
+  );
+
+  const dialogTitle = await screen.findByRole(
+    'heading',
+    {
+      name: /cancelar compra/i,
+    },
+  );
+
+  const dialog =
+    dialogTitle.parentElement?.parentElement;
+
+  expect(dialog).not.toBeNull();
+
+  await user.click(
+    within(dialog as HTMLElement).getByRole(
+      'button',
+      {
+        name: /cancelar compra/i,
+      },
+    ),
+  );
+
+  await waitFor(() => {
+    expect(api.patch).toHaveBeenCalledWith(
+      '/purchases/purchase-1/cancel',
+    );
+  });
+
+  const purchasesRequests = vi
+    .mocked(api.get)
+    .mock.calls.filter(
+      ([url]) => String(url) === '/purchases',
+    );
+
+  expect(purchasesRequests).toHaveLength(2);
+
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('heading', {
+        name: /cancelar compra/i,
+      }),
+    ).toBeNull();
+  });
+});
+
+  it('descarga el PDF de una compra', async () => {
+  const user = userEvent.setup();
+
+  const pdfBlob = new Blob(
+    ['contenido del PDF'],
+    {
+      type: 'application/pdf',
+    },
+  );
+
+  const createObjectURLSpy = vi
+    .spyOn(window.URL, 'createObjectURL')
+    .mockReturnValue('blob:purchase-pdf');
+
+  const revokeObjectURLSpy = vi
+    .spyOn(window.URL, 'revokeObjectURL')
+    .mockImplementation(() => undefined);
+
+  const linkClickSpy = vi
+    .spyOn(
+      HTMLAnchorElement.prototype,
+      'click',
+    )
+    .mockImplementation(() => undefined);
+
+  vi.mocked(api.get).mockImplementation(
+    async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/purchases') {
+        return {
+          data: [purchase],
+        } as never;
+      }
+
+      if (endpoint === '/suppliers') {
+        return {
+          data: [supplier],
+        } as never;
+      }
+
+      if (endpoint === '/products') {
+        return {
+          data: [product],
+        } as never;
+      }
+
+      if (
+        endpoint ===
+        '/purchases/purchase-1/pdf'
+      ) {
+        return {
+          data: pdfBlob,
+        } as never;
+      }
+
+      throw new Error(
+        `Solicitud GET no configurada: ${endpoint}`,
+      );
+    },
+  );
+
+  render(<PurchasesPage />);
+
+  await screen.findByText('OC-0001');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /descargar pdf/i,
+    }),
+  );
+
+  await waitFor(() => {
+    expect(api.get).toHaveBeenCalledWith(
+      '/purchases/purchase-1/pdf',
+      {
+        responseType: 'blob',
+      },
+    );
+  });
+
+  expect(
+    createObjectURLSpy,
+  ).toHaveBeenCalledWith(pdfBlob);
+
+  expect(linkClickSpy).toHaveBeenCalledTimes(1);
+
+  expect(
+    revokeObjectURLSpy,
+  ).toHaveBeenCalledWith(
+    'blob:purchase-pdf',
+  );
+
+  createObjectURLSpy.mockRestore();
+  revokeObjectURLSpy.mockRestore();
+  linkClickSpy.mockRestore();
+});
+});
