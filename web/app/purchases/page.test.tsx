@@ -168,14 +168,35 @@ function configureApiMocks() {
   );
 }
 
-describe('PurchasesPage — recepciones', () => {
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
     vi.clearAllMocks();
     configureApiMocks();
   });
 
   afterEach(() => {
-  cleanup();
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+describe('PurchasesPage — recepciones', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    configureApiMocks();
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
   });
 
   it('calcula la cantidad recibida y pendiente al abrir el formulario', async () => {

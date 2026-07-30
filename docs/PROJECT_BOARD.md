@@ -55,6 +55,7 @@
 | PUR-010 | Formulario frontend de recepción | ✅ Completado | Crítica |
 | PUR-011 | Usuario responsable de recepción | ✅ Completado | Alta |
 | PUR-012 | Pruebas automatizadas del formulario frontend de recepción | ✅ Completado | Alta |
+| PUR-013 | Refactor de PurchasesPage | ✅ Completado | Alta |
 
 ---
 
@@ -147,23 +148,14 @@
 
 # Próximo objetivo
 
-# Próximo objetivo
-
-## PUR-013 — Refactor de PurchasesPage
+## PUR-014 — Pruebas de acciones y formulario de compras
 
 Objetivos:
 
-1. Separar el formulario de recepción en un componente.
-2. Separar el historial de recepciones.
-3. Extraer la lógica de recepción a un hook.
-4. Reducir el tamaño y responsabilidad de `page.tsx`.
-5. Mantener las 47 pruebas aprobadas durante el refactor.
-
-Después:
-
-```text
-Refactor de PurchasesPage
-→ Separar formulario de recepción
-→ Separar historial de recepciones
-→ Actualizar README
-→ Commit de cierre
+1. Probar creación de una compra.
+2. Probar edición de una compra en borrador.
+3. Probar validaciones del formulario.
+4. Probar aprobación de compras.
+5. Probar cancelación de compras.
+6. Probar descarga de PDF.
+7. Agregar pruebas unitarias para los hooks extraídos.
