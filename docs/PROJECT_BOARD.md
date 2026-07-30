@@ -14,13 +14,13 @@
 # Milestones
 
 | ID | Milestone | Estado |
-|---|---|---|
-| M1 | Foundation | ✅ Completado |
-| M2 | Business Components Library | 🚧 En progreso |
-| M3 | Purchases Module | ✅ Completado |
-| M4 | Quotes Module | ⏳ Pendiente de cierre |
-| M5 | Sales Module | ⏳ Pendiente de cierre |
-| M6 | MVP Comercial | ⏳ Pendiente |
+|----|-----------|--------|
+| M1 | Foundation | ✅ |
+| M2 | Business Components Library | ✅ |
+| M3 | Purchases Module | ✅ |
+| M4 | Quotes Module | 🟢 |
+| M5 | Sales Module | ⏳ |
+| M6 | MVP Comercial | ⏳ |
 
 ---
 
@@ -57,6 +57,7 @@
 | PUR-012 | Pruebas automatizadas del formulario frontend de recepción | ✅ Completado | Alta |
 | PUR-013 | Refactor de PurchasesPage | ✅ Completado | Alta |
 | PUR-014 | Pruebas de acciones y formulario de compras | ✅ Completado | Alta |
+| PUR-015 | Pruebas unitarias de los hooks de Compras | ✅ Completado | Alta |
 
 ---
 
@@ -79,24 +80,17 @@
 
 ## Backend
 
-| Control | Resultado |
-|---|---|
-| Suites de prueba | ✅ 26 aprobadas |
-| Pruebas | ✅ 51 aprobadas |
-| ESLint | ✅ Sin errores |
-| Build | ✅ Correcto |
-| Migraciones Prisma | ✅ Aplicadas |
-| Prisma Client | ✅ Generado |
+- 26 suites aprobadas.
+- 51 pruebas aprobadas.
+- ESLint correcto.
+- Build correcto.
 
 ## Frontend
 
-| Control | Resultado |
-|---|---|
-| Archivos de prueba | ✅ 7 aprobados |
-| Pruebas | ✅ 47 aprobadas |
-| ESLint | ✅ Sin errores |
-| Build | ✅ Correcto |
-| Pruebas manuales de recepción | ✅ 7 escenarios aprobados |
+- 11 archivos de pruebas aprobados.
+- 82 pruebas aprobadas.
+- ESLint correcto.
+- Build correcto.
 
 ---
 
@@ -147,16 +141,13 @@
 
 ---
 
-# Próximo objetivo
+# Próximo Objetivo
 
-## PUR-014 — Pruebas de acciones y formulario de compras
+## QUO-001 — Auditoría técnica del módulo de Cotizaciones
 
-Objetivos:
-
-1. Probar creación de una compra.
-2. Probar edición de una compra en borrador.
-3. Probar validaciones del formulario.
-4. Probar aprobación de compras.
-5. Probar cancelación de compras.
-6. Probar descarga de PDF.
-7. Agregar pruebas unitarias para los hooks extraídos.
+1. Revisar modelos Prisma y relaciones.
+2. Revisar DTOs y validaciones.
+3. Revisar servicios y controladores.
+4. Revisar flujo frontend.
+5. Identificar deuda técnica y reglas faltantes.
+6. Definir plan de implementación antes de modificar código.
