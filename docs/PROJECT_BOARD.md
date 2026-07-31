@@ -59,6 +59,16 @@
 | PUR-014 | Pruebas de acciones y formulario de compras | ✅ Completado | Alta |
 | PUR-015 | Pruebas unitarias de los hooks de Compras | ✅ Completado | Alta |
 
+# Sales and Returns
+
+| ID | Objetivo | Estado | Prioridad |
+|----|----------|--------|-----------|
+| SAL-001 | Auditoría del módulo de Ventas | 🟢 En progreso | Alta |
+| SAL-002 | Conversión transaccional de cotización a venta | ⏳ Pendiente | Crítica |
+| SAL-003 | Integración frontend de conversión | ⏳ Pendiente | Alta |
+| RET-001 | Diseño funcional del módulo de devoluciones | ⏳ Pendiente | Alta |
+
+
 ---
 
 ## Inventario y trazabilidad
@@ -111,6 +121,14 @@
 - El usuario responsable se obtiene del JWT autenticado.
 - La operación completa se ejecuta dentro de una transacción Prisma.
 
+## Regla comercial aprobada
+
+Una cotización confirmada se convierte directamente en una venta confirmada.
+
+La conversión descuenta inventario y crea movimientos `OUT` dentro de una sola transacción.
+
+Las ventas confirmadas no se cancelan directamente. Cualquier reversión se gestiona mediante una devolución documentada.
+
 ---
 
 # Documentación
@@ -151,3 +169,5 @@
 4. Revisar flujo frontend.
 5. Identificar deuda técnica y reglas faltantes.
 6. Definir plan de implementación antes de modificar código.
+
+
