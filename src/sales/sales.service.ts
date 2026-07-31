@@ -12,18 +12,60 @@ export class SalesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(companyId: string, dto: CreateSaleDto) {
-    if (!dto.items || !Array.isArray(dto.items)) {
-      throw new BadRequestException('Debe enviar un arreglo items');
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        id: dto.customerId,
+        companyId,
+      },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+    if (!dto.items || !Array.isArray(dto.items) || dto.items.length === 0) {
+      throw new BadRequestException('Debe enviar al menos un item');
     }
 
-    const folio = `V-${Date.now()}`;
+    const saleItems: Array<{
+      productId: string;
+      quantity: number;
+      price: number;
+      subtotal: number;
+    }> = [];
 
     let subtotal = 0;
 
     for (const item of dto.items) {
-      subtotal += item.quantity * item.price;
+      if (typeof item.quantity !== 'number' || item.quantity <= 0) {
+        throw new BadRequestException(
+          `Cantidad inválida para producto ${item.productId}`,
+        );
+      }
+
+      const product = await this.prisma.product.findFirst({
+        where: {
+          id: item.productId,
+          companyId,
+        },
+      });
+
+      if (!product) {
+        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
+      }
+
+      const itemSubtotal = item.quantity * product.price;
+
+      subtotal += itemSubtotal;
+
+      saleItems.push({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: product.price,
+        subtotal: itemSubtotal,
+      });
     }
 
+    const folio = `V-${Date.now()}`;
     const iva = subtotal * 0.16;
     const total = subtotal + iva;
 
@@ -31,30 +73,41 @@ export class SalesService {
       data: {
         companyId,
         customerId: dto.customerId,
-
         folio,
         subtotal,
         iva,
         total,
-
         items: {
-          create: dto.items.map((item: any) => ({
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-            productId: item.productId,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-            quantity: item.quantity,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-            price: item.price,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-            subtotal: item.quantity * item.price,
-          })),
+          create: saleItems,
         },
       },
-
       include: {
         items: true,
       },
     });
+  }
+
+  async findOne(companyId: string, saleId: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: {
+        id: saleId,
+        companyId,
+      },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+
+    return sale;
   }
 
   async findAll(companyId: string) {
@@ -98,7 +151,7 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
 
-    if (sale.status === 'APPROVED') {
+    if (sale.status === 'CONFIRMED') {
       throw new BadRequestException('La venta ya fue aprobada');
     }
 
@@ -130,8 +183,9 @@ export class SalesService {
           data: {
             companyId,
             productId: item.productId,
+            unitCost: item.price,
 
-            type: 'OUT',
+            movementType: 'OUT',
             quantity: item.quantity,
 
             balance: newStock,
@@ -149,7 +203,7 @@ export class SalesService {
           id,
         },
         data: {
-          status: 'APPROVED',
+          status: 'CONFIRMED',
         },
       });
     });
@@ -277,16 +331,17 @@ export class SalesService {
       throw new BadRequestException('La cotización ya fue convertida a venta');
     }
 
-    if (quote.status !== 'APPROVED') {
+    if (quote.status !== 'CONFIRMED') {
       throw new BadRequestException('La cotización debe estar aprobada');
     }
 
     // Validar inventario disponible
 
     for (const item of quote.items) {
-      const product = await this.prisma.product.findUnique({
+      const product = await this.prisma.product.findFirst({
         where: {
           id: item.productId,
+          companyId,
         },
       });
 
@@ -303,43 +358,40 @@ export class SalesService {
 
     const folio = `V-${Date.now()}`;
 
-    const sale = await this.prisma.sale.create({
-      data: {
-        companyId,
-
-        customerId: quote.customerId,
-
-        folio,
-
-        subtotal: quote.subtotal,
-        iva: quote.iva,
-        total: quote.total,
-
-        items: {
-          create: quote.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.subtotal,
-          })),
+    return this.prisma.$transaction(async (tx) => {
+      const sale = await tx.sale.create({
+        data: {
+          companyId,
+          customerId: quote.customerId,
+          folio,
+          subtotal: quote.subtotal,
+          iva: quote.iva,
+          total: quote.total,
+          items: {
+            create: quote.items.map((item) => ({
+              productId: item.productId,
+              quantity: item.quantity,
+              price: item.price,
+              subtotal: item.subtotal,
+            })),
+          },
         },
-      },
+        include: {
+          items: true,
+        },
+      });
 
-      include: {
-        items: true,
-      },
+      await tx.quote.update({
+        where: {
+          id: quoteId,
+        },
+        data: {
+          convertedToSale: true,
+        },
+      });
+
+      return sale;
     });
-
-    await this.prisma.quote.update({
-      where: {
-        id: quoteId,
-      },
-      data: {
-        convertedToSale: true,
-      },
-    });
-
-    return sale;
   }
 
   async cancel(companyId: string, saleId: string) {
@@ -354,7 +406,7 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
 
-    if (sale.status === 'APPROVED') {
+    if (sale.status === 'CONFIRMED') {
       throw new BadRequestException('No se puede cancelar una venta aprobada');
     }
 

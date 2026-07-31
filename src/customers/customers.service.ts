@@ -8,6 +8,21 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomersService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findOne(companyId: string, customerId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId,
+      },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+
+    return customer;
+  }
+
   findAll(companyId: string) {
     return this.prisma.customer.findMany({
       where: {
@@ -24,33 +39,19 @@ export class CustomersService {
     return this.prisma.customer.create({
       data: {
         companyId,
-
         name: dto.name,
         type: dto.type,
-
         email: dto.email,
         phone: dto.phone,
-
         address: dto.address,
-
         contactName: dto.contactName,
-
         notes: dto.notes,
       },
     });
   }
 
   async update(companyId: string, customerId: string, dto: UpdateCustomerDto) {
-    const customer = await this.prisma.customer.findFirst({
-      where: {
-        id: customerId,
-        companyId,
-      },
-    });
-
-    if (!customer) {
-      throw new NotFoundException('Cliente no encontrado');
-    }
+    await this.findOne(companyId, customerId);
 
     return this.prisma.customer.update({
       where: {
@@ -61,16 +62,7 @@ export class CustomersService {
   }
 
   async remove(companyId: string, customerId: string) {
-    const customer = await this.prisma.customer.findFirst({
-      where: {
-        id: customerId,
-        companyId,
-      },
-    });
-
-    if (!customer) {
-      throw new NotFoundException('Cliente no encontrado');
-    }
+    await this.findOne(companyId, customerId);
 
     return this.prisma.customer.delete({
       where: {

@@ -18,26 +18,29 @@ import { CreateProductDto } from './dto/create-product.dto';
 
 import { UpdateProductDto } from './dto/update-product.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.productsService.findAll(req.user.companyId);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @Post()
+  @Get(':id')
+  findOne(@Request() req: any, @Param('id') id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    return this.productsService.findOne(req.user.companyId, id);
+  }
+
   @Post()
   create(@Request() req: any, @Body() dto: CreateProductDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.productsService.create(req.user.companyId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(
     @Request() req: any,
@@ -48,7 +51,6 @@ export class ProductsController {
     return this.productsService.update(req.user.companyId, id, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access

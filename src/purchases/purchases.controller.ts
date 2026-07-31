@@ -17,33 +17,53 @@ import { PurchasesService } from './purchases.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
+import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('purchases')
 export class PurchasesController {
   constructor(private readonly purchasesService: PurchasesService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req: any, @Body() dto: CreatePurchaseDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.purchasesService.create(req.user.companyId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
     return this.purchasesService.findAll(req.user.companyId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id/approve')
   approve(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.purchasesService.approve(req.user.companyId, id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Patch(':id/cancel')
+  cancel(@Request() req: any, @Param('id') id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    return this.purchasesService.cancel(req.user.companyId, id);
+  }
+
+  @Patch(':id')
+  update(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdatePurchaseDto,
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    return this.purchasesService.update(req.user.companyId, id, dto);
+  }
+
+  @Get(':id/inventory-movements')
+  findInventoryMovements(@Request() req: any, @Param('id') id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+    return this.purchasesService.findInventoryMovements(req.user.companyId, id);
+  }
+
   @Get(':id/pdf')
   generatePDF(
     @Request() req: any,

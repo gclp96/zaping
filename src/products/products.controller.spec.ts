@@ -1,18 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ProductsController } from './products.controller';
 
-describe('ProductsController', () => {
-  let controller: ProductsController;
+import { PrismaService } from '../prisma/prisma.service';
+import { InventoryService } from '../inventory/inventory.service';
+
+describe('IventoryService', () => {
+  let service: InventoryService;
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [ProductsController],
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      providers: [
+        InventoryService,
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
+      ],
     }).compile();
 
-    controller = module.get<ProductsController>(ProductsController);
+    service = moduleRef.get<InventoryService>(InventoryService);
   });
 
   it('should be defined', () => {
-    expect(controller).toBeDefined();
+    expect(service).toBeDefined();
   });
 });

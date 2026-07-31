@@ -10,9 +10,14 @@ import { QuotesModule } from './quotes/quotes.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { SalesModule } from './sales/sales.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { CategoriesModule } from './categories/categories.module';
+import { UsersModule } from './users/users.module';
+import { PurchaseReceiptsModule } from './purchases-receipts/purchases-receipts.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
+    PrismaModule,
     AuthModule,
     CustomersModule,
     ProductsModule,
@@ -21,8 +26,11 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     DashboardModule,
     QuotesModule,
     PurchasesModule,
+    PurchaseReceiptsModule,
     SalesModule,
     SuppliersModule,
+    CategoriesModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

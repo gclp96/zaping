@@ -9,7 +9,7 @@ export class DashboardController {
 
   @UseGuards(JwtAuthGuard)
   @Get()
-  get(@Request() req: any) {
+  getDashboard(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.dashboardService.get(req.user.companyId);
   }

@@ -1,83 +1,187 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateMovementDto } from './dto/create-movement.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createMovement(companyId: string, data: any) {
+  async findInventory(companyId: string) {
+    return this.prisma.product.findMany({
+      where: {
+        companyId,
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        stock: true,
+        minStock: true,
+        price: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  }
+
+  async findMovementsByReference(
+    companyId: string,
+    referenceType: string,
+    referenceId: string,
+  ) {
+    return this.prisma.inventoryMovement.findMany({
+      where: {
+        companyId,
+        referenceType,
+        referenceId,
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async createMovement(companyId: string, data: CreateMovementDto) {
     const product = await this.prisma.product.findFirst({
       where: {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
         id: data.productId,
         companyId,
       },
     });
 
     if (!product) {
-      throw new Error('Product not found');
+      throw new NotFoundException('Producto no encontrado');
     }
 
     let newStock = product.stock;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (data.type === 'IN') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      newStock += data.quantity;
+    switch (data.movementType) {
+      case 'IN':
+        newStock += data.quantity;
+        break;
+
+      case 'OUT':
+        if (product.stock < data.quantity) {
+          throw new BadRequestException('Stock insuficiente');
+        }
+
+        newStock -= data.quantity;
+        break;
+
+      case 'ADJUSTMENT':
+        newStock = data.quantity;
+        break;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (data.type === 'OUT') {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      if (product.stock < data.quantity) {
-        throw new Error('Stock insuficiente');
-      }
+    return this.prisma.$transaction(async (tx) => {
+      const movement = await tx.inventoryMovement.create({
+        data: {
+          companyId,
+          productId: data.productId,
+          movementType: data.movementType,
+          quantity: data.quantity,
+          balance: newStock,
+          notes: data.notes,
+        },
+      });
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      newStock -= data.quantity;
-    }
+      await tx.product.update({
+        where: {
+          id_companyId: {
+            id: data.productId,
+            companyId,
+          },
+        },
+        data: {
+          stock: newStock,
+        },
+      });
 
-    const movement = await this.prisma.inventoryMovement.create({
-      data: {
+      return movement;
+    });
+  }
+
+  async registerPurchaseEntry(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    data: {
+      productId: string;
+      quantity: number;
+      unitCost: number;
+      referenceId: string;
+      notes: string;
+    },
+  ) {
+    const product = await tx.product.findFirst({
+      where: {
+        id: data.productId,
         companyId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        productId: data.productId,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        type: data.type,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        quantity: data.quantity,
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
-        notes: data.notes,
+      },
+      select: {
+        id: true,
       },
     });
 
-    await this.prisma.product.update({
+    if (!product) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    const updatedProduct = await tx.product.update({
       where: {
         id_companyId: {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
           id: data.productId,
           companyId,
         },
       },
       data: {
-        stock: newStock,
+        stock: {
+          increment: data.quantity,
+        },
+      },
+      select: {
+        stock: true,
       },
     });
 
-    return movement;
+    return tx.inventoryMovement.create({
+      data: {
+        companyId,
+        productId: data.productId,
+        movementType: 'IN',
+        quantity: data.quantity,
+        balance: updatedProduct.stock,
+        unitCost: data.unitCost,
+        referenceType: 'PURCHASE',
+        referenceId: data.referenceId,
+        notes: data.notes,
+      },
+    });
   }
 
-  findMovements(companyId: string) {
+  async findMovements(companyId: string) {
     return this.prisma.inventoryMovement.findMany({
       where: {
         companyId,
       },
-
       include: {
         product: true,
       },
-
       orderBy: {
         createdAt: 'desc',
       },

@@ -1,59 +1,71 @@
 import {
-  Injectable,
   BadRequestException,
+  Injectable,
   NotFoundException,
 } from '@nestjs/common';
 
+import { DocumentStatus } from '@prisma/client';
+import PDFDocument from 'pdfkit';
+
+import type { Response } from 'express';
+
 import { PrismaService } from '../prisma/prisma.service';
 
-import PDFDocument from 'pdfkit';
-import { Response } from 'express';
 import { CreateQuoteDto } from './dto/create-quote.dto';
-import { CreateQuoteItemDto } from './dto/create-quote-item.dto';
 
 @Injectable()
 export class QuotesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(companyId: string, dto: CreateQuoteDto) {
+    await this.validateCustomer(companyId, dto.customerId);
+
+    await this.validateProducts(
+      companyId,
+      dto.items.map((item) => item.productId),
+    );
+
+    const items = dto.items.map((item) => {
+      const itemSubtotal = this.roundMoney(item.quantity * item.price);
+
+      return {
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price,
+        subtotal: itemSubtotal,
+      };
+    });
+
+    const subtotal = this.roundMoney(
+      items.reduce((accumulator, item) => accumulator + item.subtotal, 0),
+    );
+
+    const iva = this.roundMoney(subtotal * 0.16);
+    const total = this.roundMoney(subtotal + iva);
+
     const folio = `COT-${Date.now()}`;
 
-    let subtotal = 0;
-
-    for (const item of dto.items) {
-      subtotal += item.quantity * item.price;
-    }
-
-    const iva = subtotal * 0.16;
-    const total = subtotal + iva;
-
-    const quote = await this.prisma.quote.create({
+    return this.prisma.quote.create({
       data: {
         companyId,
         customerId: dto.customerId,
-
         folio,
         subtotal,
         iva,
         total,
-
         items: {
-          create: dto.items.map((item: CreateQuoteItemDto) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            price: item.price,
-            subtotal: item.quantity * item.price,
-          })),
+          create: items,
         },
       },
-
       include: {
         customer: true,
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
     });
-
-    return quote;
   }
 
   async findAll(companyId: string) {
@@ -61,12 +73,14 @@ export class QuotesService {
       where: {
         companyId,
       },
-
       include: {
         customer: true,
-        items: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
-
       orderBy: {
         createdAt: 'desc',
       },
@@ -80,6 +94,7 @@ export class QuotesService {
         companyId,
       },
       include: {
+        company: true,
         customer: true,
         items: {
           include: {
@@ -90,8 +105,17 @@ export class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundException('Quote not found');
+      throw new NotFoundException('Cotización no encontrada');
     }
+
+    const companyName = quote.company.tradeName ?? quote.company.name;
+
+    const currency = quote.company.currency || 'MXN';
+
+    const moneyFormatter = new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency,
+    });
 
     const doc = new PDFDocument({
       margin: 50,
@@ -101,54 +125,77 @@ export class QuotesService {
 
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename=quote-${quote.folio}.pdf`,
+      `attachment; filename=cotizacion-${quote.folio}.pdf`,
     );
+
     doc.pipe(res);
 
-    // Encabezado
-    doc.fontSize(22);
-    doc.text('INSAP', {
+    doc.fontSize(22).text(companyName, {
       align: 'center',
     });
 
     doc.moveDown();
 
-    doc.fontSize(16);
-    doc.text(`${quote.folio}`);
-    doc.text(`Fecha: ${quote.createdAt.toLocaleDateString()}`);
+    doc.fontSize(16).text(`Cotización ${quote.folio}`);
+
+    doc
+      .fontSize(11)
+      .text(`Fecha: ${quote.createdAt.toLocaleDateString('es-MX')}`)
+      .text(`Estado: ${quote.status}`);
 
     doc.moveDown();
 
-    // Cliente
-    doc.text(`Cliente: ${quote.customer.name}`);
-    doc.text(`Contacto: ${quote.customer.contactName}`);
-    doc.text(`Email: ${quote.customer.email}`);
-    doc.text(`Teléfono: ${quote.customer.phone}`);
+    doc.fontSize(14).text('Cliente');
+
+    doc.fontSize(11).text(`Nombre: ${quote.customer.name}`);
+
+    if (quote.customer.contactName) {
+      doc.text(`Contacto: ${quote.customer.contactName}`);
+    }
+
+    if (quote.customer.email) {
+      doc.text(`Email: ${quote.customer.email}`);
+    }
+
+    if (quote.customer.phone) {
+      doc.text(`Teléfono: ${quote.customer.phone}`);
+    }
 
     doc.moveDown();
 
-    // Productos
-    doc.fontSize(14);
-    doc.text('Productos');
+    doc.fontSize(14).text('Productos');
+
+    doc.moveDown(0.5);
+
+    for (const item of quote.items) {
+      doc
+        .fontSize(11)
+        .text(`${item.product.sku} — ${item.product.name}`)
+        .text(
+          [
+            `Cantidad: ${item.quantity}`,
+            `Precio: ${moneyFormatter.format(item.price)}`,
+            `Subtotal: ${moneyFormatter.format(item.subtotal)}`,
+          ].join(' | '),
+        );
+
+      doc.moveDown(0.5);
+    }
 
     doc.moveDown();
 
-    quote.items.forEach((item) => {
-      doc.fontSize(12);
-
-      doc.text(
-        `${item.product.name} | Cantidad: ${item.quantity} | Precio: $${item.price}`,
-      );
-    });
-
-    doc.moveDown();
-
-    // Totales
-    doc.fontSize(14);
-
-    doc.text(`Subtotal: $${quote.subtotal}`);
-    doc.text(`IVA: $${quote.iva}`);
-    doc.text(`Total: $${quote.total}`);
+    doc
+      .fontSize(12)
+      .text(`Subtotal: ${moneyFormatter.format(quote.subtotal)}`, {
+        align: 'right',
+      })
+      .text(`IVA: ${moneyFormatter.format(quote.iva)}`, {
+        align: 'right',
+      })
+      .fontSize(14)
+      .text(`Total: ${moneyFormatter.format(quote.total)}`, {
+        align: 'right',
+      });
 
     doc.end();
   }
@@ -159,8 +206,9 @@ export class QuotesService {
         id: quoteId,
         companyId,
       },
-      include: {
-        items: true,
+      select: {
+        id: true,
+        status: true,
       },
     });
 
@@ -168,53 +216,26 @@ export class QuotesService {
       throw new NotFoundException('Cotización no encontrada');
     }
 
-    if (quote.status === 'APPROVED') {
-      throw new BadRequestException('La cotización ya fue aprobada');
-    }
-
-    for (const item of quote.items) {
-      const product = await this.prisma.product.findUnique({
-        where: {
-          id: item.productId,
-        },
-      });
-
-      if (!product) {
-        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
-      }
-
-      if (product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente para ${product.name}`,
-        );
-      }
-
-      await this.prisma.product.update({
-        where: {
-          id: item.productId,
-        },
-        data: {
-          stock: product.stock - item.quantity,
-        },
-      });
-
-      await this.prisma.inventoryMovement.create({
-        data: {
-          companyId,
-          productId: item.productId,
-          type: 'OUT',
-          quantity: item.quantity,
-          notes: `Venta aprobada ${quote.folio}`,
-        },
-      });
+    if (quote.status !== DocumentStatus.DRAFT) {
+      throw new BadRequestException(
+        'Solo se pueden aprobar cotizaciones en borrador',
+      );
     }
 
     return this.prisma.quote.update({
       where: {
-        id: quoteId,
+        id: quote.id,
       },
       data: {
-        status: 'APPROVED',
+        status: DocumentStatus.CONFIRMED,
+      },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
     });
   }
@@ -225,25 +246,89 @@ export class QuotesService {
         id: quoteId,
         companyId,
       },
+      select: {
+        id: true,
+        status: true,
+      },
     });
 
     if (!quote) {
       throw new NotFoundException('Cotización no encontrada');
     }
 
-    if (quote.status === 'APPROVED') {
+    if (quote.status !== DocumentStatus.DRAFT) {
       throw new BadRequestException(
-        'No se puede cancelar una cotización aprobada',
+        'Solo se pueden cancelar cotizaciones en borrador',
       );
     }
 
     return this.prisma.quote.update({
       where: {
-        id: quoteId,
+        id: quote.id,
       },
       data: {
-        status: 'CANCELLED',
+        status: DocumentStatus.CANCELLED,
+      },
+      include: {
+        customer: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
       },
     });
+  }
+
+  private async validateCustomer(companyId: string, customerId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(
+        'El cliente no existe, está inactivo o no pertenece a la empresa',
+      );
+    }
+  }
+
+  private async validateProducts(companyId: string, productIds: string[]) {
+    const uniqueProductIds = [...new Set(productIds)];
+
+    if (uniqueProductIds.length !== productIds.length) {
+      throw new BadRequestException(
+        'No se puede repetir un producto dentro de la cotización',
+      );
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: {
+        companyId,
+        isActive: true,
+        id: {
+          in: uniqueProductIds,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (products.length !== uniqueProductIds.length) {
+      throw new NotFoundException(
+        'Uno o más productos no existen, están inactivos o no pertenecen a la empresa',
+      );
+    }
+  }
+
+  private roundMoney(value: number) {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 }

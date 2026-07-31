@@ -1,18 +1,46 @@
 import { Test, TestingModule } from '@nestjs/testing';
+
+import { PurchasesController } from './purchases.controller';
 import { PurchasesService } from './purchases.service';
 
-describe('PurchasesService', () => {
-  let service: PurchasesService;
+describe('PurchasesController', () => {
+  let controller: PurchasesController;
+
+  let purchasesServiceMock: {
+    create: jest.Mock;
+    findAll: jest.Mock;
+    update: jest.Mock;
+    approve: jest.Mock;
+    cancel: jest.Mock;
+    findInventoryMovements: jest.Mock;
+    generatePDF: jest.Mock;
+  };
 
   beforeEach(async () => {
+    purchasesServiceMock = {
+      create: jest.fn(),
+      findAll: jest.fn(),
+      update: jest.fn(),
+      approve: jest.fn(),
+      cancel: jest.fn(),
+      findInventoryMovements: jest.fn(),
+      generatePDF: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PurchasesService],
+      controllers: [PurchasesController],
+      providers: [
+        {
+          provide: PurchasesService,
+          useValue: purchasesServiceMock,
+        },
+      ],
     }).compile();
 
-    service = module.get<PurchasesService>(PurchasesService);
+    controller = module.get<PurchasesController>(PurchasesController);
   });
 
   it('should be defined', () => {
-    expect(service).toBeDefined();
+    expect(controller).toBeDefined();
   });
 });

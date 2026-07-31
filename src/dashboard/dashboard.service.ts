@@ -6,36 +6,61 @@ export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async get(companyId: string) {
-    const [customers, products, quotes, purchases, lowStockProducts] =
-      await Promise.all([
-        this.prisma.customer.count({
-          where: { companyId },
-        }),
+    const [
+      totalCustomers,
+      totalSuppliers,
+      totalProducts,
+      totalQuotes,
+      totalPurchases,
+      totalSales,
+    ] = await Promise.all([
+      this.prisma.customer.count({
+        where: { companyId },
+      }),
 
-        this.prisma.product.count({
-          where: { companyId },
-        }),
+      this.prisma.supplier.count({
+        where: { companyId },
+      }),
 
-        this.prisma.quote.count({
-          where: { companyId },
-        }),
+      this.prisma.product.count({
+        where: { companyId },
+      }),
 
-        this.prisma.purchase.count({
-          where: { companyId },
-        }),
+      this.prisma.quote.count({
+        where: { companyId },
+      }),
 
-        this.prisma.product.findMany({
-          where: {
-            companyId,
-            stock: {
-              lte: 2,
-            },
-          },
-        }),
-      ]);
+      this.prisma.purchase.count({
+        where: { companyId },
+      }),
+
+      this.prisma.sale.count({
+        where: { companyId },
+      }),
+    ]);
+
+    const lowStockProducts = await this.prisma.product.findMany({
+      where: {
+        companyId,
+      },
+      select: {
+        id: true,
+        name: true,
+        stock: true,
+        minStock: true,
+      },
+    });
+
+    const lowStock = lowStockProducts.filter(
+      (product) => product.stock <= product.minStock,
+    );
 
     const inventory = await this.prisma.product.findMany({
       where: { companyId },
+      select: {
+        stock: true,
+        cost: true,
+      },
     });
 
     const inventoryValue = inventory.reduce(
@@ -44,12 +69,17 @@ export class DashboardService {
     );
 
     return {
-      customers,
-      products,
-      quotes,
-      purchases,
+      totals: {
+        customers: totalCustomers,
+        suppliers: totalSuppliers,
+        products: totalProducts,
+        quotes: totalQuotes,
+        purchases: totalPurchases,
+        sales: totalSales,
+      },
       inventoryValue,
-      lowStockProducts: lowStockProducts.length,
+      lowStockProducts: lowStock.length,
+      lowStock,
     };
   }
 }

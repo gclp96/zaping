@@ -44,6 +44,7 @@ export class SuppliersService {
       where: {
         companyId,
         name: dto.name,
+        email: dto.email,
       },
     });
 

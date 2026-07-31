@@ -1,5 +1,21 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { Type } from 'class-transformer';
+import { ArrayMinSize, IsArray, IsUUID, ValidateNested } from 'class-validator';
 
-import { CreatePurchaseDto } from './create-purchase.dto';
+import { CreatePurchaseItemDto } from './create-purchase-item.dto';
 
-export class UpdatePurchaseDto extends PartialType(CreatePurchaseDto) {}
+export class UpdatePurchaseDto {
+  @IsUUID('4', {
+    message: 'El proveedor debe tener un identificador válido',
+  })
+  supplierId!: string;
+
+  @IsArray({
+    message: 'Las partidas deben enviarse como un arreglo',
+  })
+  @ArrayMinSize(1, {
+    message: 'Debe enviar al menos una partida',
+  })
+  @ValidateNested({ each: true })
+  @Type(() => CreatePurchaseItemDto)
+  items!: CreatePurchaseItemDto[];
+}
