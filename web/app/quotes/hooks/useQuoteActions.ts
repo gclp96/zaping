@@ -18,8 +18,15 @@ export function useQuoteActions({
   const [quoteToCancel, setQuoteToCancel] =
     useState<Quote | null>(null);
 
+  const [quoteToConvert, setQuoteToConvert] =
+    useState<Quote | null>(null);
+
   const [approving, setApproving] = useState(false);
+
   const [cancelling, setCancelling] =
+    useState(false);
+
+  const [converting, setConverting] =
     useState(false);
 
   const [
@@ -49,6 +56,18 @@ export function useQuoteActions({
     }
 
     setQuoteToCancel(null);
+  }
+
+  function openConvertDialog(quote: Quote) {
+    setQuoteToConvert(quote);
+  }
+
+  function closeConvertDialog() {
+    if (converting) {
+      return;
+    }
+
+    setQuoteToConvert(null);
   }
 
   async function handleApproveQuote() {
@@ -109,6 +128,35 @@ export function useQuoteActions({
     }
   }
 
+  async function handleConvertToSale() {
+    if (!quoteToConvert) {
+      return;
+    }
+
+    try {
+      setConverting(true);
+
+      await api.post(
+        `/sales/from-quote/${quoteToConvert.id}`,
+      );
+
+      await onQuoteChanged();
+
+      setQuoteToConvert(null);
+    } catch (error: unknown) {
+      console.error(error);
+
+      window.alert(
+        getApiErrorMessage(
+          error,
+          'No fue posible convertir la cotización en venta.',
+        ),
+      );
+    } finally {
+      setConverting(false);
+    }
+  }
+
   async function handleDownloadPdf(quote: Quote) {
     let fileUrl: string | null = null;
 
@@ -157,9 +205,11 @@ export function useQuoteActions({
   return {
     quoteToApprove,
     quoteToCancel,
+    quoteToConvert,
 
     approving,
     cancelling,
+    converting,
     downloadingQuoteId,
 
     openApproveDialog,
@@ -168,8 +218,12 @@ export function useQuoteActions({
     openCancelDialog,
     closeCancelDialog,
 
+    openConvertDialog,
+    closeConvertDialog,
+
     handleApproveQuote,
     handleCancelQuote,
+    handleConvertToSale,
     handleDownloadPdf,
   };
 }

@@ -85,25 +85,31 @@ export default function QuotesPage() {
   }
 
   const {
-    quoteToApprove,
-    quoteToCancel,
+  quoteToApprove,
+  quoteToCancel,
+  quoteToConvert,
 
-    approving,
-    cancelling,
-    downloadingQuoteId,
+  approving,
+  cancelling,
+  converting,
+  downloadingQuoteId,
 
-    openApproveDialog,
-    closeApproveDialog,
+  openApproveDialog,
+  closeApproveDialog,
 
-    openCancelDialog,
-    closeCancelDialog,
+  openCancelDialog,
+  closeCancelDialog,
 
-    handleApproveQuote,
-    handleCancelQuote,
-    handleDownloadPdf,
-  } = useQuoteActions({
-    onQuoteChanged: loadQuotes,
-  });
+  openConvertDialog,
+  closeConvertDialog,
+
+  handleApproveQuote,
+  handleCancelQuote,
+  handleConvertToSale,
+  handleDownloadPdf,
+} = useQuoteActions({
+  onQuoteChanged: loadQuotes,
+});
 
   const {
     openModal,
@@ -356,6 +362,7 @@ export default function QuotesPage() {
           quoteToView !== null &&
           downloadingQuoteId === quoteToView.id
         }
+        converting={converting}
         formatDate={formatDate}
         formatMoney={formatMoney}
         onClose={() => setQuoteToView(null)}
@@ -366,6 +373,10 @@ export default function QuotesPage() {
         onCancel={(quote) => {
           setQuoteToView(null);
           openCancelDialog(quote);
+        }}
+        onConvert={(quote) => {
+          setQuoteToView(null);
+          openConvertDialog(quote);
         }}
         onDownload={(quote) => {
           void handleDownloadPdf(quote);
@@ -420,6 +431,39 @@ export default function QuotesPage() {
           void handleCancelQuote()
         }
       />
+
+      <ConfirmDialog
+        isOpen={quoteToConvert !== null}
+        title="Convertir cotización a venta"
+        message={
+          <>
+            ¿Seguro que deseas convertir la cotización{' '}
+            <span className="font-semibold">
+              {quoteToConvert?.folio}
+            </span>{' '}
+            en venta?
+            <div className="mt-3 space-y-1 text-sm">
+              <p>Esta operación:</p>
+              <p>• Creará una venta confirmada.</p>
+              <p>• Descontará las existencias del inventario.</p>
+              <p>• Generará movimientos de inventario OUT.</p>
+              <p>
+                • La venta no podrá cancelarse directamente
+                después de confirmarse.
+              </p>
+            </div>
+          </>
+        }
+        confirmText="Convertir a venta"
+        loadingText="Convirtiendo..."
+        confirmVariant="success"
+        loading={converting}
+        onClose={closeConvertDialog}
+        onConfirm={() =>
+          void handleConvertToSale()
+        }
+      />
+      
     </>
   );
 }

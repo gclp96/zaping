@@ -9,7 +9,9 @@ import type { Quote } from '../types';
 
 type QuoteDetailModalProps = {
   quote: Quote | null;
+
   downloading: boolean;
+  converting: boolean;
 
   formatDate: (value: string) => string;
   formatMoney: (value: number) => string;
@@ -17,12 +19,15 @@ type QuoteDetailModalProps = {
   onClose: () => void;
   onApprove: (quote: Quote) => void;
   onCancel: (quote: Quote) => void;
+  onConvert: (quote: Quote) => void;
   onDownload: (quote: Quote) => void;
 };
 
 export default function QuoteDetailModal({
   quote,
+
   downloading,
+  converting,
 
   formatDate,
   formatMoney,
@@ -30,6 +35,7 @@ export default function QuoteDetailModal({
   onClose,
   onApprove,
   onCancel,
+  onConvert,
   onDownload,
 }: QuoteDetailModalProps) {
   if (!quote) {
@@ -38,6 +44,9 @@ export default function QuoteDetailModal({
 
   const statusDescriptor =
     getQuoteStatusDescriptor(quote.status);
+
+  const actionInProgress =
+    downloading || converting;
 
   return (
     <Modal
@@ -91,10 +100,20 @@ export default function QuoteDetailModal({
                 Conversión a venta
               </dt>
 
-              <dd className="font-medium text-gray-900">
-                {quote.convertedToSale
-                  ? 'Convertida'
-                  : 'No convertida'}
+              <dd className="mt-1">
+                {quote.convertedToSale ? (
+                  <StatusBadge
+                    label="Convertida a venta"
+                    tone="success"
+                    ariaLabel="Cotización convertida a venta"
+                  />
+                ) : (
+                  <StatusBadge
+                    label="No convertida"
+                    tone="neutral"
+                    ariaLabel="Cotización no convertida a venta"
+                  />
+                )}
               </dd>
             </div>
 
@@ -248,49 +267,84 @@ export default function QuoteDetailModal({
 
           <div className="flex justify-between gap-4 border-t border-gray-200 pt-2 text-lg font-semibold">
             <span>Total</span>
-            <span>{formatMoney(quote.total)}</span>
+
+            <span>
+              {formatMoney(quote.total)}
+            </span>
           </div>
         </section>
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+        {quote.status === 'CONFIRMED' &&
+        !quote.convertedToSale ? (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+            Esta cotización está aprobada y puede
+            convertirse en venta. La conversión
+            descontará las existencias del inventario.
+          </div>
+        ) : null}
+
+        {quote.convertedToSale ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
+            Esta cotización ya fue convertida en
+            venta. No puede volver a convertirse.
+          </div>
+        ) : null}
+
+       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:flex-wrap sm:justify-end">
+       
+        <Button
+          variant="outline"
+          disabled={actionInProgress}
+          onClick={onClose}
+        >
+          Cerrar
+        </Button>
+
+        {quote.status === 'DRAFT' ? (
+          <>
+            <Button
+              variant="danger"
+              disabled={actionInProgress}
+              onClick={() => onCancel(quote)}
+            >
+              Cancelar cotización
+            </Button>
+
+            <Button
+              variant="success"
+              disabled={actionInProgress}
+              onClick={() => onApprove(quote)}
+            >
+              Aprobar cotización
+            </Button>
+          </>
+        ) : null}
+
+        {quote.status === 'CONFIRMED' &&
+        !quote.convertedToSale ? (
           <Button
-            variant="outline"
+            variant="success"
+            loading={converting}
+            loadingText="Convirtiendo..."
             disabled={downloading}
-            onClick={onClose}
+            onClick={() => onConvert(quote)}
           >
-            Cerrar
+            Convertir a venta
           </Button>
+        ) : null}
 
-          {quote.status === 'DRAFT' ? (
-            <>
-              <Button
-                variant="danger"
-                disabled={downloading}
-                onClick={() => onCancel(quote)}
-              >
-                Cancelar cotización
-              </Button>
-
-              <Button
-                variant="success"
-                disabled={downloading}
-                onClick={() => onApprove(quote)}
-              >
-                Aprobar cotización
-              </Button>
-            </>
-          ) : null}
-
-          <Button
-            variant="primary"
-            loading={downloading}
-            loadingText="Descargando..."
-            onClick={() => onDownload(quote)}
-          >
-            Descargar PDF
-          </Button>
-        </div>
+        <Button
+          variant="primary"
+          loading={downloading}
+          loadingText="Descargando..."
+          disabled={converting}
+          onClick={() => onDownload(quote)}
+        >
+          Descargar PDF
+        </Button>
       </div>
+      </div>
+
     </Modal>
   );
 }
