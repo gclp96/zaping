@@ -1,0 +1,26 @@
+import { Test, TestingModule } from '@nestjs/testing';
+
+import { PrismaService } from '../prisma/prisma.service';
+import { ProductsService } from './products.service';
+
+describe('ProductsService', () => {
+  let service: ProductsService;
+
+  beforeEach(async () => {
+    const moduleRef: TestingModule = await Test.createTestingModule({
+      providers: [
+        ProductsService,
+        {
+          provide: PrismaService,
+          useValue: {},
+        },
+      ],
+    }).compile();
+
+    service = moduleRef.get<ProductsService>(ProductsService);
+  });
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
+});

@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id String @id @default(uuid())
+
+  companyId   String
+  description String?
+  name        String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  products Product[]
+
+  @@unique([companyId, name])
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  companyId   String
+  sku         String
+  name        String
+  description String?
+  brand       String?
+  categoryId  String?
+
+  category             Category?             @relation(fields: [categoryId], references: [id])
+  barcode              String?
+  cost                 Float                 @default(0)
+  price                Float                 @default(0)
+  stock                Int                   @default(0)
+  minStock             Int                   @default(0)
+  isActive             Boolean               @default(true)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  inventoryMovements   InventoryMovement[]
+  inventoryBatches     InventoryBatch[]
+  purchaseReceiptItems PurchaseReceiptItem[]
+  company              Company               @relation(fields: [companyId], references: [id])
+  purchaseItems        PurchaseItem[]
+  quoteItems           QuoteItem[]
+  saleItems            SaleItem[]
+
+  @@unique([id, companyId])
+  @@unique([companyId, sku])
+  @@unique([companyId, barcode])
+}
+
+model InventoryMovement {
+  id            String                @id @default(uuid())
+  companyId     String
+  productId     String
+  batchId       String?
+  movementType  InventoryMovementType
+  quantity      Int
+  balance       Int?
+  referenceType String?
+  referenceId   String?
+  notes         String?
+  createdBy     String?
+  unitCost      Float?
+  createdAt     DateTime              @default(now())
+
+  company Company         @relation(fields: [companyId], references: [id])
+  product Product         @relation(fields: [productId], references: [id])
+  batch   InventoryBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([companyId])
+  @@index([productId])
+  @@index([batchId])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+model InventoryBatch {
+  id        String @id @default(uuid())
+  companyId String
+  productId String
+
+  lotNumber      String
+  expirationDate DateTime?
+
+  initialQuantity   Int   @default(0)
+  availableQuantity Int   @default(0)
+  unitCost          Float @default(0)
+
+  receivedAt DateTime @default(now())
+  notes      String?
+  isActive   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  receiptItems PurchaseReceiptItem[]
+  movements    InventoryMovement[]
+
+  @@unique([id, companyId])
+  @@unique([companyId, productId, lotNumber])
+  @@index([companyId])
+  @@index([productId])
+  @@index([expirationDate])
+  @@index([isActive])
+}
+
+enum InventoryMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  type        String?
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  creditLimit Decimal?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company  Company @relation(fields: [companyId], references: [id])
+  quotes   Quote[]
+  sales    Sale[]
+  isActive Boolean @default(true)
+
+  @@index([companyId])
+}
+
+enum DocumentStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  CANCELLED
+}
+
+model Quote {
+  id              String         @id @default(uuid())
+  companyId       String
+  customerId      String
+  folio           String
+  subtotal        Float
+  iva             Float
+  total           Float
+  status          DocumentStatus @default(DRAFT)
+  convertedToSale Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  company  Company     @relation(fields: [companyId], references: [id])
+  customer Customer    @relation(fields: [customerId], references: [id])
+  items    QuoteItem[]
+
+  sale Sale?
+}
+
+model QuoteItem {
+  id        String  @id @default(uuid())
+  quoteId   String
+  productId String
+  quantity  Int
+  price     Float
+  subtotal  Float
+  product   Product @relation(fields: [productId], references: [id])
+  quote     Quote   @relation(fields: [quoteId], references: [id])
+}
+
+model Purchase {
+  id         String @id @default(uuid())
+  companyId  String
+  folio      String
+  supplierId String
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+
+  subtotal Float
+  iva      Float
+  total    Float
+
+  status    PurchaseStatus @default(DRAFT)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  company  Company           @relation(fields: [companyId], references: [id])
+  items    PurchaseItem[]
+  receipts PurchaseReceipt[]
+
+  @@index([companyId])
+  @@index([supplierId])
+  @@index([status])
+}
+
+model PurchaseItem {
+  id         String @id @default(uuid())
+  purchaseId String
+  productId  String
+  quantity   Int
+  price      Float
+  subtotal   Float
+
+  product  Product  @relation(fields: [productId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+
+  receiptItems PurchaseReceiptItem[]
+
+  @@index([purchaseId])
+  @@index([productId])
+}
+
+model PurchaseReceipt {
+  id         String   @id @default(uuid())
+  companyId  String
+  purchaseId String
+  folio      String
+  receivedAt DateTime @default(now())
+  receivedBy String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+
+  receivedByUser User? @relation("PurchaseReceiptReceivedBy", fields: [receivedBy], references: [id], onDelete: SetNull)
+
+  items PurchaseReceiptItem[]
+
+  @@unique([companyId, folio])
+  @@index([companyId])
+  @@index([purchaseId])
+  @@index([receivedBy])
+  @@index([receivedAt])
+}
+
+model PurchaseReceiptItem {
+  id               String    @id @default(uuid())
+  companyId        String
+  receiptId        String
+  purchaseItemId   String
+  productId        String
+  quantityReceived Int
+  lotNumber        String?
+  expirationDate   DateTime?
+  unitCost         Float
+  batchId          String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id])
+  receipt      PurchaseReceipt @relation(fields: [receiptId], references: [id])
+  purchaseItem PurchaseItem    @relation(fields: [purchaseItemId], references: [id])
+  product      Product         @relation(fields: [productId], references: [id])
+  batch        InventoryBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([companyId])
+  @@index([receiptId])
+  @@index([purchaseItemId])
+  @@index([productId])
+  @@index([lotNumber])
+  @@index([expirationDate])
+}
+
+model Company {
+  id                   String                @id @default(uuid())
+  name                 String
+  tradeName            String?
+  rfc                  String                @unique
+  email                String?
+  phone                String?
+  language             String                @default("es")
+  timezone             String                @default("America/Hermosillo")
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customers            Customer[]
+  inventoryMovements   InventoryMovement[]
+  inventoryBatches     InventoryBatch[]
+  purchaseReceipts     PurchaseReceipt[]
+  purchaseReceiptItems PurchaseReceiptItem[]
+  products             Product[]
+  purchases            Purchase[]
+  quotes               Quote[]
+  users                User[]
+
+  sales Sale[]
+
+  suppliers  Supplier[]
+  categories Category[]
+  currency   String     @default("MXN")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  companyId    String
+  firstName    String
+  lastName     String
+  email        String   @unique
+  passwordHash String
+  locale       String   @default("es")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  role         UserRole @default(ADMIN)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SALES
+  WAREHOUSE
+}
+
+model Sale {
+  id String @id @default(uuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  folio String
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  quoteId String? @unique
+  quote   Quote?  @relation(fields: [quoteId], references: [id])
+
+  subtotal Float
+  iva      Float
+  total    Float
+
+  status DocumentStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items SaleItem[]
+
+  @@unique([companyId, folio])
+}
+
+model SaleItem {
+  id String @id @default(uuid())
+
+  saleId String
+  sale   Sale   @relation(fields: [saleId], references: [id])
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Int
+
+  price Float
+
+  subtotal Float
+}
+
+model Supplier {
+  id String @id @default(uuid())
+
+  companyId String
+
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  contactName String?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  isActive  Boolean    @default(true)
+  purchases Purchase[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
