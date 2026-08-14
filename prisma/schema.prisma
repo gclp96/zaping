@@ -170,9 +170,12 @@ model Quote {
   convertedToSale Boolean        @default(false)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
-  company         Company        @relation(fields: [companyId], references: [id])
-  customer        Customer       @relation(fields: [customerId], references: [id])
-  items           QuoteItem[]
+
+  company  Company     @relation(fields: [companyId], references: [id])
+  customer Customer    @relation(fields: [customerId], references: [id])
+  items    QuoteItem[]
+
+  sale Sale?
 }
 
 model QuoteItem {
@@ -344,6 +347,9 @@ model Sale {
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
+
+  quoteId String? @unique
+  quote   Quote?  @relation(fields: [quoteId], references: [id])
 
   subtotal Float
   iva      Float

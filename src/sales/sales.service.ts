@@ -313,60 +313,80 @@ export class SalesService {
   }
 
   async createFromQuote(companyId: string, quoteId: string) {
-    const quote = await this.prisma.quote.findFirst({
-      where: {
-        id: quoteId,
-        companyId,
-      },
-      include: {
-        items: true,
-      },
-    });
-
-    if (!quote) {
-      throw new NotFoundException('Cotización no encontrada');
-    }
-
-    if (quote.convertedToSale) {
-      throw new BadRequestException('La cotización ya fue convertida a venta');
-    }
-
-    if (quote.status !== 'CONFIRMED') {
-      throw new BadRequestException('La cotización debe estar aprobada');
-    }
-
-    // Validar inventario disponible
-
-    for (const item of quote.items) {
-      const product = await this.prisma.product.findFirst({
+    return this.prisma.$transaction(async (tx) => {
+      const quote = await tx.quote.findFirst({
         where: {
-          id: item.productId,
+          id: quoteId,
           companyId,
+        },
+        include: {
+          items: true,
         },
       });
 
-      if (!product) {
-        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
+      if (!quote) {
+        throw new NotFoundException('Cotización no encontrada');
       }
 
-      if (product.stock < item.quantity) {
+      if (quote.status !== 'CONFIRMED') {
         throw new BadRequestException(
-          `Stock insuficiente para ${product.name}. Disponible: ${product.stock}`,
+          'La cotización debe estar aprobada antes de convertirse en venta',
         );
       }
-    }
 
-    const folio = `V-${Date.now()}`;
+      if (quote.convertedToSale) {
+        throw new BadRequestException(
+          'La cotización ya fue convertida a venta',
+        );
+      }
 
-    return this.prisma.$transaction(async (tx) => {
+      if (quote.items.length === 0) {
+        throw new BadRequestException('La cotización no contiene productos');
+      }
+
+      /*
+       * Reservar la conversión dentro de la misma
+       * transacción.
+       *
+       * El WHERE convertedToSale: false evita que dos
+       * solicitudes simultáneas conviertan la misma
+       * cotización.
+       */
+      const quoteConversion = await tx.quote.updateMany({
+        where: {
+          id: quoteId,
+          companyId,
+          status: 'CONFIRMED',
+          convertedToSale: false,
+        },
+        data: {
+          convertedToSale: true,
+        },
+      });
+
+      if (quoteConversion.count !== 1) {
+        throw new BadRequestException(
+          'La cotización ya fue convertida o ya no puede convertirse',
+        );
+      }
+
+      const folio = `V-${Date.now()}`;
+
       const sale = await tx.sale.create({
         data: {
           companyId,
           customerId: quote.customerId,
+
+          quoteId,
+
           folio,
+
           subtotal: quote.subtotal,
           iva: quote.iva,
           total: quote.total,
+
+          status: 'CONFIRMED',
+
           items: {
             create: quote.items.map((item) => ({
               productId: item.productId,
@@ -376,21 +396,117 @@ export class SalesService {
             })),
           },
         },
-        include: {
-          items: true,
-        },
       });
 
-      await tx.quote.update({
+      for (const item of quote.items) {
+        const product = await tx.product.findFirst({
+          where: {
+            id: item.productId,
+            companyId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            cost: true,
+          },
+        });
+
+        if (!product) {
+          throw new NotFoundException(
+            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+          );
+        }
+
+        /*
+         * El descuento es condicional.
+         *
+         * Esto evita vender más unidades de las
+         * disponibles aunque existan operaciones
+         * concurrentes.
+         */
+        const stockUpdate = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            companyId,
+            isActive: true,
+            stock: {
+              gte: item.quantity,
+            },
+          },
+          data: {
+            stock: {
+              decrement: item.quantity,
+            },
+          },
+        });
+
+        if (stockUpdate.count !== 1) {
+          const currentProduct = await tx.product.findFirst({
+            where: {
+              id: product.id,
+              companyId,
+            },
+            select: {
+              stock: true,
+            },
+          });
+
+          throw new BadRequestException(
+            `Stock insuficiente para ${product.name}. Disponible: ${
+              currentProduct?.stock ?? 0
+            }`,
+          );
+        }
+
+        const updatedProduct = await tx.product.findFirst({
+          where: {
+            id: product.id,
+            companyId,
+          },
+          select: {
+            stock: true,
+          },
+        });
+
+        if (!updatedProduct) {
+          throw new NotFoundException(`Producto ${product.id} no encontrado`);
+        }
+
+        await tx.inventoryMovement.create({
+          data: {
+            companyId,
+            productId: product.id,
+
+            movementType: 'OUT',
+            quantity: item.quantity,
+
+            unitCost: product.cost,
+            balance: updatedProduct.stock,
+
+            referenceType: 'SALE',
+            referenceId: sale.id,
+
+            notes: `Venta ${sale.folio} generada desde cotización ${quote.folio}`,
+          },
+        });
+      }
+
+      return tx.sale.findFirst({
         where: {
-          id: quoteId,
+          id: sale.id,
+          companyId,
         },
-        data: {
-          convertedToSale: true,
+        include: {
+          customer: true,
+          quote: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
         },
       });
-
-      return sale;
     });
   }
 

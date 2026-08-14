@@ -3,19 +3,29 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
-  Request,
-  UseGuards,
+  Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 
-import { Response } from 'express';
+import type { Request as ExpressRequest, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { SalesService } from './sales.service';
 
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { SalesService } from './sales.service';
+
+type AuthenticatedRequest = ExpressRequest & {
+  user: {
+    id: string;
+    companyId: string;
+    email: string;
+    role: string;
+  };
+};
 
 @UseGuards(JwtAuthGuard)
 @Controller('sales')
@@ -23,42 +33,46 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post()
-  create(@Request() req: any, @Body() dto: CreateSaleDto) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  create(@Req() req: AuthenticatedRequest, @Body() dto: CreateSaleDto) {
     return this.salesService.create(req.user.companyId, dto);
   }
 
   @Get()
-  findAll(@Request() req: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  findAll(@Req() req: AuthenticatedRequest) {
     return this.salesService.findAll(req.user.companyId);
   }
 
   @Patch(':id/approve')
-  approve(@Request() req: any, @Param('id') id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  approve(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.salesService.approve(req.user.companyId, id);
   }
 
   @Get(':id/pdf')
-  async getPdf(
-    @Request() req: any,
-    @Param('id') id: string,
+  getPdf(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
     @Res() res: Response,
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.salesService.generatePDF(req.user.companyId, id, res);
   }
 
-  @Post('from-quote/:id')
-  createFromQuote(@Request() req: any, @Param('id') id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-    return this.salesService.createFromQuote(req.user.companyId, id);
+  @Post('from-quote/:quoteId')
+  createFromQuote(
+    @Req() req: AuthenticatedRequest,
+    @Param('quoteId', ParseUUIDPipe)
+    quoteId: string,
+  ) {
+    return this.salesService.createFromQuote(req.user.companyId, quoteId);
   }
 
   @Patch(':id/cancel')
-  cancel(@Request() req: any, @Param('id') id: string) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  cancel(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.salesService.cancel(req.user.companyId, id);
   }
 }
