@@ -1,10 +1,10 @@
 # BC-006: ProductSelector
 
-**Versión:** 1.0.0  
-**Estado:** Completado  
-**Sprint:** Sprint 09  
-**Prioridad:** Alta  
-**Responsable:** Zaping Team  
+**Versión:** 1.0.0
+**Estado:** Completado
+**Sprint:** Sprint 09
+**Prioridad:** Alta
+**Responsable:** Zaping Team
 **Fecha de finalización:** 2026-08-14
 
 ---
