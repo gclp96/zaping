@@ -1,6 +1,8 @@
 import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
+import ProductSelector from '@/app/components/business/ProductSelector';
+import CustomerSelector from '@/app/components/business/CustomerSelector';
 
 import type {
   Customer,
@@ -36,6 +38,8 @@ type QuoteFormModalProps = {
   onSubmit: () => void;
 
   onCustomerChange: (value: string) => void;
+  onCreateCustomer: () => void;
+
   onSelectedProductChange: (
     value: string,
   ) => void;
@@ -86,6 +90,7 @@ export default function QuoteFormModal({
   onSubmit,
 
   onCustomerChange,
+  onCreateCustomer,
   onSelectedProductChange,
   onQuantityChange,
   onPriceChange,
@@ -95,19 +100,6 @@ export default function QuoteFormModal({
   onItemPriceChange,
   onRemoveItem,
 }: QuoteFormModalProps) {
-  const excludedProductIds = new Set(
-    items.map((item) => item.productId),
-  );
-
-  const availableProducts = products.filter(
-    (product) =>
-      product.isActive !== false &&
-      !excludedProductIds.has(product.id),
-  );
-
-  const activeCustomers = customers.filter(
-    (customer) => customer.isActive !== false,
-  );
 
   return (
     <Modal
@@ -116,129 +108,37 @@ export default function QuoteFormModal({
       title="Nueva cotización"
     >
       <div className="space-y-6">
-        <div>
-          <label
-            htmlFor="quote-customer"
-            className="mb-1 block text-sm font-medium text-gray-700"
-          >
-            Cliente
-            <span
-              className="ml-1 text-red-600"
-              aria-hidden="true"
-            >
-              *
-            </span>
-          </label>
-
-          <select
-            id="quote-customer"
-            value={customerId}
-            disabled={saving}
-            aria-invalid={Boolean(customerError)}
-            aria-describedby={
-              customerError
-                ? 'quote-customer-error'
-                : 'quote-customer-helper'
-            }
-            className={[
-              'w-full rounded-lg border bg-white px-3 py-2',
-              'text-sm text-gray-900 outline-none',
-              'transition focus:ring-2',
-              customerError
-                ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
-                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100',
-              saving
-                ? 'cursor-not-allowed bg-gray-100 opacity-70'
-                : '',
-            ].join(' ')}
-            onChange={(event) =>
-              onCustomerChange(event.target.value)
-            }
-          >
-            <option value="">
-              Selecciona un cliente
-            </option>
-
-            {activeCustomers.map((customer) => (
-              <option
-                key={customer.id}
-                value={customer.id}
-              >
-                {customer.name}
-              </option>
-            ))}
-          </select>
-
-          {customerError ? (
-            <p
-              id="quote-customer-error"
-              role="alert"
-              className="mt-1 text-sm text-red-600"
-            >
-              {customerError}
-            </p>
-          ) : (
-            <p
-              id="quote-customer-helper"
-              className="mt-1 text-sm text-gray-500"
-            >
-              Cliente al que se emitirá la cotización.
-            </p>
-          )}
-        </div>
+        <CustomerSelector
+          options={customers}
+          value={customerId}
+          onChange={onCustomerChange}
+          onCreateNew={onCreateCustomer}
+          required
+          disabled={saving}
+          error={customerError}
+          helperText="Cliente al que se emitirá la cotización."
+        />
 
         <div className="rounded-lg border border-gray-200 p-4">
           <h3 className="mb-4 font-semibold text-gray-900">
             Agregar producto
           </h3>
 
+          <ProductSelector
+              options={products}
+              value={selectedProductId}
+              excludedProductIds={items.map(
+                (item) => item.productId,
+              )}
+              priceMode="price"
+              enableStockFilter
+              disabled={saving}
+              onChange={onSelectedProductChange}
+              error={productError}
+              helperText="Busca por nombre, SKU, código de barras, marca o categoría."
+            />
+
           <div className="space-y-4">
-            <div>
-              <label
-                htmlFor="quote-product"
-                className="mb-1 block text-sm font-medium text-gray-700"
-              >
-                Producto
-              </label>
-
-              <select
-                id="quote-product"
-                value={selectedProductId}
-                disabled={saving}
-                aria-invalid={Boolean(productError)}
-                className={[
-                  'w-full rounded-lg border bg-white px-3 py-2',
-                  'text-sm text-gray-900 outline-none',
-                  'transition focus:ring-2',
-                  productError
-                    ? 'border-red-400 focus:border-red-500 focus:ring-red-100'
-                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-100',
-                  saving
-                    ? 'cursor-not-allowed bg-gray-100 opacity-70'
-                    : '',
-                ].join(' ')}
-                onChange={(event) =>
-                  onSelectedProductChange(
-                    event.target.value,
-                  )
-                }
-              >
-                <option value="">
-                  Selecciona un producto
-                </option>
-
-                {availableProducts.map((product) => (
-                  <option
-                    key={product.id}
-                    value={product.id}
-                  >
-                    {product.sku} — {product.name} —
-                    Stock: {product.stock}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div className="grid gap-4 md:grid-cols-2">
               <Input
                 label="Cantidad"
@@ -262,19 +162,12 @@ export default function QuoteFormModal({
                 value={price}
                 disabled={saving}
                 onChange={(event) =>
-                  onPriceChange(event.target.value)
+                  onPriceChange(
+                    event.target.value,
+                  )
                 }
               />
             </div>
-
-            {productError ? (
-              <p
-                role="alert"
-                className="text-sm text-red-600"
-              >
-                {productError}
-              </p>
-            ) : null}
 
             <Button
               variant="outline"

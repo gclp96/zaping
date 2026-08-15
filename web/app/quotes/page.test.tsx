@@ -45,6 +45,7 @@ vi.mock('@/services/errors', () => ({
 const customer: Customer = {
   id: 'customer-1',
   name: 'Hospital de prueba',
+  type: 'Hospital',
   contactName: 'Responsable de compras',
   email: 'hospital@example.com',
   phone: '6621234567',
@@ -55,8 +56,10 @@ const product: Product = {
   id: 'product-1',
   sku: 'MED-001',
   name: 'Producto médico',
+  cost: 300,
   price: 500,
   stock: 20,
+  minStock: 5,
   isActive: true,
 };
 
@@ -205,6 +208,145 @@ describe('QuotesPage', () => {
       '/products',
     );
   });
+
+  it('registra un cliente desde la cotización y lo selecciona automáticamente', async () => {
+  const user = userEvent.setup();
+
+  const newCustomer = {
+    id: 'customer-2',
+    name: 'Clínica nueva',
+    type: 'Clínica',
+    email: 'compras@clinicanueva.com',
+    phone: '6627654321',
+    contactName: null,
+    address: null,
+    notes: null,
+    isActive: true,
+  };
+
+  vi.mocked(api.post).mockResolvedValue({
+    data: newCustomer,
+  } as never);
+
+  render(<QuotesPage />);
+
+  await screen.findByText('COT-0001');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /nueva cotización/i,
+    }),
+  );
+
+  const quoteHeading =
+    await screen.findByRole('heading', {
+      name: /nueva cotización/i,
+    });
+
+  const quoteModal =
+    quoteHeading.parentElement?.parentElement;
+
+  expect(quoteModal).not.toBeNull();
+
+  const quoteScope = within(
+    quoteModal as HTMLElement,
+  );
+
+  await user.click(
+    quoteScope.getByRole('combobox', {
+      name: 'Cliente',
+    }),
+  );
+
+  await user.click(
+    quoteScope.getByRole('button', {
+      name: /registrar nuevo cliente/i,
+    }),
+  );
+
+  const customerHeading =
+    await screen.findByRole('heading', {
+      name: /nuevo cliente/i,
+    });
+
+  const customerModal =
+    customerHeading.parentElement?.parentElement;
+
+  expect(customerModal).not.toBeNull();
+
+  const customerScope = within(
+    customerModal as HTMLElement,
+  );
+
+  await user.type(
+    customerScope.getByLabelText(/^nombre/i),
+    'Clínica nueva',
+  );
+
+  await user.type(
+    customerScope.getByLabelText(/^tipo/i),
+    'Clínica',
+  );
+
+  await user.type(
+    customerScope.getByLabelText(/^email/i),
+    'compras@clinicanueva.com',
+  );
+
+  await user.type(
+    customerScope.getByLabelText(/^teléfono/i),
+    '6627654321',
+  );
+
+  await user.click(
+    customerScope.getByRole('button', {
+      name: /registrar cliente/i,
+    }),
+  );
+
+  await waitFor(() => {
+    expect(api.post).toHaveBeenCalledWith(
+      '/customers',
+      {
+        name: 'Clínica nueva',
+        type: 'Clínica',
+        email: 'compras@clinicanueva.com',
+        phone: '6627654321',
+        contactName: undefined,
+        address: undefined,
+        notes: undefined,
+      },
+    );
+  });
+
+  await waitFor(() => {
+    expect(
+      screen.queryByRole('heading', {
+        name: /^nuevo cliente$/i,
+      }),
+    ).toBeNull();
+  });
+
+  expect(
+    within(
+      quoteModal as HTMLElement,
+    ).getByText('Clínica nueva'),
+  ).toBeTruthy();
+
+  expect(
+    within(
+      quoteModal as HTMLElement,
+    ).getByText(
+      'compras@clinicanueva.com',
+    ),
+  ).toBeTruthy();
+
+  expect(
+    screen.getByRole('heading', {
+      name: /nueva cotización/i,
+    }),
+  ).toBeTruthy();
+});
 
   it('muestra aprobar y cancelar para una cotización en borrador', async () => {
     render(<QuotesPage />);
@@ -472,6 +614,64 @@ describe('QuotesPage', () => {
 
     expect(alertSpy).not.toHaveBeenCalled();
   });
+
+  it('permite buscar y seleccionar un cliente al crear una cotización', async () => {
+  const user = userEvent.setup();
+
+  render(<QuotesPage />);
+
+  await screen.findByText('COT-0001');
+
+  await user.click(
+    screen.getByRole('button', {
+      name: /nueva cotización/i,
+    }),
+  );
+
+  const quoteHeading =
+    await screen.findByRole('heading', {
+      name: /nueva cotización/i,
+    });
+
+  const quoteModal =
+    quoteHeading.parentElement?.parentElement;
+
+  expect(quoteModal).not.toBeNull();
+
+  const quoteScope = within(
+    quoteModal as HTMLElement,
+  );
+
+  const customerSearch =
+    quoteScope.getByRole('combobox', {
+      name: 'Cliente',
+    });
+
+  await user.click(customerSearch);
+
+  await user.type(
+    customerSearch,
+    'Hospital de prueba',
+  );
+
+  await user.click(
+    quoteScope.getByRole('option', {
+      name: /Hospital de prueba/i,
+    }),
+  );
+
+  expect(
+    quoteScope.getByText(
+      'Hospital de prueba',
+    ),
+  ).toBeTruthy();
+
+  expect(
+    quoteScope.getByText(
+      'hospital@example.com',
+    ),
+  ).toBeTruthy();
+});
 
   it('muestra el error de carga y permite reintentar', async () => {
     const user = userEvent.setup();

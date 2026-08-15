@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import Modal from '@/app/components/ui/Modal';
-import Input from '@/app/components/ui/Input';
 import Table from '@/app/components/ui/Table';
 import PageContainer from '../components/ui/layout/PageContainer';
 import Button from '../components/ui/Button';
@@ -11,26 +10,28 @@ import Loading from '../components/ui/Loading';
 import EmptyState from '../components/ui/EmptyState';
 import PageHeader from '../components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import CustomerFormModal from '@/app/components/business/CustomerForm';
 
 type Customer = {
-    id: string;
-    name: string;
-    type?: string;
-    email?: string;
-    phone?: string;
+  id: string;
+  name: string;
+  type: string;
+  email: string;
+  phone: string;
+  address?: string | null;
+  contactName?: string | null;
+  notes?: string | null;
+  isActive?: boolean;
 };
 
  export default function CustomersPage() {
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
+
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [openModal, setOpenModal] = useState(false);
-  const [name, setName] = useState('');
-  const [customerType, setCustomerType] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -55,75 +56,15 @@ async function loadCustomers() {
   })();
  }, []);
 
-async function handleCreateCustomer() {
-  const emailValid = /\S+@\S+\.\S+/.test(email);
-
-  if (!name || !customerType || !email || !phone) {
-    alert('Completa todos los campos');
-    return;
-  }
-
-  if (!emailValid) {
-    alert('Ingresa un email válido');
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    if (editingCustomer) {
-      await api.patch(
-        `/customers/${editingCustomer.id}`,
-        {
-          name,
-          type: customerType,
-          email,
-          phone,
-        },
-      );
-    } else {
-      await api.post(
-        '/customers',
-        {
-          name,
-          type: customerType,
-          email,
-          phone,
-        },
-      );
-    }
-
-    setOpenModal(false);
-    setEditingCustomer(null);
-
-    setName('');
-    setCustomerType('');
-    setEmail('');
-    setPhone('');
-
-    await loadCustomers();
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setLoading(false);
-  }
-}  
-
  function openDeleteModal(customer: Customer){
   setSelectedCustomer(customer);
   setDeleteModalOpen(true);
 }
 
- function openEditModal(customer: Customer) {
+function openEditModal(customer: Customer) {
   setEditingCustomer(customer);
-
-  setName(customer.name || '');
-  setCustomerType(customer.type || '');
-  setEmail(customer.email || '');
-  setPhone(customer.phone || '');
-
   setOpenModal(true);
- }
+}
 
  async function handleDeleteCustomer() {
    if (!selectedCustomer) return;
@@ -179,8 +120,13 @@ async function handleCreateCustomer() {
             title="Clientes"
             description="Administra los clientes registrados."
             action={
-              <Button onClick={() => setOpenModal(true)}>
-                  Nuevo Cliente
+              <Button
+                onClick={() => {
+                  setEditingCustomer(null);
+                  setOpenModal(true);
+                }}
+              >
+                Nuevo Cliente
               </Button>
             }
           />
@@ -203,59 +149,18 @@ async function handleCreateCustomer() {
         </Section>
       )}
     </PageContainer>
-    
-    <Modal
+
+    <CustomerFormModal
       isOpen={openModal}
-        onClose={() => {
-          setOpenModal(false);
-          setEditingCustomer(null);
-
-          setName('');
-          setCustomerType('');
-          setEmail('');
-          setPhone('');
-         }}
-
-       title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
-         >
-          <div className="space-y-4">
-          <Input
-            label="Nombre"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-
-          <Input
-            label="Tipo"
-            value={customerType}
-            onChange={(e) => setCustomerType(e.target.value)}
-          />
-
-          <Input
-            label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <Input
-            label="Teléfono"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-          />
-
-          <button
-              onClick={handleCreateCustomer}
-              disabled={loading || !name || !customerType || !email || !phone}
-              className="w-full bg-blue-600 text-white p-3 rounded disabled:bg-gray-400"
-            >
-              {loading
-               ? 'Guardando...'
-               : editingCustomer
-               ? 'Actualizar'
-               : 'Guardar'}
-          </button>
-          </div>
-    </Modal>  
+      customer={editingCustomer}
+      onClose={() => {
+        setOpenModal(false);
+        setEditingCustomer(null);
+      }}
+      onSaved={async () => {
+        await loadCustomers();
+      }}
+    />
 
     <Modal
       isOpen={deleteModalOpen}

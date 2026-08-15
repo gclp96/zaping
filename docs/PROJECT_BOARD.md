@@ -7,7 +7,7 @@
 | Versión | v0.9.0-alpha.1 |
 | Sprint actual | Sprint 09 |
 | Milestone actual | Core ERP — Compras e Inventario |
-| Última actualización | 2026-07-30 |
+| Última actualización | 2026-08-14 |
 
 ---
 
@@ -34,7 +34,7 @@
 | BC-002 | MoneyInput | ⬜ Pendiente | Alta |
 | BC-003 | DateInput | ⬜ Pendiente | Alta |
 | BC-004 | SupplierSelector | ✅ Implementado | Alta |
-| BC-005 | CustomerSelector | ⬜ Pendiente | Alta |
+| BC-005 | CustomerSelector | ✅ Implementado | Alta |
 | BC-006 | ProductSelector | ✅ Implementado | Alta |
 
 ---

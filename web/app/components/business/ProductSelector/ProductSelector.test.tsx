@@ -24,43 +24,106 @@ const products = [
     id: 'product-1',
     sku: 'SKU-001',
     name: 'Catéter diagnóstico',
+    barcode: '750100000001',
+    brand: 'Abbott',
+    category: {
+      id: 'category-1',
+      name: 'Hemodinamia',
+    },
     cost: 150.5,
+    price: 250,
     stock: 10,
     minStock: 5,
+    isActive: true,
   },
   {
     id: 'product-2',
     sku: 'SKU-002',
     name: 'Guía médica',
+    barcode: '750100000002',
+    brand: 'Terumo',
+    category: {
+      id: 'category-2',
+      name: 'Intervencionismo',
+    },
     cost: 80,
+    price: 125.75,
     stock: 0,
     minStock: 3,
+    isActive: true,
+  },
+  {
+    id: 'product-3',
+    sku: 'SKU-003',
+    name: 'Introductor vascular',
+    barcode: null,
+    brand: 'Merit',
+    category: {
+      id: 'category-1',
+      name: 'Hemodinamia',
+    },
+    cost: 95,
+    price: 160,
+    stock: 2,
+    minStock: 5,
+    isActive: true,
   },
 ];
 
+function openSelector() {
+  fireEvent.focus(
+    screen.getByRole('combobox', {
+      name: 'Producto',
+    }),
+  );
+}
+
 describe('ProductSelector', () => {
-  it('muestra los productos con SKU, nombre y costo', () => {
+  it('muestra SKU, nombre, stock y costo en modo compras', () => {
     render(
       <ProductSelector
         options={products}
         value=""
+        priceMode="cost"
         onChange={() => undefined}
       />,
     );
 
+    openSelector();
+
     expect(
-      screen.getByText(
-        'SKU-001 — Catéter diagnóstico — $150.50',
-      ),
+      screen.getByRole('option', {
+        name: /SKU-001.*Catéter diagnóstico/i,
+      }),
     ).toBeDefined();
 
     expect(
-      screen.getByText(
-        'SKU-002 — Guía médica — $80.00',
-      ),
-    ).toBeDefined();  });
+      screen.getByText('Costo: $150.50'),
+    ).toBeDefined();
 
-  it('devuelve el identificador seleccionado', () => {
+    expect(
+      screen.getByText('Stock: 10'),
+    ).toBeDefined();
+  });
+
+  it('muestra precio de venta en modo cotizaciones', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        priceMode="price"
+        onChange={() => undefined}
+      />,
+    );
+
+    openSelector();
+
+    expect(
+      screen.getByText('Precio: $250.00'),
+    ).toBeDefined();
+  });
+
+  it('devuelve el identificador del producto seleccionado', () => {
     const onChange = vi.fn();
 
     render(
@@ -71,18 +134,17 @@ describe('ProductSelector', () => {
       />,
     );
 
-    fireEvent.change(
-      screen.getByRole('combobox', {
-        name: 'Producto',
+    openSelector();
+
+    fireEvent.click(
+      screen.getByRole('option', {
+        name: /SKU-002.*Guía médica/i,
       }),
-      {
-        target: {
-          value: 'product-2',
-        },
-      },
     );
 
-    expect(onChange).toHaveBeenCalledWith('product-2');
+    expect(onChange).toHaveBeenCalledWith(
+      'product-2',
+    );
   });
 
   it('deshabilita los productos excluidos', () => {
@@ -95,17 +157,56 @@ describe('ProductSelector', () => {
       />,
     );
 
+    openSelector();
+
     const option = screen.getByRole(
       'option',
       {
-        name: 'SKU-001 — Catéter diagnóstico — $150.50',
+        name: /SKU-001.*Catéter diagnóstico/i,
       },
-    ) as HTMLOptionElement;
+    );
 
-    expect(option.disabled).toBe(true);
+    expect(
+      option.getAttribute('aria-disabled'),
+    ).toBe('true');
+
+    expect(
+      (option as HTMLButtonElement).disabled,
+    ).toBe(true);
   });
 
   it('permite seleccionar productos sin stock', () => {
+    const onChange = vi.fn();
+
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        onChange={onChange}
+      />,
+    );
+
+    openSelector();
+
+    const option = screen.getByRole(
+      'option',
+      {
+        name: /SKU-002.*Guía médica/i,
+      },
+    );
+
+    expect(
+      (option as HTMLButtonElement).disabled,
+    ).toBe(false);
+
+    fireEvent.click(option);
+
+    expect(onChange).toHaveBeenCalledWith(
+      'product-2',
+    );
+  });
+
+  it('busca productos por nombre', () => {
     render(
       <ProductSelector
         options={products}
@@ -114,17 +215,243 @@ describe('ProductSelector', () => {
       />,
     );
 
-    const option = screen.getByRole(
-      'option',
+    const search = screen.getByRole(
+      'combobox',
       {
-        name: 'SKU-002 — Guía médica — $80.00',
+        name: 'Producto',
       },
-    ) as HTMLOptionElement;
+    );
 
-    expect(option.disabled).toBe(false);
+    fireEvent.change(search, {
+      target: {
+        value: 'Guía médica',
+      },
+    });
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-002.*Guía médica/i,
+      }),
+    ).toBeDefined();
+
+    expect(
+      screen.queryByRole('option', {
+        name: /SKU-001.*Catéter diagnóstico/i,
+      }),
+    ).toBeNull();
   });
 
-  it('muestra carga y deshabilita el selector', () => {
+  it('busca productos por SKU', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Producto',
+      }),
+      {
+        target: {
+          value: 'SKU-003',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-003.*Introductor vascular/i,
+      }),
+    ).toBeDefined();
+  });
+
+  it('busca productos por código de barras', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Producto',
+      }),
+      {
+        target: {
+          value: '750100000002',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-002.*Guía médica/i,
+      }),
+    ).toBeDefined();
+  });
+
+  it('busca productos por marca', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Producto',
+      }),
+      {
+        target: {
+          value: 'Abbott',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-001.*Catéter diagnóstico/i,
+      }),
+    ).toBeDefined();
+  });
+
+  it('busca productos por categoría', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        onChange={() => undefined}
+      />,
+    );
+
+    fireEvent.change(
+      screen.getByRole('combobox', {
+        name: 'Producto',
+      }),
+      {
+        target: {
+          value: 'Intervencionismo',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-002.*Guía médica/i,
+      }),
+    ).toBeDefined();
+  });
+
+  it('filtra productos con existencia', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        enableStockFilter
+        onChange={() => undefined}
+      />,
+    );
+
+    openSelector();
+
+    fireEvent.change(
+      screen.getByLabelText('Disponibilidad'),
+      {
+        target: {
+          value: 'in-stock',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-001.*Catéter diagnóstico/i,
+      }),
+    ).toBeDefined();
+
+    expect(
+      screen.queryByRole('option', {
+        name: /SKU-002.*Guía médica/i,
+      }),
+    ).toBeNull();
+
+    expect(
+      screen.queryByRole('option', {
+        name: /SKU-003.*Introductor vascular/i,
+      }),
+    ).toBeNull();
+  });
+
+  it('filtra productos con stock bajo', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        enableStockFilter
+        onChange={() => undefined}
+      />,
+    );
+
+    openSelector();
+
+    fireEvent.change(
+      screen.getByLabelText('Disponibilidad'),
+      {
+        target: {
+          value: 'low-stock',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-003.*Introductor vascular/i,
+      }),
+    ).toBeDefined();
+
+    expect(
+      screen.queryByRole('option', {
+        name: /SKU-001.*Catéter diagnóstico/i,
+      }),
+    ).toBeNull();
+  });
+
+  it('filtra productos sin existencia', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value=""
+        enableStockFilter
+        onChange={() => undefined}
+      />,
+    );
+
+    openSelector();
+
+    fireEvent.change(
+      screen.getByLabelText('Disponibilidad'),
+      {
+        target: {
+          value: 'out-of-stock',
+        },
+      },
+    );
+
+    expect(
+      screen.getByRole('option', {
+        name: /SKU-002.*Guía médica/i,
+      }),
+    ).toBeDefined();
+  });
+
+  it('muestra carga y deshabilita el buscador', () => {
     render(
       <ProductSelector
         options={[]}
@@ -134,15 +461,18 @@ describe('ProductSelector', () => {
       />,
     );
 
-    const select = screen.getByRole(
+    const search = screen.getByRole(
       'combobox',
       {
         name: 'Producto',
       },
-    ) as HTMLSelectElement;
+    ) as HTMLInputElement;
 
-    expect(select.disabled).toBe(true);
-    expect(select.getAttribute('aria-busy')).toBe('true');
+    expect(search.disabled).toBe(true);
+
+    expect(
+      search.getAttribute('aria-busy'),
+    ).toBe('true');
 
     expect(
       screen.getByText('Cargando productos...'),
@@ -158,17 +488,19 @@ describe('ProductSelector', () => {
       />,
     );
 
-    const select = screen.getByRole(
+    const search = screen.getByRole(
       'combobox',
       {
         name: 'Producto',
       },
-    ) as HTMLSelectElement;
+    ) as HTMLInputElement;
 
-    expect(select.disabled).toBe(true);
+    expect(search.disabled).toBe(true);
 
     expect(
-      screen.getByText('No hay productos disponibles'),
+      screen.getByText(
+        'No hay productos disponibles',
+      ),
     ).toBeDefined();
   });
 
@@ -182,32 +514,66 @@ describe('ProductSelector', () => {
       />,
     );
 
-    const select = screen.getByRole('combobox', {
-      name: 'Producto',
-    });
-
-    expect(select.getAttribute('aria-invalid')).toBe('true');
-    expect(screen.getByRole('alert').textContent).toBe(
-      'Selecciona un producto',
-    );
-  });
-
-  it('respeta el producto seleccionado', () => {
-    render(
-      <ProductSelector
-        options={products}
-        value="product-2"
-        onChange={() => undefined}
-      />,
-    );
-
-    const select = screen.getByRole(
+    const search = screen.getByRole(
       'combobox',
       {
         name: 'Producto',
       },
-    ) as HTMLSelectElement;
+    );
 
-    expect(select.value).toBe('product-2');
+    expect(
+      search.getAttribute('aria-invalid'),
+    ).toBe('true');
+
+    expect(
+      screen.getByRole('alert').textContent,
+    ).toBe('Selecciona un producto');
+  });
+
+  it('muestra el producto seleccionado', () => {
+    render(
+      <ProductSelector
+        options={products}
+        value="product-2"
+        priceMode="price"
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        /SKU-002.*Guía médica/i,
+      ),
+    ).toBeDefined();
+
+    expect(
+      screen.getByText('Sin existencia'),
+    ).toBeDefined();
+
+    expect(
+      screen.getByText(
+        'Precio: $125.75',
+      ),
+    ).toBeDefined();
+  });
+
+  it('permite cambiar el producto seleccionado', () => {
+    const onChange = vi.fn();
+
+    render(
+      <ProductSelector
+        options={products}
+        value="product-1"
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Cambiar',
+      }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith('');
   });
 });

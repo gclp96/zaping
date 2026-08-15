@@ -102,8 +102,10 @@ export default function PurchaseFormModal({
               excludedProductIds={items.map(
                 (item) => item.productId,
               )}
+              priceMode="cost"
               onChange={onSelectedProductChange}
               error={productError}
+              helperText="Busca por nombre, SKU, código de barras, marca o categoría."
             />
 
             <Input

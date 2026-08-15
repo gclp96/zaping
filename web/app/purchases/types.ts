@@ -132,6 +132,7 @@ export type Product = {
   cost: number;
   stock: number;
   minStock: number;
+  price: number;
 };
 
 export type PurchaseFormItem = {

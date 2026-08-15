@@ -13,6 +13,7 @@ import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import CustomerFormModal from '@/app/components/business/CustomerForm';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -74,6 +75,9 @@ export default function QuotesPage() {
 
   const [pageLoading, setPageLoading] =
     useState(true);
+
+  const [customerFormOpen, setCustomerFormOpen] =
+  useState(false);
 
   const [pageError, setPageError] = useState('');
 
@@ -339,6 +343,9 @@ export default function QuotesPage() {
           void handleCreateQuote()
         }
         onCustomerChange={handleCustomerChange}
+        onCreateCustomer={() =>
+          setCustomerFormOpen(true)
+        }
         onSelectedProductChange={
           handleSelectedProductChange
         }
@@ -354,6 +361,27 @@ export default function QuotesPage() {
           handleItemPriceChange
         }
         onRemoveItem={handleRemoveItem}
+      />
+
+      <CustomerFormModal
+        isOpen={customerFormOpen}
+        customer={null}
+        onClose={() =>
+          setCustomerFormOpen(false)
+        }
+        onSaved={(customer) => {
+          setCustomers((current) => [
+            customer,
+            ...current.filter(
+              (item) =>
+                item.id !== customer.id,
+            ),
+          ]);
+
+          handleCustomerChange(
+            customer.id,
+          );
+        }}
       />
 
       <QuoteDetailModal

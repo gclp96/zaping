@@ -1,5 +1,6 @@
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -175,6 +176,31 @@ function configureApiMocks() {
 }
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+async function selectProduct(
+  user: ReturnType<typeof userEvent.setup>,
+  searchValue = 'MED-001',
+) {
+  const productSelect = screen.getByRole(
+    'combobox',
+    {
+      name: 'Producto',
+    },
+  );
+
+  await user.click(productSelect);
+
+  await user.type(
+    productSelect,
+    searchValue,
+  );
+
+  await user.click(
+    screen.getByRole('option', {
+      name: new RegExp(searchValue, 'i'),
+    }),
+  );
+}
 
 describe('PurchasesPage — recepciones', () => {
   beforeEach(() => {
@@ -750,9 +776,6 @@ describe('PurchasesPage — formulario de compra', () => {
     const supplierSelect =
       screen.getByLabelText(/proveedor/i);
 
-    const productSelect =
-      screen.getByLabelText(/producto/i);
-
     const quantityInput = screen.getByRole(
       'spinbutton',
       {
@@ -765,10 +788,7 @@ describe('PurchasesPage — formulario de compra', () => {
       'supplier-1',
     );
 
-    await user.selectOptions(
-      productSelect,
-      'product-1',
-    );
+    await selectProduct(user);
 
     await user.clear(quantityInput);
     await user.type(quantityInput, '3');
@@ -922,39 +942,49 @@ describe('PurchasesPage — formulario de compra', () => {
     }),
   );
 
-  await screen.findByRole('heading', {
-    name: /nueva compra/i,
+  const modalHeading =
+    await screen.findByRole('heading', {
+      name: /nueva compra/i,
+    });
+
+  const modal =
+    modalHeading.parentElement?.parentElement;
+
+  expect(modal).not.toBeNull();
+
+  const modalScope = within(
+    modal as HTMLElement,
+  );
+
+  const quantityInput =
+    modalScope.getByRole('spinbutton', {
+      name: /^cantidad$/i,
+    });
+
+  await selectProduct(user);
+
+  fireEvent.change(quantityInput, {
+    target: {
+      value: '0',
+    },
   });
 
-  const productSelect =
-    screen.getByLabelText(/producto/i);
-
-  const quantityInput = screen.getByRole(
-    'spinbutton',
-    {
-      name: /^cantidad$/i,
-    },
-  );
-
-  await user.selectOptions(
-    productSelect,
-    'product-1',
-  );
-
-  await user.clear(quantityInput);
-  await user.type(quantityInput, '0');
+  expect(
+    (quantityInput as HTMLInputElement).value,
+  ).toBe('0');
 
   await user.click(
-    screen.getByRole('button', {
+    modalScope.getByRole('button', {
       name: /agregar producto/i,
     }),
   );
 
-  expect(
-    await screen.findByText(
-      'La cantidad debe ser un número entero mayor o igual a uno.',
-    ),
-  ).toBeTruthy();
+  const alert =
+    await modalScope.findByRole('alert');
+
+  expect(alert.textContent).toContain(
+    'La cantidad debe ser un número entero mayor o igual a uno.',
+  );
 
   expect(api.post).not.toHaveBeenCalled();
 

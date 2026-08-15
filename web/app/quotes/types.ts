@@ -6,6 +6,7 @@ export type QuoteStatus =
 export type Customer = {
   id: string;
   name: string;
+  type?: string | null;
   contactName?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -16,8 +17,10 @@ export type Product = {
   id: string;
   sku: string;
   name: string;
+  cost: number;
   price: number;
   stock: number;
+  minStock: number;
   isActive?: boolean;
 };
 
