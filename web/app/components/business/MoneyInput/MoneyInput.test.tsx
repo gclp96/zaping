@@ -42,7 +42,7 @@ describe('MoneyInput', () => {
       />,
     );
 
-    const input = screen.getByLabelText('Precio');
+    const input = screen.getByLabelText(/precio/i);
 
     expect(input.getAttribute('inputmode')).toBe('decimal');
     expect(input.getAttribute('type')).toBe('text');
@@ -105,4 +105,81 @@ describe('MoneyInput', () => {
       screen.getByText('El precio es obligatorio'),
     ).toBeDefined();
   });
+
+  it('respeta el límite de decimales', () => {
+  const onValueChange = vi.fn();
+
+  render(
+    <MoneyInput
+      label="Precio"
+      value=""
+      maxDecimals={2}
+      onValueChange={onValueChange}
+    />,
+  );
+
+  fireEvent.change(
+    screen.getByLabelText('Precio'),
+    {
+      target: {
+        value: '100.123',
+      },
+    },
+  );
+
+  expect(
+    onValueChange,
+  ).not.toHaveBeenCalled();
+});
+
+it('permite valores negativos cuando se habilitan', () => {
+  const onValueChange = vi.fn();
+
+  render(
+    <MoneyInput
+      label="Ajuste"
+      value=""
+      allowNegative
+      onValueChange={onValueChange}
+    />,
+  );
+
+  fireEvent.change(
+    screen.getByLabelText('Ajuste'),
+    {
+      target: {
+        value: '-150.25',
+      },
+    },
+  );
+
+  expect(
+    onValueChange,
+  ).toHaveBeenCalledWith('-150.25');
+});
+
+it('respeta las propiedades heredadas de Input', () => {
+  render(
+    <MoneyInput
+      label="Precio"
+      value="100"
+      disabled
+      required
+      onValueChange={() => undefined}
+    />,
+  );
+
+  const input = screen.getByRole('textbox', {
+    name: /precio/i,
+  });
+
+  expect(
+    (input as HTMLInputElement).disabled,
+  ).toBe(true);
+
+  expect(
+    (input as HTMLInputElement).required,
+  ).toBe(true);
+});
+
 });

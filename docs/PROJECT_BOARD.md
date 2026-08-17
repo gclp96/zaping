@@ -159,15 +159,44 @@ Las ventas confirmadas no se cancelan directamente. Cualquier reversión se gest
 
 ---
 
-# Próximo Objetivo
+## Pruebas
 
-## QUO-001 — Auditoría técnica del módulo de Cotizaciones
+MoneyInput cuenta con 25 pruebas automatizadas directas.
 
-1. Revisar modelos Prisma y relaciones.
-2. Revisar DTOs y validaciones.
-3. Revisar servicios y controladores.
-4. Revisar flujo frontend.
-5. Identificar deuda técnica y reglas faltantes.
-6. Definir plan de implementación antes de modificar código.
+### Componente
+
+Se validan:
+
+- Símbolo monetario y moneda.
+- `inputMode="decimal"`.
+- Normalización de coma a punto.
+- Entradas inválidas.
+- Estado de error accesible.
+- Límite de decimales.
+- Valores negativos configurables.
+- Propiedades heredadas de Input.
+
+### Normalización monetaria
+
+Se validan:
+
+- Componente MoneyInput creado.
+- Componente UI Input ampliado y reutilizado.
+- Captura monetaria controlada mediante string.
+- Coma decimal normalizada a punto.
+- Límite configurable de decimales.
+- Valores negativos deshabilitados por defecto.
+- Prefijo monetario y moneda MXN integrados.
+- Estados de error y texto auxiliar accesibles.
+- Integración realizada en los campos Costo y Precio.
+- Cobertura automatizada ampliada.
+- 25 pruebas directas de MoneyInput ejecutadas correctamente.
+- Casos límite de `maxDecimals` validados para valores negativos, decimales y no finitos.
+- ESLint completado sin errores.
+- Build de producción completado correctamente.
+
+## Estado final
+
+BC-002 se considera completado.
 
 

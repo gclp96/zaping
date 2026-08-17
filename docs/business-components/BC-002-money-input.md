@@ -49,6 +49,9 @@ Resultados:
 - 26 pruebas ejecutadas correctamente.
 - ESLint completado sin errores.
 - Build de producción completado correctamente.
+- Cobertura automatizada ampliada.
+- 25 pruebas directas de MoneyInput ejecutadas correctamente.
+- Casos límite de `maxDecimals` validados para valores negativos, decimales y no finitos.
 
 ## Estado final
 

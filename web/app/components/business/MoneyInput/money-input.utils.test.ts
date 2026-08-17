@@ -44,4 +44,94 @@ describe('normalizeMoneyInputValue', () => {
       }),
     ).toBe('-100.50');
   });
+
+  it('permite conservar el separador decimal durante la edición', () => {
+  expect(
+    normalizeMoneyInputValue('12.'),
+  ).toBe('12.');
+});
+
+it('normaliza un separador decimal inicial', () => {
+  expect(
+    normalizeMoneyInputValue('.'),
+  ).toBe('0.');
+});
+
+it('elimina la moneda MXN de un valor pegado', () => {
+  expect(
+    normalizeMoneyInputValue('MXN 150.50'),
+  ).toBe('150.50');
+});
+
+it('rechaza múltiples signos negativos', () => {
+  expect(
+    normalizeMoneyInputValue('--100', {
+      allowNegative: true,
+    }),
+  ).toBeNull();
+});
+
+it('rechaza un signo negativo en una posición inválida', () => {
+  expect(
+    normalizeMoneyInputValue('10-0', {
+      allowNegative: true,
+    }),
+  ).toBeNull();
+});
+
+it('trata maxDecimals negativo como cero', () => {
+  expect(
+    normalizeMoneyInputValue('12.1', {
+      maxDecimals: -1,
+    }),
+  ).toBeNull();
+
+  expect(
+    normalizeMoneyInputValue('12', {
+      maxDecimals: -1,
+    }),
+  ).toBe('12');
+});
+
+it('normaliza maxDecimals decimal a un entero', () => {
+  expect(
+    normalizeMoneyInputValue('12.34', {
+      maxDecimals: 1.8,
+    }),
+  ).toBeNull();
+
+  expect(
+    normalizeMoneyInputValue('12.3', {
+      maxDecimals: 1.8,
+    }),
+  ).toBe('12.3');
+});
+
+it('usa dos decimales cuando maxDecimals no es finito', () => {
+  expect(
+    normalizeMoneyInputValue('12.34', {
+      maxDecimals: Number.NaN,
+    }),
+  ).toBe('12.34');
+
+  expect(
+    normalizeMoneyInputValue('12.345', {
+      maxDecimals: Number.NaN,
+    }),
+  ).toBeNull();
+});
+
+it('usa dos decimales cuando maxDecimals es infinito', () => {
+  expect(
+    normalizeMoneyInputValue('12.34', {
+      maxDecimals: Number.POSITIVE_INFINITY,
+    }),
+  ).toBe('12.34');
+
+  expect(
+    normalizeMoneyInputValue('12.345', {
+      maxDecimals: Number.POSITIVE_INFINITY,
+    }),
+  ).toBeNull();
+});
 });

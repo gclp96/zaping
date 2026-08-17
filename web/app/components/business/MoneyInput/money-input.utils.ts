@@ -57,7 +57,12 @@ export function normalizeMoneyInputValue(
   }
 
   const decimals = value.split('.')[1];
-  const decimalLimit = Math.max(0, maxDecimals);
+  const decimalLimit = Number.isFinite(maxDecimals)
+  ? Math.max(
+      0,
+      Math.floor(maxDecimals),
+    )
+  : 2;
 
   if (decimals && decimals.length > decimalLimit) {
     return null;
