@@ -1,3 +1,5 @@
+import DateInput from '@/app/components/business/DateInput';
+
 import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
@@ -171,15 +173,14 @@ export default function PurchaseReceiptModal({
                       </td>
 
                       <td className="w-44 px-3 py-3">
-                        <Input
+                        <DateInput
                           aria-label={`Caducidad de ${item.name}`}
-                          type="date"
                           value={item.expirationDate}
-                          onChange={(event) =>
+                          onValueChange={(value) =>
                             onItemChange(
                               item.purchaseItemId,
                               'expirationDate',
-                              event.target.value,
+                              value,
                             )
                           }
                         />
