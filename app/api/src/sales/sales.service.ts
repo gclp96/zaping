@@ -16,15 +16,52 @@ export class SalesService {
       where: {
         id: dto.customerId,
         companyId,
+        isActive: true,
       },
     });
 
     if (!customer) {
-      throw new NotFoundException('Cliente no encontrado');
+      throw new NotFoundException(
+        'Cliente no encontrado, inactivo o fuera de la empresa',
+      );
     }
+
     if (!dto.items || !Array.isArray(dto.items) || dto.items.length === 0) {
       throw new BadRequestException('Debe enviar al menos un item');
     }
+
+    /*
+     * Aunque el DTO ya valida quantity,
+     * mantenemos esta regla de negocio en el
+     * service para proteger llamadas internas
+     * que no pasen por ValidationPipe.
+     */
+    for (const item of dto.items) {
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        throw new BadRequestException(
+          `Cantidad inválida para producto ${item.productId}`,
+        );
+      }
+    }
+
+    /*
+     * Una venta no debe contener el mismo
+     * producto en partidas distintas.
+     */
+    const productIds = new Set<string>();
+
+    for (const item of dto.items) {
+      if (productIds.has(item.productId)) {
+        throw new BadRequestException(
+          `El producto ${item.productId} está duplicado`,
+        );
+      }
+
+      productIds.add(item.productId);
+    }
+
+    const roundMoney = (value: number): number =>
+      Math.round((value + Number.EPSILON) * 100) / 100;
 
     const saleItems: Array<{
       productId: string;
@@ -36,26 +73,27 @@ export class SalesService {
     let subtotal = 0;
 
     for (const item of dto.items) {
-      if (typeof item.quantity !== 'number' || item.quantity <= 0) {
-        throw new BadRequestException(
-          `Cantidad inválida para producto ${item.productId}`,
-        );
-      }
-
       const product = await this.prisma.product.findFirst({
         where: {
           id: item.productId,
           companyId,
+          isActive: true,
         },
       });
 
       if (!product) {
-        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
+        throw new NotFoundException(
+          `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+        );
       }
 
-      const itemSubtotal = item.quantity * product.price;
+      /*
+       * En venta manual el backend utiliza
+       * siempre el precio vigente del producto.
+       */
+      const itemSubtotal = roundMoney(item.quantity * product.price);
 
-      subtotal += itemSubtotal;
+      subtotal = roundMoney(subtotal + itemSubtotal);
 
       saleItems.push({
         productId: item.productId,
@@ -65,22 +103,30 @@ export class SalesService {
       });
     }
 
+    const iva = roundMoney(subtotal * 0.16);
+
+    const total = roundMoney(subtotal + iva);
+
     const folio = `V-${Date.now()}`;
-    const iva = subtotal * 0.16;
-    const total = subtotal + iva;
 
     return this.prisma.sale.create({
       data: {
         companyId,
         customerId: dto.customerId,
+
         folio,
+
         subtotal,
         iva,
         total,
+
+        status: 'DRAFT',
+
         items: {
           create: saleItems,
         },
       },
+
       include: {
         items: true,
       },
@@ -132,18 +178,14 @@ export class SalesService {
     });
   }
 
-  async approve(companyId: string, id: string) {
+  async approve(companyId: string, saleId: string) {
     const sale = await this.prisma.sale.findFirst({
       where: {
-        id,
+        id: saleId,
         companyId,
       },
       include: {
-        items: {
-          include: {
-            product: true,
-          },
-        },
+        items: true,
       },
     });
 
@@ -155,22 +197,77 @@ export class SalesService {
       throw new BadRequestException('La venta ya fue aprobada');
     }
 
-    // Validar inventario disponible
-    for (const item of sale.items) {
-      if (item.product.stock < item.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente para ${item.product.name}. Disponible: ${item.product.stock}`,
-        );
-      }
+    if (sale.status === 'CANCELLED') {
+      throw new BadRequestException('No se puede aprobar una venta cancelada');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      for (const item of sale.items) {
-        const newStock = item.product.stock - item.quantity;
+      /*
+       * Reservar la transición DRAFT -> CONFIRMED.
+       *
+       * Esto evita que dos solicitudes concurrentes
+       * aprueben la misma venta y descuenten inventario
+       * más de una vez.
+       */
+      const statusUpdate = await tx.sale.updateMany({
+        where: {
+          id: saleId,
+          companyId,
+          status: 'DRAFT',
+        },
+        data: {
+          status: 'CONFIRMED',
+        },
+      });
 
-        await tx.product.update({
+      if (statusUpdate.count !== 1) {
+        throw new BadRequestException(
+          'La venta ya fue aprobada, cancelada o ya no puede aprobarse',
+        );
+      }
+
+      for (const item of sale.items) {
+        /*
+         * Obtener nuevamente el producto dentro de la
+         * transacción.
+         *
+         * No utilizamos el stock precargado de la venta,
+         * porque podría haberse modificado entre la lectura
+         * inicial y la aprobación.
+         */
+        const product = await tx.product.findFirst({
           where: {
             id: item.productId,
+            companyId,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            cost: true,
+          },
+        });
+
+        if (!product) {
+          throw new NotFoundException(
+            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+          );
+        }
+
+        /*
+         * Descuento condicional.
+         *
+         * La condición stock >= quantity evita sobreventa
+         * incluso cuando existen operaciones concurrentes.
+         */
+        const stockUpdate = await tx.product.updateMany({
+          where: {
+            id: product.id,
+            companyId,
+            isActive: true,
+            stock: {
+              gte: item.quantity,
+            },
           },
           data: {
             stock: {
@@ -179,16 +276,56 @@ export class SalesService {
           },
         });
 
+        if (stockUpdate.count !== 1) {
+          const currentProduct = await tx.product.findFirst({
+            where: {
+              id: product.id,
+              companyId,
+            },
+            select: {
+              stock: true,
+            },
+          });
+
+          throw new BadRequestException(
+            `Stock insuficiente para ${product.name}. Disponible: ${
+              currentProduct?.stock ?? 0
+            }`,
+          );
+        }
+
+        /*
+         * Leer el saldo real después del descuento.
+         */
+        const updatedProduct = await tx.product.findFirst({
+          where: {
+            id: product.id,
+            companyId,
+          },
+          select: {
+            stock: true,
+          },
+        });
+
+        if (!updatedProduct) {
+          throw new NotFoundException(`Producto ${product.id} no encontrado`);
+        }
+
         await tx.inventoryMovement.create({
           data: {
             companyId,
-            productId: item.productId,
-            unitCost: item.price,
+            productId: product.id,
 
             movementType: 'OUT',
             quantity: item.quantity,
 
-            balance: newStock,
+            /*
+             * El movimiento almacena costo de inventario,
+             * no precio de venta.
+             */
+            unitCost: product.cost,
+
+            balance: updatedProduct.stock,
 
             referenceType: 'SALE',
             referenceId: sale.id,
@@ -198,12 +335,18 @@ export class SalesService {
         });
       }
 
-      return tx.sale.update({
+      return tx.sale.findFirst({
         where: {
-          id,
+          id: saleId,
+          companyId,
         },
-        data: {
-          status: 'CONFIRMED',
+        include: {
+          customer: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
         },
       });
     });
@@ -216,6 +359,7 @@ export class SalesService {
         companyId,
       },
       include: {
+        company: true,
         customer: true,
         items: {
           include: {
@@ -229,6 +373,16 @@ export class SalesService {
       throw new NotFoundException('Venta no encontrada');
     }
 
+    const companyName = sale.company.tradeName?.trim() || sale.company.name;
+
+    const currency = sale.company.currency || 'MXN';
+
+    const formatMoney = (value: number) =>
+      new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency,
+      }).format(value);
+
     const doc = new PDFDocument();
 
     res.setHeader('Content-Type', 'application/pdf');
@@ -240,10 +394,8 @@ export class SalesService {
 
     doc.pipe(res);
 
-    // Encabezado
-
     doc.fontSize(22);
-    doc.text('INSAP', {
+    doc.text(companyName, {
       align: 'center',
     });
 
@@ -276,9 +428,18 @@ export class SalesService {
 
     doc.fontSize(16);
     doc.text(`Cliente: ${sale.customer.name}`);
-    doc.text(`Contacto: ${sale.customer.contactName ?? ''}`);
-    doc.text(`Email: ${sale.customer.email}`);
-    doc.text(`Teléfono: ${sale.customer.phone}`);
+
+    if (sale.customer.contactName) {
+      doc.text(`Contacto: ${sale.customer.contactName}`);
+    }
+
+    if (sale.customer.email) {
+      doc.text(`Email: ${sale.customer.email}`);
+    }
+
+    if (sale.customer.phone) {
+      doc.text(`Teléfono: ${sale.customer.phone}`);
+    }
 
     doc.moveDown();
 
@@ -293,9 +454,11 @@ export class SalesService {
       doc.fontSize(12);
 
       doc.text(
-        `- ${item.product.name} | Cantidad: ${item.quantity} | Precio: $${item.price.toFixed(
-          2,
-        )} | Subtotal: $${item.subtotal.toFixed(2)}`,
+        `- ${item.product.name} | Cantidad: ${
+          item.quantity
+        } | Precio: ${formatMoney(item.price)} | Subtotal: ${formatMoney(
+          item.subtotal,
+        )}`,
       );
     });
 
@@ -305,9 +468,11 @@ export class SalesService {
 
     doc.fontSize(14);
 
-    doc.text(`Subtotal: $${sale.subtotal.toFixed(2)}`);
-    doc.text(`IVA (16%): $${sale.iva.toFixed(2)}`);
-    doc.text(`Total: $${sale.total.toFixed(2)}`);
+    doc.text(`Subtotal: ${formatMoney(sale.subtotal)}`);
+
+    doc.text(`IVA (16%): ${formatMoney(sale.iva)}`);
+
+    doc.text(`Total: ${formatMoney(sale.total)}`);
 
     doc.end();
   }
@@ -530,13 +695,41 @@ export class SalesService {
       throw new BadRequestException('La venta ya está cancelada');
     }
 
-    return this.prisma.sale.update({
+    /*
+     * Transición atómica DRAFT -> CANCELLED.
+     *
+     * El status en el WHERE evita que una venta
+     * sea cancelada si otra operación ya la aprobó
+     * o canceló de forma concurrente.
+     */
+    const statusUpdate = await this.prisma.sale.updateMany({
       where: {
         id: saleId,
+        companyId,
+        status: 'DRAFT',
       },
       data: {
         status: 'CANCELLED',
       },
     });
+
+    if (statusUpdate.count !== 1) {
+      throw new BadRequestException(
+        'La venta ya fue aprobada, cancelada o ya no puede cancelarse',
+      );
+    }
+
+    const cancelledSale = await this.prisma.sale.findFirst({
+      where: {
+        id: saleId,
+        companyId,
+      },
+    });
+
+    if (!cancelledSale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+
+    return cancelledSale;
   }
 }

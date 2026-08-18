@@ -1,15 +1,13 @@
-import { IsNumber, IsString } from 'class-validator';
+import { IsInt, IsUUID, Min } from 'class-validator';
+
 import { Type } from 'class-transformer';
 
 export class CreateSaleItemDto {
-  @IsString()
+  @IsUUID()
   productId!: string;
 
   @Type(() => Number)
-  @IsNumber()
+  @IsInt()
+  @Min(1)
   quantity!: number;
-
-  @Type(() => Number)
-  @IsNumber()
-  price!: number;
 }

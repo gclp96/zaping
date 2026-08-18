@@ -7,7 +7,7 @@
 | Versión | v0.9.0-alpha.1 |
 | Sprint actual | Sprint 09 |
 | Milestone actual | Core ERP — Compras e Inventario |
-| Última actualización | 2026-08-17
+| Última actualización | 2026-08-18
 
 ---
 
@@ -63,10 +63,12 @@
 
 | ID | Objetivo | Estado | Prioridad |
 |----|----------|--------|-----------|
-| SAL-001 | Auditoría del módulo de Ventas | 🟢 En progreso | Alta |
-| SAL-002 | Conversión transaccional de cotización a venta | ⏳ Pendiente | Crítica |
-| SAL-003 | Integración frontend de conversión | ⏳ Pendiente | Alta |
-| RET-001 | Diseño funcional del módulo de devoluciones | ⏳ Pendiente | Alta |
+| SAL-001 | Auditoría del módulo de Ventas | ✅ Completado | Alta |
+| SAL-002 | Conversión transaccional de cotización a venta | ✅ Completado | Crítica |
+| SAL-003 | Integración frontend de conversión | ✅ Completado | Alta |
+| SAL-004 | Hardening backend de Ventas | ✅ Completado | Crítica |
+| SAL-005 | Pruebas y validación de Ventas | ✅ Completado | Alta |
+| RET-001 | Diseño funcional del módulo de devoluciones | ⏳ Pendiente | Alta
 
 
 ---
