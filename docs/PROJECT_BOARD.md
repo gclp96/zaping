@@ -68,7 +68,7 @@
 | SAL-003 | Integración frontend de conversión | ✅ Completado | Alta |
 | SAL-004 | Hardening backend de Ventas | ✅ Completado | Crítica |
 | SAL-005 | Pruebas y validación de Ventas | ✅ Completado | Alta |
-| RET-001 | Diseño funcional del módulo de devoluciones | ⏳ Pendiente | Alta
+| RET-001 | Diseño funcional del módulo de devoluciones | 🟢 En progreso | Alta |
 
 
 ---
