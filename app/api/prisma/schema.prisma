@@ -328,6 +328,10 @@ model User {
   company Company @relation(fields: [companyId], references: [id])
 
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
+
+  createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
+  confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
+  cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
 }
 
 enum UserRole {
@@ -335,6 +339,20 @@ enum UserRole {
   MANAGER
   SALES
   WAREHOUSE
+}
+
+enum ReturnStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum ReturnItemCondition {
+  SELLABLE
+  DAMAGED
+  EXPIRED
+  OPENED
+  OTHER
 }
 
 model Sale {
@@ -362,7 +380,74 @@ model Sale {
 
   items SaleItem[]
 
+  returns SaleReturn[]
+
+  @@unique([id, companyId])
   @@unique([companyId, folio])
+}
+
+model SaleReturn {
+  id        String @id @default(uuid())
+  companyId String
+  saleId    String
+
+  folio  String
+  reason String
+
+  status ReturnStatus @default(DRAFT)
+
+  createdById   String
+  confirmedById String?
+  cancelledById String?
+
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sale Sale @relation(fields: [saleId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  createdBy   User  @relation("SaleReturnCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  confirmedBy User? @relation("SaleReturnConfirmedBy", fields: [confirmedById], references: [id], onDelete: Restrict)
+  cancelledBy User? @relation("SaleReturnCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+
+  items SaleReturnItem[]
+
+  @@unique([companyId, folio])
+  @@unique([id, companyId, saleId])
+  @@index([companyId, saleId])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@index([createdById])
+}
+
+model SaleReturnItem {
+  id String @id @default(uuid())
+
+  companyId    String
+  saleReturnId String
+  saleId       String
+  saleItemId   String
+
+  quantity Int
+
+  condition ReturnItemCondition
+  restock   Boolean             @default(false)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId, companyId, saleId], references: [id, companyId, saleId], onDelete: Restrict)
+  saleItem   SaleItem   @relation(fields: [saleItemId, saleId], references: [id, saleId], onDelete: Restrict)
+
+  @@unique([saleReturnId, saleItemId])
+  @@index([companyId, saleReturnId])
+  @@index([saleId])
+  @@index([saleItemId])
+  @@index([condition])
 }
 
 model SaleItem {
@@ -379,6 +464,12 @@ model SaleItem {
   price Float
 
   subtotal Float
+
+  returnedQuantity Int @default(0)
+
+  returnItems SaleReturnItem[]
+
+  @@unique([id, saleId])
 }
 
 model Supplier {

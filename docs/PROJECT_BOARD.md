@@ -70,7 +70,8 @@
 | SAL-005 | Pruebas y validación de Ventas | ✅ Completado | Alta |
 | RET-001 | Diseño funcional del módulo de devoluciones | ✅ Completado | Alta |
 | RET-002 | Diseño del modelo Prisma de devoluciones | ✅ Completado | Alta |
-| RET-003 | Implementación Prisma y migración de devoluciones | ⏳ Pendiente | Crítica |
+| RET-003 | Implementación Prisma y migración de devoluciones | ✅ Completado | Crítica |
+| RET-004 | Implementación backend del módulo de devoluciones | ⏳ Pendiente | Crítica |
 
 
 ---
