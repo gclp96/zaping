@@ -34,19 +34,22 @@ model Product {
   brand       String?
   categoryId  String?
 
-  category             Category?             @relation(fields: [categoryId], references: [id])
+  category             Category?                @relation(fields: [categoryId], references: [id])
   barcode              String?
-  cost                 Float                 @default(0)
-  price                Float                 @default(0)
-  stock                Int                   @default(0)
-  minStock             Int                   @default(0)
-  isActive             Boolean               @default(true)
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
+  cost                 Float                    @default(0)
+  price                Float                    @default(0)
+  stock                Int                      @default(0)
+  minStock             Int                      @default(0)
+  isActive             Boolean                  @default(true)
+  inventoryTracking    ProductInventoryTracking @default(QUANTITY)
+  lotTracking          ProductLotTracking       @default(OPTIONAL)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
   inventoryMovements   InventoryMovement[]
   inventoryBatches     InventoryBatch[]
   purchaseReceiptItems PurchaseReceiptItem[]
-  company              Company               @relation(fields: [companyId], references: [id])
+  equipmentAssets      EquipmentAsset[]
+  company              Company                  @relation(fields: [companyId], references: [id])
   purchaseItems        PurchaseItem[]
   quoteItems           QuoteItem[]
   saleItems            SaleItem[]
@@ -104,8 +107,9 @@ model InventoryBatch {
   company Company @relation(fields: [companyId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
-  receiptItems PurchaseReceiptItem[]
-  movements    InventoryMovement[]
+  receiptItems    PurchaseReceiptItem[]
+  movements       InventoryMovement[]
+  equipmentAssets EquipmentAsset[]
 
   @@unique([id, companyId])
   @@unique([companyId, productId, lotNumber])
@@ -119,6 +123,46 @@ enum InventoryMovementType {
   IN
   OUT
   ADJUSTMENT
+}
+
+enum ProductInventoryTracking {
+  QUANTITY
+  SERIALIZED
+  ASSET
+}
+
+enum ProductLotTracking {
+  NONE
+  OPTIONAL
+  REQUIRED
+}
+
+enum EquipmentLifecycle {
+  ACTIVE
+  RETIRED
+}
+
+enum EquipmentCondition {
+  GOOD
+  INSPECTION_PENDING
+  DAMAGED
+  OUT_OF_SERVICE
+}
+
+enum EquipmentOrigin {
+  MANUAL
+  PURCHASE_RECEIPT
+  IMPORT
+  INITIAL_MIGRATION
+}
+
+enum EquipmentRetirementReason {
+  SOLD
+  LOST
+  DESTROYED
+  END_OF_LIFE
+  REPLACED
+  OTHER
 }
 
 model Customer {
@@ -276,6 +320,8 @@ model PurchaseReceiptItem {
   product      Product         @relation(fields: [productId], references: [id])
   batch        InventoryBatch? @relation(fields: [batchId], references: [id])
 
+  equipmentAssets EquipmentAsset[]
+
   @@index([companyId])
   @@index([receiptId])
   @@index([purchaseItemId])
@@ -298,6 +344,9 @@ model Company {
   customers            Customer[]
   inventoryMovements   InventoryMovement[]
   inventoryBatches     InventoryBatch[]
+  equipmentAssets      EquipmentAsset[]
+  equipmentInspections EquipmentInspection[]
+  companySequences     CompanySequence[]
   purchaseReceipts     PurchaseReceipt[]
   purchaseReceiptItems PurchaseReceiptItem[]
   products             Product[]
@@ -310,6 +359,21 @@ model Company {
   suppliers  Supplier[]
   categories Category[]
   currency   String     @default("MXN")
+}
+
+model CompanySequence {
+  id        String @id @default(uuid())
+  companyId String
+
+  key       String
+  nextValue Int    @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, key])
 }
 
 model User {
@@ -329,9 +393,90 @@ model User {
 
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
 
+  equipmentInspections EquipmentInspection[] @relation("EquipmentInspectedBy")
+  retiredEquipment     EquipmentAsset[]      @relation("EquipmentRetiredBy")
+
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
   cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
+}
+
+model EquipmentAsset {
+  id        String @id @default(uuid())
+  companyId String
+  productId String
+
+  assetCode String
+
+  serialNumber    String?
+  serialNumberKey String?
+
+  lifecycle EquipmentLifecycle @default(ACTIVE)
+  condition EquipmentCondition
+
+  origin EquipmentOrigin @default(MANUAL)
+
+  batchId               String?
+  purchaseReceiptItemId String?
+
+  retiredAt       DateTime?
+  retiredById     String?
+  retiredReason   EquipmentRetirementReason?
+  retirementNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  batch InventoryBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+
+  purchaseReceiptItem PurchaseReceiptItem? @relation(fields: [purchaseReceiptItemId], references: [id], onDelete: Restrict)
+
+  retiredBy User? @relation("EquipmentRetiredBy", fields: [retiredById], references: [id], onDelete: Restrict)
+
+  inspections EquipmentInspection[]
+
+  @@unique([id, companyId])
+  @@unique([companyId, assetCode])
+  @@unique([companyId, productId, serialNumberKey])
+  @@index([companyId, productId])
+  @@index([companyId, serialNumberKey])
+  @@index([companyId, lifecycle])
+  @@index([companyId, condition])
+  @@index([batchId])
+  @@index([purchaseReceiptItemId])
+  @@index([retiredById])
+}
+
+model EquipmentInspection {
+  id        String @id @default(uuid())
+  companyId String
+
+  equipmentAssetId String
+
+  conditionBefore EquipmentCondition
+  conditionAfter  EquipmentCondition
+
+  inspectedAt   DateTime @default(now())
+  inspectedById String
+
+  notes String?
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  equipmentAsset EquipmentAsset @relation(fields: [equipmentAssetId, companyId], references: [id, companyId], onDelete: Restrict)
+  inspectedBy User @relation("EquipmentInspectedBy", fields: [inspectedById], references: [id], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@index([companyId, equipmentAssetId])
+  @@index([equipmentAssetId, inspectedAt])
+  @@index([companyId, conditionAfter])
+  @@index([inspectedById])
 }
 
 enum UserRole {

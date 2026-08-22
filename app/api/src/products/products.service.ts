@@ -66,6 +66,8 @@ export class ProductsService {
         price: dto.price,
         stock: dto.stock,
         minStock: dto.minStock,
+        inventoryTracking: dto.inventoryTracking,
+        lotTracking: dto.lotTracking,
       },
     });
   }

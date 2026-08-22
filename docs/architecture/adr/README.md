@@ -98,6 +98,7 @@ La decisión continúa registrada por razones históricas pero ya no debe utiliz
 | ADR-011 | Sales Order y Delivery | ACCEPTED | Arquitectura objetivo |
 | ADR-012 | Entity Lifecycle Strategy | ACCEPTED | Implementación parcial |
 | ADR-013 | Inventory Custody & Case Logistics | ACCEPTED | Arquitectura objetivo Healthcare |
+|ADR-014 — Inventory Locations and Internal Transfers | ACCEPTED |
 
 ---
 

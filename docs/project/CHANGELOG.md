@@ -3,8 +3,7 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.0.0
 **Estado:** Activo
-**Última actualización:** 2026-08-19
-**Responsable:** Zaping Team
+**Última actualización:** 2026-08-21
 
 ---
 
@@ -60,8 +59,660 @@ ROADMAP
 Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Backlog y pasar a formar parte de la historia consolidada del proyecto.
 
 ---
+# 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
 
-# 3. Estado actual — Unreleased
+## Documentation Architecture Refactor
+
+**Estado:** Completed
+**Periodo:** 2026-08
+
+Se completó una reconstrucción de la documentación oficial de Zaping con el objetivo de eliminar:
+
+* documentos vacíos;
+* duplicados;
+* fuentes contradictorias;
+* arquitectura obsoleta;
+* documentación fragmentada por Sprint;
+* reglas históricas presentadas como vigentes.
+
+Se adoptó y aplicó el principio:
+
+> **Una verdad → un documento responsable.**
+
+---
+
+# Equipment Inspection Workflow — EQ-INS-001
+
+# Equipment Retirement Workflow — EQ-RET-001
+
+Después de implementar Equipment Inspection, Core Equipment incorporó una operación explícita para retirar permanentemente activos de la flota operacional.
+
+Estado:
+
+```text
+EQ-RET-001
+Equipment Retirement
+→ IMPLEMENTED / VALIDATED
+
+## Product Documentation
+
+Se consolidaron:
+
+```text
+product/PRODUCT_VISION.md
+product/PRODUCT_REQUIREMENTS.md
+product/ZAPING_WAY.md
+```
+
+El ecosistema quedó estructurado conceptualmente como:
+
+```text
+Zaping Platform
+├── Zaping ERP Core
+├── Zaping Healthcare
+├── Zaping Radar
+└── Zaping AI
+```
+
+Healthcare se mantiene como la primera vertical especializada.
+
+---
+
+## Architecture Documentation
+
+Se consolidaron:
+
+```text
+architecture/ARCHITECTURE.md
+architecture/c4/
+architecture/adr/
+```
+
+El catálogo ADR vigente quedó consolidado hasta ADR-013.
+
+Se eliminaron ubicaciones legacy y documentos arquitectónicos redundantes.
+
+---
+
+## Engineering Documentation
+
+Se consolidaron:
+
+```text
+ENGINEERING_GUIDE.md
+DEVELOPMENT_WORKFLOW.md
+QUALITY_STANDARDS.md
+SECURITY_PRINCIPLES.md
+API_GUIDELINES.md
+```
+
+Se corrigieron duplicaciones entre Quality y Security y se formalizó nuevamente el flujo:
+
+```text
+Business Analysis
+↓
+Documentation
+↓
+Architecture Review
+↓
+Implementation
+↓
+Tests
+↓
+QA
+↓
+Documentation Update
+```
+
+---
+
+## UX Documentation
+
+Se consolidaron:
+
+```text
+ux/DESIGN_SYSTEM.md
+ux/BUSINESS_COMPONENTS.md
+product/ZAPING_WAY.md
+```
+
+Se mantuvo como principio:
+
+> **Simple por defecto. Poderoso cuando se necesita.**
+
+Y:
+
+```text
+Data
+↓
+Context
+↓
+Action
+```
+
+como dirección general de experiencia.
+
+---
+
+## ERP Module Documentation
+
+La documentación funcional fue consolidada bajo:
+
+```text
+docs/modules/erp/
+```
+
+incluyendo fuentes responsables para:
+
+```text
+AUDIT
+COMPANIES
+CUSTOMERS
+DASHBOARD
+IDENTITY_ACCESS
+INVENTORY
+PRODUCTS
+PURCHASES
+QUOTES
+RETURNS
+SALES
+SUPPLIERS
+EQUIPMENT
+```
+
+Se eliminaron o sustituyeron documentos duplicados y snapshots que ya no representaban el estado vigente.
+
+---
+
+# Core Equipment Domain
+
+Durante agosto de 2026 se formalizó e implementó la primera baseline técnica de Core Equipment.
+
+La responsabilidad quedó separada de la siguiente manera:
+
+```text
+Zaping ERP / Core
+→ EquipmentAsset identity and lifecycle
+
+Zaping Healthcare
+→ operational use of Equipment inside Cases
+```
+
+Documentación vigente:
+
+```text
+docs/modules/erp/EQUIPMENT.md
+→ v1.3.0
+
+docs/modules/healthcare/EQUIPMENT.md
+→ v1.0.0
+```
+
+---
+
+## Product Tracking Evolution
+
+`Product` evolucionó para distinguir la estrategia principal de seguimiento físico.
+
+Se incorporó:
+
+```text
+ProductInventoryTracking
+├── QUANTITY
+├── SERIALIZED
+└── ASSET
+```
+
+También se formalizó lot tracking como dimensión independiente:
+
+```text
+ProductLotTracking
+├── NONE
+├── OPTIONAL
+└── REQUIRED
+```
+
+Debe mantenerse:
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+Para:
+
+```text
+inventoryTracking = ASSET
+```
+
+la identidad de cada unidad física pertenece a:
+
+```text
+EquipmentAsset
+```
+
+---
+
+## Equipment Persistence Baseline
+
+Se incorporaron en Prisma:
+
+```text
+EquipmentAsset
+EquipmentInspection
+```
+
+junto con:
+
+```text
+EquipmentLifecycle
+├── ACTIVE
+└── RETIRED
+
+EquipmentCondition
+├── GOOD
+├── INSPECTION_PENDING
+├── DAMAGED
+└── OUT_OF_SERVICE
+
+EquipmentOrigin
+├── MANUAL
+├── PURCHASE_RECEIPT
+├── IMPORT
+└── INITIAL_MIGRATION
+
+EquipmentRetirementReason
+├── SOLD
+├── LOST
+├── DESTROYED
+├── END_OF_LIFE
+├── REPLACED
+└── OTHER
+```
+
+---
+
+## Equipment Identity
+
+Se formalizó:
+
+```text
+Product
+→ what the resource/model is
+
+EquipmentAsset
+→ which exact physical unit it is
+```
+
+Todo `EquipmentAsset` requiere:
+
+```text
+productId
+companyId
+assetCode
+```
+
+`serialNumber` es opcional.
+
+Se incorporó:
+
+```text
+serialNumberKey
+```
+
+para normalización y detección consistente de duplicados.
+
+Restricciones principales:
+
+```text
+companyId + assetCode
+→ UNIQUE
+```
+
+y:
+
+```text
+companyId + productId + serialNumberKey
+→ UNIQUE
+```
+
+---
+
+## Core Equipment Backend
+
+Se implementó el módulo NestJS de Equipment.
+
+Contrato API vigente:
+
+```text
+GET  /equipment
+GET  /equipment/:id
+POST /equipment
+```
+
+No forman parte del contrato actual:
+
+```text
+PATCH /equipment/:id
+DELETE /equipment/:id
+```
+
+La ausencia de `DELETE` preserva la historia del activo.
+
+La ausencia de un `PATCH` genérico protege la identidad operacional y reserva cambios sensibles para futuras operaciones explícitas y auditables.
+
+---
+
+## Equipment Registration
+
+El flujo implementado para registro manual es:
+
+```text
+Authenticated User
+↓
+companyId from authentication context
+↓
+Validate DTO
+↓
+Validate Product belongs to Company
+↓
+Validate Product.inventoryTracking = ASSET
+↓
+Validate Product.isActive
+↓
+Validate optional Batch
+↓
+Normalize assetCode
+↓
+Validate assetCode uniqueness
+↓
+Normalize optional serialNumber
+↓
+Generate serialNumberKey
+↓
+Validate serial uniqueness
+↓
+Create EquipmentAsset
+```
+
+Los Equipment creados mediante este flujo utilizan:
+
+```text
+origin = MANUAL
+lifecycle = ACTIVE
+```
+
+---
+
+## Multi-Tenant Protection
+
+Equipment utiliza:
+
+```text
+companyId
+```
+
+del usuario autenticado como frontera del tenant.
+
+El cliente no controla `companyId` mediante el DTO.
+
+También se valida tenant ownership para:
+
+```text
+Product
+InventoryBatch
+EquipmentAsset
+```
+
+según corresponda.
+
+---
+
+## Error Handling
+
+Durante esta implementación se validaron respuestas explícitas:
+
+```text
+400 Bad Request
+→ invalid DTO
+→ incompatible Product tracking
+→ invalid business input
+
+404 Not Found
+→ missing Equipment
+→ missing Product
+→ invalid Batch relationship
+
+409 Conflict
+→ duplicate assetCode
+→ duplicate normalized serial
+```
+
+Los conflictos esperados no deben convertirse en errores `500`.
+
+---
+
+## Equipment QA
+
+La baseline final fue validada mediante QA manual sobre:
+
+```text
+GET equipment
+GET equipment by ID
+valid Equipment creation
+duplicate assetCode
+duplicate normalized serial
+QUANTITY Product rejection
+nonexistent Equipment
+invalid DTO
+optional serialNumber
+assetCode normalization
+protected operational fields during development
+```
+
+Durante el desarrollo se exploró temporalmente:
+
+```text
+PATCH /equipment/:id
+```
+
+para validar normalización y protección de campos.
+
+Después de revisar las reglas de identidad del dominio, dicho endpoint fue retirado antes del cierre de la baseline.
+
+Por tanto:
+
+```text
+PATCH /equipment/:id
+→ NOT part of the final v1.3.0 contract
+```
+
+---
+
+## Automated Tests
+
+Estado final de Equipment:
+
+```text
+EquipmentService
+8 / 8 PASS
+
+EquipmentController
+4 / 4 PASS
+
+Equipment total
+12 / 12 PASS
+```
+
+Regression suite completa del backend:
+
+```text
+Test Suites
+28 / 28 PASS
+
+Tests
+124 / 124 PASS
+```
+
+Quality Gates:
+
+```text
+Prisma migrate status
+→ Database schema up to date
+
+Prisma validate
+→ PASS
+
+Prisma generate
+→ PASS
+
+npm test
+→ PASS
+
+npm run build
+→ PASS
+
+ESLint
+→ PASS
+```
+
+---
+
+## Healthcare Equipment Boundary
+
+Se eliminó la duplicación documental entre Core y Healthcare.
+
+La responsabilidad vigente es:
+
+```text
+ERP/Core Equipment
+→ physical identity
+→ Product relationship
+→ assetCode
+→ serial
+→ lifecycle
+→ condition
+→ retirement
+```
+
+Healthcare conserva responsabilidad sobre:
+
+```text
+Equipment Requirement
+Case Equipment Assignment
+Preparation
+Dispatch
+Custody
+Return
+Inspection context
+Availability for Case
+Case Equipment history
+```
+
+Debe mantenerse:
+
+```text
+EquipmentAsset
+→ one Core identity
+
+Healthcare
+→ consumes that identity
+```
+
+---
+
+## Equipment Architecture Principles Established
+
+Quedaron formalizadas las siguientes separaciones:
+
+```text
+Product
+≠
+EquipmentAsset
+```
+
+```text
+Lifecycle
+≠
+Condition
+```
+
+```text
+Condition
+≠
+Availability
+```
+
+```text
+Assignment
+≠
+Custody
+```
+
+```text
+Dispatch
+≠
+Inventory OUT
+```
+
+```text
+Return
+≠
+Inventory IN
+```
+
+```text
+Return
+≠
+Available
+```
+
+```text
+Inspection GOOD
+≠
+Available
+```
+
+```text
+Missing
+≠
+Lost
+```
+
+Estas reglas constituyen la base para la futura integración de Equipment con Zaping Healthcare.
+
+---
+
+## Resultado de agosto 2026
+
+Al cierre de esta baseline:
+
+```text
+Documentation Architecture Refactor
+→ COMPLETED
+
+Core Equipment Domain
+→ APPROVED
+
+Equipment Persistence Baseline
+→ IMPLEMENTED
+
+Equipment Registration / Read Backend
+→ IMPLEMENTED
+
+Equipment Automated Tests
+→ PASS
+
+Healthcare Equipment Boundary
+→ APPROVED
+
+Equipment Operational Workflows
+→ NOT YET IMPLEMENTED
+```
+
+Los siguientes workflows deberán construirse como operaciones explícitas de dominio y no como extensiones indiscriminadas de un CRUD.
+
 
 ## Documentation Architecture Refactor
 

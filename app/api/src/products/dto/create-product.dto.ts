@@ -1,4 +1,7 @@
+import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
+
 import {
+  IsEnum,
   IsString,
   IsNumber,
   IsOptional,
@@ -58,4 +61,12 @@ export class CreateProductDto {
   @IsNumber()
   @IsOptional()
   stock?: number;
+
+  @IsEnum(ProductInventoryTracking)
+  @IsOptional()
+  inventoryTracking?: ProductInventoryTracking;
+
+  @IsEnum(ProductLotTracking)
+  @IsOptional()
+  lotTracking?: ProductLotTracking;
 }
