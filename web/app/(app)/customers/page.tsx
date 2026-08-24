@@ -4,11 +4,11 @@ import { useEffect, useState } from 'react';
 import { api } from '@/services/api';
 import Modal from '@/app/components/ui/Modal';
 import Table from '@/app/components/ui/Table';
-import PageContainer from '../components/ui/layout/PageContainer';
-import Button from '../components/ui/Button';
-import Loading from '../components/ui/Loading';
-import EmptyState from '../components/ui/EmptyState';
-import PageHeader from '../components/ui/layout/PageHeader';
+import PageContainer from '@/app/components/ui/layout/PageContainer';
+import Button from '@/app/components/ui/Button';
+import Loading from '@/app/components/ui/Loading';
+import EmptyState from '@/app/components/ui/EmptyState';
+import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 import CustomerFormModal from '@/app/components/business/CustomerForm';
 
@@ -197,7 +197,7 @@ function openEditModal(customer: Customer) {
                 onClick={handleDeleteCustomer}
                 disabled={deleteLoading}
                 className='px-4 py-2 bg-red-700 text-white rounded-lg disabled:bg-gray-400'
-                > 
+                >
                 {deleteLoading ? 'Eliminando...' : 'Eliminar'}
                 </button>
             </div>

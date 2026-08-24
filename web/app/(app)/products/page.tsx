@@ -9,7 +9,7 @@ import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Button from '@/app/components/ui/Button';
 import EmptyState from '@/app/components/ui/EmptyState';
 import Loading from '@/app/components/ui/Loading';
-import MoneyInput from '../components/business/MoneyInput';
+import MoneyInput from '@/app/components/business/MoneyInput';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
@@ -49,7 +49,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-    
+
 async function loadProducts() {
   try {
     const response = await api.get('/products');
