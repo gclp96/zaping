@@ -61,6 +61,7 @@ const dashboardData = {
   },
   inventoryValue: 0,
   lowStockProducts: 0,
+  lowStock: [],
 };
 
 function configureApiMocks() {
@@ -124,7 +125,7 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(
       await screen.findByText(
-        'Resumen general de la actividad de la empresa.',
+        'Estado actual de tu operación.',
       ),
     ).toBeTruthy();
     expect(container.querySelectorAll('aside')).toHaveLength(1);
