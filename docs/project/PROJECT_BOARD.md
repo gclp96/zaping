@@ -2,7 +2,7 @@
 
 **Producto:** Zaping Platform
 **Estado:** Desarrollo activo
-**Fase actual:** ERP Core + Equipment Foundation + Healthcare Preparation
+**Fase actual:** ERP Core UI/UX Completion after Healthcare Case Foundation validation
 **Última actualización:** 2026-08-24
 **Responsable:** Zaping Team
 
@@ -55,7 +55,7 @@ Zaping Platform
 │
 ├── Healthcare
 │   ├── Arquitectura de dominio en evolución
-│   ├── Case Foundation domain design approved
+│   ├── Case Foundation implemented / validated
 │   ├── Equipment boundary documentado
 │   └── Workflows operacionales pendientes
 │
@@ -1590,7 +1590,7 @@ salvo que alguno sea necesario para un workflow P0/P1.
 
 # 11. Healthcare — estado actual
 
-**Estado:** 🟡 Case Foundation ready for implementation
+**Estado:** ✅ Case Foundation completed / validated; Healthcare expansion deferred behind ERP Core UI/UX
 **Prioridad:** P1 estratégica
 
 Completado específicamente para Equipment:
@@ -1608,7 +1608,7 @@ Healthcare Equipment todavía no está implementado.
 Healthcare Case Foundation:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+IMPLEMENTED / VALIDATED
 
 Repository analysis
 → COMPLETE
@@ -1617,10 +1617,16 @@ Domain design
 → APPROVED
 
 Implementation
-→ NOT STARTED
+→ COMPLETE
+
+Automated validation
+→ PASS
+
+Manual PostgreSQL / API QA
+→ PASS within stated limits
 ```
 
-Scope aprobado para Phase 1:
+Implementado:
 
 ```text
 HealthcareCase
@@ -1634,7 +1640,7 @@ creation / cancellation audit facts
 stable references for future Healthcare domains
 ```
 
-Campos conceptuales aprobados:
+Persistencia implementada:
 
 ```text
 id
@@ -1661,7 +1667,32 @@ createdAt
 updatedAt
 ```
 
-Status conceptual aprobado:
+Migration:
+
+```text
+20260824162849_add_healthcare_case_foundation
+→ focused Case Foundation migration
+→ no reset
+→ no unrelated destructive SQL
+```
+
+Relations preserve audit history:
+
+```text
+Company
+→ onDelete Restrict
+
+responsibleUser
+→ onDelete Restrict
+
+createdBy
+→ onDelete Restrict
+
+cancelledBy
+→ onDelete Restrict
+```
+
+Lifecycle implemented:
 
 ```text
 DRAFT
@@ -1669,7 +1700,27 @@ SCHEDULED
 CANCELLED
 ```
 
-No incluir en Foundation:
+Active status derivation:
+
+```text
+effective scheduledStart exists
+→ SCHEDULED
+
+effective scheduledStart absent
+→ DRAFT
+```
+
+Cancelled is terminal in Foundation:
+
+```text
+PATCH CANCELLED
+→ 409 El caso cancelado no puede modificarse
+
+second cancel
+→ 409 El caso ya está cancelado
+```
+
+Not implemented in Foundation:
 
 ```text
 IN_PROGRESS
@@ -1706,7 +1757,28 @@ CASE-000001
 → allocated inside Case creation transaction
 ```
 
-Candidate constraints/indexes approved for implementation review:
+Shared sequence infrastructure implemented:
+
+```text
+src/company-sequences
+CompanySequenceAllocatorService
+
+allocateNext(tx, companyId, key)
+→ caller-owned Prisma transaction
+→ race-safe sequence row bootstrap
+→ atomic nextValue increment
+→ numeric allocation only
+```
+
+Case folio key:
+
+```text
+HEALTHCARE_CASE_FOLIO
+```
+
+Equipment owns `EQ-` formatting and collision logic. Healthcare Case owns `CASE-` formatting and collision logic.
+
+Constraints/indexes implemented:
 
 ```text
 @@unique([companyId, folio])
@@ -1785,7 +1857,7 @@ API namespace approved:
 /healthcare/cases
 ```
 
-Planned Phase 1 API:
+API implemented:
 
 ```text
 POST /healthcare/cases
@@ -1795,17 +1867,70 @@ PATCH /healthcare/cases/:id
 POST /healthcare/cases/:id/cancel
 ```
 
-RBAC direction for later implementation:
+Create:
+
+```text
+client supplies
+→ title
+→ procedureDescription?
+→ scheduledStart?
+→ scheduledEnd?
+→ responsibleUserId?
+
+server derives
+→ companyId
+→ createdById
+→ folio
+→ status
+```
+
+Create transaction:
+
+```text
+creator validation
+responsible-user validation when supplied
+CompanySequence folio allocation
+HealthcareCase create
+```
+
+PATCH planning:
+
+```text
+omitted
+→ retain persisted value
+
+explicit null where allowed
+→ clear value
+```
+
+B.4.1 regression and resolution:
+
+```text
+schedule-only PATCH with title omitted
+→ originally returned 400 El título del caso es obligatorio
+
+root cause
+→ update normalization treated own undefined as supplied value
+
+fix
+→ undefined / omitted retains persisted value
+→ explicit value applies normalization/update
+
+manual retest
+→ PASS
+```
+
+RBAC implemented:
 
 ```text
 ADMIN
-→ read / create / edit / cancel
+→ create / read / edit / cancel
 
 MANAGER
-→ read / create / edit / cancel
+→ create / read / edit / cancel
 
 SALES
-→ read / create / edit
+→ create / read / edit
 
 WAREHOUSE
 → read
@@ -1822,31 +1947,128 @@ Case creation idempotency
 Prisma assessment:
 
 ```text
-new HealthcareCase model
-new HealthcareCaseStatus enum
-relations
-indexes / constraints
-migration
+B.1 required one focused schema/migration change
+
+B.2 / B.3 / B.4 / B.4.1
+→ no additional schema changes
+→ no additional migrations
 
 Hospital and Doctor
 → not part of this migration
 ```
 
-Planned implementation phases:
+Automated validation:
 
 ```text
-B.1 Prisma HealthcareCase model + HealthcareCaseStatus + migration
-B.2 Case folio allocation + HealthcareCaseService create/read/list
-B.3 DTOs + HealthcareCaseController + authenticated API
-B.4 planning update + cancellation lifecycle rules
-B.5 automated validation + PostgreSQL/API manual QA
-C final documentation synchronization
+HealthcareCaseService
+59 tests PASS
+
+Controller + DTOs
+46 tests PASS
+
+Full Healthcare Case
+6 suites
+116 tests PASS
+
+Full backend
+40 suites
+341 tests PASS
+
+Prisma validate
+PASS
+
+Build
+PASS
+
+Changed TypeScript ESLint
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
 ```
 
-Pendiente:
+Manual PostgreSQL / API QA:
 
 ```text
-Healthcare Case Foundation implementation
+two repeated Case creation requests
+→ CASE-000001
+→ CASE-000002
+→ valid independent Cases
+
+primary QA Case
+→ CASE-000002
+→ 99ca6093-7209-4152-af4d-37a9d774536d
+
+GET one
+→ PASS
+
+GET list
+→ PASS
+
+schedule-only PATCH after B.4.1
+→ DRAFT to SCHEDULED
+→ existing title preserved
+→ PASS
+
+reschedule
+→ SCHEDULED to SCHEDULED
+→ PASS
+
+invalid schedule
+→ 400 La fecha de fin debe ser posterior a la fecha de inicio
+→ subsequent GET confirmed no mutation
+→ PASS
+
+unschedule
+→ SCHEDULED to DRAFT
+→ PASS
+
+reschedule before cancellation
+→ DRAFT to SCHEDULED
+→ PASS
+
+cancel
+→ SCHEDULED to CANCELLED
+→ schedule preserved
+→ cancellation audit set
+→ PASS
+
+terminal state checks
+→ PATCH CANCELLED 409
+→ second cancel 409
+→ final GET preserved original cancellation audit facts
+→ PASS
+```
+
+Manual QA limits:
+
+```text
+real manual second-company cross-tenant QA
+→ NOT PERFORMED
+
+real simultaneous concurrent cancellation race
+→ NOT PERFORMED
+```
+
+Idempotency evidence/debt:
+
+```text
+same logical Case create submitted twice
+→ two valid Cases
+→ two folios
+
+Case creation idempotency
+→ unresolved
+```
+
+This is expected under the current non-idempotent API and is not a sequence bug.
+
+Still pending for Healthcare, deferred behind ERP Core UI/UX Completion:
+
+```text
 Hospital/Doctor master data
 Equipment Requirement
 Case Equipment Assignment
@@ -1864,23 +2086,21 @@ Technician Mobile
 
 ---
 
-# 12. Healthcare Equipment — orden recomendado
+# 12. Healthcare — orden futuro recomendado
+
+Healthcare expansion remains queued after ERP Core UI/UX Completion.
 
 ```text
-1. Healthcare Case Foundation
-2. Hospital/Doctor master data
-3. Equipment Requirement contract
-4. Case Equipment Assignment
-5. Availability for Case
-6. Preparation integration
-7. Dispatch
-8. Custody
-9. Return
-10. Inspection integration
-11. Case 360
-12. Warehouse Operations UI
-13. Calendar integration
-14. Technician Mobile
+1. Hospital / Doctor master data
+2. Equipment / Material Requirements
+3. Equipment Assignment
+4. Case Availability
+5. Dispatch / Custody
+6. Return
+7. Case Kit / Maletín
+8. Case Calendar
+9. Case 360
+10. Mobile technician experience
 ```
 
 Healthcare deberá consumir siempre:
@@ -2225,7 +2445,7 @@ Future
 
 # 19. Orden de trabajo inmediato
 
-Para el workstream actual Healthcare + Equipment:
+Para el workstream Healthcare + Equipment recientemente cerrado:
 
 ```text
 1. Design Automatic assetCode generation
@@ -2233,8 +2453,6 @@ Para el workstream actual Healthcare + Equipment:
 3. Purchase Receipt → EquipmentAsset
 4. Availability Evaluator
 5. Healthcare Case Foundation
-6. Healthcare Equipment Assignment
-7. Healthcare Case Logistics integration
 ```
 
 Estado:
@@ -2253,10 +2471,7 @@ Estado:
 → completed / validated
 
 5. Healthcare Case Foundation
-→ domain design approved / ready for implementation
-
-6. Healthcare Equipment Assignment
-→ blocked by Case Foundation
+→ completed / validated
 ```
 Core Equipment baseline
 ✅
@@ -2272,6 +2487,76 @@ Purchase Receipt → EquipmentAsset
 
 Current Availability
 ✅
+
+Healthcare Case Foundation
+✅
+
+Equipment Assignment is no longer blocked by absence of `HealthcareCase`, but it is not the immediate next implementation task.
+
+Immediate next milestone:
+
+```text
+ERP CORE UI / UX COMPLETION
+```
+
+Purpose:
+
+```text
+finish and normalize Zaping's base ERP product experience
+before adding more Healthcare-specific modules
+```
+
+Conceptual milestone areas:
+
+```text
+1. authenticated global App Shell
+→ persistent sidebar across authenticated pages
+→ consistent header/layout
+→ active navigation state
+→ responsive navigation
+
+2. Dashboard / Home refinement
+→ operational overview
+→ meaningful KPIs
+→ pending work / alerts
+→ consistent visual hierarchy
+
+3. Sales frontend completion
+→ Sales listing
+→ create Sale experience
+→ Sale detail
+→ status/actions
+→ integration with existing backend
+
+4. ERP module UX consistency
+→ Products
+→ Customers
+→ Suppliers
+→ Quotes
+→ Purchases
+→ Purchase Receipts
+→ Inventory
+→ Sales
+→ Equipment
+
+Review for:
+→ PageContainer
+→ PageHeader
+→ filters
+→ search
+→ tables
+→ badges
+→ loading
+→ empty states
+→ errors
+→ forms
+→ dialogs
+→ navigation
+
+5. ERP end-to-end UX/QA
+→ Supplier → Purchase → Receipt → Inventory → Quote → Sale
+→ Purchase → Receipt ASSET → Equipment → Inspection → Availability
+```
 
 En paralelo, antes de release comercial deberán cerrarse los blockers:
 
@@ -2292,56 +2577,56 @@ No debe sacrificarse seguridad para acelerar un workflow funcional.
 El siguiente bloque es:
 
 ```text
-Healthcare Case Foundation
+ERP CORE UI / UX COMPLETION
 ```
 
 Estado:
 
 ```text
 Healthcare Case Foundation
-→ DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+→ COMPLETED / VALIDATED
 
-Implementation
-→ NOT STARTED
+ERP CORE UI / UX COMPLETION
+→ NEXT MILESTONE
 ```
 
-Primero:
+Este hito debe estabilizar la experiencia base del ERP antes de expandir Healthcare logistics.
+
+Scope recomendado:
 
 ```text
-Repository analysis
-↓
-Domain design
-↓
-Architecture review
+authenticated global App Shell
+Dashboard / Home refinement
+Sales frontend completion
+ERP module UX consistency
+ERP end-to-end UX/QA
 ```
 
-Después:
+Healthcare futuro queda en cola posterior:
 
 ```text
-Backend
-↓
-Tests
-↓
-QA
-↓
-Documentation Update
+Hospital / Doctor master data
+Equipment / Material Requirements
+Equipment Assignment
+Case Availability
+Dispatch / Custody
+Return
+Case Kit / Maletín
+Case Calendar
+Case 360
+Mobile technician experience
 ```
 
-Debe mantenerse:
+Deuda no resuelta que debe seguir visible:
 
 ```text
-assetCode
-→ stable operational identity
-
-assetCode
-→ unique inside Company
-
-assetCode
-→ never reused
-
-generated identifier
-≠
-business meaning encoded in code
+Purchase Receipt idempotency
+Healthcare Case creation idempotency
+Product.stock ↔ EquipmentAsset reconciliation
+serial assignment/correction
+broader lotTracking enforcement
+tenant-safe legacy write hardening
+future Equipment Assignment concurrency design
 ```
 
 ---
@@ -2369,10 +2654,15 @@ Availability Evaluator
 Then:
 
 Healthcare Case Foundation
-→ next approved implementation dependency
+→ completed / validated
 
 Then:
 
-Healthcare Equipment Assignment
-→ blocked until HealthcareCase exists
+ERP CORE UI / UX COMPLETION
+→ immediate next milestone
+
+Then:
+
+Healthcare logistics expansion
+→ queued after ERP Core UI/UX Completion
 ```

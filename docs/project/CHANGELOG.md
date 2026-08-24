@@ -61,6 +61,307 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
 
+## Healthcare Case Foundation
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+Healthcare Case Foundation incorporo el root operacional persistido para Healthcare Cases:
+
+```text
+HealthcareCase
+HealthcareCaseStatus
+```
+
+Persistencia implementada:
+
+```text
+id
+companyId
+folio
+title
+procedureDescription
+status
+scheduledStart
+scheduledEnd
+responsibleUserId
+createdById
+cancelledAt
+cancelledById
+cancellationReason
+createdAt
+updatedAt
+```
+
+Migration:
+
+```text
+20260824162849_add_healthcare_case_foundation
+→ focused Case Foundation migration
+→ no reset
+→ no unrelated destructive SQL
+```
+
+Relations use audit-preserving delete policy:
+
+```text
+Company
+→ onDelete Restrict
+
+responsibleUser
+→ onDelete Restrict
+
+createdBy
+→ onDelete Restrict
+
+cancelledBy
+→ onDelete Restrict
+```
+
+Folio generation:
+
+```text
+CASE-000001
+→ server generated
+→ immutable
+→ tenant scoped
+→ minimum six digits
+→ no six-digit maximum
+→ cancelled/historical folios remain occupied
+```
+
+Sequence key:
+
+```text
+HEALTHCARE_CASE_FOLIO
+```
+
+Shared sequence infrastructure was extracted:
+
+```text
+src/company-sequences
+CompanySequenceAllocatorService
+
+allocateNext(tx, companyId, key)
+→ caller-owned Prisma transaction
+→ race-safe bootstrap
+→ atomic nextValue increment
+→ numeric allocation only
+```
+
+Equipment continues to own `EQ-` formatting/collision behavior. Healthcare Case owns `CASE-` formatting/collision behavior.
+
+Lifecycle implemented:
+
+```text
+DRAFT
+SCHEDULED
+CANCELLED
+```
+
+Active status derivation:
+
+```text
+effective scheduledStart exists
+→ SCHEDULED
+
+effective scheduledStart absent
+→ DRAFT
+```
+
+API implemented:
+
+```text
+POST /healthcare/cases
+GET /healthcare/cases
+GET /healthcare/cases/:caseId
+PATCH /healthcare/cases/:caseId
+POST /healthcare/cases/:caseId/cancel
+```
+
+No:
+
+```text
+DELETE
+complete command
+reopen command
+COMPLETED status
+```
+
+Create uses one Prisma transaction containing:
+
+```text
+creator validation
+responsible-user validation when supplied
+CompanySequence folio allocation
+HealthcareCase create
+```
+
+Creator and responsible-user validation are tenant-safe:
+
+```text
+id
+companyId
+isActive
+```
+
+HTTP tenant and actor identity come from authenticated request context, not client payload.
+
+RBAC implemented:
+
+```text
+POST
+→ ADMIN / MANAGER / SALES
+
+GET list/read
+→ ADMIN / MANAGER / SALES / WAREHOUSE
+
+PATCH
+→ ADMIN / MANAGER / SALES
+
+CANCEL
+→ ADMIN / MANAGER
+```
+
+PATCH planning semantics:
+
+```text
+omitted / undefined
+→ retain persisted value
+
+explicit null where allowed
+→ clear value
+
+schedule validation
+→ evaluates merged final state
+```
+
+B.4.1 QA/fix evidence:
+
+```text
+schedule-only PATCH with title omitted
+→ originally returned 400 El título del caso es obligatorio
+
+root cause
+→ update normalization treated own undefined as supplied value
+
+fix
+→ undefined / omitted retains existing value
+→ explicit value applies normalization/update
+
+manual retest
+→ PASS
+```
+
+Cancellation:
+
+```text
+DRAFT → CANCELLED
+SCHEDULED → CANCELLED
+
+cancellationReason
+→ required
+→ trimmed
+
+cancelledAt
+→ server-side
+
+cancelledById
+→ authenticated user
+
+existing schedule/title/procedure
+→ preserved
+```
+
+`CANCELLED` is terminal in Foundation.
+
+PHI boundary:
+
+```text
+no patient name
+no patient identifiers
+no diagnosis
+no medical history
+no clinical notes
+no clinical record fields
+```
+
+Hospital and Doctor remain future first-class Healthcare master data. HealthcareCase currently has no `hospitalId`, `doctorId`, `hospitalName`, or `doctorName`.
+
+HealthcareCase does not include Equipment Assignment, Equipment Requirement, CaseKit, Dispatch, Custody, Return, or Inventory state.
+
+Automated validation:
+
+```text
+HealthcareCaseService
+59 tests PASS
+
+Controller + DTOs
+46 tests PASS
+
+Full Healthcare Case
+6 suites
+116 tests PASS
+
+Full backend
+40 suites
+341 tests PASS
+
+Prisma validate
+PASS
+
+Build
+PASS
+
+Changed TypeScript ESLint
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+CASE-000001 and CASE-000002 generated for repeated independent creates
+GET one PASS
+GET list PASS
+DRAFT → SCHEDULED PASS
+SCHEDULED → SCHEDULED reschedule PASS
+invalid schedule rejected with no mutation PASS
+SCHEDULED → DRAFT by clearing schedule PASS
+DRAFT → SCHEDULED again PASS
+SCHEDULED → CANCELLED PASS
+PATCH CANCELLED → 409 PASS
+second cancel → 409 PASS
+final GET preserved cancellation audit facts PASS
+```
+
+Manual QA limits:
+
+```text
+real manual second-company cross-tenant QA
+→ NOT PERFORMED
+
+real simultaneous concurrent cancellation race
+→ NOT PERFORMED
+```
+
+Idempotency remains unresolved:
+
+```text
+same logical Case create submitted twice
+→ two valid Cases
+→ two folios
+```
+
+This is expected under the current non-idempotent API and is not a sequence bug. Purchase Receipt request idempotency also remains unresolved.
+
+---
+
 ## Current Equipment Availability — EQ-AVL-001
 
 **Estado:** IMPLEMENTED / VALIDATED

@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
-**Última actualización:** 2026-08-20
+**Estado de implementación:** IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-24
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -377,13 +377,13 @@ La definición técnica debe seguir las reglas de folios empresariales de Zaping
 
 ---
 
-# 18.1 Healthcare Case Foundation aprobado
+# 18.1 Healthcare Case Foundation implementado
 
-**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado:** IMPLEMENTED / VALIDATED.
 
 `HealthcareCase` es el root operacional persistido para un Case medico/quirurgico.
 
-Phase 1 posee solamente:
+Foundation implementa solamente:
 
 ```text
 identity
@@ -395,7 +395,7 @@ creation / cancellation audit facts
 stable references for future Healthcare domains
 ```
 
-Phase 1 no posee:
+Foundation no posee:
 
 ```text
 Equipment Assignment
@@ -411,13 +411,13 @@ Patient records
 Clinical records
 ```
 
-Modelo conceptual aprobado:
+Modelo Prisma implementado:
 
 ```text
 HealthcareCase
 ```
 
-Campos conceptuales aprobados para Foundation:
+Campos implementados para Foundation:
 
 ```text
 id
@@ -444,7 +444,42 @@ createdAt
 updatedAt
 ```
 
-Esto documenta el contrato aprobado. No significa que `schema.prisma` ya haya sido modificado.
+Persistencia implementada mediante la migracion:
+
+```text
+20260824162849_add_healthcare_case_foundation
+```
+
+La migracion creo solamente el Foundation aprobado:
+
+```text
+HealthcareCaseStatus enum
+HealthcareCase table
+Company relation
+responsible User relation
+creator User relation
+cancellation actor User relation
+approved uniqueness constraints
+approved indexes
+```
+
+No hubo reset ni SQL destructivo no relacionado.
+
+Politica conservadora de borrado para auditoria:
+
+```text
+Company
+→ onDelete Restrict
+
+responsibleUser
+→ onDelete Restrict
+
+createdBy
+→ onDelete Restrict
+
+cancelledBy
+→ onDelete Restrict
+```
 
 Identity:
 
@@ -462,25 +497,53 @@ folio
 → not submitted by client
 ```
 
-Formato conceptual aprobado:
+Formato implementado:
 
 ```text
 CASE-000001
 ```
 
-La generacion de folio pertenece a la transaccion de creacion del Case y debe reutilizar `CompanySequence`.
+La generacion de folio pertenece a la transaccion de creacion del Case y utiliza `CompanySequence`.
 
-La implementacion debe utilizar el patron atomico endurecido ya establecido para Equipment, o una extraccion reutilizable equivalente:
+La implementacion extrajo la asignacion compartida a:
 
 ```text
+src/company-sequences
+CompanySequenceAllocatorService
+```
+
+Comportamiento publico:
+
+```text
+allocateNext(
+  tx,
+  companyId,
+  key
+)
+```
+
+El allocator compartido:
+
+```text
+receives caller-owned Prisma transaction
 createMany skipDuplicates
 ↓
 atomic update nextValue increment
 ↓
 allocated value = returned nextValue - 1
+returns numeric allocation
+does not format Equipment or Case codes
 ```
 
-Constraints / indexes candidatos aprobados para revision de implementacion:
+Case folio usa:
+
+```text
+key = HEALTHCARE_CASE_FOLIO
+```
+
+Equipment conserva su formato `EQ-` y su logica de colisiones. Healthcare Case conserva su formato `CASE-` y su logica de colisiones. Healthcare no depende de Equipment para generar folios.
+
+Constraints / indexes implementados:
 
 ```text
 @@unique([companyId, folio])
@@ -760,7 +823,7 @@ API namespace aprobado:
 /healthcare/cases
 ```
 
-Planned Phase 1 API:
+API implementada:
 
 ```text
 POST /healthcare/cases
@@ -777,23 +840,96 @@ DELETE
 complete command
 ```
 
-RBAC direction inicial:
+RBAC implementado:
 
 ```text
 ADMIN
-→ read / create / edit / cancel
+→ create / read / edit / cancel
 
 MANAGER
-→ read / create / edit / cancel
+→ create / read / edit / cancel
 
 SALES
-→ read / create / edit
+→ create / read / edit
 
 WAREHOUSE
 → read
 ```
 
-No agregar `TECHNICIAN` role en este ticket. Si la arquitectura RBAC actual no puede expresar esta direccion sin cambios amplios, la implementacion debe detenerse y reportarlo en vez de redisenar Auth.
+No se agrego rol `TECHNICIAN`.
+
+Create transaction:
+
+```text
+creator validation
+responsible-user validation when supplied
+CompanySequence folio allocation
+HealthcareCase create
+```
+
+No abre una segunda transaccion. Errores inesperados de create se propagan.
+
+Read:
+
+```text
+GET /healthcare/cases
+→ tenant scoped
+→ createdAt DESC
+
+GET /healthcare/cases/:caseId
+→ id + companyId
+```
+
+Missing/cross-tenant:
+
+```text
+Caso no encontrado
+```
+
+PATCH planning:
+
+```text
+PATCH /healthcare/cases/:caseId
+```
+
+Campos editables:
+
+```text
+title
+procedureDescription
+scheduledStart
+scheduledEnd
+responsibleUserId
+```
+
+Semantica parcial:
+
+```text
+omitted / undefined
+→ retain persisted value
+
+explicit null where allowed
+→ clear value
+```
+
+Los campos server-managed no se aceptan desde cliente.
+
+B.4.1 QA/fix evidence:
+
+```text
+schedule-only PATCH with title omitted
+→ originally returned 400 El título del caso es obligatorio
+
+root cause
+→ update normalization treated own undefined as supplied value
+
+fix
+→ undefined / omitted retains existing value
+→ explicit value applies normalization/update
+
+manual retest
+→ passed
+```
 
 Idempotency:
 
@@ -818,10 +954,14 @@ Concurrency:
 
 ```text
 Case create folio allocation
-→ transaction-safe required
+→ transaction-safe through CompanySequenceAllocatorService
 
 normal planning update concurrency
 → current project behavior acceptable for Foundation
+
+cancel
+→ tenant pre-read + conditional update on active eligible status
+→ zero affected count after eligible pre-read is a concurrency conflict
 
 future conflict-sensitive reschedule
 → stronger revalidation/concurrency required once Assignment exists
@@ -829,7 +969,7 @@ future conflict-sensitive reschedule
 
 Prisma assessment:
 
-Case Foundation requiere:
+Case Foundation requirio una migracion enfocada:
 
 ```text
 new HealthcareCase model
@@ -841,7 +981,79 @@ migration
 
 Hospital y Doctor no forman parte de esta migracion.
 
-Planned implementation phases:
+Automated validation final after B.4.1:
+
+```text
+HealthcareCaseService
+59 tests PASS
+
+Controller + DTOs
+46 tests PASS
+
+Full Healthcare Case
+6 suites
+116 tests PASS
+
+Full backend
+40 suites
+341 tests PASS
+
+Prisma validate
+PASS
+
+Build
+PASS
+
+Changed TypeScript ESLint
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+CASE-000001 and CASE-000002 were generated for two independent create requests
+GET one
+GET list
+DRAFT → SCHEDULED by schedule-only PATCH
+SCHEDULED → SCHEDULED by reschedule
+invalid end <= start rejected with no mutation
+SCHEDULED → DRAFT by clearing schedule
+DRAFT → SCHEDULED again
+SCHEDULED → CANCELLED
+PATCH CANCELLED → 409
+second cancel → 409
+final GET preserved original cancellation audit facts
+```
+
+Manual QA limits:
+
+```text
+real manual second-company cross-tenant QA
+→ NOT PERFORMED
+
+real simultaneous concurrent cancellation race
+→ NOT PERFORMED
+```
+
+Unit tests cover tenant-scoped queries and conditional cancellation mutation.
+
+Idempotency remains unresolved:
+
+```text
+same logical Case create submitted twice
+→ two valid Cases
+→ two folios
+```
+
+This is expected under the current non-idempotent API and is not a sequence bug.
+
+Implementation phases completed:
 
 ```text
 B.1
@@ -862,8 +1074,6 @@ automated validation + PostgreSQL/API manual QA
 C
 final documentation synchronization
 ```
-
-Si la generacion de folio revela duplicacion de `CompanySequence`, preferir una extraccion pequena reutilizable en vez de copiar logica insegura.
 
 ---
 
@@ -2365,7 +2575,23 @@ indistintamente.
 
 # 139. API
 
-No existen endpoints Healthcare implementados actualmente.
+Healthcare Case Foundation implementa actualmente:
+
+```text
+POST /healthcare/cases
+GET /healthcare/cases
+GET /healthcare/cases/:caseId
+PATCH /healthcare/cases/:caseId
+POST /healthcare/cases/:caseId/cancel
+```
+
+No existe:
+
+```text
+DELETE /healthcare/cases/:caseId
+complete command
+reopen command
+```
 
 ---
 
@@ -2936,18 +3162,30 @@ Actualmente:
 
 ```text
 Healthcare Case
-→ domain design
+→ Foundation implemented / validated
 ```
 
-No existe todavía evidencia de:
+Existe evidencia de:
 
 ```text
 Prisma model
 migration
 backend
 API
-frontend
 tests
+```
+
+No existe todavía evidencia de:
+
+```text
+frontend
+Equipment Assignment
+CaseKit
+Dispatch
+Custody
+Return
+Case Calendar UI
+Case 360
 ```
 
 ---
@@ -3365,15 +3603,15 @@ PROJECT_BOARD.md
 
 ---
 
-# 201. Decisiones aprobadas para Case Foundation
+# 201. Estado final de Case Foundation
 
-Healthcare Case Foundation A.5 resuelve el alcance minimo para crear:
+Healthcare Case Foundation implemento el alcance minimo aprobado para:
 
 ```text
 model HealthcareCase
 ```
 
-Decisiones aprobadas:
+Decisiones implementadas:
 
 ```text
 model name
@@ -3416,15 +3654,19 @@ PHI / clinical records
 → not part of Foundation
 ```
 
-Open for implementation review:
+Fuera de Foundation:
 
 ```text
-exact Prisma migration
-exact DTO contracts
-exact service/controller files
-exact RBAC expression with current Auth
-folio allocator extraction vs Case-local service
-test fixtures and manual QA script
+Hospital / Doctor master data
+Equipment / Material Requirements
+Equipment Assignment
+Case Availability
+Dispatch / Custody
+Return
+CaseKit / Maletín
+Case Calendar UI
+Case 360
+Mobile technician experience
 ```
 
 ---

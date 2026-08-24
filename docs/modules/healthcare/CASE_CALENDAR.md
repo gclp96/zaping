@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN / NOT IMPLEMENTED
-**Última actualización:** 2026-08-20
+**Estado de implementación:** DOMAIN DESIGN / CALENDAR UI NOT IMPLEMENTED / CASE SCHEDULE PERSISTENCE AVAILABLE
+**Última actualización:** 2026-08-24
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -187,9 +187,9 @@ sin convertirse en propietario de esas reglas.
 
 ---
 
-# 8.1 Case Foundation dependency approved
+# 8.1 Case Foundation dependency implemented
 
-Healthcare Case Foundation A.5 aprueba que el Calendar consuma:
+Healthcare Case Foundation implemento la persistencia que Calendar consumira:
 
 ```text
 HealthcareCase.scheduledStart
@@ -253,9 +253,11 @@ return state
 
 Por tanto, Calendar Phase 1 puede leer schedule/status/responsible user del Case, pero Doctor/Hospital, readiness, Equipment conflicts y logistics indicators siguen siendo futuras integraciones.
 
-**Estado de Case Foundation:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado de Case Foundation:** IMPLEMENTED / VALIDATED.
 
 **Estado de Calendar:** DOMAIN DESIGN / NOT IMPLEMENTED.
+
+Calendar sigue siendo una proyeccion/workspace futuro sobre los hechos persistidos del Case. No se agrego persistencia separada de Calendar ni UI de Calendar.
 
 ---
 
@@ -1816,7 +1818,17 @@ available according to Zaping records
 
 # 137. Calendar Read API
 
-No existe actualmente API Healthcare.
+Existe API Healthcare Case Foundation para crear, listar, leer, actualizar planeacion y cancelar Cases:
+
+```text
+POST /healthcare/cases
+GET /healthcare/cases
+GET /healthcare/cases/:caseId
+PATCH /healthcare/cases/:caseId
+POST /healthcare/cases/:caseId/cancel
+```
+
+No existe actualmente un API dedicado de Calendar.
 
 Una futura capacidad puede ser conceptualmente:
 
@@ -2311,6 +2323,9 @@ Actualmente:
 ```text
 Case Calendar
 → documented domain/read-model design
+
+HealthcareCase schedule persistence
+→ implemented / validated
 ```
 
 No existe evidencia actual de:
@@ -2318,7 +2333,6 @@ No existe evidencia actual de:
 ```text
 Calendar UI
 Calendar API
-Healthcare Case model
 conflict engine
 readiness engine
 ```
@@ -2699,16 +2713,16 @@ PROJECT_BOARD.md
 
 ---
 
-# 201. Decisiones pendientes antes de implementación
+# 201. Decisiones pendientes antes de Calendar
 
 Antes de construir Calendar debemos resolver:
 
 ```text
 HealthcareCase schema
-→ Case Foundation approved / implementation pending
+→ implemented / validated
 
 scheduledStart / scheduledEnd strategy
-→ approved by Case Foundation A.5
+→ implemented by Case Foundation
 
 Technician identity model
 → responsibleUserId approved for Foundation
@@ -2730,8 +2744,8 @@ conflict severity rules
 → pending
 
 permissions
-→ initial Case RBAC direction approved
-→ exact implementation pending
+→ initial Case RBAC implemented for Foundation
+→ Calendar-specific permissions pending
 
 API read model
 → pending
