@@ -16,6 +16,7 @@ import {
 
 import { PrismaService } from '../prisma/prisma.service';
 
+import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { EquipmentService } from './equipment.service';
 
 describe('EquipmentService', () => {
@@ -53,6 +54,10 @@ describe('EquipmentService', () => {
     $transaction: jest.fn(),
   };
 
+  const equipmentAssetCodeServiceMock = {
+    allocateNextAvailableAssetCode: jest.fn(),
+  };
+
   beforeEach(async () => {
     jest.resetAllMocks();
 
@@ -65,9 +70,17 @@ describe('EquipmentService', () => {
       count: 1,
     });
 
+    equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode.mockResolvedValue(
+      'EQ-000001',
+    );
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         EquipmentService,
+        {
+          provide: EquipmentAssetCodeService,
+          useValue: equipmentAssetCodeServiceMock,
+        },
         {
           provide: PrismaService,
           useValue: prismaMock,
@@ -136,10 +149,6 @@ describe('EquipmentService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
 
-    prismaMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 2,
-    });
-
     const createdEquipment = {
       id: equipmentId,
       companyId,
@@ -179,33 +188,10 @@ describe('EquipmentService', () => {
       },
     });
 
-    expect(prismaMock.companySequence.createMany).toHaveBeenCalledWith({
-      data: [
-        {
-          companyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-          nextValue: 1,
-        },
-      ],
-      skipDuplicates: true,
-    });
-
-    expect(prismaMock.companySequence.update).toHaveBeenCalledWith({
-      where: {
-        companyId_key: {
-          companyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-        },
-      },
-      data: {
-        nextValue: {
-          increment: 1,
-        },
-      },
-      select: {
-        nextValue: true,
-      },
-    });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(
+      equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode,
+    ).toHaveBeenCalledWith(prismaMock, companyId);
   });
 
   it('should generate the next automatic asset code', async () => {
@@ -216,11 +202,9 @@ describe('EquipmentService', () => {
       isActive: true,
     });
 
-    prismaMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 3,
-    });
-
-    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
+    equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode.mockResolvedValue(
+      'EQ-000002',
+    );
 
     prismaMock.equipmentAsset.create.mockResolvedValue({
       id: equipmentId,
@@ -260,18 +244,6 @@ describe('EquipmentService', () => {
       inventoryTracking: ProductInventoryTracking.ASSET,
       isActive: true,
     });
-
-    prismaMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 2,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 2,
-      });
-
-    prismaMock.equipmentAsset.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
 
     prismaMock.equipmentAsset.create.mockImplementation(
       ({ data }: { data: { companyId: string; assetCode: string } }) => ({
@@ -323,6 +295,13 @@ describe('EquipmentService', () => {
         batch: true,
       },
     });
+
+    expect(
+      equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode,
+    ).toHaveBeenNthCalledWith(1, prismaMock, companyId);
+    expect(
+      equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode,
+    ).toHaveBeenNthCalledWith(2, prismaMock, otherCompanyId);
   });
 
   it('should reject products that do not use ASSET tracking', async () => {
@@ -405,10 +384,6 @@ describe('EquipmentService', () => {
 
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
 
-    prismaMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 2,
-    });
-
     prismaMock.equipmentAsset.create.mockResolvedValue({
       id: equipmentId,
       companyId,
@@ -457,11 +432,6 @@ describe('EquipmentService', () => {
       productId,
     });
 
-    prismaMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 2,
-    });
-
-    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
     prismaMock.equipmentAsset.create.mockResolvedValue({
       id: equipmentId,
       companyId,
@@ -526,186 +496,6 @@ describe('EquipmentService', () => {
     expect(prismaMock.equipmentAsset.create).not.toHaveBeenCalled();
   });
 
-  it('should skip occupied historical automatic asset codes', async () => {
-    prismaMock.product.findFirst.mockResolvedValue({
-      id: productId,
-      companyId,
-      inventoryTracking: ProductInventoryTracking.ASSET,
-      isActive: true,
-    });
-
-    prismaMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 2,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 3,
-      });
-
-    prismaMock.equipmentAsset.findFirst
-      .mockResolvedValueOnce({
-        id: 'historical-equipment-id',
-      })
-      .mockResolvedValueOnce(null);
-
-    prismaMock.equipmentAsset.create.mockResolvedValue({
-      id: equipmentId,
-      companyId,
-      productId,
-      assetCode: 'EQ-000002',
-    });
-
-    await service.create(companyId, {
-      productId,
-      condition: EquipmentCondition.GOOD,
-    });
-
-    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
-      data: {
-        companyId,
-        productId,
-        assetCode: 'EQ-000002',
-        serialNumber: null,
-        serialNumberKey: null,
-        condition: EquipmentCondition.GOOD,
-        origin: EquipmentOrigin.MANUAL,
-        batchId: undefined,
-      },
-      include: {
-        product: true,
-        batch: true,
-      },
-    });
-  });
-
-  it('should not reuse retired automatic asset codes', async () => {
-    prismaMock.product.findFirst.mockResolvedValue({
-      id: productId,
-      companyId,
-      inventoryTracking: ProductInventoryTracking.ASSET,
-      isActive: true,
-    });
-
-    prismaMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 2,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 3,
-      });
-
-    prismaMock.equipmentAsset.findFirst
-      .mockResolvedValueOnce({
-        id: 'retired-equipment-id',
-        lifecycle: EquipmentLifecycle.RETIRED,
-      })
-      .mockResolvedValueOnce(null);
-
-    prismaMock.equipmentAsset.create.mockResolvedValue({
-      id: equipmentId,
-      companyId,
-      productId,
-      assetCode: 'EQ-000002',
-    });
-
-    await service.create(companyId, {
-      productId,
-      condition: EquipmentCondition.GOOD,
-    });
-
-    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenNthCalledWith(1, {
-      where: {
-        companyId,
-        assetCode: 'EQ-000001',
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
-      data: {
-        companyId,
-        productId,
-        assetCode: 'EQ-000002',
-        serialNumber: null,
-        serialNumberKey: null,
-        condition: EquipmentCondition.GOOD,
-        origin: EquipmentOrigin.MANUAL,
-        batchId: undefined,
-      },
-      include: {
-        product: true,
-        batch: true,
-      },
-    });
-  });
-
-  it('should continue past more than 100 occupied generated asset codes', async () => {
-    prismaMock.product.findFirst.mockResolvedValue({
-      id: productId,
-      companyId,
-      inventoryTracking: ProductInventoryTracking.ASSET,
-      isActive: true,
-    });
-
-    for (let value = 1; value <= 102; value += 1) {
-      prismaMock.companySequence.update.mockResolvedValueOnce({
-        nextValue: value + 1,
-      });
-    }
-
-    for (let value = 1; value <= 101; value += 1) {
-      prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
-        id: `occupied-equipment-${value}`,
-      });
-    }
-
-    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
-
-    prismaMock.equipmentAsset.create.mockResolvedValue({
-      id: equipmentId,
-      companyId,
-      productId,
-      assetCode: 'EQ-000102',
-    });
-
-    await service.create(companyId, {
-      productId,
-      condition: EquipmentCondition.GOOD,
-    });
-
-    expect(prismaMock.companySequence.update).toHaveBeenCalledTimes(102);
-    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(102);
-
-    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenLastCalledWith({
-      where: {
-        companyId,
-        assetCode: 'EQ-000102',
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
-      data: {
-        companyId,
-        productId,
-        assetCode: 'EQ-000102',
-        serialNumber: null,
-        serialNumberKey: null,
-        condition: EquipmentCondition.GOOD,
-        origin: EquipmentOrigin.MANUAL,
-        batchId: undefined,
-      },
-      include: {
-        product: true,
-        batch: true,
-      },
-    });
-  });
-
   it('should not retry inside the same transaction when equipment creation hits a unique constraint', async () => {
     prismaMock.product.findFirst.mockResolvedValue({
       id: productId,
@@ -713,12 +503,6 @@ describe('EquipmentService', () => {
       inventoryTracking: ProductInventoryTracking.ASSET,
       isActive: true,
     });
-
-    prismaMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 2,
-    });
-
-    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
 
     prismaMock.equipmentAsset.create.mockRejectedValue(
       new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -737,8 +521,9 @@ describe('EquipmentService', () => {
       }),
     ).rejects.toBeInstanceOf(ConflictException);
 
-    expect(prismaMock.companySequence.update).toHaveBeenCalledTimes(1);
-    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(1);
+    expect(
+      equipmentAssetCodeServiceMock.allocateNextAvailableAssetCode,
+    ).toHaveBeenCalledTimes(1);
     expect(prismaMock.equipmentAsset.create).toHaveBeenCalledTimes(1);
   });
 
