@@ -342,6 +342,7 @@ model Company {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   customers            Customer[]
+  healthcareCases      HealthcareCase[]
   inventoryMovements   InventoryMovement[]
   inventoryBatches     InventoryBatch[]
   equipmentAssets      EquipmentAsset[]
@@ -376,6 +377,12 @@ model CompanySequence {
   @@unique([companyId, key])
 }
 
+enum HealthcareCaseStatus {
+  DRAFT
+  SCHEDULED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid())
   companyId    String
@@ -396,9 +403,51 @@ model User {
   equipmentInspections EquipmentInspection[] @relation("EquipmentInspectedBy")
   retiredEquipment     EquipmentAsset[]      @relation("EquipmentRetiredBy")
 
+  responsibleHealthcareCases HealthcareCase[] @relation("HealthcareCaseResponsibleUser")
+  createdHealthcareCases     HealthcareCase[] @relation("HealthcareCaseCreatedBy")
+  cancelledHealthcareCases   HealthcareCase[] @relation("HealthcareCaseCancelledBy")
+
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
   cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
+}
+
+model HealthcareCase {
+  id        String @id @default(uuid())
+  companyId String
+
+  folio String
+
+  title                String
+  procedureDescription String?
+
+  status HealthcareCaseStatus @default(DRAFT)
+
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+
+  responsibleUserId String?
+
+  createdById String
+
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  responsibleUser User? @relation("HealthcareCaseResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: Restrict)
+  createdBy       User  @relation("HealthcareCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  cancelledBy     User? @relation("HealthcareCaseCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, folio])
+  @@unique([id, companyId])
+  @@index([companyId, status])
+  @@index([companyId, scheduledStart])
+  @@index([companyId, responsibleUserId])
 }
 
 model EquipmentAsset {
@@ -470,7 +519,7 @@ model EquipmentInspection {
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   equipmentAsset EquipmentAsset @relation(fields: [equipmentAssetId, companyId], references: [id, companyId], onDelete: Restrict)
-  inspectedBy User @relation("EquipmentInspectedBy", fields: [inspectedById], references: [id], onDelete: Restrict)
+  inspectedBy    User           @relation("EquipmentInspectedBy", fields: [inspectedById], references: [id], onDelete: Restrict)
 
   @@unique([id, companyId])
   @@index([companyId, equipmentAssetId])
