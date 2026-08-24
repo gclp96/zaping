@@ -3536,6 +3536,267 @@ Orden:
 11. Documentation synchronization
 ```
 
+Diseño de dominio aprobado para la primera implementación:
+
+```text
+Status
+→ DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+
+Implementation
+→ NOT IMPLEMENTED
+→ NOT VALIDATED
+```
+
+Regla de creación:
+
+```text
+Product.inventoryTracking = ASSET
+PurchaseReceiptItem.quantityReceived = N
+↓
+create exactly N EquipmentAsset rows
+```
+
+No debe usarse `PurchaseItem.quantity` para determinar cuántos `EquipmentAsset` crear.
+
+Para EQ-PR-001:
+
+```text
+QUANTITY
+→ no EquipmentAsset creation
+
+SERIALIZED
+→ no EquipmentAsset creation
+
+ASSET
+→ EquipmentAsset creation from PurchaseReceiptItem.quantityReceived
+```
+
+Los `EquipmentAsset` creados desde recepción pueden nacer sin serial:
+
+```text
+serialNumber = null
+serialNumberKey = null
+```
+
+La recepción no debe bloquearse esperando números de serie. La asignación o corrección futura de serial deberá ocurrir mediante una operación explícita de identidad de Equipment fuera de EQ-PR-001.
+
+Estado inicial aprobado:
+
+```text
+lifecycle = ACTIVE
+condition = INSPECTION_PENDING
+origin = PURCHASE_RECEIPT
+```
+
+Razón:
+
+```text
+physical receipt
+≠
+inspection successfully passed
+```
+
+Todo `EquipmentAsset` creado desde una recepción debe conservar permanentemente:
+
+```text
+purchaseReceiptItemId
+```
+
+La trazabilidad queda:
+
+```text
+EquipmentAsset
+↓
+PurchaseReceiptItem
+↓
+PurchaseReceipt
+↓
+Purchase
+↓
+Supplier
+```
+
+Si el `PurchaseReceiptItem` quedó asociado a un `InventoryBatch`:
+
+```text
+EquipmentAsset.batchId = InventoryBatch.id
+```
+
+Si no existe batch:
+
+```text
+batchId = null
+```
+
+EQ-PR-001 no redefine ni amplía la política general de:
+
+```text
+ProductLotTracking.REQUIRED
+ProductLotTracking.OPTIONAL
+ProductLotTracking.NONE
+```
+
+La aplicación completa de `lotTracking` queda como preocupación separada.
+
+Política de stock aprobada:
+
+```text
+PurchaseReceipt
+→ Product.stock += quantityReceived
+
+EquipmentAsset creation
+→ does not increment Product.stock again
+```
+
+Para Products `ASSET`:
+
+```text
+EquipmentAsset
+→ physical unit identity truth
+
+Product.stock
+→ aggregate inventory projection maintained by Inventory / PurchaseReceipt
+```
+
+La reconciliación final `Product.stock ↔ EquipmentAsset` queda fuera de EQ-PR-001.
+
+Unidad transaccional requerida:
+
+```text
+PurchaseReceipt
++
+PurchaseReceiptItems
++
+InventoryBatch
++
+InventoryMovement
++
+Product.stock mutation
++
+CompanySequence allocation
++
+EquipmentAsset creation
+```
+
+Todo debe ocurrir dentro de la misma transacción Prisma. Si falla la creación de cualquier `EquipmentAsset`, debe revertirse la recepción completa.
+
+Debe evitarse:
+
+```text
+stock committed
++
+missing required EquipmentAsset identities
+```
+
+y:
+
+```text
+EquipmentAsset identities
++
+missing corresponding receipt
+```
+
+Los `assetCode` de Equipment creado desde recepción reutilizan el mecanismo ya implementado:
+
+```text
+CompanySequence
+companyId + key = EQUIPMENT_ASSET_CODE
+
+EQ-000001
+EQ-000002
+...
+```
+
+`PurchaseReceiptsService` no debe duplicar el algoritmo de secuencia. La lógica reutilizable del dominio Equipment deberá aceptar `Prisma.TransactionClient` para participar en la transacción propiedad de Receipt.
+
+Propiedad arquitectónica:
+
+```text
+Equipment domain / application logic
+→ Equipment identity generation
+→ EquipmentAsset provisioning rules
+
+PurchaseReceiptsService
+→ Purchase Receipt orchestration
+→ transaction boundary
+```
+
+Deben evitarse dependencias circulares de módulos NestJS.
+
+Idempotencia:
+
+```text
+Formal PurchaseReceipt request idempotency
+→ OUT OF SCOPE for EQ-PR-001
+```
+
+Riesgo existente:
+
+```text
+committed PurchaseReceipt
+↓
+client retries after timeout
+↓
+another legitimate receipt may be created if pending quantity remains
+```
+
+Este riesgo queda registrado como preocupación separada de confiabilidad de Purchase Receipt.
+
+Correcciones y reversas:
+
+```text
+Purchase Receipt correction / reversal
+→ OUT OF SCOPE
+```
+
+No debe usarse `DELETE` de `EquipmentAsset` para representar correcciones. Un diseño futuro deberá definir explícitamente efectos sobre Inventory, EquipmentAsset, Lifecycle e historia financiera/operativa.
+
+Persistencia:
+
+```text
+new Prisma model
+→ not required
+
+new field
+→ not required
+
+new enum
+→ not required
+
+new migration
+→ not required
+```
+
+La implementación mínima reutiliza:
+
+```text
+EquipmentAsset.purchaseReceiptItemId
+EquipmentAsset.batchId
+EquipmentAsset.origin
+EquipmentOrigin.PURCHASE_RECEIPT
+CompanySequence
+UNIQUE companyId + assetCode
+```
+
+Fases previstas:
+
+```text
+Phase B.1
+Extract / reuse transaction-aware Equipment assetCode allocation
+
+Phase B.2
+Add Equipment receipt provisioning capability
+
+Phase B.3
+Integrate provisioning into PurchaseReceiptsService transaction
+
+Phase B.4
+Tests and technical validation
+
+Phase C
+Manual QA and final documentation synchronization
+```
+
 Debe mantenerse:
 
 ```text
@@ -4963,15 +5224,62 @@ Purchase Receipt → EquipmentAsset
 Orden:
 
 1. Business Analysis
-2. Purchase Receipt / Equipment documentation
-3. Prisma review
-4. Backend domain operation
-5. Authorization review
-6. Automated tests
-7. Manual QA
-8. Full regression
-9. Build + lint
-10. Documentation synchronization
+2. Domain design approval
+3. Purchase Receipt / Equipment documentation
+4. Prisma review
+5. Backend domain operation
+6. Authorization review
+7. Automated tests
+8. Manual QA
+9. Full regression
+10. Build + lint
+11. Documentation synchronization
+
+Estado de diseño:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+```
+
+Estado de implementación:
+
+```text
+NOT IMPLEMENTED
+```
+
+Reglas aprobadas:
+
+```text
+Product.inventoryTracking = ASSET
+PurchaseReceiptItem.quantityReceived = N
+→ create exactly N EquipmentAsset rows
+
+serialNumber = null
+serialNumberKey = null
+→ allowed at receipt
+
+lifecycle = ACTIVE
+condition = INSPECTION_PENDING
+origin = PURCHASE_RECEIPT
+
+Product.stock
+→ still mutated by PurchaseReceipt only
+→ EquipmentAsset creation does not increment stock again
+
+CompanySequence
+key = EQUIPMENT_ASSET_CODE
+→ reused inside the receipt transaction
+```
+
+Fuera de alcance:
+
+```text
+PurchaseReceipt request idempotency
+Receipt correction / reversal
+Product.stock ↔ EquipmentAsset reconciliation
+broader lotTracking enforcement
+SERIALIZED receipt behavior
+```
 
 Debe mantenerse:
 

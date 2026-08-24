@@ -688,13 +688,42 @@ PASS
 
 **Prioridad:** P1
 
+**Repository analysis:** Approved
+
+**Domain design:** Approved
+
+**Implementation:** Not implemented
+
 Para Products:
 
 ```text
 inventoryTracking = ASSET
 ```
 
-una recepción deberá poder crear las identidades físicas correspondientes.
+una recepción deberá crear las identidades físicas correspondientes durante la implementación de EQ-PR-001.
+
+Regla aprobada:
+
+```text
+PurchaseReceiptItem.quantityReceived = N
+↓
+create exactly N EquipmentAsset rows
+```
+
+No debe usarse `PurchaseItem.quantity` como conteo de creación de Equipment.
+
+Para este ticket:
+
+```text
+QUANTITY
+→ no EquipmentAsset creation
+
+SERIALIZED
+→ no EquipmentAsset creation
+
+ASSET
+→ EquipmentAsset creation
+```
 
 Debe mantener consistencia entre:
 
@@ -705,7 +734,90 @@ Product
 EquipmentAsset
 ```
 
-y ejecutarse transaccionalmente cuando corresponda.
+y ejecutarse dentro de la misma transacción Prisma:
+
+```text
+PurchaseReceipt
++
+PurchaseReceiptItems
++
+InventoryBatch
++
+InventoryMovement
++
+Product.stock mutation
++
+CompanySequence allocation
++
+EquipmentAsset creation
+```
+
+Decisiones aprobadas:
+
+```text
+Receipt-created EquipmentAsset
+→ lifecycle = ACTIVE
+→ condition = INSPECTION_PENDING
+→ origin = PURCHASE_RECEIPT
+→ purchaseReceiptItemId preserved
+
+serialNumber
+→ optional at receipt
+→ serialNumber = null allowed
+
+Product.stock
+→ mutated only by PurchaseReceipt
+→ EquipmentAsset creation does not increment stock again
+
+Prisma migration
+→ not required for minimal implementation
+```
+
+Arquitectura aprobada:
+
+```text
+Equipment domain/application logic
+→ owns Equipment identity generation and provisioning rules
+
+PurchaseReceiptsService
+→ owns receipt orchestration and transaction boundary
+```
+
+La implementación debe reutilizar el mecanismo existente:
+
+```text
+CompanySequence
+key = EQUIPMENT_ASSET_CODE
+```
+
+Pendientes fuera de EQ-PR-001:
+
+```text
+PurchaseReceipt request idempotency
+Receipt correction / reversal
+Product.stock ↔ EquipmentAsset reconciliation
+broader lotTracking enforcement
+SERIALIZED receipt behavior
+```
+
+Fases previstas:
+
+```text
+Phase B.1
+Extract / reuse transaction-aware Equipment assetCode allocation
+
+Phase B.2
+Add Equipment receipt provisioning capability
+
+Phase B.3
+Integrate provisioning into PurchaseReceiptsService transaction
+
+Phase B.4
+Tests and technical validation
+
+Phase C
+Manual QA and final documentation synchronization
+```
 
 ---
 
