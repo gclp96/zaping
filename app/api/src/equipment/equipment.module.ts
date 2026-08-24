@@ -3,6 +3,7 @@ import { EquipmentService } from './equipment.service';
 import { EquipmentController } from './equipment.controller';
 import { PrismaService } from '../prisma/prisma.service';
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
+import { EquipmentAvailabilityService } from './equipment-availability.service';
 import { EquipmentProvisioningService } from './equipment-provisioning.service';
 
 @Module({
@@ -10,6 +11,7 @@ import { EquipmentProvisioningService } from './equipment-provisioning.service';
   providers: [
     EquipmentService,
     EquipmentAssetCodeService,
+    EquipmentAvailabilityService,
     EquipmentProvisioningService,
     PrismaService,
   ],

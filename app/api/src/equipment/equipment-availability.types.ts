@@ -20,3 +20,8 @@ export type EquipmentCurrentAvailabilityEvaluation = {
   primaryReason: EquipmentAvailabilityReason | null;
   reasons: EquipmentAvailabilityReason[];
 };
+
+export type EquipmentCurrentAvailabilityResult =
+  EquipmentCurrentAvailabilityEvaluation & {
+    evaluatedAt: string;
+  };
