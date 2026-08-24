@@ -21,6 +21,11 @@ describe('HealthcareCasesController', () => {
       Promise<HealthcareCase>,
       [string, string, CreateHealthcareCaseInput]
     >(),
+    update: jest.fn<Promise<HealthcareCase>, [string, string, unknown]>(),
+    cancel: jest.fn<
+      Promise<HealthcareCase>,
+      [string, string, string, string]
+    >(),
     findAll: jest.fn<Promise<HealthcareCase[]>, [string]>(),
     findOne: jest.fn<Promise<HealthcareCase>, [string, string]>(),
   };
@@ -73,7 +78,7 @@ describe('HealthcareCasesController', () => {
   });
 
   const getRolesMetadata = (
-    methodName: 'create' | 'findAll' | 'findOne',
+    methodName: 'create' | 'update' | 'cancel' | 'findAll' | 'findOne',
   ): UserRole[] | undefined => {
     const descriptor = Object.getOwnPropertyDescriptor(
       HealthcareCasesController.prototype,
@@ -249,6 +254,125 @@ describe('HealthcareCasesController', () => {
     await expect(controller.findOne(request, caseId)).rejects.toBe(error);
   });
 
+  it('should update using authenticated companyId and caseId', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    await controller.update(request, caseId, {
+      title: 'Caso actualizado',
+    });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      expect.any(Object),
+    );
+  });
+
+  it('should map update Date and null values before delegating', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    await controller.update(request, caseId, {
+      title: 'Caso actualizado',
+      procedureDescription: null,
+      scheduledStart: '2026-09-01T10:00:00.000Z',
+      scheduledEnd: null,
+      responsibleUserId: null,
+    });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      {
+        title: 'Caso actualizado',
+        procedureDescription: null,
+        scheduledStart: new Date('2026-09-01T10:00:00.000Z'),
+        scheduledEnd: null,
+        responsibleUserId: null,
+      },
+    );
+  });
+
+  it('should preserve omitted update fields instead of converting them to null', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    await controller.update(request, caseId, {
+      title: 'Caso actualizado',
+    });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      {
+        title: 'Caso actualizado',
+      },
+    );
+  });
+
+  it('should return update service result unchanged', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    const result = await controller.update(request, caseId, {
+      title: 'Caso actualizado',
+    });
+
+    expect(result).toBe(healthcareCase);
+  });
+
+  it('should propagate update service errors', async () => {
+    const error = new Error('update failed');
+    healthcareCaseServiceMock.update.mockRejectedValue(error);
+
+    await expect(
+      controller.update(request, caseId, {
+        title: 'Caso actualizado',
+      }),
+    ).rejects.toBe(error);
+  });
+
+  it('should cancel using companyId, caseId, and authenticated user id', async () => {
+    healthcareCaseServiceMock.cancel.mockResolvedValue({
+      ...healthcareCase,
+      status: HealthcareCaseStatus.CANCELLED,
+    });
+
+    await controller.cancel(request, caseId, {
+      cancellationReason: 'Cancelación operacional',
+    });
+
+    expect(healthcareCaseServiceMock.cancel).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      userId,
+      'Cancelación operacional',
+    );
+  });
+
+  it('should return cancel service result unchanged', async () => {
+    const cancelledCase = {
+      ...healthcareCase,
+      status: HealthcareCaseStatus.CANCELLED,
+    };
+
+    healthcareCaseServiceMock.cancel.mockResolvedValue(cancelledCase);
+
+    const result = await controller.cancel(request, caseId, {
+      cancellationReason: 'Cancelación operacional',
+    });
+
+    expect(result).toBe(cancelledCase);
+  });
+
+  it('should propagate cancel service errors', async () => {
+    const error = new Error('cancel failed');
+    healthcareCaseServiceMock.cancel.mockRejectedValue(error);
+
+    await expect(
+      controller.cancel(request, caseId, {
+        cancellationReason: 'Cancelación operacional',
+      }),
+    ).rejects.toBe(error);
+  });
+
   it('should not pass client companyId, createdById, or status to service input', async () => {
     healthcareCaseServiceMock.create.mockResolvedValue(healthcareCase);
 
@@ -289,6 +413,21 @@ describe('HealthcareCasesController', () => {
       UserRole.MANAGER,
       UserRole.SALES,
       UserRole.WAREHOUSE,
+    ]);
+  });
+
+  it('should allow ADMIN, MANAGER, and SALES to update cases', () => {
+    expect(getRolesMetadata('update')).toEqual([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.SALES,
+    ]);
+  });
+
+  it('should allow ADMIN and MANAGER to cancel cases', () => {
+    expect(getRolesMetadata('cancel')).toEqual([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
     ]);
   });
 });
