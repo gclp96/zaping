@@ -1351,25 +1351,68 @@ Pregunta:
 ¿Puede utilizarse esta unidad ahora?
 ```
 
-Conceptualmente requiere:
+Para EQ-AVL-001 Fase 1 responde:
 
 ```text
-Lifecycle ACTIVE
-+
-Condition GOOD
-+
-No blocking custody
-+
-Inspection satisfied
-+
-No maintenance blocker
-+
-No calibration blocker
-+
-No immediate operational blocker
+Can this EquipmentAsset be used now according to currently implemented Core Equipment facts?
 ```
 
-**Estado:** APPROVED / NOT IMPLEMENTED.
+La primera implementación utilizará únicamente hechos Core ya persistidos e implementados:
+
+```text
+EquipmentAsset.lifecycle
+EquipmentAsset.condition
+```
+
+Inspection history existe, pero no será requerida directamente por el evaluator. `EquipmentAsset.condition` es el snapshot operacional actual.
+
+Reglas aprobadas para Fase 1:
+
+```text
+ACTIVE + GOOD
+→ available = true
+
+ACTIVE + INSPECTION_PENDING
+→ available = false
+→ INSPECTION_PENDING
+
+ACTIVE + DAMAGED
+→ available = false
+→ DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+→ available = false
+→ OUT_OF_SERVICE
+
+RETIRED
+→ available = false
+→ RETIRED
+```
+
+El significado de:
+
+```text
+ACTIVE + GOOD
+→ available = true
+```
+
+es estrictamente:
+
+```text
+available according to currently implemented Core Equipment facts
+```
+
+No garantiza todavía:
+
+```text
+availability for a specific Case
+absence of future Custody blocker
+absence of Maintenance blocker
+absence of Calibration blocker
+absence of Assignment conflict
+```
+
+**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
 
 ---
 
@@ -1390,6 +1433,22 @@ Existing assignments
 Conflict rules
 ```
 
+Case Availability no forma parte de EQ-AVL-001 Fase 1.
+
+Requerirá hechos implementados para:
+
+```text
+Case
+Assignment
+schedule
+custody
+dispatch
+conflicts
+turnaround
+```
+
+Una futura confirmación de Assignment deberá revalidar Availability porque un resultado consultado previamente puede quedar obsoleto.
+
 Por tanto Availability no debe reducirse a:
 
 ```text
@@ -1398,41 +1457,38 @@ available Boolean
 
 persistido permanentemente.
 
-**Estado:** APPROVED / NOT IMPLEMENTED.
+**Estado:** APPROVED / FUTURE IMPLEMENTATION.
 
 ---
 
 # 40. Availability result
 
-La evaluación deberá devolver razones explicables.
+La evaluación deberá devolver razones explicables y se computará al momento del request.
 
-Ejemplo:
+Contrato conceptual externo aprobado:
 
-```text
-available: false
-reason:
-INSPECTION_PENDING
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"],
+  "evaluatedAt": "2026-08-24T00:00:00.000Z"
+}
 ```
 
-o:
+Contrato conceptual del evaluator puro interno:
 
-```text
-available: false
-reason:
-EXTERNAL_CUSTODY
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"]
+}
 ```
 
-o:
+El evaluator puro no genera `evaluatedAt`; `EquipmentAvailabilityService` lo agrega al servir la respuesta de aplicación/API.
 
-```text
-available: false
-reason:
-CASE_CONFLICT
-```
-
-Los reason codes definitivos se definirán durante API design.
-
-**Estado:** APPROVED / API DESIGN PENDING.
+**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
 
 ---
 
@@ -1442,18 +1498,73 @@ Pueden incluir:
 
 ```text
 RETIRED
+INSPECTION_PENDING
 DAMAGED
 OUT_OF_SERVICE
+```
+
+Reason codes aprobados para EQ-AVL-001 Fase 1:
+
+```text
+RETIRED
 INSPECTION_PENDING
+DAMAGED
+OUT_OF_SERVICE
+```
+
+No deberán exponerse todavía reason codes futuros como:
+
+```text
 EXTERNAL_CUSTODY
 CASE_CONFLICT
 MAINTENANCE_BLOCKED
 CALIBRATION_BLOCKED
 ```
 
-Estos nombres no se consideran enums Prisma hasta que el Availability design los formalice.
+hasta que exista una fuente de verdad implementada.
 
-**Estado:** APPROVED CONCEPTUALLY.
+Los reason codes son valores TypeScript de dominio/aplicación:
+
+```text
+runtime constants
++
+TypeScript string union
+```
+
+No requieren:
+
+```text
+Prisma enum
+database persistence
+migration
+```
+
+Cuando existan múltiples blockers, deben devolverse todos los aplicables con prioridad determinística:
+
+```text
+1. RETIRED
+2. INSPECTION_PENDING
+3. DAMAGED
+4. OUT_OF_SERVICE
+```
+
+`primaryReason` será el primer valor de `reasons`. Cuando `reasons` está vacío:
+
+```text
+primaryReason = null
+available = true
+```
+
+Ejemplo:
+
+```text
+RETIRED + DAMAGED
+→ available = false
+→ primaryReason = RETIRED
+→ reasons = [RETIRED, DAMAGED]
+```
+
+**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
 
 ---
 
@@ -1484,7 +1595,178 @@ OUT_OF_SERVICE
 → Authorized Condition resolution
 ```
 
+Availability es:
+
+```text
+derived
+contextual
+explainable
+```
+
+No debe persistirse como:
+
+```text
+available Boolean
+```
+
+No debe existir:
+
+```text
+normal mutation endpoint
+application cache
+database cache
+```
+
+Availability cambia únicamente porque cambian sus hechos subyacentes:
+
+```text
+Inspection
+Retirement
+future Custody
+future Assignment
+future Maintenance
+future Calibration
+```
+
 **Estado:** APPROVED.
+
+---
+
+# 42.1 EQ-AVL-001 approved architecture
+
+Arquitectura aprobada para Fase 1:
+
+```text
+EquipmentAvailabilityService
+→ tenant-safe Equipment lookup
+→ orchestration
+→ evaluatedAt
+
+pure Equipment Current Availability evaluator
+→ consumes lifecycle + condition facts
+→ no database dependency
+→ deterministic
+```
+
+No debe crearse un framework de plugins/providers en Fase 1.
+
+La arquitectura debe permanecer evolucionable hacia composición futura de blockers desde:
+
+```text
+Core Equipment
+Custody
+Assignment
+Maintenance
+Calibration
+```
+
+sin agregar fuentes persistidas placeholder.
+
+API aprobada para Fase 1:
+
+```text
+GET /equipment/:equipmentId/availability
+```
+
+Reglas de tenant:
+
+```text
+Authenticated Company
+→ derived from JWT
+
+lookup
+→ equipmentId + companyId
+
+cross-tenant or nonexistent Equipment
+→ 404 Equipo no encontrado
+```
+
+No debe revelar:
+
+```text
+cross-tenant existence
+lifecycle
+condition
+availability
+reason codes
+```
+
+No debe agregarse Availability a:
+
+```text
+GET /equipment
+```
+
+en Fase 1, para evitar comportamiento N+1 implícito.
+
+Prisma:
+
+```text
+new Prisma model
+→ NOT REQUIRED
+
+new field
+→ NOT REQUIRED
+
+new enum
+→ NOT REQUIRED
+
+migration
+→ NOT REQUIRED
+```
+
+Fases previstas:
+
+```text
+B.1
+Pure evaluator + reason types/constants
+
+B.2
+EquipmentAvailabilityService with tenant-safe lookup
+
+B.3
+GET /equipment/:equipmentId/availability
+
+B.4
+Automated tests and technical validation
+
+B.5
+Manual PostgreSQL/API QA using real Equipment state transitions
+
+C
+Final documentation synchronization
+```
+
+Manual QA plan:
+
+```text
+manual ACTIVE + GOOD
+→ available true
+
+Purchase Receipt ACTIVE + INSPECTION_PENDING
+→ false / INSPECTION_PENDING
+
+Inspection:
+INSPECTION_PENDING → GOOD
+→ available true
+
+GOOD → DAMAGED
+→ available false / DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+→ unavailable
+
+GOOD → RETIRED
+→ unavailable / RETIRED
+
+RETIRED + DAMAGED
+→ reasons [RETIRED, DAMAGED]
+
+cross-tenant Equipment
+→ 404
+```
+
+**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
 
 ---
 
@@ -3527,6 +3809,19 @@ EQ-AVL-001
 Availability Evaluator
 ```
 
+Estado de EQ-AVL-001:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+```
+
+Siguiente paso:
+
+```text
+Phase B.1
+Pure evaluator + reason types/constants
+```
+
 El workflow anterior quedó cerrado:
 
 ```text
@@ -5297,6 +5592,12 @@ EQ-AVL-001
 Availability Evaluator
 ```
 
+Estado:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+```
+
 # Final Principle
 
 Equipment representa realidad física.
@@ -5446,6 +5747,12 @@ El siguiente paso técnico recomendado es:
 ```text
 EQ-AVL-001
 Availability Evaluator
+```
+
+Estado:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
 ```
 
 Orden:

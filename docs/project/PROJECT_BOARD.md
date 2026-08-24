@@ -966,9 +966,17 @@ Manual QA and final documentation synchronization
 
 ## EQ-AVL-001 — Availability Evaluator
 
-**Estado:** ⏳ Pending
+**Estado:** 🟡 Ready / Next
 
 **Prioridad:** P1
+
+**Repository analysis:** Complete
+
+**Domain design:** Approved
+
+**Implementation:** Not implemented
+
+**Validation:** Not performed
 
 Availability será:
 
@@ -997,6 +1005,226 @@ Assignment
 Maintenance
 Calibration
 Case context
+```
+
+EQ-AVL-001 Fase 1 implementará:
+
+```text
+Current Equipment Availability
+```
+
+Pregunta:
+
+```text
+Can this EquipmentAsset be used now according to currently implemented Core Equipment facts?
+```
+
+Fase 1 no implementa:
+
+```text
+Case Availability
+Case Assignment conflicts
+Custody
+Dispatch
+Returns / Custody Return
+Maintenance
+Calibration
+Turnaround
+Case scheduling
+```
+
+No deben agregarse booleans manuales para simular esos dominios.
+
+Hechos implementados que se usarán:
+
+```text
+EquipmentAsset.lifecycle
+EquipmentAsset.condition
+```
+
+Inspection history existe, pero no será requerida directamente por el evaluator. `EquipmentAsset.condition` es el snapshot operacional actual.
+
+Reglas aprobadas:
+
+```text
+ACTIVE + GOOD
+→ available = true
+
+ACTIVE + INSPECTION_PENDING
+→ available = false
+→ INSPECTION_PENDING
+
+ACTIVE + DAMAGED
+→ available = false
+→ DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+→ available = false
+→ OUT_OF_SERVICE
+
+RETIRED
+→ available = false
+→ RETIRED
+```
+
+`ACTIVE + GOOD = available` significa:
+
+```text
+available according to currently implemented Core Equipment facts
+```
+
+No garantiza todavía:
+
+```text
+availability for a specific Case
+absence of future Custody blocker
+absence of Maintenance blocker
+absence of Calibration blocker
+absence of Assignment conflict
+```
+
+Contrato externo conceptual:
+
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"],
+  "evaluatedAt": "2026-08-24T00:00:00.000Z"
+}
+```
+
+Contrato conceptual del evaluator puro:
+
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"]
+}
+```
+
+Reason codes Fase 1:
+
+```text
+RETIRED
+INSPECTION_PENDING
+DAMAGED
+OUT_OF_SERVICE
+```
+
+Prioridad determinística:
+
+```text
+1. RETIRED
+2. INSPECTION_PENDING
+3. DAMAGED
+4. OUT_OF_SERVICE
+```
+
+No exponer todavía:
+
+```text
+EXTERNAL_CUSTODY
+CASE_CONFLICT
+MAINTENANCE_BLOCKED
+CALIBRATION_BLOCKED
+```
+
+Arquitectura aprobada:
+
+```text
+EquipmentAvailabilityService
+→ tenant-safe Equipment lookup
+→ orchestration
+→ evaluatedAt
+
+pure Equipment Current Availability evaluator
+→ consumes lifecycle + condition facts
+→ no database dependency
+→ deterministic
+```
+
+API aprobada:
+
+```text
+GET /equipment/:equipmentId/availability
+```
+
+Tenant behavior:
+
+```text
+Authenticated Company from JWT
+lookup by equipmentId + companyId
+cross-tenant or nonexistent Equipment → 404 Equipo no encontrado
+```
+
+No agregar Availability a `GET /equipment` en Fase 1 para evitar N+1 implícito.
+
+Prisma:
+
+```text
+new Prisma model
+→ NOT REQUIRED
+
+new field
+→ NOT REQUIRED
+
+new enum
+→ NOT REQUIRED
+
+migration
+→ NOT REQUIRED
+```
+
+Manual QA plan:
+
+```text
+manual ACTIVE + GOOD
+→ available true
+
+Purchase Receipt ACTIVE + INSPECTION_PENDING
+→ false / INSPECTION_PENDING
+
+Inspection: INSPECTION_PENDING → GOOD
+→ available true
+
+GOOD → DAMAGED
+→ available false / DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+→ unavailable
+
+GOOD → RETIRED
+→ unavailable / RETIRED
+
+RETIRED + DAMAGED
+→ reasons [RETIRED, DAMAGED]
+
+cross-tenant Equipment
+→ 404
+```
+
+Fases previstas:
+
+```text
+B.1
+Pure evaluator + reason types/constants
+
+B.2
+EquipmentAvailabilityService with tenant-safe lookup
+
+B.3
+GET /equipment/:equipmentId/availability
+
+B.4
+Automated tests and technical validation
+
+B.5
+Manual PostgreSQL/API QA using real Equipment state transitions
+
+C
+Final documentation synchronization
 ```
 
 ---
@@ -1665,7 +1893,7 @@ Estado:
 → completed / validated
 
 4. Availability Evaluator
-→ next
+→ ready / next
 ```
 Core Equipment baseline
 ✅
@@ -1702,14 +1930,23 @@ EQ-AVL-001
 Availability Evaluator
 ```
 
+Estado:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+```
+
 Primero:
 
 ```text
-Availability derivation rules
+Phase B.1
+Pure evaluator + reason types/constants
 ↓
-Documentation
+Phase B.2
+EquipmentAvailabilityService with tenant-safe lookup
 ↓
-Architecture Review
+Phase B.3
+GET /equipment/:equipmentId/availability
 ```
 
 Después:
@@ -1761,5 +1998,5 @@ Purchase Receipt → EquipmentAsset
 Then:
 
 Availability Evaluator
-→ next domain workflow
+→ ready / next domain workflow
 ```
