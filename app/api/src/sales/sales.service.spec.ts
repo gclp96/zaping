@@ -429,6 +429,82 @@ describe('SalesService', () => {
     });
   });
 
+  describe('findOne', () => {
+    it('consulta una venta usando id y companyId', async () => {
+      const sale = {
+        ...draftSale,
+        customer: {
+          id: customerId,
+          companyId,
+          name: 'Hospital de prueba',
+        },
+      };
+
+      prismaMock.sale.findFirst.mockResolvedValue(sale);
+
+      await service.findOne(companyId, saleId);
+
+      expect(prismaMock.sale.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: saleId,
+          companyId,
+        },
+        include: {
+          customer: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+    });
+
+    it('devuelve la venta con cliente y productos de partidas', async () => {
+      const sale = {
+        ...draftSale,
+        customer: {
+          id: customerId,
+          companyId,
+          name: 'Hospital de prueba',
+        },
+      };
+
+      prismaMock.sale.findFirst.mockResolvedValue(sale);
+
+      const result = await service.findOne(companyId, saleId);
+
+      expect(result).toEqual(sale);
+      expect(result.customer).toEqual(sale.customer);
+      expect(result.items[0].product).toEqual(draftSale.items[0].product);
+    });
+
+    it('lanza NotFoundException cuando la venta no existe', async () => {
+      prismaMock.sale.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(companyId, saleId)).rejects.toThrow(
+        new NotFoundException('Venta no encontrada'),
+      );
+    });
+
+    it('no puede devolver una venta de otra empresa', async () => {
+      prismaMock.sale.findFirst.mockResolvedValue(null);
+
+      await expect(service.findOne(companyId, saleId)).rejects.toThrow(
+        new NotFoundException('Venta no encontrada'),
+      );
+
+      expect(prismaMock.sale.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: saleId,
+            companyId,
+          },
+        }),
+      );
+    });
+  });
+
   describe('approve', () => {
     it('rechaza una venta inexistente o de otra empresa', async () => {
       prismaMock.sale.findFirst.mockResolvedValue(null);

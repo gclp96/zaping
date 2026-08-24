@@ -42,6 +42,14 @@ export class SalesController {
     return this.salesService.findAll(req.user.companyId);
   }
 
+  @Get(':id')
+  findOne(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.salesService.findOne(req.user.companyId, id);
+  }
+
   @Patch(':id/approve')
   approve(
     @Req() req: AuthenticatedRequest,
