@@ -55,6 +55,7 @@ Zaping Platform
 │
 ├── Healthcare
 │   ├── Arquitectura de dominio en evolución
+│   ├── Case Foundation domain design approved
 │   ├── Equipment boundary documentado
 │   └── Workflows operacionales pendientes
 │
@@ -1589,7 +1590,7 @@ salvo que alguno sea necesario para un workflow P0/P1.
 
 # 11. Healthcare — estado actual
 
-**Estado:** 🟡 Domain design in progress
+**Estado:** 🟡 Case Foundation ready for implementation
 **Prioridad:** P1 estratégica
 
 Completado específicamente para Equipment:
@@ -1604,9 +1605,249 @@ Healthcare Equipment domain document
 
 Healthcare Equipment todavía no está implementado.
 
+Healthcare Case Foundation:
+
+```text
+DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+
+Repository analysis
+→ COMPLETE
+
+Domain design
+→ APPROVED
+
+Implementation
+→ NOT STARTED
+```
+
+Scope aprobado para Phase 1:
+
+```text
+HealthcareCase
+
+identity
+tenant
+planning schedule
+minimal lifecycle
+operational responsibility
+creation / cancellation audit facts
+stable references for future Healthcare domains
+```
+
+Campos conceptuales aprobados:
+
+```text
+id
+companyId
+folio
+
+title
+procedureDescription?
+
+status
+
+scheduledStart?
+scheduledEnd?
+
+responsibleUserId?
+
+createdById
+
+cancelledAt?
+cancelledById?
+cancellationReason?
+
+createdAt
+updatedAt
+```
+
+Status conceptual aprobado:
+
+```text
+DRAFT
+SCHEDULED
+CANCELLED
+```
+
+No incluir en Foundation:
+
+```text
+IN_PROGRESS
+COMPLETED
+RECONCILIATION_PENDING
+RETURN_PENDING
+DISPATCHED
+```
+
+HealthcareCase no posee:
+
+```text
+Equipment Assignment
+Equipment Requirement
+CaseKit
+Dispatch
+Custody
+Return
+Inventory
+Billing
+Insurance
+Patient records
+Clinical records
+```
+
+Folio:
+
+```text
+CASE-000001
+→ generated server-side
+→ immutable
+→ unique per Company
+→ CompanySequence-based
+→ allocated inside Case creation transaction
+```
+
+Candidate constraints/indexes approved for implementation review:
+
+```text
+@@unique([companyId, folio])
+@@unique([id, companyId])
+
+@@index([companyId, status])
+@@index([companyId, scheduledStart])
+@@index([companyId, responsibleUserId])
+```
+
+Schedule invariants:
+
+```text
+start null + end null
+→ valid unscheduled Case
+
+start present + end null
+→ valid scheduled Case with unknown duration/end
+
+start present + end present
+→ valid only when end > start
+
+start null + end present
+→ invalid
+```
+
+Hospital / Doctor:
+
+```text
+hospitalId
+→ deferred
+
+doctorId
+→ deferred
+
+Customer
+≠
+Hospital / Doctor / Payer
+```
+
+Responsible user:
+
+```text
+responsibleUserId
+→ nullable
+→ references User
+
+Technician model / profile / TECHNICIAN role
+→ not part of Foundation
+```
+
+Cancellation:
+
+```text
+POST /healthcare/cases/:id/cancel
+
+DRAFT / SCHEDULED
+→ CANCELLED
+
+CANCELLED
+→ terminal in Phase 1
+```
+
+No:
+
+```text
+DELETE endpoint
+complete command
+patient / PHI fields
+clinical record fields
+```
+
+API namespace approved:
+
+```text
+/healthcare/cases
+```
+
+Planned Phase 1 API:
+
+```text
+POST /healthcare/cases
+GET /healthcare/cases
+GET /healthcare/cases/:id
+PATCH /healthcare/cases/:id
+POST /healthcare/cases/:id/cancel
+```
+
+RBAC direction for later implementation:
+
+```text
+ADMIN
+→ read / create / edit / cancel
+
+MANAGER
+→ read / create / edit / cancel
+
+SALES
+→ read / create / edit
+
+WAREHOUSE
+→ read
+```
+
+Reliability debt:
+
+```text
+Case creation idempotency
+→ NOT IMPLEMENTED in Foundation
+→ retry after lost successful response may create another Case and consume another folio
+```
+
+Prisma assessment:
+
+```text
+new HealthcareCase model
+new HealthcareCaseStatus enum
+relations
+indexes / constraints
+migration
+
+Hospital and Doctor
+→ not part of this migration
+```
+
+Planned implementation phases:
+
+```text
+B.1 Prisma HealthcareCase model + HealthcareCaseStatus + migration
+B.2 Case folio allocation + HealthcareCaseService create/read/list
+B.3 DTOs + HealthcareCaseController + authenticated API
+B.4 planning update + cancellation lifecycle rules
+B.5 automated validation + PostgreSQL/API manual QA
+C final documentation synchronization
+```
+
 Pendiente:
 
 ```text
+Healthcare Case Foundation implementation
+Hospital/Doctor master data
 Equipment Requirement
 Case Equipment Assignment
 Availability for Case
@@ -1626,18 +1867,20 @@ Technician Mobile
 # 12. Healthcare Equipment — orden recomendado
 
 ```text
-1. Equipment Requirement contract
-2. Case Equipment Assignment
-3. Availability for Case
-4. Preparation integration
-5. Dispatch
-6. Custody
-7. Return
-8. Inspection integration
-9. Case 360
-10. Warehouse Operations UI
-11. Calendar integration
-12. Technician Mobile
+1. Healthcare Case Foundation
+2. Hospital/Doctor master data
+3. Equipment Requirement contract
+4. Case Equipment Assignment
+5. Availability for Case
+6. Preparation integration
+7. Dispatch
+8. Custody
+9. Return
+10. Inspection integration
+11. Case 360
+12. Warehouse Operations UI
+13. Calendar integration
+14. Technician Mobile
 ```
 
 Healthcare deberá consumir siempre:
@@ -1982,15 +2225,16 @@ Future
 
 # 19. Orden de trabajo inmediato
 
-Para el workstream actual de Equipment:
+Para el workstream actual Healthcare + Equipment:
 
 ```text
 1. Design Automatic assetCode generation
 2. Implement Automatic assetCode generation
 3. Purchase Receipt → EquipmentAsset
 4. Availability Evaluator
-5. Healthcare Equipment Assignment
-6. Healthcare Case Logistics integration
+5. Healthcare Case Foundation
+6. Healthcare Equipment Assignment
+7. Healthcare Case Logistics integration
 ```
 
 Estado:
@@ -2007,6 +2251,12 @@ Estado:
 
 4. Availability Evaluator
 → completed / validated
+
+5. Healthcare Case Foundation
+→ domain design approved / ready for implementation
+
+6. Healthcare Equipment Assignment
+→ blocked by Case Foundation
 ```
 Core Equipment baseline
 ✅
@@ -2042,15 +2292,17 @@ No debe sacrificarse seguridad para acelerar un workflow funcional.
 El siguiente bloque es:
 
 ```text
-Healthcare Equipment Assignment
+Healthcare Case Foundation
 ```
 
 Estado:
 
 ```text
-EQ-AVL-001
-Current Equipment Availability
-→ IMPLEMENTED / VALIDATED
+Healthcare Case Foundation
+→ DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+
+Implementation
+→ NOT STARTED
 ```
 
 Primero:
@@ -2116,6 +2368,11 @@ Availability Evaluator
 
 Then:
 
+Healthcare Case Foundation
+→ next approved implementation dependency
+
+Then:
+
 Healthcare Equipment Assignment
-→ next documented Equipment workflow
+→ blocked until HealthcareCase exists
 ```

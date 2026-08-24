@@ -187,6 +187,78 @@ sin convertirse en propietario de esas reglas.
 
 ---
 
+# 8.1 Case Foundation dependency approved
+
+Healthcare Case Foundation A.5 aprueba que el Calendar consuma:
+
+```text
+HealthcareCase.scheduledStart
+HealthcareCase.scheduledEnd
+```
+
+como source of truth temporal.
+
+No se requiere persistencia separada como:
+
+```text
+CalendarEvent
+```
+
+para Case Foundation.
+
+El Calendar no debe convertirse en otra fuente de verdad para el schedule.
+
+Schedule Foundation aprobado:
+
+```text
+scheduledStart DateTime?
+scheduledEnd DateTime?
+```
+
+Invariantes:
+
+```text
+start null
+end null
+→ valid unscheduled Case
+
+start present
+end null
+→ valid scheduled Case with unknown duration/end
+
+start present
+end present
+→ valid only when end > start
+
+start null
+end present
+→ invalid
+```
+
+Los timestamps de API deben ser ISO-8601 no ambiguos. Persistencia usa `DateTime` con instantes absolutos. `Company.timezone` aporta contexto operacional/display cuando aplique.
+
+Case Foundation Phase 1 no persiste:
+
+```text
+hospitalId
+doctorId
+customerId
+readiness
+equipment assignments
+case kit state
+dispatch state
+custody state
+return state
+```
+
+Por tanto, Calendar Phase 1 puede leer schedule/status/responsible user del Case, pero Doctor/Hospital, readiness, Equipment conflicts y logistics indicators siguen siendo futuras integraciones.
+
+**Estado de Case Foundation:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+
+**Estado de Calendar:** DOMAIN DESIGN / NOT IMPLEMENTED.
+
+---
+
 # 9. Alcance inicial
 
 La primera versión debe permitir como mínimo:
@@ -2633,15 +2705,36 @@ Antes de construir Calendar debemos resolver:
 
 ```text
 HealthcareCase schema
+→ Case Foundation approved / implementation pending
+
 scheduledStart / scheduledEnd strategy
+→ approved by Case Foundation A.5
+
 Technician identity model
+→ responsibleUserId approved for Foundation
+→ full Technician profile deferred
+
 Hospital model
+→ deferred to Healthcare master data follow-up
+
 Doctor model
+→ deferred to Healthcare master data follow-up
+
 readiness calculation
+→ pending
+
 Equipment assignment model
+→ pending
+
 conflict severity rules
+→ pending
+
 permissions
+→ initial Case RBAC direction approved
+→ exact implementation pending
+
 API read model
+→ pending
 ```
 
 ---

@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN / NOT IMPLEMENTED
+**Estado de implementación:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
 **Última actualización:** 2026-08-20
 **Responsable:** Zaping Healthcare Team
 
@@ -374,6 +374,496 @@ CASE-000001
 podrían coexistir si esa estrategia se aprueba.
 
 La definición técnica debe seguir las reglas de folios empresariales de Zaping.
+
+---
+
+# 18.1 Healthcare Case Foundation aprobado
+
+**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+
+`HealthcareCase` es el root operacional persistido para un Case medico/quirurgico.
+
+Phase 1 posee solamente:
+
+```text
+identity
+tenant
+planning schedule
+minimal lifecycle
+operational responsibility
+creation / cancellation audit facts
+stable references for future Healthcare domains
+```
+
+Phase 1 no posee:
+
+```text
+Equipment Assignment
+Equipment Requirement
+CaseKit
+Dispatch
+Custody
+Return
+Inventory
+Billing
+Insurance
+Patient records
+Clinical records
+```
+
+Modelo conceptual aprobado:
+
+```text
+HealthcareCase
+```
+
+Campos conceptuales aprobados para Foundation:
+
+```text
+id
+companyId
+folio
+
+title
+procedureDescription?
+
+status
+
+scheduledStart?
+scheduledEnd?
+
+responsibleUserId?
+
+createdById
+
+cancelledAt?
+cancelledById?
+cancellationReason?
+
+createdAt
+updatedAt
+```
+
+Esto documenta el contrato aprobado. No significa que `schema.prisma` ya haya sido modificado.
+
+Identity:
+
+```text
+id
+→ UUID
+→ technical identity
+→ immutable
+
+folio
+→ human identity
+→ generated server-side
+→ immutable
+→ unique per Company
+→ not submitted by client
+```
+
+Formato conceptual aprobado:
+
+```text
+CASE-000001
+```
+
+La generacion de folio pertenece a la transaccion de creacion del Case y debe reutilizar `CompanySequence`.
+
+La implementacion debe utilizar el patron atomico endurecido ya establecido para Equipment, o una extraccion reutilizable equivalente:
+
+```text
+createMany skipDuplicates
+↓
+atomic update nextValue increment
+↓
+allocated value = returned nextValue - 1
+```
+
+Constraints / indexes candidatos aprobados para revision de implementacion:
+
+```text
+@@unique([companyId, folio])
+@@unique([id, companyId])
+
+@@index([companyId, status])
+@@index([companyId, scheduledStart])
+@@index([companyId, responsibleUserId])
+```
+
+Status conceptual aprobado para Phase 1:
+
+```text
+DRAFT
+SCHEDULED
+CANCELLED
+```
+
+No incluir todavia:
+
+```text
+IN_PROGRESS
+COMPLETED
+RECONCILIATION_PENDING
+RETURN_PENDING
+DISPATCHED
+```
+
+`status` es server-managed y no debe ser libremente escribible desde DTOs.
+
+Semantica aprobada:
+
+```text
+scheduledStart absent
+→ DRAFT
+
+scheduledStart present
+→ SCHEDULED
+
+cancel command
+→ CANCELLED
+```
+
+Mientras Equipment Assignment no exista, un PATCH de planeacion puede modificar/remover schedule y el service puede transicionar:
+
+```text
+DRAFT ↔ SCHEDULED
+```
+
+segun `scheduledStart`.
+
+`CANCELLED` es terminal en Phase 1.
+
+No existe comando de reopen en Foundation.
+
+Schedule aprobado:
+
+```text
+scheduledStart DateTime?
+scheduledEnd DateTime?
+```
+
+Invariantes:
+
+```text
+start null
+end null
+→ valid unscheduled Case
+
+start present
+end null
+→ valid scheduled Case with unknown duration/end
+
+start present
+end present
+→ valid only when end > start
+
+start null
+end present
+→ invalid
+```
+
+Los valores API deben ser timestamps ISO-8601 no ambiguos. Persistencia utiliza `DateTime`; los valores almacenados representan instantes absolutos. `Company.timezone` es el contexto operacional/display cuando aplique.
+
+`title` es requerido y representa un titulo/resumen operacional.
+
+`procedureDescription` es opcional y representa una descripcion operacional.
+
+No introducir en Phase 1:
+
+```text
+procedureType enum
+surgeryType enum
+specialty taxonomy
+clinical taxonomy
+```
+
+Hospital / Doctor / Customer / Payer:
+
+```text
+hospitalId
+→ DEFERRED
+
+doctorId
+→ DEFERRED
+
+customerId
+→ DEFERRED
+
+payer / insurance fields
+→ DEFERRED
+```
+
+Decision aprobada:
+
+```text
+Customer
+≠
+Hospital
+
+Customer
+≠
+Doctor
+
+Customer
+≠
+Payer
+```
+
+No crear verdad permanente en texto como:
+
+```text
+hospitalName
+doctorName
+```
+
+Hospital y Doctor seran master data Healthcare de primera clase en follow-ups separados.
+
+Responsible User:
+
+```text
+responsibleUserId
+→ nullable
+→ references User
+```
+
+No crear en Case Foundation:
+
+```text
+Technician model
+Technician profile
+TECHNICIAN auth role
+```
+
+Authentication role y operational function son conceptos separados.
+
+La implementacion debera validar que `responsibleUser`:
+
+```text
+exists
+belongs to authenticated Company
+is active
+```
+
+Actor fields:
+
+```text
+createdById
+→ required
+→ derived from authenticated User
+→ never accepted from client payload
+
+cancelledAt
+cancelledById
+→ set only by cancel command
+→ never accepted through generic PATCH
+```
+
+Cancellation:
+
+```text
+POST /healthcare/cases/:id/cancel
+```
+
+Valid source states:
+
+```text
+DRAFT
+SCHEDULED
+```
+
+Target:
+
+```text
+CANCELLED
+```
+
+Cancellation requires a non-empty operational `cancellationReason`.
+
+No second cancellation notes field is approved for Foundation.
+
+Completion:
+
+```text
+COMPLETED
+→ DEFERRED
+```
+
+No complete command exists in Foundation.
+
+Do not equate:
+
+```text
+procedure occurred
+```
+
+with:
+
+```text
+Case completed
+```
+
+because future Dispatch, Custody, Return and Reconciliation may remain unresolved.
+
+Delete policy:
+
+```text
+DELETE /healthcare/cases/:id
+→ NOT APPROVED in Phase 1
+```
+
+Cancellation is the supported terminal operation.
+
+PHI / patient boundary:
+
+Healthcare Case Foundation must not store patient identity or clinical record data.
+
+Do not add:
+
+```text
+patientName
+patientId
+patientDOB
+diagnosis
+treatment history
+medical history
+clinical notes
+clinical record identifiers
+```
+
+`title` and `procedureDescription` are operational fields, not patient medical-record fields.
+
+Future domain references:
+
+```text
+CaseEquipmentRequirement
+CaseMaterialRequirement
+CaseEquipmentAssignment
+CaseKit
+Dispatch
+Custody
+Return
+```
+
+will reference:
+
+```text
+HealthcareCase.id
+company ownership
+```
+
+but are not implemented in Foundation.
+
+API namespace aprobado:
+
+```text
+/healthcare/cases
+```
+
+Planned Phase 1 API:
+
+```text
+POST /healthcare/cases
+GET /healthcare/cases
+GET /healthcare/cases/:id
+PATCH /healthcare/cases/:id
+POST /healthcare/cases/:id/cancel
+```
+
+No:
+
+```text
+DELETE
+complete command
+```
+
+RBAC direction inicial:
+
+```text
+ADMIN
+→ read / create / edit / cancel
+
+MANAGER
+→ read / create / edit / cancel
+
+SALES
+→ read / create / edit
+
+WAREHOUSE
+→ read
+```
+
+No agregar `TECHNICIAN` role en este ticket. Si la arquitectura RBAC actual no puede expresar esta direccion sin cambios amplios, la implementacion debe detenerse y reportarlo en vez de redisenar Auth.
+
+Idempotency:
+
+```text
+Case creation idempotency
+→ NOT IMPLEMENTED in Foundation
+```
+
+Reliability debt:
+
+```text
+successful commit
+lost response
+client retry
+→ another Case may be created
+→ another folio may be consumed
+```
+
+No resolver Purchase Receipt idempotency dentro de Case Foundation.
+
+Concurrency:
+
+```text
+Case create folio allocation
+→ transaction-safe required
+
+normal planning update concurrency
+→ current project behavior acceptable for Foundation
+
+future conflict-sensitive reschedule
+→ stronger revalidation/concurrency required once Assignment exists
+```
+
+Prisma assessment:
+
+Case Foundation requiere:
+
+```text
+new HealthcareCase model
+new HealthcareCaseStatus enum
+relations
+indexes / constraints
+migration
+```
+
+Hospital y Doctor no forman parte de esta migracion.
+
+Planned implementation phases:
+
+```text
+B.1
+Prisma HealthcareCase model + HealthcareCaseStatus + migration
+
+B.2
+Case folio allocation + HealthcareCaseService create/read/list
+
+B.3
+DTOs + HealthcareCaseController + authenticated API
+
+B.4
+planning update + cancellation lifecycle rules
+
+B.5
+automated validation + PostgreSQL/API manual QA
+
+C
+final documentation synchronization
+```
+
+Si la generacion de folio revela duplicacion de `CompanySequence`, preferir una extraccion pequena reutilizable en vez de copiar logica insegura.
 
 ---
 
@@ -2875,29 +3365,66 @@ PROJECT_BOARD.md
 
 ---
 
-# 201. Decisiones pendientes antes de Prisma
+# 201. Decisiones aprobadas para Case Foundation
 
-Antes de crear:
+Healthcare Case Foundation A.5 resuelve el alcance minimo para crear:
 
 ```text
 model HealthcareCase
 ```
 
-debemos resolver:
+Decisiones aprobadas:
 
 ```text
-Doctor model
-Hospital model
-Technician model / User relationship
-lifecycle enum final
-readiness representation
-minimum fields for creation
-minimum fields for scheduling
-procedure representation
-folio strategy
-Opportunity → Case cardinality
-Customer/Payer relationship
-schedule history strategy
+model name
+→ HealthcareCase
+
+technical id
+→ UUID
+
+folio
+→ CASE-000001 conceptual format
+→ server-generated
+→ immutable
+→ unique per Company
+→ CompanySequence-based
+
+Phase 1 status
+→ DRAFT / SCHEDULED / CANCELLED
+
+responsibility
+→ nullable responsibleUserId
+→ references User
+
+Hospital / Doctor
+→ deferred to first-class Healthcare master data follow-ups
+
+Customer / Payer
+→ deferred commercial integration
+
+schedule
+→ scheduledStart? / scheduledEnd?
+→ unscheduled Case allowed
+
+completion
+→ deferred
+
+delete
+→ no DELETE in Phase 1
+
+PHI / clinical records
+→ not part of Foundation
+```
+
+Open for implementation review:
+
+```text
+exact Prisma migration
+exact DTO contracts
+exact service/controller files
+exact RBAC expression with current Auth
+folio allocator extraction vs Case-local service
+test fixtures and manual QA script
 ```
 
 ---
