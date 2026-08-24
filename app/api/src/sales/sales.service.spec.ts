@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SalesService } from './sales.service';
 import type { Response } from 'express';
@@ -9,7 +10,40 @@ const companyId = '11111111-1111-4111-8111-111111111111';
 const quoteId = '22222222-2222-4222-8222-222222222222';
 const customerId = '33333333-3333-4333-8333-333333333333';
 const productId = '44444444-4444-4444-8444-444444444444';
+const secondProductId = '77777777-7777-4777-8777-777777777777';
 const saleId = '55555555-5555-4555-8555-555555555555';
+const incompatibleTrackingMessage =
+  'El producto Producto médico no es compatible con el flujo de venta genérico por su tipo de seguimiento de inventario';
+const requiredLotMessage =
+  'El producto Producto médico requiere selección de lote para completar la venta';
+
+function createProductMock(
+  overrides: Partial<{
+    id: string;
+    companyId: string;
+    name: string;
+    cost: number;
+    price: number;
+    stock: number;
+    isActive: boolean;
+    inventoryTracking: ProductInventoryTracking;
+    lotTracking: ProductLotTracking;
+  }> = {},
+) {
+  return {
+    id: productId,
+    companyId,
+    name: 'Producto médico',
+    cost: 65,
+    price: 100,
+    stock: 10,
+    isActive: true,
+    inventoryTracking: ProductInventoryTracking.QUANTITY,
+    lotTracking: ProductLotTracking.OPTIONAL,
+    ...overrides,
+  };
+}
+
 const quote = {
   id: quoteId,
   companyId,
@@ -45,6 +79,7 @@ const transactionMock = {
 
   product: {
     findFirst: jest.fn(),
+    findMany: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
   },
@@ -83,6 +118,8 @@ const draftSale = {
         price: 100,
         stock: 10,
         isActive: true,
+        inventoryTracking: ProductInventoryTracking.QUANTITY,
+        lotTracking: ProductLotTracking.OPTIONAL,
       },
     },
   ],
@@ -152,6 +189,7 @@ const prismaMock = {
 
   product: {
     findFirst: jest.fn(),
+    findMany: jest.fn(),
   },
 
   sale: {
@@ -171,6 +209,9 @@ describe('SalesService', () => {
     prismaMock.$transaction.mockImplementation(
       async (callback: TransactionCallback) => callback(transactionMock),
     );
+
+    prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
+    transactionMock.product.findMany.mockResolvedValue([createProductMock()]);
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -254,7 +295,7 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
 
-      expect(prismaMock.product.findFirst).not.toHaveBeenCalled();
+      expect(prismaMock.product.findMany).not.toHaveBeenCalled();
 
       expect(prismaMock.sale.create).not.toHaveBeenCalled();
     });
@@ -294,7 +335,7 @@ describe('SalesService', () => {
         isActive: true,
       });
 
-      prismaMock.product.findFirst.mockResolvedValue(null);
+      prismaMock.product.findMany.mockResolvedValue([]);
 
       await expect(
         service.create(companyId, {
@@ -308,13 +349,169 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(prismaMock.product.findFirst).toHaveBeenCalledWith({
+      expect(prismaMock.product.findMany).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id: {
+            in: [productId],
+          },
           companyId,
           isActive: true,
         },
+        select: {
+          id: true,
+          name: true,
+          price: true,
+          inventoryTracking: true,
+          lotTracking: true,
+        },
       });
+
+      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+    });
+
+    it('permite crear una venta con producto QUANTITY y lote NONE', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          lotTracking: ProductLotTracking.NONE,
+        }),
+      ]);
+
+      prismaMock.sale.create.mockResolvedValue({
+        id: saleId,
+      });
+
+      await service.create(companyId, {
+        customerId,
+        items: [
+          {
+            productId,
+            quantity: 2,
+          },
+        ],
+      });
+
+      expect(prismaMock.sale.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('permite crear una venta con producto QUANTITY y lote OPTIONAL', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
+
+      prismaMock.sale.create.mockResolvedValue({
+        id: saleId,
+      });
+
+      await service.create(companyId, {
+        customerId,
+        items: [
+          {
+            productId,
+            quantity: 2,
+          },
+        ],
+      });
+
+      expect(prismaMock.sale.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('rechaza crear una venta con producto no QUANTITY', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          inventoryTracking: ProductInventoryTracking.ASSET,
+        }),
+      ]);
+
+      await expect(
+        service.create(companyId, {
+          customerId,
+          items: [
+            {
+              productId,
+              quantity: 2,
+            },
+          ],
+        }),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
+
+      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza crear una venta con producto que requiere lote', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          lotTracking: ProductLotTracking.REQUIRED,
+        }),
+      ]);
+
+      await expect(
+        service.create(companyId, {
+          customerId,
+          items: [
+            {
+              productId,
+              quantity: 2,
+            },
+          ],
+        }),
+      ).rejects.toThrow(new BadRequestException(requiredLotMessage));
+
+      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza completamente una venta mixta con un producto incompatible', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      prismaMock.product.findMany.mockResolvedValue([
+        createProductMock(),
+        createProductMock({
+          id: secondProductId,
+          name: 'Producto médico',
+          inventoryTracking: ProductInventoryTracking.SERIALIZED,
+        }),
+      ]);
+
+      await expect(
+        service.create(companyId, {
+          customerId,
+          items: [
+            {
+              productId,
+              quantity: 1,
+            },
+            {
+              productId: secondProductId,
+              quantity: 1,
+            },
+          ],
+        }),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
       expect(prismaMock.sale.create).not.toHaveBeenCalled();
     });
@@ -328,13 +525,7 @@ describe('SalesService', () => {
         isActive: true,
       });
 
-      prismaMock.product.findFirst.mockResolvedValue({
-        id: productId,
-        companyId,
-        name: 'Producto médico',
-        price: 100,
-        isActive: true,
-      });
+      prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
 
       const createdSale = {
         id: saleId,
@@ -394,13 +585,11 @@ describe('SalesService', () => {
         isActive: true,
       });
 
-      prismaMock.product.findFirst.mockResolvedValue({
-        id: productId,
-        companyId,
-        name: 'Producto médico',
-        price: 33.335,
-        isActive: true,
-      });
+      prismaMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          price: 33.335,
+        }),
+      ]);
 
       prismaMock.sale.create.mockResolvedValue({
         id: saleId,
@@ -558,6 +747,75 @@ describe('SalesService', () => {
       expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
     });
 
+    it('rechaza aprobar una venta con producto no QUANTITY', async () => {
+      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          inventoryTracking: ProductInventoryTracking.SERIALIZED,
+        }),
+      ]);
+
+      await expect(service.approve(companyId, saleId)).rejects.toThrow(
+        new BadRequestException(incompatibleTrackingMessage),
+      );
+
+      expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza aprobar una venta con producto que requiere lote', async () => {
+      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          lotTracking: ProductLotTracking.REQUIRED,
+        }),
+      ]);
+
+      await expect(service.approve(companyId, saleId)).rejects.toThrow(
+        new BadRequestException(requiredLotMessage),
+      );
+
+      expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza aprobar una venta mixta si una partida es incompatible', async () => {
+      prismaMock.sale.findFirst.mockResolvedValue({
+        ...draftSale,
+        items: [
+          ...draftSale.items,
+          {
+            id: 'sale-item-2',
+            productId: secondProductId,
+            quantity: 1,
+            price: 50,
+            subtotal: 50,
+          },
+        ],
+      });
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock(),
+        createProductMock({
+          id: secondProductId,
+          name: 'Producto médico',
+          inventoryTracking: ProductInventoryTracking.ASSET,
+        }),
+      ]);
+
+      await expect(service.approve(companyId, saleId)).rejects.toThrow(
+        new BadRequestException(incompatibleTrackingMessage),
+      );
+
+      expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
     it('rechaza la aprobación cuando no existe stock suficiente', async () => {
       prismaMock.sale.findFirst.mockResolvedValue(draftSale);
 
@@ -565,15 +823,9 @@ describe('SalesService', () => {
         count: 1,
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 1,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 1,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 0,
@@ -595,15 +847,9 @@ describe('SalesService', () => {
         count: 1,
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 8,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 8,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 1,
@@ -677,15 +923,9 @@ describe('SalesService', () => {
         count: 1,
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 27,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 27,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 1,
@@ -949,15 +1189,9 @@ describe('SalesService', () => {
         status: 'CONFIRMED',
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 8,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 8,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 1,
@@ -1158,23 +1392,87 @@ describe('SalesService', () => {
     it('rechaza un producto inexistente, inactivo o de otra empresa', async () => {
       transactionMock.quote.findFirst.mockResolvedValue(quote);
 
-      transactionMock.quote.updateMany.mockResolvedValue({
-        count: 1,
-      });
-
-      transactionMock.sale.create.mockResolvedValue({
-        id: saleId,
-        folio: 'V-123',
-      });
-
-      transactionMock.product.findFirst.mockResolvedValue(null);
+      transactionMock.product.findMany.mockResolvedValue([]);
 
       await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
         NotFoundException,
       );
 
+      expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
 
+    it('rechaza convertir una cotización con producto no QUANTITY', async () => {
+      transactionMock.quote.findFirst.mockResolvedValue(quote);
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          inventoryTracking: ProductInventoryTracking.ASSET,
+        }),
+      ]);
+
+      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+        new BadRequestException(incompatibleTrackingMessage),
+      );
+
+      expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza convertir una cotización con producto que requiere lote', async () => {
+      transactionMock.quote.findFirst.mockResolvedValue(quote);
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock({
+          lotTracking: ProductLotTracking.REQUIRED,
+        }),
+      ]);
+
+      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+        new BadRequestException(requiredLotMessage),
+      );
+
+      expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza convertir una cotización mixta si una partida es incompatible', async () => {
+      transactionMock.quote.findFirst.mockResolvedValue({
+        ...quote,
+        items: [
+          ...quote.items,
+          {
+            id: 'quote-item-2',
+            productId: secondProductId,
+            quantity: 1,
+            price: 50,
+            subtotal: 50,
+          },
+        ],
+      });
+
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock(),
+        createProductMock({
+          id: secondProductId,
+          name: 'Producto médico',
+          inventoryTracking: ProductInventoryTracking.SERIALIZED,
+        }),
+      ]);
+
+      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+        new BadRequestException(incompatibleTrackingMessage),
+      );
+
+      expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
     });
 
@@ -1190,15 +1488,9 @@ describe('SalesService', () => {
         folio: 'V-123',
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 1,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 1,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 0,
@@ -1229,15 +1521,15 @@ describe('SalesService', () => {
         folio: 'V-1700000000000',
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
+      transactionMock.product.findMany.mockResolvedValue([
+        createProductMock({
           cost: 55.75,
-        })
-        .mockResolvedValueOnce({
-          stock: 8,
-        });
+        }),
+      ]);
+
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 8,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 1,
@@ -1275,15 +1567,9 @@ describe('SalesService', () => {
         folio: 'V-123',
       });
 
-      transactionMock.product.findFirst
-        .mockResolvedValueOnce({
-          id: productId,
-          name: 'Producto médico',
-          cost: 65,
-        })
-        .mockResolvedValueOnce({
-          stock: 27,
-        });
+      transactionMock.product.findFirst.mockResolvedValueOnce({
+        stock: 27,
+      });
 
       transactionMock.product.updateMany.mockResolvedValue({
         count: 1,
