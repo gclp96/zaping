@@ -3,7 +3,7 @@
 **Producto:** Zaping Platform
 **Estado:** Desarrollo activo
 **Fase actual:** ERP Core + Equipment Foundation + Healthcare Preparation
-**Última actualización:** 2026-08-21
+**Última actualización:** 2026-08-24
 **Responsable:** Zaping Team
 
 ---
@@ -364,7 +364,7 @@ No redefine `EquipmentAsset`.
 | Purchases         | ✅ Implementado / avanzado                       |
 | Purchase Receipts | ✅ Implementado                                  |
 | Inventory         | ✅ Implementado / avanzado / evolución pendiente |
-| Equipment Core    |  ✅ Registration + Read + Inspection + Retirement implementados |
+| Equipment Core    |  ✅ Registration + Read + Inspection + Retirement + Purchase Receipt provisioning implementados |
 | Quotes            | ✅ Legacy funcional                              |
 | Sales             | 🟡 Legacy funcional / refactor pendiente        |
 | Returns           | 🟡 Parcialmente implementado                    |
@@ -684,7 +684,7 @@ PASS
 
 ## EQ-PR-001 — Purchase Receipt → EquipmentAsset
 
-**Estado:** 🟡 Ready / Next
+**Estado:** ✅ Completed / Validated
 
 **Prioridad:** P1
 
@@ -692,17 +692,17 @@ PASS
 
 **Domain design:** Approved
 
-**Implementation:** Not implemented
+**Implementation:** Implemented / Validated
 
-Para Products:
+Implementado para Products:
 
 ```text
 inventoryTracking = ASSET
 ```
 
-una recepción deberá crear las identidades físicas correspondientes durante la implementación de EQ-PR-001.
+una recepción crea las identidades físicas correspondientes.
 
-Regla aprobada:
+Regla implementada:
 
 ```text
 PurchaseReceiptItem.quantityReceived = N
@@ -725,7 +725,7 @@ ASSET
 → EquipmentAsset creation
 ```
 
-Debe mantener consistencia entre:
+Consistencia mantenida entre:
 
 ```text
 PurchaseReceipt
@@ -734,25 +734,55 @@ Product
 EquipmentAsset
 ```
 
-y ejecutarse dentro de la misma transacción Prisma:
+Arquitectura implementada:
 
 ```text
-PurchaseReceipt
-+
-PurchaseReceiptItems
-+
-InventoryBatch
-+
-InventoryMovement
-+
-Product.stock mutation
-+
-CompanySequence allocation
-+
-EquipmentAsset creation
+EquipmentAssetCodeService
+→ owns CompanySequence allocation
+→ owns EQ assetCode formatting and collision reservation
+
+EquipmentProvisioningService
+→ owns PurchaseReceiptItem lookup
+→ owns tenant-safe provisioning
+→ owns inventoryTracking decision
+→ owns Equipment identity creation
+
+PurchaseReceiptsService
+→ owns receipt orchestration
+→ owns transaction boundary
 ```
 
-Decisiones aprobadas:
+Public API:
+
+```text
+provisionFromPurchaseReceiptItem(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  purchaseReceiptItemId: string
+): Promise<EquipmentAsset[]>
+```
+
+La operación acepta una transacción Prisma propiedad del caller y no abre una segunda transacción.
+
+Flujo validado dentro de la misma transacción Prisma:
+
+```text
+InventoryBatch create / resolve
+↓
+PurchaseReceiptItem.create
+↓
+EquipmentProvisioningService.provisionFromPurchaseReceiptItem(tx, companyId, createdReceiptItem.id)
+↓
+Product.stock += quantityReceived
+↓
+InventoryMovement IN
+↓
+Purchase status recalculation
+↓
+COMMIT
+```
+
+Decisiones implementadas:
 
 ```text
 Receipt-created EquipmentAsset
@@ -769,38 +799,151 @@ Product.stock
 → mutated only by PurchaseReceipt
 → EquipmentAsset creation does not increment stock again
 
+InventoryMovement
+→ no extra movement per EquipmentAsset
+
 Prisma migration
 → not required for minimal implementation
 ```
 
-Arquitectura aprobada:
+Module dependency:
 
 ```text
-Equipment domain/application logic
-→ owns Equipment identity generation and provisioning rules
-
-PurchaseReceiptsService
-→ owns receipt orchestration and transaction boundary
+PurchasesReceiptsModule
+→ EquipmentModule
+→ no forwardRef
+→ no circular dependency
 ```
 
-La implementación debe reutilizar el mecanismo existente:
+Mecanismo reutilizado:
 
 ```text
 CompanySequence
 key = EQUIPMENT_ASSET_CODE
 ```
 
+Persistencia reutilizada:
+
+```text
+EquipmentAsset.purchaseReceiptItemId
+EquipmentAsset.batchId
+EquipmentAsset.origin
+EquipmentOrigin.PURCHASE_RECEIPT
+CompanySequence
+companyId + assetCode uniqueness
+```
+
+Validación automatizada:
+
+```text
+Purchase Receipt tests
+2 suites
+26/26 passed
+
+Equipment tests
+5 suites
+68/68 passed
+
+Full backend tests
+31 suites
+184/184 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint changed TypeScript
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+Partial receipt
+→ Purchase quantity 5
+→ Receipt A quantityReceived 2 created 2 EquipmentAssets
+→ Receipt B quantityReceived 3 created 3 EquipmentAssets
+→ total EquipmentAssets 5
+
+Product.stock
+→ initial 0
+→ after Receipt A 2
+→ after Receipt B 5
+→ no double counting
+
+InventoryMovement
+→ Receipt A one IN movement, quantity 2, balance 2
+→ Receipt B one IN movement, quantity 3, balance 5
+→ final movements 2
+→ total IN 5
+
+Traceability
+→ PurchaseReceiptItem 4a93d639-e25e-4018-98a7-46e5aa36a422 linked exactly 2 assets
+→ PurchaseReceiptItem 86319c8a-0e79-451c-84cb-b1471c9ffe4b linked exactly 3 assets
+
+Receipt-created Equipment
+→ origin PURCHASE_RECEIPT
+→ lifecycle ACTIVE
+→ condition INSPECTION_PENDING
+→ batchId null when Product lotTracking = NONE
+
+Over-receipt protection
+→ extra receipt after RECEIVED returned 400 Bad Request
+→ La compra ya fue recibida completamente
+→ Product.stock remained 5
+→ InventoryMovements remained exactly 2
+→ valid EquipmentAssets remained exactly 5
+```
+
+Rollback evidence:
+
+```text
+transaction rollback behavior
+→ structurally implemented and unit-tested
+
+Provisioning errors
+→ propagate through the existing receipt Prisma transaction
+→ no second transaction is opened
+→ downstream Product.stock and InventoryMovement operations are not executed after provisioning failure
+
+manual forced database provisioning failure
+→ NOT PERFORMED
+```
+
 Pendientes fuera de EQ-PR-001:
 
 ```text
 PurchaseReceipt request idempotency
+→ unresolved high-priority reliability concern
+
 Receipt correction / reversal
+→ unresolved
+
 Product.stock ↔ EquipmentAsset reconciliation
+→ formal invariant unresolved
+
+serial assignment / correction workflow
+→ pending
+
 broader lotTracking enforcement
+→ pending
+
 SERIALIZED receipt behavior
+→ provisioning pending
+
+tenant-safe write hardening
+→ existing debt remains
 ```
 
-Fases previstas:
+Fases cerradas:
 
 ```text
 Phase B.1
@@ -1508,6 +1651,22 @@ Para el workstream actual de Equipment:
 5. Healthcare Equipment Assignment
 6. Healthcare Case Logistics integration
 ```
+
+Estado:
+
+```text
+1. Design Automatic assetCode generation
+→ completed
+
+2. Implement Automatic assetCode generation
+→ completed
+
+3. Purchase Receipt → EquipmentAsset
+→ completed / validated
+
+4. Availability Evaluator
+→ next
+```
 Core Equipment baseline
 ✅
 
@@ -1515,6 +1674,9 @@ Equipment Inspection
 ✅
 
 Equipment Retirement
+✅
+
+Purchase Receipt → EquipmentAsset
 ✅
 
 En paralelo, antes de release comercial deberán cerrarse los blockers:
@@ -1536,13 +1698,14 @@ No debe sacrificarse seguridad para acelerar un workflow funcional.
 El siguiente bloque es:
 
 ```text
-EQ-PR-001
-Purchase Receipt → EquipmentAsset
+EQ-AVL-001
+Availability Evaluator
 ```
 
 Primero:
 
-Business Analysis
+```text
+Availability derivation rules
 ↓
 Documentation
 ↓
@@ -1551,12 +1714,7 @@ Architecture Review
 
 Después:
 
-PurchaseReceipt / Equipment consistency review
-↓
-Concurrency design
-↓
-Prisma review
-↓
+```text
 Backend
 ↓
 Tests
@@ -1565,7 +1723,8 @@ QA
 ↓
 Documentation Update
 ```
-Debe manternerse:
+
+Debe mantenerse:
 
 ```text
 assetCode
@@ -1596,11 +1755,11 @@ Respuesta actual:
 Core Equipment baseline
 ✅
 
-Documentation synchronization
-→ finish CHANGELOG
+Purchase Receipt → EquipmentAsset
+✅
 
 Then:
 
-Equipment Inspection
+Availability Evaluator
 → next domain workflow
 ```

@@ -2,10 +2,10 @@
 
 **Módulo:** Core Equipment
 **Producto:** Zaping ERP
-**Versión:** 1.5.0
+**Versión:** 1.6.0
 **Estado:** Approved
-**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE
-**Última actualización:** 2026-08-23
+**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE + PURCHASE RECEIPT PROVISIONING
+**Última actualización:** 2026-08-24
 **Responsable:** Zaping Team
 
 ---
@@ -43,6 +43,9 @@ Equipment Core Backend — Registration / Read
 → IMPLEMENTED
 
 Automatic assetCode Generation
+→ IMPLEMENTED / VALIDATED
+
+Purchase Receipt → EquipmentAsset
 → IMPLEMENTED / VALIDATED
 
 Equipment Operational Workflows
@@ -90,6 +93,9 @@ Batch ownership validation
 server-generated assetCode
 CompanySequence assetCode allocation
 assetCode duplicate protection
+Purchase Receipt → EquipmentAsset provisioning
+EquipmentProvisioningService
+EquipmentAssetCodeService
 serial normalization
 serial duplicate validation
 DTO validation
@@ -114,7 +120,6 @@ No deben considerarse implementadas todavía:
 ```text
 serial correction operation
 assetCode correction operation
-automatic creation from Purchase Receipt
 Inventory / Equipment synchronization policy
 Availability Evaluator
 Case Equipment Assignment
@@ -2231,17 +2236,19 @@ La baseline actual implementa:
 ```text
 POST /equipment
 → origin = MANUAL
+
+Purchase Receipt provisioning
+→ origin = PURCHASE_RECEIPT
 ```
 
 Todavía están pendientes los workflows:
 
 ```text
-PURCHASE_RECEIPT
 IMPORT
 INITIAL_MIGRATION
 ```
 
-**Estado:** PERSISTED / MANUAL FLOW IMPLEMENTED.
+**Estado:** PERSISTED / MANUAL + PURCHASE RECEIPT FLOWS IMPLEMENTED.
 
 ---
 
@@ -3486,7 +3493,7 @@ Automatic assetCode generation
 ✅
 
 Purchase Receipt Equipment creation
-⏳
+✅
 
 Explicit identity correction operations
 ⏳
@@ -3513,11 +3520,19 @@ Inspection integration
 
 # 92. Próxima prioridad recomendada
 
-El próximo workflow Core es:
+El siguiente workflow Core recomendado es:
+
+```text
+EQ-AVL-001
+Availability Evaluator
+```
+
+El workflow anterior quedó cerrado:
 
 ```text
 EQ-PR-001
 Purchase Receipt → EquipmentAsset
+→ IMPLEMENTED / VALIDATED
 ```
 
 Orden:
@@ -3540,11 +3555,11 @@ Diseño de dominio aprobado para la primera implementación:
 
 ```text
 Status
-→ DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+→ IMPLEMENTED / VALIDATED
 
 Implementation
-→ NOT IMPLEMENTED
-→ NOT VALIDATED
+→ IMPLEMENTED
+→ VALIDATED
 ```
 
 Regla de creación:
@@ -3795,6 +3810,215 @@ Tests and technical validation
 
 Phase C
 Manual QA and final documentation synchronization
+```
+
+Implementación validada:
+
+```text
+EquipmentAssetCodeService
+→ owns CompanySequence allocation
+→ owns EQ-000001 formatting
+→ owns historical / retired generated-looking code reservation
+
+EquipmentProvisioningService
+→ owns PurchaseReceiptItem lookup
+→ owns tenant-safe provisioning
+→ owns inventoryTracking decision
+→ owns Equipment identity creation
+
+provisionFromPurchaseReceiptItem(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  purchaseReceiptItemId: string
+): Promise<EquipmentAsset[]>
+→ participates in caller-owned transaction
+→ does not open its own transaction
+
+PurchaseReceiptsService
+→ owns Purchase Receipt transaction
+→ calls Equipment provisioning after PurchaseReceiptItem.create
+```
+
+Module dependency:
+
+```text
+PurchasesReceiptsModule
+→ imports EquipmentModule
+→ no forwardRef
+→ no circular dependency
+```
+
+Flujo transaccional implementado:
+
+```text
+InventoryBatch create / resolve
+↓
+PurchaseReceiptItem.create
+↓
+EquipmentProvisioningService.provisionFromPurchaseReceiptItem(
+  tx,
+  companyId,
+  createdReceiptItem.id
+)
+↓
+Product.stock += quantityReceived
+↓
+InventoryMovement IN
+↓
+Purchase status recalculation
+↓
+COMMIT
+```
+
+Todo ocurre dentro de la misma transacción Prisma propiedad de `PurchaseReceiptsService`.
+
+Reglas implementadas:
+
+```text
+Product.inventoryTracking = ASSET
+PurchaseReceiptItem.quantityReceived = N
+→ creates exactly N EquipmentAsset rows
+
+Product.inventoryTracking = QUANTITY
+→ creates no EquipmentAsset
+
+Product.inventoryTracking = SERIALIZED
+→ creates no EquipmentAsset
+→ SERIALIZED provisioning remains out of scope
+
+Receipt-created EquipmentAsset
+→ lifecycle = ACTIVE
+→ condition = INSPECTION_PENDING
+→ origin = PURCHASE_RECEIPT
+→ serialNumber = null
+→ serialNumberKey = null
+→ purchaseReceiptItemId preserved permanently
+→ batchId = PurchaseReceiptItem.batchId when available
+```
+
+Stock e InventoryMovement:
+
+```text
+Product.stock
+→ mutated only by PurchaseReceipt
+→ Product.stock += quantityReceived
+→ provisioning does not mutate stock
+
+InventoryMovement
+→ one IN movement per receipt item flow
+→ no extra movement per EquipmentAsset
+```
+
+Validación automatizada registrada:
+
+```text
+Purchase Receipt tests
+2 suites
+26/26 passed
+
+Equipment tests
+5 suites
+68/68 passed
+
+Full backend tests
+31 suites
+184/184 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint changed TypeScript
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA registrada:
+
+```text
+Purchase quantity
+→ 5
+
+Receipt A
+→ quantityReceived = 2
+→ Purchase status CONFIRMED → PARTIALLY_RECEIVED
+→ created 2 EquipmentAsset rows
+→ one InventoryMovement IN, quantity 2, balance 2
+→ Product.stock = 2
+
+Receipt B
+→ quantityReceived = 3
+→ Purchase status PARTIALLY_RECEIVED → RECEIVED
+→ created 3 EquipmentAsset rows
+→ one InventoryMovement IN, quantity 3, balance 5
+→ Product.stock = 5
+
+Final totals
+→ EquipmentAssets = 5
+→ InventoryMovements = 2
+→ Total IN = 5
+→ Product.stock = 5
+```
+
+Traceability QA:
+
+```text
+Receipt A PurchaseReceiptItem
+→ 4a93d639-e25e-4018-98a7-46e5aa36a422
+→ linked exactly 2 EquipmentAsset rows
+
+Receipt B PurchaseReceiptItem
+→ 86319c8a-0e79-451c-84cb-b1471c9ffe4b
+→ linked exactly 3 EquipmentAsset rows
+
+Equipment origin
+→ PURCHASE_RECEIPT
+
+Equipment lifecycle
+→ ACTIVE
+
+Equipment condition
+→ INSPECTION_PENDING
+
+batchId
+→ null in this QA because Product lotTracking = NONE
+```
+
+Over-receipt protection QA:
+
+```text
+After Purchase status RECEIVED and Product.stock = 5
+additional receipt quantityReceived = 1
+→ 400 Bad Request
+→ La compra ya fue recibida completamente
+
+After failed request
+→ Product.stock remained 5
+→ InventoryMovements remained exactly 2
+→ EquipmentAssets linked to valid partial receipts remained exactly 5
+→ no extra Receipt / stock / movement / Equipment mutation
+```
+
+Rollback evidence:
+
+```text
+transaction rollback behavior
+→ structurally implemented and unit-tested
+
+Provisioning failure
+→ propagates through the existing receipt Prisma transaction
+→ no second transaction is opened
+→ downstream Product.stock and InventoryMovement operations are not executed
+
+manual forced database provisioning failure
+→ NOT PERFORMED
 ```
 
 Debe mantenerse:
@@ -5028,7 +5252,7 @@ Automatic assetCode generation
 ✅
 
 Purchase Receipt Equipment creation
-⏳
+✅
 
 Explicit identity correction operations
 ⏳
@@ -5061,13 +5285,16 @@ Retirement
 
 Automatic assetCode Generation
 ✅
+
+Purchase Receipt → EquipmentAsset
+✅
 ```
 
 El siguiente paso técnico es:
 
 ```text
-EQ-PR-001
-Purchase Receipt → EquipmentAsset
+EQ-AVL-001
+Availability Evaluator
 ```
 
 # Final Principle
@@ -5195,7 +5422,7 @@ Automatic assetCode generation
 ✅
 
 Purchase Receipt Equipment creation
-⏳
+✅
 
 Equipment Retirement
 ✅
@@ -5214,11 +5441,11 @@ Availability Evaluator
 
 # 92. Próxima prioridad recomendada
 
-El próximo paso técnico es:
+El siguiente paso técnico recomendado es:
 
 ```text
-EQ-PR-001
-Purchase Receipt → EquipmentAsset
+EQ-AVL-001
+Availability Evaluator
 ```
 
 Orden:
@@ -5235,16 +5462,10 @@ Orden:
 10. Build + lint
 11. Documentation synchronization
 
-Estado de diseño:
+Estado de EQ-PR-001:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
-```
-
-Estado de implementación:
-
-```text
-NOT IMPLEMENTED
+IMPLEMENTED / VALIDATED
 ```
 
 Reglas aprobadas:
@@ -5269,6 +5490,29 @@ Product.stock
 CompanySequence
 key = EQUIPMENT_ASSET_CODE
 → reused inside the receipt transaction
+```
+
+Validación registrada:
+
+```text
+Purchase Receipt tests
+26/26 passed
+
+Equipment tests
+68/68 passed
+
+Full backend tests
+184/184 passed
+
+Manual PostgreSQL / API QA
+PASS
+
+Partial receipt
+→ 2 + 3 = 5 EquipmentAssets
+
+Over-receipt protection
+→ 400 Bad Request
+→ no extra Receipt / stock / movement / Equipment mutation
 ```
 
 Fuera de alcance:

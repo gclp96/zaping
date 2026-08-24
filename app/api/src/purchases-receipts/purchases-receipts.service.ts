@@ -6,6 +6,7 @@ import {
 import { InventoryMovementType, Prisma, PurchaseStatus } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
+import { EquipmentProvisioningService } from '../equipment/equipment-provisioning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseReceiptItemDto } from './dto/create-purchase-receipt-item.dto';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
@@ -31,7 +32,10 @@ interface RegisterBatchData {
 
 @Injectable()
 export class PurchaseReceiptsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly equipmentProvisioningService: EquipmentProvisioningService,
+  ) {}
 
   async create(
     companyId: string,
@@ -157,7 +161,7 @@ export class PurchaseReceiptsService {
               })
             : undefined;
 
-          await tx.purchaseReceiptItem.create({
+          const createdReceiptItem = await tx.purchaseReceiptItem.create({
             data: {
               companyId,
               receiptId: receipt.id,
@@ -170,6 +174,12 @@ export class PurchaseReceiptsService {
               batchId: batch?.id,
             },
           });
+
+          await this.equipmentProvisioningService.provisionFromPurchaseReceiptItem(
+            tx,
+            companyId,
+            createdReceiptItem.id,
+          );
 
           const updatedProduct = await tx.product.update({
             where: {

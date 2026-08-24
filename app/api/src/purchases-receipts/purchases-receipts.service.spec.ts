@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 
+import { EquipmentProvisioningService } from '../equipment/equipment-provisioning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
@@ -40,6 +41,10 @@ type PrismaServiceMock = {
   purchase: {
     findFirst: jest.Mock;
   };
+};
+
+type EquipmentProvisioningServiceMock = {
+  provisionFromPurchaseReceiptItem: jest.Mock;
 };
 
 type PurchaseReceiptCreateArgs = {
@@ -144,6 +149,7 @@ describe('PurchaseReceiptsService', () => {
   let service: PurchaseReceiptsService;
   let prisma: PrismaServiceMock;
   let transactionClient: TransactionClientMock;
+  let equipmentProvisioningService: EquipmentProvisioningServiceMock;
 
   beforeEach(async () => {
     transactionClient = {
@@ -186,9 +192,17 @@ describe('PurchaseReceiptsService', () => {
       },
     };
 
+    equipmentProvisioningService = {
+      provisionFromPurchaseReceiptItem: jest.fn().mockResolvedValue([]),
+    };
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         PurchaseReceiptsService,
+        {
+          provide: EquipmentProvisioningService,
+          useValue: equipmentProvisioningService,
+        },
         {
           provide: PrismaService,
           useValue: prisma,
@@ -551,6 +565,8 @@ describe('PurchaseReceiptsService', () => {
 
     const batchId = '77777777-7777-4777-8777-777777777777';
 
+    const createdReceiptItemId = '88888888-8888-4888-8888-888888888888';
+
     transactionClient.purchase.findFirst.mockResolvedValue({
       id: purchaseId,
       companyId,
@@ -590,7 +606,7 @@ describe('PurchaseReceiptsService', () => {
     });
 
     transactionClient.purchaseReceiptItem.create.mockResolvedValue({
-      id: '88888888-8888-4888-8888-888888888888',
+      id: createdReceiptItemId,
     });
 
     transactionClient.product.update.mockResolvedValue({
@@ -680,6 +696,19 @@ describe('PurchaseReceiptsService', () => {
     expect(purchaseReceiptItemCreateArgs.data.unitCost).toBe(1347);
     expect(purchaseReceiptItemCreateArgs.data.batchId).toBe(batchId);
 
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem.mock
+        .invocationCallOrder[0],
+    ).toBeLessThan(
+      transactionClient.product.update.mock.invocationCallOrder[0],
+    );
+
     expect(transactionClient.product.update).toHaveBeenCalledWith({
       where: {
         id: productId,
@@ -726,6 +755,331 @@ describe('PurchaseReceiptsService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('debe invocar provisioning una vez por cada PurchaseReceiptItem creado', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+
+    const userId = '44444444-4444-4444-8444-444444444444';
+
+    const purchaseId = '22222222-2222-4222-8222-222222222222';
+
+    const firstPurchaseItemId = '11111111-1111-4111-8111-111111111111';
+
+    const secondPurchaseItemId = '12121212-1212-4121-8121-121212121212';
+
+    const firstProductId = '55555555-5555-4555-8555-555555555555';
+
+    const secondProductId = '56565656-5656-4565-8565-565656565656';
+
+    const receiptId = '66666666-6666-4666-8666-666666666666';
+
+    const firstReceiptItemId = '88888888-8888-4888-8888-888888888888';
+
+    const secondReceiptItemId = '89898989-8989-4898-8898-898989898989';
+
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      companyId,
+      folio: 'OC-PRUEBA-001',
+      status: PurchaseStatus.CONFIRMED,
+      items: [
+        {
+          id: firstPurchaseItemId,
+          productId: firstProductId,
+          quantity: 5,
+          price: 100,
+          receiptItems: [],
+        },
+        {
+          id: secondPurchaseItemId,
+          productId: secondProductId,
+          quantity: 7,
+          price: 200,
+          receiptItems: [],
+        },
+      ],
+    });
+
+    transactionClient.product.findMany.mockResolvedValue([
+      {
+        id: firstProductId,
+      },
+      {
+        id: secondProductId,
+      },
+    ]);
+
+    transactionClient.purchaseReceipt.create.mockResolvedValue({
+      id: receiptId,
+      folio: 'REC-PRUEBA-001',
+    });
+
+    transactionClient.purchaseReceiptItem.create
+      .mockResolvedValueOnce({
+        id: firstReceiptItemId,
+      })
+      .mockResolvedValueOnce({
+        id: secondReceiptItemId,
+      });
+
+    transactionClient.product.update
+      .mockResolvedValueOnce({
+        stock: 12,
+      })
+      .mockResolvedValueOnce({
+        stock: 18,
+      });
+
+    transactionClient.inventoryMovement.create.mockResolvedValue({
+      id: '99999999-9999-4999-8999-999999999999',
+    });
+
+    transactionClient.purchase.update.mockResolvedValue({
+      id: purchaseId,
+      status: PurchaseStatus.PARTIALLY_RECEIVED,
+    });
+
+    const expectedResult = {
+      id: receiptId,
+    };
+
+    transactionClient.purchaseReceipt.findUniqueOrThrow.mockResolvedValue(
+      expectedResult,
+    );
+
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 2,
+        },
+        {
+          purchaseItemId: secondPurchaseItemId,
+          quantityReceived: 3,
+        },
+      ],
+    };
+
+    const result = await service.create(companyId, userId, dto);
+
+    expect(result).toEqual(expectedResult);
+    expect(transactionClient.purchaseReceiptItem.create).toHaveBeenCalledTimes(
+      2,
+    );
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledTimes(2);
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenNthCalledWith(
+      1,
+      transactionClient,
+      companyId,
+      firstReceiptItemId,
+    );
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenNthCalledWith(
+      2,
+      transactionClient,
+      companyId,
+      secondReceiptItemId,
+    );
+    expect(transactionClient.product.update).toHaveBeenCalledTimes(2);
+    expect(transactionClient.inventoryMovement.create).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['QUANTITY', 'SERIALIZED'])(
+    'debe conservar el flujo existente cuando provisioning devuelve [] para %s',
+    async () => {
+      const companyId = '33333333-3333-4333-8333-333333333333';
+
+      const userId = '44444444-4444-4444-8444-444444444444';
+
+      const purchaseId = '22222222-2222-4222-8222-222222222222';
+
+      const purchaseItemId = '11111111-1111-4111-8111-111111111111';
+
+      const productId = '55555555-5555-4555-8555-555555555555';
+
+      const receiptId = '66666666-6666-4666-8666-666666666666';
+
+      const createdReceiptItemId = '88888888-8888-4888-8888-888888888888';
+
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem.mockResolvedValue(
+        [],
+      );
+
+      transactionClient.purchase.findFirst.mockResolvedValue({
+        id: purchaseId,
+        companyId,
+        folio: 'OC-PRUEBA-001',
+        status: PurchaseStatus.CONFIRMED,
+        items: [
+          {
+            id: purchaseItemId,
+            productId,
+            quantity: 10,
+            price: 1347,
+            receiptItems: [],
+          },
+        ],
+      });
+
+      transactionClient.product.findMany.mockResolvedValue([
+        {
+          id: productId,
+        },
+      ]);
+
+      transactionClient.purchaseReceipt.create.mockResolvedValue({
+        id: receiptId,
+        folio: 'REC-PRUEBA-001',
+      });
+
+      transactionClient.purchaseReceiptItem.create.mockResolvedValue({
+        id: createdReceiptItemId,
+      });
+
+      transactionClient.product.update.mockResolvedValue({
+        stock: 24,
+      });
+
+      transactionClient.inventoryMovement.create.mockResolvedValue({
+        id: '99999999-9999-4999-8999-999999999999',
+      });
+
+      transactionClient.purchase.update.mockResolvedValue({
+        id: purchaseId,
+        status: PurchaseStatus.PARTIALLY_RECEIVED,
+      });
+
+      const expectedResult = {
+        id: receiptId,
+      };
+
+      transactionClient.purchaseReceipt.findUniqueOrThrow.mockResolvedValue(
+        expectedResult,
+      );
+
+      const dto: CreatePurchaseReceiptDto = {
+        purchaseId,
+        items: [
+          {
+            purchaseItemId,
+            quantityReceived: 4,
+          },
+        ],
+      };
+
+      const result = await service.create(companyId, userId, dto);
+
+      expect(result).toEqual(expectedResult);
+      expect(
+        equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+      ).toHaveBeenCalledWith(
+        transactionClient,
+        companyId,
+        createdReceiptItemId,
+      );
+      expect(transactionClient.product.update).toHaveBeenCalledTimes(1);
+      expect(transactionClient.product.update).toHaveBeenCalledWith({
+        where: {
+          id: productId,
+        },
+        data: {
+          stock: {
+            increment: 4,
+          },
+        },
+        select: {
+          stock: true,
+        },
+      });
+      expect(transactionClient.inventoryMovement.create).toHaveBeenCalledTimes(
+        1,
+      );
+    },
+  );
+
+  it('debe propagar errores de provisioning y detener operaciones posteriores', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+
+    const userId = '44444444-4444-4444-8444-444444444444';
+
+    const purchaseId = '22222222-2222-4222-8222-222222222222';
+
+    const purchaseItemId = '11111111-1111-4111-8111-111111111111';
+
+    const productId = '55555555-5555-4555-8555-555555555555';
+
+    const receiptId = '66666666-6666-4666-8666-666666666666';
+
+    const createdReceiptItemId = '88888888-8888-4888-8888-888888888888';
+
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      companyId,
+      folio: 'OC-PRUEBA-001',
+      status: PurchaseStatus.CONFIRMED,
+      items: [
+        {
+          id: purchaseItemId,
+          productId,
+          quantity: 10,
+          price: 1347,
+          receiptItems: [],
+        },
+      ],
+    });
+
+    transactionClient.product.findMany.mockResolvedValue([
+      {
+        id: productId,
+      },
+    ]);
+
+    transactionClient.purchaseReceipt.create.mockResolvedValue({
+      id: receiptId,
+      folio: 'REC-PRUEBA-001',
+    });
+
+    transactionClient.purchaseReceiptItem.create.mockResolvedValue({
+      id: createdReceiptItemId,
+    });
+
+    equipmentProvisioningService.provisionFromPurchaseReceiptItem.mockRejectedValue(
+      new Error('provisioning failed'),
+    );
+
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId,
+      items: [
+        {
+          purchaseItemId,
+          quantityReceived: 4,
+        },
+      ],
+    };
+
+    await expect(service.create(companyId, userId, dto)).rejects.toThrow(
+      'provisioning failed',
+    );
+
+    expect(transactionClient.purchaseReceiptItem.create).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
+    expect(transactionClient.product.update).not.toHaveBeenCalled();
+    expect(transactionClient.inventoryMovement.create).not.toHaveBeenCalled();
+    expect(transactionClient.purchase.update).not.toHaveBeenCalled();
+    expect(
+      transactionClient.purchaseReceipt.findUniqueOrThrow,
+    ).not.toHaveBeenCalled();
+  });
+
   it('debe completar la compra actualizando un lote existente', async () => {
     const companyId = '33333333-3333-4333-8333-333333333333';
 
@@ -742,6 +1096,8 @@ describe('PurchaseReceiptsService', () => {
     const batchId = '77777777-7777-4777-8777-777777777777';
 
     const expirationDate = new Date('2028-12-31T00:00:00.000Z');
+
+    const createdReceiptItemId = '88888888-8888-4888-8888-888888888888';
 
     transactionClient.purchase.findFirst.mockResolvedValue({
       id: purchaseId,
@@ -794,7 +1150,7 @@ describe('PurchaseReceiptsService', () => {
     });
 
     transactionClient.purchaseReceiptItem.create.mockResolvedValue({
-      id: '88888888-8888-4888-8888-888888888888',
+      id: createdReceiptItemId,
     });
 
     transactionClient.product.update.mockResolvedValue({
@@ -859,6 +1215,13 @@ describe('PurchaseReceiptsService', () => {
     );
 
     expect(inventoryBatchUpdateArgs.data.isActive).toBe(true);
+
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      equipmentProvisioningService.provisionFromPurchaseReceiptItem,
+    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
 
     expect(transactionClient.product.update).toHaveBeenCalledWith({
       where: {

@@ -3,7 +3,7 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.0.0
 **Estado:** Activo
-**Última actualización:** 2026-08-21
+**Última actualización:** 2026-08-24
 
 ---
 
@@ -60,6 +60,191 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
+
+## Purchase Receipt → EquipmentAsset — EQ-PR-001
+
+**Estado:** Completed / Validated
+**Periodo:** 2026-08
+
+Se integró la creación automática de `EquipmentAsset` desde Purchase Receipts para productos físicos administrados como activos:
+
+```text
+Product.inventoryTracking = ASSET
+PurchaseReceiptItem.quantityReceived = N
+→ create exactly N EquipmentAsset rows
+```
+
+Arquitectura implementada:
+
+```text
+EquipmentAssetCodeService
+→ owns CompanySequence allocation
+→ owns assetCode formatting
+→ owns historical / retired generated-looking code reservation
+
+EquipmentProvisioningService
+→ owns PurchaseReceiptItem lookup
+→ owns tenant-safe provisioning
+→ owns inventoryTracking decision
+→ owns Equipment identity creation
+
+PurchaseReceiptsService
+→ owns Purchase Receipt orchestration
+→ owns the Prisma transaction boundary
+```
+
+La integración quedó dentro de la transacción existente de Purchase Receipt:
+
+```text
+InventoryBatch create / resolve
+↓
+PurchaseReceiptItem.create
+↓
+EquipmentProvisioningService.provisionFromPurchaseReceiptItem(tx, companyId, createdReceiptItem.id)
+↓
+Product.stock += quantityReceived
+↓
+InventoryMovement IN
+↓
+Purchase status recalculation
+↓
+COMMIT
+```
+
+Reglas entregadas:
+
+```text
+ASSET
+→ provisioned from quantityReceived
+
+QUANTITY
+→ no EquipmentAsset creation
+
+SERIALIZED
+→ no EquipmentAsset creation in this phase
+
+Receipt-created EquipmentAsset
+→ lifecycle = ACTIVE
+→ condition = INSPECTION_PENDING
+→ origin = PURCHASE_RECEIPT
+→ serialNumber = null
+→ serialNumberKey = null
+→ purchaseReceiptItemId preserved
+→ batchId copied from PurchaseReceiptItem when available
+```
+
+No se duplican proyecciones de inventario:
+
+```text
+Product.stock
+→ mutated only by PurchaseReceipt
+
+InventoryMovement
+→ no extra movement per EquipmentAsset
+```
+
+Validación registrada:
+
+```text
+Purchase Receipt tests
+2 suites
+26/26 passed
+
+Equipment tests
+5 suites
+68/68 passed
+
+Full backend tests
+31 suites
+184/184 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint changed TypeScript
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+Purchase quantity 5
+Receipt A quantityReceived 2
+→ created 2 EquipmentAssets
+→ Purchase status CONFIRMED → PARTIALLY_RECEIVED
+→ one InventoryMovement IN, quantity 2, balance 2
+→ Product.stock = 2
+
+Receipt B quantityReceived 3
+→ created 3 EquipmentAssets
+→ Purchase status PARTIALLY_RECEIVED → RECEIVED
+→ one InventoryMovement IN, quantity 3, balance 5
+→ Product.stock = 5
+
+Final
+→ EquipmentAssets = 5
+→ InventoryMovements = 2
+→ Total IN = 5
+→ Product.stock = 5
+```
+
+Traceability QA:
+
+```text
+PurchaseReceiptItem 4a93d639-e25e-4018-98a7-46e5aa36a422
+→ linked exactly 2 EquipmentAsset rows
+
+PurchaseReceiptItem 86319c8a-0e79-451c-84cb-b1471c9ffe4b
+→ linked exactly 3 EquipmentAsset rows
+```
+
+Over-receipt protection:
+
+```text
+Additional receipt after Purchase status RECEIVED
+→ 400 Bad Request
+→ La compra ya fue recibida completamente
+
+After failed request
+→ Product.stock remained 5
+→ InventoryMovements remained exactly 2
+→ valid EquipmentAssets remained exactly 5
+```
+
+Rollback evidence:
+
+```text
+transaction rollback behavior
+→ structurally implemented and unit-tested
+
+manual forced database provisioning failure
+→ NOT PERFORMED
+```
+
+No se requirieron cambios de Prisma schema ni migración.
+
+Deuda que permanece abierta:
+
+```text
+Purchase Receipt request idempotency
+Purchase Receipt correction / reversal
+Product.stock ↔ EquipmentAsset formal reconciliation invariant
+serial assignment / correction workflow
+SERIALIZED receipt provisioning
+broader ProductLotTracking REQUIRED / NONE enforcement
+tenant-safe write hardening
+```
+
+---
 
 ## Equipment Automatic assetCode Generation — EQ-ASSETCODE-001
 
@@ -133,7 +318,7 @@ PASS
 
 No se requirieron cambios de Prisma schema ni migración.
 
-Importación de Equipment y Purchase Receipt → EquipmentAsset permanecen fuera de alcance en esta entrega.
+En la entrega de EQ-ASSETCODE-001, Importación de Equipment y Purchase Receipt → EquipmentAsset permanecieron fuera de alcance.
 
 ---
 
@@ -169,6 +354,7 @@ Estado:
 EQ-RET-001
 Equipment Retirement
 → IMPLEMENTED / VALIDATED
+```
 
 ## Product Documentation
 
