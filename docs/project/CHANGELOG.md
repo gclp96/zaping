@@ -61,6 +61,82 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
 
+## Equipment Automatic assetCode Generation — EQ-ASSETCODE-001
+
+**Estado:** Completed / Validated
+**Periodo:** 2026-08
+
+Core Equipment incorporó generación automática de `assetCode` para el registro normal:
+
+```text
+POST /equipment
+→ server-generated assetCode
+```
+
+Cambios principales:
+
+```text
+CreateEquipmentDto
+→ no longer exposes assetCode
+
+Client-provided assetCode
+→ rejected by ValidationPipe
+
+CompanySequence
+→ reused for tenant-scoped allocation
+
+Sequence key
+→ EQUIPMENT_ASSET_CODE
+
+Format
+→ EQ-000001, EQ-000002, ..., EQ-1000000
+```
+
+La asignación utiliza:
+
+```text
+companyId + key = EQUIPMENT_ASSET_CODE
+atomic nextValue increment
+allocatedValue = returned nextValue - 1
+```
+
+La generación ocurre dentro de la misma transacción Prisma que crea `EquipmentAsset`.
+
+Los códigos históricos, manuales o generados previamente se verifican antes del insert. Si el candidato ya existe, la secuencia avanza y se evalúa el siguiente.
+
+Los `assetCode` de Equipment retirado permanecen reservados permanentemente.
+
+Los gaps de secuencia son aceptados explícitamente; no se implementó numeración gapless.
+
+Validación:
+
+```text
+Equipment tests
+42/42 passed
+
+Backend tests
+154/154 passed
+29/29 suites passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint
+PASS
+
+Real PostgreSQL concurrency QA
+PASS
+```
+
+No se requirieron cambios de Prisma schema ni migración.
+
+Importación de Equipment y Purchase Receipt → EquipmentAsset permanecen fuera de alcance en esta entrega.
+
+---
+
 ## Documentation Architecture Refactor
 
 **Estado:** Completed

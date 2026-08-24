@@ -10,6 +10,7 @@ import {
   EquipmentLifecycle,
   EquipmentOrigin,
   EquipmentRetirementReason,
+  Prisma,
   ProductInventoryTracking,
 } from '@prisma/client';
 
@@ -41,6 +42,10 @@ describe('EquipmentService', () => {
       create: jest.fn(),
       updateMany: jest.fn(),
     },
+    companySequence: {
+      createMany: jest.fn(),
+      update: jest.fn(),
+    },
     equipmentInspection: {
       create: jest.fn(),
       findMany: jest.fn(),
@@ -55,6 +60,10 @@ describe('EquipmentService', () => {
       async (callback: (tx: typeof prismaMock) => Promise<unknown>) =>
         callback(prismaMock),
     );
+
+    prismaMock.companySequence.createMany.mockResolvedValue({
+      count: 1,
+    });
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -127,11 +136,15 @@ describe('EquipmentService', () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
 
+    prismaMock.companySequence.update.mockResolvedValueOnce({
+      nextValue: 2,
+    });
+
     const createdEquipment = {
       id: equipmentId,
       companyId,
       productId,
-      assetCode: 'EQ-AST-001',
+      assetCode: 'EQ-000001',
       serialNumber: 'sn-test-001',
       serialNumberKey: 'SN-TEST-001',
       lifecycle: EquipmentLifecycle.ACTIVE,
@@ -143,7 +156,6 @@ describe('EquipmentService', () => {
 
     const result = await service.create(companyId, {
       productId,
-      assetCode: 'eq-ast-001',
       serialNumber: '  sn-test-001  ',
       condition: EquipmentCondition.GOOD,
     });
@@ -154,9 +166,154 @@ describe('EquipmentService', () => {
       data: {
         companyId,
         productId,
-        assetCode: 'EQ-AST-001',
+        assetCode: 'EQ-000001',
         serialNumber: 'sn-test-001',
         serialNumberKey: 'SN-TEST-001',
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+
+    expect(prismaMock.companySequence.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          companyId,
+          key: 'EQUIPMENT_ASSET_CODE',
+          nextValue: 1,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    expect(prismaMock.companySequence.update).toHaveBeenCalledWith({
+      where: {
+        companyId_key: {
+          companyId,
+          key: 'EQUIPMENT_ASSET_CODE',
+        },
+      },
+      data: {
+        nextValue: {
+          increment: 1,
+        },
+      },
+      select: {
+        nextValue: true,
+      },
+    });
+  });
+
+  it('should generate the next automatic asset code', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.companySequence.update.mockResolvedValueOnce({
+      nextValue: 3,
+    });
+
+    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockResolvedValue({
+      id: equipmentId,
+      companyId,
+      productId,
+      assetCode: 'EQ-000002',
+    });
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000002',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+  });
+
+  it('should isolate automatic asset codes by company', async () => {
+    const otherCompanyId = '64af248f-8081-4407-91f5-8d545749d7f4';
+
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.companySequence.update
+      .mockResolvedValueOnce({
+        nextValue: 2,
+      })
+      .mockResolvedValueOnce({
+        nextValue: 2,
+      });
+
+    prismaMock.equipmentAsset.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockImplementation(
+      ({ data }: { data: { companyId: string; assetCode: string } }) => ({
+        id: equipmentId,
+        ...data,
+      }),
+    );
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    await service.create(otherCompanyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenNthCalledWith(1, {
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000001',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenNthCalledWith(2, {
+      data: {
+        companyId: otherCompanyId,
+        productId,
+        assetCode: 'EQ-000001',
+        serialNumber: null,
+        serialNumberKey: null,
         condition: EquipmentCondition.GOOD,
         origin: EquipmentOrigin.MANUAL,
         batchId: undefined,
@@ -179,7 +336,6 @@ describe('EquipmentService', () => {
     await expect(
       service.create(companyId, {
         productId,
-        assetCode: 'EQ-AST-001',
         condition: EquipmentCondition.GOOD,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -187,7 +343,25 @@ describe('EquipmentService', () => {
     expect(prismaMock.equipmentAsset.create).not.toHaveBeenCalled();
   });
 
-  it('should reject duplicated assetCode', async () => {
+  it('should reject inactive products', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: false,
+    });
+
+    await expect(
+      service.create(companyId, {
+        productId,
+        condition: EquipmentCondition.GOOD,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.equipmentAsset.create).not.toHaveBeenCalled();
+  });
+
+  it('should reject duplicated normalized serial number', async () => {
     prismaMock.product.findFirst.mockResolvedValue({
       id: productId,
       companyId,
@@ -202,32 +376,6 @@ describe('EquipmentService', () => {
     await expect(
       service.create(companyId, {
         productId,
-        assetCode: 'EQ-AST-001',
-        condition: EquipmentCondition.GOOD,
-      }),
-    ).rejects.toBeInstanceOf(ConflictException);
-
-    expect(prismaMock.equipmentAsset.create).not.toHaveBeenCalled();
-  });
-
-  it('should reject duplicated normalized serial number', async () => {
-    prismaMock.product.findFirst.mockResolvedValue({
-      id: productId,
-      companyId,
-      inventoryTracking: ProductInventoryTracking.ASSET,
-      isActive: true,
-    });
-
-    prismaMock.equipmentAsset.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: equipmentId,
-      });
-
-    await expect(
-      service.create(companyId, {
-        productId,
-        assetCode: 'EQ-AST-002',
         serialNumber: 'sn-test-001',
         condition: EquipmentCondition.GOOD,
       }),
@@ -257,18 +405,21 @@ describe('EquipmentService', () => {
 
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
 
+    prismaMock.companySequence.update.mockResolvedValueOnce({
+      nextValue: 2,
+    });
+
     prismaMock.equipmentAsset.create.mockResolvedValue({
       id: equipmentId,
       companyId,
       productId,
-      assetCode: 'EQ-AST-020',
+      assetCode: 'EQ-000001',
       serialNumber: null,
       serialNumberKey: null,
     });
 
     await service.create(companyId, {
       productId,
-      assetCode: 'eq-ast-020',
       condition: EquipmentCondition.INSPECTION_PENDING,
     });
 
@@ -276,7 +427,7 @@ describe('EquipmentService', () => {
       data: {
         companyId,
         productId,
-        assetCode: 'EQ-AST-020',
+        assetCode: 'EQ-000001',
         serialNumber: null,
         serialNumberKey: null,
         condition: EquipmentCondition.INSPECTION_PENDING,
@@ -288,6 +439,307 @@ describe('EquipmentService', () => {
         batch: true,
       },
     });
+  });
+
+  it('should validate optional batch ownership before creating equipment', async () => {
+    const batchId = 'f89b0de7-d345-4710-95af-464bd8dc6706';
+
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.inventoryBatch.findFirst.mockResolvedValue({
+      id: batchId,
+      companyId,
+      productId,
+    });
+
+    prismaMock.companySequence.update.mockResolvedValueOnce({
+      nextValue: 2,
+    });
+
+    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
+    prismaMock.equipmentAsset.create.mockResolvedValue({
+      id: equipmentId,
+      companyId,
+      productId,
+      batchId,
+      assetCode: 'EQ-000001',
+    });
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+      batchId,
+    });
+
+    expect(prismaMock.inventoryBatch.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: batchId,
+        companyId,
+        productId,
+      },
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000001',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+  });
+
+  it('should reject a batch that does not belong to the product and company', async () => {
+    const batchId = 'f89b0de7-d345-4710-95af-464bd8dc6706';
+
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.inventoryBatch.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.create(companyId, {
+        productId,
+        condition: EquipmentCondition.GOOD,
+        batchId,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.equipmentAsset.create).not.toHaveBeenCalled();
+  });
+
+  it('should skip occupied historical automatic asset codes', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.companySequence.update
+      .mockResolvedValueOnce({
+        nextValue: 2,
+      })
+      .mockResolvedValueOnce({
+        nextValue: 3,
+      });
+
+    prismaMock.equipmentAsset.findFirst
+      .mockResolvedValueOnce({
+        id: 'historical-equipment-id',
+      })
+      .mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockResolvedValue({
+      id: equipmentId,
+      companyId,
+      productId,
+      assetCode: 'EQ-000002',
+    });
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000002',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+  });
+
+  it('should not reuse retired automatic asset codes', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.companySequence.update
+      .mockResolvedValueOnce({
+        nextValue: 2,
+      })
+      .mockResolvedValueOnce({
+        nextValue: 3,
+      });
+
+    prismaMock.equipmentAsset.findFirst
+      .mockResolvedValueOnce({
+        id: 'retired-equipment-id',
+        lifecycle: EquipmentLifecycle.RETIRED,
+      })
+      .mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockResolvedValue({
+      id: equipmentId,
+      companyId,
+      productId,
+      assetCode: 'EQ-000002',
+    });
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenNthCalledWith(1, {
+      where: {
+        companyId,
+        assetCode: 'EQ-000001',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000002',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+  });
+
+  it('should continue past more than 100 occupied generated asset codes', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    for (let value = 1; value <= 102; value += 1) {
+      prismaMock.companySequence.update.mockResolvedValueOnce({
+        nextValue: value + 1,
+      });
+    }
+
+    for (let value = 1; value <= 101; value += 1) {
+      prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+        id: `occupied-equipment-${value}`,
+      });
+    }
+
+    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockResolvedValue({
+      id: equipmentId,
+      companyId,
+      productId,
+      assetCode: 'EQ-000102',
+    });
+
+    await service.create(companyId, {
+      productId,
+      condition: EquipmentCondition.GOOD,
+    });
+
+    expect(prismaMock.companySequence.update).toHaveBeenCalledTimes(102);
+    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(102);
+
+    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenLastCalledWith({
+      where: {
+        companyId,
+        assetCode: 'EQ-000102',
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        productId,
+        assetCode: 'EQ-000102',
+        serialNumber: null,
+        serialNumberKey: null,
+        condition: EquipmentCondition.GOOD,
+        origin: EquipmentOrigin.MANUAL,
+        batchId: undefined,
+      },
+      include: {
+        product: true,
+        batch: true,
+      },
+    });
+  });
+
+  it('should not retry inside the same transaction when equipment creation hits a unique constraint', async () => {
+    prismaMock.product.findFirst.mockResolvedValue({
+      id: productId,
+      companyId,
+      inventoryTracking: ProductInventoryTracking.ASSET,
+      isActive: true,
+    });
+
+    prismaMock.companySequence.update.mockResolvedValueOnce({
+      nextValue: 2,
+    });
+
+    prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce(null);
+
+    prismaMock.equipmentAsset.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: {
+          target: ['companyId', 'assetCode'],
+        },
+      }),
+    );
+
+    await expect(
+      service.create(companyId, {
+        productId,
+        condition: EquipmentCondition.GOOD,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(prismaMock.companySequence.update).toHaveBeenCalledTimes(1);
+    expect(prismaMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(1);
+    expect(prismaMock.equipmentAsset.create).toHaveBeenCalledTimes(1);
   });
 
   it('should create an inspection and update equipment condition atomically', async () => {

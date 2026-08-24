@@ -5,20 +5,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   MaxLength,
-  MinLength,
 } from 'class-validator';
 
 export class CreateEquipmentDto {
   @IsUUID()
   productId!: string;
-
-  @IsString()
-  @MinLength(2)
-  @MaxLength(50)
-  @Matches(/^[A-Za-z0-9_-]+$/)
-  assetCode!: string;
 
   @IsString()
   @IsOptional()

@@ -99,7 +99,6 @@ describe('EquipmentController', () => {
   it('should create equipment using the authenticated companyId', async () => {
     const dto = {
       productId,
-      assetCode: 'EQ-AST-030',
       serialNumber: 'SN-TEST-030',
       condition: EquipmentCondition.GOOD,
     };
@@ -108,6 +107,7 @@ describe('EquipmentController', () => {
       id: equipmentId,
       companyId,
       ...dto,
+      assetCode: 'EQ-000001',
     };
 
     equipmentServiceMock.create.mockResolvedValue(createdEquipment);

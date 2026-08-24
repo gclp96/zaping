@@ -4,8 +4,8 @@
 **Producto:** Zaping ERP
 **Versión:** 1.5.0
 **Estado:** Approved
-**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT
-**Última actualización:** 2026-08-21
+**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE
+**Última actualización:** 2026-08-23
 **Responsable:** Zaping Team
 
 ---
@@ -41,6 +41,9 @@ Equipment Persistence Baseline
 
 Equipment Core Backend — Registration / Read
 → IMPLEMENTED
+
+Automatic assetCode Generation
+→ IMPLEMENTED / VALIDATED
 
 Equipment Operational Workflows
 → PARTIAL / PENDING
@@ -84,8 +87,9 @@ companyId tenant isolation
 Product ASSET validation
 Product active validation
 Batch ownership validation
-assetCode normalization
-assetCode duplicate validation
+server-generated assetCode
+CompanySequence assetCode allocation
+assetCode duplicate protection
 serial normalization
 serial duplicate validation
 DTO validation
@@ -108,11 +112,8 @@ La modificación genérica de esas estrategias mediante `UpdateProductDto` no fo
 No deben considerarse implementadas todavía:
 
 ```text
-Equipment Retirement API
-Equipment Inspection API / workflow
 serial correction operation
 assetCode correction operation
-automatic assetCode generation
 automatic creation from Purchase Receipt
 Inventory / Equipment synchronization policy
 Availability Evaluator
@@ -1698,20 +1699,25 @@ companyId + assetCode
 → UNIQUE
 ```
 
-En registro manual, el backend normaliza el código mediante:
+`assetCode` es:
 
 ```text
-trim
-+
-uppercase
+unique inside Company
+stable
+immutable through normal operations
+never reused after Retirement
+operational identity only
 ```
 
-Ejemplo:
+No codifica:
 
 ```text
-eq-ast-001
-→
-EQ-AST-001
+Product
+category
+brand
+warehouse
+location
+condition
 ```
 
 **Estado:** APPROVED / IMPLEMENTED.
@@ -1720,36 +1726,144 @@ EQ-AST-001
 
 # 53. assetCode generation
 
-La estrategia objetivo continúa siendo que Zaping genere `assetCode` automáticamente por defecto.
+Zaping genera `assetCode` automáticamente por defecto durante el registro normal de Equipment.
 
-Formato inicial recomendado:
-
-```text
-EQ-000041
-```
-
-El código no debe codificar:
+Formato implementado:
 
 ```text
-warehouse
-brand
-category
-Product
-location
+EQ-000001
+EQ-000002
+...
+EQ-999999
+EQ-1000000
 ```
 
-porque estas propiedades pueden cambiar.
+Los seis dígitos son ancho mínimo de presentación, no límite máximo.
 
-En la baseline v1.3.0:
+El registro normal:
 
 ```text
 POST /equipment
-→ assetCode is supplied explicitly
+→ does not accept client-controlled assetCode
 ```
 
-La generación automática todavía no está implementada.
+`CreateEquipmentDto` no expone `assetCode`.
 
-**Estado:** APPROVED / AUTOMATION PENDING.
+La generación utiliza la persistencia existente:
+
+```text
+CompanySequence
+companyId + key = EQUIPMENT_ASSET_CODE
+```
+
+`CompanySequence.nextValue` representa el siguiente valor numérico disponible para asignación.
+
+Bootstrap:
+
+```text
+createMany
+data:
+  companyId
+  key = EQUIPMENT_ASSET_CODE
+  nextValue = 1
+skipDuplicates = true
+```
+
+Asignación:
+
+```text
+atomic update:
+  nextValue += 1
+
+allocatedValue = returned nextValue - 1
+```
+
+Formato:
+
+```text
+EQ-${value.toString().padStart(6, '0')}
+```
+
+La asignación de secuencia y la creación de `EquipmentAsset` ocurren dentro de la misma transacción Prisma.
+
+Antes del insert se verifica si el candidato ya está ocupado:
+
+```text
+companyId + assetCode
+```
+
+Si el candidato ya existe:
+
+```text
+allocate next sequence value
+↓
+check next candidate
+↓
+continue until free
+```
+
+Esto permite saltar códigos históricos o manuales con forma generada.
+
+Los códigos de Equipment retirado permanecen reservados. La verificación de ocupación no filtra por Lifecycle.
+
+Si `EquipmentAsset.create` produce un `P2002`, no se reintenta dentro de la misma transacción PostgreSQL. El error sigue el manejo normal y la transacción revierte.
+
+No se requirió cambio de Prisma schema.
+
+No se requirió migración.
+
+Los gaps de secuencia son aceptables. La numeración gapless no es requisito de dominio.
+
+Validación:
+
+```text
+Equipment tests
+3 suites
+42 tests
+42 passed
+
+Full backend
+29 suites
+154 tests
+154 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint
+PASS
+```
+
+QA PostgreSQL real:
+
+```text
+10 simultaneous POST /equipment requests
+10 successes
+10 unique assetCodes
+0 failures
+
+5 simultaneous POST /equipment requests after transaction correction
+5 successes
+5 unique assetCodes
+0 failures
+```
+
+QA HTTP:
+
+```text
+assetCode = CUSTOM-001
+→ 400 Bad Request
+→ property assetCode should not exist
+
+POST /equipment without assetCode
+→ 201 Created
+→ server-generated assetCode
+```
+
+**Estado:** IMPLEMENTED / VALIDATED.
 
 ---
 
@@ -1946,7 +2060,7 @@ y no un PATCH genérico de master data.
 
 # 60. Asset creation
 
-La baseline v1.3.0 implementa registro manual de Equipment.
+El backend implementa registro normal de Equipment con `assetCode` generado por servidor.
 
 Flujo actual:
 
@@ -1958,6 +2072,7 @@ POST /equipment
 Read companyId from authenticated context
 ↓
 Validate CreateEquipmentDto
+  assetCode is not accepted
 ↓
 Find Product inside same Company
 ↓
@@ -1971,20 +2086,34 @@ If batchId exists:
   validate same Company
   validate same Product
 ↓
-Normalize assetCode
-↓
-Validate companyId + assetCode uniqueness
-↓
 Normalize optional serialNumber
 ↓
 Generate serialNumberKey
 ↓
 Validate companyId + productId + serialNumberKey uniqueness
 ↓
+BEGIN Prisma transaction
+↓
+Ensure CompanySequence:
+  companyId
+  key = EQUIPMENT_ASSET_CODE
+↓
+Allocate next sequence value atomically
+↓
+Format assetCode
+↓
+Validate candidate is not already occupied inside Company
+↓
+If occupied:
+  allocate next value
+  check next candidate
+↓
 Create EquipmentAsset
 ↓
 origin = MANUAL
 lifecycle = ACTIVE
+↓
+COMMIT
 ↓
 Return Equipment + Product + optional Batch
 ```
@@ -1993,7 +2122,6 @@ Datos aceptados por el endpoint:
 
 ```text
 productId
-assetCode
 serialNumber?
 condition
 batchId?
@@ -2003,6 +2131,7 @@ Datos que no son controlados directamente por el cliente:
 
 ```text
 companyId
+assetCode
 serialNumberKey
 lifecycle
 origin
@@ -3351,10 +3480,10 @@ Equipment Inspection
 ✅
 
 Equipment Retirement
-⏳
+✅
 
 Automatic assetCode generation
-⏳
+✅
 
 Purchase Receipt Equipment creation
 ⏳
@@ -3387,15 +3516,15 @@ Inspection integration
 El próximo workflow Core es:
 
 ```text
-EQ-RET-001
-Equipment Retirement
+EQ-PR-001
+Purchase Receipt → EquipmentAsset
 ```
 
 Orden:
 
 ```text
 1. Business Analysis
-2. Retirement documentation
+2. Purchase Receipt / Equipment documentation
 3. Architecture Review
 4. Prisma review
 5. Backend domain operation
@@ -4632,10 +4761,10 @@ Equipment Retirement Design
 ✅
 
 Equipment Retirement Implementation
-⏳
+✅
 
 Automatic assetCode generation
-⏳
+✅
 
 Purchase Receipt Equipment creation
 ⏳
@@ -4669,10 +4798,15 @@ Inspection
 Retirement
 ✅
 
-Debe mantenerse:
+Automatic assetCode Generation
+✅
+```
+
+El siguiente paso técnico es:
 
 ```text
-
+EQ-PR-001
+Purchase Receipt → EquipmentAsset
 ```
 
 # Final Principle
@@ -4797,13 +4931,13 @@ Equipment Inspection
 ✅
 
 Automatic assetCode generation
-⏳
+✅
 
 Purchase Receipt Equipment creation
 ⏳
 
 Equipment Retirement
-⏳
+✅
 
 Explicit identity correction operations
 ⏳
@@ -4813,6 +4947,7 @@ Equipment Audit
 
 Availability Evaluator
 ⏳
+```
 
 ---
 
@@ -4821,14 +4956,14 @@ Availability Evaluator
 El próximo paso técnico es:
 
 ```text
-EQ-INS-001
-Equipment Inspection Implementation
+EQ-PR-001
+Purchase Receipt → EquipmentAsset
 ```
 
 Orden:
 
 1. Business Analysis
-2. Retirement documentation
+2. Purchase Receipt / Equipment documentation
 3. Prisma review
 4. Backend domain operation
 5. Authorization review

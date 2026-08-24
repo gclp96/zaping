@@ -611,7 +611,7 @@ No debe existir `DELETE` como sustituto del Retirement.
 
 ## EQ-ASSETCODE-001 — Automatic Asset Code
 
-**Estado:** 🟡 Ready / Next
+**Estado:** ✅ Completed
 
 **Prioridad:** P1
 
@@ -638,11 +638,53 @@ no reuse
 import compatibility
 ```
 
+Resultado:
+
+```text
+Normal POST /equipment
+→ server-generated assetCode
+
+CreateEquipmentDto
+→ no longer accepts assetCode
+
+CompanySequence
+→ reused with key EQUIPMENT_ASSET_CODE
+
+Prisma schema changes
+→ none
+
+Migration
+→ none
+```
+
+Validación:
+
+```text
+Equipment tests
+42/42 passed
+
+Backend tests
+154/154 passed
+29/29 suites passed
+
+Build
+PASS
+
+ESLint
+PASS
+
+Prisma validate
+PASS
+
+Real PostgreSQL concurrency QA
+PASS
+```
+
 ---
 
 ## EQ-PR-001 — Purchase Receipt → EquipmentAsset
 
-**Estado:** ⏳ Pending
+**Estado:** 🟡 Ready / Next
 
 **Prioridad:** P1
 
@@ -1382,8 +1424,8 @@ No debe sacrificarse seguridad para acelerar un workflow funcional.
 El siguiente bloque es:
 
 ```text
-EQ-ASSETCODE-001
-Automatic assetCode Generation
+EQ-PR-001
+Purchase Receipt → EquipmentAsset
 ```
 
 Primero:
@@ -1397,7 +1439,7 @@ Architecture Review
 
 Después:
 
-CompanySequence review
+PurchaseReceipt / Equipment consistency review
 ↓
 Concurrency design
 ↓
