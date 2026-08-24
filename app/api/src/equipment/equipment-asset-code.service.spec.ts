@@ -8,45 +8,58 @@ describe('EquipmentAssetCodeService', () => {
   const companyId = '699baaae-2718-4d96-8683-8a2cf12bfe55';
 
   const txMock = {
-    companySequence: {
-      createMany: jest.fn(),
-      update: jest.fn(),
-    },
     equipmentAsset: {
       findFirst: jest.fn(),
     },
     $transaction: jest.fn(),
   };
 
+  const companySequenceAllocatorMock = {
+    allocateNext: jest.fn(),
+  };
+
   beforeEach(() => {
     jest.resetAllMocks();
 
-    service = new EquipmentAssetCodeService();
+    service = new EquipmentAssetCodeService(companySequenceAllocatorMock);
 
-    txMock.companySequence.createMany.mockResolvedValue({
-      count: 1,
-    });
-
-    txMock.companySequence.update.mockResolvedValue({
-      nextValue: 2,
-    });
+    companySequenceAllocatorMock.allocateNext.mockResolvedValue(1);
 
     txMock.equipmentAsset.findFirst.mockResolvedValue(null);
   });
 
-  it('should bootstrap a missing CompanySequence with createMany skipDuplicates', async () => {
+  it('should allocate numeric values through the shared company sequence allocator', async () => {
     await service.allocateNextAvailableAssetCode(txMock as never, companyId);
 
-    expect(txMock.companySequence.createMany).toHaveBeenCalledWith({
-      data: [
-        {
-          companyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-          nextValue: 1,
-        },
-      ],
-      skipDuplicates: true,
-    });
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenCalledWith(
+      txMock,
+      companyId,
+      'EQUIPMENT_ASSET_CODE',
+    );
+  });
+
+  it('should isolate equipment sequence allocation by company', async () => {
+    const otherCompanyId = '64af248f-8081-4407-91f5-8d545749d7f4';
+
+    await service.allocateNextAvailableAssetCode(txMock as never, companyId);
+    await service.allocateNextAvailableAssetCode(
+      txMock as never,
+      otherCompanyId,
+    );
+
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenNthCalledWith(
+      1,
+      txMock,
+      companyId,
+      'EQUIPMENT_ASSET_CODE',
+    );
+
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenNthCalledWith(
+      2,
+      txMock,
+      otherCompanyId,
+      'EQUIPMENT_ASSET_CODE',
+    );
   });
 
   it('should allocate the first automatic asset code', async () => {
@@ -59,9 +72,7 @@ describe('EquipmentAssetCodeService', () => {
   });
 
   it('should allocate a subsequent automatic asset code', async () => {
-    txMock.companySequence.update.mockResolvedValueOnce({
-      nextValue: 3,
-    });
+    companySequenceAllocatorMock.allocateNext.mockResolvedValueOnce(2);
 
     const result = await service.allocateNextAvailableAssetCode(
       txMock as never,
@@ -71,80 +82,10 @@ describe('EquipmentAssetCodeService', () => {
     expect(result).toBe('EQ-000002');
   });
 
-  it('should isolate sequence allocation by company', async () => {
-    const otherCompanyId = '64af248f-8081-4407-91f5-8d545749d7f4';
-
-    await service.allocateNextAvailableAssetCode(txMock as never, companyId);
-    await service.allocateNextAvailableAssetCode(
-      txMock as never,
-      otherCompanyId,
-    );
-
-    expect(txMock.companySequence.createMany).toHaveBeenNthCalledWith(1, {
-      data: [
-        {
-          companyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-          nextValue: 1,
-        },
-      ],
-      skipDuplicates: true,
-    });
-
-    expect(txMock.companySequence.createMany).toHaveBeenNthCalledWith(2, {
-      data: [
-        {
-          companyId: otherCompanyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-          nextValue: 1,
-        },
-      ],
-      skipDuplicates: true,
-    });
-
-    expect(txMock.companySequence.update).toHaveBeenNthCalledWith(1, {
-      where: {
-        companyId_key: {
-          companyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-        },
-      },
-      data: {
-        nextValue: {
-          increment: 1,
-        },
-      },
-      select: {
-        nextValue: true,
-      },
-    });
-
-    expect(txMock.companySequence.update).toHaveBeenNthCalledWith(2, {
-      where: {
-        companyId_key: {
-          companyId: otherCompanyId,
-          key: 'EQUIPMENT_ASSET_CODE',
-        },
-      },
-      data: {
-        nextValue: {
-          increment: 1,
-        },
-      },
-      select: {
-        nextValue: true,
-      },
-    });
-  });
-
   it('should format asset codes beyond the six-digit minimum width', async () => {
-    txMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 1000000,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 1000001,
-      });
+    companySequenceAllocatorMock.allocateNext
+      .mockResolvedValueOnce(999999)
+      .mockResolvedValueOnce(1000000);
 
     await expect(
       service.allocateNextAvailableAssetCode(txMock as never, companyId),
@@ -156,13 +97,9 @@ describe('EquipmentAssetCodeService', () => {
   });
 
   it('should skip an occupied historical active asset code', async () => {
-    txMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 124,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 125,
-      });
+    companySequenceAllocatorMock.allocateNext
+      .mockResolvedValueOnce(123)
+      .mockResolvedValueOnce(124);
 
     txMock.equipmentAsset.findFirst
       .mockResolvedValueOnce({
@@ -190,13 +127,9 @@ describe('EquipmentAssetCodeService', () => {
   });
 
   it('should skip an occupied historical retired asset code', async () => {
-    txMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 124,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 125,
-      });
+    companySequenceAllocatorMock.allocateNext
+      .mockResolvedValueOnce(123)
+      .mockResolvedValueOnce(124);
 
     txMock.equipmentAsset.findFirst
       .mockResolvedValueOnce({
@@ -224,19 +157,11 @@ describe('EquipmentAssetCodeService', () => {
   });
 
   it('should continue past multiple consecutive occupied generated asset codes', async () => {
-    txMock.companySequence.update
-      .mockResolvedValueOnce({
-        nextValue: 2,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 3,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 4,
-      })
-      .mockResolvedValueOnce({
-        nextValue: 5,
-      });
+    companySequenceAllocatorMock.allocateNext
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(2)
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(4);
 
     txMock.equipmentAsset.findFirst
       .mockResolvedValueOnce({
@@ -256,15 +181,13 @@ describe('EquipmentAssetCodeService', () => {
     );
 
     expect(result).toBe('EQ-000004');
-    expect(txMock.companySequence.update).toHaveBeenCalledTimes(4);
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenCalledTimes(4);
     expect(txMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(4);
   });
 
   it('should continue past more than 100 occupied generated asset codes', async () => {
     for (let value = 1; value <= 102; value += 1) {
-      txMock.companySequence.update.mockResolvedValueOnce({
-        nextValue: value + 1,
-      });
+      companySequenceAllocatorMock.allocateNext.mockResolvedValueOnce(value);
     }
 
     for (let value = 1; value <= 101; value += 1) {
@@ -281,7 +204,9 @@ describe('EquipmentAssetCodeService', () => {
     );
 
     expect(result).toBe('EQ-000102');
-    expect(txMock.companySequence.update).toHaveBeenCalledTimes(102);
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenCalledTimes(
+      102,
+    );
     expect(txMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(102);
 
     expect(txMock.equipmentAsset.findFirst).toHaveBeenLastCalledWith({
@@ -312,8 +237,11 @@ describe('EquipmentAssetCodeService', () => {
   it('should use the supplied Prisma transaction client', async () => {
     await service.allocateNextAvailableAssetCode(txMock as never, companyId);
 
-    expect(txMock.companySequence.createMany).toHaveBeenCalledTimes(1);
-    expect(txMock.companySequence.update).toHaveBeenCalledTimes(1);
+    expect(companySequenceAllocatorMock.allocateNext).toHaveBeenCalledWith(
+      txMock,
+      companyId,
+      'EQUIPMENT_ASSET_CODE',
+    );
     expect(txMock.equipmentAsset.findFirst).toHaveBeenCalledTimes(1);
   });
 

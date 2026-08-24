@@ -1,20 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
+import { CompanySequenceAllocatorService } from '../company-sequences/company-sequence-allocator.service';
+
 const EQUIPMENT_ASSET_CODE_SEQUENCE_KEY = 'EQUIPMENT_ASSET_CODE';
 
 @Injectable()
 export class EquipmentAssetCodeService {
+  constructor(
+    private readonly companySequenceAllocator: CompanySequenceAllocatorService,
+  ) {}
+
   async allocateNextAvailableAssetCode(
     tx: Prisma.TransactionClient,
     companyId: string,
   ): Promise<string> {
-    await this.ensureEquipmentAssetCodeSequence(tx, companyId);
-
     while (true) {
-      const nextValue = await this.allocateNextEquipmentSequenceValue(
+      const nextValue = await this.companySequenceAllocator.allocateNext(
         tx,
         companyId,
+        EQUIPMENT_ASSET_CODE_SEQUENCE_KEY,
       );
 
       const assetCode = this.formatEquipmentAssetCode(nextValue);
@@ -33,46 +38,6 @@ export class EquipmentAssetCodeService {
         return assetCode;
       }
     }
-  }
-
-  private async ensureEquipmentAssetCodeSequence(
-    tx: Prisma.TransactionClient,
-    companyId: string,
-  ) {
-    await tx.companySequence.createMany({
-      data: [
-        {
-          companyId,
-          key: EQUIPMENT_ASSET_CODE_SEQUENCE_KEY,
-          nextValue: 1,
-        },
-      ],
-      skipDuplicates: true,
-    });
-  }
-
-  private async allocateNextEquipmentSequenceValue(
-    tx: Prisma.TransactionClient,
-    companyId: string,
-  ) {
-    const sequence = await tx.companySequence.update({
-      where: {
-        companyId_key: {
-          companyId,
-          key: EQUIPMENT_ASSET_CODE_SEQUENCE_KEY,
-        },
-      },
-      data: {
-        nextValue: {
-          increment: 1,
-        },
-      },
-      select: {
-        nextValue: true,
-      },
-    });
-
-    return sequence.nextValue - 1;
   }
 
   private formatEquipmentAssetCode(value: number) {
