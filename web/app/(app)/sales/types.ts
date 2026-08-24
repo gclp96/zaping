@@ -2,9 +2,43 @@ import type { StatusTone } from '@/app/components/business/StatusBadge';
 
 export type SaleStatus = 'DRAFT' | 'CONFIRMED' | 'CANCELLED';
 
+export type ProductInventoryTracking =
+  | 'QUANTITY'
+  | 'ASSET'
+  | 'SERIALIZED';
+
+export type ProductLotTracking =
+  | 'NONE'
+  | 'OPTIONAL'
+  | 'REQUIRED';
+
 export type SaleCustomer = {
   id: string;
   name: string;
+  type?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isActive?: boolean;
+};
+
+export type SaleProduct = {
+  id: string;
+  sku: string;
+  name: string;
+  barcode?: string | null;
+  brand?: string | null;
+  category?: {
+    id: string;
+    name: string;
+  } | null;
+  cost: number;
+  price: number;
+  stock: number;
+  minStock: number;
+  isActive?: boolean;
+  inventoryTracking: ProductInventoryTracking;
+  lotTracking: ProductLotTracking;
 };
 
 export type SaleItemProduct = {
@@ -41,4 +75,22 @@ export type Sale = {
 export type SaleStatusDescriptor = {
   label: string;
   tone: StatusTone;
+};
+
+export type SaleFormItem = {
+  productId: string;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  price: number;
+  stock: number;
+  subtotal: number;
+};
+
+export type CreateSalePayload = {
+  customerId: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
 };

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
+import Button from '@/app/components/ui/Button';
 import EmptyState from '@/app/components/ui/EmptyState';
 import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
@@ -13,9 +14,17 @@ import Section from '@/app/components/ui/layout/Section';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
+import SaleFormModal from './components/SaleFormModal';
+import { useSaleForm } from './hooks/useSaleForm';
+import { getCompatibleSalesProducts } from './sale-form.utils';
 import { getSaleStatusDescriptor } from './sale-status';
 
-import type { Sale, SaleStatus } from './types';
+import type {
+  Sale,
+  SaleCustomer,
+  SaleProduct,
+  SaleStatus,
+} from './types';
 
 type StatusFilter = 'ALL' | SaleStatus;
 
@@ -81,20 +90,43 @@ function matchesSearch(sale: Sale, normalizedSearch: string): boolean {
 
 export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [customers, setCustomers] = useState<SaleCustomer[]>([]);
+  const [products, setProducts] = useState<SaleProduct[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('ALL');
 
+  const compatibleProducts = useMemo(
+    () => getCompatibleSalesProducts(products),
+    [products],
+  );
+
   async function loadSales() {
+    const response = await api.get<Sale[]>('/sales');
+
+    setSales(response.data);
+  }
+
+  async function loadPageData() {
     try {
       setPageLoading(true);
       setPageError('');
 
-      const response = await api.get<Sale[]>('/sales');
+      const [
+        salesResponse,
+        customersResponse,
+        productsResponse,
+      ] = await Promise.all([
+        api.get<Sale[]>('/sales'),
+        api.get<SaleCustomer[]>('/customers'),
+        api.get<SaleProduct[]>('/products'),
+      ]);
 
-      setSales(response.data);
+      setSales(salesResponse.data);
+      setCustomers(customersResponse.data);
+      setProducts(productsResponse.data);
     } catch (error: unknown) {
       console.error(error);
 
@@ -111,8 +143,36 @@ export default function SalesPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadSales();
+    void loadPageData();
   }, []);
+
+  const {
+    openModal,
+    saving,
+    customerId,
+    selectedProductId,
+    quantity,
+    items,
+    customerError,
+    productError,
+    itemsError,
+    formError,
+    subtotal,
+    iva,
+    total,
+    openCreateModal,
+    closeCreateModal,
+    handleCustomerChange,
+    handleSelectedProductChange,
+    handleFormQuantityChange,
+    handleAddProduct,
+    handleItemQuantityChange,
+    handleRemoveItem,
+    handleCreateSale,
+  } = useSaleForm({
+    products: compatibleProducts,
+    onSaleSaved: loadSales,
+  });
 
   const filteredSales = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -145,90 +205,124 @@ export default function SalesPage() {
   });
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Ventas"
-        description="Consulta y da seguimiento a las ventas registradas."
-      />
-
-      {pageLoading ? (
-        <Loading message="Cargando ventas..." />
-      ) : pageError ? (
-        <div
-          role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
-        >
-          <p>{pageError}</p>
-
-          <button
-            type="button"
-            className="mt-3 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
-            onClick={() => void loadSales()}
-          >
-            Reintentar
-          </button>
-        </div>
-      ) : sales.length === 0 ? (
-        <EmptyState
-          title="No hay ventas registradas"
-          description="Las ventas aparecerán aquí cuando existan registros."
+    <>
+      <PageContainer>
+        <PageHeader
+          title="Ventas"
+          description="Consulta y da seguimiento a las ventas registradas."
+          action={
+            <Button onClick={openCreateModal}>
+              Nueva venta
+            </Button>
+          }
         />
-      ) : (
-        <Section>
-          <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-            <Input
-              label="Buscar"
-              type="search"
-              value={search}
-              placeholder="Buscar por folio o cliente"
-              onChange={(event) => setSearch(event.target.value)}
-            />
 
-            <div className="flex w-full flex-col gap-2">
-              <label
-                htmlFor="sales-status-filter"
-                className="text-sm font-medium text-gray-700"
-              >
-                Estado
-              </label>
+        {pageLoading ? (
+          <Loading message="Cargando ventas..." />
+        ) : pageError ? (
+          <div
+            role="alert"
+            className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700"
+          >
+            <p>{pageError}</p>
 
-              <select
-                id="sales-status-filter"
-                value={statusFilter}
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                onChange={(event) =>
-                  setStatusFilter(event.target.value as StatusFilter)
-                }
-              >
-                {statusFilterOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <button
+              type="button"
+              className="mt-3 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100"
+              onClick={() => void loadPageData()}
+            >
+              Reintentar
+            </button>
           </div>
+        ) : sales.length === 0 ? (
+          <EmptyState
+            title="No hay ventas registradas"
+            description="Las ventas aparecerán aquí cuando existan registros."
+          />
+        ) : (
+          <Section>
+            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+              <Input
+                label="Buscar"
+                type="search"
+                value={search}
+                placeholder="Buscar por folio o cliente"
+                onChange={(event) => setSearch(event.target.value)}
+              />
 
-          {filteredSales.length === 0 ? (
-            <EmptyState
-              title="No se encontraron ventas"
-              description="No se encontraron ventas con los filtros seleccionados."
-            />
-          ) : (
-            <Table
-              headers={[
-                'Folio',
-                'Cliente',
-                'Fecha',
-                'Partidas',
-                'Total',
-                'Estado',
-              ]}
-              data={tableData}
-            />
-          )}
-        </Section>
-      )}
-    </PageContainer>
+              <div className="flex w-full flex-col gap-2">
+                <label
+                  htmlFor="sales-status-filter"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Estado
+                </label>
+
+                <select
+                  id="sales-status-filter"
+                  value={statusFilter}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as StatusFilter)
+                  }
+                >
+                  {statusFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {filteredSales.length === 0 ? (
+              <EmptyState
+                title="No se encontraron ventas"
+                description="No se encontraron ventas con los filtros seleccionados."
+              />
+            ) : (
+              <Table
+                headers={[
+                  'Folio',
+                  'Cliente',
+                  'Fecha',
+                  'Partidas',
+                  'Total',
+                  'Estado',
+                ]}
+                data={tableData}
+              />
+            )}
+          </Section>
+        )}
+      </PageContainer>
+
+      <SaleFormModal
+        isOpen={openModal}
+        saving={saving}
+        customers={customers}
+        products={compatibleProducts}
+        customerId={customerId}
+        selectedProductId={selectedProductId}
+        quantity={quantity}
+        items={items}
+        customerError={customerError}
+        productError={productError}
+        itemsError={itemsError}
+        formError={formError}
+        subtotal={subtotal}
+        iva={iva}
+        total={total}
+        formatMoney={formatMoney}
+        onClose={closeCreateModal}
+        onSubmit={() => void handleCreateSale()}
+        onCustomerChange={handleCustomerChange}
+        onSelectedProductChange={handleSelectedProductChange}
+        onQuantityChange={handleFormQuantityChange}
+        onAddProduct={handleAddProduct}
+        onItemQuantityChange={handleItemQuantityChange}
+        onRemoveItem={handleRemoveItem}
+      />
+    </>
   );
 }
