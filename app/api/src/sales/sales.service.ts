@@ -7,6 +7,7 @@ import { Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { SalesFolioService } from './sales-folio.service';
 
 type GenericSalesProduct = {
   id: string;
@@ -17,7 +18,10 @@ type GenericSalesProduct = {
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly salesFolioService: SalesFolioService,
+  ) {}
 
   private validateGenericSalesProductEligibility(product: GenericSalesProduct) {
     if (product.inventoryTracking !== ProductInventoryTracking.QUANTITY) {
@@ -146,29 +150,34 @@ export class SalesService {
 
     const total = roundMoney(subtotal + iva);
 
-    const folio = `V-${Date.now()}`;
-
-    return this.prisma.sale.create({
-      data: {
+    return this.prisma.$transaction(async (tx) => {
+      const folio = await this.salesFolioService.allocateNextAvailableFolio(
+        tx,
         companyId,
-        customerId: dto.customerId,
+      );
 
-        folio,
+      return tx.sale.create({
+        data: {
+          companyId,
+          customerId: dto.customerId,
 
-        subtotal,
-        iva,
-        total,
+          folio,
 
-        status: 'DRAFT',
+          subtotal,
+          iva,
+          total,
 
-        items: {
-          create: saleItems,
+          status: 'DRAFT',
+
+          items: {
+            create: saleItems,
+          },
         },
-      },
 
-      include: {
-        items: true,
-      },
+        include: {
+          items: true,
+        },
+      });
     });
   }
 
@@ -603,6 +612,11 @@ export class SalesService {
         this.validateGenericSalesProductEligibility(product);
       }
 
+      const folio = await this.salesFolioService.allocateNextAvailableFolio(
+        tx,
+        companyId,
+      );
+
       /*
        * Reservar la conversión dentro de la misma
        * transacción.
@@ -628,8 +642,6 @@ export class SalesService {
           'La cotización ya fue convertida o ya no puede convertirse',
         );
       }
-
-      const folio = `V-${Date.now()}`;
 
       const sale = await tx.sale.create({
         data: {

@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SalesFolioService } from './sales-folio.service';
 import { SalesService } from './sales.service';
 import type { Response } from 'express';
 import PDFDocument from 'pdfkit';
@@ -200,6 +201,10 @@ const prismaMock = {
   },
 };
 
+const salesFolioServiceMock = {
+  allocateNextAvailableFolio: jest.fn(),
+};
+
 describe('SalesService', () => {
   let service: SalesService;
 
@@ -212,6 +217,12 @@ describe('SalesService', () => {
 
     prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
     transactionMock.product.findMany.mockResolvedValue([createProductMock()]);
+    transactionMock.sale.create.mockResolvedValue({
+      id: saleId,
+    });
+    salesFolioServiceMock.allocateNextAvailableFolio.mockResolvedValue(
+      'V-000001',
+    );
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -219,6 +230,10 @@ describe('SalesService', () => {
         {
           provide: PrismaService,
           useValue: prismaMock,
+        },
+        {
+          provide: SalesFolioService,
+          useValue: salesFolioServiceMock,
         },
       ],
     }).compile();
@@ -254,7 +269,7 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(NotFoundException);
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza una venta sin productos', async () => {
@@ -273,7 +288,7 @@ describe('SalesService', () => {
         new BadRequestException('Debe enviar al menos un item'),
       );
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza cantidades que no sean enteros positivos', async () => {
@@ -297,7 +312,7 @@ describe('SalesService', () => {
 
       expect(prismaMock.product.findMany).not.toHaveBeenCalled();
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza productos duplicados', async () => {
@@ -325,7 +340,7 @@ describe('SalesService', () => {
         new BadRequestException(`El producto ${productId} está duplicado`),
       );
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza un producto inexistente, inactivo o de otra empresa', async () => {
@@ -366,7 +381,7 @@ describe('SalesService', () => {
         },
       });
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('permite crear una venta con producto QUANTITY y lote NONE', async () => {
@@ -382,10 +397,6 @@ describe('SalesService', () => {
         }),
       ]);
 
-      prismaMock.sale.create.mockResolvedValue({
-        id: saleId,
-      });
-
       await service.create(companyId, {
         customerId,
         items: [
@@ -396,7 +407,7 @@ describe('SalesService', () => {
         ],
       });
 
-      expect(prismaMock.sale.create).toHaveBeenCalledTimes(1);
+      expect(transactionMock.sale.create).toHaveBeenCalledTimes(1);
     });
 
     it('permite crear una venta con producto QUANTITY y lote OPTIONAL', async () => {
@@ -408,10 +419,6 @@ describe('SalesService', () => {
 
       prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
 
-      prismaMock.sale.create.mockResolvedValue({
-        id: saleId,
-      });
-
       await service.create(companyId, {
         customerId,
         items: [
@@ -422,7 +429,7 @@ describe('SalesService', () => {
         ],
       });
 
-      expect(prismaMock.sale.create).toHaveBeenCalledTimes(1);
+      expect(transactionMock.sale.create).toHaveBeenCalledTimes(1);
     });
 
     it('rechaza crear una venta con producto no QUANTITY', async () => {
@@ -450,7 +457,7 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza crear una venta con producto que requiere lote', async () => {
@@ -478,7 +485,7 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(new BadRequestException(requiredLotMessage));
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
     it('rechaza completamente una venta mixta con un producto incompatible', async () => {
@@ -513,12 +520,10 @@ describe('SalesService', () => {
         }),
       ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
-      expect(prismaMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
     });
 
-    it('crea una venta manual en borrador usando el precio vigente del producto', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
-
+    it('crea una venta manual en borrador usando el precio vigente del producto y folio secuencial', async () => {
       prismaMock.customer.findFirst.mockResolvedValue({
         id: customerId,
         companyId,
@@ -531,14 +536,14 @@ describe('SalesService', () => {
         id: saleId,
         companyId,
         customerId,
-        folio: 'V-1700000000000',
+        folio: 'V-000001',
         subtotal: 200,
         iva: 32,
         total: 232,
         status: 'DRAFT',
       };
 
-      prismaMock.sale.create.mockResolvedValue(createdSale);
+      transactionMock.sale.create.mockResolvedValue(createdSale);
 
       const result = await service.create(companyId, {
         customerId,
@@ -550,11 +555,15 @@ describe('SalesService', () => {
         ],
       });
 
-      expect(prismaMock.sale.create).toHaveBeenCalledWith({
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio,
+      ).toHaveBeenCalledWith(transactionMock, companyId);
+      expect(transactionMock.sale.create).toHaveBeenCalledWith({
         data: {
           companyId,
           customerId,
-          folio: 'V-1700000000000',
+          folio: 'V-000001',
           subtotal: 200,
           iva: 32,
           total: 232,
@@ -575,7 +584,123 @@ describe('SalesService', () => {
         },
       });
 
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
       expect(result).toEqual(createdSale);
+    });
+
+    it('no usa Date.now para generar el folio de venta directa', async () => {
+      const dateNowSpy = jest.spyOn(Date, 'now').mockImplementation(() => {
+        throw new Error('Date.now no debe usarse para folios de venta');
+      });
+
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      await service.create(companyId, {
+        customerId,
+        items: [
+          {
+            productId,
+            quantity: 2,
+          },
+        ],
+      });
+
+      expect(dateNowSpy).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+          data: expect.objectContaining({
+            folio: 'V-000001',
+          }),
+        }),
+      );
+    });
+
+    it('crea la venta directa dentro de la misma transacción que la asignación de folio', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      await service.create(companyId, {
+        customerId,
+        items: [
+          {
+            productId,
+            quantity: 2,
+          },
+        ],
+      });
+
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio,
+      ).toHaveBeenCalledWith(transactionMock, companyId);
+      expect(transactionMock.sale.create).toHaveBeenCalledTimes(1);
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(transactionMock.sale.create.mock.invocationCallOrder[0]);
+    });
+
+    it('no crea venta directa si falla la asignación de folio', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      salesFolioServiceMock.allocateNextAvailableFolio.mockRejectedValue(
+        new Error('sequence unavailable'),
+      );
+
+      await expect(
+        service.create(companyId, {
+          customerId,
+          items: [
+            {
+              productId,
+              quantity: 2,
+            },
+          ],
+        }),
+      ).rejects.toThrow('sequence unavailable');
+
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
+    });
+
+    it('propaga un fallo de Sale.create después de asignar folio en la transacción', async () => {
+      prismaMock.customer.findFirst.mockResolvedValue({
+        id: customerId,
+        companyId,
+        isActive: true,
+      });
+
+      transactionMock.sale.create.mockRejectedValue(
+        new Error('sale create failed'),
+      );
+
+      await expect(
+        service.create(companyId, {
+          customerId,
+          items: [
+            {
+              productId,
+              quantity: 2,
+            },
+          ],
+        }),
+      ).rejects.toThrow('sale create failed');
+
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio,
+      ).toHaveBeenCalledWith(transactionMock, companyId);
+      expect(transactionMock.sale.create).toHaveBeenCalledTimes(1);
     });
 
     it('redondea los importes monetarios a dos decimales', async () => {
@@ -591,10 +716,6 @@ describe('SalesService', () => {
         }),
       ]);
 
-      prismaMock.sale.create.mockResolvedValue({
-        id: saleId,
-      });
-
       await service.create(companyId, {
         customerId,
         items: [
@@ -605,7 +726,7 @@ describe('SalesService', () => {
         ],
       });
 
-      expect(prismaMock.sale.create).toHaveBeenCalledWith(
+      expect(transactionMock.sale.create).toHaveBeenCalledWith(
         expect.objectContaining({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           data: expect.objectContaining({
@@ -1169,8 +1290,6 @@ describe('SalesService', () => {
 
   describe('createFromQuote', () => {
     it('convierte una cotización confirmada en una venta confirmada y descuenta inventario', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
-
       transactionMock.quote.findFirst.mockResolvedValue(quote);
 
       transactionMock.quote.updateMany.mockResolvedValue({
@@ -1182,7 +1301,7 @@ describe('SalesService', () => {
         companyId,
         customerId,
         quoteId,
-        folio: 'V-1700000000000',
+        folio: 'V-000001',
         subtotal: 200,
         iva: 32,
         total: 232,
@@ -1206,7 +1325,7 @@ describe('SalesService', () => {
         companyId,
         customerId,
         quoteId,
-        folio: 'V-1700000000000',
+        folio: 'V-000001',
         subtotal: 200,
         iva: 32,
         total: 232,
@@ -1219,6 +1338,15 @@ describe('SalesService', () => {
       const result = await service.createFromQuote(companyId, quoteId);
 
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio,
+      ).toHaveBeenCalledWith(transactionMock, companyId);
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio.mock
+          .invocationCallOrder[0],
+      ).toBeLessThan(
+        transactionMock.quote.updateMany.mock.invocationCallOrder[0],
+      );
 
       expect(transactionMock.quote.findFirst).toHaveBeenCalledWith({
         where: {
@@ -1247,7 +1375,7 @@ describe('SalesService', () => {
           companyId,
           customerId,
           quoteId,
-          folio: 'V-1700000000000',
+          folio: 'V-000001',
           subtotal: 200,
           iva: 32,
           total: 232,
@@ -1291,7 +1419,7 @@ describe('SalesService', () => {
           balance: 8,
           referenceType: 'SALE',
           referenceId: saleId,
-          notes: 'Venta V-1700000000000 generada desde cotización COT-001',
+          notes: 'Venta V-000001 generada desde cotización COT-001',
         },
       });
 
@@ -1387,6 +1515,26 @@ describe('SalesService', () => {
       expect(transactionMock.sale.create).not.toHaveBeenCalled();
 
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('no crea venta ni marca la cotización si falla la asignación de folio', async () => {
+      transactionMock.quote.findFirst.mockResolvedValue(quote);
+
+      salesFolioServiceMock.allocateNextAvailableFolio.mockRejectedValue(
+        new Error('sequence unavailable'),
+      );
+
+      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+        'sequence unavailable',
+      );
+
+      expect(
+        salesFolioServiceMock.allocateNextAvailableFolio,
+      ).toHaveBeenCalledWith(transactionMock, companyId);
+      expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.sale.create).not.toHaveBeenCalled();
+      expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
+      expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
     });
 
     it('rechaza un producto inexistente, inactivo o de otra empresa', async () => {
@@ -1485,7 +1633,7 @@ describe('SalesService', () => {
 
       transactionMock.sale.create.mockResolvedValue({
         id: saleId,
-        folio: 'V-123',
+        folio: 'V-000001',
       });
 
       transactionMock.product.findFirst.mockResolvedValueOnce({
@@ -1508,8 +1656,6 @@ describe('SalesService', () => {
     });
 
     it('usa el costo del producto y no el precio de venta en el movimiento de inventario', async () => {
-      jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
-
       transactionMock.quote.findFirst.mockResolvedValue(quote);
 
       transactionMock.quote.updateMany.mockResolvedValue({
@@ -1518,7 +1664,7 @@ describe('SalesService', () => {
 
       transactionMock.sale.create.mockResolvedValue({
         id: saleId,
-        folio: 'V-1700000000000',
+        folio: 'V-000001',
       });
 
       transactionMock.product.findMany.mockResolvedValue([
@@ -1564,7 +1710,7 @@ describe('SalesService', () => {
 
       transactionMock.sale.create.mockResolvedValue({
         id: saleId,
-        folio: 'V-123',
+        folio: 'V-000001',
       });
 
       transactionMock.product.findFirst.mockResolvedValueOnce({
