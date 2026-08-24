@@ -14,6 +14,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { UsersModule } from './users/users.module';
 import { PurchaseReceiptsModule } from './purchases-receipts/purchases-receipts.module';
 import { EquipmentModule } from './equipment/equipment.module';
+import { HealthcareCasesModule } from './healthcare/cases/healthcare-cases.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
@@ -33,6 +34,7 @@ import { PrismaModule } from './prisma/prisma.module';
     CategoriesModule,
     UsersModule,
     EquipmentModule,
+    HealthcareCasesModule,
   ],
 })
 export class AppModule {}
