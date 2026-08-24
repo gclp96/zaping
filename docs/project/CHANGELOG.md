@@ -61,6 +61,235 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
 
+## Current Equipment Availability — EQ-AVL-001
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+Core Equipment incorporó un evaluator de Current Availability para responder:
+
+```text
+Can this EquipmentAsset be used now according to currently implemented Core Equipment facts?
+```
+
+Arquitectura implementada:
+
+```text
+equipment-availability.types.ts
+→ runtime TypeScript reason constants
+→ derived TypeScript reason union
+
+equipment-availability.evaluator.ts
+→ pure deterministic evaluator
+→ lifecycle + condition facts only
+→ no PrismaService
+→ no database lookup
+→ no I/O
+→ no clock access
+→ no evaluatedAt
+→ no Inspection history requirement
+
+EquipmentAvailabilityService
+→ tenant-safe Equipment lookup
+→ invokes pure evaluator
+→ adds evaluatedAt
+→ no Inspection-history query
+→ no Product.stock query
+→ no writes
+→ no Prisma transaction
+→ no cache
+
+EquipmentController
+→ GET /equipment/:equipmentId/availability
+→ delegates to EquipmentAvailabilityService
+→ no Availability business logic
+```
+
+Hechos usados en Fase 1:
+
+```text
+EquipmentAsset.lifecycle
+EquipmentAsset.condition
+```
+
+Reglas entregadas:
+
+```text
+ACTIVE + GOOD
+→ available true
+
+ACTIVE + INSPECTION_PENDING
+→ available false
+→ INSPECTION_PENDING
+
+ACTIVE + DAMAGED
+→ available false
+→ DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+→ available false
+→ OUT_OF_SERVICE
+
+RETIRED
+→ available false
+→ RETIRED
+```
+
+Reason codes implementados:
+
+```text
+RETIRED
+INSPECTION_PENDING
+DAMAGED
+OUT_OF_SERVICE
+```
+
+No se implementaron reason codes futuros:
+
+```text
+EXTERNAL_CUSTODY
+CASE_CONFLICT
+MAINTENANCE_BLOCKED
+CALIBRATION_BLOCKED
+```
+
+Orden determinístico de blockers:
+
+```text
+1. RETIRED
+2. INSPECTION_PENDING
+3. DAMAGED
+4. OUT_OF_SERVICE
+```
+
+Ejemplo validado:
+
+```text
+RETIRED + DAMAGED
+→ available false
+→ primaryReason RETIRED
+→ reasons [RETIRED, DAMAGED]
+```
+
+Resultado externo:
+
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"],
+  "evaluatedAt": "2026-08-24T00:00:00.000Z"
+}
+```
+
+El resultado es derivado al momento del request. No se persiste ni se cachea Availability.
+
+Validación automatizada:
+
+```text
+Pure Availability evaluator
+1 suite
+12/12 passed
+
+EquipmentAvailabilityService
+1 suite
+15/15 passed
+
+EquipmentController
+1 suite
+12/12 passed
+
+All Equipment tests
+7 suites
+100/100 passed
+
+Full backend tests
+33 suites
+216/216 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+Changed TypeScript ESLint
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+Asset
+→ EQ-000021
+→ 9eac7f6a-45ad-49b7-a423-2b182f98860e
+→ origin PURCHASE_RECEIPT
+
+ACTIVE + INSPECTION_PENDING
+→ available false
+→ primaryReason INSPECTION_PENDING
+→ reasons [INSPECTION_PENDING]
+→ PASS
+
+Inspection INSPECTION_PENDING → GOOD
+→ available true
+→ primaryReason null
+→ reasons []
+→ PASS
+
+Inspection GOOD → DAMAGED
+→ available false
+→ primaryReason DAMAGED
+→ reasons [DAMAGED]
+→ PASS
+
+Retirement ACTIVE → RETIRED
+condition remained DAMAGED
+→ available false
+→ primaryReason RETIRED
+→ reasons [RETIRED, DAMAGED]
+→ PASS
+
+Nonexistent Equipment
+→ 404 Equipo no encontrado
+→ PASS
+```
+
+Cross-tenant real manual second-company QA was not performed; tenant-scoped lookup behavior is covered by automated tests.
+
+No se requirieron cambios de Prisma schema ni migración.
+
+Permanecen como trabajo futuro:
+
+```text
+Case Availability
+Custody
+Assignment
+Case conflict
+Maintenance
+Calibration
+Turnaround
+batch/list Availability
+```
+
+Deuda no resuelta por esta entrega:
+
+```text
+Purchase Receipt idempotency
+Product.stock ↔ EquipmentAsset reconciliation
+serial assignment/correction
+broader ProductLotTracking enforcement
+tenant-safe write hardening
+```
+
+---
+
 ## Purchase Receipt → EquipmentAsset — EQ-PR-001
 
 **Estado:** Completed / Validated

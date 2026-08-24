@@ -966,7 +966,7 @@ Manual QA and final documentation synchronization
 
 ## EQ-AVL-001 — Availability Evaluator
 
-**Estado:** 🟡 Ready / Next
+**Estado:** ✅ IMPLEMENTED / VALIDATED
 
 **Prioridad:** P1
 
@@ -974,9 +974,9 @@ Manual QA and final documentation synchronization
 
 **Domain design:** Approved
 
-**Implementation:** Not implemented
+**Implementation:** IMPLEMENTED / VALIDATED
 
-**Validation:** Not performed
+**Validation:** Completed
 
 Availability será:
 
@@ -1007,7 +1007,7 @@ Calibration
 Case context
 ```
 
-EQ-AVL-001 Fase 1 implementará:
+EQ-AVL-001 Fase 1 implementa:
 
 ```text
 Current Equipment Availability
@@ -1083,7 +1083,7 @@ absence of Calibration blocker
 absence of Assignment conflict
 ```
 
-Contrato externo conceptual:
+Contrato externo implementado:
 
 ```json
 {
@@ -1094,7 +1094,7 @@ Contrato externo conceptual:
 }
 ```
 
-Contrato conceptual del evaluator puro:
+Contrato del evaluator puro:
 
 ```json
 {
@@ -1131,9 +1131,22 @@ MAINTENANCE_BLOCKED
 CALIBRATION_BLOCKED
 ```
 
-Arquitectura aprobada:
+Arquitectura implementada:
 
 ```text
+equipment-availability.types.ts
+→ runtime TypeScript reason constants
+→ derived TypeScript reason union
+
+equipment-availability.evaluator.ts
+→ pure deterministic evaluator
+→ no PrismaService
+→ no DB lookup
+→ no I/O
+→ no clock access
+→ no evaluatedAt
+→ no Inspection history requirement
+
 EquipmentAvailabilityService
 → tenant-safe Equipment lookup
 → orchestration
@@ -1143,9 +1156,14 @@ pure Equipment Current Availability evaluator
 → consumes lifecycle + condition facts
 → no database dependency
 → deterministic
+
+EquipmentController
+→ GET /equipment/:equipmentId/availability
+→ delegates to EquipmentAvailabilityService
+→ no Availability business logic
 ```
 
-API aprobada:
+API implementada:
 
 ```text
 GET /equipment/:equipmentId/availability
@@ -1160,6 +1178,8 @@ cross-tenant or nonexistent Equipment → 404 Equipo no encontrado
 ```
 
 No agregar Availability a `GET /equipment` en Fase 1 para evitar N+1 implícito.
+
+Availability tampoco se agrega automáticamente a `GET /equipment/:id`.
 
 Prisma:
 
@@ -1177,35 +1197,104 @@ migration
 → NOT REQUIRED
 ```
 
-Manual QA plan:
+Validación automatizada:
 
 ```text
-manual ACTIVE + GOOD
-→ available true
+Pure Availability evaluator
+1 suite
+12/12 passed
+
+EquipmentAvailabilityService
+1 suite
+15/15 passed
+
+EquipmentController
+1 suite
+12/12 passed
+
+All Equipment tests
+7 suites
+100/100 passed
+
+Full backend tests
+33 suites
+216/216 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+Changed TypeScript ESLint
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA:
+
+```text
+Asset
+→ EQ-000021
+→ 9eac7f6a-45ad-49b7-a423-2b182f98860e
+→ origin PURCHASE_RECEIPT
 
 Purchase Receipt ACTIVE + INSPECTION_PENDING
 → false / INSPECTION_PENDING
+→ PASS
 
 Inspection: INSPECTION_PENDING → GOOD
 → available true
+→ PASS
 
 GOOD → DAMAGED
 → available false / DAMAGED
-
-ACTIVE + OUT_OF_SERVICE
-→ unavailable
+→ PASS
 
 GOOD → RETIRED
 → unavailable / RETIRED
+→ condition remained DAMAGED
 
 RETIRED + DAMAGED
 → reasons [RETIRED, DAMAGED]
+→ primaryReason RETIRED
+→ PASS
 
-cross-tenant Equipment
-→ 404
+Nonexistent Equipment
+→ 404 Equipo no encontrado
+→ PASS
 ```
 
-Fases previstas:
+Cross-tenant QA:
+
+```text
+real manual second-company QA
+→ NOT PERFORMED
+
+automated tenant-scoped lookup / null lookup coverage
+→ exists
+```
+
+Invalid Retirement QA note:
+
+```text
+reason / notes payload
+→ invalid
+
+retiredReason / retirementNotes
+→ expected
+
+invalid request returned 400
+→ no retirement occurred
+→ Availability remained DAMAGED until valid Retirement request
+```
+
+Fases completadas:
 
 ```text
 B.1
@@ -1225,6 +1314,30 @@ Manual PostgreSQL/API QA using real Equipment state transitions
 
 C
 Final documentation synchronization
+```
+
+Permanecen fuera de alcance:
+
+```text
+Case Availability
+Custody
+Assignment
+Case conflict
+Maintenance
+Calibration
+Turnaround
+placeholder persisted booleans
+Product.stock-based Equipment availability
+```
+
+Deuda no resuelta por EQ-AVL-001:
+
+```text
+Purchase Receipt idempotency
+Product.stock ↔ EquipmentAsset reconciliation
+serial assignment/correction
+broader lotTracking enforcement
+tenant-safe write hardening
 ```
 
 ---
@@ -1893,7 +2006,7 @@ Estado:
 → completed / validated
 
 4. Availability Evaluator
-→ ready / next
+→ completed / validated
 ```
 Core Equipment baseline
 ✅
@@ -1905,6 +2018,9 @@ Equipment Retirement
 ✅
 
 Purchase Receipt → EquipmentAsset
+✅
+
+Current Availability
 ✅
 
 En paralelo, antes de release comercial deberán cerrarse los blockers:
@@ -1926,27 +2042,25 @@ No debe sacrificarse seguridad para acelerar un workflow funcional.
 El siguiente bloque es:
 
 ```text
-EQ-AVL-001
-Availability Evaluator
+Healthcare Equipment Assignment
 ```
 
 Estado:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+EQ-AVL-001
+Current Equipment Availability
+→ IMPLEMENTED / VALIDATED
 ```
 
 Primero:
 
 ```text
-Phase B.1
-Pure evaluator + reason types/constants
+Repository analysis
 ↓
-Phase B.2
-EquipmentAvailabilityService with tenant-safe lookup
+Domain design
 ↓
-Phase B.3
-GET /equipment/:equipmentId/availability
+Architecture review
 ```
 
 Después:
@@ -1998,5 +2112,10 @@ Purchase Receipt → EquipmentAsset
 Then:
 
 Availability Evaluator
-→ ready / next domain workflow
+→ completed / validated
+
+Then:
+
+Healthcare Equipment Assignment
+→ next documented Equipment workflow
 ```

@@ -14,6 +14,7 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-request.inte
 import { CreateEquipmentInspectionDto } from './dto/create-equipment-inspection.dto';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { RetireEquipmentDto } from './dto/retire-equipment.dto';
+import { EquipmentAvailabilityService } from './equipment-availability.service';
 import { EquipmentService } from './equipment.service';
 
 type EquipmentRequest = {
@@ -23,7 +24,10 @@ type EquipmentRequest = {
 @UseGuards(JwtAuthGuard)
 @Controller('equipment')
 export class EquipmentController {
-  constructor(private readonly equipmentService: EquipmentService) {}
+  constructor(
+    private readonly equipmentService: EquipmentService,
+    private readonly equipmentAvailabilityService: EquipmentAvailabilityService,
+  ) {}
 
   @Get()
   findAll(@Request() req: EquipmentRequest) {
@@ -36,6 +40,17 @@ export class EquipmentController {
     @Param('equipmentId') equipmentId: string,
   ) {
     return this.equipmentService.findInspections(
+      req.user.companyId,
+      equipmentId,
+    );
+  }
+
+  @Get(':equipmentId/availability')
+  availability(
+    @Request() req: EquipmentRequest,
+    @Param('equipmentId') equipmentId: string,
+  ) {
+    return this.equipmentAvailabilityService.evaluateCurrent(
       req.user.companyId,
       equipmentId,
     );

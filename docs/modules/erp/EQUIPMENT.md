@@ -2,9 +2,9 @@
 
 **Módulo:** Core Equipment
 **Producto:** Zaping ERP
-**Versión:** 1.6.0
+**Versión:** 1.7.0
 **Estado:** Approved
-**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE + PURCHASE RECEIPT PROVISIONING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE + PURCHASE RECEIPT PROVISIONING + CURRENT AVAILABILITY
 **Última actualización:** 2026-08-24
 **Responsable:** Zaping Team
 
@@ -48,6 +48,9 @@ Automatic assetCode Generation
 Purchase Receipt → EquipmentAsset
 → IMPLEMENTED / VALIDATED
 
+Current Availability
+→ IMPLEMENTED / VALIDATED
+
 Equipment Operational Workflows
 → PARTIAL / PENDING
 
@@ -83,6 +86,7 @@ CreateEquipmentDto
 
 GET /equipment
 GET /equipment/:id
+GET /equipment/:equipmentId/availability
 POST /equipment
 
 JWT protection
@@ -96,6 +100,8 @@ assetCode duplicate protection
 Purchase Receipt → EquipmentAsset provisioning
 EquipmentProvisioningService
 EquipmentAssetCodeService
+EquipmentAvailabilityService
+pure Current Availability evaluator
 serial normalization
 serial duplicate validation
 DTO validation
@@ -121,7 +127,7 @@ No deben considerarse implementadas todavía:
 serial correction operation
 assetCode correction operation
 Inventory / Equipment synchronization policy
-Availability Evaluator
+Case Availability
 Case Equipment Assignment
 Custody
 Dispatch
@@ -1412,7 +1418,7 @@ absence of Calibration blocker
 absence of Assignment conflict
 ```
 
-**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado:** IMPLEMENTED / VALIDATED.
 
 ---
 
@@ -1488,7 +1494,7 @@ Contrato conceptual del evaluator puro interno:
 
 El evaluator puro no genera `evaluatedAt`; `EquipmentAvailabilityService` lo agrega al servir la respuesta de aplicación/API.
 
-**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado:** IMPLEMENTED / VALIDATED.
 
 ---
 
@@ -1564,7 +1570,7 @@ RETIRED + DAMAGED
 → reasons = [RETIRED, DAMAGED]
 ```
 
-**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado:** IMPLEMENTED / VALIDATED.
 
 ---
 
@@ -1632,20 +1638,37 @@ future Calibration
 
 ---
 
-# 42.1 EQ-AVL-001 approved architecture
+# 42.1 EQ-AVL-001 implemented architecture
 
-Arquitectura aprobada para Fase 1:
+Arquitectura implementada para Fase 1:
 
 ```text
+equipment-availability.types.ts
+→ runtime reason constants
+→ TypeScript reason union
+→ pure/application result types
+
+equipment-availability.evaluator.ts
+→ evaluateEquipmentCurrentAvailability(...)
+→ pure deterministic evaluator
+→ lifecycle + condition facts only
+→ no PrismaService
+→ no database lookup
+→ no I/O
+→ no clock access
+→ no evaluatedAt
+→ no Inspection history requirement
+
 EquipmentAvailabilityService
 → tenant-safe Equipment lookup
 → orchestration
 → evaluatedAt
+→ API-ready result
 
-pure Equipment Current Availability evaluator
-→ consumes lifecycle + condition facts
-→ no database dependency
-→ deterministic
+EquipmentController
+→ GET /equipment/:equipmentId/availability
+→ delegates to EquipmentAvailabilityService
+→ contains no Availability business logic
 ```
 
 No debe crearse un framework de plugins/providers en Fase 1.
@@ -1662,7 +1685,7 @@ Calibration
 
 sin agregar fuentes persistidas placeholder.
 
-API aprobada para Fase 1:
+API implementada para Fase 1:
 
 ```text
 GET /equipment/:equipmentId/availability
@@ -1699,6 +1722,136 @@ GET /equipment
 
 en Fase 1, para evitar comportamiento N+1 implícito.
 
+Availability tampoco se incluye automáticamente en:
+
+```text
+GET /equipment/:id
+```
+
+Resultado externo:
+
+```json
+{
+  "available": false,
+  "primaryReason": "INSPECTION_PENDING",
+  "reasons": ["INSPECTION_PENDING"],
+  "evaluatedAt": "2026-08-24T00:00:00.000Z"
+}
+```
+
+`evaluatedAt` es agregado por `EquipmentAvailabilityService` con reloj de request. El evaluator puro no genera tiempo.
+
+Validación automatizada:
+
+```text
+EquipmentController
+1 suite
+12/12 passed
+
+EquipmentAvailabilityService
+1 suite
+15/15 passed
+
+Pure Availability evaluator
+1 suite
+12/12 passed
+
+All Equipment tests
+7 suites
+100/100 passed
+
+Full backend tests
+33 suites
+216/216 passed
+
+npx prisma validate
+PASS
+
+npm run build
+PASS
+
+ESLint changed TypeScript
+PASS
+
+Full backend ESLint
+PASS
+
+git diff --check
+PASS
+```
+
+Manual PostgreSQL / API QA registrada:
+
+```text
+Asset
+→ assetCode EQ-000021
+→ id 9eac7f6a-45ad-49b7-a423-2b182f98860e
+→ origin PURCHASE_RECEIPT
+
+Initial state
+→ lifecycle ACTIVE
+→ condition INSPECTION_PENDING
+
+GET availability
+→ available false
+→ primaryReason INSPECTION_PENDING
+→ reasons [INSPECTION_PENDING]
+→ PASS
+
+Inspection
+→ INSPECTION_PENDING → GOOD
+
+GET availability
+→ available true
+→ primaryReason null
+→ reasons []
+→ PASS
+
+Inspection
+→ GOOD → DAMAGED
+
+GET availability
+→ available false
+→ primaryReason DAMAGED
+→ reasons [DAMAGED]
+→ PASS
+
+Retirement
+→ lifecycle ACTIVE → RETIRED
+→ condition remained DAMAGED
+
+GET availability
+→ available false
+→ primaryReason RETIRED
+→ reasons [RETIRED, DAMAGED]
+→ PASS
+
+Nonexistent Equipment
+→ GET /equipment/{random-uuid}/availability
+→ 404 Equipo no encontrado
+→ PASS
+```
+
+Cross-tenant QA:
+
+```text
+real manual second-tenant QA
+→ NOT PERFORMED
+
+tenant-scoped lookup / null lookup behavior
+→ covered by automated tests
+```
+
+Invalid Retirement QA note:
+
+```text
+invalid request used reason / notes
+expected fields are retiredReason / retirementNotes
+→ ValidationPipe returned 400
+→ no retirement occurred
+→ Availability remained DAMAGED until valid Retirement request
+```
+
 Prisma:
 
 ```text
@@ -1715,7 +1868,7 @@ migration
 → NOT REQUIRED
 ```
 
-Fases previstas:
+Fases completadas:
 
 ```text
 B.1
@@ -1737,7 +1890,7 @@ C
 Final documentation synchronization
 ```
 
-Manual QA plan:
+Manual QA plan ejecutado:
 
 ```text
 manual ACTIVE + GOOD
@@ -1763,10 +1916,11 @@ RETIRED + DAMAGED
 → reasons [RETIRED, DAMAGED]
 
 cross-tenant Equipment
-→ 404
+→ real manual second-tenant QA NOT PERFORMED
+→ automated tenant isolation coverage exists
 ```
 
-**Estado:** DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION.
+**Estado:** IMPLEMENTED / VALIDATED.
 
 ---
 
@@ -3784,7 +3938,7 @@ Equipment Audit
 ⏳
 
 Availability Evaluator
-⏳
+✅
 ```
 
 Healthcare consumirá posteriormente estas capacidades mediante:
@@ -3802,24 +3956,24 @@ Inspection integration
 
 # 92. Próxima prioridad recomendada
 
-El siguiente workflow Core recomendado es:
+El siguiente workflow documentado recomendado es:
 
 ```text
-EQ-AVL-001
-Availability Evaluator
+Healthcare Equipment Assignment
 ```
 
 Estado de EQ-AVL-001:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+IMPLEMENTED / VALIDATED
 ```
 
-Siguiente paso:
+Workflow cerrado:
 
 ```text
-Phase B.1
-Pure evaluator + reason types/constants
+EQ-AVL-001
+Current Equipment Availability
+→ IMPLEMENTED / VALIDATED
 ```
 
 El workflow anterior quedó cerrado:
@@ -5556,7 +5710,7 @@ Equipment Audit
 ⏳
 
 Availability Evaluator
-⏳
+✅
 ```
 
 ---
@@ -5583,19 +5737,23 @@ Automatic assetCode Generation
 
 Purchase Receipt → EquipmentAsset
 ✅
+
+Current Availability
+✅
 ```
 
-El siguiente paso técnico es:
+El siguiente paso técnico documentado es:
 
 ```text
-EQ-AVL-001
-Availability Evaluator
+Healthcare Equipment Assignment
 ```
 
 Estado:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+EQ-AVL-001
+Current Equipment Availability
+→ IMPLEMENTED / VALIDATED
 ```
 
 # Final Principle
@@ -5735,24 +5893,25 @@ Equipment Audit
 ⏳
 
 Availability Evaluator
-⏳
+✅
 ```
 
 ---
 
 # 92. Próxima prioridad recomendada
 
-El siguiente paso técnico recomendado es:
+El siguiente paso técnico documentado recomendado es:
 
 ```text
-EQ-AVL-001
-Availability Evaluator
+Healthcare Equipment Assignment
 ```
 
 Estado:
 
 ```text
-DOMAIN DESIGN APPROVED / READY FOR IMPLEMENTATION
+EQ-AVL-001
+Current Equipment Availability
+→ IMPLEMENTED / VALIDATED
 ```
 
 Orden:

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   EquipmentCondition,
@@ -7,6 +8,8 @@ import {
 } from '@prisma/client';
 
 import { EquipmentController } from './equipment.controller';
+import { EquipmentAvailabilityService } from './equipment-availability.service';
+import { EQUIPMENT_AVAILABILITY_REASON } from './equipment-availability.types';
 import { EquipmentService } from './equipment.service';
 
 describe('EquipmentController', () => {
@@ -24,6 +27,10 @@ describe('EquipmentController', () => {
     findInspections: jest.fn(),
     createInspection: jest.fn(),
     retire: jest.fn(),
+  };
+
+  const equipmentAvailabilityServiceMock = {
+    evaluateCurrent: jest.fn(),
   };
 
   const req = {
@@ -46,6 +53,10 @@ describe('EquipmentController', () => {
         {
           provide: EquipmentService,
           useValue: equipmentServiceMock,
+        },
+        {
+          provide: EquipmentAvailabilityService,
+          useValue: equipmentAvailabilityServiceMock,
         },
       ],
     }).compile();
@@ -147,6 +158,92 @@ describe('EquipmentController', () => {
       companyId,
       equipmentId,
     );
+  });
+
+  it('should delegate availability lookup to EquipmentAvailabilityService', async () => {
+    const availability = {
+      available: false,
+      primaryReason: EQUIPMENT_AVAILABILITY_REASON.INSPECTION_PENDING,
+      reasons: [EQUIPMENT_AVAILABILITY_REASON.INSPECTION_PENDING],
+      evaluatedAt: '2026-08-24T12:34:56.789Z',
+    };
+
+    equipmentAvailabilityServiceMock.evaluateCurrent.mockResolvedValue(
+      availability,
+    );
+
+    const result = await controller.availability(req, equipmentId);
+
+    expect(result).toEqual(availability);
+    expect(
+      equipmentAvailabilityServiceMock.evaluateCurrent,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      equipmentAvailabilityServiceMock.evaluateCurrent,
+    ).toHaveBeenCalledWith(companyId, equipmentId);
+  });
+
+  it('should pass through an ACTIVE GOOD availability response unchanged', async () => {
+    const availability = {
+      available: true,
+      primaryReason: null,
+      reasons: [],
+      evaluatedAt: '2026-08-24T12:34:56.789Z',
+    };
+
+    equipmentAvailabilityServiceMock.evaluateCurrent.mockResolvedValue(
+      availability,
+    );
+
+    const result = await controller.availability(req, equipmentId);
+
+    expect(result).toBe(availability);
+  });
+
+  it('should pass through a blocked availability response with multiple reasons unchanged', async () => {
+    const availability = {
+      available: false,
+      primaryReason: EQUIPMENT_AVAILABILITY_REASON.RETIRED,
+      reasons: [
+        EQUIPMENT_AVAILABILITY_REASON.RETIRED,
+        EQUIPMENT_AVAILABILITY_REASON.DAMAGED,
+      ],
+      evaluatedAt: '2026-08-24T12:34:56.789Z',
+    };
+
+    equipmentAvailabilityServiceMock.evaluateCurrent.mockResolvedValue(
+      availability,
+    );
+
+    const result = await controller.availability(req, equipmentId);
+
+    expect(result).toBe(availability);
+  });
+
+  it('should use companyId and not userId for availability lookup', async () => {
+    equipmentAvailabilityServiceMock.evaluateCurrent.mockResolvedValue({
+      available: true,
+      primaryReason: null,
+      reasons: [],
+      evaluatedAt: '2026-08-24T12:34:56.789Z',
+    });
+
+    await controller.availability(req, equipmentId);
+
+    expect(
+      equipmentAvailabilityServiceMock.evaluateCurrent,
+    ).toHaveBeenCalledWith(companyId, equipmentId);
+    expect(
+      equipmentAvailabilityServiceMock.evaluateCurrent,
+    ).not.toHaveBeenCalledWith(userId, equipmentId);
+  });
+
+  it('should propagate availability service errors', async () => {
+    const error = new NotFoundException('Equipo no encontrado');
+
+    equipmentAvailabilityServiceMock.evaluateCurrent.mockRejectedValue(error);
+
+    await expect(controller.availability(req, equipmentId)).rejects.toBe(error);
   });
 
   it('should create inspection using authenticated companyId and userId', async () => {
