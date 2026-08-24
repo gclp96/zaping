@@ -2,7 +2,7 @@
 
 **Producto:** Zaping Platform
 **Estado:** Desarrollo activo
-**Fase actual:** ERP Core UI/UX Completion after Healthcare Case Foundation validation
+**Fase actual:** ERP Core UI/UX Completion - UX-A.5 documented / UX-B.1 next
 **Última actualización:** 2026-08-24
 **Responsable:** Zaping Team
 
@@ -2497,6 +2497,9 @@ Immediate next milestone:
 
 ```text
 ERP CORE UI / UX COMPLETION
+→ ACTIVE / NEXT
+→ UX-A.5 DOCUMENTED
+→ IMPLEMENTATION NOT STARTED UNTIL UX-B.1
 ```
 
 Purpose:
@@ -2558,6 +2561,37 @@ Review for:
 → Purchase → Receipt ASSET → Equipment → Inspection → Availability
 ```
 
+Frontend source of truth:
+
+```text
+docs/modules/erp/ERP_UI_UX.md
+```
+
+Approved UX phase order:
+
+```text
+UX-A.5
+→ approved architecture and milestone documentation
+
+UX-B.1
+→ Authenticated App Shell
+
+UX-B.2
+→ Navigation IA + active state + responsive shell
+
+UX-B.3
+→ Dashboard 2.0 using real current data
+
+UX-B.4
+→ Sales frontend completion
+
+UX-B.5
+→ ERP Core screen completion / normalization
+
+UX-B.6
+→ End-to-end ERP UX QA
+```
+
 En paralelo, antes de release comercial deberán cerrarse los blockers:
 
 ```text
@@ -2587,7 +2621,9 @@ Healthcare Case Foundation
 → COMPLETED / VALIDATED
 
 ERP CORE UI / UX COMPLETION
-→ NEXT MILESTONE
+→ ACTIVE / NEXT MILESTONE
+→ UX-A.5 DOCUMENTED
+→ UX-B.1 IMPLEMENTATION NOT STARTED
 ```
 
 Este hito debe estabilizar la experiencia base del ERP antes de expandir Healthcare logistics.
@@ -2600,6 +2636,23 @@ Dashboard / Home refinement
 Sales frontend completion
 ERP module UX consistency
 ERP end-to-end UX/QA
+```
+
+Fuente de verdad frontend:
+
+```text
+docs/modules/erp/ERP_UI_UX.md
+```
+
+Orden aprobado:
+
+```text
+UX-B.1 Authenticated App Shell
+UX-B.2 Navigation IA + active state + responsive shell
+UX-B.3 Dashboard 2.0 using real current data
+UX-B.4 Sales frontend completion
+UX-B.5 ERP Core screen completion / normalization
+UX-B.6 End-to-end ERP UX QA
 ```
 
 Healthcare futuro queda en cola posterior:
