@@ -29,6 +29,10 @@ export const navigationGroups: NavigationGroup[] = [
         label: 'Cotizaciones',
         href: '/quotes',
       },
+      {
+        label: 'Ventas',
+        href: '/sales',
+      },
     ],
   },
   {

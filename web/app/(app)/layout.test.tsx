@@ -24,6 +24,7 @@ import CustomersPage from './customers/page';
 import DashboardPage from './dashboard/page';
 import ProductsPage from './products/page';
 import PurchasesPage from './purchases/page';
+import SalesPage from './sales/page';
 import ForgotPasswordPage from '../(public)/forgot-password/page';
 import LoginPage from '../(public)/login/page';
 import RegisterPage from '../(public)/register/page';
@@ -162,6 +163,11 @@ describe('AuthenticatedAppLayout', () => {
     ).toBe('/quotes');
     expect(
       screen
+        .getByRole('link', { name: 'Ventas' })
+        .getAttribute('href'),
+    ).toBe('/sales');
+    expect(
+      screen
         .getByRole('link', { name: 'Proveedores' })
         .getAttribute('href'),
     ).toBe('/suppliers');
@@ -190,9 +196,6 @@ describe('AuthenticatedAppLayout', () => {
   it('does not render navigation links for missing routes', () => {
     renderInShell(<div>Shell child</div>);
 
-    expect(
-      screen.queryByRole('link', { name: 'Ventas' }),
-    ).toBeNull();
     expect(
       screen.queryByRole('link', { name: 'Sales' }),
     ).toBeNull();
@@ -240,6 +243,30 @@ describe('AuthenticatedAppLayout', () => {
     ).toBe('page');
   });
 
+  it('marks Sales active for the Sales route', () => {
+    navigationMock.pathname = '/sales';
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Ventas' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('marks Sales active for nested Sales routes', () => {
+    navigationMock.pathname = '/sales/sale-1';
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Ventas' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
   it('does not mark unrelated routes active', () => {
     navigationMock.pathname = '/products';
 
@@ -271,6 +298,7 @@ describe('AuthenticatedAppLayout', () => {
     ['/products', 'Productos'],
     ['/purchases', 'Compras'],
     ['/quotes', 'Cotizaciones'],
+    ['/sales', 'Ventas'],
   ])(
     'renders %s with the correct Header title',
     (pathname, title) => {
@@ -327,6 +355,23 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen.getByText(
         'Administra las órdenes de compra registradas.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('renders Sales under the authenticated shell', async () => {
+    navigationMock.pathname = '/sales';
+
+    renderInShell(<SalesPage />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/sales');
+    });
+
+    expect(screen.getByText('Zaping ERP')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Consulta y da seguimiento a las ventas registradas.',
       ),
     ).toBeTruthy();
   });
