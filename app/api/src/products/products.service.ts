@@ -53,6 +53,8 @@ export class ProductsService {
       );
     }
 
+    await this.validateCategory(companyId, dto.categoryId);
+
     return this.prisma.product.create({
       data: {
         companyId,
@@ -72,7 +74,7 @@ export class ProductsService {
     });
   }
 
-  async findOne(productId: string, companyId: string) {
+  async findOne(companyId: string, productId: string) {
     const product = await this.prisma.product.findFirst({
       where: {
         id: productId,
@@ -88,7 +90,7 @@ export class ProductsService {
   }
 
   async update(companyId: string, productId: string, dto: UpdateProductDto) {
-    await this.findOne(productId, companyId);
+    await this.findOne(companyId, productId);
 
     const existingProduct = await this.prisma.product.findFirst({
       where: {
@@ -119,6 +121,8 @@ export class ProductsService {
         throw new BadRequestException('Ese código de barras ya está en uso');
       }
     }
+
+    await this.validateCategory(companyId, dto.categoryId);
 
     return this.prisma.product.update({
       where: {
@@ -151,12 +155,35 @@ export class ProductsService {
   }
 
   async remove(companyId: string, productId: string) {
-    await this.findOne(productId, companyId);
+    await this.findOne(companyId, productId);
 
     return this.prisma.product.delete({
       where: {
         id: productId,
       },
     });
+  }
+
+  private async validateCategory(
+    companyId: string,
+    categoryId?: string | null,
+  ) {
+    if (categoryId === undefined || categoryId === null) {
+      return;
+    }
+
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        companyId,
+        isActive: true,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException(
+        'Categoría no encontrada, inactiva o fuera de la empresa',
+      );
+    }
   }
 }

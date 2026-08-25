@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Request,
@@ -29,16 +30,22 @@ export class ProductsController {
     return this.productsService.findAll(req.user.companyId);
   }
 
-  @Get(':id')
-  findOne(@Request() req: any, @Param('id') id: string) {
+  @Get('low-stock')
+  findLowStock(@Request() req: any) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.productsService.findOne(req.user.companyId, id);
+    return this.productsService.lowStock(req.user.companyId);
   }
 
   @Post()
   create(@Request() req: any, @Body() dto: CreateProductDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.productsService.create(req.user.companyId, dto);
+  }
+
+  @Get(':id')
+  findOne(@Request() req: any, @Param('id', ParseUUIDPipe) id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    return this.productsService.findOne(req.user.companyId, id);
   }
 
   @Patch(':id')
@@ -55,12 +62,5 @@ export class ProductsController {
   remove(@Request() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.productsService.remove(req.user.companyId, id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Get('low-stock')
-  findLowStock(@Request() req: any) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-    return this.productsService.lowStock(req.user.companyId);
   }
 }
