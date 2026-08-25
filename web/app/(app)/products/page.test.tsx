@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -572,25 +573,145 @@ describe('ProductsPage', () => {
     expect(screen.getByText('Stock actual')).toBeTruthy();
   });
 
-  it('preserva delete actual', async () => {
-    const user = await openEditProductModal();
+  it('presenta la desactivacion con copy no destructivo y contexto accesible', async () => {
+    const user = userEvent.setup();
 
-    await user.click(screen.getByLabelText('Cerrar modal'));
+    await renderProductsPage();
+    const productRow = screen.getByText('BLUNT TIP').closest('tr');
+    expect(productRow).toBeTruthy();
 
+    const deactivateButton = within(
+      productRow as HTMLTableRowElement,
+    ).getByRole('button', {
+      name: 'Desactivar producto LF1837',
+    });
+
+    expect(deactivateButton.textContent).toBe('Desactivar');
+    expect(deactivateButton.getAttribute('title')).toBe(
+      'Desactivar producto LF1837',
+    );
+    expect(screen.queryByText(/eliminar/i)).toBeNull();
+
+    await user.click(deactivateButton);
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'Desactivar producto',
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /dejará de estar disponible para nuevas operaciones, pero su historial se conservará/i,
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', {
+        name: /^desactivar$/i,
+      }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/eliminar/i)).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(
+      screen.queryByRole('combobox', {
+        name: /estado|activo|inactivo/i,
+      }),
+    ).toBeNull();
+  });
+
+  it('mantiene DELETE y recarga la lista hasta retirar el producto desactivado', async () => {
+    let productRequestCount = 0;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/products') {
+        productRequestCount += 1;
+
+        return {
+          data:
+            productRequestCount === 1
+              ? [bluntTipProduct, noBrandProduct]
+              : [noBrandProduct],
+        } as never;
+      }
+
+      if (endpoint === '/categories') {
+        return {
+          data: [surgicalCategory, inactiveCategory],
+        } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    const user = userEvent.setup();
+
+    await renderProductsPage();
     const productRow = screen.getByText('BLUNT TIP').closest('tr');
     expect(productRow).toBeTruthy();
 
     await user.click(
       within(productRow as HTMLTableRowElement).getByRole('button', {
-        name: /eliminar/i,
+        name: 'Desactivar producto LF1837',
       }),
     );
     await user.click(
-      screen.getAllByRole('button', {
-        name: /^eliminar$/i,
-      }).at(-1)!,
+      screen.getByRole('button', {
+        name: /^desactivar$/i,
+      }),
     );
 
     expect(api.delete).toHaveBeenCalledWith('/products/product-blunt-tip');
+    await waitFor(() => {
+      expect(screen.queryByText('BLUNT TIP')).toBeNull();
+    });
+    expect(screen.getByText('NB001')).toBeTruthy();
+    expect(productRequestCount).toBe(2);
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Desactivar producto',
+      }),
+    ).toBeNull();
+  });
+
+  it('conserva el producto y muestra el error cuando falla la desactivacion', async () => {
+    vi.mocked(api.delete).mockRejectedValue(
+      new Error('No fue posible desactivar el producto'),
+    );
+
+    const user = userEvent.setup();
+
+    await renderProductsPage();
+    const productRow = screen.getByText('BLUNT TIP').closest('tr');
+    expect(productRow).toBeTruthy();
+
+    await user.click(
+      within(productRow as HTMLTableRowElement).getByRole('button', {
+        name: 'Desactivar producto LF1837',
+      }),
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: /^desactivar$/i,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith(
+        'No fue posible desactivar el producto',
+      );
+    });
+    expect(api.delete).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(api.get).mock.calls.filter(
+        ([url]) => String(url) === '/products',
+      ),
+    ).toHaveLength(1);
+    expect(screen.getAllByText('BLUNT TIP').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('heading', {
+        name: 'Desactivar producto',
+      }),
+    ).toBeTruthy();
   });
 });

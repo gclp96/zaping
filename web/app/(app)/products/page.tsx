@@ -314,7 +314,7 @@ export default function ProductsPage() {
   }
 
   async function handleDeleteProduct() {
-    if (!selectedProduct) return;
+    if (!selectedProduct || deleteLoading) return;
 
     try {
       setDeleteLoading(true);
@@ -324,7 +324,7 @@ export default function ProductsPage() {
       await loadProducts();
     } catch (error: unknown) {
       console.error(error);
-      alert(getApiErrorMessage(error, 'Error al eliminar producto'));
+      alert(getApiErrorMessage(error, 'Error al desactivar producto'));
     } finally {
       setDeleteLoading(false);
     }
@@ -478,9 +478,11 @@ export default function ProductsPage() {
                     <Button
                       variant="danger"
                       size="sm"
+                      aria-label={`Desactivar producto ${product.sku}`}
+                      title={`Desactivar producto ${product.sku}`}
                       onClick={() => openDeleteModal(product)}
                     >
-                      Eliminar
+                      Desactivar
                     </Button>
                   </div>
                 ),
@@ -649,17 +651,19 @@ export default function ProductsPage() {
 
       <ConfirmDialog
         isOpen={deleteModalOpen}
-        title="Eliminar producto"
+        title="Desactivar producto"
         message={
           <>
-            ¿Seguro que deseas eliminar{' '}
             <span className="font-semibold">
               {selectedProduct?.name}
             </span>
-            ?
+            {' '}dejará de estar disponible para nuevas operaciones, pero su
+            historial se conservará.
           </>
         }
         loading={deleteLoading}
+        confirmText="Desactivar"
+        loadingText="Desactivando..."
         onClose={() => {
           setDeleteModalOpen(false);
           setSelectedProduct(null);
