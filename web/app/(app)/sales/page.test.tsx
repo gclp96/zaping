@@ -30,6 +30,7 @@ vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
+    patch: vi.fn(),
   },
 }));
 
@@ -182,10 +183,12 @@ function configureApiMocks({
     serializedProduct,
     requiredLotProduct,
   ],
+  saleDetails,
 }: {
   sales?: Sale[];
   customers?: SaleCustomer[];
   products?: SaleProduct[];
+  saleDetails?: Record<string, Sale>;
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
@@ -206,6 +209,18 @@ function configureApiMocks({
       return {
         data: products,
       } as never;
+    }
+
+    if (endpoint.startsWith('/sales/')) {
+      const saleId = endpoint.replace('/sales/', '');
+      const saleDetail =
+        saleDetails?.[saleId] ?? sales.find((sale) => sale.id === saleId);
+
+      if (saleDetail) {
+        return {
+          data: saleDetail,
+        } as never;
+      }
     }
 
     throw new Error(`Solicitud GET no configurada: ${endpoint}`);
@@ -241,7 +256,30 @@ async function selectFirstProduct(user: ReturnType<typeof userEvent.setup>) {
   );
 }
 
+async function openSaleDetail(
+  sale: Sale = baseSale,
+  sales: Sale[] = [sale],
+) {
+  const user = userEvent.setup();
+
+  configureApiMocks({ sales });
+
+  render(<SalesPage />);
+
+  await screen.findByText(sale.folio);
+  await user.click(
+    screen.getByRole('button', {
+      name: `Ver venta ${sale.folio}`,
+    }),
+  );
+
+  return user;
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+let createObjectUrlSpy: ReturnType<typeof vi.fn>;
+let revokeObjectUrlSpy: ReturnType<typeof vi.fn>;
+let anchorClickSpy: ReturnType<typeof vi.spyOn>;
 
 describe('SalesPage', () => {
   beforeEach(() => {
@@ -255,10 +293,29 @@ describe('SalesPage', () => {
     vi.mocked(api.post).mockResolvedValue({
       data: baseSale,
     } as never);
+    vi.mocked(api.patch).mockResolvedValue({
+      data: baseSale,
+    } as never);
+
+    createObjectUrlSpy = vi.fn(() => 'blob:sale-pdf');
+    revokeObjectUrlSpy = vi.fn();
+
+    Object.defineProperty(window, 'URL', {
+      configurable: true,
+      value: {
+        createObjectURL: createObjectUrlSpy,
+        revokeObjectURL: revokeObjectUrlSpy,
+      },
+    });
+
+    anchorClickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    anchorClickSpy.mockRestore();
     cleanup();
   });
 
@@ -437,9 +494,425 @@ describe('SalesPage', () => {
 
     expect(await screen.findByText('V-000001')).toBeTruthy();
     expect(screen.queryByText('Venta de ejemplo')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /ver venta v-000001/i }),
+    ).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^eliminar$/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^aprobar$/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^cancelar$/i })).toBeNull();
+  });
+
+  it('abre detalle con GET /sales/:id y muestra el estado de carga', async () => {
+    const user = userEvent.setup();
+    let resolveDetail!: () => void;
+
+    vi.mocked(api.get).mockImplementation((url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/sales') {
+        return Promise.resolve({ data: [baseSale] } as never);
+      }
+
+      if (endpoint === '/customers') {
+        return Promise.resolve({ data: [customer] } as never);
+      }
+
+      if (endpoint === '/products') {
+        return Promise.resolve({ data: [productQuantityNone] } as never);
+      }
+
+      if (endpoint === '/sales/sale-1') {
+        return new Promise((resolve) => {
+          resolveDetail = () => resolve({ data: baseSale } as never);
+        });
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    render(<SalesPage />);
+
+    await screen.findByText('V-000001');
+    await user.click(
+      screen.getByRole('button', { name: /ver venta v-000001/i }),
+    );
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-1');
+    expect(screen.getByText('Cargando detalle de venta...')).toBeTruthy();
+
+    resolveDetail();
+  });
+
+  it('muestra error de detalle y permite cerrar o reintentar', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/sales') {
+        return { data: [baseSale] } as never;
+      }
+
+      if (endpoint === '/customers') {
+        return { data: [customer] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [productQuantityNone] } as never;
+      }
+
+      if (endpoint === '/sales/sale-1') {
+        throw new Error('Detalle no disponible');
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    render(<SalesPage />);
+
+    await screen.findByText('V-000001');
+    await user.click(
+      screen.getByRole('button', { name: /ver venta v-000001/i }),
+    );
+
+    const alert = await screen.findByRole('alert');
+
+    expect(alert.textContent).toContain(
+      'No fue posible cargar el detalle de la venta.',
+    );
+
+    await user.click(
+      within(alert).getByRole('button', { name: /reintentar/i }),
+    );
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-1');
+  });
+
+  it('renderiza el detalle persistido de la venta', async () => {
+    await openSaleDetail(baseSale);
+
+    expect(await screen.findByRole('heading', { name: /detalle de venta/i }))
+      .toBeTruthy();
+    expect(screen.getAllByText('V-000001').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('Hospital de prueba').length).toBeGreaterThan(1);
+    expect(screen.getByText('MED-001')).toBeTruthy();
+    expect(screen.getByText('Producto médico')).toBeTruthy();
+    expect(screen.getByText('MED-002')).toBeTruthy();
+    expect(screen.getByText('Insumo médico')).toBeTruthy();
+    expect(screen.getAllByText('2').length).toBeGreaterThan(1);
+    expect(screen.getAllByText('$500.00').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$1,000.00').length).toBeGreaterThan(1);
+    expect(screen.getByText('$160.00')).toBeTruthy();
+    expect(screen.getAllByText('$1,160.00').length).toBeGreaterThan(1);
+    expect(
+      screen.getAllByLabelText('Estado de la venta: Borrador').length,
+    ).toBeGreaterThan(1);
+  });
+
+  it('muestra estados terminales y origen de cotización en detalle', async () => {
+    const quotedConfirmedSale: Sale = {
+      ...confirmedSale,
+      quoteId: 'quote-1',
+    };
+
+    await openSaleDetail(quotedConfirmedSale, [quotedConfirmedSale, cancelledSale]);
+
+    expect(
+      await screen.findAllByLabelText('Estado de la venta: Confirmada'),
+    ).toHaveLength(2);
+    expect(screen.getByText('Cotización')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^aprobar$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^cancelar$/i })).toBeNull();
+
+    cleanup();
+    consoleErrorSpy.mockRestore();
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+
+    await openSaleDetail(cancelledSale, [cancelledSale]);
+
+    expect(
+      await screen.findAllByLabelText('Estado de la venta: Cancelada'),
+    ).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /^aprobar$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^cancelar$/i })).toBeNull();
+  });
+
+  it('aprueba una venta DRAFT con confirmación, sin payload inventado, y refresca lista y detalle', async () => {
+    const user = userEvent.setup();
+    const approvedSale: Sale = {
+      ...baseSale,
+      status: 'CONFIRMED',
+    };
+    let currentSale = baseSale;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/sales') {
+        return { data: [currentSale] } as never;
+      }
+
+      if (endpoint === '/customers') {
+        return { data: [customer] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [productQuantityNone] } as never;
+      }
+
+      if (endpoint === '/sales/sale-1') {
+        return { data: currentSale } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    vi.mocked(api.patch).mockImplementation(async (url, body) => {
+      expect(url).toBe('/sales/sale-1/approve');
+      expect(body).toBeUndefined();
+
+      currentSale = approvedSale;
+      return { data: approvedSale } as never;
+    });
+
+    render(<SalesPage />);
+
+    await screen.findByText('V-000001');
+    await user.click(
+      screen.getByRole('button', { name: /ver venta v-000001/i }),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(
+      screen.getAllByRole('button', { name: /^aprobar$/i }).at(-1)!,
+    );
+
+    expect(screen.getByText(/se descontará el inventario/i)).toBeTruthy();
+
+    await user.click(
+      screen.getAllByRole('button', { name: /^aprobar$/i }).at(-1)!,
+    );
+
+    expect(api.patch).toHaveBeenCalledWith('/sales/sale-1/approve');
+    expect(
+      await screen.findAllByLabelText('Estado de la venta: Confirmada'),
+    ).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /^aprobar$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^cancelar$/i })).toBeNull();
+    expect(api.get).toHaveBeenCalledWith('/sales');
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-1');
+  });
+
+  it('muestra error al aprobar y mantiene el detalle abierto', async () => {
+    const user = await openSaleDetail(baseSale);
+
+    vi.mocked(api.patch).mockRejectedValue(
+      new Error('Stock insuficiente'),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /^aprobar$/i }));
+    await user.click(
+      screen.getAllByRole('button', { name: /^aprobar$/i }).at(-1)!,
+    );
+
+    expect(await screen.findByText('No fue posible aprobar la venta.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /detalle de venta/i })).toBeTruthy();
+  });
+
+  it('evita doble aprobación mientras la solicitud está pendiente', async () => {
+    const user = await openSaleDetail(baseSale);
+    let resolveApprove!: () => void;
+
+    vi.mocked(api.patch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveApprove = () => resolve({ data: confirmedSale } as never);
+        }),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /^aprobar$/i }));
+
+    const confirmButton = screen
+      .getAllByRole('button', { name: /^aprobar$/i })
+      .at(-1)!;
+    await user.dblClick(confirmButton);
+
+    expect(api.patch).toHaveBeenCalledTimes(1);
+    expect(
+      (screen.getByRole('button', {
+        name: /aprobando/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveApprove();
+  });
+
+  it('cancela una venta DRAFT con confirmación, sin razón, y refresca lista y detalle', async () => {
+    const user = userEvent.setup();
+    const cancelledDetail: Sale = {
+      ...baseSale,
+      status: 'CANCELLED',
+    };
+    let currentSale = baseSale;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/sales') {
+        return { data: [currentSale] } as never;
+      }
+
+      if (endpoint === '/customers') {
+        return { data: [customer] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [productQuantityNone] } as never;
+      }
+
+      if (endpoint === '/sales/sale-1') {
+        return { data: currentSale } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    vi.mocked(api.patch).mockImplementation(async (url, body) => {
+      expect(url).toBe('/sales/sale-1/cancel');
+      expect(body).toBeUndefined();
+
+      currentSale = cancelledDetail;
+      return { data: cancelledDetail } as never;
+    });
+
+    render(<SalesPage />);
+
+    await screen.findByText('V-000001');
+    await user.click(
+      screen.getByRole('button', { name: /ver venta v-000001/i }),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }));
+
+    expect(
+      screen.getByText(/esta venta en borrador será cancelada/i),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole('button', { name: /cancelar venta/i }),
+    );
+
+    expect(api.patch).toHaveBeenCalledWith('/sales/sale-1/cancel');
+    expect(
+      await screen.findAllByLabelText('Estado de la venta: Cancelada'),
+    ).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /^aprobar$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^cancelar$/i })).toBeNull();
+    expect(api.get).toHaveBeenCalledWith('/sales');
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-1');
+  });
+
+  it('muestra error al cancelar y mantiene el detalle abierto', async () => {
+    const user = await openSaleDetail(baseSale);
+
+    vi.mocked(api.patch).mockRejectedValue(
+      new Error('Estado inválido'),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }));
+    await user.click(screen.getByRole('button', { name: /cancelar venta/i }));
+
+    expect(await screen.findByText('No fue posible cancelar la venta.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /detalle de venta/i })).toBeTruthy();
+  });
+
+  it('evita doble cancelación mientras la solicitud está pendiente', async () => {
+    const user = await openSaleDetail(baseSale);
+    let resolveCancel!: () => void;
+
+    vi.mocked(api.patch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCancel = () => resolve({ data: cancelledSale } as never);
+        }),
+    );
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /^cancelar$/i }));
+
+    const confirmButton = screen.getByRole('button', {
+      name: /cancelar venta/i,
+    });
+    await user.dblClick(confirmButton);
+
+    expect(api.patch).toHaveBeenCalledTimes(1);
+    expect(
+      (screen.getByRole('button', {
+        name: /cancelando/i,
+      }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    resolveCancel();
+  });
+
+  it('descarga PDF como blob y muestra errores sin cerrar el detalle', async () => {
+    const user = await openSaleDetail(baseSale);
+    const pdfBlob = new Blob(['PDF'], {
+      type: 'application/pdf',
+    });
+
+    vi.mocked(api.get).mockImplementation(async (url, config) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/sales/sale-1/pdf') {
+        expect(config).toEqual({
+          responseType: 'blob',
+        });
+
+        return { data: pdfBlob } as never;
+      }
+
+      if (endpoint === '/sales/sale-1') {
+        return { data: baseSale } as never;
+      }
+
+      if (endpoint === '/sales') {
+        return { data: [baseSale] } as never;
+      }
+
+      if (endpoint === '/customers') {
+        return { data: [customer] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [productQuantityNone] } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    await screen.findByRole('heading', { name: /detalle de venta/i });
+    await user.click(screen.getByRole('button', { name: /descargar pdf/i }));
+
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-1/pdf', {
+      responseType: 'blob',
+    });
+    expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfBlob);
+    expect(anchorClickSpy).toHaveBeenCalled();
+    expect(revokeObjectUrlSpy).toHaveBeenCalledWith('blob:sale-pdf');
+
+    vi.mocked(api.get).mockRejectedValue(new Error('PDF falló'));
+
+    await user.click(screen.getByRole('button', { name: /descargar pdf/i }));
+
+    expect(await screen.findByText('No fue posible descargar el PDF.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: /detalle de venta/i })).toBeTruthy();
   });
 
   it('renderiza Nueva venta y abre el modal', async () => {

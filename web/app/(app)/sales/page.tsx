@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import EmptyState from '@/app/components/ui/EmptyState';
 import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
@@ -14,7 +15,10 @@ import Section from '@/app/components/ui/layout/Section';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
+import SaleDetailModal from './components/SaleDetailModal';
 import SaleFormModal from './components/SaleFormModal';
+import { useSaleActions } from './hooks/useSaleActions';
+import { useSaleDetail } from './hooks/useSaleDetail';
 import { useSaleForm } from './hooks/useSaleForm';
 import { getCompatibleSalesProducts } from './sale-form.utils';
 import { getSaleStatusDescriptor } from './sale-status';
@@ -147,6 +151,41 @@ export default function SalesPage() {
   }, []);
 
   const {
+    saleIdToView,
+    saleToView,
+    detailLoading,
+    detailError,
+    openSaleDetail,
+    closeSaleDetail,
+    loadSaleDetail,
+    retrySaleDetail,
+  } = useSaleDetail();
+
+  const {
+    saleToApprove,
+    saleToCancel,
+    approving,
+    cancelling,
+    downloadingSaleId,
+    actionError,
+    clearActionError,
+    openApproveDialog,
+    closeApproveDialog,
+    openCancelDialog,
+    closeCancelDialog,
+    handleApproveSale,
+    handleCancelSale,
+    handleDownloadPdf,
+  } = useSaleActions({
+    onSaleChanged: async (saleId: string) => {
+      await Promise.all([
+        loadSales(),
+        loadSaleDetail(saleId),
+      ]);
+    },
+  });
+
+  const {
     openModal,
     saving,
     customerId,
@@ -200,6 +239,20 @@ export default function SalesPage() {
           tone={statusDescriptor.tone}
           ariaLabel={`Estado de la venta: ${statusDescriptor.label}`}
         />
+      ),
+      actions: (
+        <Button
+          variant="secondary"
+          size="sm"
+          className="min-w-20"
+          aria-label={`Ver venta ${sale.folio}`}
+          onClick={() => {
+            clearActionError();
+            void openSaleDetail(sale);
+          }}
+        >
+          Ver
+        </Button>
       ),
     };
   });
@@ -289,6 +342,7 @@ export default function SalesPage() {
                   'Partidas',
                   'Total',
                   'Estado',
+                  'Acciones',
                 ]}
                 data={tableData}
               />
@@ -322,6 +376,69 @@ export default function SalesPage() {
         onAddProduct={handleAddProduct}
         onItemQuantityChange={handleItemQuantityChange}
         onRemoveItem={handleRemoveItem}
+      />
+
+      <SaleDetailModal
+        isOpen={saleIdToView !== null}
+        sale={saleToView}
+        loading={detailLoading}
+        error={detailError}
+        actionError={actionError}
+        downloading={
+          saleToView !== null &&
+          downloadingSaleId === saleToView.id
+        }
+        actionInProgress={approving || cancelling}
+        formatDate={formatDate}
+        formatMoney={formatMoney}
+        onClose={closeSaleDetail}
+        onRetry={retrySaleDetail}
+        onApprove={openApproveDialog}
+        onCancel={openCancelDialog}
+        onDownload={(sale) => {
+          void handleDownloadPdf(sale);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={saleToApprove !== null}
+        title="Aprobar venta"
+        message={
+          <>
+            ¿Seguro que deseas aprobar la venta{' '}
+            <span className="font-semibold">
+              {saleToApprove?.folio}
+            </span>
+            ? Al aprobar la venta se descontará el inventario correspondiente.
+            Esta es una acción operativa.
+          </>
+        }
+        confirmText="Aprobar"
+        loadingText="Aprobando..."
+        confirmVariant="success"
+        loading={approving}
+        onClose={closeApproveDialog}
+        onConfirm={() => void handleApproveSale()}
+      />
+
+      <ConfirmDialog
+        isOpen={saleToCancel !== null}
+        title="Cancelar venta"
+        message={
+          <>
+            ¿Seguro que deseas cancelar la venta{' '}
+            <span className="font-semibold">
+              {saleToCancel?.folio}
+            </span>
+            ? Esta venta en borrador será cancelada.
+          </>
+        }
+        confirmText="Cancelar venta"
+        loadingText="Cancelando..."
+        confirmVariant="danger"
+        loading={cancelling}
+        onClose={closeCancelDialog}
+        onConfirm={() => void handleCancelSale()}
       />
     </>
   );
