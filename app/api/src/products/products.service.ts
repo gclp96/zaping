@@ -16,6 +16,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
       },
 
       orderBy: {
@@ -66,7 +67,6 @@ export class ProductsService {
         barcode: dto.barcode,
         cost: dto.cost,
         price: dto.price,
-        stock: dto.stock,
         minStock: dto.minStock,
         inventoryTracking: dto.inventoryTracking,
         lotTracking: dto.lotTracking,
@@ -137,7 +137,6 @@ export class ProductsService {
         barcode: dto.barcode || null,
         cost: dto.cost,
         price: dto.price,
-        stock: dto.stock,
         minStock: dto.minStock,
       },
     });
@@ -147,6 +146,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
         stock: {
           lte: this.prisma.product.fields.minStock,
         },
@@ -157,11 +157,18 @@ export class ProductsService {
   async remove(companyId: string, productId: string) {
     await this.findOne(companyId, productId);
 
-    return this.prisma.product.delete({
+    await this.prisma.product.updateMany({
       where: {
         id: productId,
+        companyId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
       },
     });
+
+    return this.findOne(companyId, productId);
   }
 
   private async validateCategory(

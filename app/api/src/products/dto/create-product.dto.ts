@@ -57,11 +57,6 @@ export class CreateProductDto {
   @Min(0)
   minStock!: number;
 
-  @Type(() => Number)
-  @IsNumber()
-  @IsOptional()
-  stock?: number;
-
   @IsEnum(ProductInventoryTracking)
   @IsOptional()
   inventoryTracking?: ProductInventoryTracking;

@@ -29,6 +29,7 @@ function productMock(
     price: number;
     stock: number;
     minStock: number;
+    isActive: boolean;
     inventoryTracking: ProductInventoryTracking;
     lotTracking: ProductLotTracking;
   }> = {},
@@ -45,6 +46,7 @@ function productMock(
     price: 150,
     stock: 0,
     minStock: 1,
+    isActive: true,
     inventoryTracking: ProductInventoryTracking.QUANTITY,
     lotTracking: ProductLotTracking.OPTIONAL,
     ...overrides,
@@ -70,6 +72,7 @@ const prismaMock = {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
     delete: jest.fn(),
     fields: {
       minStock: 'minStock',
@@ -79,6 +82,17 @@ const prismaMock = {
     findFirst: jest.fn(),
   },
 };
+
+function getProductCreateData(callIndex = 0): Record<string, unknown> {
+  const mock = prismaMock.product.create;
+  const [createArgs] = mock.mock.calls[callIndex] as [
+    {
+      data: Record<string, unknown>;
+    },
+  ];
+
+  return createArgs.data;
+}
 
 describe('ProductsService', () => {
   let service: ProductsService;
@@ -106,6 +120,9 @@ describe('ProductsService', () => {
           ...data,
         }),
     );
+    prismaMock.product.updateMany.mockResolvedValue({
+      count: 1,
+    });
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -122,6 +139,38 @@ describe('ProductsService', () => {
 
   it('debe estar definido', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('findAll', () => {
+    it('lista solo productos activos de la empresa autenticada', async () => {
+      await service.findAll(companyId);
+
+      expect(prismaMock.product.findMany).toHaveBeenCalledWith({
+        where: {
+          companyId,
+          isActive: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+    });
+  });
+
+  describe('lowStock', () => {
+    it('consulta solo productos activos de bajo stock de la empresa', async () => {
+      await service.lowStock(companyId);
+
+      expect(prismaMock.product.findMany).toHaveBeenCalledWith({
+        where: {
+          companyId,
+          isActive: true,
+          stock: {
+            lte: prismaMock.product.fields.minStock,
+          },
+        },
+      });
+    });
   });
 
   describe('findOne', () => {
@@ -187,6 +236,46 @@ describe('ProductsService', () => {
         data: expect.objectContaining({
           companyId,
           categoryId,
+        }),
+      });
+    });
+
+    it('no envia stock arbitrario a Prisma al crear producto', async () => {
+      const dtoWithStock = {
+        ...createDto(),
+        stock: 100,
+      } as CreateProductDto & { stock: number };
+
+      await service.create(companyId, dtoWithStock);
+
+      expect(getProductCreateData()).not.toHaveProperty('stock');
+    });
+
+    it('crea productos dejando que Prisma aplique stock 0 por defecto', async () => {
+      prismaMock.product.create.mockResolvedValueOnce(productMock());
+
+      const result = await service.create(companyId, createDto());
+
+      expect(getProductCreateData()).not.toHaveProperty('stock');
+      expect(result.stock).toBe(0);
+    });
+
+    it('preserva minStock, inventoryTracking y lotTracking en create', async () => {
+      await service.create(
+        companyId,
+        createDto({
+          minStock: 4,
+          inventoryTracking: ProductInventoryTracking.ASSET,
+          lotTracking: ProductLotTracking.REQUIRED,
+        }),
+      );
+
+      expect(prismaMock.product.create).toHaveBeenCalledWith({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        data: expect.objectContaining({
+          minStock: 4,
+          inventoryTracking: ProductInventoryTracking.ASSET,
+          lotTracking: ProductLotTracking.REQUIRED,
         }),
       });
     });
@@ -376,13 +465,36 @@ describe('ProductsService', () => {
         }),
       });
     });
+
+    it('no permite actualizar stock por PATCH', async () => {
+      await service.update(companyId, productId, {
+        stock: 50,
+      } as unknown as UpdateProductDto);
+
+      expect(prismaMock.product.update).toHaveBeenCalledWith({
+        where: {
+          id: productId,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        data: expect.not.objectContaining({
+          stock: 50,
+        }),
+      });
+    });
   });
 
   describe('remove', () => {
-    it('verifica tenant antes de borrar y conserva el delete fisico actual', async () => {
-      prismaMock.product.findFirst.mockResolvedValue(productMock());
+    it('desactiva un producto activo sin borrarlo fisicamente', async () => {
+      const activeProduct = productMock();
+      const inactiveProduct = productMock({
+        isActive: false,
+      });
 
-      await service.remove(companyId, productId);
+      prismaMock.product.findFirst
+        .mockResolvedValueOnce(activeProduct)
+        .mockResolvedValueOnce(inactiveProduct);
+
+      const result = await service.remove(companyId, productId);
 
       expect(prismaMock.product.findFirst).toHaveBeenCalledWith({
         where: {
@@ -390,11 +502,70 @@ describe('ProductsService', () => {
           companyId,
         },
       });
-      expect(prismaMock.product.delete).toHaveBeenCalledWith({
+
+      expect(prismaMock.product.updateMany).toHaveBeenCalledWith({
         where: {
           id: productId,
+          companyId,
+          isActive: true,
+        },
+        data: {
+          isActive: false,
         },
       });
+      expect(prismaMock.product.delete).not.toHaveBeenCalled();
+      expect(result).toEqual(inactiveProduct);
+      expect(result.id).toBe(productId);
+    });
+
+    it('no desactiva productos inexistentes o de otra empresa', async () => {
+      prismaMock.product.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove(companyId, productId)).rejects.toThrow(
+        new NotFoundException('Producto no encontrado'),
+      );
+
+      expect(prismaMock.product.updateMany).not.toHaveBeenCalled();
+      expect(prismaMock.product.delete).not.toHaveBeenCalled();
+    });
+
+    it('permite repetir DELETE sobre un producto ya inactivo sin borrarlo', async () => {
+      const inactiveProduct = productMock({
+        isActive: false,
+      });
+
+      prismaMock.product.findFirst
+        .mockResolvedValueOnce(inactiveProduct)
+        .mockResolvedValueOnce(inactiveProduct);
+      prismaMock.product.updateMany.mockResolvedValueOnce({
+        count: 0,
+      });
+
+      const result = await service.remove(companyId, productId);
+
+      expect(prismaMock.product.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: productId,
+          companyId,
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+        },
+      });
+      expect(prismaMock.product.delete).not.toHaveBeenCalled();
+      expect(result).toEqual(inactiveProduct);
+    });
+
+    it('no elimina relaciones historicas al desactivar', async () => {
+      prismaMock.product.findFirst
+        .mockResolvedValueOnce(productMock())
+        .mockResolvedValueOnce(productMock({ isActive: false }));
+
+      await service.remove(companyId, productId);
+
+      expect(prismaMock.product.updateMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.product.delete).not.toHaveBeenCalled();
     });
   });
 });
