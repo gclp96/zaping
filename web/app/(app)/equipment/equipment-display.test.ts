@@ -8,9 +8,10 @@ import {
   getEquipmentConditionDescriptor,
   getEquipmentLifecycleDescriptor,
   getEquipmentOriginLabel,
+  isEquipmentProductEligible,
 } from './equipment-display';
 
-import type { EquipmentAsset } from './types';
+import type { EquipmentAsset, EquipmentProduct } from './types';
 
 const equipment = {
   assetCode: 'EQ-000001',
@@ -107,4 +108,21 @@ describe('equipment display helpers', () => {
       'Fecha no disponible',
     );
   });
+
+  it.each([
+    ['ASSET', true, true],
+    ['ASSET', false, false],
+    ['QUANTITY', true, false],
+    ['SERIALIZED', true, false],
+  ] as const)(
+    'evalúa elegibilidad %s activo=%s',
+    (inventoryTracking, isActive, expected) => {
+      expect(
+        isEquipmentProductEligible({
+          inventoryTracking,
+          isActive,
+        } as EquipmentProduct),
+      ).toBe(expected);
+    },
+  );
 });

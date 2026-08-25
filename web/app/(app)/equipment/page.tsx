@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -15,6 +16,7 @@ import Section from '@/app/components/ui/layout/Section';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
+import EquipmentCreateModal from './components/EquipmentCreateModal';
 import EquipmentDetailModal from './components/EquipmentDetailModal';
 import EquipmentInspectionModal from './components/EquipmentInspectionModal';
 import {
@@ -22,6 +24,7 @@ import {
   getEquipmentConditionDescriptor,
   getEquipmentLifecycleDescriptor,
   getEquipmentOriginLabel,
+  isEquipmentProductEligible,
 } from './equipment-display';
 
 import type {
@@ -33,6 +36,8 @@ import type {
   EquipmentInspectionResult,
   EquipmentLifecycle,
   EquipmentOrigin,
+  EquipmentProduct,
+  CreateEquipmentPayload,
   CreateEquipmentInspectionPayload,
 } from './types';
 
@@ -89,6 +94,17 @@ export default function EquipmentPage() {
   const [inspectionSaving, setInspectionSaving] = useState(false);
   const [inspectionError, setInspectionError] = useState('');
   const inspectionSubmissionInFlight = useRef(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createProducts, setCreateProducts] = useState<EquipmentProduct[]>([]);
+  const [createProductsLoading, setCreateProductsLoading] = useState(false);
+  const [createProductsError, setCreateProductsError] = useState('');
+  const [createProductId, setCreateProductId] = useState('');
+  const [createCondition, setCreateCondition] =
+    useState<'' | EquipmentCondition>('');
+  const [createSerialNumber, setCreateSerialNumber] = useState('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const createSubmissionInFlight = useRef(false);
 
   const filteredEquipment = useMemo(() => {
     return equipment.filter((item) => {
@@ -208,6 +224,30 @@ export default function EquipmentPage() {
     }
   }
 
+  async function loadCreateProducts() {
+    try {
+      setCreateProductsLoading(true);
+      setCreateProductsError('');
+      setCreateProducts([]);
+
+      const response = await api.get<EquipmentProduct[]>('/products');
+
+      setCreateProducts(
+        response.data.filter(isEquipmentProductEligible),
+      );
+    } catch (error: unknown) {
+      console.error(error);
+      setCreateProductsError(
+        getApiErrorMessage(
+          error,
+          'No fue posible cargar los productos para equipo.',
+        ),
+      );
+    } finally {
+      setCreateProductsLoading(false);
+    }
+  }
+
   function openEquipmentDetail(item: EquipmentAsset) {
     setSelectedEquipment(item);
     void Promise.all([
@@ -322,6 +362,75 @@ export default function EquipmentPage() {
     }
   }
 
+  function resetCreateForm() {
+    setCreateProductId('');
+    setCreateCondition('');
+    setCreateSerialNumber('');
+    setCreateError('');
+  }
+
+  function openCreateModal() {
+    resetCreateForm();
+    setCreateModalOpen(true);
+    void loadCreateProducts();
+  }
+
+  function closeCreateModal() {
+    if (createSubmissionInFlight.current) {
+      return;
+    }
+
+    setCreateModalOpen(false);
+    setCreateProducts([]);
+    setCreateProductsError('');
+    setCreateProductsLoading(false);
+    resetCreateForm();
+  }
+
+  async function submitEquipment() {
+    if (
+      !createProductId ||
+      !createCondition ||
+      createSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    createSubmissionInFlight.current = true;
+    setCreateSaving(true);
+    setCreateError('');
+
+    const normalizedSerialNumber = createSerialNumber.trim();
+    const payload: CreateEquipmentPayload = {
+      productId: createProductId,
+      condition: createCondition,
+      ...(normalizedSerialNumber
+        ? { serialNumber: normalizedSerialNumber }
+        : {}),
+    };
+
+    try {
+      await api.post('/equipment', payload);
+
+      setCreateModalOpen(false);
+      setCreateProducts([]);
+      resetCreateForm();
+
+      await loadEquipment(false);
+    } catch (error: unknown) {
+      console.error(error);
+      setCreateError(
+        getApiErrorMessage(
+          error,
+          'No fue posible registrar el equipo.',
+        ),
+      );
+    } finally {
+      createSubmissionInFlight.current = false;
+      setCreateSaving(false);
+    }
+  }
+
   function clearFilters() {
     setSearch('');
     setLifecycleFilter('');
@@ -340,6 +449,12 @@ export default function EquipmentPage() {
         <PageHeader
           title="Equipos"
           description="Consulta las unidades físicas identificables del catálogo."
+          action={
+            <Button type="button" onClick={openCreateModal}>
+              <Plus aria-hidden="true" size={18} />
+              Nuevo equipo
+            </Button>
+          }
         />
 
         {pageLoading ? (
@@ -492,6 +607,24 @@ export default function EquipmentPage() {
           </Section>
         )}
       </PageContainer>
+
+      <EquipmentCreateModal
+        isOpen={createModalOpen}
+        products={createProducts}
+        productsLoading={createProductsLoading}
+        productsError={createProductsError}
+        productId={createProductId}
+        condition={createCondition}
+        serialNumber={createSerialNumber}
+        saving={createSaving}
+        error={createError}
+        onProductIdChange={setCreateProductId}
+        onConditionChange={setCreateCondition}
+        onSerialNumberChange={setCreateSerialNumber}
+        onRetryProducts={() => void loadCreateProducts()}
+        onClose={closeCreateModal}
+        onSubmit={() => void submitEquipment()}
+      />
 
       <EquipmentDetailModal
         isOpen={Boolean(selectedEquipment)}

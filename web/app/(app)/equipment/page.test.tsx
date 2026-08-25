@@ -221,13 +221,17 @@ function configureApiMocks({
   details = equipmentDetails,
   availability = equipmentAvailability,
   inspections = equipmentInspections,
+  products = [buildProduct()],
   listError,
+  productsError,
 }: {
   list?: EquipmentAsset[];
   details?: Record<string, EquipmentAssetDetail>;
   availability?: Record<string, EquipmentAvailability>;
   inspections?: Record<string, EquipmentInspection[]>;
+  products?: EquipmentProduct[];
   listError?: Error;
+  productsError?: Error;
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
@@ -238,6 +242,14 @@ function configureApiMocks({
       }
 
       return { data: list } as never;
+    }
+
+    if (endpoint === '/products') {
+      if (productsError) {
+        throw productsError;
+      }
+
+      return { data: products } as never;
     }
 
     const availabilityMatch = endpoint.match(
@@ -285,6 +297,18 @@ async function renderEquipmentPage() {
   await screen.findByText('EQ-000001');
 }
 
+async function openCreateEquipmentModal() {
+  const user = userEvent.setup();
+
+  await renderEquipmentPage();
+  await user.click(screen.getByRole('button', { name: 'Nuevo equipo' }));
+
+  return {
+    user,
+    form: await screen.findByRole('form', { name: 'Nuevo equipo' }),
+  };
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('EquipmentPage', () => {
@@ -328,8 +352,417 @@ describe('EquipmentPage', () => {
         name: 'Ver equipo EQ-000001',
       }),
     ).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /crear/i })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Nuevo equipo' }),
+    ).toBeTruthy();
     expect(screen.queryByRole('button', { name: /retirar/i })).toBeNull();
+  });
+
+  it('abre, cancela y reinicia el formulario de nuevo equipo', async () => {
+    const { user, form } = await openCreateEquipmentModal();
+    const productSelect = within(form).getByRole('combobox', {
+      name: /Producto/,
+    });
+    const conditionSelect = within(form).getByRole('combobox', {
+      name: /Condición inicial/,
+    });
+    const serialInput = within(form).getByRole('textbox', {
+      name: 'Número de serie (opcional)',
+    });
+
+    expect(api.get).toHaveBeenCalledWith('/products');
+    expect(
+      within(productSelect).getByRole('option', {
+        name: 'EQUIPO DE PRUEBA · EQP-001',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(conditionSelect)
+        .getAllByRole('option')
+        .map((option) => (option as HTMLOptionElement).value),
+    ).toEqual([
+      '',
+      'GOOD',
+      'INSPECTION_PENDING',
+      'DAMAGED',
+      'OUT_OF_SERVICE',
+    ]);
+
+    await user.selectOptions(productSelect, 'product-equipment');
+    await user.selectOptions(conditionSelect, 'GOOD');
+    await user.type(serialInput, 'SERIE-TEMPORAL');
+    await user.click(within(form).getByRole('button', { name: 'Cancelar' }));
+
+    expect(
+      screen.queryByRole('form', { name: 'Nuevo equipo' }),
+    ).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo equipo' }));
+    const reopenedForm = await screen.findByRole('form', {
+      name: 'Nuevo equipo',
+    });
+
+    expect(
+      (
+        within(reopenedForm).getByRole('combobox', { name: /Producto/ }) as
+          HTMLSelectElement
+      ).value,
+    ).toBe('');
+    expect(
+      (
+        within(reopenedForm).getByRole('combobox', {
+          name: /Condición inicial/,
+        }) as HTMLSelectElement
+      ).value,
+    ).toBe('');
+    expect(
+      (
+        within(reopenedForm).getByRole('textbox', {
+          name: 'Número de serie (opcional)',
+        }) as HTMLInputElement
+      ).value,
+    ).toBe('');
+  });
+
+  it('ofrece únicamente productos activos con seguimiento ASSET', async () => {
+    const products = [
+      buildProduct({
+        id: 'product-quantity',
+        name: 'PRODUCTO POR CANTIDAD',
+        sku: 'QTY-001',
+        inventoryTracking: 'QUANTITY',
+      }),
+      buildProduct({
+        id: 'product-asset',
+        name: 'EQUIPO ELEGIBLE',
+        sku: 'AST-001',
+        inventoryTracking: 'ASSET',
+      }),
+      buildProduct({
+        id: 'product-inactive-asset',
+        name: 'EQUIPO INACTIVO',
+        sku: 'AST-002',
+        inventoryTracking: 'ASSET',
+        isActive: false,
+      }),
+      buildProduct({
+        id: 'product-serialized',
+        name: 'PRODUCTO SERIALIZADO',
+        sku: 'SER-001',
+        inventoryTracking: 'SERIALIZED',
+      }),
+    ];
+
+    configureApiMocks({ products });
+    const { form } = await openCreateEquipmentModal();
+    const productSelect = within(form).getByRole('combobox', {
+      name: /Producto/,
+    });
+
+    expect(
+      within(productSelect).getByRole('option', {
+        name: 'EQUIPO ELEGIBLE · AST-001',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(productSelect).queryByRole('option', {
+        name: /PRODUCTO POR CANTIDAD/,
+      }),
+    ).toBeNull();
+    expect(
+      within(productSelect).queryByRole('option', {
+        name: /EQUIPO INACTIVO/,
+      }),
+    ).toBeNull();
+    expect(
+      within(productSelect).queryByRole('option', {
+        name: /PRODUCTO SERIALIZADO/,
+      }),
+    ).toBeNull();
+  });
+
+  it('distingue la ausencia de productos elegibles de un error de API', async () => {
+    configureApiMocks({
+      products: [
+        buildProduct({ inventoryTracking: 'QUANTITY' }),
+        buildProduct({
+          id: 'serialized-product',
+          inventoryTracking: 'SERIALIZED',
+        }),
+      ],
+    });
+    const { form } = await openCreateEquipmentModal();
+
+    expect(
+      within(form).getByText(
+        'No hay productos de tipo equipo disponibles para registrar.',
+      ),
+    ).toBeTruthy();
+    expect(
+      (
+        within(form).getByRole('button', { name: 'Registrar equipo' }) as
+          HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(within(form).queryByRole('alert')).toBeNull();
+  });
+
+  it('muestra y reintenta el error de carga de productos sin bloquear la lista', async () => {
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+    let productAttempts = 0;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/products') {
+        productAttempts += 1;
+
+        if (productAttempts === 1) {
+          throw new Error('Productos para equipo no disponibles');
+        }
+
+        return { data: [buildProduct()] } as never;
+      }
+
+      return await defaultGet!(url);
+    });
+
+    const { user, form } = await openCreateEquipmentModal();
+
+    expect(
+      await within(form).findByText('Productos para equipo no disponibles'),
+    ).toBeTruthy();
+    expect(
+      within(form).queryByText(
+        'No hay productos de tipo equipo disponibles para registrar.',
+      ),
+    ).toBeNull();
+    expect(screen.getAllByText('EQ-000001').length).toBeGreaterThan(0);
+
+    await user.click(
+      within(form).getByRole('button', { name: 'Reintentar productos' }),
+    );
+
+    expect(
+      await within(form).findByRole('option', {
+        name: 'EQUIPO DE PRUEBA · EQP-001',
+      }),
+    ).toBeTruthy();
+    expect(productAttempts).toBe(2);
+  });
+
+  it('envía el DTO exacto, normaliza serie y omite la serie vacía', async () => {
+    const { user, form } = await openCreateEquipmentModal();
+    const productSelect = within(form).getByRole('combobox', {
+      name: /Producto/,
+    });
+    const conditionSelect = within(form).getByRole('combobox', {
+      name: /Condición inicial/,
+    });
+    const serialInput = within(form).getByRole('textbox', {
+      name: 'Número de serie (opcional)',
+    });
+
+    await user.selectOptions(productSelect, 'product-equipment');
+    await user.selectOptions(conditionSelect, 'INSPECTION_PENDING');
+    await user.type(serialInput, '  QA-G1-001  ');
+    await user.click(
+      within(form).getByRole('button', { name: 'Registrar equipo' }),
+    );
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/equipment', {
+        productId: 'product-equipment',
+        condition: 'INSPECTION_PENDING',
+        serialNumber: 'QA-G1-001',
+      });
+    });
+
+    const firstPayload = vi.mocked(api.post).mock.calls[0][1] as Record<
+      string,
+      unknown
+    >;
+
+    for (const serverField of [
+      'companyId',
+      'assetCode',
+      'serialNumberKey',
+      'lifecycle',
+      'origin',
+      'batchId',
+      'purchaseReceiptItemId',
+      'createdAt',
+      'updatedAt',
+    ]) {
+      expect(firstPayload).not.toHaveProperty(serverField);
+    }
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('form', { name: 'Nuevo equipo' }),
+      ).toBeNull();
+    });
+    await user.click(screen.getByRole('button', { name: 'Nuevo equipo' }));
+    const reopenedForm = await screen.findByRole('form', {
+      name: 'Nuevo equipo',
+    });
+    await user.selectOptions(
+      within(reopenedForm).getByRole('combobox', { name: /Producto/ }),
+      'product-equipment',
+    );
+    await user.selectOptions(
+      within(reopenedForm).getByRole('combobox', {
+        name: /Condición inicial/,
+      }),
+      'GOOD',
+    );
+    await user.type(
+      within(reopenedForm).getByRole('textbox', {
+        name: 'Número de serie (opcional)',
+      }),
+      '   ',
+    );
+    await user.click(
+      within(reopenedForm).getByRole('button', {
+        name: 'Registrar equipo',
+      }),
+    );
+
+    await waitFor(() => expect(api.post).toHaveBeenCalledTimes(2));
+    expect(api.post).toHaveBeenNthCalledWith(2, '/equipment', {
+      productId: 'product-equipment',
+      condition: 'GOOD',
+    });
+  });
+
+  it('evita doble envío y conserva valores ante un serial duplicado', async () => {
+    let rejectCreate: (reason: Error) => void = () => undefined;
+
+    vi.mocked(api.post).mockImplementation(
+      async () =>
+        await new Promise((_, reject) => {
+          rejectCreate = reject;
+        }),
+    );
+
+    const { user, form } = await openCreateEquipmentModal();
+    const productSelect = within(form).getByRole('combobox', {
+      name: /Producto/,
+    });
+    const conditionSelect = within(form).getByRole('combobox', {
+      name: /Condición inicial/,
+    });
+    const serialInput = within(form).getByRole('textbox', {
+      name: 'Número de serie (opcional)',
+    });
+
+    await user.selectOptions(productSelect, 'product-equipment');
+    await user.selectOptions(conditionSelect, 'GOOD');
+    await user.type(serialInput, 'DUPLICADA-001');
+
+    const submit = within(form).getByRole('button', {
+      name: 'Registrar equipo',
+    });
+    await user.click(submit);
+    await user.click(submit);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(api.get).mock.calls.filter(
+        ([url]) => String(url) === '/equipment',
+      ),
+    ).toHaveLength(1);
+
+    rejectCreate(
+      new Error(
+        'Ya existe un equipo de este producto con ese número de serie',
+      ),
+    );
+
+    expect(
+      await within(form).findByText(
+        'Ya existe un equipo de este producto con ese número de serie',
+      ),
+    ).toBeTruthy();
+    expect((productSelect as HTMLSelectElement).value).toBe(
+      'product-equipment',
+    );
+    expect((conditionSelect as HTMLSelectElement).value).toBe('GOOD');
+    expect((serialInput as HTMLInputElement).value).toBe('DUPLICADA-001');
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.getAllByText('EQ-000001').length).toBeGreaterThan(0);
+  });
+
+  it('refresca la lista y muestra exclusivamente el assetCode generado por backend', async () => {
+    let created = false;
+    const createdEquipment = buildEquipment({
+      id: 'equipment-created',
+      assetCode: 'EQ-004321',
+      serialNumber: 'QA-G1-001',
+      serialNumberKey: 'QA-G1-001',
+      condition: 'GOOD',
+      origin: 'MANUAL',
+      batchId: null,
+      batch: null,
+      purchaseReceiptItemId: null,
+    });
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/equipment') {
+        return {
+          data: created
+            ? [createdEquipment, ...equipmentList]
+            : equipmentList,
+        } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [buildProduct()] } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+    vi.mocked(api.post).mockImplementation(async (url) => {
+      if (String(url) !== '/equipment') {
+        throw new Error(`Solicitud POST no configurada: ${String(url)}`);
+      }
+
+      created = true;
+      return { data: createdEquipment } as never;
+    });
+
+    const { user, form } = await openCreateEquipmentModal();
+    await user.selectOptions(
+      within(form).getByRole('combobox', { name: /Producto/ }),
+      'product-equipment',
+    );
+    await user.selectOptions(
+      within(form).getByRole('combobox', { name: /Condición inicial/ }),
+      'GOOD',
+    );
+    await user.type(
+      within(form).getByRole('textbox', {
+        name: 'Número de serie (opcional)',
+      }),
+      'QA-G1-001',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'Registrar equipo' }),
+    );
+
+    expect(await screen.findByText('EQ-004321')).toBeTruthy();
+    expect(screen.getByText('QA-G1-001')).toBeTruthy();
+    expect(
+      vi.mocked(api.get).mock.calls.filter(
+        ([url]) => String(url) === '/equipment',
+      ),
+    ).toHaveLength(2);
+    expect(
+      vi.mocked(api.get).mock.calls.some(([url]) =>
+        String(url).includes('/availability'),
+      ),
+    ).toBe(false);
+    expect(api.post).toHaveBeenCalledTimes(1);
   });
 
   it('distingue vacío real de error y permite reintentar la lista', async () => {

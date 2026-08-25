@@ -119,3 +119,9 @@ export function equipmentMatchesSearch(
     equipment.product.sku,
   ].some((value) => value?.toLowerCase().includes(normalizedSearch));
 }
+
+export function isEquipmentProductEligible(
+  product: EquipmentAsset['product'],
+): boolean {
+  return product.isActive && product.inventoryTracking === 'ASSET';
+}

@@ -103,6 +103,12 @@ export type CreateEquipmentInspectionPayload = {
   notes?: string;
 };
 
+export type CreateEquipmentPayload = {
+  productId: string;
+  condition: EquipmentCondition;
+  serialNumber?: string;
+};
+
 export type EquipmentAsset = {
   id: string;
   companyId: string;
