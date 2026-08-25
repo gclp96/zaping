@@ -59,6 +59,10 @@ export const navigationGroups: NavigationGroup[] = [
         label: 'Inventario',
         href: '/inventory',
       },
+      {
+        label: 'Equipos',
+        href: '/equipment',
+      },
     ],
   },
   {

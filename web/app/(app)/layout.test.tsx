@@ -188,6 +188,11 @@ describe('AuthenticatedAppLayout', () => {
     ).toBe('/inventory');
     expect(
       screen
+        .getByRole('link', { name: 'Equipos' })
+        .getAttribute('href'),
+    ).toBe('/equipment');
+    expect(
+      screen
         .getByRole('link', { name: 'Categorías' })
         .getAttribute('href'),
     ).toBe('/categories');
@@ -202,9 +207,18 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen.queryByRole('link', { name: 'Equipment' }),
     ).toBeNull();
+  });
+
+  it('renders Equipos after Inventario in the INVENTARIO group', () => {
+    renderInShell(<div>Shell child</div>);
+
+    const inventoryGroup = screen.getByText('INVENTARIO').parentElement;
+    expect(inventoryGroup).toBeTruthy();
     expect(
-      screen.queryByRole('link', { name: 'Equipos' }),
-    ).toBeNull();
+      within(inventoryGroup as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Productos', 'Inventario', 'Equipos']);
   });
 
   it('marks Dashboard active for the Dashboard route', () => {
@@ -227,6 +241,18 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen
         .getByRole('link', { name: 'Productos' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('marks Equipment active for the Equipment route', () => {
+    navigationMock.pathname = '/equipment';
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Equipos' })
         .getAttribute('aria-current'),
     ).toBe('page');
   });
@@ -299,6 +325,7 @@ describe('AuthenticatedAppLayout', () => {
     ['/purchases', 'Compras'],
     ['/quotes', 'Cotizaciones'],
     ['/sales', 'Ventas'],
+    ['/equipment', 'Equipos'],
   ])(
     'renders %s with the correct Header title',
     (pathname, title) => {

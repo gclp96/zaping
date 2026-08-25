@@ -1,0 +1,97 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  compactEquipmentReference,
+  formatEquipmentDate,
+  equipmentMatchesSearch,
+  getEquipmentConditionDescriptor,
+  getEquipmentLifecycleDescriptor,
+  getEquipmentOriginLabel,
+} from './equipment-display';
+
+import type { EquipmentAsset } from './types';
+
+const equipment = {
+  assetCode: 'EQ-000001',
+  serialNumber: 'SN-MED-001',
+  product: {
+    name: 'Equipo de prueba',
+    sku: 'EQP-001',
+  },
+} as EquipmentAsset;
+
+describe('equipment display helpers', () => {
+  it.each([
+    ['ACTIVE', 'Activo', 'success'],
+    ['RETIRED', 'Retirado', 'neutral'],
+  ])('mapea lifecycle %s', (lifecycle, label, tone) => {
+    expect(getEquipmentLifecycleDescriptor(lifecycle)).toEqual({
+      label,
+      tone,
+    });
+  });
+
+  it.each([
+    ['GOOD', 'Bueno', 'success'],
+    ['INSPECTION_PENDING', 'Inspección pendiente', 'warning'],
+    ['DAMAGED', 'Dañado', 'warning'],
+    ['OUT_OF_SERVICE', 'Fuera de servicio', 'danger'],
+  ])('mapea condición %s', (condition, label, tone) => {
+    expect(getEquipmentConditionDescriptor(condition)).toEqual({
+      label,
+      tone,
+    });
+  });
+
+  it.each([
+    ['MANUAL', 'Registro manual'],
+    ['PURCHASE_RECEIPT', 'Recepción de compra'],
+    ['IMPORT', 'Importación'],
+    ['INITIAL_MIGRATION', 'Migración inicial'],
+  ])('mapea origen %s', (origin, label) => {
+    expect(getEquipmentOriginLabel(origin)).toBe(label);
+  });
+
+  it('tolera valores desconocidos con fallbacks neutrales', () => {
+    expect(getEquipmentLifecycleDescriptor('LEGACY')).toEqual({
+      label: 'Otro (LEGACY)',
+      tone: 'neutral',
+    });
+    expect(getEquipmentConditionDescriptor('UNKNOWN')).toEqual({
+      label: 'Otra (UNKNOWN)',
+      tone: 'neutral',
+    });
+    expect(getEquipmentOriginLabel('OTHER_SOURCE')).toBe(
+      'Otro origen (OTHER_SOURCE)',
+    );
+  });
+
+  it.each([
+    '  eq-000001  ',
+    'sn-med-001',
+    'EQUIPO DE PRUEBA',
+    'eqp-001',
+  ])('busca sin distinguir mayúsculas ni espacios: %s', (search) => {
+    expect(equipmentMatchesSearch(equipment, search)).toBe(true);
+  });
+
+  it('rechaza búsquedas sin coincidencia', () => {
+    expect(equipmentMatchesSearch(equipment, 'otro equipo')).toBe(false);
+  });
+
+  it('compacta referencias largas y conserva las cortas', () => {
+    expect(
+      compactEquipmentReference('658dc34b-1111-2222-3333-444444444444'),
+    ).toBe('658dc34b…');
+    expect(compactEquipmentReference('ITEM-001')).toBe('ITEM-001');
+  });
+
+  it('formatea fechas válidas y tolera valores inválidos', () => {
+    expect(formatEquipmentDate('2026-08-20T18:00:00.000Z')).not.toBe(
+      'Fecha no disponible',
+    );
+    expect(formatEquipmentDate('fecha-invalida')).toBe(
+      'Fecha no disponible',
+    );
+  });
+});
