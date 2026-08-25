@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -16,6 +16,7 @@ import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
 import EquipmentDetailModal from './components/EquipmentDetailModal';
+import EquipmentInspectionModal from './components/EquipmentInspectionModal';
 import {
   equipmentMatchesSearch,
   getEquipmentConditionDescriptor,
@@ -26,9 +27,13 @@ import {
 import type {
   EquipmentAsset,
   EquipmentAssetDetail,
+  EquipmentAvailability,
   EquipmentCondition,
+  EquipmentInspection,
+  EquipmentInspectionResult,
   EquipmentLifecycle,
   EquipmentOrigin,
+  CreateEquipmentInspectionPayload,
 } from './types';
 
 type LifecycleFilter = '' | EquipmentLifecycle;
@@ -70,6 +75,20 @@ export default function EquipmentPage() {
     useState<EquipmentAssetDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [availability, setAvailability] =
+    useState<EquipmentAvailability | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState('');
+  const [inspections, setInspections] = useState<EquipmentInspection[]>([]);
+  const [inspectionsLoading, setInspectionsLoading] = useState(false);
+  const [inspectionsError, setInspectionsError] = useState('');
+  const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
+  const [inspectionConditionAfter, setInspectionConditionAfter] =
+    useState<'' | EquipmentInspectionResult>('');
+  const [inspectionNotes, setInspectionNotes] = useState('');
+  const [inspectionSaving, setInspectionSaving] = useState(false);
+  const [inspectionError, setInspectionError] = useState('');
+  const inspectionSubmissionInFlight = useRef(false);
 
   const filteredEquipment = useMemo(() => {
     return equipment.filter((item) => {
@@ -92,9 +111,11 @@ export default function EquipmentPage() {
     search.trim() || lifecycleFilter || conditionFilter || originFilter,
   );
 
-  async function loadEquipment() {
+  async function loadEquipment(showLoading = true) {
     try {
-      setPageLoading(true);
+      if (showLoading) {
+        setPageLoading(true);
+      }
       setPageError('');
 
       const response = await api.get<EquipmentAsset[]>('/equipment');
@@ -109,7 +130,9 @@ export default function EquipmentPage() {
         ),
       );
     } finally {
-      setPageLoading(false);
+      if (showLoading) {
+        setPageLoading(false);
+      }
     }
   }
 
@@ -137,16 +160,75 @@ export default function EquipmentPage() {
     }
   }
 
+  async function loadEquipmentAvailability(equipmentId: string) {
+    try {
+      setAvailabilityLoading(true);
+      setAvailabilityError('');
+      setAvailability(null);
+
+      const response = await api.get<EquipmentAvailability>(
+        `/equipment/${equipmentId}/availability`,
+      );
+
+      setAvailability(response.data);
+    } catch (error: unknown) {
+      console.error(error);
+      setAvailabilityError(
+        getApiErrorMessage(
+          error,
+          'No fue posible consultar la disponibilidad.',
+        ),
+      );
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  }
+
+  async function loadEquipmentInspections(equipmentId: string) {
+    try {
+      setInspectionsLoading(true);
+      setInspectionsError('');
+      setInspections([]);
+
+      const response = await api.get<EquipmentInspection[]>(
+        `/equipment/${equipmentId}/inspections`,
+      );
+
+      setInspections(response.data);
+    } catch (error: unknown) {
+      console.error(error);
+      setInspectionsError(
+        getApiErrorMessage(
+          error,
+          'No fue posible cargar las inspecciones.',
+        ),
+      );
+    } finally {
+      setInspectionsLoading(false);
+    }
+  }
+
   function openEquipmentDetail(item: EquipmentAsset) {
     setSelectedEquipment(item);
-    void loadEquipmentDetail(item.id);
+    void Promise.all([
+      loadEquipmentDetail(item.id),
+      loadEquipmentAvailability(item.id),
+      loadEquipmentInspections(item.id),
+    ]);
   }
 
   function closeEquipmentDetail() {
+    closeInspectionModal();
     setSelectedEquipment(null);
     setEquipmentDetail(null);
     setDetailError('');
     setDetailLoading(false);
+    setAvailability(null);
+    setAvailabilityError('');
+    setAvailabilityLoading(false);
+    setInspections([]);
+    setInspectionsError('');
+    setInspectionsLoading(false);
   }
 
   function retryEquipmentDetail() {
@@ -155,6 +237,89 @@ export default function EquipmentPage() {
     }
 
     void loadEquipmentDetail(selectedEquipment.id);
+  }
+
+  function retryEquipmentAvailability() {
+    if (!selectedEquipment) {
+      return;
+    }
+
+    void loadEquipmentAvailability(selectedEquipment.id);
+  }
+
+  function retryEquipmentInspections() {
+    if (!selectedEquipment) {
+      return;
+    }
+
+    void loadEquipmentInspections(selectedEquipment.id);
+  }
+
+  function openInspectionModal() {
+    setInspectionConditionAfter('');
+    setInspectionNotes('');
+    setInspectionError('');
+    setInspectionModalOpen(true);
+  }
+
+  function closeInspectionModal() {
+    if (inspectionSubmissionInFlight.current) {
+      return;
+    }
+
+    setInspectionModalOpen(false);
+    setInspectionConditionAfter('');
+    setInspectionNotes('');
+    setInspectionError('');
+  }
+
+  async function submitInspection() {
+    if (
+      !selectedEquipment ||
+      !inspectionConditionAfter ||
+      inspectionSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    inspectionSubmissionInFlight.current = true;
+    setInspectionSaving(true);
+    setInspectionError('');
+
+    const normalizedNotes = inspectionNotes.trim();
+    const payload: CreateEquipmentInspectionPayload = {
+      conditionAfter: inspectionConditionAfter,
+      ...(normalizedNotes ? { notes: normalizedNotes } : {}),
+    };
+
+    try {
+      await api.post(
+        `/equipment/${selectedEquipment.id}/inspections`,
+        payload,
+      );
+
+      setInspectionModalOpen(false);
+      setInspectionConditionAfter('');
+      setInspectionNotes('');
+
+      await Promise.all([
+        loadEquipmentDetail(selectedEquipment.id),
+        loadEquipmentAvailability(selectedEquipment.id),
+        loadEquipmentInspections(selectedEquipment.id),
+        loadEquipment(false),
+      ]);
+    } catch (error: unknown) {
+      console.error(error);
+      setInspectionError(
+        getApiErrorMessage(
+          error,
+          'No fue posible registrar la inspección.',
+        ),
+      );
+    } finally {
+      inspectionSubmissionInFlight.current = false;
+      setInspectionSaving(false);
+    }
   }
 
   function clearFilters() {
@@ -334,8 +499,30 @@ export default function EquipmentPage() {
         equipment={equipmentDetail}
         loading={detailLoading}
         error={detailError}
+        availability={availability}
+        availabilityLoading={availabilityLoading}
+        availabilityError={availabilityError}
+        inspections={inspections}
+        inspectionsLoading={inspectionsLoading}
+        inspectionsError={inspectionsError}
         onClose={closeEquipmentDetail}
         onRetry={retryEquipmentDetail}
+        onRetryAvailability={retryEquipmentAvailability}
+        onRetryInspections={retryEquipmentInspections}
+        onOpenInspection={openInspectionModal}
+      />
+
+      <EquipmentInspectionModal
+        isOpen={inspectionModalOpen}
+        assetCode={selectedEquipment?.assetCode ?? null}
+        conditionAfter={inspectionConditionAfter}
+        notes={inspectionNotes}
+        saving={inspectionSaving}
+        error={inspectionError}
+        onConditionAfterChange={setInspectionConditionAfter}
+        onNotesChange={setInspectionNotes}
+        onClose={closeInspectionModal}
+        onSubmit={() => void submitInspection()}
       />
     </>
   );

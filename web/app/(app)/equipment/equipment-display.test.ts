@@ -4,6 +4,7 @@ import {
   compactEquipmentReference,
   formatEquipmentDate,
   equipmentMatchesSearch,
+  getEquipmentAvailabilityReasonLabel,
   getEquipmentConditionDescriptor,
   getEquipmentLifecycleDescriptor,
   getEquipmentOriginLabel,
@@ -64,6 +65,18 @@ describe('equipment display helpers', () => {
     expect(getEquipmentOriginLabel('OTHER_SOURCE')).toBe(
       'Otro origen (OTHER_SOURCE)',
     );
+    expect(getEquipmentAvailabilityReasonLabel('FUTURE_REASON')).toBe(
+      'Otro motivo (FUTURE_REASON)',
+    );
+  });
+
+  it.each([
+    ['RETIRED', 'Retirado'],
+    ['INSPECTION_PENDING', 'Inspección pendiente'],
+    ['DAMAGED', 'Dañado'],
+    ['OUT_OF_SERVICE', 'Fuera de servicio'],
+  ])('mapea motivo de no disponibilidad %s', (reason, label) => {
+    expect(getEquipmentAvailabilityReasonLabel(reason)).toBe(label);
   });
 
   it.each([

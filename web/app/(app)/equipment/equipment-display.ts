@@ -44,6 +44,13 @@ const originLabels: Record<string, string> = {
   INITIAL_MIGRATION: 'Migración inicial',
 };
 
+const availabilityReasonLabels: Record<string, string> = {
+  RETIRED: 'Retirado',
+  INSPECTION_PENDING: 'Inspección pendiente',
+  DAMAGED: 'Dañado',
+  OUT_OF_SERVICE: 'Fuera de servicio',
+};
+
 const equipmentDateFormatter = new Intl.DateTimeFormat('es-MX', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -69,6 +76,12 @@ export function getEquipmentConditionDescriptor(
 
 export function getEquipmentOriginLabel(origin: string): string {
   return originLabels[origin] ?? `Otro origen (${origin})`;
+}
+
+export function getEquipmentAvailabilityReasonLabel(
+  reason: string,
+): string {
+  return availabilityReasonLabels[reason] ?? `Otro motivo (${reason})`;
 }
 
 export function formatEquipmentDate(value: string): string {

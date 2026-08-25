@@ -2,6 +2,7 @@ import {
   cleanup,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -22,13 +23,16 @@ import EquipmentPage from './page';
 import type {
   EquipmentAsset,
   EquipmentAssetDetail,
+  EquipmentAvailability,
   EquipmentBatch,
+  EquipmentInspection,
   EquipmentProduct,
 } from './types';
 
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
+    post: vi.fn(),
   },
 }));
 
@@ -157,13 +161,72 @@ const equipmentDetails: Record<string, EquipmentAssetDetail> = {
   },
 };
 
+const equipmentAvailability: Record<string, EquipmentAvailability> = {
+  'equipment-1': {
+    available: true,
+    primaryReason: null,
+    reasons: [],
+    evaluatedAt: '2026-08-22T18:00:00.000Z',
+  },
+  'equipment-2': {
+    available: false,
+    primaryReason: 'RETIRED',
+    reasons: ['RETIRED', 'DAMAGED'],
+    evaluatedAt: '2026-08-22T18:05:00.000Z',
+  },
+};
+
+const equipmentInspections: Record<string, EquipmentInspection[]> = {
+  'equipment-1': [
+    {
+      id: 'inspection-api-1',
+      companyId: 'company-1',
+      equipmentAssetId: 'equipment-1',
+      conditionBefore: 'INSPECTION_PENDING',
+      conditionAfter: 'GOOD',
+      inspectedAt: '2026-08-20T17:00:00.000Z',
+      inspectedById: 'user-1',
+      notes: 'Revisión operativa completada',
+      createdAt: '2026-08-20T17:00:00.000Z',
+      inspectedBy: {
+        id: 'user-1',
+        firstName: 'Ana',
+        lastName: 'López',
+        email: 'ana@example.com',
+      },
+    },
+    {
+      id: 'inspection-api-0',
+      companyId: 'company-1',
+      equipmentAssetId: 'equipment-1',
+      conditionBefore: 'GOOD',
+      conditionAfter: 'DAMAGED',
+      inspectedAt: '2026-08-18T12:00:00.000Z',
+      inspectedById: 'user-2',
+      notes: null,
+      createdAt: '2026-08-18T12:00:00.000Z',
+      inspectedBy: {
+        id: 'user-2',
+        firstName: '',
+        lastName: '',
+        email: 'inspector@example.com',
+      },
+    },
+  ],
+  'equipment-2': [],
+};
+
 function configureApiMocks({
   list = equipmentList,
   details = equipmentDetails,
+  availability = equipmentAvailability,
+  inspections = equipmentInspections,
   listError,
 }: {
   list?: EquipmentAsset[];
   details?: Record<string, EquipmentAssetDetail>;
+  availability?: Record<string, EquipmentAvailability>;
+  inspections?: Record<string, EquipmentInspection[]>;
   listError?: Error;
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
@@ -177,9 +240,34 @@ function configureApiMocks({
       return { data: list } as never;
     }
 
-    if (endpoint.startsWith('/equipment/')) {
-      const equipmentId = endpoint.replace('/equipment/', '');
-      const detail = details[equipmentId];
+    const availabilityMatch = endpoint.match(
+      /^\/equipment\/([^/]+)\/availability$/,
+    );
+
+    if (availabilityMatch) {
+      const result = availability[availabilityMatch[1]];
+
+      if (result) {
+        return { data: result } as never;
+      }
+    }
+
+    const inspectionsMatch = endpoint.match(
+      /^\/equipment\/([^/]+)\/inspections$/,
+    );
+
+    if (inspectionsMatch) {
+      const result = inspections[inspectionsMatch[1]];
+
+      if (result) {
+        return { data: result } as never;
+      }
+    }
+
+    const detailMatch = endpoint.match(/^\/equipment\/([^/]+)$/);
+
+    if (detailMatch) {
+      const detail = details[detailMatch[1]];
 
       if (detail) {
         return { data: detail } as never;
@@ -188,6 +276,8 @@ function configureApiMocks({
 
     throw new Error(`Solicitud GET no configurada: ${endpoint}`);
   });
+
+  vi.mocked(api.post).mockResolvedValue({ data: {} } as never);
 }
 
 async function renderEquipmentPage() {
@@ -385,12 +475,47 @@ describe('EquipmentPage', () => {
     expect(
       within(detailRegion).queryByText('Inspección no visible en B.5E'),
     ).toBeNull();
-    expect(within(detailRegion).queryByRole('link')).toBeNull();
+    expect(api.get).toHaveBeenCalledWith(
+      '/equipment/equipment-1/availability',
+    );
+    expect(api.get).toHaveBeenCalledWith(
+      '/equipment/equipment-1/inspections',
+    );
     expect(
-      vi.mocked(api.get).mock.calls.some(([url]) =>
-        String(url).includes('/availability'),
+      within(detailRegion).getByLabelText(
+        'Disponibilidad del equipo: Disponible',
       ),
-    ).toBe(false);
+    ).toBeTruthy();
+    expect(
+      within(detailRegion).getByText(
+        `Evaluado: ${formatEquipmentDate(
+          equipmentAvailability['equipment-1'].evaluatedAt,
+        )}`,
+      ),
+    ).toBeTruthy();
+    const inspectionsRegion = within(detailRegion).getByRole('region', {
+      name: 'Inspecciones',
+    });
+    expect(
+      within(inspectionsRegion).getByText('Revisión operativa completada'),
+    ).toBeTruthy();
+    expect(within(inspectionsRegion).getByText('Ana López')).toBeTruthy();
+    expect(
+      within(inspectionsRegion).getByText(
+        formatEquipmentDate(
+          equipmentInspections['equipment-1'][0].inspectedAt,
+        ),
+      ),
+    ).toBeTruthy();
+    const inspectionRows = within(inspectionsRegion).getAllByRole('listitem');
+    expect(
+      within(inspectionRows[0]).getByText('Revisión operativa completada'),
+    ).toBeTruthy();
+    expect(within(inspectionRows[1]).getByText('Sin notas')).toBeTruthy();
+    expect(
+      within(inspectionRows[1]).getByText('inspector@example.com'),
+    ).toBeTruthy();
+    expect(within(detailRegion).queryByRole('link')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
     expect(
@@ -398,6 +523,390 @@ describe('EquipmentPage', () => {
         name: 'Detalle del equipo EQ-000001',
       }),
     ).toBeNull();
+  });
+
+  it('presenta no disponibilidad, todos sus motivos y el vacío de inspecciones', async () => {
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000002' }),
+    );
+
+    await screen.findByText('Sin número de serie');
+    const availabilityRegion = screen.getByRole('region', {
+      name: 'Disponibilidad actual',
+    });
+    const inspectionsRegion = screen.getByRole('region', {
+      name: 'Inspecciones',
+    });
+
+    expect(
+      within(availabilityRegion).getByLabelText(
+        'Disponibilidad del equipo: No disponible',
+      ),
+    ).toBeTruthy();
+    expect(
+      within(availabilityRegion).getByText('Retirado (principal)'),
+    ).toBeTruthy();
+    expect(within(availabilityRegion).getByText('Dañado')).toBeTruthy();
+    expect(
+      within(inspectionsRegion).getByText(
+        'Aún no hay inspecciones registradas.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Registrar inspección de EQ-000002',
+      }),
+    ).toBeNull();
+  });
+
+  it('mantiene el detalle usable mientras disponibilidad e inspecciones cargan', async () => {
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+    let resolveAvailability: (
+      value: { data: EquipmentAvailability },
+    ) => void = () => undefined;
+    let resolveInspections: (
+      value: { data: EquipmentInspection[] },
+    ) => void = () => undefined;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/equipment/equipment-1/availability') {
+        return await new Promise<{ data: EquipmentAvailability }>((resolve) => {
+          resolveAvailability = resolve;
+        });
+      }
+
+      if (endpoint === '/equipment/equipment-1/inspections') {
+        return await new Promise<{ data: EquipmentInspection[] }>((resolve) => {
+          resolveInspections = resolve;
+        });
+      }
+
+      return await defaultGet!(url);
+    });
+
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+    );
+
+    expect(await screen.findByText('DETAIL-SN-001')).toBeTruthy();
+    expect(screen.getByText('Consultando disponibilidad...')).toBeTruthy();
+    expect(screen.getByText('Cargando inspecciones...')).toBeTruthy();
+
+    resolveAvailability({ data: equipmentAvailability['equipment-1'] });
+    resolveInspections({ data: equipmentInspections['equipment-1'] });
+
+    expect(
+      await screen.findByLabelText('Disponibilidad del equipo: Disponible'),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText('Revisión operativa completada'),
+    ).toBeTruthy();
+  });
+
+  it('aísla errores de disponibilidad e inspecciones y reintenta cada recurso', async () => {
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+    let availabilityAttempts = 0;
+    let inspectionAttempts = 0;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/equipment/equipment-1/availability') {
+        availabilityAttempts += 1;
+
+        if (availabilityAttempts === 1) {
+          throw new Error('Disponibilidad temporalmente inaccesible');
+        }
+
+        return { data: equipmentAvailability['equipment-1'] } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/inspections') {
+        inspectionAttempts += 1;
+
+        if (inspectionAttempts === 1) {
+          throw new Error('Historial temporalmente inaccesible');
+        }
+
+        return { data: equipmentInspections['equipment-1'] } as never;
+      }
+
+      return await defaultGet!(url);
+    });
+
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+    );
+
+    expect(await screen.findByText('DETAIL-SN-001')).toBeTruthy();
+    expect(
+      await screen.findByText('Disponibilidad temporalmente inaccesible'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Historial temporalmente inaccesible'),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reintentar disponibilidad' }),
+    );
+    expect(
+      await screen.findByLabelText('Disponibilidad del equipo: Disponible'),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reintentar inspecciones' }),
+    );
+    expect(
+      await screen.findByText('Revisión operativa completada'),
+    ).toBeTruthy();
+    expect(availabilityAttempts).toBe(2);
+    expect(inspectionAttempts).toBe(2);
+  });
+
+  it('envía únicamente el resultado y las notas permitidas por el DTO', async () => {
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+    );
+    await screen.findByText('DETAIL-SN-001');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar inspección de EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', {
+      name: 'Registrar inspección',
+    });
+    const resultSelect = within(form).getByRole('combobox', {
+      name: /Condición resultante/,
+    });
+    const optionValues = within(resultSelect)
+      .getAllByRole('option')
+      .map((option) => (option as HTMLOptionElement).value);
+
+    expect(optionValues).toEqual([
+      '',
+      'GOOD',
+      'DAMAGED',
+      'OUT_OF_SERVICE',
+    ]);
+    expect(optionValues).not.toContain('INSPECTION_PENDING');
+
+    await user.selectOptions(resultSelect, 'DAMAGED');
+    await user.type(
+      within(form).getByRole('textbox', { name: 'Notas (opcional)' }),
+      '  Carcasa fisurada  ',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'Registrar inspección' }),
+    );
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/equipment/equipment-1/inspections',
+        {
+          conditionAfter: 'DAMAGED',
+          notes: 'Carcasa fisurada',
+        },
+      );
+    });
+    expect(Object.keys(vi.mocked(api.post).mock.calls[0][1])).toEqual([
+      'conditionAfter',
+      'notes',
+    ]);
+  });
+
+  it('bloquea el doble envío y conserva el formulario cuando el POST falla', async () => {
+    let rejectPost: (reason: Error) => void = () => undefined;
+
+    vi.mocked(api.post).mockImplementation(
+      async () =>
+        await new Promise((_, reject) => {
+          rejectPost = reject;
+        }),
+    );
+
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+    );
+    await screen.findByText('DETAIL-SN-001');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar inspección de EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', {
+      name: 'Registrar inspección',
+    });
+    const resultSelect = within(form).getByRole('combobox', {
+      name: /Condición resultante/,
+    });
+    const notes = within(form).getByRole('textbox', {
+      name: 'Notas (opcional)',
+    });
+
+    await user.selectOptions(resultSelect, 'OUT_OF_SERVICE');
+    await user.type(notes, 'Requiere reparación especializada');
+
+    const submit = within(form).getByRole('button', {
+      name: 'Registrar inspección',
+    });
+    await user.click(submit);
+    await user.click(submit);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    rejectPost(new Error('No fue posible completar la inspección'));
+
+    expect(
+      await screen.findByText('No fue posible completar la inspección'),
+    ).toBeTruthy();
+    expect((resultSelect as HTMLSelectElement).value).toBe(
+      'OUT_OF_SERVICE',
+    );
+    expect((notes as HTMLTextAreaElement).value).toBe(
+      'Requiere reparación especializada',
+    );
+    expect(
+      screen.getByRole('heading', {
+        name: 'Registrar inspección de EQ-000001',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('refresca detalle, historial, disponibilidad y lista con datos del servidor', async () => {
+    let inspectionCreated = false;
+    const updatedEquipment = buildEquipment({ condition: 'DAMAGED' });
+    const updatedDetail: EquipmentAssetDetail = {
+      ...equipmentDetails['equipment-1'],
+      condition: 'DAMAGED',
+    };
+    const updatedAvailability: EquipmentAvailability = {
+      available: false,
+      primaryReason: 'DAMAGED',
+      reasons: ['DAMAGED'],
+      evaluatedAt: '2026-08-22T19:00:00.000Z',
+    };
+    const updatedInspections: EquipmentInspection[] = [
+      {
+        ...equipmentInspections['equipment-1'][0],
+        id: 'inspection-new',
+        conditionBefore: 'GOOD',
+        conditionAfter: 'DAMAGED',
+        inspectedAt: '2026-08-22T18:59:00.000Z',
+        notes: 'Daño confirmado por inspección',
+      },
+      ...equipmentInspections['equipment-1'],
+    ];
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/equipment') {
+        return {
+          data: inspectionCreated
+            ? [updatedEquipment, manualEquipment]
+            : equipmentList,
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1') {
+        return {
+          data: inspectionCreated
+            ? updatedDetail
+            : equipmentDetails['equipment-1'],
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/availability') {
+        return {
+          data: inspectionCreated
+            ? updatedAvailability
+            : equipmentAvailability['equipment-1'],
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/inspections') {
+        return {
+          data: inspectionCreated
+            ? updatedInspections
+            : equipmentInspections['equipment-1'],
+        } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+    vi.mocked(api.post).mockImplementation(async () => {
+      inspectionCreated = true;
+      return { data: updatedInspections[0] } as never;
+    });
+
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+    await user.click(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+    );
+    await screen.findByLabelText('Disponibilidad del equipo: Disponible');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar inspección de EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', {
+      name: 'Registrar inspección',
+    });
+    await user.selectOptions(
+      within(form).getByRole('combobox', {
+        name: /Condición resultante/,
+      }),
+      'DAMAGED',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'Registrar inspección' }),
+    );
+
+    expect(
+      await screen.findByLabelText('Disponibilidad del equipo: No disponible'),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText('Daño confirmado por inspección'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Condición del equipo: Dañado'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Condición del equipo EQ-000001: Dañado'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('form', { name: 'Registrar inspección' }),
+    ).toBeNull();
+
+    for (const endpoint of [
+      '/equipment',
+      '/equipment/equipment-1',
+      '/equipment/equipment-1/availability',
+      '/equipment/equipment-1/inspections',
+    ]) {
+      expect(
+        vi.mocked(api.get).mock.calls.filter(
+          ([url]) => String(url) === endpoint,
+        ),
+      ).toHaveLength(2);
+    }
   });
 
   it('muestra carga y fallbacks nulos dentro del detalle', async () => {
@@ -416,6 +925,14 @@ describe('EquipmentPage', () => {
         return await new Promise<{ data: EquipmentAssetDetail }>((resolve) => {
           resolveDetail = resolve;
         });
+      }
+
+      if (endpoint === '/equipment/equipment-2/availability') {
+        return { data: equipmentAvailability['equipment-2'] } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-2/inspections') {
+        return { data: [] } as never;
       }
 
       throw new Error(`Solicitud GET no configurada: ${endpoint}`);
@@ -453,6 +970,14 @@ describe('EquipmentPage', () => {
         }
 
         return { data: equipmentDetails['equipment-1'] } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/availability') {
+        return { data: equipmentAvailability['equipment-1'] } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/inspections') {
+        return { data: equipmentInspections['equipment-1'] } as never;
       }
 
       throw new Error(`Solicitud GET no configurada: ${endpoint}`);

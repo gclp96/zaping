@@ -6,6 +6,18 @@ export type EquipmentCondition =
   | 'DAMAGED'
   | 'OUT_OF_SERVICE';
 
+export type EquipmentInspectionResult = Extract<
+  EquipmentCondition,
+  'GOOD' | 'DAMAGED' | 'OUT_OF_SERVICE'
+>;
+
+export type EquipmentAvailabilityReason =
+  | 'RETIRED'
+  | 'INSPECTION_PENDING'
+  | 'DAMAGED'
+  | 'OUT_OF_SERVICE'
+  | (string & {});
+
 export type EquipmentOrigin =
   | 'MANUAL'
   | 'PURCHASE_RECEIPT'
@@ -56,7 +68,7 @@ export type EquipmentBatch = {
   updatedAt: string;
 };
 
-export type EquipmentInspection = {
+export type EquipmentInspectionRecord = {
   id: string;
   companyId: string;
   equipmentAssetId: string;
@@ -66,6 +78,29 @@ export type EquipmentInspection = {
   inspectedById: string;
   notes: string | null;
   createdAt: string;
+};
+
+export type EquipmentInspectionActor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+};
+
+export type EquipmentInspection = EquipmentInspectionRecord & {
+  inspectedBy: EquipmentInspectionActor;
+};
+
+export type EquipmentAvailability = {
+  available: boolean;
+  primaryReason: EquipmentAvailabilityReason | null;
+  reasons: EquipmentAvailabilityReason[];
+  evaluatedAt: string;
+};
+
+export type CreateEquipmentInspectionPayload = {
+  conditionAfter: EquipmentInspectionResult;
+  notes?: string;
 };
 
 export type EquipmentAsset = {
@@ -91,5 +126,5 @@ export type EquipmentAsset = {
 };
 
 export type EquipmentAssetDetail = EquipmentAsset & {
-  inspections: EquipmentInspection[];
+  inspections: EquipmentInspectionRecord[];
 };
