@@ -4,8 +4,8 @@
 **Producto:** Zaping ERP Core
 **Versión:** 2.0.0
 **Estado:** Aprobado
-**Estado de implementación:** LEGACY IMPLEMENTED / TARGET REFACTOR APPROVED
-**Última actualización:** 2026-08-19
+**Estado de implementación:** CURRENT SALES V1 IMPLEMENTED / VALIDATED + TARGET REFACTOR APPROVED
+**Última actualización:** 2026-08-25
 **Responsable:** Zaping ERP Team
 
 ---
@@ -116,6 +116,311 @@ DRAFT
 └── cancel
        ↓
     CANCELLED
+```
+
+---
+
+# 5A. CURRENT — Sales V1 implementado / validado
+
+Sales V1 conserva `Sale` como modelo CURRENT / LEGACY y no implementa todavía SalesOrder / Delivery.
+
+Frontend implementado:
+
+```text
+/sales
+COMERCIAL sidebar navigation
+Sales list
+search by folio / customer
+status filter
+loading / error / retry
+empty and filtered-empty states
+
+Nueva venta modal
+Customer selection
+generic-Sales-compatible Product selection
+stock visibility
+read-only current price
+quantity
+item add / remove
+duplicate prevention
+subtotal
+IVA 16%
+total preview
+POST /sales
+list refresh after success
+
+Sale detail modal
+GET /sales/:id
+approve
+cancel
+PDF action
+terminal-state action visibility
+```
+
+API CURRENT:
+
+```text
+POST /sales
+GET /sales
+GET /sales/:id
+PATCH /sales/:id/approve
+PATCH /sales/:id/cancel
+GET /sales/:id/pdf
+POST /sales/from-quote/:quoteId
+```
+
+`GET /sales/:id`:
+
+```text
+JwtAuthGuard
+req.user.companyId
+ParseUUIDPipe
+SalesService.findOne(companyId, id)
+tenant scoped
+missing / cross-tenant → Venta no encontrada
+response includes customer and items.product
+no Prisma schema change
+```
+
+Generic Sales eligibility:
+
+```text
+Allowed:
+QUANTITY + NONE
+QUANTITY + OPTIONAL
+
+Rejected:
+QUANTITY + REQUIRED
+any non-QUANTITY inventory tracking
+```
+
+This validation is enforced in:
+
+```text
+direct Sale create
+Sale approval
+Quote → Sale conversion
+```
+
+The frontend filters incompatible Products for UX, but backend remains the source of truth.
+
+Generic Sales does not implement:
+
+```text
+EquipmentAsset selection
+serialized picking
+required-lot selection
+lot allocation
+Equipment dispatch
+Healthcare Assignment
+```
+
+Folio CURRENT:
+
+```text
+new Sales
+→ V-000001
+→ V-000002
+→ ...
+
+server generated
+tenant scoped
+sequential
+minimum six digits
+no six-digit maximum
+immutable
+historical / cancelled folios remain occupied
+timestamp-style legacy folios remain unchanged
+```
+
+Implementation:
+
+```text
+SalesFolioService
+→ CompanySequenceAllocatorService
+key SALE_FOLIO
+
+Direct Sale and Quote-converted Sale use the same sequence.
+```
+
+Transaction semantics:
+
+```text
+Direct Sale
+validation
+→ transaction
+→ Sales folio allocation
+→ Sale create
+→ DRAFT
+```
+
+Direct Sale create does not mutate stock.
+
+```text
+Quote conversion
+→ existing conversion transaction
+→ folio allocation inside the same transaction
+→ confirmed Sale
+→ InventoryMovement OUT
+```
+
+Quote conversion keeps the existing duplicate-conversion guard. Request-level idempotency is not implemented.
+
+Lifecycle CURRENT:
+
+```text
+DRAFT
+→ approve
+→ CONFIRMED
+→ revalidates generic Sales Product eligibility
+→ Product.stock decrement
+→ InventoryMovement OUT
+
+DRAFT
+→ cancel
+→ CANCELLED
+→ no InventoryMovement
+→ no stock mutation
+```
+
+Confirmed Sale cancellation is not exposed as a supported reversal workflow. Inventory restoration for confirmed Sales is not implemented.
+
+Frontend status labels:
+
+```text
+DRAFT → Borrador
+CONFIRMED → Confirmada
+CANCELLED → Cancelada
+```
+
+PDF CURRENT:
+
+```text
+GET /sales/:id/pdf
+Content-Type application/pdf
+Content-Disposition attachment; filename=venta-{folio}.pdf
+
+Frontend:
+responseType blob
+download filename venta-{folio}.pdf
+
+Status:
+IMPLEMENTED / AUTOMATED
+manual browser PDF verification pending
+```
+
+No Sale edit/update UI exists. No Sale DELETE exists.
+
+Manual QA evidence:
+
+```text
+ASSET Product EQ-TEST-001 / EQUIPO DE PRUEBA
+inventoryTracking ASSET
+lotTracking NONE
+POST /sales → 400
+Sales count unchanged
+PASS
+
+Compatible Product LF1837 / BLUNT TIP
+inventoryTracking QUANTITY
+lotTracking OPTIONAL
+direct Sale creation → DRAFT
+stock unchanged
+PASS
+
+Sequential folios observed:
+V-000005 ... V-000011
+cancelled folios were not reused
+PASS
+
+UI Sale V-000011
+customer Miguel Sahuaro
+Product LF1837 / BLUNT TIP
+quantity 1
+subtotal 215
+IVA 34.4
+total 249.4
+initial status DRAFT
+detail response confirmed customer and items.product relations
+stock unchanged on DRAFT create
+PASS
+
+Approval QA on V-000011
+DRAFT → CONFIRMED
+BLUNT TIP stock 50 → 49
+InventoryMovement OUT quantity 1 balance 49
+referenceId 7d295999-714a-450e-b7c6-e8092e2e9993 matched approved Sale
+PASS
+
+DRAFT cancellation QA
+stock 49 → 49
+status CANCELLED
+Sales InventoryMovements for that Sale: 0
+PASS
+```
+
+Automated validation:
+
+```text
+Backend Sales tests
+76 PASS
+
+Shared sequence regressions
+32 PASS
+
+Full backend
+41 suites
+374 tests PASS
+
+Prisma validate
+PASS
+
+backend build
+PASS
+
+backend lint
+PASS
+
+Frontend focused Sales
+40 tests PASS
+
+Navigation
+29 tests PASS
+
+Full frontend
+20 files
+240 tests PASS
+
+frontend build
+PASS
+
+frontend lint
+PASS
+
+git diff --check
+PASS
+```
+
+Reliability debt:
+
+```text
+Sale create request idempotency
+GET /sales pagination / server filtering
+confirmed Sale reversal / returns workflow
+payments
+invoice
+delivery
+SalesOrder future architecture
+required-lot Sale flow
+ASSET / serialized physical Sale flow
+```
+
+Products/API investigation item:
+
+```text
+GET /products/:id returned 404 Producto no encontrado
+for a Product that demonstrably existed in GET /products
+and in GET /sales/:id → items.product
 ```
 
 ---
@@ -234,6 +539,7 @@ Sale
 ├── companyId
 ├── folio
 ├── customerId
+├── quoteId?
 ├── subtotal
 ├── iva
 ├── total
@@ -930,22 +1236,23 @@ sin Quote previa.
 
 ---
 
-# 57. Limitación actual de relación
+# 57. Relación actual con Quote
 
-El modelo actual no contiene una relación estructurada:
+El modelo CURRENT puede preservar:
 
 ```text
-Sale
-→ Quote
+quoteId
 ```
 
-En cambio, Quote conserva:
+cuando la Sale proviene de una Quote.
+
+Quote conserva:
 
 ```text
 convertedToSale
 ```
 
-como booleano legacy.
+como guard legacy de conversión duplicada.
 
 ---
 

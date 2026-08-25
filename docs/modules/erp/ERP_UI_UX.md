@@ -4,8 +4,8 @@
 **Producto:** Zaping ERP Core
 **Version:** 1.0.0
 **Estado:** Approved milestone scope
-**Estado de implementacion:** UX-A.5 DOCUMENTED / IMPLEMENTATION NOT STARTED
-**Ultima actualizacion:** 2026-08-24
+**Estado de implementacion:** UX-B.4 SALES V1 COMPLETED / VALIDATED
+**Ultima actualizacion:** 2026-08-25
 **Responsable:** Zaping ERP Team
 
 ---
@@ -222,55 +222,299 @@ No se deben prometer KPIs que requieran APIs backend inexistentes.
 
 # 7. Sales V1
 
-Sales frontend completion es requisito P1 del hito.
+Sales frontend completion esta implementado y validado como Sales V1 sobre el modelo `Sale` actual.
 
 Backend actual soporta:
 
 ```text
 POST /sales
 GET /sales
-approve
-cancel
-PDF
+GET /sales/:id
+PATCH /sales/:id/approve
+PATCH /sales/:id/cancel
+GET /sales/:id/pdf
 POST /sales/from-quote/:quoteId
 ```
 
-Hallazgo actual:
+`GET /sales/:id`:
 
 ```text
-SalesService tiene findOne
-SalesController no expone GET /sales/:id
+JwtAuthGuard
+req.user.companyId
+ParseUUIDPipe
+SalesService.findOne(companyId, id)
+tenant scoped
+missing / cross-tenant → Venta no encontrada
+response includes customer and items.product
+Prisma schema changes → none
 ```
 
-Direccion aprobada:
+Frontend implementado:
 
 ```text
-Build Sales V1 against the current Sales backend.
-Do not wait for a future SalesOrder/Delivery refactor.
-Do not refactor SalesOrder/Delivery in this milestone.
-```
-
-Un endpoint backend pequeño y aislado `GET /sales/:id` puede evaluarse cuando la UI de Sales llegue al requisito de detalle, sujeto a revision enfocada.
-
-Sales V1 debe soportar conceptualmente:
-
-```text
+/sales route
+Sidebar navigation under COMERCIAL
 Sales list
-New Sale
-Sale detail
-Customer
-Items
-quantities
-prices
-IVA/totals
-status
+search by folio / customer
+status filter
+loading / error / retry
+empty and filtered-empty states
+
+Nueva venta modal
+Customer selection
+generic-Sales-compatible Product selection
+stock visibility
+read-only current price
+quantity
+item add / remove
+duplicate prevention
+subtotal
+IVA 16%
+total preview
+POST /sales
+list refresh after success
+
+Sale detail modal
+GET /sales/:id
 approve
 cancel
-PDF
-Quote → Sale relationship where currently supported
+PDF action
+terminal-state action visibility
 ```
 
-No debe sobreconstruir workflows no soportados por backend.
+Generic Sales safety:
+
+```text
+Allowed:
+QUANTITY + NONE
+QUANTITY + OPTIONAL
+
+Rejected:
+QUANTITY + REQUIRED
+any non-QUANTITY inventory tracking
+```
+
+Enforcement exists in:
+
+```text
+direct Sale create
+Sale approval
+Quote → Sale conversion
+```
+
+The frontend New Sale product selector filters incompatible Products for UX, but backend remains the source of truth.
+
+Generic Sales does not implement:
+
+```text
+EquipmentAsset selection
+serialized picking
+required-lot selection
+lot allocation
+Equipment dispatch
+Healthcare Assignment
+```
+
+Sale folios:
+
+```text
+V-000001
+V-000002
+...
+server generated
+tenant scoped
+sequential
+minimum six digits
+no six-digit maximum
+immutable
+historical / cancelled folios remain occupied
+legacy timestamp-style folios remain unchanged
+```
+
+Implementation:
+
+```text
+SalesFolioService
+→ CompanySequenceAllocatorService
+
+Sequence key:
+SALE_FOLIO
+
+Direct Sale and Quote-converted Sale use the same sequence.
+```
+
+Direct Sale transaction:
+
+```text
+validation
+→ transaction
+→ Sales folio allocation
+→ Sale create
+→ DRAFT
+```
+
+No stock mutation occurs on direct create.
+
+Quote conversion:
+
+```text
+confirmed Quote
+→ conversion
+→ confirmed Sale
+→ InventoryMovement OUT
+```
+
+Quote conversion uses the same Sales folio sequence and preserves the existing duplicate-conversion guard. Request-level idempotency is not implemented.
+
+Lifecycle:
+
+```text
+DRAFT
+→ approve
+→ CONFIRMED
+→ Product.stock decrement
+→ InventoryMovement OUT
+
+DRAFT
+→ cancel
+→ CANCELLED
+→ no InventoryMovement
+→ no stock mutation
+```
+
+Confirmed Sale cancellation is not exposed as a supported reversal workflow. Returns / reversal remain future domain work.
+
+Frontend status labels:
+
+```text
+DRAFT → Borrador
+CONFIRMED → Confirmada
+CANCELLED → Cancelada
+```
+
+PDF:
+
+```text
+GET /sales/:id/pdf
+frontend responseType blob
+download filename venta-{folio}.pdf
+```
+
+Status:
+
+```text
+IMPLEMENTED / AUTOMATED
+manual browser PDF verification pending
+```
+
+Manual QA evidence:
+
+```text
+Generic Sales safety
+ASSET Product EQ-TEST-001 / EQUIPO DE PRUEBA
+inventoryTracking ASSET
+lotTracking NONE
+POST /sales → 400
+message indicated incompatible generic Sales inventory tracking
+Sales count unchanged
+PASS
+
+Compatible Product LF1837 / BLUNT TIP
+inventoryTracking QUANTITY
+lotTracking OPTIONAL
+direct Sale creation → DRAFT
+stock unchanged
+PASS
+
+Sequential folios observed in PostgreSQL/API:
+V-000005 ... V-000011
+cancelled folios were not reused
+PASS
+
+UI-created Sale:
+V-000011
+Miguel Sahuaro
+LF1837 / BLUNT TIP
+quantity 1
+subtotal 215
+IVA 34.4
+total 249.4
+initial status DRAFT
+detail response confirmed customer and items.product relations
+creating DRAFT did not mutate Product.stock
+PASS
+
+Approval QA:
+V-000011 DRAFT → CONFIRMED
+BLUNT TIP stock 50 → 49
+InventoryMovement OUT quantity 1 balance 49
+referenceId 7d295999-714a-450e-b7c6-e8092e2e9993 matched approved Sale
+PASS
+
+Cancellation QA:
+DRAFT cancellation
+stock 49 → 49
+Sales InventoryMovements for that Sale: 0
+PASS
+```
+
+Automated validation:
+
+```text
+Backend Sales tests
+76 PASS
+
+Shared sequence regressions
+32 PASS
+
+Full backend
+41 suites
+374 tests PASS
+
+Prisma validate
+PASS
+
+backend build
+PASS
+
+backend lint
+PASS
+
+Frontend focused Sales
+40 tests PASS
+
+navigation
+29 tests PASS
+
+full frontend
+20 files
+240 tests PASS
+
+frontend build
+PASS
+
+frontend lint
+PASS
+
+git diff --check
+PASS
+```
+
+No Sale edit/update UI exists. No Sale DELETE exists.
+
+Reliability debt remains:
+
+```text
+Sale create request idempotency
+GET /sales pagination / server filtering
+confirmed Sale reversal / returns workflow
+payments
+invoice
+delivery
+SalesOrder future architecture
+required-lot Sale flow
+ASSET / serialized physical Sale flow
+```
 
 ---
 
@@ -328,6 +572,19 @@ Bug de display confirmado:
 ```text
 brand currently displays product.name
 ```
+
+Pending UX-B.5 Products/API investigation:
+
+```text
+GET /products/:id
+→ 404 Producto no encontrado
+
+for a Product that existed in:
+GET /products
+GET /sales/:id → items.product
+```
+
+This is a concrete investigation item only; no diagnosis is recorded in this documentation phase.
 
 Inventory UI actual es principalmente una stock table.
 

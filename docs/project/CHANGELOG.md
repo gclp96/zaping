@@ -3,7 +3,7 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.0.0
 **Estado:** Activo
-**Última actualización:** 2026-08-24
+**Última actualización:** 2026-08-25
 
 ---
 
@@ -60,6 +60,259 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
+
+## Sales V1 Frontend and Legacy Sale Hardening
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+Sales V1 completed the current `/sales` frontend over the existing legacy `Sale` backend while preserving the future SalesOrder / Delivery architecture direction.
+
+Implemented:
+
+```text
+/sales route
+COMERCIAL sidebar navigation
+Sales list
+search by folio / customer
+status filter
+loading / error / retry
+empty and filtered-empty states
+
+New Sale modal
+Customer selection
+generic-Sales-compatible Product selection
+stock visibility
+read-only current price
+quantity
+item add / remove
+duplicate prevention
+subtotal / IVA 16% / total preview
+POST /sales
+list refresh after success
+
+Sale detail modal
+GET /sales/:id
+DRAFT approve
+DRAFT cancel
+PDF blob download
+terminal-state action visibility
+```
+
+`GET /sales/:id` was exposed as a focused tenant-safe detail endpoint:
+
+```text
+JwtAuthGuard
+req.user.companyId
+ParseUUIDPipe
+SalesService.findOne(companyId, id)
+missing / cross-tenant → Venta no encontrada
+response includes customer and items.product
+no Prisma schema change
+```
+
+Generic Sales eligibility was hardened:
+
+```text
+Allowed:
+QUANTITY + NONE
+QUANTITY + OPTIONAL
+
+Rejected:
+QUANTITY + REQUIRED
+any non-QUANTITY inventory tracking
+```
+
+This backend boundary is enforced in:
+
+```text
+direct Sale create
+Sale approval
+Quote → Sale conversion
+```
+
+The frontend filters incompatible Products for UX, but backend remains the source of truth.
+
+Generic Sales does not implement:
+
+```text
+EquipmentAsset selection
+serialized picking
+required-lot selection
+lot allocation
+Equipment dispatch
+Healthcare Assignment
+```
+
+Sales folios no longer use timestamp-style generation for new Sales:
+
+```text
+old style
+V-${Date.now()}
+
+new style
+V-000001
+V-000002
+...
+```
+
+Rules:
+
+```text
+server generated
+tenant scoped
+sequential
+minimum six digits
+no six-digit maximum
+immutable
+historical / cancelled folios remain occupied
+existing timestamp-style legacy folios remain unchanged
+```
+
+Implementation:
+
+```text
+SalesFolioService
+→ CompanySequenceAllocatorService
+key SALE_FOLIO
+
+Direct Sale and Quote-converted Sale use the same sequence.
+```
+
+Inventory semantics:
+
+```text
+Direct Sale create
+→ DRAFT
+→ no stock mutation
+
+DRAFT approve
+→ CONFIRMED
+→ Product.stock decrement
+→ InventoryMovement OUT
+
+DRAFT cancel
+→ CANCELLED
+→ no stock mutation
+→ no InventoryMovement
+```
+
+Confirmed Sale cancellation / inventory restoration remains unsupported. Returns / reversal remain future workflow work.
+
+Manual PostgreSQL / API / UI QA:
+
+```text
+ASSET Product EQ-TEST-001 / EQUIPO DE PRUEBA rejected from generic Sales with 400
+Sales count remained unchanged
+PASS
+
+Compatible Product LF1837 / BLUNT TIP created as DRAFT
+stock unchanged on create
+PASS
+
+Sequential folios observed in PostgreSQL/API:
+V-000005 ... V-000011
+cancelled folios were not reused
+PASS
+
+UI-created Sale V-000011
+customer Miguel Sahuaro
+Product LF1837 / BLUNT TIP
+quantity 1
+subtotal 215
+IVA 34.4
+total 249.4
+initial status DRAFT
+detail response confirmed customer and items.product relations
+PASS
+
+Approval QA on V-000011
+stock 50 → 49
+status DRAFT → CONFIRMED
+InventoryMovement OUT quantity 1 balance 49
+referenceId 7d295999-714a-450e-b7c6-e8092e2e9993 matched approved Sale
+PASS
+
+DRAFT cancellation QA
+stock 49 → 49
+status CANCELLED
+Sales InventoryMovements for that Sale: 0
+PASS
+```
+
+PDF:
+
+```text
+GET /sales/:id/pdf
+frontend responseType blob
+download filename venta-{folio}.pdf
+
+Status:
+IMPLEMENTED / AUTOMATED
+manual browser PDF verification pending
+```
+
+Validation:
+
+```text
+Backend Sales tests
+76 PASS
+
+Shared sequence regressions
+32 PASS
+
+Full backend
+41 suites
+374 tests PASS
+
+Prisma validate
+PASS
+
+backend build
+PASS
+
+backend lint
+PASS
+
+Frontend focused Sales
+40 tests PASS
+
+Navigation
+29 tests PASS
+
+Full frontend
+20 files
+240 tests PASS
+
+frontend build
+PASS
+
+frontend lint
+PASS
+
+git diff --check
+PASS
+```
+
+Reliability and product debt kept visible:
+
+```text
+Sale create request idempotency
+GET /sales pagination / server filtering
+confirmed Sale reversal / returns workflow
+payments
+invoice
+delivery
+SalesOrder future architecture
+required-lot Sale flow
+ASSET / serialized physical Sale flow
+
+Products/API finding:
+GET /products/:id returned 404 Producto no encontrado
+for a Product visible in GET /products and GET /sales/:id → items.product
+```
+
+---
 
 ## Healthcare Case Foundation
 

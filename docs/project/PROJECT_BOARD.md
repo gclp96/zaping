@@ -2,8 +2,8 @@
 
 **Producto:** Zaping Platform
 **Estado:** Desarrollo activo
-**Fase actual:** ERP Core UI/UX Completion - UX-A.5 documented / UX-B.1 next
-**Última actualización:** 2026-08-24
+**Fase actual:** ERP Core UI/UX Completion - UX-B.4 Sales V1 completed / UX-B.5 next
+**Última actualización:** 2026-08-25
 **Responsable:** Zaping Team
 
 ---
@@ -50,7 +50,7 @@ Zaping Platform
 │   ├── Inventory avanzado en evolución
 │   ├── Core Equipment baseline implementado
 │   ├── Returns parcialmente implementado
-│   ├── Sales legacy funcional
+│   ├── Sales V1 frontend completed / validated sobre Sale legacy
 │   └── Seguridad pre-release pendiente
 │
 ├── Healthcare
@@ -353,6 +353,149 @@ No redefine `EquipmentAsset`.
 
 ---
 
+## UX-B.4 — Sales Frontend / Sales V1
+
+**Estado:** ✅ Completed / Validated
+
+Completado:
+
+```text
+/sales frontend route
+COMERCIAL sidebar navigation
+Sales list
+search by folio / customer
+status filter
+loading / error / retry
+empty and filtered-empty states
+
+Nueva venta modal
+Customer selection
+generic-Sales-compatible Product selection
+stock visibility
+read-only current price
+quantity
+item add / remove
+duplicate prevention
+subtotal / IVA 16% / total preview
+POST /sales
+list refresh after success
+
+Sale detail modal
+GET /sales/:id
+approve
+cancel
+PDF implementation
+terminal-state action visibility
+```
+
+Generic Sales boundary:
+
+```text
+inventoryTracking === QUANTITY
+AND
+lotTracking !== REQUIRED
+
+backend remains source of truth
+frontend filters incompatible Products for UX
+```
+
+Sales folios:
+
+```text
+SalesFolioService
+→ CompanySequenceAllocatorService
+key SALE_FOLIO
+V-000001, V-000002, ...
+tenant scoped
+sequential
+immutable
+historical / cancelled folios remain occupied
+direct Sale and Quote-converted Sale share the same sequence
+```
+
+Lifecycle:
+
+```text
+Direct Sale create
+→ DRAFT
+→ no stock mutation
+
+DRAFT approve
+→ CONFIRMED
+→ Product.stock decrement
+→ InventoryMovement OUT
+
+DRAFT cancel
+→ CANCELLED
+→ no stock mutation
+→ no InventoryMovement
+```
+
+Manual PostgreSQL / API / UI QA:
+
+```text
+ASSET Product rejected from generic Sales
+compatible QUANTITY + OPTIONAL Product created as DRAFT with stock unchanged
+sequential folios observed V-000005 ... V-000011
+cancelled folios not reused
+UI Sale V-000011 created for Miguel Sahuaro / LF1837 BLUNT TIP
+approval changed V-000011 DRAFT → CONFIRMED and stock 50 → 49
+InventoryMovement OUT referenceId matched approved Sale
+DRAFT cancellation changed status to CANCELLED with stock unchanged and 0 movements
+```
+
+PDF:
+
+```text
+GET /sales/:id/pdf
+frontend blob download implemented
+automated coverage present
+manual browser PDF verification pending
+```
+
+Validation:
+
+```text
+Backend Sales tests
+76 PASS
+
+Shared sequence regressions
+32 PASS
+
+Full backend
+41 suites
+374 tests PASS
+
+Frontend focused Sales
+40 tests PASS
+
+Navigation
+29 tests PASS
+
+Full frontend
+20 files
+240 tests PASS
+
+Prisma validate / build / lint / git diff --check
+PASS
+```
+
+Out of scope / debt:
+
+```text
+Sale edit
+Sale DELETE
+confirmed Sale cancellation / reversal
+Sale create request idempotency
+GET /sales pagination / server filtering
+required-lot Sale flow
+ASSET / serialized physical Sale flow
+SalesOrder / Delivery future architecture
+payments / invoice / delivery
+```
+
+---
+
 # 4. ERP Core — estado actual
 
 | Dominio           | Estado                                          |
@@ -367,7 +510,7 @@ No redefine `EquipmentAsset`.
 | Inventory         | ✅ Implementado / avanzado / evolución pendiente |
 | Equipment Core    |  ✅ Registration + Read + Inspection + Retirement + Purchase Receipt provisioning implementados |
 | Quotes            | ✅ Legacy funcional                              |
-| Sales             | 🟡 Legacy funcional / refactor pendiente        |
+| Sales             | ✅ Sales V1 frontend completed / validated sobre Sale legacy |
 | Returns           | 🟡 Parcialmente implementado                    |
 | Dashboard         | ✅ Implementado / evolución UX pendiente         |
 | Audit             | ⏳ Requerimiento aprobado                        |
@@ -2497,9 +2640,9 @@ Immediate next milestone:
 
 ```text
 ERP CORE UI / UX COMPLETION
-→ ACTIVE / NEXT
-→ UX-A.5 DOCUMENTED
-→ IMPLEMENTATION NOT STARTED UNTIL UX-B.1
+→ ACTIVE
+→ UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
+→ UX-B.5 ERP CORE SCREEN COMPLETION / NORMALIZATION NEXT
 ```
 
 Purpose:
@@ -2530,6 +2673,7 @@ Conceptual milestone areas:
 → Sale detail
 → status/actions
 → integration with existing backend
+→ completed / validated in UX-B.4
 
 4. ERP module UX consistency
 → Products
@@ -2584,9 +2728,11 @@ UX-B.3
 
 UX-B.4
 → Sales frontend completion
+→ completed / validated
 
 UX-B.5
 → ERP Core screen completion / normalization
+→ next
 
 UX-B.6
 → End-to-end ERP UX QA
@@ -2621,9 +2767,9 @@ Healthcare Case Foundation
 → COMPLETED / VALIDATED
 
 ERP CORE UI / UX COMPLETION
-→ ACTIVE / NEXT MILESTONE
-→ UX-A.5 DOCUMENTED
-→ UX-B.1 IMPLEMENTATION NOT STARTED
+→ ACTIVE MILESTONE
+→ UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
+→ UX-B.5 NEXT
 ```
 
 Este hito debe estabilizar la experiencia base del ERP antes de expandir Healthcare logistics.
@@ -2634,6 +2780,7 @@ Scope recomendado:
 authenticated global App Shell
 Dashboard / Home refinement
 Sales frontend completion
+→ completed / validated in UX-B.4
 ERP module UX consistency
 ERP end-to-end UX/QA
 ```
@@ -2650,10 +2797,32 @@ Orden aprobado:
 UX-B.1 Authenticated App Shell
 UX-B.2 Navigation IA + active state + responsive shell
 UX-B.3 Dashboard 2.0 using real current data
-UX-B.4 Sales frontend completion
-UX-B.5 ERP Core screen completion / normalization
+UX-B.4 Sales frontend completion → completed / validated
+UX-B.5 ERP Core screen completion / normalization → next
 UX-B.6 End-to-end ERP UX QA
 ```
+
+UX-B.5 initial focus:
+
+```text
+Products
+→ inventoryTracking UI
+→ lotTracking UI
+→ brand display bug
+→ investigate GET /products/:id 404 for Product present in GET /products and GET /sales/:id items.product
+
+Inventory
+→ movement UI
+→ consistency / readability
+
+Equipment
+→ list
+→ detail
+→ current availability
+→ inspection
+```
+
+Purchase Receipts and broader ERP normalization remain queued inside UX-B.5.
 
 Healthcare futuro queda en cola posterior:
 
@@ -2675,6 +2844,9 @@ Deuda no resuelta que debe seguir visible:
 ```text
 Purchase Receipt idempotency
 Healthcare Case creation idempotency
+Sale create request idempotency
+GET /sales pagination / server filtering
+confirmed Sale reversal / returns workflow
 Product.stock ↔ EquipmentAsset reconciliation
 serial assignment/correction
 broader lotTracking enforcement
