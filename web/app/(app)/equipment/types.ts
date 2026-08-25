@@ -109,6 +109,11 @@ export type CreateEquipmentPayload = {
   serialNumber?: string;
 };
 
+export type CreateEquipmentRetirementPayload = {
+  retiredReason: EquipmentRetirementReason;
+  retirementNotes?: string;
+};
+
 export type EquipmentAsset = {
   id: string;
   companyId: string;

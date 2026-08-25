@@ -51,6 +51,15 @@ const availabilityReasonLabels: Record<string, string> = {
   OUT_OF_SERVICE: 'Fuera de servicio',
 };
 
+const retirementReasonLabels: Record<string, string> = {
+  SOLD: 'Vendido',
+  LOST: 'Perdido',
+  DESTROYED: 'Destruido',
+  END_OF_LIFE: 'Fin de vida útil',
+  REPLACED: 'Reemplazado',
+  OTHER: 'Otro',
+};
+
 const equipmentDateFormatter = new Intl.DateTimeFormat('es-MX', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -82,6 +91,12 @@ export function getEquipmentAvailabilityReasonLabel(
   reason: string,
 ): string {
   return availabilityReasonLabels[reason] ?? `Otro motivo (${reason})`;
+}
+
+export function getEquipmentRetirementReasonLabel(
+  reason: string,
+): string {
+  return retirementReasonLabels[reason] ?? `Otro motivo (${reason})`;
 }
 
 export function formatEquipmentDate(value: string): string {

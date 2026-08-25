@@ -8,6 +8,7 @@ import {
   getEquipmentConditionDescriptor,
   getEquipmentLifecycleDescriptor,
   getEquipmentOriginLabel,
+  getEquipmentRetirementReasonLabel,
   isEquipmentProductEligible,
 } from './equipment-display';
 
@@ -69,6 +70,9 @@ describe('equipment display helpers', () => {
     expect(getEquipmentAvailabilityReasonLabel('FUTURE_REASON')).toBe(
       'Otro motivo (FUTURE_REASON)',
     );
+    expect(getEquipmentRetirementReasonLabel('LEGACY_REASON')).toBe(
+      'Otro motivo (LEGACY_REASON)',
+    );
   });
 
   it.each([
@@ -78,6 +82,17 @@ describe('equipment display helpers', () => {
     ['OUT_OF_SERVICE', 'Fuera de servicio'],
   ])('mapea motivo de no disponibilidad %s', (reason, label) => {
     expect(getEquipmentAvailabilityReasonLabel(reason)).toBe(label);
+  });
+
+  it.each([
+    ['SOLD', 'Vendido'],
+    ['LOST', 'Perdido'],
+    ['DESTROYED', 'Destruido'],
+    ['END_OF_LIFE', 'Fin de vida útil'],
+    ['REPLACED', 'Reemplazado'],
+    ['OTHER', 'Otro'],
+  ])('mapea motivo de retiro %s', (reason, label) => {
+    expect(getEquipmentRetirementReasonLabel(reason)).toBe(label);
   });
 
   it.each([

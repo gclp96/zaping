@@ -19,6 +19,7 @@ import { getApiErrorMessage } from '@/services/errors';
 import EquipmentCreateModal from './components/EquipmentCreateModal';
 import EquipmentDetailModal from './components/EquipmentDetailModal';
 import EquipmentInspectionModal from './components/EquipmentInspectionModal';
+import EquipmentRetirementModal from './components/EquipmentRetirementModal';
 import {
   equipmentMatchesSearch,
   getEquipmentConditionDescriptor,
@@ -37,8 +38,10 @@ import type {
   EquipmentLifecycle,
   EquipmentOrigin,
   EquipmentProduct,
+  EquipmentRetirementReason,
   CreateEquipmentPayload,
   CreateEquipmentInspectionPayload,
+  CreateEquipmentRetirementPayload,
 } from './types';
 
 type LifecycleFilter = '' | EquipmentLifecycle;
@@ -105,6 +108,13 @@ export default function EquipmentPage() {
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState('');
   const createSubmissionInFlight = useRef(false);
+  const [retirementModalOpen, setRetirementModalOpen] = useState(false);
+  const [retirementReason, setRetirementReason] =
+    useState<'' | EquipmentRetirementReason>('');
+  const [retirementNotes, setRetirementNotes] = useState('');
+  const [retirementSaving, setRetirementSaving] = useState(false);
+  const [retirementError, setRetirementError] = useState('');
+  const retirementSubmissionInFlight = useRef(false);
 
   const filteredEquipment = useMemo(() => {
     return equipment.filter((item) => {
@@ -259,6 +269,7 @@ export default function EquipmentPage() {
 
   function closeEquipmentDetail() {
     closeInspectionModal();
+    closeRetirementModal();
     setSelectedEquipment(null);
     setEquipmentDetail(null);
     setDetailError('');
@@ -428,6 +439,75 @@ export default function EquipmentPage() {
     } finally {
       createSubmissionInFlight.current = false;
       setCreateSaving(false);
+    }
+  }
+
+  function resetRetirementForm() {
+    setRetirementReason('');
+    setRetirementNotes('');
+    setRetirementError('');
+  }
+
+  function openRetirementModal() {
+    resetRetirementForm();
+    setRetirementModalOpen(true);
+  }
+
+  function closeRetirementModal() {
+    if (retirementSubmissionInFlight.current) {
+      return;
+    }
+
+    setRetirementModalOpen(false);
+    resetRetirementForm();
+  }
+
+  async function submitRetirement() {
+    if (
+      !selectedEquipment ||
+      !retirementReason ||
+      (retirementReason === 'OTHER' && !retirementNotes.trim()) ||
+      retirementSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    retirementSubmissionInFlight.current = true;
+    setRetirementSaving(true);
+    setRetirementError('');
+
+    const normalizedNotes = retirementNotes.trim();
+    const payload: CreateEquipmentRetirementPayload = {
+      retiredReason: retirementReason,
+      ...(normalizedNotes ? { retirementNotes: normalizedNotes } : {}),
+    };
+
+    try {
+      await api.post(
+        `/equipment/${selectedEquipment.id}/retirement`,
+        payload,
+      );
+
+      setRetirementModalOpen(false);
+      resetRetirementForm();
+
+      await Promise.all([
+        loadEquipmentDetail(selectedEquipment.id),
+        loadEquipmentAvailability(selectedEquipment.id),
+        loadEquipmentInspections(selectedEquipment.id),
+        loadEquipment(false),
+      ]);
+    } catch (error: unknown) {
+      console.error(error);
+      setRetirementError(
+        getApiErrorMessage(
+          error,
+          'No fue posible retirar el equipo.',
+        ),
+      );
+    } finally {
+      retirementSubmissionInFlight.current = false;
+      setRetirementSaving(false);
     }
   }
 
@@ -643,6 +723,20 @@ export default function EquipmentPage() {
         onRetryAvailability={retryEquipmentAvailability}
         onRetryInspections={retryEquipmentInspections}
         onOpenInspection={openInspectionModal}
+        onOpenRetirement={openRetirementModal}
+      />
+
+      <EquipmentRetirementModal
+        isOpen={retirementModalOpen}
+        assetCode={selectedEquipment?.assetCode ?? null}
+        reason={retirementReason}
+        notes={retirementNotes}
+        saving={retirementSaving}
+        error={retirementError}
+        onReasonChange={setRetirementReason}
+        onNotesChange={setRetirementNotes}
+        onClose={closeRetirementModal}
+        onSubmit={() => void submitRetirement()}
       />
 
       <EquipmentInspectionModal

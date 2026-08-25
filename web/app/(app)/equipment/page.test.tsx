@@ -309,6 +309,23 @@ async function openCreateEquipmentModal() {
   };
 }
 
+async function openActiveEquipmentDetail() {
+  const user = userEvent.setup();
+
+  await renderEquipmentPage();
+  await user.click(
+    screen.getByRole('button', { name: 'Ver equipo EQ-000001' }),
+  );
+  await screen.findByText('DETAIL-SN-001');
+
+  return {
+    user,
+    detail: screen.getByRole('region', {
+      name: 'Información del equipo',
+    }),
+  };
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('EquipmentPage', () => {
@@ -949,6 +966,11 @@ describe('EquipmentPage', () => {
       within(inspectionRows[1]).getByText('inspector@example.com'),
     ).toBeTruthy();
     expect(within(detailRegion).queryByRole('link')).toBeNull();
+    expect(
+      within(detailRegion).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    ).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: /^cerrar$/i }));
     expect(
@@ -956,6 +978,335 @@ describe('EquipmentPage', () => {
         name: 'Detalle del equipo EQ-000001',
       }),
     ).toBeNull();
+  });
+
+  it('abre el retiro activo con advertencia, enum exacto y cancelación limpia', async () => {
+    const { user, detail } = await openActiveEquipmentDetail();
+
+    await user.click(
+      within(detail).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', { name: 'Retirar equipo' });
+    const reasonSelect = within(form).getByRole('combobox', {
+      name: /Motivo del retiro/,
+    });
+    const submit = within(form).getByRole('button', {
+      name: 'Retirar equipo',
+    }) as HTMLButtonElement;
+
+    expect(
+      within(form).getByText(
+        /El equipo quedará retirado y dejará de estar disponible/,
+      ),
+    ).toBeTruthy();
+    expect(
+      within(reasonSelect)
+        .getAllByRole('option')
+        .map((option) => (option as HTMLOptionElement).value),
+    ).toEqual([
+      '',
+      'SOLD',
+      'LOST',
+      'DESTROYED',
+      'END_OF_LIFE',
+      'REPLACED',
+      'OTHER',
+    ]);
+    expect(submit.disabled).toBe(true);
+
+    await user.selectOptions(reasonSelect, 'SOLD');
+    expect(submit.disabled).toBe(false);
+    await user.click(within(form).getByRole('button', { name: 'Cancelar' }));
+
+    expect(
+      screen.queryByRole('form', { name: 'Retirar equipo' }),
+    ).toBeNull();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(
+      within(detail).getByLabelText('Estado del equipo: Activo'),
+    ).toBeTruthy();
+  });
+
+  it('exige notas útiles para OTHER y envía sólo el DTO de retiro', async () => {
+    const { user, detail } = await openActiveEquipmentDetail();
+    await user.click(
+      within(detail).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', { name: 'Retirar equipo' });
+    const reasonSelect = within(form).getByRole('combobox', {
+      name: /Motivo del retiro/,
+    });
+    const notes = within(form).getByRole('textbox', {
+      name: 'Notas (opcional)',
+    });
+    const submit = within(form).getByRole('button', {
+      name: 'Retirar equipo',
+    }) as HTMLButtonElement;
+
+    await user.selectOptions(reasonSelect, 'OTHER');
+    expect(within(form).getByRole('textbox', { name: 'Notas' })).toBe(notes);
+    expect(
+      within(form).getByText(
+        'Las notas son obligatorias cuando el motivo es Otro.',
+      ),
+    ).toBeTruthy();
+    expect(submit.disabled).toBe(true);
+
+    await user.type(notes, '   ');
+    expect(submit.disabled).toBe(true);
+    await user.clear(notes);
+    await user.type(notes, '  QA UX-B.5G2 - retiro funcional  ');
+    expect(submit.disabled).toBe(false);
+    await user.click(submit);
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/equipment/equipment-1/retirement',
+        {
+          retiredReason: 'OTHER',
+          retirementNotes: 'QA UX-B.5G2 - retiro funcional',
+        },
+      );
+    });
+
+    const payload = vi.mocked(api.post).mock.calls[0][1] as Record<
+      string,
+      unknown
+    >;
+
+    for (const serverField of [
+      'companyId',
+      'equipmentId',
+      'retiredAt',
+      'retiredById',
+      'lifecycle',
+      'condition',
+      'createdAt',
+      'updatedAt',
+    ]) {
+      expect(payload).not.toHaveProperty(serverField);
+    }
+  });
+
+  it('permite un motivo no OTHER sin notas y omite el campo opcional', async () => {
+    const { user, detail } = await openActiveEquipmentDetail();
+    await user.click(
+      within(detail).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', { name: 'Retirar equipo' });
+    await user.selectOptions(
+      within(form).getByRole('combobox', { name: /Motivo del retiro/ }),
+      'REPLACED',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'Retirar equipo' }),
+    );
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith(
+        '/equipment/equipment-1/retirement',
+        { retiredReason: 'REPLACED' },
+      );
+    });
+  });
+
+  it('evita doble retiro y conserva el formulario cuando el POST falla', async () => {
+    let rejectRetirement: (reason: Error) => void = () => undefined;
+
+    vi.mocked(api.post).mockImplementation(
+      async () =>
+        await new Promise((_, reject) => {
+          rejectRetirement = reject;
+        }),
+    );
+
+    const { user, detail } = await openActiveEquipmentDetail();
+    await user.click(
+      within(detail).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    );
+
+    const form = screen.getByRole('form', { name: 'Retirar equipo' });
+    const reasonSelect = within(form).getByRole('combobox', {
+      name: /Motivo del retiro/,
+    });
+    const notes = within(form).getByRole('textbox', {
+      name: 'Notas (opcional)',
+    });
+
+    await user.selectOptions(reasonSelect, 'LOST');
+    await user.type(notes, 'Reporte pendiente');
+
+    const submit = within(form).getByRole('button', {
+      name: 'Retirar equipo',
+    });
+    await user.click(submit);
+    await user.click(submit);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    rejectRetirement(new Error('El equipo ya se encuentra retirado'));
+
+    expect(
+      await within(form).findByText('El equipo ya se encuentra retirado'),
+    ).toBeTruthy();
+    expect((reasonSelect as HTMLSelectElement).value).toBe('LOST');
+    expect((notes as HTMLTextAreaElement).value).toBe('Reporte pendiente');
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+    expect(
+      within(detail).getByLabelText('Estado del equipo: Activo'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Estado del equipo EQ-000001: Activo'),
+    ).toBeTruthy();
+  });
+
+  it('refresca el estado terminal, disponibilidad, historial y lista desde backend', async () => {
+    let retired = false;
+    const retiredAt = '2026-08-25T20:00:00.000Z';
+    const retiredEquipment = buildEquipment({
+      lifecycle: 'RETIRED',
+      retiredAt,
+      retiredById: 'user-qa',
+      retiredReason: 'OTHER',
+      retirementNotes: 'QA UX-B.5G2 - retiro funcional',
+    });
+    const retiredDetail: EquipmentAssetDetail = {
+      ...equipmentDetails['equipment-1'],
+      lifecycle: 'RETIRED',
+      retiredAt,
+      retiredById: 'user-qa',
+      retiredReason: 'OTHER',
+      retirementNotes: 'QA UX-B.5G2 - retiro funcional',
+    };
+    const retiredAvailability: EquipmentAvailability = {
+      available: false,
+      primaryReason: 'RETIRED',
+      reasons: ['RETIRED'],
+      evaluatedAt: '2026-08-25T20:00:01.000Z',
+    };
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/equipment') {
+        return {
+          data: retired
+            ? [retiredEquipment, manualEquipment]
+            : equipmentList,
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1') {
+        return {
+          data: retired ? retiredDetail : equipmentDetails['equipment-1'],
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/availability') {
+        return {
+          data: retired
+            ? retiredAvailability
+            : equipmentAvailability['equipment-1'],
+        } as never;
+      }
+
+      if (endpoint === '/equipment/equipment-1/inspections') {
+        return { data: equipmentInspections['equipment-1'] } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+    vi.mocked(api.post).mockImplementation(async (url) => {
+      if (String(url) !== '/equipment/equipment-1/retirement') {
+        throw new Error(`Solicitud POST no configurada: ${String(url)}`);
+      }
+
+      retired = true;
+      return { data: retiredEquipment } as never;
+    });
+
+    const { user, detail } = await openActiveEquipmentDetail();
+    await user.click(
+      within(detail).getByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    );
+    const form = screen.getByRole('form', { name: 'Retirar equipo' });
+    await user.selectOptions(
+      within(form).getByRole('combobox', { name: /Motivo del retiro/ }),
+      'OTHER',
+    );
+    await user.type(
+      within(form).getByRole('textbox', { name: 'Notas' }),
+      'QA UX-B.5G2 - retiro funcional',
+    );
+    await user.click(
+      within(form).getByRole('button', { name: 'Retirar equipo' }),
+    );
+
+    expect(
+      await screen.findByLabelText('Estado del equipo: Retirado'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Estado del equipo EQ-000001: Retirado'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Disponibilidad del equipo: No disponible'),
+    ).toBeTruthy();
+    expect(screen.getByText('Retirado (principal)')).toBeTruthy();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Retirar equipo EQ-000001',
+      }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Registrar inspección de EQ-000001',
+      }),
+    ).toBeNull();
+    expect(screen.getByText('DETAIL-SN-001')).toBeTruthy();
+    expect(screen.getAllByText('EQUIPO DE PRUEBA').length).toBeGreaterThan(0);
+    expect(screen.getByText('Revisión operativa completada')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Condición del equipo: Bueno'),
+    ).toBeTruthy();
+
+    const retirementRegion = screen.getByRole('region', {
+      name: 'Datos de retiro',
+    });
+    expect(within(retirementRegion).getByText('Otro')).toBeTruthy();
+    expect(
+      within(retirementRegion).getByText(formatEquipmentDate(retiredAt)),
+    ).toBeTruthy();
+    expect(
+      within(retirementRegion).getByText(
+        'QA UX-B.5G2 - retiro funcional',
+      ),
+    ).toBeTruthy();
+    expect(screen.getAllByText('EQ-000001').length).toBeGreaterThan(1);
+
+    for (const endpoint of [
+      '/equipment',
+      '/equipment/equipment-1',
+      '/equipment/equipment-1/availability',
+      '/equipment/equipment-1/inspections',
+    ]) {
+      expect(
+        vi.mocked(api.get).mock.calls.filter(
+          ([url]) => String(url) === endpoint,
+        ),
+      ).toHaveLength(2);
+    }
   });
 
   it('presenta no disponibilidad, todos sus motivos y el vacío de inspecciones', async () => {
@@ -993,6 +1344,22 @@ describe('EquipmentPage', () => {
         name: 'Registrar inspección de EQ-000002',
       }),
     ).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: 'Retirar equipo EQ-000002',
+      }),
+    ).toBeNull();
+    const retirementRegion = screen.getByRole('region', {
+      name: 'Datos de retiro',
+    });
+    expect(
+      within(retirementRegion).getAllByText('Fin de vida útil'),
+    ).toHaveLength(2);
+    expect(
+      within(retirementRegion).getByText(
+        formatEquipmentDate(manualEquipment.retiredAt!),
+      ),
+    ).toBeTruthy();
   });
 
   it('mantiene el detalle usable mientras disponibilidad e inspecciones cargan', async () => {

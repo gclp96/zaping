@@ -10,6 +10,7 @@ import {
   getEquipmentConditionDescriptor,
   getEquipmentLifecycleDescriptor,
   getEquipmentOriginLabel,
+  getEquipmentRetirementReasonLabel,
 } from '../equipment-display';
 
 import type {
@@ -35,6 +36,7 @@ type EquipmentDetailModalProps = {
   onRetryAvailability: () => void;
   onRetryInspections: () => void;
   onOpenInspection: () => void;
+  onOpenRetirement: () => void;
 };
 
 export default function EquipmentDetailModal({
@@ -54,6 +56,7 @@ export default function EquipmentDetailModal({
   onRetryAvailability,
   onRetryInspections,
   onOpenInspection,
+  onOpenRetirement,
 }: EquipmentDetailModalProps) {
   const lifecycleDescriptor = equipment
     ? getEquipmentLifecycleDescriptor(equipment.lifecycle)
@@ -119,6 +122,41 @@ export default function EquipmentDetailModal({
               />
             </div>
           </section>
+
+          {equipment.lifecycle === 'RETIRED' ? (
+            <section
+              aria-label="Datos de retiro"
+              className="rounded-lg border border-gray-300 bg-gray-50 p-4"
+            >
+              <h3 className="font-semibold text-gray-900">Datos de retiro</h3>
+              <dl className="mt-3 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-sm text-gray-500">Motivo del retiro</dt>
+                  <dd className="font-medium text-gray-900">
+                    {equipment.retiredReason
+                      ? getEquipmentRetirementReasonLabel(
+                          equipment.retiredReason,
+                        )
+                      : 'No disponible'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-gray-500">Fecha de retiro</dt>
+                  <dd className="font-medium text-gray-900">
+                    {equipment.retiredAt
+                      ? formatEquipmentDate(equipment.retiredAt)
+                      : 'Fecha no disponible'}
+                  </dd>
+                </div>
+                <div className="sm:col-span-2">
+                  <dt className="text-sm text-gray-500">Notas</dt>
+                  <dd className="whitespace-pre-wrap text-sm text-gray-900">
+                    {equipment.retirementNotes || 'Sin notas'}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          ) : null}
 
           <section
             aria-label="Disponibilidad actual"
@@ -367,7 +405,17 @@ export default function EquipmentDetailModal({
             )}
           </section>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            {equipment.lifecycle === 'ACTIVE' ? (
+              <Button
+                type="button"
+                variant="danger"
+                aria-label={`Retirar equipo ${equipment.assetCode}`}
+                onClick={onOpenRetirement}
+              >
+                Retirar equipo
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" onClick={onClose}>
               Cerrar
             </Button>
