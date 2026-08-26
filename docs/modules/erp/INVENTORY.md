@@ -4,8 +4,8 @@
 **Producto:** Zaping ERP Core
 **Versión:** 2.0.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EVOLVING
-**Última actualización:** 2026-08-20
+**Estado de implementación:** INVENTORY V1 LEDGER IMPLEMENTED / VALIDATED; DOMAIN EVOLVING
+**Última actualización:** 2026-08-25
 **Responsable:** Zaping ERP Team
 
 ---
@@ -2376,3 +2376,83 @@ y evolucionar hacia:
 sin perder una única historia física coherente.
 
 > **Una transferencia cambia dónde está el inventario; una salida cambia cuánto inventario continúa perteneciendo a la Company. Zaping debe preservar esa diferencia en todo momento.**
+
+---
+
+# 149. Inventory Movement Ledger V1 — estado vigente
+
+**Estado:** IMPLEMENTED / VALIDATED.
+
+La ruta `/inventory` ofrece dos vistas operacionales:
+
+```text
+Existencias
+→ estado actual de stock
+
+Movimientos
+→ historia que explica los cambios de stock
+```
+
+El frontend de Inventory permanece de solo lectura en este hito. No existe UI de ajuste manual.
+
+## 149.1 Ledger de movimientos
+
+`GET /inventory/movements` alimenta el ledger con:
+
+```text
+Fecha
+Producto
+Tipo
+Cantidad
+Balance posterior
+Referencia
+Notas
+```
+
+Mapeo de tipos implementados:
+
+```text
+IN         → Entrada
+OUT        → Salida
+ADJUSTMENT → Ajuste
+```
+
+Mapeo de referencias observado e implementado:
+
+```text
+PURCHASE_RECEIPT → Recepción de compra
+SALE             → Venta
+PURCHASE         → Compra
+null             → Movimiento manual
+```
+
+La referencia es informativa; V1 no inventa rutas ni enlaces hacia documentos que el backend no expone.
+
+## 149.2 Consulta y estados independientes
+
+Movimientos permite búsqueda client-side por campos prácticos de Product y referencia, filtro por tipo y estado vacío específico para resultados filtrados.
+
+Las vistas de existencias y movimientos mantienen carga, error y reintento independientes. Los endpoints actuales no están paginados.
+
+## 149.3 Validación real
+
+La QA registrada verificó movimientos reales `IN` de Purchase Receipt y `OUT` de Sale. El ledger coincidió con balances y referencias de API; búsqueda, filtros y comportamiento de navegador pasaron.
+
+```text
+Inventory frontend
+23 tests PASS
+
+Frontend final vigente
+25 files / 336 tests PASS
+
+build / lint / git diff --check
+PASS
+```
+
+## 149.4 Deuda abierta
+
+```text
+backend pagination / filtering
+date-range filtering
+manual adjustment workflow subject to separate review
+```

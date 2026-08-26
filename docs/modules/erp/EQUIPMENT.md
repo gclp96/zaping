@@ -2,10 +2,10 @@
 
 **Módulo:** Core Equipment
 **Producto:** Zaping ERP
-**Versión:** 1.7.0
+**Versión:** 1.8.0
 **Estado:** Approved
-**Estado de implementación:** PARTIALLY IMPLEMENTED — CORE BACKEND + INSPECTION + RETIREMENT + AUTOMATIC ASSET CODE + PURCHASE RECEIPT PROVISIONING + CURRENT AVAILABILITY
-**Última actualización:** 2026-08-24
+**Estado de implementación:** EQUIPMENT V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-25
 **Responsable:** Zaping Team
 
 ---
@@ -52,10 +52,10 @@ Current Availability
 → IMPLEMENTED / VALIDATED
 
 Equipment Operational Workflows
-→ PARTIAL / PENDING
+→ V1 IMPLEMENTED / VALIDATED
 
 Equipment Frontend
-→ NOT IMPLEMENTED
+→ IMPLEMENTED / VALIDATED
 
 Healthcare Equipment Integration
 → NOT IMPLEMENTED
@@ -134,7 +134,6 @@ Dispatch
 Return
 Maintenance
 Calibration
-Equipment Registry frontend
 Equipment 360
 Healthcare operational integration
 Equipment-specific audit workflow
@@ -4489,6 +4488,223 @@ RETIRED
 
 ---
 
+# Equipment V1 — estado vigente (2026-08-25)
+
+**Estado:** IMPLEMENTED / VALIDATED.
+
+Frontera de dominio:
+
+```text
+Product
+→ definición de catálogo / modelo
+
+EquipmentAsset
+→ unidad física individual
+```
+
+Para Products con `inventoryTracking = ASSET`, `EquipmentAsset` es la capa de unidad física. La reconciliación `Product.stock ↔ EquipmentAsset` continúa como deuda conocida y no se considera resuelta.
+
+## Ruta y capacidades V1
+
+La ruta frontend `/equipment` aparece como **Equipos** bajo **INVENTARIO** y ofrece:
+
+```text
+list
+search
+lifecycle filter
+condition filter
+origin filter
+detail
+current availability
+inspection history
+inspection registration
+manual Equipment creation
+retirement
+```
+
+Lista y detalle muestran los campos operacionales disponibles:
+
+```text
+assetCode
+Product
+SKU
+serialNumber
+lifecycle
+condition
+origin
+batch / lot when present
+registration date
+```
+
+`assetCode` es el identificador operacional generado por servidor. El UUID no es el identificador principal mostrado al usuario.
+
+## Lifecycle y condition V1
+
+Lifecycle implementado:
+
+```text
+ACTIVE  → Activo
+RETIRED → Retirado
+```
+
+El retiro es terminal. Equipment V1 no incluye `DELETE` ni reactivación.
+
+Condiciones implementadas:
+
+```text
+GOOD               → Bueno
+INSPECTION_PENDING → Inspección pendiente
+DAMAGED            → Dañado
+OUT_OF_SERVICE     → Fuera de servicio
+```
+
+Condition y Availability son conceptos separados. `GOOD` no garantiza por sí solo que una unidad esté disponible.
+
+## Current Availability V1
+
+```text
+GET /equipment/:equipmentId/availability
+```
+
+Respuesta:
+
+```text
+available
+primaryReason
+reasons
+evaluatedAt
+```
+
+Razones implementadas:
+
+```text
+RETIRED
+INSPECTION_PENDING
+DAMAGED
+OUT_OF_SERVICE
+```
+
+Availability es evaluada por backend; el frontend no la infiere desde `condition`. Se consulta sólo al abrir detalle, sin llamadas N+1 desde la lista.
+
+## Inspecciones V1
+
+```text
+GET  /equipment/:equipmentId/inspections
+POST /equipment/:equipmentId/inspections
+```
+
+Resultados seleccionables:
+
+```text
+GOOD
+DAMAGED
+OUT_OF_SERVICE
+```
+
+`INSPECTION_PENDING` no es resultado final seleccionable. El payload frontend es:
+
+```json
+{
+  "conditionAfter": "GOOD | DAMAGED | OUT_OF_SERVICE",
+  "notes": "optional"
+}
+```
+
+Servidor controla inspector, timestamps y `conditionBefore`. Después del POST, el frontend refresca detalle, inspecciones, Availability y lista.
+
+## Creación manual V1
+
+```text
+POST /equipment
+Frontend action: Nuevo equipo
+```
+
+El selector incluye sólo Products activos con `inventoryTracking = ASSET`.
+
+`CreateEquipmentDto` requiere `productId` y `condition`; permite opcionalmente `serialNumber` y `batchId`. El payload V1 del frontend es:
+
+```json
+{
+  "productId": "uuid",
+  "condition": "GOOD | INSPECTION_PENDING | DAMAGED | OUT_OF_SERVICE",
+  "serialNumber": "optional"
+}
+```
+
+`batchId` no se expone porque todavía no existe un selector de lote seguro. Servidor controla `assetCode`, `origin = MANUAL`, lifecycle inicial, `serialNumberKey`, tenant y timestamps.
+
+## Retiro V1
+
+```text
+POST /equipment/:equipmentId/retirement
+```
+
+Payload:
+
+```json
+{
+  "retiredReason": "SOLD | LOST | DESTROYED | END_OF_LIFE | REPLACED | OTHER",
+  "retirementNotes": "optional"
+}
+```
+
+Para `OTHER`, `retirementNotes` no vacías son obligatorias. Servidor controla `retiredAt` y `retiredById`.
+
+El retiro:
+
+* preserva `EquipmentAsset`, `assetCode`, serial, Product, condition e historia;
+* cambia lifecycle a `RETIRED`;
+* hace que Current Availability reporte no disponible con razón `RETIRED`;
+* impide nuevas inspecciones conforme a las reglas de lifecycle;
+* no elimina ni reactiva la unidad.
+
+## QA y validación V1
+
+La evidencia de proyecto registra:
+
+```text
+real API list / detail QA
+PASS
+
+inspection workflow manual QA
+PASS
+
+manual Equipment creation QA
+PASS
+
+retirement workflow manual QA
+PASS
+```
+
+El activo descartable de G1/G2 fue identificado por el serial `QA-G1-001`. No se documentan un `assetCode` ni timestamps exactos porque no existe evidencia persistida suficiente para afirmarlos aquí.
+
+Validación frontend final:
+
+```text
+Equipment
+61 tests PASS
+
+Full frontend
+25 files / 336 tests PASS
+
+build / lint / git diff --check
+PASS
+```
+
+## Deuda abierta después de V1
+
+```text
+serial correction / edit workflow
+batch selector for manual create
+retired actor name resolution
+Product.stock ↔ EquipmentAsset reconciliation
+bulk / list Availability endpoint if needed later
+pagination
+Equipment Assignment / Case logistics as Healthcare work
+```
+
+---
+
 # 93. EQ-RET-001 — Equipment Retirement
 
 Equipment Retirement representa la salida permanente de un `EquipmentAsset` de la flota operacional normal.
@@ -5898,13 +6114,16 @@ Availability Evaluator
 
 ---
 
-# 92. Próxima prioridad recomendada
+# 92. Prioridad posterior a Equipment V1
 
-El siguiente paso técnico documentado recomendado es:
+El siguiente trabajo del proyecto es:
 
 ```text
-Healthcare Equipment Assignment
+UX-B.5H
+Purchase Receipts + remaining ERP normalization
 ```
+
+`Healthcare Equipment Assignment` permanece como trabajo futuro de Healthcare después de estabilizar el ERP Core UI/UX; no forma parte de Equipment V1 ni de UX-B.5H.
 
 Estado:
 

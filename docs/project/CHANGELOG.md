@@ -61,6 +61,122 @@ Una funcionalidad completada debe dejar de vivir únicamente en un Sprint o Back
 ---
 # 3. 2026-08 — Documentation Consolidation & Core Equipment Baseline
 
+## Products V1 Normalization
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+Products V1 quedó alineado con su frontera de catálogo:
+
+```text
+Brand display corrected
+Category selector and tenant-safe Category validation
+inventoryTracking / lotTracking selectable on create
+tracking read-only on edit
+current stock read-only
+minStock editable
+active Product list
+non-destructive Product deactivation
+responsive table / form behavior
+```
+
+Product CRUD dejó de aceptar `stock`; Product nuevo usa el default backend/Prisma `stock = 0`. El `PATCH` normal tampoco permite cambiar `inventoryTracking` ni `lotTracking`.
+
+`GET /products/:id` quedó tenant-scoped mediante `findOne(companyId, productId)`. `GET /products/low-stock` se ubicó antes de la ruta dinámica y dejó de ser sombreado por `/:id`.
+
+`DELETE /products/:id` conserva semántica de desactivación idempotente (`isActive = false`), sin eliminación física ni reactivación implementada.
+
+Validación registrada:
+
+```text
+Products backend
+43 suites / 413 tests PASS
+
+Products frontend
+14 tests PASS
+```
+
+---
+
+## Inventory Movement Ledger V1
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+`/inventory` incorporó dos vistas read-only:
+
+```text
+Existencias
+Movimientos
+```
+
+El ledger expone fecha, Product, tipo, cantidad, balance posterior, referencia y notas. Implementa búsqueda client-side, filtro por `IN` / `OUT` / `ADJUSTMENT`, estados vacíos filtrados y carga/error/retry independientes de Existencias.
+
+Mapeos de referencia incluidos:
+
+```text
+PURCHASE_RECEIPT → Recepción de compra
+SALE             → Venta
+PURCHASE         → Compra
+null             → Movimiento manual
+```
+
+La QA real verificó movimientos `IN` de Purchase Receipt y `OUT` de Sale, con balances y referencias coincidentes con API. No se añadió ajuste manual, paginación backend ni enlaces de referencia inventados.
+
+```text
+Inventory frontend
+23 tests PASS
+```
+
+---
+
+## Equipment V1 Frontend
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Periodo:** 2026-08
+
+Se completó `/equipment` bajo **INVENTARIO** con:
+
+```text
+list / search / lifecycle-condition-origin filters
+detail
+backend-evaluated Current Availability
+inspection history and registration
+manual Equipment creation
+terminal retirement
+```
+
+La creación manual usa Products activos `ASSET`, envía `productId`, `condition` y `serialNumber?`, y deja `assetCode`, lifecycle, origin, tenant y auditoría al servidor. `batchId` no se expuso sin selector seguro.
+
+El retiro usa `retiredReason` y `retirementNotes?`; `OTHER` exige notas útiles. Preserva EquipmentAsset, identidad, Product, condition e historia, cambia lifecycle a `RETIRED`, actualiza Availability desde backend y bloquea nuevas inspecciones. No se añadió eliminación ni reactivación.
+
+QA registrada:
+
+```text
+real Equipment list / detail
+inspection workflow
+manual creation
+retirement workflow
+PASS
+```
+
+El activo descartable G1/G2 se identificó por serial `QA-G1-001`; no se conserva aquí un `assetCode` ni timestamps no evidenciados.
+
+Validación frontend final:
+
+```text
+Equipment
+61 tests PASS
+
+Full frontend
+25 files / 336 tests PASS
+
+build / lint / git diff --check
+PASS
+```
+
+---
+
 ## Sales V1 Frontend and Legacy Sale Hardening
 
 **Estado:** IMPLEMENTED / VALIDATED

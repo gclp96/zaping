@@ -2,7 +2,7 @@
 
 **Producto:** Zaping Platform
 **Estado:** Desarrollo activo
-**Fase actual:** ERP Core UI/UX Completion - UX-B.4 Sales V1 completed / UX-B.5 next
+**Fase actual:** ERP Core UI/UX Completion - Products / Inventory / Equipment V1 completed; UX-B.5H next
 **Última actualización:** 2026-08-25
 **Responsable:** Zaping Team
 
@@ -47,8 +47,9 @@ Zaping Platform
 ├── ERP Core
 │   ├── Foundation estable
 │   ├── Compras + Recepciones funcionales
-│   ├── Inventory avanzado en evolución
-│   ├── Core Equipment baseline implementado
+│   ├── Products V1 implementado / validado
+│   ├── Inventory Movement Ledger V1 implementado / validado
+│   ├── Equipment V1 implementado / validado
 │   ├── Returns parcialmente implementado
 │   ├── Sales V1 frontend completed / validated sobre Sale legacy
 │   └── Seguridad pre-release pendiente
@@ -496,6 +497,66 @@ payments / invoice / delivery
 
 ---
 
+## UX-B.5 — Products / Inventory / Equipment V1
+
+**Estado:** ✅ Completed / Validated
+
+Completado:
+
+```text
+Products V1
+→ catalog CRUD normalization
+→ tenant-safe Product detail and Category assignment
+→ stock removed from client POST / PATCH
+→ tracking selected on create and read-only on edit
+→ non-destructive Product deactivation
+
+Inventory Movement Ledger V1
+→ Existencias / Movimientos views
+→ movement search and type filter
+→ independent loading / error / retry
+→ real Purchase Receipt IN and Sale OUT QA
+
+Equipment V1
+→ list / detail / filters
+→ Current Availability
+→ inspection history and registration
+→ manual creation
+→ terminal retirement
+```
+
+Validación frontend vigente:
+
+```text
+Products  14 tests PASS
+Inventory 23 tests PASS
+Equipment 61 tests PASS
+
+Full frontend
+25 files / 336 tests PASS
+
+build / lint / git diff --check
+PASS
+```
+
+QA manual registrada:
+
+```text
+Product detail / low-stock / stock rejection / deactivation
+Inventory Purchase Receipt IN / Sale OUT ledger
+Equipment list / detail / inspection / manual creation / retirement
+PASS
+```
+
+Siguiente bloque:
+
+```text
+UX-B.5H
+PURCHASE RECEIPTS + REMAINING ERP NORMALIZATION
+```
+
+---
+
 # 4. ERP Core — estado actual
 
 | Dominio           | Estado                                          |
@@ -504,11 +565,11 @@ payments / invoice / delivery
 | Identity & Access | 🟡 Implementado / security evolution pending    |
 | Customers         | ✅ Implementado                                  |
 | Suppliers         | ✅ Implementado                                  |
-| Products          | ✅ Implementado / tracking baseline integrated   |
+| Products          | ✅ Products V1 implementado / validado            |
 | Purchases         | ✅ Implementado / avanzado                       |
 | Purchase Receipts | ✅ Implementado                                  |
-| Inventory         | ✅ Implementado / avanzado / evolución pendiente |
-| Equipment Core    |  ✅ Registration + Read + Inspection + Retirement + Purchase Receipt provisioning implementados |
+| Inventory         | ✅ Movement Ledger V1 validado / dominio en evolución |
+| Equipment Core    | ✅ Equipment V1 implementado / validado            |
 | Quotes            | ✅ Legacy funcional                              |
 | Sales             | ✅ Sales V1 frontend completed / validated sobre Sale legacy |
 | Returns           | 🟡 Parcialmente implementado                    |
@@ -2642,7 +2703,8 @@ Immediate next milestone:
 ERP CORE UI / UX COMPLETION
 → ACTIVE
 → UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
-→ UX-B.5 ERP CORE SCREEN COMPLETION / NORMALIZATION NEXT
+→ UX-B.5 PRODUCTS / INVENTORY / EQUIPMENT V1 COMPLETED / VALIDATED
+→ UX-B.5H PURCHASE RECEIPTS + REMAINING ERP NORMALIZATION NEXT
 ```
 
 Purpose:
@@ -2732,6 +2794,10 @@ UX-B.4
 
 UX-B.5
 → ERP Core screen completion / normalization
+→ Products / Inventory / Equipment V1 completed / validated
+
+UX-B.5H
+→ Purchase Receipts + remaining ERP normalization
 → next
 
 UX-B.6
@@ -2769,7 +2835,8 @@ Healthcare Case Foundation
 ERP CORE UI / UX COMPLETION
 → ACTIVE MILESTONE
 → UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
-→ UX-B.5 NEXT
+→ UX-B.5 PRODUCTS / INVENTORY / EQUIPMENT V1 COMPLETED / VALIDATED
+→ UX-B.5H NEXT
 ```
 
 Este hito debe estabilizar la experiencia base del ERP antes de expandir Healthcare logistics.
@@ -2798,31 +2865,23 @@ UX-B.1 Authenticated App Shell
 UX-B.2 Navigation IA + active state + responsive shell
 UX-B.3 Dashboard 2.0 using real current data
 UX-B.4 Sales frontend completion → completed / validated
-UX-B.5 ERP Core screen completion / normalization → next
+UX-B.5 Products / Inventory / Equipment V1 → completed / validated
+UX-B.5H Purchase Receipts + remaining ERP normalization → next
 UX-B.6 End-to-end ERP UX QA
 ```
 
-UX-B.5 initial focus:
+UX-B.5H initial focus:
 
 ```text
-Products
-→ inventoryTracking UI
-→ lotTracking UI
-→ brand display bug
-→ investigate GET /products/:id 404 for Product present in GET /products and GET /sales/:id items.product
-
-Inventory
-→ movement UI
-→ consistency / readability
-
-Equipment
-→ list
-→ detail
-→ current availability
-→ inspection
+dedicated /purchase-receipts experience
+receipt list / detail
+purchase → receipt traceability
+ASSET provisioning visibility where useful
+Customers / Suppliers / Quotes / Purchases normalization
+shared UX inconsistencies
 ```
 
-Purchase Receipts and broader ERP normalization remain queued inside UX-B.5.
+Products V1, Inventory Movement Ledger y Equipment V1 ya no son trabajo activo. Purchase Receipts y la normalización ERP restante continúan en UX-B.5H.
 
 Healthcare futuro queda en cola posterior:
 
@@ -2847,9 +2906,17 @@ Healthcare Case creation idempotency
 Sale create request idempotency
 GET /sales pagination / server filtering
 confirmed Sale reversal / returns workflow
+Product reactivation workflow
+Product tracking migration workflow
+Inventory backend pagination / filtering
+Inventory date-range filtering
+manual adjustment workflow review
 Product.stock ↔ EquipmentAsset reconciliation
-serial assignment/correction
-broader lotTracking enforcement
+Equipment serial correction / edit
+manual Equipment batch selector
+retired actor name resolution
+Equipment bulk / list Availability if needed later
+Equipment pagination
 tenant-safe legacy write hardening
 future Equipment Assignment concurrency design
 ```
@@ -2884,7 +2951,14 @@ Healthcare Case Foundation
 Then:
 
 ERP CORE UI / UX COMPLETION
-→ immediate next milestone
+→ ACTIVE
+→ Products / Inventory / Equipment V1 completed / validated
+
+Then:
+
+UX-B.5H
+→ Purchase Receipts + remaining ERP normalization
+→ immediate next work
 
 Then:
 

@@ -2,9 +2,9 @@
 
 **Modulo:** ERP Core UI / UX
 **Producto:** Zaping ERP Core
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Estado:** Approved milestone scope
-**Estado de implementacion:** UX-B.4 SALES V1 COMPLETED / VALIDATED
+**Estado de implementacion:** UX-B.5 PRODUCTS / INVENTORY / EQUIPMENT V1 COMPLETED / VALIDATED
 **Ultima actualizacion:** 2026-08-25
 **Responsable:** Zaping ERP Team
 
@@ -532,65 +532,34 @@ No se debe implementar en UX-B.1.
 
 # 9. Equipment
 
-Equipment frontend si forma parte de ERP Core UI / UX Completion.
+**Estado:** EQUIPMENT V1 IMPLEMENTED / VALIDATED.
 
-Razon:
+`/equipment`, accesible como **Equipos** bajo **INVENTARIO**, incluye lista, búsqueda, filtros de lifecycle/condition/origin, detalle, Availability evaluada por backend, historial y registro de inspecciones, creación manual y retiro terminal.
 
-```text
-Core Equipment backend is already implemented and validated,
-but the frontend journey is currently broken.
-```
+`assetCode` es generado por servidor y funciona como identidad operacional visible. El UUID no es el identificador principal de UX.
 
-Prioridad Equipment UX:
-
-```text
-1. Equipment list
-2. Equipment detail
-3. Current Availability display
-4. Inspection workflow
-```
-
-Retirement puede implementarse despues del workflow primario si el alcance requiere staging.
-
-No se debe implementar Equipment en UX-B.1.
+La lista no ejecuta llamadas N+1 de Availability; `GET /equipment/:equipmentId/availability` se consulta en detalle. Los equipos retirados permanecen visibles para historia, sin acciones de retiro repetido ni nuevas inspecciones.
 
 ---
 
 # 10. Products e Inventory
 
-Products frontend esta stale frente al backend.
+**Estado:** PRODUCTS V1 + INVENTORY MOVEMENT LEDGER IMPLEMENTED / VALIDATED.
 
-Normalizacion futura debe exponer apropiadamente:
+`/products` corrige Brand e incorpora Category y tracking. `inventoryTracking` (`QUANTITY`, `SERIALIZED`, `ASSET`) y `lotTracking` (`NONE`, `OPTIONAL`, `REQUIRED`) se seleccionan al crear y permanecen de solo lectura al editar. Stock actual es de solo lectura y stock mínimo continúa editable.
 
-```text
-inventoryTracking
-lotTracking
-```
+Product CRUD no acepta `stock`. La creación usa `stock = 0` por default de backend/Prisma. El `PATCH` tampoco permite cambiar tracking. `DELETE /products/:id` desactiva de forma idempotente y no borra físicamente.
 
-Bug de display confirmado:
+La consulta de detalle quedó tenant-scoped mediante `findOne(companyId, productId)` y la ruta estática `/products/low-stock` ya no queda sombreada por `/:id`.
 
-```text
-brand currently displays product.name
-```
-
-Pending UX-B.5 Products/API investigation:
+`/inventory` ofrece dos tabs operacionales:
 
 ```text
-GET /products/:id
-→ 404 Producto no encontrado
-
-for a Product that existed in:
-GET /products
-GET /sales/:id → items.product
+Existencias
+Movimientos
 ```
 
-This is a concrete investigation item only; no diagnosis is recorded in this documentation phase.
-
-Inventory UI actual es principalmente una stock table.
-
-El hito futuro debe considerar Inventory Movement UI usando capacidad backend existente.
-
-Inventory Movement UI no es P0.
+Movimientos presenta fecha, Product, tipo, cantidad, balance posterior, referencia y notas; permite búsqueda y filtro por tipo. Existencias y movimientos tienen carga, error y retry independientes. Inventory V1 permanece read-only y no incluye ajuste manual.
 
 ---
 
@@ -679,28 +648,24 @@ Las primitivas existentes deben reutilizarse siempre que sea razonable.
 P0:
 
 ```text
-persistent Authenticated App Shell
-broken navigation architecture
-/sales link currently points to missing route
+security pre-release blockers
 protected-route/session UX review
 ```
 
 P1:
 
 ```text
-Sales frontend
-Dashboard 2.0
-Products tracking-field alignment
-Equipment list/detail/current workflow
+Purchase Receipts dedicated experience
+remaining ERP module normalization
+shared UX consistency
 ```
 
 P2:
 
 ```text
-Purchase Receipts dedicated route
-Inventory movements frontend
-search/filter/table consistency
-form/error/loading/empty-state normalization
+backend pagination / filtering integration
+date-range filtering
+advanced cross-module journeys
 ```
 
 P3:
@@ -733,6 +698,19 @@ Sales frontend completion
 
 UX-B.5
 ERP Core screen completion / normalization
+
+Products V1
+→ completed / validated
+
+Inventory Movement Ledger
+→ completed / validated
+
+Equipment V1
+→ completed / validated
+
+UX-B.5H
+Purchase Receipts + remaining ERP normalization
+→ next
 
 UX-B.6
 End-to-end ERP UX QA
@@ -836,12 +814,76 @@ No se intenta certificar WCAG completo en este hito.
 
 Este es principalmente un hito frontend.
 
-Cambios backend requieren aprobacion enfocada separada.
-
-Bloqueador potencial conocido:
-
-```text
-GET /sales/:id
-```
+Cambios backend requieren aprobacion enfocada separada. Los ajustes puntuales de Products y Sales ya entregados se documentan como capacidad vigente, no como autorización para un rediseño backend amplio.
 
 No hay rediseño backend amplio aprobado.
+
+---
+
+# 21. Validacion vigente UX-B.5G3
+
+```text
+Products frontend
+14 tests PASS
+
+Inventory frontend
+23 tests PASS
+
+Equipment frontend
+61 tests PASS
+
+Full frontend
+25 files / 336 tests PASS
+
+build
+PASS
+
+lint
+PASS
+
+git diff --check
+PASS
+```
+
+La QA histórica registrada cubre detalle y lifecycle de Products, movimientos reales de Purchase Receipt y Sale, Equipment list/detail, inspección, creación manual y retiro.
+
+---
+
+# 22. Deuda y siguiente hito
+
+Permanece abierta:
+
+```text
+Products reactivation
+Product tracking migration workflow
+Inventory backend pagination / filtering
+Inventory date-range filtering
+manual adjustment workflow review
+Equipment serial correction / edit
+manual Equipment batch selector
+retired actor name resolution
+Product.stock ↔ EquipmentAsset reconciliation
+Equipment bulk / list Availability if later required
+Equipment pagination
+request idempotency debts already recorded elsewhere
+```
+
+Siguiente bloque:
+
+```text
+UX-B.5H
+PURCHASE RECEIPTS + REMAINING ERP NORMALIZATION
+```
+
+Foco inicial:
+
+```text
+dedicated /purchase-receipts experience
+receipt list / detail
+purchase → receipt traceability
+ASSET provisioning visibility where useful
+Customers / Suppliers / Quotes / Purchases normalization
+shared UX inconsistencies
+```
+
+Equipment Assignment y Case logistics permanecen en la línea futura de Healthcare; no forman parte de UX-B.5H.

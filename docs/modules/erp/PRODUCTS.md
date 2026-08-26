@@ -2,10 +2,10 @@
 
 **Módulo:** Products
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.1.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** PRODUCTS V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-25
 **Responsable:** Zaping ERP Team
 
 ---
@@ -1992,3 +1992,135 @@ Inventory
 ```
 
 > **El catálogo identifica el producto. El inventario explica sus existencias.**
+
+---
+
+# 117. Products V1 — estado vigente
+
+**Estado:** IMPLEMENTED / VALIDATED.
+
+Products V1 administra datos maestros de catálogo por Company:
+
+```text
+SKU
+name
+description
+brand
+Category
+barcode
+cost
+price
+minStock
+inventoryTracking
+lotTracking
+active / inactive lifecycle
+```
+
+`Product.stock` continúa persistido como estado operacional, pero Product CRUD no es propietario de sus movimientos.
+
+## 117.1 Política de stock
+
+```text
+POST /products
+→ no acepta stock del cliente
+→ Product nuevo usa el default backend / Prisma stock = 0
+
+PATCH /products/:id
+→ no acepta stock
+```
+
+El stock actual se muestra como solo lectura en `/products`. `minStock` permanece editable.
+
+## 117.2 Estrategias de tracking
+
+Valores implementados:
+
+```text
+inventoryTracking
+├── QUANTITY
+├── SERIALIZED
+└── ASSET
+
+lotTracking
+├── NONE
+├── OPTIONAL
+└── REQUIRED
+```
+
+Ambas estrategias pueden elegirse al crear un Product. El `PATCH` normal no permite modificar `inventoryTracking` ni `lotTracking`; cualquier migración futura requiere un workflow explícito que todavía no existe.
+
+## 117.3 Seguridad de Category
+
+Cuando se proporciona `categoryId`, la Category debe pertenecer a la Company autenticada y estar activa. Se rechazan categorías inexistentes, inactivas o de otro tenant.
+
+```text
+categoryId = null
+→ limpia la Category
+
+categoryId omitido en PATCH
+→ conserva la Category actual
+```
+
+## 117.4 Consulta y ciclo de vida
+
+La convención vigente es:
+
+```text
+ProductsService.findOne(companyId, productId)
+```
+
+`GET /products/:id` está aislado por tenant. `GET /products/low-stock` se declara antes de la ruta dinámica y ya no queda sombreado por `GET /products/:id`.
+
+La ruta pública `DELETE /products/:id` implementa desactivación, no eliminación física:
+
+```text
+ACTIVE Product
+→ isActive = false
+
+GET /products
+→ sólo Products activos
+
+GET /products/:id
+→ Product inactivo recuperable para auditoría e historia
+```
+
+La desactivación repetida es segura e idempotente. No existe workflow de reactivación.
+
+## 117.5 Frontend Products V1
+
+`/products` incluye:
+
+* Brand corregido;
+* selector de Category;
+* selectores de `inventoryTracking` y `lotTracking` en creación;
+* tracking de solo lectura durante edición;
+* stock actual de solo lectura;
+* stock mínimo editable;
+* lenguaje de desactivación no destructivo;
+* lista de Products activos;
+* tabla y formulario responsivos.
+
+## 117.6 Validación y deuda
+
+Evidencia registrada:
+
+```text
+Products backend
+43 suites / 413 tests PASS
+
+Products frontend
+14 tests PASS
+
+Frontend final vigente
+25 files / 336 tests PASS
+
+build / lint / git diff --check
+PASS
+```
+
+Deuda abierta:
+
+```text
+Product reactivation workflow
+tracking migration workflow
+```
