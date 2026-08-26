@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -93,6 +94,24 @@ function matchesSearch(sale: Sale, normalizedSearch: string): boolean {
 }
 
 export default function SalesPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer>
+          <Loading message="Cargando ventas..." />
+        </PageContainer>
+      }
+    >
+      <SalesPageContent />
+    </Suspense>
+  );
+}
+
+function SalesPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const saleId = searchParams.get('saleId')?.trim() || null;
+  const openedSaleId = useRef<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [customers, setCustomers] = useState<SaleCustomer[]>([]);
   const [products, setProducts] = useState<SaleProduct[]>([]);
@@ -156,10 +175,35 @@ export default function SalesPage() {
     detailLoading,
     detailError,
     openSaleDetail,
+    openSaleDetailById,
     closeSaleDetail,
     loadSaleDetail,
     retrySaleDetail,
   } = useSaleDetail();
+
+  useEffect(() => {
+    if (!saleId) {
+      openedSaleId.current = null;
+      return;
+    }
+
+    if (openedSaleId.current === saleId) {
+      return;
+    }
+
+    openedSaleId.current = saleId;
+    void openSaleDetailById(saleId);
+    // The sale-id guard makes this one-shot despite the local modal handler.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saleId]);
+
+  function closeSaleDetailWithUrlCleanup() {
+    closeSaleDetail();
+
+    if (saleId) {
+      router.replace('/sales');
+    }
+  }
 
   const {
     saleToApprove,
@@ -391,7 +435,7 @@ export default function SalesPage() {
         actionInProgress={approving || cancelling}
         formatDate={formatDate}
         formatMoney={formatMoney}
-        onClose={closeSaleDetail}
+        onClose={closeSaleDetailWithUrlCleanup}
         onRetry={retrySaleDetail}
         onApprove={openApproveDialog}
         onCancel={openCancelDialog}

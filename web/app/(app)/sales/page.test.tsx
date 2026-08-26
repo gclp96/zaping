@@ -26,6 +26,11 @@ import type {
   SaleProduct,
 } from './types';
 
+const navigationMock = vi.hoisted(() => ({
+  replace: vi.fn(),
+  search: '',
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
@@ -39,6 +44,11 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => navigationMock,
+  useSearchParams: () => new URLSearchParams(navigationMock.search),
 }));
 
 const customer: SaleCustomer = {
@@ -284,6 +294,7 @@ let anchorClickSpy: ReturnType<typeof vi.spyOn>;
 describe('SalesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.search = '';
 
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -325,6 +336,79 @@ describe('SalesPage', () => {
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/sales');
     });
+  });
+
+  it('abre el detalle existente desde saleId usando el backend como fuente de verdad', async () => {
+    const linkedSale: Sale = {
+      ...confirmedSale,
+      id: 'sale-123',
+      folio: 'V-000123',
+    };
+    navigationMock.search = 'saleId=sale-123';
+    configureApiMocks({
+      sales: [baseSale],
+      saleDetails: {
+        'sale-123': linkedSale,
+      },
+    });
+
+    render(<SalesPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Detalle de venta' }),
+    ).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/sales/sale-123');
+    expect(await screen.findByText('V-000123')).toBeTruthy();
+    expect(screen.getByText(linkedSale.customer!.name)).toBeTruthy();
+  });
+
+  it('limpia el deep-link con replace al cerrar y conserva la lista usable', async () => {
+    const user = userEvent.setup();
+    navigationMock.search = 'saleId=sale-1';
+
+    render(<SalesPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Detalle de venta' }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+
+    expect(navigationMock.replace).toHaveBeenCalledWith('/sales');
+    expect(
+      screen.queryByRole('heading', { name: 'Detalle de venta' }),
+    ).toBeNull();
+    expect(screen.getByText(baseSale.folio)).toBeTruthy();
+  });
+
+  it('mantiene la ruta normal sin abrir ni solicitar un detalle', async () => {
+    render(<SalesPage />);
+
+    expect(await screen.findByText(baseSale.folio)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Detalle de venta' }),
+    ).toBeNull();
+    expect(api.get).not.toHaveBeenCalledWith(`/sales/${baseSale.id}`);
+    expect(navigationMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('muestra el error de un saleId inválido y permite volver a la lista', async () => {
+    const user = userEvent.setup();
+    navigationMock.search = 'saleId=sale-missing';
+
+    render(<SalesPage />);
+
+    expect(
+      await screen.findByText('No fue posible cargar el detalle de la venta.'),
+    ).toBeTruthy();
+    expect(screen.getByText(baseSale.folio)).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+    expect(navigationMock.replace).toHaveBeenCalledWith('/sales');
+    expect(
+      screen.queryByText('No fue posible cargar el detalle de la venta.'),
+    ).toBeNull();
+    expect(screen.getByText(baseSale.folio)).toBeTruthy();
   });
 
   it('muestra el estado de carga', () => {

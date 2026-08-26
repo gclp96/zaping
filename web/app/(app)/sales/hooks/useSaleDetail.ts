@@ -34,9 +34,13 @@ export function useSaleDetail() {
     }
   }
 
+  async function openSaleDetailById(saleId: string) {
+    setSaleIdToView(saleId);
+    await loadSaleDetail(saleId);
+  }
+
   async function openSaleDetail(sale: Sale) {
-    setSaleIdToView(sale.id);
-    await loadSaleDetail(sale.id);
+    await openSaleDetailById(sale.id);
   }
 
   function closeSaleDetail() {
@@ -60,6 +64,7 @@ export function useSaleDetail() {
     detailLoading,
     detailError,
     openSaleDetail,
+    openSaleDetailById,
     closeSaleDetail,
     loadSaleDetail,
     retrySaleDetail,
