@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
-import type { Quote } from '../types';
+import type { CreatedSale, Quote } from '../types';
 
 type UseQuoteActionsParams = {
   onQuoteChanged: () => Promise<void>;
@@ -29,12 +29,21 @@ export function useQuoteActions({
   const [converting, setConverting] =
     useState(false);
 
+  const [actionError, setActionError] =
+    useState('');
+
+  const [createdSale, setCreatedSale] =
+    useState<CreatedSale | null>(null);
+
+  const conversionInFlight = useRef(false);
+
   const [
     downloadingQuoteId,
     setDownloadingQuoteId,
   ] = useState<string | null>(null);
 
   function openApproveDialog(quote: Quote) {
+    setActionError('');
     setQuoteToApprove(quote);
   }
 
@@ -44,9 +53,11 @@ export function useQuoteActions({
     }
 
     setQuoteToApprove(null);
+    setActionError('');
   }
 
   function openCancelDialog(quote: Quote) {
+    setActionError('');
     setQuoteToCancel(quote);
   }
 
@@ -56,9 +67,11 @@ export function useQuoteActions({
     }
 
     setQuoteToCancel(null);
+    setActionError('');
   }
 
   function openConvertDialog(quote: Quote) {
+    setActionError('');
     setQuoteToConvert(quote);
   }
 
@@ -68,15 +81,26 @@ export function useQuoteActions({
     }
 
     setQuoteToConvert(null);
+    setActionError('');
+  }
+
+  function clearActionError() {
+    setActionError('');
+  }
+
+  function closeCreatedSale() {
+    setCreatedSale(null);
+    setActionError('');
   }
 
   async function handleApproveQuote() {
-    if (!quoteToApprove) {
+    if (!quoteToApprove || approving) {
       return;
     }
 
     try {
       setApproving(true);
+      setActionError('');
 
       await api.patch(
         `/quotes/${quoteToApprove.id}/approve`,
@@ -88,7 +112,7 @@ export function useQuoteActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible aprobar la cotización.',
@@ -100,12 +124,13 @@ export function useQuoteActions({
   }
 
   async function handleCancelQuote() {
-    if (!quoteToCancel) {
+    if (!quoteToCancel || cancelling) {
       return;
     }
 
     try {
       setCancelling(true);
+      setActionError('');
 
       await api.patch(
         `/quotes/${quoteToCancel.id}/cancel`,
@@ -117,7 +142,7 @@ export function useQuoteActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible cancelar la cotización.',
@@ -129,30 +154,49 @@ export function useQuoteActions({
   }
 
   async function handleConvertToSale() {
-    if (!quoteToConvert) {
+    if (!quoteToConvert || conversionInFlight.current) {
       return;
     }
 
+    conversionInFlight.current = true;
+
     try {
       setConverting(true);
+      setActionError('');
 
-      await api.post(
+      const response = await api.post<CreatedSale>(
         `/sales/from-quote/${quoteToConvert.id}`,
       );
 
-      await onQuoteChanged();
-
       setQuoteToConvert(null);
+      setCreatedSale({
+        id: response.data.id,
+        folio: response.data.folio,
+      });
+
+      try {
+        await onQuoteChanged();
+      } catch (error: unknown) {
+        console.error(error);
+
+        setActionError(
+          getApiErrorMessage(
+            error,
+            'La venta se creó, pero no fue posible actualizar el estado de la cotización.',
+          ),
+        );
+      }
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible convertir la cotización en venta.',
         ),
       );
     } finally {
+      conversionInFlight.current = false;
       setConverting(false);
     }
   }
@@ -162,6 +206,7 @@ export function useQuoteActions({
 
     try {
       setDownloadingQuoteId(quote.id);
+      setActionError('');
 
       const response = await api.get(
         `/quotes/${quote.id}/pdf`,
@@ -187,7 +232,7 @@ export function useQuoteActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible descargar el PDF.',
@@ -211,6 +256,8 @@ export function useQuoteActions({
     cancelling,
     converting,
     downloadingQuoteId,
+    actionError,
+    createdSale,
 
     openApproveDialog,
     closeApproveDialog,
@@ -220,6 +267,9 @@ export function useQuoteActions({
 
     openConvertDialog,
     closeConvertDialog,
+
+    clearActionError,
+    closeCreatedSale,
 
     handleApproveQuote,
     handleCancelQuote,

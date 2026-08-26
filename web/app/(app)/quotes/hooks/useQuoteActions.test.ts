@@ -94,7 +94,6 @@ function setupHook() {
 }
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 let linkClickSpy: ReturnType<typeof vi.spyOn>;
 
 const createObjectURLMock = vi.fn();
@@ -135,10 +134,6 @@ describe('useQuoteActions', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
 
-    alertSpy = vi
-      .spyOn(window, 'alert')
-      .mockImplementation(() => undefined);
-
     linkClickSpy = vi
       .spyOn(
         HTMLAnchorElement.prototype,
@@ -149,7 +144,6 @@ describe('useQuoteActions', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
-    alertSpy.mockRestore();
     linkClickSpy.mockRestore();
 
     cleanup();
@@ -177,6 +171,9 @@ describe('useQuoteActions', () => {
     expect(
       result.current.downloadingQuoteId,
     ).toBeNull();
+
+    expect(result.current.actionError).toBe('');
+    expect(result.current.createdSale).toBeNull();
   });
 
   it('abre y cierra los diálogos de acciones', () => {
@@ -295,7 +292,7 @@ describe('useQuoteActions', () => {
       onQuoteChanged,
     ).not.toHaveBeenCalled();
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible aprobar la cotización.',
     );
   });
@@ -362,7 +359,7 @@ describe('useQuoteActions', () => {
       onQuoteChanged,
     ).not.toHaveBeenCalled();
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible cancelar la cotización.',
     );
   });
@@ -376,8 +373,7 @@ describe('useQuoteActions', () => {
     vi.mocked(api.post).mockResolvedValue({
       data: {
         id: 'sale-1',
-        quoteId: confirmedQuote.id,
-        status: 'CONFIRMED',
+        folio: 'V-000001',
       },
     } as never);
 
@@ -404,7 +400,10 @@ describe('useQuoteActions', () => {
     ).toBeNull();
 
     expect(result.current.converting).toBe(false);
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(result.current.createdSale).toEqual({
+      id: 'sale-1',
+      folio: 'V-000001',
+    });
   });
 
   it('mantiene abierto el diálogo cuando falla la conversión', async () => {
@@ -437,13 +436,87 @@ describe('useQuoteActions', () => {
 
     expect(result.current.converting).toBe(false);
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible convertir la cotización en venta.',
     );
+    expect(result.current.createdSale).toBeNull();
 
     expect(consoleErrorSpy).toHaveBeenCalledTimes(
       1,
     );
+  });
+
+  it('bloquea una segunda conversión mientras la primera sigue pendiente', async () => {
+    const { result } = setupHook();
+    let resolveRequest!: (value: unknown) => void;
+    const request = new Promise((resolve) => {
+      resolveRequest = resolve;
+    });
+
+    vi.mocked(api.post).mockReturnValue(request as never);
+
+    act(() => {
+      result.current.openConvertDialog(confirmedQuote);
+    });
+
+    let firstRequest!: Promise<void>;
+    act(() => {
+      firstRequest = result.current.handleConvertToSale();
+      void result.current.handleConvertToSale();
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRequest({
+        data: {
+          id: 'sale-1',
+          folio: 'V-000001',
+        },
+      });
+      await firstRequest;
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it('conserva el éxito cuando falla solo la recarga posterior', async () => {
+    const { result, onQuoteChanged } = setupHook();
+
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        id: 'sale-1',
+        folio: 'V-000001',
+      },
+    } as never);
+    onQuoteChanged.mockRejectedValue(
+      new Error('No fue posible recargar'),
+    );
+
+    act(() => {
+      result.current.openConvertDialog(confirmedQuote);
+    });
+
+    await act(async () => {
+      await result.current.handleConvertToSale();
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(result.current.quoteToConvert).toBeNull();
+    expect(result.current.createdSale).toEqual({
+      id: 'sale-1',
+      folio: 'V-000001',
+    });
+    expect(result.current.actionError).toBe(
+      'La venta se creó, pero no fue posible actualizar el estado de la cotización.',
+    );
+
+    act(() => {
+      result.current.closeCreatedSale();
+    });
+
+    expect(result.current.createdSale).toBeNull();
+    expect(result.current.actionError).toBe('');
   });
 
   it('descarga el PDF y libera la URL temporal', async () => {
@@ -507,7 +580,7 @@ describe('useQuoteActions', () => {
       );
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible descargar el PDF.',
     );
 

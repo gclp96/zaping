@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import EmptyState from '@/app/components/ui/EmptyState';
+import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
+import Modal from '@/app/components/ui/Modal';
 import Table from '@/app/components/ui/Table';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
@@ -30,7 +33,26 @@ import type {
   Customer,
   Product,
   Quote,
+  QuoteStatus,
 } from './types';
+
+type StatusFilter = 'ALL' | QuoteStatus;
+
+const statusFilterOptions: Array<{
+  value: StatusFilter;
+  label: string;
+}> = [
+  { value: 'ALL', label: 'Todos' },
+  { value: 'DRAFT', label: getQuoteStatusDescriptor('DRAFT').label },
+  {
+    value: 'CONFIRMED',
+    label: getQuoteStatusDescriptor('CONFIRMED').label,
+  },
+  {
+    value: 'CANCELLED',
+    label: getQuoteStatusDescriptor('CANCELLED').label,
+  },
+];
 
 const moneyFormatter = new Intl.NumberFormat(
   'es-MX',
@@ -57,7 +79,27 @@ function formatDate(value: string): string {
   return dateFormatter.format(new Date(value));
 }
 
+function quoteMatchesSearch(quote: Quote, search: string): boolean {
+  const normalizedSearch = search.trim().toLocaleLowerCase('es-MX');
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  const values = [
+    quote.folio,
+    quote.customer.name,
+    quote.customer.email,
+    ...quote.items.flatMap((item) => [item.product.sku, item.product.name]),
+  ];
+
+  return values.some((value) =>
+    value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
+  );
+}
+
 export default function QuotesPage() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Quote[]>(
     [],
   );
@@ -77,9 +119,12 @@ export default function QuotesPage() {
     useState(true);
 
   const [customerFormOpen, setCustomerFormOpen] =
-  useState(false);
+    useState(false);
 
   const [pageError, setPageError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>('ALL');
 
   async function loadQuotes() {
     const response =
@@ -89,31 +134,46 @@ export default function QuotesPage() {
   }
 
   const {
-  quoteToApprove,
-  quoteToCancel,
-  quoteToConvert,
+    quoteToApprove,
+    quoteToCancel,
+    quoteToConvert,
 
-  approving,
-  cancelling,
-  converting,
-  downloadingQuoteId,
+    approving,
+    cancelling,
+    converting,
+    downloadingQuoteId,
+    actionError,
+    createdSale,
 
-  openApproveDialog,
-  closeApproveDialog,
+    openApproveDialog,
+    closeApproveDialog,
 
-  openCancelDialog,
-  closeCancelDialog,
+    openCancelDialog,
+    closeCancelDialog,
 
-  openConvertDialog,
-  closeConvertDialog,
+    openConvertDialog,
+    closeConvertDialog,
 
-  handleApproveQuote,
-  handleCancelQuote,
-  handleConvertToSale,
-  handleDownloadPdf,
-} = useQuoteActions({
-  onQuoteChanged: loadQuotes,
-});
+    clearActionError,
+    closeCreatedSale,
+
+    handleApproveQuote,
+    handleCancelQuote,
+    handleConvertToSale,
+    handleDownloadPdf,
+  } = useQuoteActions({
+    onQuoteChanged: loadQuotes,
+  });
+
+  const filteredQuotes = useMemo(
+    () =>
+      quotes.filter(
+        (quote) =>
+          (statusFilter === 'ALL' || quote.status === statusFilter) &&
+          quoteMatchesSearch(quote, search),
+      ),
+    [quotes, search, statusFilter],
+  );
 
   const {
     openModal,
@@ -189,7 +249,25 @@ export default function QuotesPage() {
     void loadPageData();
   }, []);
 
-  const tableData = quotes.map((quote) => {
+  function closeQuoteDetail() {
+    setQuoteToView(null);
+    clearActionError();
+  }
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('ALL');
+  }
+
+  const actionErrorHasModal = Boolean(
+    quoteToView ||
+      quoteToApprove ||
+      quoteToCancel ||
+      quoteToConvert ||
+      createdSale,
+  );
+
+  const tableData = filteredQuotes.map((quote) => {
     const statusDescriptor =
       getQuoteStatusDescriptor(quote.status);
 
@@ -218,7 +296,10 @@ export default function QuotesPage() {
             variant="secondary"
             size="sm"
             className="min-w-24"
-            onClick={() => setQuoteToView(quote)}
+            onClick={() => {
+              clearActionError();
+              setQuoteToView(quote);
+            }}
           >
             Ver detalle
           </Button>
@@ -279,6 +360,23 @@ export default function QuotesPage() {
           }
         />
 
+        {actionError && !actionErrorHasModal ? (
+          <div
+            role="alert"
+            className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>{actionError}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearActionError}
+            >
+              Cerrar mensaje
+            </Button>
+          </div>
+        ) : null}
+
         {pageLoading ? (
           <Loading message="Cargando cotizaciones..." />
         ) : pageError ? (
@@ -301,21 +399,71 @@ export default function QuotesPage() {
           <EmptyState
             title="No hay cotizaciones registradas"
             description="Comienza creando tu primera cotización."
+            action={
+              <Button type="button" onClick={openCreateModal}>
+                Nueva cotización
+              </Button>
+            }
           />
         ) : (
           <Section>
-            <Table
-              headers={[
-                'Folio',
-                'Cliente',
-                'Fecha',
-                'Partidas',
-                'Total',
-                'Estado',
-                'Acciones',
-              ]}
-              data={tableData}
-            />
+            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
+              <Input
+                label="Buscar cotizaciones"
+                type="search"
+                value={search}
+                placeholder="Folio, cliente, email, SKU o producto"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+
+              <div className="flex w-full flex-col gap-2">
+                <label
+                  htmlFor="quotes-status-filter"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Estado
+                </label>
+                <select
+                  id="quotes-status-filter"
+                  value={statusFilter}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as StatusFilter)
+                  }
+                >
+                  {statusFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {filteredQuotes.length === 0 ? (
+              <EmptyState
+                title="No se encontraron cotizaciones"
+                description="No hay cotizaciones que coincidan con la búsqueda y el estado seleccionados."
+                action={
+                  <Button type="button" variant="outline" onClick={clearFilters}>
+                    Limpiar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <Table
+                headers={[
+                  'Folio',
+                  'Cliente',
+                  'Fecha',
+                  'Partidas',
+                  'Total',
+                  'Estado',
+                  'Acciones',
+                ]}
+                data={tableData}
+              />
+            )}
           </Section>
         )}
       </PageContainer>
@@ -391,9 +539,10 @@ export default function QuotesPage() {
           downloadingQuoteId === quoteToView.id
         }
         converting={converting}
+        actionError={actionError}
         formatDate={formatDate}
         formatMoney={formatMoney}
-        onClose={() => setQuoteToView(null)}
+        onClose={closeQuoteDetail}
         onApprove={(quote) => {
           setQuoteToView(null);
           openApproveDialog(quote);
@@ -415,16 +564,23 @@ export default function QuotesPage() {
         isOpen={quoteToApprove !== null}
         title="Aprobar cotización"
         message={
-          <>
-            ¿Seguro que deseas aprobar la
-            cotización{' '}
-            <span className="font-semibold">
-              {quoteToApprove?.folio}
-            </span>
-            ? La cotización quedará confirmada.
-            Esta acción no modificará el
-            inventario.
-          </>
+          <div className="space-y-3">
+            <p>
+              ¿Seguro que deseas aprobar la
+              cotización{' '}
+              <span className="font-semibold">
+                {quoteToApprove?.folio}
+              </span>
+              ? La cotización quedará confirmada.
+              Esta acción no modificará el
+              inventario.
+            </p>
+            {actionError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {actionError}
+              </p>
+            ) : null}
+          </div>
         }
         confirmText="Aprobar"
         loadingText="Aprobando..."
@@ -440,15 +596,22 @@ export default function QuotesPage() {
         isOpen={quoteToCancel !== null}
         title="Cancelar cotización"
         message={
-          <>
-            ¿Seguro que deseas cancelar la
-            cotización{' '}
-            <span className="font-semibold">
-              {quoteToCancel?.folio}
-            </span>
-            ? Permanecerá registrada, pero ya no
-            podrá aprobarse.
-          </>
+          <div className="space-y-3">
+            <p>
+              ¿Seguro que deseas cancelar la
+              cotización{' '}
+              <span className="font-semibold">
+                {quoteToCancel?.folio}
+              </span>
+              ? Permanecerá registrada, pero ya no
+              podrá aprobarse.
+            </p>
+            {actionError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {actionError}
+              </p>
+            ) : null}
+          </div>
         }
         confirmText="Cancelar cotización"
         loadingText="Cancelando..."
@@ -480,6 +643,11 @@ export default function QuotesPage() {
                 después de confirmarse.
               </p>
             </div>
+            {actionError ? (
+              <p role="alert" className="mt-3 text-sm text-red-700">
+                {actionError}
+              </p>
+            ) : null}
           </>
         }
         confirmText="Convertir a venta"
@@ -491,7 +659,51 @@ export default function QuotesPage() {
           void handleConvertToSale()
         }
       />
-      
+
+      <Modal
+        isOpen={createdSale !== null}
+        title="Venta creada correctamente"
+        onClose={closeCreatedSale}
+      >
+        <div className="space-y-6">
+          <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-900">
+            <p className="text-sm">Venta generada</p>
+            <p className="mt-1 text-xl font-semibold">{createdSale?.folio}</p>
+            <p className="mt-2 text-sm">
+              La cotización fue convertida en una venta.
+            </p>
+          </div>
+
+          {actionError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+            >
+              {actionError}
+            </div>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={closeCreatedSale}>
+              Cerrar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (createdSale) {
+                  const createdSaleId = createdSale.id;
+                  closeCreatedSale();
+                  router.push(
+                    `/sales?saleId=${encodeURIComponent(createdSaleId)}`,
+                  );
+                }
+              }}
+            >
+              Ver venta
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

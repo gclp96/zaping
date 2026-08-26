@@ -27,6 +27,10 @@ import type {
   Quote,
 } from './types';
 
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
@@ -40,6 +44,10 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
 }));
 
 const customer: Customer = {
@@ -109,6 +117,37 @@ const convertedQuote: Quote = {
   convertedToSale: true,
 };
 
+const alternateConfirmedQuote: Quote = {
+  ...confirmedQuote,
+  id: 'quote-2',
+  folio: 'COT-0002',
+  customerId: 'customer-2',
+  customer: {
+    ...customer,
+    id: 'customer-2',
+    name: 'Clínica del Desierto',
+    email: 'compras@desierto.test',
+  },
+  items: [
+    {
+      ...draftQuote.items[0],
+      id: 'quote-item-2',
+      product: {
+        id: 'product-2',
+        sku: 'RX-200',
+        name: 'Reactivo especializado',
+      },
+    },
+  ],
+};
+
+const cancelledQuote: Quote = {
+  ...draftQuote,
+  id: 'quote-3',
+  folio: 'COT-0003',
+  status: 'CANCELLED',
+};
+
 function configureApiMocks(
   quotes: Quote[] = [draftQuote],
 ) {
@@ -156,8 +195,40 @@ function getDetailModal(
   return modal;
 }
 
+async function submitQuoteConversion(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await user.click(
+    screen.getByRole('button', { name: /ver detalle/i }),
+  );
+  const detailHeading = await screen.findByRole('heading', {
+    name: /cotización cot-0001/i,
+  });
+  const detailModal = getDetailModal(detailHeading);
+
+  await user.click(
+    within(detailModal).getByRole('button', {
+      name: /^convertir a venta$/i,
+    }),
+  );
+
+  const dialogHeading = await screen.findByRole('heading', {
+    name: /convertir cotización a venta/i,
+  });
+  const dialog = dialogHeading.parentElement?.parentElement;
+
+  if (!dialog) {
+    throw new Error('No fue posible localizar el diálogo de conversión');
+  }
+
+  await user.click(
+    within(dialog).getByRole('button', {
+      name: /^convertir a venta$/i,
+    }),
+  );
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 
 describe('QuotesPage', () => {
   beforeEach(() => {
@@ -167,16 +238,11 @@ describe('QuotesPage', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
 
-    alertSpy = vi
-      .spyOn(window, 'alert')
-      .mockImplementation(() => undefined);
-
     configureApiMocks();
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
-    alertSpy.mockRestore();
 
     cleanup();
   });
@@ -193,7 +259,13 @@ describe('QuotesPage', () => {
     ).toBeTruthy();
 
     expect(
-      screen.getByText('Borrador'),
+      screen.getByLabelText(
+        'Estado de la cotización: Borrador',
+      ),
+    ).toBeTruthy();
+
+    expect(
+      screen.getByText('$1,160.00'),
     ).toBeTruthy();
 
     expect(api.get).toHaveBeenCalledWith(
@@ -207,6 +279,88 @@ describe('QuotesPage', () => {
     expect(api.get).toHaveBeenCalledWith(
       '/products',
     );
+  });
+
+  it('busca por folio, cliente, email y producto, y muestra vacío contextual', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([draftQuote, alternateConfirmedQuote]);
+
+    render(<QuotesPage />);
+
+    await screen.findByText(draftQuote.folio);
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar cotizaciones',
+    });
+
+    for (const term of [
+      '  cot-0002  ',
+      'CLÍNICA DEL DESIERTO',
+      'compras@desierto.test',
+      'rx-200',
+      'REACTIVO ESPECIALIZADO',
+    ]) {
+      await user.clear(search);
+      await user.type(search, term);
+      expect(screen.getByText(alternateConfirmedQuote.folio)).toBeTruthy();
+      expect(screen.queryByText(draftQuote.folio)).toBeNull();
+    }
+
+    await user.clear(search);
+    await user.type(search, 'sin coincidencias');
+    expect(screen.getByText('No se encontraron cotizaciones')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No hay cotizaciones que coincidan con la búsqueda y el estado seleccionados.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('filtra los estados reales y combina estado con búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([
+      draftQuote,
+      alternateConfirmedQuote,
+      cancelledQuote,
+    ]);
+
+    render(<QuotesPage />);
+
+    await screen.findByText(draftQuote.folio);
+    const status = screen.getByRole('combobox', { name: 'Estado' });
+
+    expect(screen.getByRole('option', { name: 'Todos' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Borrador' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Aprobada' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Cancelada' })).toBeTruthy();
+
+    await user.selectOptions(status, 'CONFIRMED');
+    expect(screen.getByText(alternateConfirmedQuote.folio)).toBeTruthy();
+    expect(screen.queryByText(draftQuote.folio)).toBeNull();
+    expect(screen.queryByText(cancelledQuote.folio)).toBeNull();
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar cotizaciones' }),
+      'Hospital de prueba',
+    );
+    expect(screen.getByText('No se encontraron cotizaciones')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText(draftQuote.folio)).toBeTruthy();
+    expect(screen.getByText(alternateConfirmedQuote.folio)).toBeTruthy();
+    expect(screen.getByText(cancelledQuote.folio)).toBeTruthy();
+  });
+
+  it('muestra un estado vacío útil cuando no existen cotizaciones', async () => {
+    configureApiMocks([]);
+
+    render(<QuotesPage />);
+
+    expect(
+      await screen.findByText('No hay cotizaciones registradas'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Comienza creando tu primera cotización.'),
+    ).toBeTruthy();
   });
 
   it('registra un cliente desde la cotización y lo selecciona automáticamente', async () => {
@@ -464,6 +618,10 @@ describe('QuotesPage', () => {
         },
       ),
     ).toBeNull();
+
+    expect(
+      within(detailModal).queryByRole('button', { name: 'Ver venta' }),
+    ).toBeNull();
   });
 
   it('convierte una cotización confirmada y recarga su estado', async () => {
@@ -507,9 +665,8 @@ describe('QuotesPage', () => {
 
     vi.mocked(api.post).mockResolvedValue({
       data: {
-        id: 'sale-1',
-        quoteId: confirmedQuote.id,
-        status: 'CONFIRMED',
+        id: 'sale-123',
+        folio: 'V-000123',
       },
     } as never);
 
@@ -517,53 +674,7 @@ describe('QuotesPage', () => {
 
     await screen.findByText('COT-0001');
 
-    await user.click(
-      screen.getByRole('button', {
-        name: /ver detalle/i,
-      }),
-    );
-
-    const detailHeading =
-      await screen.findByRole('heading', {
-        name: /cotización cot-0001/i,
-      });
-
-    const detailModal =
-      getDetailModal(detailHeading);
-
-    await user.click(
-      within(detailModal).getByRole(
-        'button',
-        {
-          name: /^convertir a venta$/i,
-        },
-      ),
-    );
-
-    const dialogHeading =
-      await screen.findByRole('heading', {
-        name: /convertir cotización a venta/i,
-      });
-
-    const dialog =
-      dialogHeading.parentElement?.parentElement;
-
-    expect(dialog).not.toBeNull();
-
-    expect(
-      within(dialog as HTMLElement).getByText(
-        /descontará las existencias del inventario/i,
-      ),
-    ).toBeTruthy();
-
-    await user.click(
-      within(dialog as HTMLElement).getByRole(
-        'button',
-        {
-          name: /^convertir a venta$/i,
-        },
-      ),
-    );
+    await submitQuoteConversion(user);
 
     await waitFor(() => {
       expect(api.post).toHaveBeenCalledWith(
@@ -575,13 +686,25 @@ describe('QuotesPage', () => {
       expect(quoteRequestCount).toBe(2);
     });
 
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('heading', {
-          name: /convertir cotización a venta/i,
-        }),
-      ).toBeNull();
-    });
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Venta creada correctamente',
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText('V-000123')).toBeTruthy();
+    expect(
+      screen.getByText('La cotización fue convertida en una venta.'),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Venta creada correctamente',
+      }),
+    ).toBeNull();
+    expect(screen.getByText('COT-0001')).toBeTruthy();
 
     await user.click(
       screen.getByRole('button', {
@@ -611,8 +734,82 @@ describe('QuotesPage', () => {
         },
       ),
     ).toBeNull();
+  });
 
-    expect(alertSpy).not.toHaveBeenCalled();
+  it('navega a la venta creada usando el deep-link aprobado', async () => {
+    const user = userEvent.setup();
+    let quoteRequestCount = 0;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/quotes') {
+        quoteRequestCount += 1;
+        return {
+          data: [quoteRequestCount === 1 ? confirmedQuote : convertedQuote],
+        } as never;
+      }
+
+      if (endpoint === '/customers') {
+        return { data: [customer] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [product] } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+    vi.mocked(api.post).mockResolvedValue({
+      data: { id: 'sale-123', folio: 'V-000123' },
+    } as never);
+
+    render(<QuotesPage />);
+
+    await screen.findByText('COT-0001');
+    await submitQuoteConversion(user);
+    await screen.findByText('V-000123');
+    await user.click(screen.getByRole('button', { name: 'Ver venta' }));
+
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/sales?saleId=sale-123',
+    );
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Venta creada correctamente',
+      }),
+    ).toBeNull();
+  });
+
+  it('muestra el error de conversión sin navegar ni mostrar éxito', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([confirmedQuote]);
+    vi.mocked(api.post).mockRejectedValue(new Error('Stock insuficiente'));
+
+    render(<QuotesPage />);
+
+    await screen.findByText('COT-0001');
+    await submitQuoteConversion(user);
+
+    expect(
+      await screen.findByText(
+        'No fue posible convertir la cotización en venta.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Venta creada correctamente',
+      }),
+    ).toBeNull();
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Convertir a venta',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
   });
 
   it('permite buscar y seleccionar un cliente al crear una cotización', async () => {

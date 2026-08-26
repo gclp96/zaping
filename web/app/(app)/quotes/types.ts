@@ -59,6 +59,11 @@ export type Quote = {
   items: QuoteItem[];
 };
 
+export type CreatedSale = {
+  id: string;
+  folio: string;
+};
+
 export type QuoteFormItem = {
   productId: string;
   productName: string;
