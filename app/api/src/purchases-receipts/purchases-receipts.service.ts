@@ -3,7 +3,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InventoryMovementType, Prisma, PurchaseStatus } from '@prisma/client';
+import {
+  InventoryMovementType,
+  Prisma,
+  ProductLotTracking,
+  PurchaseStatus,
+} from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { EquipmentProvisioningService } from '../equipment/equipment-provisioning.service';
@@ -11,13 +16,26 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseReceiptItemDto } from './dto/create-purchase-receipt-item.dto';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
 
-interface ValidatedReceiptItem {
+interface NormalizedReceiptItem {
   purchaseItemId: string;
   productId: string;
   quantityReceived: number;
   unitCost: number;
   lotNumber?: string;
+  expirationDate?: string;
+}
+
+interface ValidatedReceiptItem extends Omit<
+  NormalizedReceiptItem,
+  'expirationDate'
+> {
   expirationDate?: Date;
+}
+
+interface ReceiptProduct {
+  id: string;
+  sku: string;
+  lotTracking: ProductLotTracking;
 }
 
 interface RegisterBatchData {
@@ -76,7 +94,7 @@ export class PurchaseReceiptsService {
           purchase.items.map((item) => [item.id, item]),
         );
 
-        const validatedItems: ValidatedReceiptItem[] = dto.items.map(
+        const normalizedItems: NormalizedReceiptItem[] = dto.items.map(
           (inputItem) => {
             const purchaseItem = purchaseItemsById.get(
               inputItem.purchaseItemId,
@@ -109,32 +127,33 @@ export class PurchaseReceiptsService {
 
             const lotNumber = this.normalizeOptionalText(inputItem.lotNumber);
 
-            const expirationDate = this.parseExpirationDate(
-              inputItem.expirationDate,
-              receivedAt,
-            );
-
-            if (expirationDate && !lotNumber) {
-              throw new BadRequestException(
-                'No se puede registrar una fecha de caducidad sin número de lote',
-              );
-            }
-
             return {
               purchaseItemId: purchaseItem.id,
               productId: purchaseItem.productId,
               quantityReceived: inputItem.quantityReceived,
               unitCost: purchaseItem.price,
               lotNumber,
-              expirationDate,
+              expirationDate: inputItem.expirationDate,
             };
           },
         );
 
-        await this.validateProducts(
+        const productsById = await this.validateProducts(
           tx,
           companyId,
-          validatedItems.map((item) => item.productId),
+          normalizedItems.map((item) => item.productId),
+        );
+
+        this.validateLotTracking(normalizedItems, productsById);
+
+        const validatedItems: ValidatedReceiptItem[] = normalizedItems.map(
+          (item) => ({
+            ...item,
+            expirationDate: this.parseExpirationDate(
+              item.expirationDate,
+              receivedAt,
+            ),
+          }),
         );
 
         const receipt = await tx.purchaseReceipt.create({
@@ -447,7 +466,7 @@ export class PurchaseReceiptsService {
     tx: Prisma.TransactionClient,
     companyId: string,
     productIds: string[],
-  ): Promise<void> {
+  ): Promise<Map<string, ReceiptProduct>> {
     const uniqueProductIds = [...new Set(productIds)];
 
     const products = await tx.product.findMany({
@@ -459,17 +478,60 @@ export class PurchaseReceiptsService {
       },
       select: {
         id: true,
+        sku: true,
+        lotTracking: true,
       },
     });
 
-    const existingProductIds = new Set(products.map((product) => product.id));
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
 
     const missingProductId = uniqueProductIds.find(
-      (productId) => !existingProductIds.has(productId),
+      (productId) => !productsById.has(productId),
     );
 
     if (missingProductId) {
       throw new NotFoundException(`Producto ${missingProductId} no encontrado`);
+    }
+
+    return productsById;
+  }
+
+  private validateLotTracking(
+    items: NormalizedReceiptItem[],
+    productsById: Map<string, ReceiptProduct>,
+  ): void {
+    for (const item of items) {
+      const product = productsById.get(item.productId);
+
+      if (!product) {
+        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
+      }
+
+      if (
+        product.lotTracking === ProductLotTracking.NONE &&
+        (item.lotNumber || item.expirationDate)
+      ) {
+        throw new BadRequestException(
+          `El producto ${product.sku} no permite seguimiento por lote`,
+        );
+      }
+
+      if (
+        product.lotTracking === ProductLotTracking.REQUIRED &&
+        !item.lotNumber
+      ) {
+        throw new BadRequestException(
+          `El producto ${product.sku} requiere número de lote`,
+        );
+      }
+
+      if (item.expirationDate && !item.lotNumber) {
+        throw new BadRequestException(
+          'No se puede registrar una fecha de caducidad sin número de lote',
+        );
+      }
     }
   }
 
