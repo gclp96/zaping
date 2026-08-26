@@ -105,6 +105,11 @@ const previousReceipt: PurchaseReceipt = {
   ],
 };
 
+const firstIdempotencyKey =
+  '11111111-1111-4111-8111-111111111111';
+const secondIdempotencyKey =
+  '22222222-2222-4222-8222-222222222222';
+
 function setupHook(
   purchaseReceipts: PurchaseReceipt[] = [
     previousReceipt,
@@ -133,6 +138,10 @@ describe('usePurchaseReceipts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.post).mockReset();
+    vi.spyOn(
+      globalThis.crypto,
+      'randomUUID',
+    ).mockReturnValue(firstIdempotencyKey);
 
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -141,6 +150,7 @@ describe('usePurchaseReceipts', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    vi.restoreAllMocks();
     cleanup();
   });
 
@@ -344,7 +354,20 @@ describe('usePurchaseReceipts', () => {
           },
         ],
       },
+      {
+        headers: {
+          'Idempotency-Key':
+            firstIdempotencyKey,
+        },
+      },
     );
+
+    expect(
+      globalThis.crypto.randomUUID,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      api.post.mock.calls[0]?.[1],
+    ).not.toHaveProperty('idempotencyKey');
 
     expect(
       onReceiptCreated,
@@ -361,6 +384,167 @@ describe('usePurchaseReceipts', () => {
     expect(result.current.receiptNotes).toBe('');
     expect(result.current.receiptFormError).toBe('');
     expect(result.current.receiptSaving).toBe(false);
+  });
+
+  it('reutiliza la misma clave al reintentar después de un error', async () => {
+    const { result } = setupHook();
+
+    vi.mocked(api.post)
+      .mockRejectedValueOnce(
+        new Error('Error transitorio'),
+      )
+      .mockResolvedValueOnce({
+        data: {
+          id: 'receipt-retry',
+        },
+      } as never);
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '2',
+      );
+    });
+
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(api.post.mock.calls[0]?.[2]).toEqual({
+      headers: {
+        'Idempotency-Key': firstIdempotencyKey,
+      },
+    });
+    expect(api.post.mock.calls[1]?.[2]).toEqual({
+      headers: {
+        'Idempotency-Key': firstIdempotencyKey,
+      },
+    });
+    expect(
+      globalThis.crypto.randomUUID,
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it('genera otra clave después de completar y abrir una nueva recepción', async () => {
+    vi.mocked(globalThis.crypto.randomUUID)
+      .mockReset()
+      .mockReturnValueOnce(firstIdempotencyKey)
+      .mockReturnValueOnce(secondIdempotencyKey);
+
+    const { result } = setupHook();
+
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        id: 'receipt-success',
+      },
+    } as never);
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '2',
+      );
+    });
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '1',
+      );
+    });
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    expect(api.post.mock.calls[0]?.[2]).toEqual({
+      headers: {
+        'Idempotency-Key': firstIdempotencyKey,
+      },
+    });
+    expect(api.post.mock.calls[1]?.[2]).toEqual({
+      headers: {
+        'Idempotency-Key': secondIdempotencyKey,
+      },
+    });
+  });
+
+  it('bloquea un segundo envío mientras el primero sigue pendiente', async () => {
+    let resolvePost:
+      | ((value: unknown) => void)
+      | undefined;
+
+    const pendingPost = new Promise((resolve) => {
+      resolvePost = resolve;
+    });
+
+    vi.mocked(api.post).mockReturnValue(
+      pendingPost as never,
+    );
+
+    const { result } = setupHook();
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '2',
+      );
+    });
+
+    let firstSubmission:
+      | Promise<void>
+      | undefined;
+    let secondSubmission:
+      | Promise<void>
+      | undefined;
+
+    act(() => {
+      firstSubmission =
+        result.current.handleCreateReceipt();
+      secondSubmission =
+        result.current.handleCreateReceipt();
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePost?.({
+        data: {
+          id: 'receipt-pending',
+        },
+      });
+
+      await Promise.all([
+        firstSubmission,
+        secondSubmission,
+      ]);
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
   });
 
   it('mantiene abierto el formulario cuando el backend falla', async () => {

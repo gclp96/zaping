@@ -137,6 +137,10 @@ enum ProductLotTracking {
   REQUIRED
 }
 
+enum IdempotencyScope {
+  PURCHASE_RECEIPT_CREATE
+}
+
 enum EquipmentLifecycle {
   ACTIVE
   RETIRED
@@ -348,6 +352,7 @@ model Company {
   equipmentAssets      EquipmentAsset[]
   equipmentInspections EquipmentInspection[]
   companySequences     CompanySequence[]
+  idempotencyRecords   IdempotencyRecord[]
   purchaseReceipts     PurchaseReceipt[]
   purchaseReceiptItems PurchaseReceiptItem[]
   products             Product[]
@@ -375,6 +380,21 @@ model CompanySequence {
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, key])
+}
+
+model IdempotencyRecord {
+  id          String           @id @default(uuid())
+  companyId   String
+  scope       IdempotencyScope
+  key         String
+  requestHash String
+  resourceId  String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+
+  @@unique([companyId, scope, key])
 }
 
 enum HealthcareCaseStatus {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -28,14 +28,19 @@ export function usePurchaseReceipts({
 
   const [receiptNotes, setReceiptNotes] = useState('');
   const [receiptSaving, setReceiptSaving] = useState(false);
+  const [receiptIdempotencyKey, setReceiptIdempotencyKey] =
+    useState<string | null>(null);
   const [receiptFormError, setReceiptFormError] =
     useState('');
+  const receiptSubmissionInFlight = useRef(false);
 
   function resetReceiptForm() {
     setPurchaseToReceive(null);
     setReceiptFormItems([]);
     setReceiptNotes('');
     setReceiptFormError('');
+    setReceiptIdempotencyKey(null);
+    receiptSubmissionInFlight.current = false;
   }
 
   function openReceiptModal(purchase: Purchase) {
@@ -96,6 +101,7 @@ export function usePurchaseReceipts({
     setReceiptFormItems(formItems);
     setReceiptNotes('');
     setReceiptFormError('');
+    setReceiptIdempotencyKey(crypto.randomUUID());
   }
 
   function closeReceiptModal() {
@@ -131,7 +137,11 @@ export function usePurchaseReceipts({
   }
 
   async function handleCreateReceipt() {
-    if (!purchaseToReceive) {
+    if (
+      !purchaseToReceive ||
+      !receiptIdempotencyKey ||
+      receiptSubmissionInFlight.current
+    ) {
       return;
     }
 
@@ -185,25 +195,34 @@ export function usePurchaseReceipts({
     }
 
     try {
+      receiptSubmissionInFlight.current = true;
       setReceiptSaving(true);
 
-      await api.post('/purchase-receipts', {
-        purchaseId: purchaseToReceive.id,
-        notes:
-          receiptNotes.trim() || undefined,
-        items: selectedItems.map((item) => ({
-          purchaseItemId:
-            item.purchaseItemId,
-          quantityReceived: Number(
-            item.quantityReceived,
-          ),
-          lotNumber:
-            item.lotNumber.trim() || undefined,
-          expirationDate:
-            item.expirationDate.trim() ||
-            undefined,
-        })),
-      });
+      await api.post(
+        '/purchase-receipts',
+        {
+          purchaseId: purchaseToReceive.id,
+          notes:
+            receiptNotes.trim() || undefined,
+          items: selectedItems.map((item) => ({
+            purchaseItemId:
+              item.purchaseItemId,
+            quantityReceived: Number(
+              item.quantityReceived,
+            ),
+            lotNumber:
+              item.lotNumber.trim() || undefined,
+            expirationDate:
+              item.expirationDate.trim() ||
+              undefined,
+          })),
+        },
+        {
+          headers: {
+            'Idempotency-Key': receiptIdempotencyKey,
+          },
+        },
+      );
 
       await onReceiptCreated();
 
@@ -218,6 +237,7 @@ export function usePurchaseReceipts({
         ),
       );
     } finally {
+      receiptSubmissionInFlight.current = false;
       setReceiptSaving(false);
     }
   }

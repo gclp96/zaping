@@ -37,6 +37,9 @@ vi.mock('@/services/errors', () => ({
   ) => fallbackMessage,
 }));
 
+const receiptIdempotencyKey =
+  '11111111-1111-4111-8111-111111111111';
+
 const purchase = {
   id: 'purchase-1',
   folio: 'OC-0001',
@@ -205,6 +208,10 @@ async function selectProduct(
 describe('PurchasesPage — recepciones', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(
+      globalThis.crypto,
+      'randomUUID',
+    ).mockReturnValue(receiptIdempotencyKey);
 
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -215,6 +222,7 @@ describe('PurchasesPage — recepciones', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    vi.restoreAllMocks();
     cleanup();
   });
 
@@ -558,6 +566,12 @@ it('envía correctamente la recepción al backend', async () => {
           expirationDate: '2029-06-30',
         },
       ],
+    },
+    {
+      headers: {
+        'Idempotency-Key':
+          receiptIdempotencyKey,
+      },
     },
   );
 });

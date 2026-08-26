@@ -1,11 +1,15 @@
+import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { EquipmentProvisioningService } from '../equipment/equipment-provisioning.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
+import { createPurchaseReceiptRequestHash } from './purchase-receipt-request-hash';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
 import {
+  IdempotencyScope,
   InventoryMovementType,
+  Prisma,
   ProductLotTracking,
   PurchaseStatus,
 } from '@prisma/client';
@@ -21,6 +25,10 @@ type LotTrackingReceiptItemFixture = {
 };
 
 type TransactionClientMock = {
+  idempotencyRecord: {
+    create: jest.Mock;
+    update: jest.Mock;
+  };
   purchase: {
     findFirst: jest.Mock;
     update: jest.Mock;
@@ -48,6 +56,9 @@ type TransactionClientMock = {
 
 type PrismaServiceMock = {
   $transaction: jest.Mock;
+  idempotencyRecord: {
+    findUnique: jest.Mock;
+  };
   purchaseReceipt: {
     findMany: jest.Mock;
     findFirst: jest.Mock;
@@ -160,6 +171,7 @@ type PurchaseFindFirstArgs = {
 };
 
 describe('PurchaseReceiptsService', () => {
+  const defaultIdempotencyKey = 'purchase-receipt-test-key';
   const lotTrackingCompanyId = '33333333-3333-4333-8333-333333333333';
   const lotTrackingUserId = '44444444-4444-4444-8444-444444444444';
   const lotTrackingPurchaseId = '22222222-2222-4222-8222-222222222222';
@@ -175,6 +187,12 @@ describe('PurchaseReceiptsService', () => {
 
   beforeEach(async () => {
     transactionClient = {
+      idempotencyRecord: {
+        create: jest.fn().mockResolvedValue({
+          id: 'idempotency-record-1',
+        }),
+        update: jest.fn(),
+      },
       purchase: {
         findFirst: jest.fn(),
         update: jest.fn(),
@@ -205,6 +223,9 @@ describe('PurchaseReceiptsService', () => {
         (callback: (tx: TransactionClientMock) => Promise<unknown>) =>
           callback(transactionClient),
       ),
+      idempotencyRecord: {
+        findUnique: jest.fn().mockResolvedValue(null),
+      },
       purchaseReceipt: {
         findMany: jest.fn(),
         findFirst: jest.fn(),
@@ -234,6 +255,15 @@ describe('PurchaseReceiptsService', () => {
 
     service = moduleRef.get<PurchaseReceiptsService>(PurchaseReceiptsService);
   });
+
+  function createReceipt(
+    companyId: string,
+    receivedBy: string | undefined,
+    dto: CreatePurchaseReceiptDto,
+    idempotencyKey = defaultIdempotencyKey,
+  ) {
+    return service.create(companyId, receivedBy, idempotencyKey, dto);
+  }
 
   function arrangeLotTrackingReceipt(
     items: LotTrackingReceiptItemFixture[],
@@ -346,6 +376,330 @@ describe('PurchaseReceiptsService', () => {
     expect(service).toBeDefined();
   });
 
+  it('reproduce una recepción completada sin abrir otra transacción ni repetir mutaciones', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const idempotencyKey = 'completed-receipt-key';
+    const receiptId = '66666666-6666-4666-8666-666666666666';
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId: '22222222-2222-4222-8222-222222222222',
+      notes: 'Recepción idempotente',
+      items: [
+        {
+          purchaseItemId: '11111111-1111-4111-8111-111111111111',
+          quantityReceived: 2,
+          lotNumber: 'LOTE-001',
+          expirationDate: '2099-12-31',
+        },
+      ],
+    };
+    const existingReceipt = {
+      id: receiptId,
+      folio: 'REC-IDEMPOTENTE-001',
+    };
+
+    prisma.idempotencyRecord.findUnique.mockResolvedValue({
+      companyId,
+      scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+      key: idempotencyKey,
+      requestHash: createPurchaseReceiptRequestHash(dto),
+      resourceId: receiptId,
+    });
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(existingReceipt);
+
+    await expect(
+      createReceipt(companyId, lotTrackingUserId, dto, idempotencyKey),
+    ).resolves.toEqual(existingReceipt);
+
+    expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledWith({
+      where: {
+        companyId_scope_key: {
+          companyId,
+          scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+          key: idempotencyKey,
+        },
+      },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expectNoReceiptMutations();
+    expect(transactionClient.idempotencyRecord.create).not.toHaveBeenCalled();
+  });
+
+  it('reproduce la misma solicitud cuando las partidas llegan en distinto orden', async () => {
+    const idempotencyKey = 'reordered-items-key';
+    const originalDto: CreatePurchaseReceiptDto = {
+      purchaseId: lotTrackingPurchaseId,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 1,
+        },
+        {
+          purchaseItemId: secondPurchaseItemId,
+          quantityReceived: 2,
+        },
+      ],
+    };
+    const reorderedDto: CreatePurchaseReceiptDto = {
+      ...originalDto,
+      items: [...originalDto.items].reverse(),
+    };
+    const existingReceipt = {
+      id: '66666666-6666-4666-8666-666666666666',
+      folio: 'REC-IDEMPOTENTE-002',
+    };
+
+    prisma.idempotencyRecord.findUnique.mockResolvedValue({
+      requestHash: createPurchaseReceiptRequestHash(originalDto),
+      resourceId: existingReceipt.id,
+    });
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(existingReceipt);
+
+    await expect(
+      createReceipt(
+        lotTrackingCompanyId,
+        lotTrackingUserId,
+        reorderedDto,
+        idempotencyKey,
+      ),
+    ).resolves.toEqual(existingReceipt);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expectNoReceiptMutations();
+  });
+
+  it('rechaza la reutilización de una clave con un payload diferente', async () => {
+    const idempotencyKey = 'conflicting-payload-key';
+    const originalDto: CreatePurchaseReceiptDto = {
+      purchaseId: lotTrackingPurchaseId,
+      notes: 'Solicitud original',
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 1,
+        },
+      ],
+    };
+    const changedDto: CreatePurchaseReceiptDto = {
+      ...originalDto,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 2,
+        },
+      ],
+    };
+
+    prisma.idempotencyRecord.findUnique.mockResolvedValue({
+      requestHash: createPurchaseReceiptRequestHash(originalDto),
+      resourceId: '66666666-6666-4666-8666-666666666666',
+    });
+
+    const error = await createReceipt(
+      lotTrackingCompanyId,
+      lotTrackingUserId,
+      changedDto,
+      idempotencyKey,
+    ).catch((caughtError: unknown) => caughtError);
+
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error).toMatchObject({
+      message:
+        'La clave de idempotencia ya fue utilizada con una solicitud diferente',
+      status: 409,
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expectNoReceiptMutations();
+  });
+
+  it('permite reintentar con la misma clave después de un rollback simulado', async () => {
+    const idempotencyKey = 'rolled-back-receipt-key';
+    const item = createLotTrackingItem(ProductLotTracking.OPTIONAL);
+    const dto = arrangeLotTrackingReceipt([item]);
+
+    transactionClient.purchase.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      createReceipt(
+        lotTrackingCompanyId,
+        lotTrackingUserId,
+        dto,
+        idempotencyKey,
+      ),
+    ).rejects.toThrow('Compra no encontrada');
+
+    await expect(
+      createReceipt(
+        lotTrackingCompanyId,
+        lotTrackingUserId,
+        dto,
+        idempotencyKey,
+      ),
+    ).resolves.toEqual({
+      id: '66666666-6666-4666-8666-666666666666',
+      folio: 'REC-LOTES-001',
+    });
+
+    expect(transactionClient.idempotencyRecord.create).toHaveBeenCalledTimes(2);
+    expect(transactionClient.idempotencyRecord.update).toHaveBeenCalledTimes(1);
+    expect(transactionClient.purchaseReceipt.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('no trata un P2002 de otro índice como conflicto concurrente de idempotencia', async () => {
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId: lotTrackingPurchaseId,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 1,
+        },
+      ],
+    };
+    const unrelatedUniqueError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed',
+      {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: {
+          target: ['companyId', 'folio'],
+        },
+      },
+    );
+
+    prisma.$transaction.mockRejectedValue(unrelatedUniqueError);
+
+    await expect(
+      createReceipt(
+        lotTrackingCompanyId,
+        lotTrackingUserId,
+        dto,
+        'unrelated-p2002-key',
+      ),
+    ).rejects.toBe(unrelatedUniqueError);
+
+    expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledTimes(1);
+  });
+
+  it('mantiene aislada la misma clave literal entre empresas', async () => {
+    const firstCompanyId = '33333333-3333-4333-8333-333333333333';
+    const secondCompanyId = '34343434-3434-4343-8343-343434343434';
+    const idempotencyKey = 'shared-company-key';
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId: lotTrackingPurchaseId,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 1,
+        },
+      ],
+    };
+    const requestHash = createPurchaseReceiptRequestHash(dto);
+    const firstReceipt = { id: 'receipt-company-a' };
+    const secondReceipt = { id: 'receipt-company-b' };
+
+    prisma.idempotencyRecord.findUnique
+      .mockResolvedValueOnce({
+        requestHash,
+        resourceId: firstReceipt.id,
+      })
+      .mockResolvedValueOnce({
+        requestHash,
+        resourceId: secondReceipt.id,
+      });
+    prisma.purchaseReceipt.findFirst
+      .mockResolvedValueOnce(firstReceipt)
+      .mockResolvedValueOnce(secondReceipt);
+
+    await expect(
+      createReceipt(firstCompanyId, lotTrackingUserId, dto, idempotencyKey),
+    ).resolves.toEqual(firstReceipt);
+    await expect(
+      createReceipt(secondCompanyId, lotTrackingUserId, dto, idempotencyKey),
+    ).resolves.toEqual(secondReceipt);
+
+    expect(prisma.idempotencyRecord.findUnique.mock.calls).toEqual([
+      [
+        {
+          where: {
+            companyId_scope_key: {
+              companyId: firstCompanyId,
+              scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+              key: idempotencyKey,
+            },
+          },
+        },
+      ],
+      [
+        {
+          where: {
+            companyId_scope_key: {
+              companyId: secondCompanyId,
+              scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+              key: idempotencyKey,
+            },
+          },
+        },
+      ],
+    ]);
+    expect(prisma.purchaseReceipt.findFirst).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        where: { id: firstReceipt.id, companyId: firstCompanyId },
+      }),
+    );
+    expect(prisma.purchaseReceipt.findFirst).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: { id: secondReceipt.id, companyId: secondCompanyId },
+      }),
+    );
+  });
+
+  it('resuelve un P2002 concurrente releyendo el recibo ganador fuera de la transacción', async () => {
+    const companyId = lotTrackingCompanyId;
+    const idempotencyKey = 'concurrent-receipt-key';
+    const receiptId = '66666666-6666-4666-8666-666666666666';
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId: lotTrackingPurchaseId,
+      items: [
+        {
+          purchaseItemId: firstPurchaseItemId,
+          quantityReceived: 1,
+        },
+      ],
+    };
+    const requestHash = createPurchaseReceiptRequestHash(dto);
+    const winningReceipt = { id: receiptId, folio: 'REC-GANADOR-001' };
+    const uniqueError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed',
+      {
+        code: 'P2002',
+        clientVersion: 'test',
+        meta: {
+          target: ['companyId', 'scope', 'key'],
+        },
+      },
+    );
+
+    prisma.idempotencyRecord.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        requestHash,
+        resourceId: receiptId,
+      });
+    prisma.$transaction.mockRejectedValue(uniqueError);
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(winningReceipt);
+
+    await expect(
+      createReceipt(companyId, lotTrackingUserId, dto, idempotencyKey),
+    ).resolves.toEqual(winningReceipt);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledTimes(2);
+    expect(transactionClient.purchaseReceipt.create).not.toHaveBeenCalled();
+    expectNoReceiptMutations();
+  });
+
   it('debe rechazar partidas duplicadas en la misma recepción', async () => {
     const duplicatedPurchaseItemId = '11111111-1111-4111-8111-111111111111';
 
@@ -367,7 +721,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const action = service.create(
+    const action = createReceipt(
       '33333333-3333-4333-8333-333333333333',
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -399,7 +753,7 @@ describe('PurchaseReceiptsService', () => {
 
     transactionClient.purchase.findFirst.mockResolvedValue(null);
 
-    const action = service.create(
+    const action = createReceipt(
       companyId,
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -410,6 +764,16 @@ describe('PurchaseReceiptsService', () => {
     });
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(transactionClient.idempotencyRecord.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+        key: defaultIdempotencyKey,
+        requestHash: createPurchaseReceiptRequestHash(dto),
+      },
+    });
+    expect(transactionClient.idempotencyRecord.update).not.toHaveBeenCalled();
+    expect(transactionClient.purchaseReceipt.create).not.toHaveBeenCalled();
 
     expect(transactionClient.purchase.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -458,7 +822,7 @@ describe('PurchaseReceiptsService', () => {
         items: [],
       });
 
-      const action = service.create(
+      const action = createReceipt(
         companyId,
         '44444444-4444-4444-8444-444444444444',
         dto,
@@ -512,7 +876,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const action = service.create(
+    const action = createReceipt(
       companyId,
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -533,7 +897,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).resolves.toEqual({
       id: '66666666-6666-4666-8666-666666666666',
       folio: 'REC-LOTES-001',
@@ -583,7 +947,7 @@ describe('PurchaseReceiptsService', () => {
       ]);
 
       await expect(
-        service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+        createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
       ).rejects.toThrow(
         'El producto SKU-LOTE-001 no permite seguimiento por lote',
       );
@@ -622,7 +986,7 @@ describe('PurchaseReceiptsService', () => {
       ]);
 
       await expect(
-        service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+        createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
       ).resolves.toEqual({
         id: '66666666-6666-4666-8666-666666666666',
         folio: 'REC-LOTES-001',
@@ -649,7 +1013,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).rejects.toThrow(
       'No se puede registrar una fecha de caducidad sin número de lote',
     );
@@ -666,7 +1030,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).rejects.toThrow(
       'La fecha de caducidad no puede ser anterior a la fecha de recepción',
     );
@@ -701,7 +1065,7 @@ describe('PurchaseReceiptsService', () => {
       ]);
 
       await expect(
-        service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+        createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
       ).rejects.toThrow('El producto SKU-LOTE-001 requiere número de lote');
 
       expectNoReceiptMutations();
@@ -716,7 +1080,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).resolves.toEqual({
       id: '66666666-6666-4666-8666-666666666666',
       folio: 'REC-LOTES-001',
@@ -737,7 +1101,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).resolves.toEqual({
       id: '66666666-6666-4666-8666-666666666666',
       folio: 'REC-LOTES-001',
@@ -762,7 +1126,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).rejects.toThrow('El producto SKU-LOTE-002 requiere número de lote');
 
     expectNoReceiptMutations();
@@ -782,7 +1146,7 @@ describe('PurchaseReceiptsService', () => {
     ]);
 
     await expect(
-      service.create(lotTrackingCompanyId, lotTrackingUserId, dto),
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).rejects.toThrow(
       'El producto SKU-LOTE-002 no permite seguimiento por lote',
     );
@@ -834,7 +1198,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const action = service.create(
+    const action = createReceipt(
       companyId,
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -893,7 +1257,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const action = service.create(
+    const action = createReceipt(
       companyId,
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -944,7 +1308,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const action = service.create(
+    const action = createReceipt(
       companyId,
       '44444444-4444-4444-8444-444444444444',
       dto,
@@ -1057,9 +1421,26 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const result = await service.create(companyId, userId, dto);
+    const result = await createReceipt(companyId, userId, dto);
 
     expect(result).toEqual(expectedResult);
+
+    expect(transactionClient.idempotencyRecord.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        scope: IdempotencyScope.PURCHASE_RECEIPT_CREATE,
+        key: defaultIdempotencyKey,
+        requestHash: createPurchaseReceiptRequestHash(dto),
+      },
+    });
+    expect(transactionClient.idempotencyRecord.update).toHaveBeenCalledWith({
+      where: {
+        id: 'idempotency-record-1',
+      },
+      data: {
+        resourceId: receiptId,
+      },
+    });
 
     expect(transactionClient.purchaseReceipt.create).toHaveBeenCalledTimes(1);
 
@@ -1274,7 +1655,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const result = await service.create(companyId, userId, dto);
+    const result = await createReceipt(companyId, userId, dto);
 
     expect(result).toEqual(expectedResult);
     expect(transactionClient.purchaseReceiptItem.create).toHaveBeenCalledTimes(
@@ -1388,7 +1769,7 @@ describe('PurchaseReceiptsService', () => {
         ],
       };
 
-      const result = await service.create(companyId, userId, dto);
+      const result = await createReceipt(companyId, userId, dto);
 
       expect(result).toEqual(expectedResult);
       expect(
@@ -1480,7 +1861,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    await expect(service.create(companyId, userId, dto)).rejects.toThrow(
+    await expect(createReceipt(companyId, userId, dto)).rejects.toThrow(
       'provisioning failed',
     );
 
@@ -1611,7 +1992,7 @@ describe('PurchaseReceiptsService', () => {
       ],
     };
 
-    const result = await service.create(companyId, userId, dto);
+    const result = await createReceipt(companyId, userId, dto);
 
     expect(result).toEqual(expectedResult);
 

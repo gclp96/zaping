@@ -1,7 +1,9 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Req,
@@ -23,11 +25,15 @@ export class PurchaseReceiptsController {
   @Post()
   create(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() dto: CreatePurchaseReceiptDto,
   ) {
+    const idempotencyKey = this.validateIdempotencyKey(idempotencyKeyHeader);
+
     return this.purchaseReceiptsService.create(
       request.user.companyId,
       request.user.id,
+      idempotencyKey,
       dto,
     );
   }
@@ -57,5 +63,17 @@ export class PurchaseReceiptsController {
       request.user.companyId,
       receiptId,
     );
+  }
+
+  private validateIdempotencyKey(value: string | undefined): string {
+    const normalizedValue = value?.trim();
+
+    if (!normalizedValue || normalizedValue.length > 128) {
+      throw new BadRequestException(
+        'Se requiere una clave Idempotency-Key válida',
+      );
+    }
+
+    return normalizedValue;
   }
 }
