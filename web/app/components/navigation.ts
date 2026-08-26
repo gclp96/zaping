@@ -46,6 +46,10 @@ export const navigationGroups: NavigationGroup[] = [
         label: 'Compras',
         href: '/purchases',
       },
+      {
+        label: 'Recepciones',
+        href: '/purchase-receipts',
+      },
     ],
   },
   {

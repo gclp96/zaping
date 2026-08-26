@@ -178,6 +178,11 @@ describe('AuthenticatedAppLayout', () => {
     ).toBe('/purchases');
     expect(
       screen
+        .getByRole('link', { name: 'Recepciones' })
+        .getAttribute('href'),
+    ).toBe('/purchase-receipts');
+    expect(
+      screen
         .getByRole('link', { name: 'Productos' })
         .getAttribute('href'),
     ).toBe('/products');
@@ -219,6 +224,18 @@ describe('AuthenticatedAppLayout', () => {
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toEqual(['Productos', 'Inventario', 'Equipos']);
+  });
+
+  it('renders Recepciones after Compras in the COMPRAS group', () => {
+    renderInShell(<div>Shell child</div>);
+
+    const purchasesGroup = screen.getByText('COMPRAS').parentElement;
+    expect(purchasesGroup).toBeTruthy();
+    expect(
+      within(purchasesGroup as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Proveedores', 'Compras', 'Recepciones']);
   });
 
   it('marks Dashboard active for the Dashboard route', () => {
@@ -265,6 +282,18 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen
         .getByRole('link', { name: 'Compras' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('marks Recepciones active for nested Receipt routes', () => {
+    navigationMock.pathname = '/purchase-receipts/receipt-1';
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Recepciones' })
         .getAttribute('aria-current'),
     ).toBe('page');
   });
@@ -323,6 +352,7 @@ describe('AuthenticatedAppLayout', () => {
     ['/dashboard', 'Dashboard'],
     ['/products', 'Productos'],
     ['/purchases', 'Compras'],
+    ['/purchase-receipts/receipt-1', 'Recepciones'],
     ['/quotes', 'Cotizaciones'],
     ['/sales', 'Ventas'],
     ['/equipment', 'Equipos'],
