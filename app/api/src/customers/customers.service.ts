@@ -27,6 +27,7 @@ export class CustomersService {
     return this.prisma.customer.findMany({
       where: {
         companyId,
+        isActive: true,
       },
 
       orderBy: {
@@ -51,23 +52,54 @@ export class CustomersService {
   }
 
   async update(companyId: string, customerId: string, dto: UpdateCustomerDto) {
-    await this.findOne(companyId, customerId);
+    const customer = await this.findOne(companyId, customerId);
+    const data = {
+      name: dto.name,
+      type: dto.type,
+      email: dto.email,
+      phone: dto.phone,
+      address: dto.address,
+      contactName: dto.contactName,
+      notes: dto.notes,
+    };
 
-    return this.prisma.customer.update({
+    if (Object.values(data).every((value) => value === undefined)) {
+      return customer;
+    }
+
+    const result = await this.prisma.customer.updateMany({
       where: {
         id: customerId,
+        companyId,
       },
-      data: dto,
+      data,
     });
+
+    if (result.count !== 1) {
+      throw new NotFoundException('Cliente no encontrado');
+    }
+
+    return this.findOne(companyId, customerId);
   }
 
   async remove(companyId: string, customerId: string) {
-    await this.findOne(companyId, customerId);
+    const customer = await this.findOne(companyId, customerId);
 
-    return this.prisma.customer.delete({
+    if (!customer.isActive) {
+      return customer;
+    }
+
+    await this.prisma.customer.updateMany({
       where: {
         id: customerId,
+        companyId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
       },
     });
+
+    return this.findOne(companyId, customerId);
   }
 }

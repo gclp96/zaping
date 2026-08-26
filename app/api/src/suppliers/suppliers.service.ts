@@ -17,6 +17,7 @@ export class SuppliersService {
     return this.prisma.supplier.findMany({
       where: {
         companyId,
+        isActive: true,
       },
       orderBy: {
         name: 'asc',
@@ -66,30 +67,53 @@ export class SuppliersService {
   }
 
   async update(companyId: string, supplierId: string, dto: UpdateSupplierDto) {
-    await this.findOne(companyId, supplierId);
+    const supplier = await this.findOne(companyId, supplierId);
+    const data = {
+      name: dto.name,
+      email: dto.email,
+      phone: dto.phone,
+      address: dto.address,
+      contactName: dto.contactName,
+      notes: dto.notes,
+    };
 
-    return this.prisma.supplier.update({
+    if (Object.values(data).every((value) => value === undefined)) {
+      return supplier;
+    }
+
+    const result = await this.prisma.supplier.updateMany({
       where: {
         id: supplierId,
+        companyId,
       },
-      data: {
-        name: dto.name,
-        email: dto.email,
-        phone: dto.phone,
-        address: dto.address,
-        contactName: dto.contactName,
-        notes: dto.notes,
-      },
+      data,
     });
+
+    if (result.count !== 1) {
+      throw new NotFoundException('Proveedor no encontrado');
+    }
+
+    return this.findOne(companyId, supplierId);
   }
 
   async remove(companyId: string, supplierId: string) {
-    await this.findOne(companyId, supplierId);
+    const supplier = await this.findOne(companyId, supplierId);
 
-    return this.prisma.supplier.delete({
+    if (!supplier.isActive) {
+      return supplier;
+    }
+
+    await this.prisma.supplier.updateMany({
       where: {
         id: supplierId,
+        companyId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
       },
     });
+
+    return this.findOne(companyId, supplierId);
   }
 }
