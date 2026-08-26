@@ -168,6 +168,7 @@ describe('usePurchaseReceipts', () => {
     expect(result.current.receiptNotes).toBe('');
     expect(result.current.receiptSaving).toBe(false);
     expect(result.current.receiptFormError).toBe('');
+    expect(result.current.createdReceipt).toBeNull();
   });
 
   it('calcula las cantidades recibidas y pendientes', () => {
@@ -297,7 +298,7 @@ describe('usePurchaseReceipts', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('registra la recepción y reinicia el formulario', async () => {
+  it('registra la recepción, conserva su identidad y reinicia el formulario', async () => {
     const { result, onReceiptCreated } =
       setupHook();
 
@@ -384,6 +385,10 @@ describe('usePurchaseReceipts', () => {
     expect(result.current.receiptNotes).toBe('');
     expect(result.current.receiptFormError).toBe('');
     expect(result.current.receiptSaving).toBe(false);
+    expect(result.current.createdReceipt).toEqual({
+      id: 'receipt-2',
+      folio: 'RC-0002',
+    });
   });
 
   it('reutiliza la misma clave al reintentar después de un error', async () => {
@@ -396,6 +401,7 @@ describe('usePurchaseReceipts', () => {
       .mockResolvedValueOnce({
         data: {
           id: 'receipt-retry',
+          folio: 'RC-RETRY',
         },
       } as never);
 
@@ -415,6 +421,11 @@ describe('usePurchaseReceipts', () => {
       await result.current.handleCreateReceipt();
     });
 
+    expect(result.current.createdReceipt).toBeNull();
+    expect(
+      result.current.receiptFormItems[0].quantityReceived,
+    ).toBe('2');
+
     await act(async () => {
       await result.current.handleCreateReceipt();
     });
@@ -433,6 +444,10 @@ describe('usePurchaseReceipts', () => {
     expect(
       globalThis.crypto.randomUUID,
     ).toHaveBeenCalledTimes(1);
+    expect(result.current.createdReceipt).toEqual({
+      id: 'receipt-retry',
+      folio: 'RC-RETRY',
+    });
   });
 
   it('genera otra clave después de completar y abrir una nueva recepción', async () => {
@@ -446,6 +461,7 @@ describe('usePurchaseReceipts', () => {
     vi.mocked(api.post).mockResolvedValue({
       data: {
         id: 'receipt-success',
+        folio: 'RC-SUCCESS',
       },
     } as never);
 
@@ -464,8 +480,18 @@ describe('usePurchaseReceipts', () => {
     });
 
     act(() => {
+      result.current.closeReceiptModal();
+    });
+
+    expect(result.current.createdReceipt).toBeNull();
+
+    act(() => {
       result.current.openReceiptModal(purchase);
     });
+
+    expect(
+      result.current.receiptFormItems[0].quantityReceived,
+    ).toBe('');
     act(() => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
@@ -535,6 +561,7 @@ describe('usePurchaseReceipts', () => {
       resolvePost?.({
         data: {
           id: 'receipt-pending',
+          folio: 'RC-PENDING',
         },
       });
 
@@ -545,6 +572,10 @@ describe('usePurchaseReceipts', () => {
     });
 
     expect(api.post).toHaveBeenCalledTimes(1);
+    expect(result.current.createdReceipt).toEqual({
+      id: 'receipt-pending',
+      folio: 'RC-PENDING',
+    });
   });
 
   it('mantiene abierto el formulario cuando el backend falla', async () => {
@@ -589,5 +620,50 @@ describe('usePurchaseReceipts', () => {
     ).not.toHaveBeenCalled();
 
     expect(result.current.receiptSaving).toBe(false);
+    expect(result.current.createdReceipt).toBeNull();
+  });
+
+  it('descarta un intento cancelado y usa otra clave al reabrir', async () => {
+    vi.mocked(globalThis.crypto.randomUUID)
+      .mockReset()
+      .mockReturnValueOnce(firstIdempotencyKey)
+      .mockReturnValueOnce(secondIdempotencyKey);
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        id: 'receipt-after-cancel',
+        folio: 'RC-AFTER-CANCEL',
+      },
+    } as never);
+
+    const { result } = setupHook();
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+      result.current.handleReceiptNotesChange('Intento cancelado');
+      result.current.closeReceiptModal();
+    });
+
+    expect(result.current.purchaseToReceive).toBeNull();
+    expect(result.current.receiptNotes).toBe('');
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '1',
+      );
+    });
+
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post.mock.calls[0]?.[2]).toEqual({
+      headers: {
+        'Idempotency-Key': secondIdempotencyKey,
+      },
+    });
   });
 });

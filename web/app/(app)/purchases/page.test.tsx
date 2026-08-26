@@ -22,6 +22,10 @@ import { api } from '@/services/api';
 
 import PurchasesPage from './page';
 
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
@@ -35,6 +39,10 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => routerMock,
 }));
 
 const receiptIdempotencyKey =
@@ -478,8 +486,8 @@ it('envía correctamente la recepción al backend', async () => {
 
   vi.mocked(api.post).mockResolvedValue({
     data: {
-      id: 'receipt-2',
-      folio: 'RC-0002',
+      id: 'receipt-123',
+      folio: 'REC-000123',
     },
   } as never);
 
@@ -574,17 +582,98 @@ it('envía correctamente la recepción al backend', async () => {
       },
     },
   );
+
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Recepción registrada correctamente',
+    }),
+  ).toBeTruthy();
+  expect(screen.getByText('REC-000123')).toBeTruthy();
+  expect(
+    screen.queryByRole('button', {
+      name: /^registrar recepción$/i,
+    }),
+  ).toBeNull();
+  expect(api.post).toHaveBeenCalledTimes(1);
+
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Ver recepción',
+    }),
+  );
+
+  expect(routerMock.push).toHaveBeenCalledWith(
+    '/purchase-receipts/receipt-123',
+  );
 });
 
-it('Cierra el formulario y recarga las compras después de registrar la recepción', async () => {
+it('refresca compra e historial, cierra el éxito y abre un intento fresco', async () => {
   const user = userEvent.setup();
 
-  vi.mocked(api.post).mockResolvedValue({
-    data: {
-      id: 'receipt-2',
-      folio: 'RC-0002',
-    },
-  } as never);
+  const partialPurchase = {
+    ...purchase,
+    status: 'PARTIALLY_RECEIVED',
+  };
+  const createdReceipt = {
+    ...previousReceipt,
+    id: 'receipt-2',
+    folio: 'REC-000002',
+    items: [
+      {
+        ...previousReceipt.items[0],
+        id: 'receipt-item-2',
+        quantityReceived: 2,
+      },
+    ],
+  };
+  let receiptCreated = false;
+
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    const endpoint = String(url);
+
+    if (endpoint === '/purchases') {
+      return {
+        data: [receiptCreated ? partialPurchase : purchase],
+      } as never;
+    }
+
+    if (endpoint === '/suppliers') {
+      return { data: [supplier] } as never;
+    }
+
+    if (endpoint === '/products') {
+      return { data: [product] } as never;
+    }
+
+    if (
+      endpoint === '/purchases/purchase-1/inventory-movements'
+    ) {
+      return { data: [] } as never;
+    }
+
+    if (
+      endpoint === '/purchase-receipts/purchase/purchase-1'
+    ) {
+      return {
+        data: receiptCreated
+          ? [previousReceipt, createdReceipt]
+          : [previousReceipt],
+      } as never;
+    }
+
+    throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+  });
+
+  vi.mocked(api.post).mockImplementation(async () => {
+    receiptCreated = true;
+
+    return {
+      data: {
+        id: 'receipt-2',
+        folio: 'REC-000002',
+      },
+    } as never;
+  });
 
   render(<PurchasesPage />);
 
@@ -636,13 +725,16 @@ it('Cierra el formulario y recarga las compras después de registrar la recepci�
     }),
   );
 
-  await waitFor(() => {
-    expect(
-      screen.queryByRole('heading', {
-        name: /registrar recepci[oó]n.*OC-0001/i,
-      }),
-    ).toBeNull();
-  });
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Recepción registrada correctamente',
+    }),
+  ).toBeTruthy();
+  expect(
+    screen.getByLabelText(
+      'Estado de la compra: Parcialmente recibida',
+    ),
+  ).toBeTruthy();
 
   const purchasesRequests = vi
     .mocked(api.get)
@@ -651,6 +743,112 @@ it('Cierra el formulario y recarga las compras después de registrar la recepci�
     );
 
   expect(purchasesRequests).toHaveLength(2);
+
+  await user.click(screen.getByRole('button', { name: 'Cerrar' }));
+
+  expect(
+    screen.queryByRole('heading', {
+      name: 'Recepción registrada correctamente',
+    }),
+  ).toBeNull();
+  expect(screen.getByRole('heading', { name: 'Compras' })).toBeTruthy();
+
+  await user.click(
+    screen.getByRole('button', { name: 'Ver detalle' }),
+  );
+
+  const detailTitleAfterSuccess = await screen.findByRole('heading', {
+    name: 'Detalle de compra',
+  });
+  const detailAfterSuccess =
+    detailTitleAfterSuccess.parentElement?.parentElement;
+
+  expect(detailAfterSuccess).toBeTruthy();
+  expect(
+    within(detailAfterSuccess as HTMLElement).getByText('REC-000002'),
+  ).toBeTruthy();
+
+  await user.click(
+    within(detailAfterSuccess as HTMLElement).getByRole('button', {
+      name: 'Registrar recepción',
+    }),
+  );
+
+  const freshQuantity = await screen.findByRole('spinbutton', {
+    name: 'Cantidad recibida de Producto médico',
+  });
+
+  expect((freshQuantity as HTMLInputElement).value).toBe('');
+  expect(freshQuantity.getAttribute('max')).toBe('4');
+  expect((screen.getByLabelText('Notas') as HTMLTextAreaElement).value).toBe(
+    '',
+  );
+});
+
+it('mantiene el handoff cuando la recepción completa la compra', async () => {
+  const user = userEvent.setup();
+  const receivedPurchase = {
+    ...purchase,
+    status: 'RECEIVED',
+  };
+  let purchaseRequests = 0;
+  const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (String(url) === '/purchases') {
+      purchaseRequests += 1;
+
+      return {
+        data: [purchaseRequests > 1 ? receivedPurchase : purchase],
+      } as never;
+    }
+
+    return await defaultGet!(url);
+  });
+  vi.mocked(api.post).mockResolvedValue({
+    data: {
+      id: 'receipt-full',
+      folio: 'REC-FULL-001',
+    },
+  } as never);
+
+  render(<PurchasesPage />);
+
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+  const detailTitle = await screen.findByRole('heading', {
+    name: 'Detalle de compra',
+  });
+  const detailModal = detailTitle.parentElement?.parentElement;
+
+  await user.click(
+    within(detailModal as HTMLElement).getByRole('button', {
+      name: 'Registrar recepción',
+    }),
+  );
+  await user.type(
+    screen.getByRole('spinbutton', {
+      name: 'Cantidad recibida de Producto médico',
+    }),
+    '6',
+  );
+  await user.click(
+    screen.getByRole('button', { name: 'Registrar recepción' }),
+  );
+
+  expect(
+    await screen.findByRole('heading', {
+      name: 'Recepción registrada correctamente',
+    }),
+  ).toBeTruthy();
+  expect(screen.getByText('REC-FULL-001')).toBeTruthy();
+  expect(
+    screen.getByLabelText('Estado de la compra: Recibida'),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole('button', { name: 'Ver recepción' }),
+  ).toBeTruthy();
 });
 
 it('muestra un error cuando el backend no puede registrar la recepción', async () => {

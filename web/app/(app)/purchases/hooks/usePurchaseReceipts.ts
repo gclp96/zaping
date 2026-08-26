@@ -4,6 +4,7 @@ import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
 import type {
+  CreatedPurchaseReceipt,
   Purchase,
   PurchaseReceipt,
   PurchaseReceiptFormField,
@@ -28,19 +29,26 @@ export function usePurchaseReceipts({
 
   const [receiptNotes, setReceiptNotes] = useState('');
   const [receiptSaving, setReceiptSaving] = useState(false);
+  const [createdReceipt, setCreatedReceipt] =
+    useState<CreatedPurchaseReceipt | null>(null);
   const [receiptIdempotencyKey, setReceiptIdempotencyKey] =
     useState<string | null>(null);
   const [receiptFormError, setReceiptFormError] =
     useState('');
   const receiptSubmissionInFlight = useRef(false);
 
-  function resetReceiptForm() {
+  function clearReceiptAttempt() {
     setPurchaseToReceive(null);
     setReceiptFormItems([]);
     setReceiptNotes('');
     setReceiptFormError('');
     setReceiptIdempotencyKey(null);
     receiptSubmissionInFlight.current = false;
+  }
+
+  function resetReceiptState() {
+    clearReceiptAttempt();
+    setCreatedReceipt(null);
   }
 
   function openReceiptModal(purchase: Purchase) {
@@ -97,6 +105,7 @@ export function usePurchaseReceipts({
           (item) => item.pendingQuantity > 0,
         );
 
+    setCreatedReceipt(null);
     setPurchaseToReceive(purchase);
     setReceiptFormItems(formItems);
     setReceiptNotes('');
@@ -109,7 +118,7 @@ export function usePurchaseReceipts({
       return;
     }
 
-    resetReceiptForm();
+    resetReceiptState();
   }
 
   function handleReceiptItemChange(
@@ -198,7 +207,7 @@ export function usePurchaseReceipts({
       receiptSubmissionInFlight.current = true;
       setReceiptSaving(true);
 
-      await api.post(
+      const response = await api.post<PurchaseReceipt>(
         '/purchase-receipts',
         {
           purchaseId: purchaseToReceive.id,
@@ -226,7 +235,11 @@ export function usePurchaseReceipts({
 
       await onReceiptCreated();
 
-      resetReceiptForm();
+      clearReceiptAttempt();
+      setCreatedReceipt({
+        id: response.data.id,
+        folio: response.data.folio,
+      });
     } catch (error: unknown) {
       console.error(error);
 
@@ -248,6 +261,7 @@ export function usePurchaseReceipts({
     receiptNotes,
     receiptSaving,
     receiptFormError,
+    createdReceipt,
 
     openReceiptModal,
     closeReceiptModal,

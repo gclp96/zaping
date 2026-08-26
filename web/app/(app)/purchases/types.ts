@@ -63,6 +63,11 @@ export type PurchaseReceipt = {
   } | null;
 };
 
+export type CreatedPurchaseReceipt = Pick<
+  PurchaseReceipt,
+  'id' | 'folio'
+>;
+
 export type InventoryMovement = {
   id: string;
   productId: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -49,6 +50,8 @@ function formatDate(value: string): string {
 }
 
 export default function PurchasesPage() {
+
+const router = useRouter();
 
 const [ purchases, setPurchases ] = useState<Purchase[]>([]);
 const [ suppliers, setSuppliers ] = useState<Supplier[]>([]);
@@ -139,6 +142,7 @@ const {
   receiptNotes,
   receiptSaving,
   receiptFormError,
+  createdReceipt,
   openReceiptModal,
   closeReceiptModal,
   handleReceiptItemChange,
@@ -148,6 +152,11 @@ const {
     purchaseReceipts,
     onReceiptCreated: loadPurchases,
   });
+
+function handleViewCreatedReceipt(receiptId: string) {
+  closeReceiptModal();
+  router.push(`/purchase-receipts/${receiptId}`);
+}
 
 async function loadPageData() {
     try {
@@ -387,16 +396,18 @@ const tableData = purchases.map((purchase) => {
         />
 
       <PurchaseReceiptModal
-        isOpen={purchaseToReceive !== null}
+        isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}
         items={receiptFormItems}
         notes={receiptNotes}
         saving={receiptSaving}
         error={receiptFormError}
+        createdReceipt={createdReceipt}
         onClose={closeReceiptModal}
         onItemChange={handleReceiptItemChange}
         onNotesChange={handleReceiptNotesChange}
         onSubmit={() => void handleCreateReceipt()}
+        onViewReceipt={handleViewCreatedReceipt}
       />
 
       <ConfirmDialog

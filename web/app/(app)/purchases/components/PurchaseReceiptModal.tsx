@@ -1,10 +1,12 @@
 import DateInput from '@/app/components/business/DateInput';
+import { CircleCheck } from 'lucide-react';
 
 import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
 import type {
+  CreatedPurchaseReceipt,
   PurchaseReceiptFormField,
   PurchaseReceiptFormItem,
 } from '../types';
@@ -23,6 +25,7 @@ type PurchaseReceiptModalProps = {
   notes: string;
   saving: boolean;
   error: string;
+  createdReceipt: CreatedPurchaseReceipt | null;
 
   onClose: () => void;
 
@@ -34,6 +37,7 @@ type PurchaseReceiptModalProps = {
 
   onNotesChange: (value: string) => void;
   onSubmit: () => void;
+  onViewReceipt: (receiptId: string) => void;
 };
 
 export default function PurchaseReceiptModal({
@@ -43,22 +47,66 @@ export default function PurchaseReceiptModal({
   notes,
   saving,
   error,
+  createdReceipt,
   onClose,
   onItemChange,
   onNotesChange,
   onSubmit,
+  onViewReceipt,
 }: PurchaseReceiptModalProps) {
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={
-        purchase
+        createdReceipt
+          ? 'Recepción registrada correctamente'
+          : purchase
           ? `Registrar recepción · ${purchase.folio}`
           : 'Registrar recepción'
       }
     >
-      {purchase ? (
+      {createdReceipt ? (
+        <div className="space-y-6 py-2">
+          <div className="flex items-start gap-3">
+            <CircleCheck
+              aria-hidden="true"
+              className="mt-0.5 shrink-0 text-green-600"
+              size={28}
+            />
+
+            <div>
+              <p className="text-sm text-gray-500">
+                Folio de recepción
+              </p>
+              <p className="mt-1 text-xl font-semibold text-gray-900">
+                {createdReceipt.folio}
+              </p>
+              <p className="mt-3 text-gray-600">
+                La recepción quedó registrada y ya puedes consultar su
+                trazabilidad.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:justify-end">
+            <Button
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={onClose}
+            >
+              Cerrar
+            </Button>
+
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() => onViewReceipt(createdReceipt.id)}
+            >
+              Ver recepción
+            </Button>
+          </div>
+        </div>
+      ) : purchase ? (
         <div className="space-y-6">
           <div className="rounded-lg bg-gray-50 p-4">
             <p className="text-sm text-gray-500">
