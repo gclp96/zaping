@@ -1,0 +1,330 @@
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+import { api } from '@/services/api';
+
+import SuppliersPage from './page';
+
+vi.mock('@/services/api', () => ({
+  api: {
+    get: vi.fn(),
+    post: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+  },
+}));
+
+vi.mock('@/services/errors', () => ({
+  getApiErrorMessage: (error: unknown, fallback: string) =>
+    error instanceof Error ? error.message : fallback,
+}));
+
+const medicalSupplier = {
+  id: 'supplier-medical',
+  name: 'Distribuidora Médica',
+  contactName: 'María Ruiz',
+  email: 'ventas@medica.test',
+  phone: '6625551000',
+  address: 'Hermosillo Norte',
+  notes: 'Equipo médico',
+};
+
+const laboratorySupplier = {
+  id: 'supplier-laboratory',
+  name: 'Laboratorios del Desierto',
+  contactName: 'Carlos Vega',
+  email: 'pedidos@laboratorio.test',
+  phone: '6625552000',
+  address: 'Parque Industrial',
+  notes: 'Consumibles',
+};
+
+const suppliers = [medicalSupplier, laboratorySupplier];
+
+function configureApiMocks(list = suppliers) {
+  vi.mocked(api.get).mockResolvedValue({ data: list } as never);
+  vi.mocked(api.post).mockResolvedValue({ data: medicalSupplier } as never);
+  vi.mocked(api.patch).mockResolvedValue({ data: medicalSupplier } as never);
+  vi.mocked(api.delete).mockResolvedValue({ data: {} } as never);
+}
+
+async function renderSuppliersPage() {
+  render(<SuppliersPage />);
+  await screen.findByText(medicalSupplier.name);
+}
+
+async function completeSupplierForm(
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+) {
+  await user.type(screen.getByRole('textbox', { name: 'Nombre' }), name);
+  await user.type(
+    screen.getByRole('textbox', { name: 'Nombre de contacto' }),
+    'Laura Soto',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Email' }),
+    'compras@proveedor.test',
+  );
+  await user.type(
+    screen.getByRole('textbox', { name: 'Teléfono' }),
+    '6625553000',
+  );
+}
+
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+describe('SuppliersPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureApiMocks();
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+  it('carga las columnas útiles y busca por nombre, contacto, email y teléfono', async () => {
+    const user = userEvent.setup();
+    render(<SuppliersPage />);
+
+    expect(screen.getByText('Cargando proveedores...')).toBeTruthy();
+    expect(await screen.findByText(medicalSupplier.name)).toBeTruthy();
+    expect(screen.getByText(medicalSupplier.contactName)).toBeTruthy();
+    expect(screen.getByText(medicalSupplier.email)).toBeTruthy();
+    expect(screen.getByText(medicalSupplier.phone)).toBeTruthy();
+    expect(screen.getByText(medicalSupplier.address)).toBeTruthy();
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar proveedores',
+    });
+
+    await user.type(search, '  distribuidora médica  ');
+    expect(screen.getByText(medicalSupplier.name)).toBeTruthy();
+    expect(screen.queryByText(laboratorySupplier.name)).toBeNull();
+
+    await user.clear(search);
+    await user.type(search, laboratorySupplier.contactName.toUpperCase());
+    expect(screen.getByText(laboratorySupplier.name)).toBeTruthy();
+    expect(screen.queryByText(medicalSupplier.name)).toBeNull();
+
+    await user.clear(search);
+    await user.type(search, medicalSupplier.email.toUpperCase());
+    expect(screen.getByText(medicalSupplier.name)).toBeTruthy();
+
+    await user.clear(search);
+    await user.type(search, laboratorySupplier.phone);
+    expect(screen.getByText(laboratorySupplier.name)).toBeTruthy();
+
+    await user.clear(search);
+    await user.type(search, 'sin coincidencias');
+    expect(screen.getByText('Sin proveedores coincidentes')).toBeTruthy();
+    expect(
+      screen.getByText('No encontramos proveedores con esa búsqueda.'),
+    ).toBeTruthy();
+  });
+
+  it('muestra un error de carga y permite reintentar', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get)
+      .mockRejectedValueOnce(new Error('Proveedores no disponibles'))
+      .mockResolvedValueOnce({ data: suppliers } as never);
+
+    render(<SuppliersPage />);
+
+    expect(await screen.findByText('Proveedores no disponibles')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText(medicalSupplier.name)).toBeTruthy();
+    expect(api.get).toHaveBeenCalledTimes(2);
+  });
+
+  it('presenta un estado vacío útil', async () => {
+    configureApiMocks([]);
+
+    render(<SuppliersPage />);
+
+    expect(await screen.findByText('Sin proveedores activos')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Registra un proveedor para comenzar a usarlo en compras.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('crea un proveedor sin lifecycle, refresca la lista y cierra el formulario', async () => {
+    const user = userEvent.setup();
+    const newSupplier = {
+      ...medicalSupplier,
+      id: 'supplier-new',
+      name: 'Proveedor Nuevo',
+      contactName: 'Laura Soto',
+      email: 'compras@proveedor.test',
+      phone: '6625553000',
+      address: null,
+      notes: null,
+    };
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: suppliers } as never)
+      .mockResolvedValueOnce({ data: [...suppliers, newSupplier] } as never);
+    vi.mocked(api.post).mockResolvedValue({ data: newSupplier } as never);
+
+    await renderSuppliersPage();
+    await user.click(screen.getByRole('button', { name: 'Nuevo proveedor' }));
+    await completeSupplierForm(user, newSupplier.name);
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar proveedor' }),
+    );
+
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/suppliers', {
+        name: newSupplier.name,
+        email: newSupplier.email,
+        phone: newSupplier.phone,
+        address: undefined,
+        contactName: newSupplier.contactName,
+        notes: undefined,
+      });
+    });
+    expect(await screen.findByText(newSupplier.name)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Nuevo proveedor' }),
+    ).toBeNull();
+  });
+
+  it('mantiene abierto el formulario y muestra el error de creación sin alert', async () => {
+    const user = userEvent.setup();
+    const alertSpy = vi
+      .spyOn(window, 'alert')
+      .mockImplementation(() => undefined);
+    vi.mocked(api.post).mockRejectedValue(new Error('Proveedor duplicado'));
+
+    await renderSuppliersPage();
+    await user.click(screen.getByRole('button', { name: 'Nuevo proveedor' }));
+    await completeSupplierForm(user, 'Proveedor Duplicado');
+    await user.click(
+      screen.getByRole('button', { name: 'Registrar proveedor' }),
+    );
+
+    expect(await screen.findByText('Proveedor duplicado')).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'Nuevo proveedor' }),
+    ).toBeTruthy();
+    expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('edita con un payload tipado y sin campos de lifecycle', async () => {
+    const user = userEvent.setup();
+    const updatedSupplier = {
+      ...medicalSupplier,
+      name: 'Distribuidora Médica Actualizada',
+    };
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: suppliers } as never)
+      .mockResolvedValue({
+        data: [updatedSupplier, laboratorySupplier],
+      } as never);
+    vi.mocked(api.patch).mockResolvedValue({ data: updatedSupplier } as never);
+
+    await renderSuppliersPage();
+    await user.click(
+      screen.getByRole('button', {
+        name: `Editar proveedor ${medicalSupplier.name}`,
+      }),
+    );
+    const nameInput = screen.getByRole('textbox', { name: 'Nombre' });
+    await user.clear(nameInput);
+    await user.type(nameInput, updatedSupplier.name);
+    await user.click(
+      screen.getByRole('button', { name: 'Guardar cambios' }),
+    );
+
+    await waitFor(() => {
+      expect(api.patch).toHaveBeenCalledWith(
+        `/suppliers/${medicalSupplier.id}`,
+        {
+          name: updatedSupplier.name,
+          email: medicalSupplier.email,
+          phone: medicalSupplier.phone,
+          address: medicalSupplier.address,
+          contactName: medicalSupplier.contactName,
+          notes: medicalSupplier.notes,
+        },
+      );
+    });
+    expect(await screen.findByText(updatedSupplier.name)).toBeTruthy();
+  });
+
+  it('desactiva con lenguaje no destructivo y refresca la lista activa', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.get)
+      .mockResolvedValueOnce({ data: suppliers } as never)
+      .mockResolvedValueOnce({ data: [laboratorySupplier] } as never);
+
+    await renderSuppliersPage();
+    await user.click(
+      screen.getByRole('button', {
+        name: `Desactivar proveedor ${medicalSupplier.name}`,
+      }),
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Desactivar proveedor' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /El proveedor dejará de aparecer en las operaciones nuevas\. Su historial se conservará\./,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/eliminar/i)).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Desactivar' }));
+
+    expect(api.delete).toHaveBeenCalledWith(
+      `/suppliers/${medicalSupplier.id}`,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText(medicalSupplier.name)).toBeNull();
+    });
+    expect(screen.getByText(laboratorySupplier.name)).toBeTruthy();
+  });
+
+  it('conserva el proveedor y permite reintentar cuando falla la desactivación', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.delete).mockRejectedValue(
+      new Error('No fue posible desactivar este proveedor'),
+    );
+
+    await renderSuppliersPage();
+    await user.click(
+      screen.getByRole('button', {
+        name: `Desactivar proveedor ${medicalSupplier.name}`,
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Desactivar' }));
+
+    expect(
+      await screen.findByText('No fue posible desactivar este proveedor'),
+    ).toBeTruthy();
+    expect(screen.getAllByText(medicalSupplier.name).length).toBeGreaterThan(0);
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+});

@@ -1,376 +1,492 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { api } from '@/services/api';
-import Modal from '@/app/components/ui/Modal';
-import Input from '@/app/components/ui/Input';
-import Table from '@/app/components/ui/Table';
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Search } from 'lucide-react';
 
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import EmptyState from '@/app/components/ui/EmptyState';
+import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
-
+import Modal from '@/app/components/ui/Modal';
+import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { api } from '@/services/api';
+import { getApiErrorMessage } from '@/services/errors';
 
 type Supplier = {
-    id: string;
-    name: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-    contactName?: string;
-    notes?: string;
+  id: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  contactName?: string | null;
+  notes?: string | null;
 };
 
-export default function SuppliersPage() {
+type SupplierFormErrors = {
+  name?: string;
+  email?: string;
+};
 
+function normalizeOptionalValue(value: string): string | undefined {
+  const trimmedValue = value.trim();
+  return trimmedValue || undefined;
+}
+
+function supplierMatchesSearch(supplier: Supplier, search: string): boolean {
+  const normalizedSearch = search.trim().toLocaleLowerCase('es-MX');
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return [
+    supplier.name,
+    supplier.contactName,
+    supplier.email,
+    supplier.phone,
+    supplier.address,
+  ].some((value) =>
+    value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
+  );
+}
+
+export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [openModal, setOpenModal] = useState(false);
+  const [pageError, setPageError] = useState('');
+  const [search, setSearch] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formErrors, setFormErrors] = useState<SupplierFormErrors>({});
+  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [contactName, setContactName] = useState('');
   const [notes, setNotes] = useState('');
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [supplierToDeactivate, setSupplierToDeactivate] =
+    useState<Supplier | null>(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivationError, setDeactivationError] = useState('');
 
-async function loadSuppliers() {
-  try {
-    setPageLoading(true);
+  const filteredSuppliers = useMemo(
+    () => suppliers.filter((supplier) => supplierMatchesSearch(supplier, search)),
+    [search, suppliers],
+  );
 
-    const response = await api.get('/suppliers');
+  async function loadSuppliers() {
+    try {
+      setPageLoading(true);
+      setPageError('');
 
-    setSuppliers(response.data);
-  } catch (error) {
-    console.error(error);
-  } finally {
-    setPageLoading(false);
-  }
-}
-
- useEffect(() => {
-     (async () => {
-     await loadSuppliers();
-  })();
- }, []);
-
-async function handleCreateSupplier() {
-  if (!name) {
-    alert('El nombre es obligatorio');
-    return;
-  }
-
-  if (email && !/\S+@\S+\.\S+/.test(email)) {
-  alert('Ingresa un email válido');
-  return;
-}
-
-  try {
-    setLoading(true);
-
-    if (editingSupplier) {
-      await api.patch(
-        `/suppliers/${editingSupplier.id}`,
-        {
-          name,
-          email,
-          phone,
-          address,
-          contactName,
-          notes,
-        },
+      const response = await api.get<Supplier[]>('/suppliers');
+      setSuppliers(response.data);
+    } catch (error: unknown) {
+      console.error(error);
+      setPageError(
+        getApiErrorMessage(error, 'No fue posible cargar los proveedores.'),
       );
-    } else {
-      await api.post(
-        '/suppliers',
-        {
-          name,
-          email,
-          phone,
-          address,
-          contactName,
-          notes,
-        },
-      );
+    } finally {
+      setPageLoading(false);
     }
+  }
 
-    setOpenModal(false);
-    setEditingSupplier(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void loadSuppliers();
+  }, []);
 
+  function resetSupplierForm() {
     setName('');
+    setEmail('');
+    setPhone('');
     setAddress('');
     setContactName('');
     setNotes('');
-    setEmail('');
-    setPhone('');
-
-    await loadSuppliers();
-     } catch (error: unknown) {
-      console.error(error);
-     const message =
-      (error as { response?: { data?: { message?: string } } })?.response?.data
-      ?.message || 'Ocurrió un error';
-
-      alert(message);
-      } finally {
-     setLoading(false);
+    setFormErrors({});
+    setFormError('');
   }
-}  
 
-function openDeleteModal(supplier: Supplier){
-  setSelectedSupplier(supplier);
-  setDeleteModalOpen(true);
-}
+  function openCreateModal() {
+    setEditingSupplier(null);
+    resetSupplierForm();
+    setFormOpen(true);
+  }
 
-function openEditModal(supplier: Supplier) {
-  setEditingSupplier(supplier);
+  function openEditModal(supplier: Supplier) {
+    setEditingSupplier(supplier);
+    setName(supplier.name);
+    setEmail(supplier.email || '');
+    setPhone(supplier.phone || '');
+    setAddress(supplier.address || '');
+    setContactName(supplier.contactName || '');
+    setNotes(supplier.notes || '');
+    setFormErrors({});
+    setFormError('');
+    setFormOpen(true);
+  }
 
-  setName(supplier.name || '');
-  setEmail(supplier.email || '');
-  setPhone(supplier.phone || '');
-  setAddress(supplier.address || '');
-  setContactName(supplier.contactName || '');
-  setNotes(supplier.notes || '');
+  function closeSupplierForm() {
+    if (saving) {
+      return;
+    }
 
-  setOpenModal(true);
- }
+    setFormOpen(false);
+    setEditingSupplier(null);
+    resetSupplierForm();
+  }
 
-async function handleDeleteSupplier() {
-   if (!selectedSupplier) return;
+  async function handleSaveSupplier() {
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const nextErrors: SupplierFormErrors = {};
 
-   try {
-    setDeleteLoading(true);
+    setFormError('');
 
-    await api.delete(`/suppliers/${selectedSupplier.id}`);
+    if (!trimmedName) {
+      nextErrors.name = 'El nombre del proveedor es obligatorio.';
+    }
 
-    setDeleteModalOpen(false);
-    setSelectedSupplier(null);
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = 'Ingresa un correo electrónico válido.';
+    }
 
-    await loadSuppliers();
-     } catch (error: unknown) {
-     console.error(error);
-     const message =
-     (error as { response?: { data?: { message?: string } } })?.response?.data
-      ?.message || 'Ocurrió un error al eliminar';
+    setFormErrors(nextErrors);
 
-     alert(message);
-     }
-       finally {
-      setDeleteLoading(false);
-   }
- }
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
 
-const tableData = suppliers.map((supplier) => ({
-  name: supplier.name,
-  contactName: supplier.contactName || '-',
-  email: supplier.email || '-',
-  phone: supplier.phone || '-',
-  actions: (
-      <div className="flex gap-3">
-        <button
+    const payload = {
+      name: trimmedName,
+      email: normalizeOptionalValue(email),
+      phone: normalizeOptionalValue(phone),
+      address: normalizeOptionalValue(address),
+      contactName: normalizeOptionalValue(contactName),
+      notes: normalizeOptionalValue(notes),
+    };
+
+    try {
+      setSaving(true);
+
+      if (editingSupplier) {
+        await api.patch(`/suppliers/${editingSupplier.id}`, payload);
+      } else {
+        await api.post('/suppliers', payload);
+      }
+
+      await loadSuppliers();
+      setFormOpen(false);
+      setEditingSupplier(null);
+      resetSupplierForm();
+    } catch (error: unknown) {
+      console.error(error);
+      setFormError(
+        getApiErrorMessage(
+          error,
+          editingSupplier
+            ? 'No fue posible actualizar el proveedor.'
+            : 'No fue posible registrar el proveedor.',
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openDeactivateDialog(supplier: Supplier) {
+    setSupplierToDeactivate(supplier);
+    setDeactivationError('');
+  }
+
+  function closeDeactivateDialog() {
+    if (deactivating) {
+      return;
+    }
+
+    setSupplierToDeactivate(null);
+    setDeactivationError('');
+  }
+
+  async function handleDeactivateSupplier() {
+    if (!supplierToDeactivate || deactivating) {
+      return;
+    }
+
+    try {
+      setDeactivating(true);
+      setDeactivationError('');
+
+      await api.delete(`/suppliers/${supplierToDeactivate.id}`);
+      await loadSuppliers();
+
+      setSupplierToDeactivate(null);
+    } catch (error: unknown) {
+      console.error(error);
+      setDeactivationError(
+        getApiErrorMessage(error, 'No fue posible desactivar el proveedor.'),
+      );
+    } finally {
+      setDeactivating(false);
+    }
+  }
+
+  const tableData = filteredSuppliers.map((supplier) => ({
+    name: supplier.name,
+    contactName: supplier.contactName || 'Sin contacto',
+    email: supplier.email || 'Sin email',
+    phone: supplier.phone || 'Sin teléfono',
+    address: supplier.address || 'Sin dirección',
+    actions: (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Editar proveedor ${supplier.name}`}
           onClick={() => openEditModal(supplier)}
-          className="text-blue-600 hover:text-blue-800"
-          >
-            Editar
-          </button>
+        >
+          Editar
+        </Button>
+        <Button
+          type="button"
+          variant="danger"
+          size="sm"
+          aria-label={`Desactivar proveedor ${supplier.name}`}
+          onClick={() => openDeactivateDialog(supplier)}
+        >
+          Desactivar
+        </Button>
+      </div>
+    ),
+  }));
 
-          <button
-            onClick={() => openDeleteModal(supplier)}
-            className="text-red-600 hover:text-red-800"
-            >
-              Eliminar
-            </button>
-        </div>
-  )
-}));
-
-const formattedSupplierName = selectedSupplier?.name
-   ? selectedSupplier.name.charAt(0).toUpperCase() +
-    selectedSupplier.name.slice(1)
-    :'';
-
-   return (
+  return (
     <>
-    <PageContainer>
-         <PageHeader
-        title="Proveedores"
-        description="Administra los proveedores registrados."
-        action={
-          <Button
-            onClick={() => {
-              setEditingSupplier(null);
-
-              setName('');
-              setEmail('');
-              setPhone('');
-              setAddress('');
-              setContactName('');
-              setNotes('');
-
-              setOpenModal(true);
-            }}
-          >
-            Nuevo Proveedor
-          </Button>
-        }
-         />
-
-      {pageLoading ? (
-        <Loading
-            message="Cargando proveedores..."
+      <PageContainer>
+        <PageHeader
+          title="Proveedores"
+          description="Administra los proveedores disponibles para nuevas compras."
+          action={
+            <Button type="button" onClick={openCreateModal}>
+              <Plus aria-hidden="true" size={18} />
+              Nuevo proveedor
+            </Button>
+          }
         />
-      ) : suppliers.length === 0 ? (
-        <EmptyState
-            title="Sin proveedores"
-            description="Aún no existen proveedores registrados."
-        />
-      ) : (
+
+        {pageLoading ? (
+          <Loading message="Cargando proveedores..." />
+        ) : pageError ? (
           <Section>
-          <Table
-            headers={['Nombre', 'Contacto', 'Email', 'Teléfono', 'Acciones']}
-            data={tableData}
-          />
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span>{pageError}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadSuppliers()}
+              >
+                Reintentar
+              </Button>
+            </div>
           </Section>
-      )}
+        ) : suppliers.length === 0 ? (
+          <EmptyState
+            title="Sin proveedores activos"
+            description="Registra un proveedor para comenzar a usarlo en compras."
+            action={
+              <Button type="button" onClick={openCreateModal}>
+                Nuevo proveedor
+              </Button>
+            }
+          />
+        ) : (
+          <Section>
+            <Input
+              label="Buscar proveedores"
+              type="search"
+              value={search}
+              placeholder="Nombre, contacto, email, teléfono o dirección"
+              startAdornment={<Search size={18} />}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+
+            {filteredSuppliers.length === 0 ? (
+              <EmptyState
+                title="Sin proveedores coincidentes"
+                description="No encontramos proveedores con esa búsqueda."
+                action={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSearch('')}
+                  >
+                    Limpiar búsqueda
+                  </Button>
+                }
+              />
+            ) : (
+              <Table
+                headers={[
+                  'Nombre',
+                  'Contacto',
+                  'Email',
+                  'Teléfono',
+                  'Dirección',
+                  'Acciones',
+                ]}
+                data={tableData}
+              />
+            )}
+          </Section>
+        )}
       </PageContainer>
-    
-    <Modal
-      isOpen={openModal}
-        onClose={() => {
-          setOpenModal(false);
-          setEditingSupplier(null);
 
-          setName('');
-          setEmail('');
-          setPhone('');
-          setAddress('');
-          setContactName('');
-          setNotes('');
-         }}
-
-       title={editingSupplier ? 'Editar Proveedor' : 'Nuevo Proveedor'}
-         >
-         <div className="space-y-6">
-          <div className="border-b pb-2">
-            <h3 className="text-sm font-semibold text-gray-foreground">
-              Informacion general
-            </h3>
+      <Modal
+        isOpen={formOpen}
+        onClose={closeSupplierForm}
+        title={editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
+      >
+        <form
+          aria-label={editingSupplier ? 'Editar proveedor' : 'Nuevo proveedor'}
+          className="space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSaveSupplier();
+          }}
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input
+              label="Nombre"
+              value={name}
+              required
+              disabled={saving}
+              error={formErrors.name}
+              onChange={(event) => {
+                setName(event.target.value);
+                setFormErrors((current) => ({ ...current, name: undefined }));
+              }}
+            />
+            <Input
+              label="Nombre de contacto"
+              value={contactName}
+              disabled={saving}
+              onChange={(event) => setContactName(event.target.value)}
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              disabled={saving}
+              error={formErrors.email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setFormErrors((current) => ({ ...current, email: undefined }));
+              }}
+            />
+            <Input
+              label="Teléfono"
+              type="tel"
+              value={phone}
+              disabled={saving}
+              onChange={(event) => setPhone(event.target.value)}
+            />
           </div>
-          <Input
-            label="Nombre *"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            />
 
           <Input
-                label="Nombre de contacto"
-                value={contactName}
-                onChange={(e) => setContactName(e.target.value)}
-            />
-          
-         <div className="border-b pb-2">
-              <h3 className="text-sm font-semibold text-gray-foreground">
-                Información de contacto
-              </h3>
-          </div>
-          <Input
-            label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            />
+            label="Dirección"
+            value={address}
+            disabled={saving}
+            onChange={(event) => setAddress(event.target.value)}
+          />
 
-          <Input
-            label="Teléfono"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            />
-
-          <Input
-              label="Dirección"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-
-         <div className="border-b pb-2">
-            <h3 className="text-sm bg-center font-semibold text-foreground">
-              Información adicional
-            </h3>
-          </div>
-            <label className="text-sm font-medium">
+          <div className="flex flex-col gap-2">
+            <label
+              htmlFor="supplier-notes"
+              className="text-sm font-medium text-gray-700"
+            >
               Notas
             </label>
-           <textarea
+            <textarea
+              id="supplier-notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full border rounded-lg p-3 min-h-28 resize-none"
+              rows={3}
+              disabled={saving}
+              className="w-full resize-none rounded-lg border border-gray-300 p-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-gray-100"
+              onChange={(event) => setNotes(event.target.value)}
             />
+          </div>
 
-          <Button
-              onClick={handleCreateSupplier}
-              disabled={!name}
-              loading={loading}
-              loadingText={
-                editingSupplier
-                  ? 'Actualizando...'
-                  : 'Guardando...'
-              }
-              fullWidth
+          {formError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
             >
-              {editingSupplier ? 'Actualizar' : 'Guardar'}
+              {formError}
+            </div>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={closeSupplierForm}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={saving}
+              loadingText={editingSupplier ? 'Actualizando...' : 'Registrando...'}
+              disabled={saving}
+            >
+              {editingSupplier ? 'Guardar cambios' : 'Registrar proveedor'}
             </Button>
           </div>
+        </form>
+      </Modal>
 
-    </Modal>  
-
-    <Modal
-      isOpen={deleteModalOpen}
-      onClose={() => {
-        setDeleteModalOpen(false);
-        setSelectedSupplier(null);
-      }}
-        title="Confirmar eliminación"
-        >
-          <div className='space-y-6'>
-            <p className='text-gray-700'>
-              ¿Seguro que deseas eliminar a{' '}
-              <span className='font-semibold text-black'>
-                {formattedSupplierName}
-              </span>?
+      <ConfirmDialog
+        isOpen={supplierToDeactivate !== null}
+        title="Desactivar proveedor"
+        message={
+          <div className="space-y-3">
+            <p>
+              ¿Desactivar a{' '}
+              <span className="font-semibold text-gray-900">
+                {supplierToDeactivate?.name}
+              </span>
+              ?
             </p>
-
-            <p className='text-sm text-red-600'>
-              Esta acción no se puede deshacer.
+            <p className="text-sm text-gray-600">
+              El proveedor dejará de aparecer en las operaciones nuevas. Su
+              historial se conservará.
             </p>
-
-            <div className='flex justify-end gap-3'>
-              <Button
-                onClick={() => {
-                  setDeleteModalOpen(false);
-                  setSelectedSupplier(null);
-                }}
-                className='px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50'
-                >
-                  Cancelar
-                </Button>
-
-                <Button
-                onClick={handleDeleteSupplier}
-                disabled={deleteLoading}
-                className='px-4 py-2 bg-red-700 text-white rounded-lg disabled:bg-gray-400'
-                > 
-                {deleteLoading ? 'Eliminando...' : 'Eliminar'}
-                </Button>
-            </div>
+            {deactivationError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {deactivationError}
+              </p>
+            ) : null}
           </div>
-        </Modal>
-  </>
-);
- }
-
+        }
+        confirmText="Desactivar"
+        loadingText="Desactivando..."
+        confirmVariant="danger"
+        loading={deactivating}
+        onClose={closeDeactivateDialog}
+        onConfirm={() => void handleDeactivateSupplier()}
+      />
+    </>
+  );
+}

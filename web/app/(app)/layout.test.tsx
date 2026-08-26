@@ -396,7 +396,9 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(screen.getByText('Zaping ERP')).toBeTruthy();
     expect(
-      screen.getByText('Administra los clientes registrados.'),
+      screen.getByText(
+        'Administra los clientes disponibles para nuevas operaciones.',
+      ),
     ).toBeTruthy();
   });
 
