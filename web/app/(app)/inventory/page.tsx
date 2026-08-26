@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -37,7 +38,35 @@ const movementTypeOptions = [
 ];
 
 export default function InventoryPage() {
-  const [activeView, setActiveView] = useState<InventoryView>('stock');
+  return (
+    <Suspense
+      fallback={
+        <PageContainer>
+          <Loading message="Cargando inventario..." />
+        </PageContainer>
+      }
+    >
+      <InventoryPageContent />
+    </Suspense>
+  );
+}
+
+function InventoryPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedReferenceType =
+    searchParams.get('referenceType')?.trim() || null;
+  const requestedReferenceId =
+    searchParams.get('referenceId')?.trim() || null;
+  const receiptFolio = searchParams.get('receiptFolio')?.trim() || null;
+  const queryRequestsMovements = searchParams.get('tab') === 'movements';
+  const traceabilityFilterActive = Boolean(
+    requestedReferenceType && requestedReferenceId,
+  );
+  const [selectedView, setSelectedView] = useState<InventoryView>('stock');
+  const activeView: InventoryView = queryRequestsMovements
+    ? 'movements'
+    : selectedView;
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState('');
@@ -52,10 +81,66 @@ export default function InventoryPage() {
     return movements.filter((movement) => {
       const matchesType =
         !movementTypeFilter || movement.movementType === movementTypeFilter;
+      const matchesReference =
+        !traceabilityFilterActive ||
+        (movement.referenceType === requestedReferenceType &&
+          movement.referenceId === requestedReferenceId);
 
-      return matchesType && movementMatchesSearch(movement, movementSearch);
+      return (
+        matchesReference &&
+        matchesType &&
+        movementMatchesSearch(movement, movementSearch)
+      );
     });
-  }, [movementSearch, movementTypeFilter, movements]);
+  }, [
+    movementSearch,
+    movementTypeFilter,
+    movements,
+    requestedReferenceId,
+    requestedReferenceType,
+    traceabilityFilterActive,
+  ]);
+
+  const traceabilityContext =
+    requestedReferenceType === 'PURCHASE_RECEIPT'
+      ? receiptFolio
+        ? `Movimientos de la recepción ${receiptFolio}`
+        : 'Movimientos asociados a la recepción'
+      : `Movimientos asociados a ${getReferenceTypeLabel(
+          requestedReferenceType,
+        ).toLowerCase()}`;
+
+  function replaceInventoryQuery(params: URLSearchParams) {
+    const query = params.toString();
+    router.replace(query ? `/inventory?${query}` : '/inventory');
+  }
+
+  function handleViewChange(view: InventoryView) {
+    setSelectedView(view);
+
+    if (
+      view === 'stock' &&
+      (queryRequestsMovements || traceabilityFilterActive)
+    ) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('tab');
+      params.delete('referenceType');
+      params.delete('referenceId');
+      params.delete('receiptFolio');
+      replaceInventoryQuery(params);
+    }
+  }
+
+  function clearTraceabilityFilter() {
+    setSelectedView('movements');
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', 'movements');
+    params.delete('referenceType');
+    params.delete('referenceId');
+    params.delete('receiptFolio');
+    replaceInventoryQuery(params);
+  }
 
   async function loadInventory() {
     try {
@@ -199,8 +284,16 @@ export default function InventoryPage() {
     if (movements.length === 0) {
       return (
         <EmptyState
-          title="Sin movimientos de inventario"
-          description="Todavía no existe historial de entradas, salidas o ajustes."
+          title={
+            traceabilityFilterActive
+              ? 'Sin movimientos asociados'
+              : 'Sin movimientos de inventario'
+          }
+          description={
+            traceabilityFilterActive
+              ? 'No hay movimientos de inventario asociados a esta recepción.'
+              : 'Todavía no existe historial de entradas, salidas o ajustes.'
+          }
         />
       );
     }
@@ -228,8 +321,16 @@ export default function InventoryPage() {
 
         {filteredMovements.length === 0 ? (
           <EmptyState
-            title="Sin movimientos coincidentes"
-            description="Ningún movimiento coincide con los filtros actuales."
+            title={
+              traceabilityFilterActive
+                ? 'Sin movimientos asociados'
+                : 'Sin movimientos coincidentes'
+            }
+            description={
+              traceabilityFilterActive
+                ? 'No hay movimientos de inventario asociados a esta recepción.'
+                : 'Ningún movimiento coincide con los filtros actuales.'
+            }
           />
         ) : (
           <Table
@@ -323,7 +424,7 @@ export default function InventoryPage() {
           aria-selected={activeView === 'stock'}
           aria-controls="inventory-stock-panel"
           tabIndex={activeView === 'stock' ? 0 : -1}
-          onClick={() => setActiveView('stock')}
+          onClick={() => handleViewChange('stock')}
           className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
             activeView === 'stock'
               ? 'border-blue-600 text-blue-700'
@@ -339,7 +440,7 @@ export default function InventoryPage() {
           aria-selected={activeView === 'movements'}
           aria-controls="inventory-movements-panel"
           tabIndex={activeView === 'movements' ? 0 : -1}
-          onClick={() => setActiveView('movements')}
+          onClick={() => handleViewChange('movements')}
           className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
             activeView === 'movements'
               ? 'border-blue-600 text-blue-700'
@@ -373,6 +474,22 @@ export default function InventoryPage() {
             title="Historial de movimientos"
             description="Entradas, salidas y ajustes registrados en orden cronológico."
           >
+            {traceabilityFilterActive ? (
+              <div
+                role="status"
+                className="flex flex-col gap-3 border-l-4 border-blue-500 bg-blue-50 px-4 py-3 text-blue-950 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="font-medium">{traceabilityContext}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearTraceabilityFilter}
+                >
+                  Limpiar filtro
+                </Button>
+              </div>
+            ) : null}
             {renderMovementsView()}
           </Section>
         </div>

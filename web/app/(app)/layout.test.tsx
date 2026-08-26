@@ -44,6 +44,7 @@ vi.mock('@/services/api', () => ({
 
 vi.mock('next/navigation', () => ({
   usePathname: () => navigationMock.pathname,
+  useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),

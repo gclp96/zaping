@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -61,6 +61,9 @@ const backLink = (
     Volver
   </Link>
 );
+
+const traceabilityActionClassName =
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100';
 
 export default function PurchaseReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -145,6 +148,12 @@ export default function PurchaseReceiptDetailPage() {
 
   const purchaseStatus = getPurchaseStatusDescriptor(receipt.purchase.status);
   const responsible = getReceiptResponsibleLabel(receipt.receivedByUser);
+  const inventorySearchParams = new URLSearchParams({
+    tab: 'movements',
+    referenceType: 'PURCHASE_RECEIPT',
+    referenceId: receipt.id,
+    receiptFolio: receipt.folio,
+  });
 
   return (
     <PageContainer>
@@ -168,7 +177,18 @@ export default function PurchaseReceiptDetailPage() {
       </Section>
 
       <div className="border-t border-gray-200 pt-8">
-        <Section title="Compra y proveedor">
+        <Section
+          title="Compra y proveedor"
+          action={
+            <Link
+              href={`/purchases?purchaseId=${encodeURIComponent(receipt.purchase.id)}`}
+              className={traceabilityActionClassName}
+            >
+              Ver compra
+              <ArrowUpRight aria-hidden="true" size={16} />
+            </Link>
+          }
+        >
           <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
             <DetailField label="Compra">{receipt.purchase.folio}</DetailField>
             <DetailField label="Estado de compra">
@@ -222,6 +242,15 @@ export default function PurchaseReceiptDetailPage() {
         <Section
           title="Movimientos de inventario"
           description="Entradas asociadas directamente con esta recepción."
+          action={
+            <Link
+              href={`/inventory?${inventorySearchParams.toString()}`}
+              className={traceabilityActionClassName}
+            >
+              Ver en inventario
+              <ArrowUpRight aria-hidden="true" size={16} />
+            </Link>
+          }
         >
           {receipt.inventoryMovements.length === 0 ? (
             <p className="border-l-4 border-gray-300 py-2 pl-4 text-gray-600">
@@ -306,9 +335,13 @@ export default function PurchaseReceiptDetailPage() {
 
                 return {
                   code: (
-                    <span className="font-semibold text-gray-900">
+                    <Link
+                      href={`/equipment?assetId=${encodeURIComponent(asset.id)}`}
+                      aria-label={`Ver equipo ${asset.assetCode}`}
+                      className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
+                    >
                       {asset.assetCode}
-                    </span>
+                    </Link>
                   ),
                   product: (
                     <div>

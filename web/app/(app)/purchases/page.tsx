@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -50,8 +50,25 @@ function formatDate(value: string): string {
 }
 
 export default function PurchasesPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer>
+          <Loading message="Cargando compras..." />
+        </PageContainer>
+      }
+    >
+      <PurchasesPageContent />
+    </Suspense>
+  );
+}
+
+function PurchasesPageContent() {
 
 const router = useRouter();
+const searchParams = useSearchParams();
+const purchaseId = searchParams.get('purchaseId')?.trim() || null;
+const openedPurchaseId = useRef<string | null>(null);
 
 const [ purchases, setPurchases ] = useState<Purchase[]>([]);
 const [ suppliers, setSuppliers ] = useState<Supplier[]>([]);
@@ -195,6 +212,43 @@ async function loadPageData() {
     void loadPageData();
   }, []);
 
+  useEffect(() => {
+    if (!purchaseId) {
+      openedPurchaseId.current = null;
+      return;
+    }
+
+    if (
+      pageLoading ||
+      pageError ||
+      openedPurchaseId.current === purchaseId
+    ) {
+      return;
+    }
+
+    const purchase = purchases.find((item) => item.id === purchaseId);
+    openedPurchaseId.current = purchaseId;
+
+    if (purchase) {
+      void openPurchaseDetail(purchase);
+    }
+  }, [openPurchaseDetail, pageError, pageLoading, purchaseId, purchases]);
+
+  const purchaseDeepLinkMissing = Boolean(
+    purchaseId &&
+    !pageLoading &&
+    !pageError &&
+    !purchases.some((purchase) => purchase.id === purchaseId),
+  );
+
+  function closePurchaseDetailWithUrlCleanup() {
+    closePurchaseDetail();
+
+    if (purchaseId) {
+      router.replace('/purchases');
+    }
+  }
+
 const tableData = purchases.map((purchase) => {
     const statusDescriptor =
       getPurchaseStatusDescriptor(purchase.status);
@@ -285,6 +339,23 @@ const tableData = purchases.map((purchase) => {
           }
         />
 
+        {purchaseDeepLinkMissing ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-900 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>No se encontró la compra solicitada.</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={closePurchaseDetailWithUrlCleanup}
+            >
+              Volver a compras
+            </Button>
+          </div>
+        ) : null}
+
         {pageLoading ? (
           <Loading message="Cargando compras..." />
         ) : pageError ? (
@@ -373,22 +444,22 @@ const tableData = purchases.map((purchase) => {
           }
           formatDate={formatDate}
           formatMoney={formatMoney}
-          onClose={closePurchaseDetail}
+          onClose={closePurchaseDetailWithUrlCleanup}
           onEdit={(purchase) => {
             openEditModal(purchase);
-            closePurchaseDetail();
+            closePurchaseDetailWithUrlCleanup();
           }}
           onApprove={(purchase) => {
             openApproveDialog(purchase);
-            closePurchaseDetail();
+            closePurchaseDetailWithUrlCleanup();
           }}
           onCancel={(purchase) => {
             openCancelDialog(purchase);
-            closePurchaseDetail();
+            closePurchaseDetailWithUrlCleanup();
           }}
           onReceive={(purchase) => {
             openReceiptModal(purchase);
-            closePurchaseDetail();
+            closePurchaseDetailWithUrlCleanup();
           }}
           onDownload={(purchase) => {
             void handleDownloadPdf(purchase);

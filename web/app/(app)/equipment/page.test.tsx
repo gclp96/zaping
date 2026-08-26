@@ -29,11 +29,21 @@ import type {
   EquipmentProduct,
 } from './types';
 
+const navigationMock = vi.hoisted(() => ({
+  replace: vi.fn(),
+  search: '',
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
   },
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => navigationMock,
+  useSearchParams: () => new URLSearchParams(navigationMock.search),
 }));
 
 function buildProduct(
@@ -331,6 +341,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 describe('EquipmentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.search = '';
     configureApiMocks();
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -1028,6 +1039,51 @@ describe('EquipmentPage', () => {
     expect(
       within(detail).getByLabelText('Estado del equipo: Activo'),
     ).toBeTruthy();
+  });
+
+  it('abre el detalle existente desde assetId y limpia la URL al cerrar', async () => {
+    const user = userEvent.setup();
+    navigationMock.search = 'assetId=equipment-1';
+
+    render(<EquipmentPage />);
+
+    expect(await screen.findByText('DETAIL-SN-001')).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/equipment/equipment-1');
+    expect(api.get).toHaveBeenCalledWith(
+      '/equipment/equipment-1/availability',
+    );
+    expect(api.get).toHaveBeenCalledWith(
+      '/equipment/equipment-1/inspections',
+    );
+    expect(
+      screen.getByRole('region', { name: 'Información del equipo' }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+
+    expect(navigationMock.replace).toHaveBeenCalledWith('/equipment');
+    expect(
+      screen.queryByRole('heading', { name: 'Detalle del equipo EQ-000001' }),
+    ).toBeNull();
+    expect(screen.getByText('EQ-000001')).toBeTruthy();
+  });
+
+  it('conserva la lista y el error existente cuando falla un detalle enlazado', async () => {
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+    navigationMock.search = 'assetId=equipment-1';
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/equipment/equipment-1') {
+        throw new Error('Equipo no encontrado');
+      }
+
+      return await defaultGet!(url);
+    });
+
+    render(<EquipmentPage />);
+
+    expect(await screen.findByText('Equipo no encontrado')).toBeTruthy();
+    expect(screen.getAllByText('EQ-000001').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
   });
 
   it('exige notas útiles para OTHER y envía sólo el DTO de retiro', async () => {

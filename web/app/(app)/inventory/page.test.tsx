@@ -24,10 +24,20 @@ import {
 } from './inventory-ledger';
 import InventoryPage from './page';
 
+const navigationMock = vi.hoisted(() => ({
+  replace: vi.fn(),
+  search: '',
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
   },
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => navigationMock,
+  useSearchParams: () => new URLSearchParams(navigationMock.search),
 }));
 
 const inventory: InventoryItem[] = [
@@ -205,6 +215,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 describe('InventoryPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigationMock.search = '';
     configureApiMocks();
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -401,5 +412,92 @@ describe('InventoryPage', () => {
 
     expect(await screen.findByText('Venta V-000001')).toBeTruthy();
     expect(movementAttempts).toBe(2);
+  });
+
+  it('abre Movimientos desde query y conserva sólo la coincidencia exacta de recepción', async () => {
+    const otherReceiptMovement: InventoryMovement = {
+      ...purchaseReceiptMovement,
+      id: 'movement-other-receipt',
+      referenceId: `${purchaseReceiptMovement.referenceId}-suffix`,
+      notes: 'Otra recepción con referencia parecida',
+    };
+    navigationMock.search = new URLSearchParams({
+      tab: 'movements',
+      referenceType: 'PURCHASE_RECEIPT',
+      referenceId: purchaseReceiptMovement.referenceId!,
+      receiptFolio: 'REC-000001',
+    }).toString();
+    configureApiMocks({
+      movementData: [
+        purchaseReceiptMovement,
+        otherReceiptMovement,
+        saleMovement,
+        purchaseMovement,
+      ],
+    });
+
+    render(<InventoryPage />);
+
+    expect(
+      screen.getByRole('tab', { name: 'Movimientos' }).getAttribute(
+        'aria-selected',
+      ),
+    ).toBe('true');
+    expect(
+      await screen.findByText('Movimientos de la recepción REC-000001'),
+    ).toBeTruthy();
+    expect(screen.getByText('Recepción REC-000001 de compra OC-000001'))
+      .toBeTruthy();
+    expect(screen.queryByText('Otra recepción con referencia parecida'))
+      .toBeNull();
+    expect(screen.queryByText('Venta V-000001')).toBeNull();
+    expect(screen.queryByText('Compra histórica')).toBeNull();
+  });
+
+  it('limpia la referencia con replace y mantiene disponible el ledger de movimientos', async () => {
+    const user = userEvent.setup();
+    navigationMock.search = new URLSearchParams({
+      tab: 'movements',
+      referenceType: 'PURCHASE_RECEIPT',
+      referenceId: purchaseReceiptMovement.referenceId!,
+      receiptFolio: 'REC-000001',
+    }).toString();
+    const { rerender } = render(<InventoryPage />);
+
+    await screen.findByText('Recepción REC-000001 de compra OC-000001');
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtro' }));
+
+    expect(navigationMock.replace).toHaveBeenCalledWith(
+      '/inventory?tab=movements',
+    );
+
+    navigationMock.search = 'tab=movements';
+    rerender(<InventoryPage />);
+
+    expect(await screen.findByText('Venta V-000001')).toBeTruthy();
+    expect(
+      screen.getByRole('tab', { name: 'Movimientos' }).getAttribute(
+        'aria-selected',
+      ),
+    ).toBe('true');
+    expect(screen.queryByRole('button', { name: 'Limpiar filtro' })).toBeNull();
+  });
+
+  it('presenta un vacío contextual cuando la referencia no tiene movimientos', async () => {
+    navigationMock.search = new URLSearchParams({
+      tab: 'movements',
+      referenceType: 'PURCHASE_RECEIPT',
+      referenceId: 'receipt-without-movements',
+    }).toString();
+
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('Sin movimientos asociados')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'No hay movimientos de inventario asociados a esta recepción.',
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

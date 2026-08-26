@@ -214,6 +214,16 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.getByText('OC-20260826-001')).toBeTruthy();
     expect(screen.getByText('Proveedor médico QA')).toBeTruthy();
     expect(screen.getByLabelText('Estado de compra: Recibida')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Ver compra' }).getAttribute('href'),
+    ).toBe('/purchases?purchaseId=purchase-quantity');
+    expect(
+      screen
+        .getByRole('link', { name: 'Ver en inventario' })
+        .getAttribute('href'),
+    ).toBe(
+      '/inventory?tab=movements&referenceType=PURCHASE_RECEIPT&referenceId=receipt-quantity&receiptFolio=REC-20260826-4D1F98E8',
+    );
     expect(screen.getAllByText('LF1837').length).toBeGreaterThan(0);
     expect(screen.getAllByText('BLUNT TIP').length).toBeGreaterThan(0);
     expect(screen.getByText('BATCH-LOT-PREFERRED')).toBeTruthy();
@@ -244,6 +254,11 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.getByText('EQ-000019')).toBeTruthy();
     expect(screen.getByText('EQ-000020')).toBeTruthy();
     expect(screen.getByText('EQ-000021')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Ver equipo EQ-000019' })
+        .getAttribute('href'),
+    ).toBe('/equipment?assetId=equipment-19');
     expect(screen.getByText('SERIAL-019')).toBeTruthy();
     expect(
       screen.getByLabelText('Estado del equipo EQ-000019: Activo'),

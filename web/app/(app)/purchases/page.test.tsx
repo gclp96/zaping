@@ -24,6 +24,8 @@ import PurchasesPage from './page';
 
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
+  replace: vi.fn(),
+  search: '',
 }));
 
 vi.mock('@/services/api', () => ({
@@ -43,6 +45,7 @@ vi.mock('@/services/errors', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => routerMock,
+  useSearchParams: () => new URLSearchParams(routerMock.search),
 }));
 
 const receiptIdempotencyKey =
@@ -212,6 +215,74 @@ async function selectProduct(
     }),
   );
 }
+
+beforeEach(() => {
+  routerMock.search = '';
+});
+
+describe('PurchasesPage — navegación trazable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureApiMocks();
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+  it('abre el detalle existente desde purchaseId, enlaza su recepción y limpia la URL al cerrar', async () => {
+    const user = userEvent.setup();
+    routerMock.search = 'purchaseId=purchase-1';
+
+    render(<PurchasesPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Detalle de compra' }),
+    ).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith(
+      '/purchases/purchase-1/inventory-movements',
+    );
+    expect(api.get).toHaveBeenCalledWith(
+      '/purchase-receipts/purchase/purchase-1',
+    );
+    expect(
+      (await screen.findByRole('link', { name: 'Ver recepción' })).getAttribute(
+        'href',
+      ),
+    ).toBe('/purchase-receipts/receipt-1');
+
+    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+
+    expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
+    expect(
+      screen.queryByRole('heading', { name: 'Detalle de compra' }),
+    ).toBeNull();
+    expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
+  });
+
+  it('mantiene la lista usable cuando purchaseId no pertenece a una compra cargada', async () => {
+    const user = userEvent.setup();
+    routerMock.search = 'purchaseId=purchase-missing';
+
+    render(<PurchasesPage />);
+
+    expect(
+      await screen.findByText('No se encontró la compra solicitada.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Detalle de compra' }),
+    ).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Volver a compras' }));
+
+    expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
+  });
+});
 
 describe('PurchasesPage — recepciones', () => {
   beforeEach(() => {

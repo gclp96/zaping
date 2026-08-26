@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
@@ -68,6 +69,24 @@ const originOptions = [
 ];
 
 export default function EquipmentPage() {
+  return (
+    <Suspense
+      fallback={
+        <PageContainer>
+          <Loading message="Cargando equipos..." />
+        </PageContainer>
+      }
+    >
+      <EquipmentPageContent />
+    </Suspense>
+  );
+}
+
+function EquipmentPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const assetId = searchParams.get('assetId')?.trim() || null;
+  const openedAssetId = useRef<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentAsset[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
@@ -280,6 +299,14 @@ export default function EquipmentPage() {
     setInspections([]);
     setInspectionsError('');
     setInspectionsLoading(false);
+  }
+
+  function closeEquipmentDetailWithUrlCleanup() {
+    closeEquipmentDetail();
+
+    if (assetId) {
+      router.replace('/equipment');
+    }
   }
 
   function retryEquipmentDetail() {
@@ -523,6 +550,38 @@ export default function EquipmentPage() {
     void loadEquipment();
   }, []);
 
+  useEffect(() => {
+    if (!assetId) {
+      openedAssetId.current = null;
+      return;
+    }
+
+    if (
+      pageLoading ||
+      pageError ||
+      openedAssetId.current === assetId
+    ) {
+      return;
+    }
+
+    const item = equipment.find((candidate) => candidate.id === assetId);
+    openedAssetId.current = assetId;
+
+    if (item) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      openEquipmentDetail(item);
+    }
+    // The asset-id guard makes this one-shot despite the local modal handler.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId, equipment, pageError, pageLoading]);
+
+  const equipmentDeepLinkMissing = Boolean(
+    assetId &&
+    !pageLoading &&
+    !pageError &&
+    !equipment.some((item) => item.id === assetId),
+  );
+
   return (
     <>
       <PageContainer>
@@ -536,6 +595,23 @@ export default function EquipmentPage() {
             </Button>
           }
         />
+
+        {equipmentDeepLinkMissing ? (
+          <div
+            role="alert"
+            className="flex flex-col gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-900 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>No se encontró el equipo solicitado.</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={closeEquipmentDetailWithUrlCleanup}
+            >
+              Volver a equipos
+            </Button>
+          </div>
+        ) : null}
 
         {pageLoading ? (
           <Loading message="Cargando equipos..." />
@@ -718,7 +794,7 @@ export default function EquipmentPage() {
         inspections={inspections}
         inspectionsLoading={inspectionsLoading}
         inspectionsError={inspectionsError}
-        onClose={closeEquipmentDetail}
+        onClose={closeEquipmentDetailWithUrlCleanup}
         onRetry={retryEquipmentDetail}
         onRetryAvailability={retryEquipmentAvailability}
         onRetryInspections={retryEquipmentInspections}

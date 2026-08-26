@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import type { PurchaseReceipt } from '../types';
 
 type PurchaseReceiptsHistoryProps = {
@@ -49,6 +51,13 @@ export default function PurchaseReceiptsHistory({
                   <p className="text-sm text-gray-500">
                     Recibida el {formatDate(receipt.receivedAt)}
                   </p>
+
+                  <Link
+                    href={`/purchase-receipts/${encodeURIComponent(receipt.id)}`}
+                    className="mt-2 inline-flex text-sm font-medium text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
+                  >
+                    Ver recepción
+                  </Link>
 
                   {receipt.notes ? (
                     <p className="mt-2 text-sm text-gray-600">
