@@ -59,6 +59,9 @@ type PrismaServiceMock = {
   idempotencyRecord: {
     findUnique: jest.Mock;
   };
+  inventoryMovement: {
+    findMany: jest.Mock;
+  };
   purchaseReceipt: {
     findMany: jest.Mock;
     findFirst: jest.Mock;
@@ -158,6 +161,27 @@ type ReceiptFindFirstArgs = {
     id: string;
     companyId: string;
   };
+  include?: {
+    receivedByUser: unknown;
+    purchase: {
+      include: {
+        supplier: boolean;
+      };
+    };
+    items: {
+      include: {
+        product: boolean;
+        batch: boolean;
+        equipmentAssets: {
+          where: {
+            companyId: string;
+          };
+          select: Record<string, unknown>;
+          orderBy: Array<Record<string, 'asc'>>;
+        };
+      };
+    };
+  };
 };
 
 type PurchaseFindFirstArgs = {
@@ -225,6 +249,9 @@ describe('PurchaseReceiptsService', () => {
       ),
       idempotencyRecord: {
         findUnique: jest.fn().mockResolvedValue(null),
+      },
+      inventoryMovement: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       purchaseReceipt: {
         findMany: jest.fn(),
@@ -2074,9 +2101,13 @@ describe('PurchaseReceiptsService', () => {
 
     expect(findManyArgs.where.companyId).toBe(companyId);
     expect(findManyArgs.orderBy.receivedAt).toBe('desc');
+    expect(findManyArgs).not.toHaveProperty(
+      'include.items.include.equipmentAssets',
+    );
+    expect(prisma.inventoryMovement.findMany).not.toHaveBeenCalled();
   });
 
-  it('debe consultar una recepción por id y empresa', async () => {
+  it('debe consultar una recepción histórica sin trazabilidad relacionada', async () => {
     const companyId = '33333333-3333-4333-8333-333333333333';
 
     const receiptId = '11111111-1111-4111-8111-111111111111';
@@ -2085,13 +2116,22 @@ describe('PurchaseReceiptsService', () => {
       id: receiptId,
       companyId,
       folio: 'REC-PRUEBA-001',
+      items: [
+        {
+          id: '22222222-2222-4222-8222-222222222222',
+          equipmentAssets: [],
+        },
+      ],
     };
 
     prisma.purchaseReceipt.findFirst.mockResolvedValue(expectedResult);
 
     const result = await service.findOne(companyId, receiptId);
 
-    expect(result).toEqual(expectedResult);
+    expect(result).toEqual({
+      ...expectedResult,
+      inventoryMovements: [],
+    });
 
     const [findFirstArgs] = prisma.purchaseReceipt.findFirst.mock.calls[0] as [
       ReceiptFindFirstArgs,
@@ -2101,6 +2141,273 @@ describe('PurchaseReceiptsService', () => {
       id: receiptId,
       companyId,
     });
+
+    expect(prisma.inventoryMovement.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          companyId,
+          referenceType: 'PURCHASE_RECEIPT',
+          referenceId: receiptId,
+        },
+      }),
+    );
+  });
+
+  it('debe exponer el movimiento IN de una recepción QUANTITY sin EquipmentAssets', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const receiptId = '11111111-1111-4111-8111-111111111111';
+    const receiptItemId = '22222222-2222-4222-8222-222222222222';
+    const productId = '55555555-5555-4555-8555-555555555555';
+    const createdAt = new Date('2026-08-25T20:00:00.000Z');
+    const receipt = {
+      id: receiptId,
+      companyId,
+      folio: 'REC-CANTIDAD-001',
+      receivedByUser: {
+        id: '44444444-4444-4444-8444-444444444444',
+        firstName: 'Usuario',
+        lastName: 'Prueba',
+        email: 'usuario@zaping.test',
+      },
+      purchase: {
+        id: '66666666-6666-4666-8666-666666666666',
+        supplier: {
+          id: '77777777-7777-4777-8777-777777777777',
+          name: 'Proveedor prueba',
+        },
+      },
+      items: [
+        {
+          id: receiptItemId,
+          productId,
+          quantityReceived: 1,
+          product: {
+            id: productId,
+            sku: 'SKU-CANTIDAD-001',
+            name: 'Producto por cantidad',
+          },
+          batch: null,
+          equipmentAssets: [],
+        },
+      ],
+    };
+    const inventoryMovements = [
+      {
+        id: '88888888-8888-4888-8888-888888888888',
+        productId,
+        movementType: InventoryMovementType.IN,
+        quantity: 1,
+        balance: 50,
+        unitCost: 125,
+        referenceType: 'PURCHASE_RECEIPT',
+        referenceId: receiptId,
+        notes: 'Recepción de compra',
+        createdAt,
+        product: receipt.items[0].product,
+      },
+    ];
+
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(receipt);
+    prisma.inventoryMovement.findMany.mockResolvedValue(inventoryMovements);
+
+    const result = await service.findOne(companyId, receiptId);
+
+    expect(result).toEqual({
+      ...receipt,
+      inventoryMovements,
+    });
+    expect(result.items[0].equipmentAssets).toEqual([]);
+
+    const [receiptFindArgs] = prisma.purchaseReceipt.findFirst.mock
+      .calls[0] as [ReceiptFindFirstArgs];
+
+    expect(receiptFindArgs.where).toEqual({
+      id: receiptId,
+      companyId,
+    });
+    expect(receiptFindArgs.include?.receivedByUser).toBeDefined();
+    expect(receiptFindArgs.include?.purchase.include.supplier).toBe(true);
+    expect(receiptFindArgs.include?.items.include.product).toBe(true);
+    expect(receiptFindArgs.include?.items.include.batch).toBe(true);
+    expect(
+      receiptFindArgs.include?.items.include.equipmentAssets.where,
+    ).toEqual({ companyId });
+    expect(prisma.inventoryMovement.findMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        referenceType: 'PURCHASE_RECEIPT',
+        referenceId: receiptId,
+      },
+      select: {
+        id: true,
+        productId: true,
+        movementType: true,
+        quantity: true,
+        balance: true,
+        unitCost: true,
+        referenceType: true,
+        referenceId: true,
+        notes: true,
+        createdAt: true,
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+  });
+
+  it('debe exponer los EquipmentAssets reducidos de una partida ASSET', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const receiptId = '11111111-1111-4111-8111-111111111111';
+    const receiptItemId = '22222222-2222-4222-8222-222222222222';
+    const product = {
+      id: '55555555-5555-4555-8555-555555555555',
+      sku: 'SKU-ASSET-001',
+      name: 'Equipo médico',
+    };
+    const batch = {
+      id: '77777777-7777-4777-8777-777777777777',
+      lotNumber: 'LOTE-ASSET-001',
+    };
+    const createAsset = (id: string, assetCode: string) => ({
+      id,
+      assetCode,
+      serialNumber: null,
+      lifecycle: 'ACTIVE',
+      condition: 'INSPECTION_PENDING',
+      origin: 'PURCHASE_RECEIPT',
+      purchaseReceiptItemId: receiptItemId,
+      batchId: batch.id,
+      createdAt: new Date('2026-08-25T20:00:00.000Z'),
+      product,
+      batch,
+    });
+    const equipmentAssets = [
+      createAsset('88888888-8888-4888-8888-888888888888', 'EQ-000001'),
+      createAsset('99999999-9999-4999-8999-999999999999', 'EQ-000002'),
+    ];
+    const receipt = {
+      id: receiptId,
+      companyId,
+      items: [
+        {
+          id: receiptItemId,
+          product,
+          batch,
+          equipmentAssets,
+        },
+      ],
+    };
+
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(receipt);
+
+    const result = await service.findOne(companyId, receiptId);
+
+    expect(result.items[0].equipmentAssets).toHaveLength(2);
+    expect(result.items[0].equipmentAssets).toEqual(equipmentAssets);
+    expect(result.items[0].equipmentAssets[0]).toMatchObject({
+      assetCode: 'EQ-000001',
+      origin: 'PURCHASE_RECEIPT',
+      purchaseReceiptItemId: receiptItemId,
+      product,
+      batch,
+    });
+
+    const [receiptFindArgs] = prisma.purchaseReceipt.findFirst.mock
+      .calls[0] as [ReceiptFindFirstArgs];
+
+    expect(
+      receiptFindArgs.include?.items.include.equipmentAssets.orderBy,
+    ).toEqual([{ createdAt: 'asc' }, { id: 'asc' }]);
+    expect(
+      receiptFindArgs.include?.items.include.equipmentAssets.select,
+    ).not.toHaveProperty('inspections');
+  });
+
+  it('debe mantener la asociación correcta en una recepción mixta', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const receiptId = '11111111-1111-4111-8111-111111111111';
+    const quantityItemId = '22222222-2222-4222-8222-222222222222';
+    const assetItemId = '77777777-7777-4777-8777-777777777777';
+    const quantityProductId = '55555555-5555-4555-8555-555555555555';
+    const assetProductId = '99999999-9999-4999-8999-999999999999';
+    const asset = {
+      id: '88888888-8888-4888-8888-888888888888',
+      assetCode: 'EQ-000003',
+      purchaseReceiptItemId: assetItemId,
+      product: {
+        id: assetProductId,
+        sku: 'SKU-ASSET-002',
+        name: 'Equipo trazable',
+      },
+    };
+    const receipt = {
+      id: receiptId,
+      companyId,
+      items: [
+        {
+          id: quantityItemId,
+          productId: quantityProductId,
+          equipmentAssets: [],
+        },
+        {
+          id: assetItemId,
+          productId: assetProductId,
+          equipmentAssets: [asset],
+        },
+      ],
+    };
+    const inventoryMovements = [
+      {
+        id: 'movement-quantity',
+        productId: quantityProductId,
+        referenceId: receiptId,
+      },
+      {
+        id: 'movement-asset',
+        productId: assetProductId,
+        referenceId: receiptId,
+      },
+    ];
+
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(receipt);
+    prisma.inventoryMovement.findMany.mockResolvedValue(inventoryMovements);
+
+    const result = await service.findOne(companyId, receiptId);
+
+    expect(result.items[0].equipmentAssets).toEqual([]);
+    expect(result.items[1].equipmentAssets).toEqual([asset]);
+    expect(result.items[1].equipmentAssets[0].purchaseReceiptItemId).toBe(
+      assetItemId,
+    );
+    expect(result.inventoryMovements).toEqual(inventoryMovements);
+    expect(result.inventoryMovements).toHaveLength(2);
+  });
+
+  it('debe ocultar la trazabilidad de una recepción de otra empresa', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const receiptId = '11111111-1111-4111-8111-111111111111';
+
+    prisma.purchaseReceipt.findFirst.mockResolvedValue(null);
+
+    await expect(service.findOne(companyId, receiptId)).rejects.toMatchObject({
+      message: 'Recepción no encontrada',
+    });
+
+    expect(prisma.purchaseReceipt.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: receiptId,
+          companyId,
+        },
+      }),
+    );
+    expect(prisma.inventoryMovement.findMany).not.toHaveBeenCalled();
   });
 
   it('debe rechazar una recepción inexistente', async () => {
@@ -2114,6 +2421,8 @@ describe('PurchaseReceiptsService', () => {
     await expect(action).rejects.toMatchObject({
       message: 'Recepción no encontrada',
     });
+
+    expect(prisma.inventoryMovement.findMany).not.toHaveBeenCalled();
   });
 
   it('debe rechazar el historial de una compra inexistente', async () => {
@@ -2177,5 +2486,9 @@ describe('PurchaseReceiptsService', () => {
     });
 
     expect(receiptFindManyArgs.orderBy.receivedAt).toBe('desc');
+    expect(receiptFindManyArgs).not.toHaveProperty(
+      'include.items.include.equipmentAssets',
+    );
+    expect(prisma.inventoryMovement.findMany).not.toHaveBeenCalled();
   });
 });

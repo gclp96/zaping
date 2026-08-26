@@ -422,6 +422,36 @@ export class PurchaseReceiptsService {
           include: {
             product: true,
             batch: true,
+            equipmentAssets: {
+              where: {
+                companyId,
+              },
+              select: {
+                id: true,
+                assetCode: true,
+                serialNumber: true,
+                lifecycle: true,
+                condition: true,
+                origin: true,
+                purchaseReceiptItemId: true,
+                batchId: true,
+                createdAt: true,
+                product: {
+                  select: {
+                    id: true,
+                    sku: true,
+                    name: true,
+                  },
+                },
+                batch: {
+                  select: {
+                    id: true,
+                    lotNumber: true,
+                  },
+                },
+              },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            },
           },
         },
       },
@@ -431,7 +461,38 @@ export class PurchaseReceiptsService {
       throw new NotFoundException('Recepción no encontrada');
     }
 
-    return receipt;
+    const inventoryMovements = await this.prisma.inventoryMovement.findMany({
+      where: {
+        companyId,
+        referenceType: 'PURCHASE_RECEIPT',
+        referenceId: receipt.id,
+      },
+      select: {
+        id: true,
+        productId: true,
+        movementType: true,
+        quantity: true,
+        balance: true,
+        unitCost: true,
+        referenceType: true,
+        referenceId: true,
+        notes: true,
+        createdAt: true,
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return {
+      ...receipt,
+      inventoryMovements,
+    };
   }
 
   async findByPurchase(companyId: string, purchaseId: string) {
