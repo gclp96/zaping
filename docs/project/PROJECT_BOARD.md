@@ -1,1862 +1,1392 @@
-# Project Board — Zaping
+Project Board — Zaping
 
-**Producto:** Zaping Platform
-**Estado:** Desarrollo activo
-**Fase actual:** ERP Core UI/UX Completion - Products / Inventory / Equipment V1 completed; UX-B.5H next
-**Última actualización:** 2026-08-25
-**Responsable:** Zaping Team
+Producto: Zaping Platform
+Estado: Desarrollo activo
+Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
+Última actualización: 2026-08-27
+Responsable: Zaping Team
 
----
+0. Snapshot vigente
 
-# 1. Propósito
+Este documento representa el estado operativo actual del proyecto.
 
-Este documento representa exclusivamente el estado actual de trabajo de Zaping.
+Debe responder principalmente:
 
-Debe responder:
+qué está implementado;
 
-```text
-¿Qué está terminado recientemente?
-¿Qué está activo?
-¿Qué sigue?
-¿Qué tiene prioridad?
-¿Qué bloquea el avance?
-```
+qué está validado;
+
+qué trabajo está activo;
+
+qué sigue;
+
+qué bloquea un release;
+
+qué deuda técnica permanece;
+
+cuál es la siguiente decisión correcta para avanzar Zaping.
+
+Los detalles históricos de implementación y snapshots antiguos deben conservarse en:
+
+docs/project/CHANGELOG.md
+
+y no duplicarse dentro de este Board.
+
+IMPLEMENTED / VALIDATED
+
+ERP Core
+
+├── Authentication / JWT foundation
+├── Authenticated App Shell
+├── Navigation
+├── Dashboard 2.0
+├── Customers V1
+├── Suppliers V1
+├── Products / Categories V1
+├── Inventory Movement Ledger V1
+├── Equipment V1
+├── Quotes V1
+├── Sales V1
+├── Purchases V1
+├── Purchase Receipts V1
+│   ├── partial / full receiving
+│   ├── lot tracking
+│   ├── idempotency
+│   ├── Inventory IN
+│   ├── Equipment provisioning
+│   └── cross-module traceability
+└── Healthcare Case Foundation
+
+CURRENT
+
+H8 — ERP Core release preparation
+
+├── H8A Documentation synchronization
+│   └── final cross-document synchronization in progress
+│
+└── H8B Full technical regression
+    └── next technical block
+
+NEXT
+
+UX-B.6 — Full ERP end-to-end QA
+        ↓
+ERP Core V1 closure
+        ↓
+Healthcare specialization
+
+RELEASE BLOCKERS — P0
+
+Antes de pilot/commercial production deben resolverse o verificarse formalmente:
+
+secure password recovery
+
+inactive-user enforcement
+
+default ADMIN / safe role provisioning review
+
+systematic tenant-isolation regression
+
+critical authorization review
+
+protected-route / session architecture
+
+authentication abuse protection / rate limiting
+
+production secrets / configuration review
+
+ERP Core funcional validado:
+
+≠
+production-ready
+
+1. Propósito del Project Board
+
+El Project Board representa exclusivamente el estado vigente del trabajo.
 
 Separación documental:
 
-```text
-PROJECT_BOARD
-→ estado y trabajo actual
+PROJECT_BOARD.md
 
-ROADMAP
+→ estado actual
+→ prioridades
+→ trabajo activo
+→ siguiente trabajo
+→ blockers
+→ deuda
+
+ROADMAP.md
+
 → dirección futura
+→ secuencia estratégica
+→ evolución de producto
 
-CHANGELOG
+CHANGELOG.md
+
 → historia de trabajo completado
-```
+→ entregas anteriores
+→ snapshots históricos
 
-El Board no debe convertirse en un backlog histórico.
+El Project Board no debe convertirse en un historial de implementación.
 
----
+2. Estado general de Zaping
 
-# 2. Estado general
-
-```text
 Zaping Platform
 │
 ├── ERP Core
 │   ├── Foundation estable
-│   ├── Compras + Recepciones funcionales
-│   ├── Products V1 implementado / validado
-│   ├── Inventory Movement Ledger V1 implementado / validado
-│   ├── Equipment V1 implementado / validado
-│   ├── Returns parcialmente implementado
-│   ├── Sales V1 frontend completed / validated sobre Sale legacy
-│   └── Seguridad pre-release pendiente
+│   ├── Comercial V1 operativo
+│   ├── Compras / Recepciones operativas
+│   ├── Inventario transaccional
+│   ├── Equipment Core
+│   ├── trazabilidad entre módulos
+│   └── preparación de cierre V1
 │
 ├── Healthcare
-│   ├── Arquitectura de dominio en evolución
-│   ├── Case Foundation implemented / validated
-│   ├── Equipment boundary documentado
-│   └── Workflows operacionales pendientes
+│   ├── Case Foundation implementado
+│   ├── Equipment boundary definido
+│   └── operational workflows TARGET
 │
 ├── Radar
-│   └── Producto futuro aprobado
+│   └── producto futuro
 │
 └── AI
-    └── Visión futura
-```
+    └── evolución futura
 
----
+3. ERP Core — Estado actual
 
-# 3. Trabajo completado recientemente
+Dominio
 
-Los siguientes bloques ya no deben tratarse como trabajo activo.
+Estado vigente
 
-## DOC-REF — Documentation Architecture Refactor
+Companies
 
-**Estado:** ✅ Completed
+✅ IMPLEMENTED
 
-Completado:
+Identity & Access
 
-```text
-Product documentation
-Architecture documentation
-Engineering documentation
-UX documentation
-ERP module documentation
-docs/project structure
-templates cleanup
-global documentation audit
-legacy documentation cleanup
-```
+🟡 IMPLEMENTED / P0 security evolution pending
 
-Este trabajo debe conservarse históricamente en `CHANGELOG.md`.
+Dashboard
 
----
+✅ IMPLEMENTED / VALIDATED
 
-## EQ-CORE-001 — Core Equipment Domain
+Customers
 
-**Estado:** ✅ Completed
+✅ V1 IMPLEMENTED / VALIDATED
 
-**Prioridad:** P1 estratégica
+Suppliers
 
-Completado:
+✅ V1 IMPLEMENTED / VALIDATED
 
-```text
-ERP Equipment domain
-Product ↔ EquipmentAsset relationship
-tracking strategy
-lot tracking strategy
+Products
+
+✅ V1 IMPLEMENTED / VALIDATED
+
+Categories
+
+✅ IMPLEMENTED / VALIDATED
+
+Inventory
+
+✅ Movement Ledger V1 IMPLEMENTED / VALIDATED
+
+Equipment
+
+✅ Equipment V1 IMPLEMENTED / VALIDATED
+
+Quotes
+
+✅ V1 IMPLEMENTED / VALIDATED
+
+Sales
+
+✅ V1 IMPLEMENTED / VALIDATED sobre modelo Sale CURRENT
+
+Purchases
+
+✅ V1 IMPLEMENTED / VALIDATED
+
+Purchase Receipts
+
+✅ V1 IMPLEMENTED / VALIDATED
+
+Returns
+
+⏳ P1 DEFERRED — diseño/persistencia parcial; backend operacional no CURRENT
+
+Audit
+
+⏳ FUTURE foundation
+
+Healthcare Cases
+
+✅ Foundation backend IMPLEMENTED / VALIDATED
+
+4. Trabajo cerrado recientemente
+
+H7 — ERP Core Functional Normalization
+
+Estado: ✅ COMPLETED / VALIDATED
+
+Incluye:
+
+Authenticated App Shell
+
+Navigation
+
+Dashboard
+
+Customers
+
+Suppliers
+
+Products
+
+Inventory
+
+Equipment
+
+Quotes
+
+Sales
+
+Purchases
+
+Purchase Receipts
+
+Subfases finales:
+
+H7A0
+→ Sales detail deep-link
+
+H7A
+→ Quotes normalization
+→ Quote → Sale handoff
+
+H7B
+→ Purchases normalization
+
+Resultado:
+
+ERP Core functional normalization
+→ COMPLETED
+
+Purchase Receipts V1
+
+Estado: ✅ IMPLEMENTED / VALIDATED
+
+Implementado:
+
+Purchase Receipt creation
+
+partial receiving
+
+full receiving
+
+lot tracking
+
+InventoryBatch integration
+
+Product.stock increment
+
+InventoryMovement IN
+
+EquipmentAsset provisioning for ASSET Products
+
+idempotency
+
+receipt detail
+
+cross-module traceability
+
+dedicated frontend
+
+Contrato idempotente:
+
+Idempotency-Key
++
+companyId
++
+PURCHASE_RECEIPT_CREATE
+
+Comportamiento:
+
+same key + same payload
+→ replay same Receipt
+
+same key + different payload
+→ 409 Conflict
+
+same key + another Company
+→ independent identity
+
+La idempotencia de Purchase Receipts ya no es deuda funcional.
+
+Permanece como deuda de QA:
+
+real simultaneous PostgreSQL concurrency test
+
+Equipment V1
+
+Estado: ✅ IMPLEMENTED / VALIDATED
+
+Incluye:
+
+EquipmentAsset identity
+
+automatic assetCode
+
+serialNumber
+
+normalized serial key
+
 lifecycle
+
 condition
+
 origin
-retirement reasons
-asset identity rules
-serial rules
-Inventory boundary
-Healthcare/Core ownership boundary
-```
 
-Documento:
+manual creation
 
-```text
-docs/modules/erp/EQUIPMENT.md
-v1.3.0
-```
+Purchase Receipt provisioning
 
----
+inspection
 
-## EQ-DATA-001 — Equipment Persistence Baseline
+retirement
 
-**Estado:** ✅ Completed
+current availability
 
-Implementado en Prisma:
+detail frontend
 
-```text
-ProductInventoryTracking
-├── QUANTITY
-├── SERIALIZED
-└── ASSET
+search / filters
 
-ProductLotTracking
-├── NONE
-├── OPTIONAL
-└── REQUIRED
-
-EquipmentLifecycle
-├── ACTIVE
-└── RETIRED
-
-EquipmentCondition
-├── GOOD
-├── INSPECTION_PENDING
-├── DAMAGED
-└── OUT_OF_SERVICE
-
-EquipmentOrigin
-├── MANUAL
-├── PURCHASE_RECEIPT
-├── IMPORT
-└── INITIAL_MIGRATION
-
-EquipmentRetirementReason
-├── SOLD
-├── LOST
-├── DESTROYED
-├── END_OF_LIFE
-├── REPLACED
-└── OTHER
-```
-
-Persistencia:
-
-```text
-EquipmentAsset
-EquipmentInspection baseline
-```
-
-Constraints principales:
-
-```text
-companyId + assetCode
-→ UNIQUE
-
-companyId + productId + serialNumberKey
-→ UNIQUE
-```
-
-Validaciones:
-
-```text
-Prisma migrate status
-→ database up to date
-
-Prisma validate
-→ PASS
-
-Prisma generate
-→ PASS
-```
-
----
-
-## EQ-BE-001 — Equipment Core Backend Baseline
-
-**Estado:** ✅ Completed
-
-API implementada:
-
-```text
-GET  /equipment
-GET  /equipment/:id
-POST /equipment
-```
-
-Deliberadamente no implementado:
-
-```text
-PATCH /equipment/:id
-DELETE /equipment/:id
-```
-
-Reglas implementadas:
-
-```text
-JWT protection
-tenant isolation
-Product must belong to Company
-Product must use ASSET tracking
-Product must be active
-optional Batch validation
-assetCode normalization
-assetCode duplicate protection
-optional serialNumber
-serialNumberKey normalization
-serial duplicate protection
-DTO validation
-400 / 404 / 409 handling
-```
-
----
-
-## EQ-QA-001 — Equipment Backend Quality Baseline
-
-**Estado:** ✅ Completed
-
-Resultados:
-
-```text
-EquipmentService
-8 / 8 PASS
-
-EquipmentController
-4 / 4 PASS
-
-Equipment total
-12 / 12 PASS
-```
-
-Regression suite:
-
-```text
-Test Suites
-28 / 28 PASS
-
-Tests
-124 / 124 PASS
-```
-
-Quality Gates:
-
-```text
-npm test
-✅
-
-npm run build
-✅
-
-ESLint
-✅
-```
-
-QA manual del contrato final:
-
-```text
-GET equipment
-✅
-
-GET equipment by ID
-✅
-
-POST valid ASSET
-✅
-
-duplicate assetCode
-→ 409
-
-duplicate normalized serial
-→ 409
-
-QUANTITY Product
-→ 400
-
-nonexistent Equipment
-→ 404
-
-invalid DTO
-→ 400
-
-optional serial
-✅
-
-assetCode normalization
-✅
-```
-
----
-
-## HC-EQ-DOC-001 — Healthcare Equipment Boundary
-
-**Estado:** ✅ Completed
-
-Documento:
-
-```text
-docs/modules/healthcare/EQUIPMENT.md
-v1.0.0
-```
-
-Se estableció:
-
-```text
-ERP/Core
-→ physical Equipment identity
-
-Healthcare
-→ operational use inside Cases
-```
-
-Healthcare es responsable de:
-
-```text
-Equipment Requirement
-Case Equipment Assignment
-Preparation
-Dispatch
-Custody
-Return
-Inspection context
-Availability for Case
-```
-
-No redefine `EquipmentAsset`.
-
----
-
-## UX-B.4 — Sales Frontend / Sales V1
-
-**Estado:** ✅ Completed / Validated
-
-Completado:
-
-```text
-/sales frontend route
-COMERCIAL sidebar navigation
-Sales list
-search by folio / customer
-status filter
-loading / error / retry
-empty and filtered-empty states
-
-Nueva venta modal
-Customer selection
-generic-Sales-compatible Product selection
-stock visibility
-read-only current price
-quantity
-item add / remove
-duplicate prevention
-subtotal / IVA 16% / total preview
-POST /sales
-list refresh after success
-
-Sale detail modal
-GET /sales/:id
-approve
-cancel
-PDF implementation
-terminal-state action visibility
-```
-
-Generic Sales boundary:
-
-```text
-inventoryTracking === QUANTITY
-AND
-lotTracking !== REQUIRED
-
-backend remains source of truth
-frontend filters incompatible Products for UX
-```
-
-Sales folios:
-
-```text
-SalesFolioService
-→ CompanySequenceAllocatorService
-key SALE_FOLIO
-V-000001, V-000002, ...
-tenant scoped
-sequential
-immutable
-historical / cancelled folios remain occupied
-direct Sale and Quote-converted Sale share the same sequence
-```
+deep-link
 
 Lifecycle:
 
-```text
-Direct Sale create
+ACTIVE
+
+RETIRED
+
+Condition:
+
+GOOD
+
+INSPECTION_PENDING
+
+DAMAGED
+
+OUT_OF_SERVICE
+
+Origin:
+
+MANUAL
+
+PURCHASE_RECEIPT
+
+IMPORT
+
+INITIAL_MIGRATION
+
+Current Availability:
+
+ACTIVE + GOOD
+→ available
+
+INSPECTION_PENDING
+→ unavailable
+
+DAMAGED
+→ unavailable
+
+OUT_OF_SERVICE
+→ unavailable
+
+RETIRED
+→ unavailable
+
+Availability representa únicamente hechos actualmente implementados en Equipment Core.
+
+No representa todavía:
+
+Case Assignment
+
+Custody
+
+Maintenance
+
+Calibration
+
+Case conflicts
+
+Dispatch
+
+Return
+
+5. Customers / Suppliers
+
+Customers
+
+Estado: ✅ IMPLEMENTED / VALIDATED
+
+Lifecycle:
+
+active by default
+        ↓
+DELETE
+        ↓
+isActive = false
+
+DELETE representa desactivación y no hard delete.
+
+Reglas actuales:
+
+active list
+
+historical detail preserved
+
+historical Quotes preserved
+
+historical Sales preserved
+
+Customer activo para nuevas Quotes/Sales:
+
+backend validation
+→ IMPLEMENTED
+
+Pendiente:
+
+reactivation workflow
+
+inactive-record administration
+
+Suppliers
+
+Estado: ✅ IMPLEMENTED / VALIDATED
+
+Lifecycle equivalente:
+
+active
+  ↓
+deactivate
+  ↓
+isActive = false
+
+Las Purchases históricas conservan su Supplier.
+
+Pendiente:
+
+backend validation of active Supplier
+for new / edited Purchase
+
+La ausencia de esta validación permanece deuda de integridad.
+
+6. Products
+
+Estado: ✅ IMPLEMENTED / VALIDATED
+
+Campos principales:
+
+SKU
+
+name
+
+description
+
+brand
+
+category
+
+barcode
+
+cost
+
+price
+
+stock
+
+minStock
+
+isActive
+
+inventoryTracking
+
+lotTracking
+
+Inventory tracking:
+
+QUANTITY
+
+SERIALIZED
+
+ASSET
+
+Lot tracking:
+
+NONE
+
+OPTIONAL
+
+REQUIRED
+
+Reglas actuales:
+
+Product.stock
+→ no se modifica mediante Product CRUD
+
+Product creation
+→ stock inicial gestionado por backend
+
+tracking
+→ no se modifica arbitrariamente después de existir historia operacional
+
+DELETE
+→ deactivation
+
+Pendiente:
+
+Product 360
+
+reactivation
+
+formal tracking migration workflow
+
+imports
+
+future unit-of-measure model
+
+Healthcare Product Profile
+
+Deuda de integridad relacionada con Purchases:
+
+active Product backend validation
+for new / edited Purchase
+
+7. Inventory
+
+Estado: ✅ Movement Ledger V1 IMPLEMENTED / VALIDATED
+
+Frontend:
+
+Inventory
+
+├── Existencias
+
+└── Movimientos
+
+Movement types CURRENT:
+
+IN
+
+OUT
+
+ADJUSTMENT
+
+Trazabilidad:
+
+referenceType
+
+referenceId
+
+balance
+
+unitCost
+
+Product
+
+createdAt
+
+Flujos principales:
+
+Purchase Receipt
+→ InventoryMovement IN
+
+Sale approval
+→ InventoryMovement OUT
+
+Pendiente:
+
+backend pagination
+
+server-side search / filtering
+
+date-range filtering
+
+server-side reference filtering
+
+manual adjustment workflow review
+
+multi-warehouse
+
+locations
+
+transfers
+
+physical counts
+
+barcode / QR
+
+Location, Position e internal TRANSFER permanecen TARGET / architectural candidates cuando una futura necesidad lo requiera.
+
+No son CURRENT.
+
+8. Quotes
+
+Estado: ✅ V1 IMPLEMENTED / VALIDATED
+
+Estados:
+
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+
+Funcionalidad:
+
+create
+
+list
+
+search
+
+status filter
+
+detail from current loaded data
+
+approve
+
+cancel
+
+PDF
+
+Quote → Sale conversion
+
+Conversión:
+
+POST /sales/from-quote/:quoteId
+
+El backend devuelve la Sale creada con:
+
+id
+
+folio
+
+Frontend handoff:
+
+Quote
+  ↓
+Convert to Sale
+  ↓
+Venta creada correctamente
+  ↓
+/sales?saleId=<Sale.id>
+
+Deuda vigente:
+
+historical converted Quote
+→ convertedToSale is known
+→ original Sale identity is not exposed
+
+Por lo tanto una Quote histórica convertida todavía no puede navegar a su Sale original.
+
+También permanece deuda futura:
+
+dedicated GET /quotes/:id strategy
+for server-side pagination/deep-link robustness
+
+9. Sales
+
+Estado: ✅ V1 IMPLEMENTED / VALIDATED
+
+Estados principales:
+
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+
+Folios:
+
+V-000001
+
+V-000002
+
+...
+
+Generados mediante:
+
+CompanySequence
+
+key = SALE_FOLIO
+
+Flujo:
+
+Create Sale
 → DRAFT
 → no stock mutation
 
-DRAFT approve
+Approve
 → CONFIRMED
 → Product.stock decrement
 → InventoryMovement OUT
 
-DRAFT cancel
+Cancel DRAFT
 → CANCELLED
 → no stock mutation
-→ no InventoryMovement
-```
 
-Manual PostgreSQL / API / UI QA:
+Generic Sales eligibility:
 
-```text
-ASSET Product rejected from generic Sales
-compatible QUANTITY + OPTIONAL Product created as DRAFT with stock unchanged
-sequential folios observed V-000005 ... V-000011
-cancelled folios not reused
-UI Sale V-000011 created for Miguel Sahuaro / LF1837 BLUNT TIP
-approval changed V-000011 DRAFT → CONFIRMED and stock 50 → 49
-InventoryMovement OUT referenceId matched approved Sale
-DRAFT cancellation changed status to CANCELLED with stock unchanged and 0 movements
-```
+inventoryTracking === QUANTITY
 
-PDF:
+AND
 
-```text
-GET /sales/:id/pdf
-frontend blob download implemented
-automated coverage present
-manual browser PDF verification pending
-```
+lotTracking !== REQUIRED
 
-Validation:
+Productos incompatibles con Sales genérico son rechazados por backend.
 
-```text
-Backend Sales tests
-76 PASS
+Deep-link:
 
-Shared sequence regressions
-32 PASS
-
-Full backend
-41 suites
-374 tests PASS
-
-Frontend focused Sales
-40 tests PASS
-
-Navigation
-29 tests PASS
-
-Full frontend
-20 files
-240 tests PASS
-
-Prisma validate / build / lint / git diff --check
-PASS
-```
-
-Out of scope / debt:
-
-```text
-Sale edit
-Sale DELETE
-confirmed Sale cancellation / reversal
-Sale create request idempotency
-GET /sales pagination / server filtering
-required-lot Sale flow
-ASSET / serialized physical Sale flow
-SalesOrder / Delivery future architecture
-payments / invoice / delivery
-```
-
----
-
-## UX-B.5 — Products / Inventory / Equipment V1
-
-**Estado:** ✅ Completed / Validated
-
-Completado:
-
-```text
-Products V1
-→ catalog CRUD normalization
-→ tenant-safe Product detail and Category assignment
-→ stock removed from client POST / PATCH
-→ tracking selected on create and read-only on edit
-→ non-destructive Product deactivation
-
-Inventory Movement Ledger V1
-→ Existencias / Movimientos views
-→ movement search and type filter
-→ independent loading / error / retry
-→ real Purchase Receipt IN and Sale OUT QA
-
-Equipment V1
-→ list / detail / filters
-→ Current Availability
-→ inspection history and registration
-→ manual creation
-→ terminal retirement
-```
-
-Validación frontend vigente:
-
-```text
-Products  14 tests PASS
-Inventory 23 tests PASS
-Equipment 61 tests PASS
-
-Full frontend
-25 files / 336 tests PASS
-
-build / lint / git diff --check
-PASS
-```
-
-QA manual registrada:
-
-```text
-Product detail / low-stock / stock rejection / deactivation
-Inventory Purchase Receipt IN / Sale OUT ledger
-Equipment list / detail / inspection / manual creation / retirement
-PASS
-```
-
-Siguiente bloque:
-
-```text
-UX-B.5H
-PURCHASE RECEIPTS + REMAINING ERP NORMALIZATION
-```
-
----
-
-# 4. ERP Core — estado actual
-
-| Dominio           | Estado                                          |
-| ----------------- | ----------------------------------------------- |
-| Companies         | ✅ Implementado                                  |
-| Identity & Access | 🟡 Implementado / security evolution pending    |
-| Customers         | ✅ Implementado                                  |
-| Suppliers         | ✅ Implementado                                  |
-| Products          | ✅ Products V1 implementado / validado            |
-| Purchases         | ✅ Implementado / avanzado                       |
-| Purchase Receipts | ✅ Implementado                                  |
-| Inventory         | ✅ Movement Ledger V1 validado / dominio en evolución |
-| Equipment Core    | ✅ Equipment V1 implementado / validado            |
-| Quotes            | ✅ Legacy funcional                              |
-| Sales             | ✅ Sales V1 frontend completed / validated sobre Sale legacy |
-| Returns           | 🟡 Parcialmente implementado                    |
-| Dashboard         | ✅ Implementado / evolución UX pendiente         |
-| Audit             | ⏳ Requerimiento aprobado                        |
-
----
-
-# 5. Products — estado actualizado
-
-**Estado:** ✅ Implementado / en evolución
-
-Actualmente:
-
-```text
-CRUD
-SKU
-name
-description
-brand
-Category
-barcode
-cost
-price
-stock
-minStock
-isActive
-ProductSelector
-inventoryTracking
-lotTracking
-```
-
-Tracking disponible:
-
-```text
-QUANTITY
-SERIALIZED
-ASSET
-```
-
-Lot tracking:
-
-```text
-NONE
-OPTIONAL
-REQUIRED
-```
-
-La creación permite definir estas estrategias.
-
-La modificación genérica mediante `UpdateProductDto` no debe utilizarse para cambiar arbitrariamente el tracking después de existir historia operacional.
+/sales?saleId=<id>
 
 Pendiente:
 
-```text
-Product 360
-formal tracking transition workflow if ever required
-imports
-future units of measure
-Healthcare product profile
-```
+Sale create idempotency
 
----
+confirmed Sale reversal
 
-# 6. Equipment Core — siguiente evolución
+generic DRAFT edit only if product requirements justify it
 
-## EQ-INS-001 — Equipment Inspection Workflow
+pagination
 
-**Estado:** ✅ Completed
+server-side filtering
 
-**Prioridad:** P1 estratégica
+required-lot fulfillment
 
-Implementado:
-POST /equipment/:equipmentId/inspections
-GET  /equipment/:equipmentId/inspections
+ASSET / SERIALIZED fulfillment
 
-conditionBefore
-→ derived from EquipmentAsset
+SalesOrder / Delivery TARGET architecture
 
-conditionAfter
-→ GOOD
-→ DAMAGED
-→ OUT_OF_SERVICE
+payments
 
-INSPECTION_PENDING
-→ invalid final result
+invoice
 
-RETIRED Equipment
-→ inspection blocked
+10. Purchases
 
-inspectedById
-→ authenticated User
+Estado: ✅ V1 IMPLEMENTED / VALIDATED
 
-inspectedAt
-→ server generated
+Estados:
 
-Inspection history
-→ preserved
+DRAFT
 
-EquipmentAsset.condition
-→ updated atomically
+CONFIRMED
 
-Objetivo:
+PARTIALLY_RECEIVED
 
-Implementar el primer workflow operacional explícito sobre `EquipmentAsset`.
+RECEIVED
 
-Debe cubrir:
+CANCELLED
 
-```text
-Inspection creation
-Equipment validation
-current Condition validation
-inspection result
-GOOD
-DAMAGED
-OUT_OF_SERVICE
-Condition update
-inspection history
-actor
-timestamp
-notes
-tenant isolation
-authorization
-tests
-QA
-```
+Funcionalidad:
 
-Principio:
+create
 
-```text
-Inspection
-→ updates Condition
+edit DRAFT
 
-Inspection
-≠
-direct Availability mutation
-```
+approve
 
-Migration:
-20260821221133_equipment_inspection_tenant_fk
+cancel DRAFT
 
----
+detail from current loaded data
 
-## EQ-RET-001 — Equipment Retirement
+PDF
 
-**Estado:** ✅ Completed
+search
 
-**Prioridad:** P1 estratégica
+status filter
 
-Implementado:
+Supplier filter
 
-```text
-ACTIVE
-→ RETIRED
+Receipt creation
 
-RETIRED
-→ terminal lifecycle state
+Receipt history
 
-Retirement
-≠ DELETE
+partial receiving
 
-retiredReason
-→ required + enum validated
+full receiving
 
-OTHER
-→ retirementNotes required
+deep-link
 
-retirementNotes
-→ normalized
+Deep-link:
 
-retiredAt
-→ server generated
+/purchases?purchaseId=<id>
 
-retiredById
-→ authenticated User
+Limitación:
 
-Condition
-→ preserved
+Purchase deep-link currently resolves through loaded Purchase list
 
-assetCode
-→ preserved
+Con paginación futura deberá evolucionar hacia resolución directa por ID o estrategia equivalente.
 
-serialNumber
-→ preserved
+Deuda:
 
-Inspection history
-→ preserved
+active Supplier backend validation
 
-RETIRED Equipment
-→ new Inspection blocked
+active Product backend validation
 
-Retirement
-→ changes Lifecycle
+pagination
 
-second Retirement
-→ 409 Conflict
+server-side filtering
 
-concurrent lifecycle change
-→ 409 Conflict
+future deep-link pagination compatibility
 
-Existing EquipmentAsset schema reused
-✅
+11. Purchase Receipts
 
-New Prisma migration
-→ NOT REQUIRED
+Estado: ✅ V1 IMPLEMENTED / VALIDATED
 
-EquipmentService
-25 / 25 PASS
+Documento canónico:
 
-EquipmentController
-7 / 7 PASS
+docs/modules/erp/PURCHASE_RECEIPTS.md
 
-Equipment total
-32 / 32 PASS
+Flujo:
 
-Test Suites
-28 / 28 PASS
+Purchase CONFIRMED / PARTIALLY_RECEIVED
+        ↓
+PurchaseReceipt
+        ↓
+PurchaseReceiptItem
+        ├── Product.stock increment
+        ├── InventoryMovement IN
+        ├── InventoryBatch when applicable
+        └── EquipmentAsset for ASSET Product
+        ↓
+Purchase PARTIALLY_RECEIVED / RECEIVED
 
-Tests
-144 / 144 PASS
+Lot tracking implementado:
 
-Manual QA
-✅
+NONE
 
-npm test
-✅
+OPTIONAL
 
-npm run build
-✅
+REQUIRED
 
-ESLint
-✅
+Equipment provisioning:
 
-Retirement
-≠ Condition mutation
-Retirement
-≠ DELETE
-
-```
-
-No debe existir `DELETE` como sustituto del Retirement.
-
----
-
-## EQ-ASSETCODE-001 — Automatic Asset Code
-
-**Estado:** ✅ Completed
-
-**Prioridad:** P1
-
-Objetivo:
-
-```text
-POST /equipment
-↓
-automatic assetCode
-```
-
-Formato inicial recomendado:
-
-```text
-EQ-000041
-```
-
-Debe garantizar:
-
-```text
-tenant uniqueness
-concurrency safety
-no reuse
-import compatibility
-```
-
-Resultado:
-
-```text
-Normal POST /equipment
-→ server-generated assetCode
-
-CreateEquipmentDto
-→ no longer accepts assetCode
-
-CompanySequence
-→ reused with key EQUIPMENT_ASSET_CODE
-
-Prisma schema changes
-→ none
-
-Migration
-→ none
-```
-
-Validación:
-
-```text
-Equipment tests
-42/42 passed
-
-Backend tests
-154/154 passed
-29/29 suites passed
-
-Build
-PASS
-
-ESLint
-PASS
-
-Prisma validate
-PASS
-
-Real PostgreSQL concurrency QA
-PASS
-```
-
----
-
-## EQ-PR-001 — Purchase Receipt → EquipmentAsset
-
-**Estado:** ✅ Completed / Validated
-
-**Prioridad:** P1
-
-**Repository analysis:** Approved
-
-**Domain design:** Approved
-
-**Implementation:** Implemented / Validated
-
-Implementado para Products:
-
-```text
-inventoryTracking = ASSET
-```
-
-una recepción crea las identidades físicas correspondientes.
-
-Regla implementada:
-
-```text
-PurchaseReceiptItem.quantityReceived = N
-↓
-create exactly N EquipmentAsset rows
-```
-
-No debe usarse `PurchaseItem.quantity` como conteo de creación de Equipment.
-
-Para este ticket:
-
-```text
 QUANTITY
-→ no EquipmentAsset creation
+→ no EquipmentAsset
 
 SERIALIZED
-→ no EquipmentAsset creation
+→ no EquipmentAsset currently
 
 ASSET
-→ EquipmentAsset creation
-```
+→ one EquipmentAsset per unit received
 
-Consistencia mantenida entre:
+Frontend:
 
-```text
-PurchaseReceipt
-Inventory
-Product
-EquipmentAsset
-```
+/purchase-receipts
 
-Arquitectura implementada:
+/purchase-receipts/<id>
 
-```text
-EquipmentAssetCodeService
-→ owns CompanySequence allocation
-→ owns EQ assetCode formatting and collision reservation
+Cross-module navigation:
 
-EquipmentProvisioningService
-→ owns PurchaseReceiptItem lookup
-→ owns tenant-safe provisioning
-→ owns inventoryTracking decision
-→ owns Equipment identity creation
+Purchase → Receipt
 
-PurchaseReceiptsService
-→ owns receipt orchestration
-→ owns transaction boundary
-```
+Receipt → Purchase
 
-Public API:
+Receipt → Inventory
 
-```text
-provisionFromPurchaseReceiptItem(
-  tx: Prisma.TransactionClient,
-  companyId: string,
-  purchaseReceiptItemId: string
-): Promise<EquipmentAsset[]>
-```
+Receipt → Equipment
 
-La operación acepta una transacción Prisma propiedad del caller y no abre una segunda transacción.
+Deuda:
 
-Flujo validado dentro de la misma transacción Prisma:
+real simultaneous PostgreSQL idempotency race QA
 
-```text
-InventoryBatch create / resolve
-↓
-PurchaseReceiptItem.create
-↓
-EquipmentProvisioningService.provisionFromPurchaseReceiptItem(tx, companyId, createdReceiptItem.id)
-↓
-Product.stock += quantityReceived
-↓
-InventoryMovement IN
-↓
-Purchase status recalculation
-↓
-COMMIT
-```
+SERIALIZED receipt semantics
 
-Decisiones implementadas:
+Receipt PDF
 
-```text
-Receipt-created EquipmentAsset
-→ lifecycle = ACTIVE
-→ condition = INSPECTION_PENDING
-→ origin = PURCHASE_RECEIPT
-→ purchaseReceiptItemId preserved
+Receipt correction / cancellation / reversal
 
-serialNumber
-→ optional at receipt
-→ serialNumber = null allowed
-
-Product.stock
-→ mutated only by PurchaseReceipt
-→ EquipmentAsset creation does not increment stock again
-
-InventoryMovement
-→ no extra movement per EquipmentAsset
-
-Prisma migration
-→ not required for minimal implementation
-```
-
-Module dependency:
-
-```text
-PurchasesReceiptsModule
-→ EquipmentModule
-→ no forwardRef
-→ no circular dependency
-```
-
-Mecanismo reutilizado:
-
-```text
-CompanySequence
-key = EQUIPMENT_ASSET_CODE
-```
-
-Persistencia reutilizada:
-
-```text
-EquipmentAsset.purchaseReceiptItemId
-EquipmentAsset.batchId
-EquipmentAsset.origin
-EquipmentOrigin.PURCHASE_RECEIPT
-CompanySequence
-companyId + assetCode uniqueness
-```
-
-Validación automatizada:
-
-```text
-Purchase Receipt tests
-2 suites
-26/26 passed
-
-Equipment tests
-5 suites
-68/68 passed
-
-Full backend tests
-31 suites
-184/184 passed
-
-npx prisma validate
-PASS
-
-npm run build
-PASS
-
-ESLint changed TypeScript
-PASS
-
-Full backend ESLint
-PASS
-
-git diff --check
-PASS
-```
-
-Manual PostgreSQL / API QA:
-
-```text
-Partial receipt
-→ Purchase quantity 5
-→ Receipt A quantityReceived 2 created 2 EquipmentAssets
-→ Receipt B quantityReceived 3 created 3 EquipmentAssets
-→ total EquipmentAssets 5
-
-Product.stock
-→ initial 0
-→ after Receipt A 2
-→ after Receipt B 5
-→ no double counting
-
-InventoryMovement
-→ Receipt A one IN movement, quantity 2, balance 2
-→ Receipt B one IN movement, quantity 3, balance 5
-→ final movements 2
-→ total IN 5
-
-Traceability
-→ PurchaseReceiptItem 4a93d639-e25e-4018-98a7-46e5aa36a422 linked exactly 2 assets
-→ PurchaseReceiptItem 86319c8a-0e79-451c-84cb-b1471c9ffe4b linked exactly 3 assets
-
-Receipt-created Equipment
-→ origin PURCHASE_RECEIPT
-→ lifecycle ACTIVE
-→ condition INSPECTION_PENDING
-→ batchId null when Product lotTracking = NONE
-
-Over-receipt protection
-→ extra receipt after RECEIVED returned 400 Bad Request
-→ La compra ya fue recibida completamente
-→ Product.stock remained 5
-→ InventoryMovements remained exactly 2
-→ valid EquipmentAssets remained exactly 5
-```
-
-Rollback evidence:
-
-```text
-transaction rollback behavior
-→ structurally implemented and unit-tested
-
-Provisioning errors
-→ propagate through the existing receipt Prisma transaction
-→ no second transaction is opened
-→ downstream Product.stock and InventoryMovement operations are not executed after provisioning failure
-
-manual forced database provisioning failure
-→ NOT PERFORMED
-```
-
-Pendientes fuera de EQ-PR-001:
-
-```text
-PurchaseReceipt request idempotency
-→ unresolved high-priority reliability concern
-
-Receipt correction / reversal
-→ unresolved
+server-side pagination / filtering
 
 Product.stock ↔ EquipmentAsset reconciliation
-→ formal invariant unresolved
 
-serial assignment / correction workflow
-→ pending
+12. Identity & Access
 
-broader lotTracking enforcement
-→ pending
+Estado: 🟡 IMPLEMENTED / P0 SECURITY EVOLUTION PENDING
 
-SERIALIZED receipt behavior
-→ provisioning pending
+Implementado:
 
-tenant-safe write hardening
-→ existing debt remains
-```
+JWT
 
-Fases cerradas:
+JwtStrategy
 
-```text
-Phase B.1
-Extract / reuse transaction-aware Equipment assetCode allocation
+JwtAuthGuard
 
-Phase B.2
-Add Equipment receipt provisioning capability
+RolesGuard where configured
 
-Phase B.3
-Integrate provisioning into PurchaseReceiptsService transaction
+companyId tenant context
 
-Phase B.4
-Tests and technical validation
+ValidationPipe
 
-Phase C
-Manual QA and final documentation synchronization
-```
+ValidationPipe:
 
----
+whitelist = true
 
-## EQ-AVL-001 — Availability Evaluator
+forbidNonWhitelisted = true
 
-**Estado:** ✅ IMPLEMENTED / VALIDATED
+transform = true
 
-**Prioridad:** P1
+Endpoints principales:
 
-**Repository analysis:** Complete
+/auth/register
 
-**Domain design:** Approved
+/auth/login
 
-**Implementation:** IMPLEMENTED / VALIDATED
+/auth/reset-password
 
-**Validation:** Completed
+/auth/me
 
-Availability será:
+SEC-001 — Authentication Response Sanitization
 
-```text
-derived
-contextual
-explainable
-```
-
-Nunca:
-
-```text
-available Boolean
-```
-
-persistido manualmente.
-
-Debe poder considerar:
-
-```text
-Lifecycle
-Condition
-Inspection
-Custody
-Assignment
-Maintenance
-Calibration
-Case context
-```
-
-EQ-AVL-001 Fase 1 implementa:
-
-```text
-Current Equipment Availability
-```
-
-Pregunta:
-
-```text
-Can this EquipmentAsset be used now according to currently implemented Core Equipment facts?
-```
-
-Fase 1 no implementa:
-
-```text
-Case Availability
-Case Assignment conflicts
-Custody
-Dispatch
-Returns / Custody Return
-Maintenance
-Calibration
-Turnaround
-Case scheduling
-```
-
-No deben agregarse booleans manuales para simular esos dominios.
-
-Hechos implementados que se usarán:
-
-```text
-EquipmentAsset.lifecycle
-EquipmentAsset.condition
-```
-
-Inspection history existe, pero no será requerida directamente por el evaluator. `EquipmentAsset.condition` es el snapshot operacional actual.
-
-Reglas aprobadas:
-
-```text
-ACTIVE + GOOD
-→ available = true
-
-ACTIVE + INSPECTION_PENDING
-→ available = false
-→ INSPECTION_PENDING
-
-ACTIVE + DAMAGED
-→ available = false
-→ DAMAGED
-
-ACTIVE + OUT_OF_SERVICE
-→ available = false
-→ OUT_OF_SERVICE
-
-RETIRED
-→ available = false
-→ RETIRED
-```
-
-`ACTIVE + GOOD = available` significa:
-
-```text
-available according to currently implemented Core Equipment facts
-```
-
-No garantiza todavía:
-
-```text
-availability for a specific Case
-absence of future Custody blocker
-absence of Maintenance blocker
-absence of Calibration blocker
-absence of Assignment conflict
-```
-
-Contrato externo implementado:
-
-```json
-{
-  "available": false,
-  "primaryReason": "INSPECTION_PENDING",
-  "reasons": ["INSPECTION_PENDING"],
-  "evaluatedAt": "2026-08-24T00:00:00.000Z"
-}
-```
-
-Contrato del evaluator puro:
-
-```json
-{
-  "available": false,
-  "primaryReason": "INSPECTION_PENDING",
-  "reasons": ["INSPECTION_PENDING"]
-}
-```
-
-Reason codes Fase 1:
-
-```text
-RETIRED
-INSPECTION_PENDING
-DAMAGED
-OUT_OF_SERVICE
-```
-
-Prioridad determinística:
-
-```text
-1. RETIRED
-2. INSPECTION_PENDING
-3. DAMAGED
-4. OUT_OF_SERVICE
-```
-
-No exponer todavía:
-
-```text
-EXTERNAL_CUSTODY
-CASE_CONFLICT
-MAINTENANCE_BLOCKED
-CALIBRATION_BLOCKED
-```
-
-Arquitectura implementada:
-
-```text
-equipment-availability.types.ts
-→ runtime TypeScript reason constants
-→ derived TypeScript reason union
-
-equipment-availability.evaluator.ts
-→ pure deterministic evaluator
-→ no PrismaService
-→ no DB lookup
-→ no I/O
-→ no clock access
-→ no evaluatedAt
-→ no Inspection history requirement
-
-EquipmentAvailabilityService
-→ tenant-safe Equipment lookup
-→ orchestration
-→ evaluatedAt
-
-pure Equipment Current Availability evaluator
-→ consumes lifecycle + condition facts
-→ no database dependency
-→ deterministic
-
-EquipmentController
-→ GET /equipment/:equipmentId/availability
-→ delegates to EquipmentAvailabilityService
-→ no Availability business logic
-```
-
-API implementada:
-
-```text
-GET /equipment/:equipmentId/availability
-```
-
-Tenant behavior:
-
-```text
-Authenticated Company from JWT
-lookup by equipmentId + companyId
-cross-tenant or nonexistent Equipment → 404 Equipo no encontrado
-```
-
-No agregar Availability a `GET /equipment` en Fase 1 para evitar N+1 implícito.
-
-Availability tampoco se agrega automáticamente a `GET /equipment/:id`.
-
-Prisma:
-
-```text
-new Prisma model
-→ NOT REQUIRED
-
-new field
-→ NOT REQUIRED
-
-new enum
-→ NOT REQUIRED
-
-migration
-→ NOT REQUIRED
-```
-
-Validación automatizada:
-
-```text
-Pure Availability evaluator
-1 suite
-12/12 passed
-
-EquipmentAvailabilityService
-1 suite
-15/15 passed
-
-EquipmentController
-1 suite
-12/12 passed
-
-All Equipment tests
-7 suites
-100/100 passed
-
-Full backend tests
-33 suites
-216/216 passed
-
-npx prisma validate
-PASS
-
-npm run build
-PASS
-
-Changed TypeScript ESLint
-PASS
-
-Full backend ESLint
-PASS
-
-git diff --check
-PASS
-```
-
-Manual PostgreSQL / API QA:
-
-```text
-Asset
-→ EQ-000021
-→ 9eac7f6a-45ad-49b7-a423-2b182f98860e
-→ origin PURCHASE_RECEIPT
-
-Purchase Receipt ACTIVE + INSPECTION_PENDING
-→ false / INSPECTION_PENDING
-→ PASS
-
-Inspection: INSPECTION_PENDING → GOOD
-→ available true
-→ PASS
-
-GOOD → DAMAGED
-→ available false / DAMAGED
-→ PASS
-
-GOOD → RETIRED
-→ unavailable / RETIRED
-→ condition remained DAMAGED
-
-RETIRED + DAMAGED
-→ reasons [RETIRED, DAMAGED]
-→ primaryReason RETIRED
-→ PASS
-
-Nonexistent Equipment
-→ 404 Equipo no encontrado
-→ PASS
-```
-
-Cross-tenant QA:
-
-```text
-real manual second-company QA
-→ NOT PERFORMED
-
-automated tenant-scoped lookup / null lookup coverage
-→ exists
-```
-
-Invalid Retirement QA note:
-
-```text
-reason / notes payload
-→ invalid
-
-retiredReason / retirementNotes
-→ expected
-
-invalid request returned 400
-→ no retirement occurred
-→ Availability remained DAMAGED until valid Retirement request
-```
-
-Fases completadas:
-
-```text
-B.1
-Pure evaluator + reason types/constants
-
-B.2
-EquipmentAvailabilityService with tenant-safe lookup
-
-B.3
-GET /equipment/:equipmentId/availability
-
-B.4
-Automated tests and technical validation
-
-B.5
-Manual PostgreSQL/API QA using real Equipment state transitions
-
-C
-Final documentation synchronization
-```
-
-Permanecen fuera de alcance:
-
-```text
-Case Availability
-Custody
-Assignment
-Case conflict
-Maintenance
-Calibration
-Turnaround
-placeholder persisted booleans
-Product.stock-based Equipment availability
-```
-
-Deuda no resuelta por EQ-AVL-001:
-
-```text
-Purchase Receipt idempotency
-Product.stock ↔ EquipmentAsset reconciliation
-serial assignment/correction
-broader lotTracking enforcement
-tenant-safe write hardening
-```
-
----
-
-# 7. P0 — Release / Security blockers
-
-Estas tareas siguen siendo obligatorias antes de una exposición comercial real.
-
-## SEC-001 — Sanitizar Authentication Responses
-
-**Estado:** ⏳ Pending
-**Prioridad:** P0
+Estado: ✅ COMPLETED / VERIFIED
 
 Regla:
 
-```text
-API Response
-→ never passwordHash
-```
+API response
+→ no passwordHash exposure
 
-Revisar:
+La deuda histórica de exposición de passwordHash en register/login fue resuelta.
 
-```text
-login
-/auth/me
-User endpoints
-regression tests
-```
+No debe mantenerse como riesgo activo.
 
----
+SEC-002 — Default ADMIN / Safe Role Provisioning Review
 
-## SEC-002 — Revisar default ADMIN
+Estado: ⏳ PENDING
+Prioridad: P0
 
-**Estado:** ⏳ Pending
-**Prioridad:** P0
+Riesgo actual a revisar:
 
-Riesgo:
-
-```text
 User.role
 @default(ADMIN)
-```
 
-Debe revisarse:
+Debe validarse:
 
-```text
 all user creation flows
+
 explicit role assignment
-privilege escalation tests
-```
 
----
+privilege escalation protection
 
-## SEC-003 — Inactive User Authentication
+safe provisioning defaults
 
-**Estado:** 🔎 Verify
-**Prioridad:** P0
+regression tests
+
+No debe asumirse que el default es seguro para producción sin revisión formal.
+
+SEC-003 — Inactive User Enforcement
+
+Estado: 🔎 VERIFY / FIX IF NEEDED
+Prioridad: P0
 
 Debe garantizarse:
 
-```text
 User.isActive = false
 → no normal application access
-```
 
----
+Debe verificarse tanto en:
 
-## SEC-004 — Tenant Isolation Regression Suite
+authentication
 
-**Estado:** ⏳ Pending / partial
-**Prioridad:** P0
+authenticated request lifecycle
 
-Cobertura sistemática:
+según la estrategia final.
 
-```text
+SEC-004 — Tenant Isolation Regression
+
+Estado: ⏳ PENDING / PARTIAL
+Prioridad: P0
+
+Objetivo:
+
 Company A
-→ cannot access Company B resources
-```
+→ cannot read/write Company B resources
 
-para operaciones críticas.
+Debe cubrir sistemáticamente las operaciones críticas.
 
----
+La existencia de filtros tenant en múltiples services no sustituye una regresión transversal.
 
-## QA-CORE — Commercial Core Regression
+SEC-005 — Secure Password Recovery
 
-**Estado:** ⏳ Pending
-**Prioridad:** P0
+Estado: ⛔ P0 BLOCKER
+Prioridad: P0
 
-Antes de release:
+El endpoint CURRENT:
 
-```text
-backend lint
-backend build
+/auth/reset-password
+
+no puede considerarse apto para pilot/commercial production si permite restablecer una contraseña sin demostrar control de la cuenta mediante un mecanismo seguro.
+
+Debe existir una estrategia equivalente a:
+
+recovery request
+
+secure random single-use token
+
+short expiration
+
+account-control proof
+
+token invalidation after use
+
+safe response semantics
+
+no account enumeration
+
+audit / abuse controls where applicable
+
+Regla:
+
+public password reset
+without secure recovery proof
+→ P0 security blocker
+
+No debe cerrarse ERP Core para producción comercial sin resolver este punto.
+
+SEC-006 — Authentication Abuse Protection / Rate Limiting
+
+Estado: ⏳ PENDING
+Prioridad: P0 preproduction
+
+Endpoints sensibles como:
+
+/auth/login
+
+/auth/register
+
+password recovery endpoints
+
+deben contar con protección básica contra abuso antes de producción.
+
+Debe definirse según arquitectura:
+
+rate limiting
+
+retry / lockout policy where appropriate
+
+monitoring
+
+safe error responses
+
+No aplicar una estrategia de lockout que permita denegación de servicio trivial sin análisis.
+
+SEC-007 — Protected Route / Session Architecture
+
+Estado: ⏳ PENDING REVIEW
+Prioridad: P0 preproduction
+
+CURRENT frontend utiliza:
+
+(app) route group
+
+AppShell
+
+JWT stored client-side
+
+axios interceptor
+
+401 clear / redirect
+
+Esto no constituye todavía un global protected-route/session contract completo.
+
+Debe revisarse:
+
+session bootstrap
+
+protected deep-link refresh
+
+protected-page flash
+
+logout consistency
+
+unauthenticated navigation behavior
+
+storage strategy before production
+
+JWT en localStorage es estrategia CURRENT, no una decisión que deba asumirse irreversible para producción.
+
+SEC-008 — Critical Authorization Review
+
+Estado: ⏳ PENDING
+Prioridad: P0
+
+Debe verificarse sistemáticamente:
+
+sensitive endpoints
+
+RolesGuard / authorization coverage
+
+server-side business authorization
+
+no frontend-only authorization assumptions
+
+antes de production release.
+
+SEC-009 — Production Secrets / Configuration Review
+
+Estado: ⏳ PENDING
+Prioridad: P0 preproduction
+
+Debe verificarse:
+
+JWT_SECRET / secrets management
+
+production environment variables
+
+no committed credentials
+
+safe environment separation
+
+production database configuration
+
+debug/dev settings disabled where appropriate
+
+13. Release Readiness
+
+QA-CORE — Commercial Core Regression
+
+Estado: ⏳ PENDING
+Prioridad: P0
+
+Se ejecutará durante:
+
+H8B
++
+UX-B.6
+
+H8B debe incluir:
+
 backend tests
+
 frontend tests
-critical flows
+
+backend build
+
+frontend build
+
+backend lint
+
+frontend lint
+
+Prisma validate
+
+Prisma migrate status
+
+git health
+
+UX-B.6 debe incluir el QA funcional transversal real:
+
+critical business flows
+
 tenant isolation
+
 authorization
-manual QA
-security review
-```
 
----
+lifecycle
 
-# 8. Returns
+folios
 
-## RET-004 — Returns Backend
+stock effects
 
-**Estado:** ⏳ Pending
-**Prioridad:** P0
+movement references
 
-Diseño completado:
+PDFs
 
-```text
+deep-links
+
+idempotency replay/conflict
+
+historical deactivation behavior
+
+Release readiness también requiere cerrar los P0 de seguridad de §12.
+
+14. Returns
+
+RET-004 — Returns Backend
+
+Estado: ⏳ DEFERRED
+Prioridad: P1 estratégica
+
+Diseño existente:
+
 RET-001 Functional Design
-✅
+→ completed
 
 RET-002 Prisma Design
-✅
+→ completed
 
 RET-003 Schema + Migration
-✅
-```
+→ completed
 
-Pendiente:
+Backend operacional:
 
-```text
-RET-004 Backend
-```
+RET-004
+→ pending
 
-Debe incluir:
+Returns no es blocker P0 para el cierre funcional del ERP Core V1 actual.
 
-```text
-create
-read
-confirm
-cancel
-validation
-tenant isolation
-quantity protection
-concurrency
-Inventory integration
-tests
-```
+Debe evolucionar coordinadamente con la futura separación:
 
-Arquitectura futura:
-
-```text
+SalesOrder
+        ↓
 Delivery
-↓
-Return
-↓
+        ↓
+Commercial Return
+        ↓
 Inspection / Disposition
-↓
+        ↓
 Inventory
-```
 
----
+Debe distinguirse siempre:
 
-# 9. Sales evolution
+Commercial Return
+≠
+Healthcare CaseReturn
 
-## SALES-REF — SalesOrder + Delivery
+Evitar profundizar nuevas dependencias físicas sobre Sale CURRENT.
 
-**Estado:** ⏳ Pending
-**Prioridad:** P1 estratégica
+15. Sales Evolution
+
+SALES-REF — SalesOrder + Delivery
+
+Estado: ⏳ TARGET
+Prioridad: P1 estratégica
 
 Arquitectura objetivo:
 
-```text
 Quote
-↓ optional
+  ↓ optional
 SalesOrder
-↓
+  ↓
 Delivery
-↓
+  ↓
 Inventory OUT
-```
 
-Debe reemplazar progresivamente la responsabilidad física actualmente contenida en `Sale`.
+Debe separar:
 
-Incluye:
+commercial commitment
+≠
+physical fulfillment
 
-```text
+Scope futuro:
+
 SalesOrder
+
 SalesOrderItem
+
 Delivery
+
 DeliveryItem
+
 partial deliveries
+
 pending quantities
+
 batch allocation
-legacy migration
+
 Quote conversion
-Returns integration
-```
 
----
+Commercial Returns integration
 
-# 10. Inventory evolution
+legacy migration
 
-## INV-FEFO
+CURRENT continúa siendo:
 
-**Estado:** ⏳ Pending
-**Prioridad:** P1
+Sale
 
-```text
+hasta que exista una migración formal.
+
+16. Inventory Evolution
+
+INV-FEFO
+
+Estado: ⏳ PENDING
+Prioridad: P1
+
+Objetivo:
+
 First Expired
 First Out
-```
 
----
+INV-EXP
 
-## INV-EXP
-
-**Estado:** ⏳ Pending
-**Prioridad:** P1
+Estado: ⏳ PENDING
+Prioridad: P1
 
 Incluye:
 
-```text
 expired inventory
-near-expiration
+
+near-expiration inventory
+
 operational availability
+
 alerts
+
 Dashboard integration
-```
 
----
+Future Inventory
 
-## Future Inventory
+Necesidades futuras:
 
-```text
 Multi-Warehouse
+
 Locations
-Transfers
-Serial Tracking
+
+Positions
+
+Internal Transfers / custody semantics
+
+Serialized operational tracking
+
 Physical Counts
-Barcode / QR workflows
-```
 
-Prioridad:
+Barcode / QR
 
-```text
+Prioridad general:
+
 P2
-```
 
-salvo que alguno sea necesario para un workflow P0/P1.
+salvo cuando una capacidad sea prerequisite para un workflow P0/P1.
 
----
+InventoryLocation, InventoryPosition e internal TRANSFER permanecen architectural candidates hasta decisión formal.
 
-# 11. Healthcare — estado actual
+17. Healthcare — Estado actual
 
-**Estado:** ✅ Case Foundation completed / validated; Healthcare expansion deferred behind ERP Core UI/UX
-**Prioridad:** P1 estratégica
+Estado: ✅ Case Foundation IMPLEMENTED / VALIDATED
+Prioridad: P1 estratégica después del cierre ERP Core V1
 
-Completado específicamente para Equipment:
+Healthcare Case Foundation está implementado.
 
-```text
-Core / Healthcare ownership boundary
-✅
+Modelo actual:
 
-Healthcare Equipment domain document
-✅
-```
-
-Healthcare Equipment todavía no está implementado.
-
-Healthcare Case Foundation:
-
-```text
-IMPLEMENTED / VALIDATED
-
-Repository analysis
-→ COMPLETE
-
-Domain design
-→ APPROVED
-
-Implementation
-→ COMPLETE
-
-Automated validation
-→ PASS
-
-Manual PostgreSQL / API QA
-→ PASS within stated limits
-```
-
-Implementado:
-
-```text
 HealthcareCase
 
-identity
-tenant
-planning schedule
-minimal lifecycle
-operational responsibility
-creation / cancellation audit facts
-stable references for future Healthcare domains
-```
-
-Persistencia implementada:
-
-```text
 id
+
 companyId
+
 folio
 
 title
+
 procedureDescription?
 
 status
 
 scheduledStart?
+
 scheduledEnd?
 
 responsibleUserId?
@@ -1864,501 +1394,174 @@ responsibleUserId?
 createdById
 
 cancelledAt?
+
 cancelledById?
+
 cancellationReason?
 
 createdAt
+
 updatedAt
-```
 
-Migration:
+Lifecycle Foundation CURRENT:
 
-```text
-20260824162849_add_healthcare_case_foundation
-→ focused Case Foundation migration
-→ no reset
-→ no unrelated destructive SQL
-```
-
-Relations preserve audit history:
-
-```text
-Company
-→ onDelete Restrict
-
-responsibleUser
-→ onDelete Restrict
-
-createdBy
-→ onDelete Restrict
-
-cancelledBy
-→ onDelete Restrict
-```
-
-Lifecycle implemented:
-
-```text
 DRAFT
+
 SCHEDULED
+
 CANCELLED
-```
 
-Active status derivation:
+Reglas:
 
-```text
-effective scheduledStart exists
+scheduledStart exists
 → SCHEDULED
 
-effective scheduledStart absent
+scheduledStart absent
 → DRAFT
-```
 
-Cancelled is terminal in Foundation:
-
-```text
-PATCH CANCELLED
-→ 409 El caso cancelado no puede modificarse
-
-second cancel
-→ 409 El caso ya está cancelado
-```
-
-Not implemented in Foundation:
-
-```text
-IN_PROGRESS
-COMPLETED
-RECONCILIATION_PENDING
-RETURN_PENDING
-DISPATCHED
-```
-
-HealthcareCase no posee:
-
-```text
-Equipment Assignment
-Equipment Requirement
-CaseKit
-Dispatch
-Custody
-Return
-Inventory
-Billing
-Insurance
-Patient records
-Clinical records
-```
+CANCELLED
+→ terminal in Foundation
 
 Folio:
 
-```text
 CASE-000001
-→ generated server-side
-→ immutable
-→ unique per Company
-→ CompanySequence-based
-→ allocated inside Case creation transaction
-```
 
-Shared sequence infrastructure implemented:
+Generado mediante:
 
-```text
-src/company-sequences
-CompanySequenceAllocatorService
+CompanySequence
 
-allocateNext(tx, companyId, key)
-→ caller-owned Prisma transaction
-→ race-safe sequence row bootstrap
-→ atomic nextValue increment
-→ numeric allocation only
-```
+key = HEALTHCARE_CASE_FOLIO
 
-Case folio key:
+API:
 
-```text
-HEALTHCARE_CASE_FOLIO
-```
-
-Equipment owns `EQ-` formatting and collision logic. Healthcare Case owns `CASE-` formatting and collision logic.
-
-Constraints/indexes implemented:
-
-```text
-@@unique([companyId, folio])
-@@unique([id, companyId])
-
-@@index([companyId, status])
-@@index([companyId, scheduledStart])
-@@index([companyId, responsibleUserId])
-```
-
-Schedule invariants:
-
-```text
-start null + end null
-→ valid unscheduled Case
-
-start present + end null
-→ valid scheduled Case with unknown duration/end
-
-start present + end present
-→ valid only when end > start
-
-start null + end present
-→ invalid
-```
-
-Hospital / Doctor:
-
-```text
-hospitalId
-→ deferred
-
-doctorId
-→ deferred
-
-Customer
-≠
-Hospital / Doctor / Payer
-```
-
-Responsible user:
-
-```text
-responsibleUserId
-→ nullable
-→ references User
-
-Technician model / profile / TECHNICIAN role
-→ not part of Foundation
-```
-
-Cancellation:
-
-```text
-POST /healthcare/cases/:id/cancel
-
-DRAFT / SCHEDULED
-→ CANCELLED
-
-CANCELLED
-→ terminal in Phase 1
-```
-
-No:
-
-```text
-DELETE endpoint
-complete command
-patient / PHI fields
-clinical record fields
-```
-
-API namespace approved:
-
-```text
-/healthcare/cases
-```
-
-API implemented:
-
-```text
 POST /healthcare/cases
-GET /healthcare/cases
-GET /healthcare/cases/:id
+
+GET  /healthcare/cases
+
+GET  /healthcare/cases/:id
+
 PATCH /healthcare/cases/:id
+
 POST /healthcare/cases/:id/cancel
-```
 
-Create:
+Foundation no incluye:
 
-```text
-client supplies
-→ title
-→ procedureDescription?
-→ scheduledStart?
-→ scheduledEnd?
-→ responsibleUserId?
+Hospital
 
-server derives
-→ companyId
-→ createdById
-→ folio
-→ status
-```
+Doctor
 
-Create transaction:
+Case Requirements
 
-```text
-creator validation
-responsible-user validation when supplied
-CompanySequence folio allocation
-HealthcareCase create
-```
+Equipment Assignment
 
-PATCH planning:
+Case Availability
 
-```text
-omitted
-→ retain persisted value
+Preparation
 
-explicit null where allowed
-→ clear value
-```
+CaseKit
 
-B.4.1 regression and resolution:
+Dispatch
 
-```text
-schedule-only PATCH with title omitted
-→ originally returned 400 El título del caso es obligatorio
+Custody
 
-root cause
-→ update normalization treated own undefined as supplied value
+CaseReturn
 
-fix
-→ undefined / omitted retains persisted value
-→ explicit value applies normalization/update
+Healthcare material inspection
 
-manual retest
-→ PASS
-```
+Reconciliation
 
-RBAC implemented:
+Billing
 
-```text
-ADMIN
-→ create / read / edit / cancel
+Insurance
 
-MANAGER
-→ create / read / edit / cancel
+Patient records
 
-SALES
-→ create / read / edit
-
-WAREHOUSE
-→ read
-```
+Clinical records
 
 Reliability debt:
 
-```text
-Case creation idempotency
-→ NOT IMPLEMENTED in Foundation
-→ retry after lost successful response may create another Case and consume another folio
-```
+Healthcare Case creation idempotency
+→ NOT IMPLEMENTED
 
-Prisma assessment:
+Un retry después de una respuesta exitosa perdida puede crear otro Case y consumir otro folio.
 
-```text
-B.1 required one focused schema/migration change
+18. Healthcare — Orden TARGET
 
-B.2 / B.3 / B.4 / B.4.1
-→ no additional schema changes
-→ no additional migrations
+Después del cierre del ERP Core V1:
 
-Hospital and Doctor
-→ not part of this migration
-```
+1. Hospital / Doctor
 
-Automated validation:
+2. Requirements
 
-```text
-HealthcareCaseService
-59 tests PASS
-
-Controller + DTOs
-46 tests PASS
-
-Full Healthcare Case
-6 suites
-116 tests PASS
-
-Full backend
-40 suites
-341 tests PASS
-
-Prisma validate
-PASS
-
-Build
-PASS
-
-Changed TypeScript ESLint
-PASS
-
-Full backend ESLint
-PASS
-
-git diff --check
-PASS
-```
-
-Manual PostgreSQL / API QA:
-
-```text
-two repeated Case creation requests
-→ CASE-000001
-→ CASE-000002
-→ valid independent Cases
-
-primary QA Case
-→ CASE-000002
-→ 99ca6093-7209-4152-af4d-37a9d774536d
-
-GET one
-→ PASS
-
-GET list
-→ PASS
-
-schedule-only PATCH after B.4.1
-→ DRAFT to SCHEDULED
-→ existing title preserved
-→ PASS
-
-reschedule
-→ SCHEDULED to SCHEDULED
-→ PASS
-
-invalid schedule
-→ 400 La fecha de fin debe ser posterior a la fecha de inicio
-→ subsequent GET confirmed no mutation
-→ PASS
-
-unschedule
-→ SCHEDULED to DRAFT
-→ PASS
-
-reschedule before cancellation
-→ DRAFT to SCHEDULED
-→ PASS
-
-cancel
-→ SCHEDULED to CANCELLED
-→ schedule preserved
-→ cancellation audit set
-→ PASS
-
-terminal state checks
-→ PATCH CANCELLED 409
-→ second cancel 409
-→ final GET preserved original cancellation audit facts
-→ PASS
-```
-
-Manual QA limits:
-
-```text
-real manual second-company cross-tenant QA
-→ NOT PERFORMED
-
-real simultaneous concurrent cancellation race
-→ NOT PERFORMED
-```
-
-Idempotency evidence/debt:
-
-```text
-same logical Case create submitted twice
-→ two valid Cases
-→ two folios
-
-Case creation idempotency
-→ unresolved
-```
-
-This is expected under the current non-idempotent API and is not a sequence bug.
-
-Still pending for Healthcare, deferred behind ERP Core UI/UX Completion:
-
-```text
-Hospital/Doctor master data
-Equipment Requirement
-Case Equipment Assignment
-Availability for Case
-Preparation
-Dispatch
-Custody
-Return
-Inspection workflow
-Case 360 integration
-Warehouse Operations
-Calendar integration
-Technician Mobile
-```
-
----
-
-# 12. Healthcare — orden futuro recomendado
-
-Healthcare expansion remains queued after ERP Core UI/UX Completion.
-
-```text
-1. Hospital / Doctor master data
-2. Equipment / Material Requirements
 3. Equipment Assignment
+
 4. Case Availability
+
 5. Dispatch / Custody
+
 6. Return
-7. Case Kit / Maletín
-8. Case Calendar
+
+7. CaseKit / Maletín
+
+8. Calendar
+
 9. Case 360
+
 10. Mobile technician experience
-```
 
-Healthcare deberá consumir siempre:
+Principios:
 
-```text
-ERP/Core EquipmentAsset
-```
+Healthcare
+→ consumes ERP Core EquipmentAsset
 
-y no duplicar identidad física.
+Equipment Assignment / Custody
+≠
+EquipmentLifecycle
 
----
+Healthcare no debe duplicar la identidad física de Equipment.
 
-# 13. Otros P1 comerciales
+19. Otros P1 estratégicos
 
-## IMP-001 — Data Import
+IMP-001 — Data Import
 
-**Estado:** ⏳ Pending
+Estado: ⏳ PENDING
 
-```text
 Customers
+
 Suppliers
+
 Products
+
 Inventory
 
 CSV
+
 XLSX
-```
 
----
+UX-360 — 360 Views
 
-## UX-360 — 360 Views
+Estado: ⏳ PENDING
 
-**Estado:** ⏳ Pending
-
-Prioridad futura:
-
-```text
 Product 360
+
 Customer 360
+
 Supplier 360
+
 Purchase 360
-SalesOrder 360
+
+SalesOrder 360 TARGET
+
 Equipment 360
-```
 
----
+Case 360
 
-## UX-DASH — Action Dashboard
+UX-DASH — Action Dashboard Evolution
 
-**Estado:** ⏳ Pending
+Estado: ⏳ TARGET
 
 Dirección:
 
-```text
 Attention
 ↓
 Action
@@ -2366,602 +1569,632 @@ Action
 KPIs
 ↓
 Trends
-```
 
----
+Dashboard CURRENT ya está implementado.
 
-## UX-SEARCH — Global Search
+Esta tarea representa evolución posterior, no carencia del Dashboard actual.
 
-**Estado:** ⏳ Pending
+UX-SEARCH — Global Search
+
+Estado: ⏳ PENDING
 
 Debe respetar:
 
-```text
 tenant
+
 permissions
+
 resources
+
 context
-```
 
----
+AUTH-PERM — Permission-Based RBAC
 
-## AUTH-PERM — Permission-Based RBAC
-
-**Estado:** ⏳ Target
+Estado: ⏳ TARGET
 
 Evolución:
 
-```text
 UserRole
 ↓
 RolesGuard
-```
 
 hacia:
 
-```text
 Role
 ↓
 Permissions
 ↓
 PermissionsGuard
-```
 
----
+AUD-001 — Audit Foundation
 
-## AUD-001 — Audit Foundation
+Estado: ⏳ PENDING
 
-**Estado:** ⏳ Pending
+Primera fase conceptual:
 
-Primera fase:
-
-```text
 AuditEvent
+
 AuditService
+
 tenant
+
 actor
+
 action
+
 resource
+
 safe metadata
+
 append-only
+
 critical integrations
-```
 
----
+20. Future Products
 
-# 14. Future products
+Zaping Radar
 
-## Zaping Radar
+Estado: 🔮 FUTURE
 
-**Estado:** 🔮 Future
+Dirección inicial:
 
-Primera dirección:
-
-```text
 public procurement
+
 healthcare opportunities
+
 Sonora
+
 Baja California
+
 Baja California Sur
+
 Nuevo León
+
 Sinaloa
-```
 
----
+Zaping AI
 
-## Zaping AI
+Estado: 🔮 FUTURE
 
-**Estado:** 🔮 Future
+Principio:
 
-Regla:
+AI debe construirse sobre dominios confiables, workflows explícitos y datos trazables.
 
-> **AI debe construirse sobre dominios confiables, workflows explícitos y datos trazables.**
+No debe competir actualmente con la estabilización del ERP Core ni con la construcción posterior del dominio Healthcare.
 
-No debe competir actualmente con la estabilización del ERP y Healthcare.
+21. Technical Debt Consolidated
 
----
+La siguiente deuda permanece vigente y debe revisarse periódicamente.
 
-# 15. Riesgos activos
+Security / Release
 
-## RISK-001 — Security debt
+secure password recovery
 
-```text
-passwordHash exposure
-ADMIN default
+authentication abuse protection / rate limiting
+
 inactive-user enforcement
-tenant isolation coverage
-```
+
+default ADMIN / safe role provisioning
+
+systematic tenant-isolation regression
+
+critical authorization review
+
+protected-route / session architecture
+
+production secrets / configuration review
+
+Reliability / Integrity
+
+Sales create idempotency
+
+Healthcare Case create idempotency
+
+real concurrent Purchase Receipt PostgreSQL idempotency test
+
+Product.stock ↔ EquipmentAsset reconciliation
+
+SERIALIZED receipt semantics
+
+inactive Supplier validation
+for new / edited Purchase
+
+inactive Product validation
+for new / edited Purchase
+
+historical Quote → Sale identity
+
+Scalability
+
+backend pagination
+
+server-side search / filtering
+
+Inventory date filtering
+
+Inventory reference filtering server-side
+
+Purchase deep-link pagination compatibility
+
+Quote detail/deep-link pagination compatibility
+
+Equipment pagination / bulk availability if later required
+
+Equipment
+
+serial correction / edit workflow
+
+manual batch selector
+
+retired actor display/name resolution
+
+Product.stock ↔ EquipmentAsset reconciliation
+
+Lifecycle
+
+Product reactivation
+
+Customer reactivation
+
+Supplier reactivation
+
+inactive-record administration
+
+Product tracking migration workflow
+
+Purchase Receipts
+
+Receipt PDF
+
+Receipt correction / cancellation / reversal
+
+real concurrent idempotency PostgreSQL QA
+
+Frontend / Architecture
+
+Table Object.values(row) fragility
+
+Modal accessibility / focus management
+
+auth protected-route / session architecture
+
+global pagination strategy
+
+frontend test worker resource exhaustion under parallel pool
+
+22. Riesgos activos
+
+RISK-001 — Security Hardening
+
+Riesgos vigentes:
+
+secure password recovery
+
+ADMIN default / safe role provisioning
+
+inactive-user enforcement
+
+systematic tenant-isolation coverage
+
+critical authorization review
+
+protected-route / session architecture
+
+authentication abuse protection
+
+production secrets / configuration
+
+passwordHash exposure ya no forma parte de este riesgo.
 
 Mitigación:
 
-```text
-complete P0 security work before production
-```
+complete P0 security work
+before pilot / commercial production release
 
----
+RISK-002 — Legacy Sales Architecture
 
-## RISK-002 — Legacy Sales architecture
+Actualmente Sale concentra responsabilidades comerciales y parte del fulfillment físico.
 
-Actualmente:
+Objetivo TARGET:
 
-```text
-Sale
-→ commercial commitment
-+
-physical fulfillment
-```
-
-Objetivo:
-
-```text
 SalesOrder
 ≠
 Delivery
-```
-
----
-
-## RISK-003 — Returns legacy dependency
-
-Returns todavía depende del modelo legacy de Sales.
 
 Mitigación:
 
-```text
-avoid new deep dependencies
+avoid deepening physical workflows directly inside Sale
+
+hasta diseñar la evolución correspondiente.
+
+RISK-003 — Returns Legacy Dependency
+
+Commercial Returns depende parcialmente del modelo actual de Sales.
+
+Mitigación:
+
+defer operational expansion
+
 +
-coordinate future migration with Delivery
-```
 
----
+coordinate with SalesOrder / Delivery evolution
 
-## RISK-004 — Equipment / Inventory dual truth
+RISK-004 — Equipment / Inventory Dual Truth
 
-Durante la transición existe:
+Actualmente existen:
 
-```text
 Product.stock
-+
-EquipmentAsset records
-```
 
-Para Products `ASSET` no deben evolucionar como fuentes físicas independientes.
++
+
+EquipmentAsset records
+
+Para Products ASSET, ambas representaciones no deben evolucionar como fuentes físicas independientes.
 
 Mitigación:
 
-```text
-design Equipment / Inventory synchronization
-before automating acquisition flows
-```
+define formal reconciliation/invariant strategy
+before broader automation
 
----
-
-## RISK-005 — Product scope growth
+RISK-005 — Product Scope Growth
 
 Evitar desarrollar simultáneamente:
 
-```text
 ERP
+
 Healthcare
+
 Radar
+
 AI
+
 Portal
+
 Mobile
+
 Billing
-```
 
-Prioridad:
+Prioridad actual:
 
-```text
 stable ERP Core
+
 +
-differentiated Healthcare workflows
-```
 
----
+differentiated Healthcare workflows after Core closure
 
-# 16. Definition of Done
+23. Definition of Done
 
 Una tarea no está completada únicamente porque:
 
-```text
 code compiles
-```
 
 Según corresponda deberá incluir:
 
-```text
 business rules approved
-documentation
+
 architecture review
-migration
+
 implementation
+
+migration when required
+
 tests
+
 lint
+
 build
+
 tenant isolation
+
 authorization
+
 manual QA
+
 security review
-documentation update
+
+documentation
+
 CHANGELOG update
-```
 
----
+git health
 
-# 17. Estados
+24. Estados
 
-```text
-✅ Completed
+✅ COMPLETED
+
 → terminado y validado
-```
 
-```text
-🟢 In Progress
+🟢 IN PROGRESS
+
 → trabajo activo
-```
 
-```text
-🟡 Ready / Partial
-→ listo para comenzar o funcionalidad parcial
-```
+🟡 READY / PARTIAL
 
-```text
-⏳ Pending
+→ listo para comenzar o parcialmente implementado
+
+⏳ PENDING
+
 → aprobado pero no implementado
-```
 
-```text
-🔎 Verify
-→ necesita validación
-```
+⛔ BLOCKER
 
-```text
-🔮 Future
+→ debe resolverse antes del gate indicado
+
+🔎 VERIFY
+
+→ requiere verificación
+
+🎯 TARGET
+
+→ dirección aprobada no implementada
+
+🔮 FUTURE
+
 → dirección posterior
-```
 
----
+25. Prioridades
 
-# 18. Prioridades
-
-```text
 P0
-→ security / integrity / release blocker
-```
 
-```text
+→ security
+
+→ integrity
+
+→ release blocker
+
 P1
+
 → strategic commercial capability
-```
 
-```text
 P2
+
 → important expansion
-```
 
-```text
 Future
+
 → long-term direction
-```
 
----
+26. Orden de trabajo inmediato
 
-# 19. Orden de trabajo inmediato
+CURRENT
 
-Para el workstream Healthcare + Equipment recientemente cerrado:
+H8 — Documentation + Regression
 
-```text
-1. Design Automatic assetCode generation
-2. Implement Automatic assetCode generation
-3. Purchase Receipt → EquipmentAsset
-4. Availability Evaluator
-5. Healthcare Case Foundation
-```
+Subfases:
 
-Estado:
+H8A
 
-```text
-1. Design Automatic assetCode generation
-→ completed
+→ documentation synchronization
 
-2. Implement Automatic assetCode generation
-→ completed
+→ final cross-document sync
 
-3. Purchase Receipt → EquipmentAsset
-→ completed / validated
+→ security blocker sync
 
-4. Availability Evaluator
-→ completed / validated
+→ final repository/doc health checks
 
-5. Healthcare Case Foundation
-→ completed / validated
-```
-Core Equipment baseline
-✅
+H8B
 
-Equipment Inspection
-✅
+→ full technical regression
 
-Equipment Retirement
-✅
+→ technical health snapshot
 
-Purchase Receipt → EquipmentAsset
-✅
-
-Current Availability
-✅
-
-Healthcare Case Foundation
-✅
-
-Equipment Assignment is no longer blocked by absence of `HealthcareCase`, but it is not the immediate next implementation task.
-
-Immediate next milestone:
-
-```text
-ERP CORE UI / UX COMPLETION
-→ ACTIVE
-→ UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
-→ UX-B.5 PRODUCTS / INVENTORY / EQUIPMENT V1 COMPLETED / VALIDATED
-→ UX-B.5H PURCHASE RECEIPTS + REMAINING ERP NORMALIZATION NEXT
-```
-
-Purpose:
-
-```text
-finish and normalize Zaping's base ERP product experience
-before adding more Healthcare-specific modules
-```
-
-Conceptual milestone areas:
-
-```text
-1. authenticated global App Shell
-→ persistent sidebar across authenticated pages
-→ consistent header/layout
-→ active navigation state
-→ responsive navigation
-
-2. Dashboard / Home refinement
-→ operational overview
-→ meaningful KPIs
-→ pending work / alerts
-→ consistent visual hierarchy
-
-3. Sales frontend completion
-→ Sales listing
-→ create Sale experience
-→ Sale detail
-→ status/actions
-→ integration with existing backend
-→ completed / validated in UX-B.4
-
-4. ERP module UX consistency
-→ Products
-→ Customers
-→ Suppliers
-→ Quotes
-→ Purchases
-→ Purchase Receipts
-→ Inventory
-→ Sales
-→ Equipment
-
-Review for:
-→ PageContainer
-→ PageHeader
-→ filters
-→ search
-→ tables
-→ badges
-→ loading
-→ empty states
-→ errors
-→ forms
-→ dialogs
-→ navigation
-
-5. ERP end-to-end UX/QA
-→ Supplier → Purchase → Receipt → Inventory → Quote → Sale
-→ Purchase → Receipt ASSET → Equipment → Inspection → Availability
-```
-
-Frontend source of truth:
-
-```text
-docs/modules/erp/ERP_UI_UX.md
-```
-
-Approved UX phase order:
-
-```text
-UX-A.5
-→ approved architecture and milestone documentation
-
-UX-B.1
-→ Authenticated App Shell
-
-UX-B.2
-→ Navigation IA + active state + responsive shell
-
-UX-B.3
-→ Dashboard 2.0 using real current data
-
-UX-B.4
-→ Sales frontend completion
-→ completed / validated
-
-UX-B.5
-→ ERP Core screen completion / normalization
-→ Products / Inventory / Equipment V1 completed / validated
-
-UX-B.5H
-→ Purchase Receipts + remaining ERP normalization
-→ next
+NEXT
 
 UX-B.6
-→ End-to-end ERP UX QA
-```
 
-En paralelo, antes de release comercial deberán cerrarse los blockers:
+→ Full ERP end-to-end QA
 
-```text
-SEC-001
-SEC-002
-SEC-003
-SEC-004
-QA-CORE
-```
+Flujos principales a validar:
 
-No debe sacrificarse seguridad para acelerar un workflow funcional.
+Supplier
+↓
+Purchase
+↓
+Purchase Receipt
+↓
+Inventory IN
 
----
+Purchase
+↓
+ASSET Receipt
+↓
+Equipment
+↓
+Inspection
+↓
+Availability
 
-# 20. Próximo trabajo recomendado
+Customer
+↓
+Quote
+↓
+Sale
+↓
+Inventory OUT
 
-El siguiente bloque es:
+Además:
 
-```text
-ERP CORE UI / UX COMPLETION
-```
+folios
 
-Estado:
+statuses
 
-```text
-Healthcare Case Foundation
-→ COMPLETED / VALIDATED
+PDFs
 
-ERP CORE UI / UX COMPLETION
-→ ACTIVE MILESTONE
-→ UX-B.4 SALES FRONTEND / SALES V1 COMPLETED / VALIDATED
-→ UX-B.5 PRODUCTS / INVENTORY / EQUIPMENT V1 COMPLETED / VALIDATED
-→ UX-B.5H NEXT
-```
+deep-links
 
-Este hito debe estabilizar la experiencia base del ERP antes de expandir Healthcare logistics.
+traceability
 
-Scope recomendado:
+tenant isolation
 
-```text
-authenticated global App Shell
-Dashboard / Home refinement
-Sales frontend completion
-→ completed / validated in UX-B.4
-ERP module UX consistency
-ERP end-to-end UX/QA
-```
+lifecycle
 
-Fuente de verdad frontend:
+authorization
 
-```text
-docs/modules/erp/ERP_UI_UX.md
-```
+idempotency replay / conflict
 
-Orden aprobado:
+AFTER
 
-```text
-UX-B.1 Authenticated App Shell
-UX-B.2 Navigation IA + active state + responsive shell
-UX-B.3 Dashboard 2.0 using real current data
-UX-B.4 Sales frontend completion → completed / validated
-UX-B.5 Products / Inventory / Equipment V1 → completed / validated
-UX-B.5H Purchase Receipts + remaining ERP normalization → next
-UX-B.6 End-to-end ERP UX QA
-```
+ERP Core V1 closure
+        ↓
+Healthcare specialization
 
-UX-B.5H initial focus:
+Inicio Healthcare recomendado:
 
-```text
-dedicated /purchase-receipts experience
-receipt list / detail
-purchase → receipt traceability
-ASSET provisioning visibility where useful
-Customers / Suppliers / Quotes / Purchases normalization
-shared UX inconsistencies
-```
-
-Products V1, Inventory Movement Ledger y Equipment V1 ya no son trabajo activo. Purchase Receipts y la normalización ERP restante continúan en UX-B.5H.
-
-Healthcare futuro queda en cola posterior:
-
-```text
-Hospital / Doctor master data
-Equipment / Material Requirements
+Hospital / Doctor
+↓
+Requirements
+↓
 Equipment Assignment
+↓
 Case Availability
+↓
 Dispatch / Custody
+↓
 Return
-Case Kit / Maletín
-Case Calendar
+↓
+CaseKit / Maletín
+↓
+Calendar
+↓
 Case 360
-Mobile technician experience
-```
+↓
+Mobile Technician
 
-Deuda no resuelta que debe seguir visible:
+27. Snapshot de calidad vigente
 
-```text
-Purchase Receipt idempotency
-Healthcare Case creation idempotency
-Sale create request idempotency
-GET /sales pagination / server filtering
-confirmed Sale reversal / returns workflow
-Product reactivation workflow
-Product tracking migration workflow
-Inventory backend pagination / filtering
-Inventory date-range filtering
-manual adjustment workflow review
-Product.stock ↔ EquipmentAsset reconciliation
-Equipment serial correction / edit
-manual Equipment batch selector
-retired actor name resolution
-Equipment bulk / list Availability if needed later
-Equipment pagination
-tenant-safe legacy write hardening
-future Equipment Assignment concurrency design
-```
+Último snapshot frontend confirmado después de H7B:
 
----
+29 test files
 
-# Final Principle
+402 / 402 tests PASS
 
-La pregunta que este documento debe poder responder siempre es:
+frontend build
+PASS
 
-> **¿Cuál es el siguiente trabajo correcto para avanzar Zaping hoy?**
+frontend ESLint
+PASS
 
-Respuesta actual:
+git diff --check
+PASS
 
-```text
-Core Equipment baseline
-✅
+Este snapshot es informativo y debe actualizarse durante H8B.
 
-Purchase Receipt → EquipmentAsset
-✅
+El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
+
+Si ocurre:
+
+parallel infrastructure/resource failure
+≠
+application test failure
+
+La suite completa puede ejecutarse de forma serial para obtener un resultado confiable.
+
+El snapshot backend definitivo de release deberá obtenerse durante H8B y no debe inferirse desde resultados antiguos.
+
+28. Fuente de verdad por dominio
+
+ERP UX
+→ docs/modules/erp/ERP_UI_UX.md
+
+Purchase Receipts
+→ docs/modules/erp/PURCHASE_RECEIPTS.md
+
+Equipment
+→ docs/modules/erp/EQUIPMENT.md
+
+Inventory
+→ docs/modules/erp/INVENTORY.md
+
+Sales
+→ docs/modules/erp/SALES.md
+
+Identity / Access
+→ docs/modules/erp/IDENTITY_ACCESS.md
+
+Security
+→ docs/engineering/SECURITY_PRINCIPLES.md
+
+Healthcare boundaries
+→ docs/modules/healthcare/HEALTHCARE.md
+
+Healthcare domain model
+→ docs/modules/healthcare/DOMAIN_MODEL.md
+
+Healthcare Case
+→ docs/modules/healthcare/CASES.md
+
+Architecture
+→ docs/architecture/
+
+Project state
+→ docs/project/PROJECT_BOARD.md
+
+Future direction
+→ docs/project/ROADMAP.md
+
+Historical delivery record
+→ docs/project/CHANGELOG.md
+
+29. H8A close conditions
+
+H8A puede cerrarse únicamente después de:
+
+primary documentation reviewed
+
+cross-document CURRENT / TARGET / FUTURE sync
+
+secure password recovery P0 reflected
+
+auth abuse protection P0 reflected
+
+PROJECT_BOARD final sync
+
+ROADMAP / root README security wording checked if needed
+
+Markdown consistency reviewed
+
+git status --short reviewed
+
+git diff --check PASS
+
+no secrets / credentials / .env backup committed
+
+only intended documentation changes present
+
+No realizar el commit final de H8A antes de estos checks.
+
+30. Principio final
+
+Este documento debe poder responder siempre:
+
+¿Cuál es el siguiente trabajo correcto para avanzar Zaping hoy?
+
+Respuesta vigente:
+
+H8A
+→ finish final cross-document / security synchronization
+→ run final doc/repository health checks
 
 Then:
 
-Availability Evaluator
-→ completed / validated
+H8B
+→ full automated technical regression
 
 Then:
 
-Healthcare Case Foundation
-→ completed / validated
+UX-B.6
+→ full ERP end-to-end QA
 
 Then:
 
-ERP CORE UI / UX COMPLETION
-→ ACTIVE
-→ Products / Inventory / Equipment V1 completed / validated
+ERP Core V1
+→ formal closure after quality + security gates
 
 Then:
 
-UX-B.5H
-→ Purchase Receipts + remaining ERP normalization
-→ immediate next work
+Healthcare specialization
+→ next strategic product stage
 
-Then:
+No deben abrirse nuevas funcionalidades del ERP Core antes de completar H8 y UX-B.6, salvo que aparezca un defecto P0 que bloquee el cierre.
 
-Healthcare logistics expansion
-→ queued after ERP Core UI/UX Completion
-```
+Healthcare TARGET tampoco debe expandirse en Prisma durante H8.

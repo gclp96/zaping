@@ -1,208 +1,742 @@
-# Zaping Healthcare
+Zaping Healthcare
 
-**Producto:** Zaping Healthcare
-**Plataforma:** Zaping
-**Versión:** 1.0.0
-**Estado:** Aprobado
-**Estado de implementación:** DOMAIN FOUNDATION / NOT IMPLEMENTED
-**Última actualización:** 2026-08-20
-**Responsable:** Zaping Healthcare Team
+Producto: Zaping Healthcare
+Plataforma: Zaping
+Versión: 1.2.0
+Estado: Aprobado
+Estado de implementación: HEALTHCARE CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL LOGISTICS TARGET
+Última actualización: 2026-08-27
+Responsable: Zaping Healthcare Team
 
----
-
-# 1. Propósito
+1. Propósito
 
 Zaping Healthcare es la primera vertical especializada construida sobre Zaping ERP Core.
 
 Su objetivo es resolver la operación comercial, logística y de trazabilidad de empresas que suministran:
 
-* dispositivos médicos;
-* implantes;
-* consumibles;
-* instrumental;
-* equipos reutilizables;
-* materiales utilizados en procedimientos;
-* servicios de asistencia técnica asociados a procedimientos.
+dispositivos médicos;
+
+implantes;
+
+consumibles;
+
+instrumental;
+
+equipos reutilizables;
+
+materiales utilizados en procedimientos;
+
+servicios de asistencia técnica asociados a procedimientos.
 
 Healthcare no sustituye al ERP Core.
 
 Lo especializa.
 
----
+2. Principio fundamental
 
-# 2. Principio fundamental
-
-```text
 Zaping ERP Core
 =
 operación empresarial genérica
-```
 
-```text
 Zaping Healthcare
 =
 workflow especializado del sector salud
-```
 
 Por tanto:
 
-> **Healthcare debe construirse sobre las capacidades del ERP Core sin contaminar los módulos genéricos con reglas específicas de procedimientos médicos.**
+Healthcare debe construirse sobre las capacidades del ERP Core sin contaminar los módulos genéricos con reglas específicas de procedimientos médicos.
 
----
+3. CURRENT vs TARGET vs FUTURE
 
-# 3. Problema que resuelve
+Este documento distingue tres niveles.
 
-En distribuidores médicos, una venta no siempre comienza con una cotización o un pedido convencional.
+CURRENT
 
-Una operación puede comenzar cuando:
+Capacidades ya implementadas y validadas.
 
-```text
+Actualmente:
+
+HealthcareCase Foundation
+✅
+
+EquipmentAsset ERP Core
+✅
+
+EquipmentInspection ERP Core
+✅
+
+TARGET
+
+Capacidades Healthcare aprobadas como dirección funcional, pero todavía no implementadas.
+
+Incluyen:
+
+Doctor / Hospital
+
+Case Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+CaseKit / Maletín
+
+CaseDispatch / Custody
+
+CaseReturn
+
+Healthcare material inspection
+
+Reconciliation
+
+Case Calendar UI / Read Model
+
+Case 360
+
+Warehouse Operations integration
+
+FUTURE
+
+Capacidades posteriores que requieren validación adicional o nuevos dominios.
+
+Incluyen:
+
+Opportunity CRM
+
+Payer / Insurance workflows
+
+KitTemplate
+
+Reservations
+
+Maintenance / Calibration expansion
+
+QR workflows
+
+Mobile technician app
+
+Electronic signatures
+
+Notifications
+
+Advanced analytics
+
+AI assistance
+
+4. Estado CURRENT consolidado
+
+Actualmente Zaping Healthcare contiene una Foundation funcional de Healthcare Case.
+
+Estado:
+
+HealthcareCase
+✅ IMPLEMENTED / VALIDATED
+
+Capacidades CURRENT:
+
+Case folio
+
+scheduled start / schedule context
+
+responsible User
+
+HealthcareCaseStatus
+
+DRAFT
+
+SCHEDULED
+
+CANCELLED
+
+tenant-scoped persistence
+
+RBAC
+
+Case creation
+
+Case list
+
+Case detail
+
+Case update
+
+Case cancellation
+
+No existe todavía una vertical Healthcare operacional completa.
+
+5. API CURRENT
+
+Healthcare Case Foundation implementa:
+
+POST  /healthcare/cases
+
+GET   /healthcare/cases
+
+GET   /healthcare/cases/:caseId
+
+PATCH /healthcare/cases/:caseId
+
+POST  /healthcare/cases/:caseId/cancel
+
+Los endpoints utilizan:
+
+JwtAuthGuard
+
+RolesGuard
+
+explicit roles
+
+authenticated companyId
+
+tenant-scoped access
+
+6. HealthcareCaseStatus CURRENT
+
+El lifecycle CURRENT utiliza:
+
+DRAFT
+
+SCHEDULED
+
+CANCELLED
+
+Estos valores constituyen el contrato vigente.
+
+No deben confundirse con estados operacionales futuros todavía no implementados.
+
+7. Lifecycle avanzado TARGET
+
+En el futuro Healthcare Case podrá requerir una semántica operacional más rica para representar preparación, ejecución, retorno y reconciliación.
+
+Sin embargo:
+
+PLANNED
+
+READY
+
+IN_PROGRESS
+
+RETURNED
+
+RECONCILIATION_PENDING
+
+COMPLETED
+
+u otros nombres posibles no están aprobados todavía como enum CURRENT.
+
+La definición definitiva deberá realizarse cuando existan los workflows logísticos que necesiten esos estados.
+
+8. Case create idempotency
+
+Actualmente:
+
+POST /healthcare/cases
+→ no formal request-level idempotency contract
+
+Por tanto:
+
+Healthcare Case create idempotency
+→ TECHNICAL DEBT
+
+Debe resolverse cuando el riesgo operacional o el workflow requiera protección explícita contra retries o double-submit.
+
+9. Problema que resuelve Healthcare
+
+En distribuidores médicos, una operación no siempre comienza con una Quote o Sale convencional.
+
+Puede comenzar cuando:
+
 Doctor
 ↓
-contacta al técnico
+contacta al Technician
 ↓
-solicita material para un procedimiento
-```
+solicita material / Equipment
+↓
+se agenda un procedimiento
 
-o:
+También puede comenzar mediante:
 
-```text
-Técnico
+Technician
 ↓
 identifica una oportunidad
 ↓
-contacta al Doctor / Hospital
+coordina Doctor / Hospital
 ↓
 se agenda un procedimiento
-```
 
-Posteriormente puede requerirse:
+Después puede requerirse:
 
-```text
+definir requerimientos
+↓
 preparar material
+↓
+asignar Equipment
 ↓
 armar maletín
 ↓
-entregarlo a un técnico
+transferir custodia
 ↓
-llevarlo al Hospital
+llevar material al Hospital
 ↓
 utilizar una parte
 ↓
-regresar material no utilizado
+regresar lo no utilizado
 ↓
-inspeccionarlo
+inspeccionar
 ↓
-reconciliarlo
+reconciliar
 ↓
-convertir consumo en operación comercial
-```
+resolver consecuencia comercial
 
-Un ERP genérico normalmente no modela correctamente este ciclo.
+10. Healthcare no es un sistema clínico
 
----
+Zaping Healthcare no pretende convertirse en:
 
-# 4. Alcance de Healthcare
+expediente clínico electrónico;
 
-Healthcare será responsable de conceptos como:
+HIS;
 
-```text
-Opportunity
+PACS;
 
-Healthcare Case
+sistema de diagnóstico;
+
+sistema de prescripción;
+
+sistema de notas clínicas;
+
+repositorio de historia clínica.
+
+La plataforma se limita a información necesaria para:
+
+operación
+
+logística
+
+comercialización
+
+trazabilidad
+
+custodia
+
+inventario
+
+11. Minimización de información clínica
+
+Debe evitarse almacenar información clínica de pacientes salvo que exista una necesidad operacional concreta, documentada y aprobada.
+
+No debe recopilarse por defecto:
+
+diagnosis
+
+clinical history
+
+treatments
+
+medical notes
+
+medical test results
+
+unnecessary sensitive patient data
+
+únicamente porque técnicamente sea posible.
+
+12. HealthcareCase ≠ clinical record
+
+Debe mantenerse:
+
+HealthcareCase
+≠
+Clinical Record
+
+Healthcare Case representa una operación coordinada alrededor de un procedimiento o evento Healthcare.
+
+No representa el expediente médico del paciente.
+
+13. Healthcare Case
+
+Healthcare Case es el agregado operacional principal CURRENT de la vertical.
+
+Representa:
+
+una operación relacionada con un procedimiento o evento Healthcare que requiere coordinación empresarial, logística y de materiales.
+
+Puede contener o relacionarse progresivamente con contexto como:
+
+folio
+
+Company
+
+schedule
+
+responsible User
+
+future Doctor
+
+future Hospital
+
+future operational requirements
+
+future commercial context
+
+14. Scheduling CURRENT
+
+HealthcareCase ya conserva contexto de programación.
+
+Por tanto:
+
+Case scheduling data
+✅ CURRENT
+
+Esto no equivale todavía a:
+
+Case Calendar UI
+
+ni a:
+
+Calendar conflict detection
+
+15. Case Calendar TARGET
+
+Healthcare necesita una experiencia temporal especializada:
+
+Case Calendar
+
+Conceptualmente:
+
+Healthcare Cases
+↓
+Calendar Read Model
+
+La Calendar UI / Read Model no está implementada todavía.
+
+16. Calendar TARGET information
+
+Cuando se implemente podrá presentar:
+
+Date / Time
+
+Case
+
+Hospital
+
+Doctor
+
+responsible Technician / User
+
+Procedure context
+
+Case status
+
+Readiness
+
+según las entidades disponibles en ese momento.
+
+17. Calendar filters TARGET
+
+Filtros futuros pueden incluir:
+
+Technician
+
+Hospital
+
+Doctor
+
+Status
+
+Procedure
+
+Date range
+
+No forman parte del CURRENT Case Foundation.
+
+18. Calendar conflict detection TARGET
+
+La evolución futura deberá considerar conflictos como:
+
+same responsible User
++
+overlapping Cases
+
+y posteriormente:
+
+same EquipmentAsset
++
+overlapping Case Assignments
+
+cuando Equipment Assignment exista.
+
+19. Actores Healthcare
+
+Healthcare debe mantener conceptualmente separados:
 
 Doctor
 
 Hospital
 
-Procedure context
+Customer
 
-Case Calendar
+Payer
 
-Preparation
+Technician / responsible User
 
-KitTemplate
+aunque algunas relaciones puedan coincidir en una operación concreta.
 
-CaseKit
+20. Doctor TARGET
 
-CaseDispatch
+Doctor representa al profesional relacionado con el procedimiento o la oportunidad operacional.
 
-Custody
+Conceptualmente puede:
 
-CaseReturn
+solicitar material;
 
-Inspection
+influir en la selección de producto;
 
-Reconciliation
+relacionarse con múltiples Hospitals;
 
-Equipment / Assets
-```
+relacionarse con múltiples Cases.
 
-cuando cada capacidad sea implementada.
+Actualmente:
 
----
+Doctor model
+→ NOT IMPLEMENTED
 
-# 5. Fuera del alcance
+21. Doctor ≠ Customer
 
-Zaping Healthcare no pretende convertirse en:
+Debe mantenerse:
 
-* expediente clínico electrónico;
-* sistema hospitalario HIS;
-* sistema PACS;
-* sistema de diagnóstico;
-* sistema de prescripción médica;
-* sistema de notas clínicas;
-* repositorio de historia clínica.
+Doctor
+≠
+Customer
 
-La plataforma debe limitarse a información necesaria para:
+Doctor puede generar demanda sin ser la contraparte comercial que compra o recibe factura.
 
-```text
-operación
-logística
-comercialización
-trazabilidad
-custodia
-inventario
-```
+22. Doctor multi-hospital
 
----
+Un Doctor puede trabajar o realizar procedimientos en múltiples Hospitals.
 
-# 6. Principio de minimización clínica
+Por tanto no debe modelarse automáticamente como:
 
-Debe evitarse almacenar datos clínicos de pacientes salvo que exista una necesidad operacional concreta, documentada y aprobada.
+Doctor.hospitalId
 
-En particular, Healthcare no debe comenzar recopilando:
+sin diseñar primero la cardinalidad correcta.
 
-```text
-diagnóstico
-historia clínica
-resultados médicos
-tratamientos
-datos sensibles innecesarios
-```
+23. Hospital TARGET
 
-solo porque técnicamente sea posible.
+Hospital representa el lugar u organización donde puede realizarse un procedimiento.
 
----
+Puede aportar contexto como:
 
-# 7. Flujo maestro
+location
 
-La dirección funcional general es:
+logistics context
 
-```text
+requirements
+
+contacts
+
+schedule constraints
+
+Actualmente:
+
+Hospital model
+→ NOT IMPLEMENTED
+
+24. Hospital ≠ Customer
+
+Debe mantenerse:
+
+Hospital
+≠
+Customer
+
+En algunos casos ambos conceptos pueden coincidir empresarialmente.
+
+En otros:
+
+Hospital
+→ procedure location
+
+Customer
+→ commercial counterpart
+
+25. Doctor / Hospital tenancy decision
+
+Antes de diseñar Prisma debe resolverse si Doctor y Hospital serán:
+
+Company-owned master data
+
+o:
+
+shared identity
++
+Company-specific relationship
+
+Este documento no toma todavía esa decisión.
+
+26. Technician / responsible User
+
+El concepto empresarial Technician puede representar a un colaborador que participa en:
+
+commercial activity
+
+operational coordination
+
+procedure assistance
+
+Actualmente Healthcare Case ya puede relacionarse con un User responsable.
+
+27. Technician ≠ rigid authorization enum
+
+Debe mantenerse:
+
+Technician
+≠
+single hard-coded authorization role
+
+Un User puede tener responsabilidades Healthcare mediante roles y permisos apropiados.
+
+Healthcare no debe crear una segunda identidad de usuario innecesaria.
+
+28. Payer FUTURE
+
+Payer representa quién asume económicamente una operación cuando corresponda.
+
+Conceptualmente puede ser:
+
+Hospital
+
+Insurance Company
+
+Private payer
+
+Government entity
+
+Other organization
+
+Actualmente:
+
+Payer model
+→ NOT IMPLEMENTED
+
+29. Payer ≠ Customer
+
+Debe distinguirse:
+
+Customer
+→ commercial counterpart
+
+de:
+
+Payer
+→ economic responsibility
+
+Pueden coincidir.
+
+No tienen que hacerlo.
+
+30. Insurance FUTURE
+
+Healthcare podrá soportar workflows donde intervenga una aseguradora.
+
+No debe introducirse todavía:
+
+insurance authorization workflow
+
+clinical insurance data
+
+complex payer logic
+
+sin documentar primero el proceso real.
+
+31. No Patient model by default
+
+La existencia futura de un payer privado no obliga a crear un modelo Patient.
+
+Debe mantenerse:
+
+operational need
+→ determines minimum required data
+
+No:
+
+Healthcare vertical
+→ automatically stores patient profile
+
+32. Opportunity FUTURE
+
+Opportunity representa una posibilidad comercial previa.
+
+Puede originarse por:
+
+Doctor request
+
+Technician prospecting
+
+Hospital request
+
+commercial lead
+
+existing Customer
+
+Actualmente:
+
 Opportunity
+→ NOT IMPLEMENTED
+
+33. Opportunity is optional
+
+Debe mantenerse:
+
+Opportunity
+→ optional future commercial precursor
+
+Healthcare Case debe poder existir sin Opportunity.
+
+Ejemplo válido:
+
+Doctor request
 ↓
 Healthcare Case
+
+34. Opportunity ≠ Quote
+
+Debe distinguirse:
+
+Opportunity
+→ commercial possibility
+
+de:
+
+Quote
+→ economic proposal
+
+35. Opportunity ≠ Case
+
+También:
+
+Opportunity
+→ possibility
+
+Healthcare Case
+→ concrete operational event
+
+Una Opportunity futura puede no convertirse en Case.
+
+36. Workflow operacional TARGET
+
+El workflow objetivo de la operación puede expresarse conceptualmente como:
+
+Healthcare Case
 ↓
-Schedule / Calendar
+Requirements
 ↓
 Preparation
 ↓
-CaseKit
+Equipment Assignment / CaseKit
 ↓
-Dispatch
-↓
-Technician Custody
+Dispatch / Custody
 ↓
 Procedure
 ↓
@@ -211,942 +745,681 @@ Return
 Inspection
 ↓
 Reconciliation
-```
-
-Después de Reconciliation pueden producirse consecuencias comerciales y de inventario.
-
----
-
-# 8. Flujo comercial relacionado
-
-Healthcare puede integrarse con:
-
-```text
-Opportunity
 ↓
-Quote
-↓
-SalesOrder
-↓
-Delivery
-```
+Commercial consequence
 
-pero estas operaciones no son obligatoriamente lineales en todos los casos.
+Este es un workflow operativo conceptual.
 
----
+No debe confundirse con el orden técnico de implementación del roadmap.
 
-# 9. Caso sin Quote previa
+37. Case Requirements TARGET
 
-Debe ser posible:
+Requirements representa:
 
-```text
-Doctor request
-↓
-Healthcare Case
-↓
-Procedure
-↓
-Used Material
-↓
-Commercial operation
-```
-
-cuando el proceso real así ocurra.
-
----
-
-# 10. Caso originado por oportunidad comercial
-
-También:
-
-```text
-Technician prospecting
-↓
-Opportunity
-↓
-Doctor / Hospital interest
-↓
-Healthcare Case
-```
-
----
-
-# 11. Separación de actores
-
-Healthcare debe mantener separados:
-
-```text
-Doctor
-Hospital
-Customer
-Payer
-Technician
-```
-
-aunque en una operación concreta algunos puedan relacionarse.
-
----
-
-# 12. Doctor
-
-Doctor representa al profesional relacionado con la oportunidad o procedimiento.
-
-Puede:
-
-* solicitar material;
-* influir en la selección de producto;
-* participar en múltiples Hospitals;
-* generar futuras Opportunities.
-
----
-
-# 13. Doctor no es Customer
-
-Debe cumplirse:
-
-```text
-Doctor
-≠
-Customer
-```
-
-El Doctor puede generar demanda sin ser la entidad que compra o recibe factura.
-
----
-
-# 14. Doctor multi-hospital
-
-Un Doctor puede trabajar o realizar procedimientos en múltiples Hospitals.
-
-Por tanto no debe modelarse como una simple propiedad fija:
-
-```text
-Doctor.hospitalId
-```
-
-sin analizar esa relación.
-
----
-
-# 15. Hospital
-
-Hospital representa el lugar u organización donde puede realizarse un procedimiento.
-
-Puede aportar:
-
-* ubicación;
-* contexto logístico;
-* requerimientos;
-* contactos;
-* agenda;
-* restricciones.
-
----
-
-# 16. Hospital no es necesariamente Customer
-
-Debe cumplirse:
-
-```text
-Hospital
-≠
-Customer
-```
-
-En algunos casos pueden representar la misma organización empresarial.
-
-En otros:
-
-```text
-Hospital
-→ lugar del procedimiento
-
-Customer
-→ empresa que compra
-```
-
----
-
-# 17. Payer
-
-Payer representa quién asume económicamente la operación cuando corresponda.
-
-Puede ser:
-
-```text
-Hospital
-Insurance Company
-Patient / Private
-Government entity
-Other organization
-```
-
-según el caso real.
-
----
-
-# 18. Payer no es Customer
-
-Debe distinguirse:
-
-```text
-Customer
-→ contraparte comercial
-```
-
-de:
-
-```text
-Payer
-→ responsable económico
-```
-
-Pueden coincidir.
-
-No tienen que hacerlo.
-
----
-
-# 19. Insurance
-
-Healthcare debe estar preparado para operaciones donde una aseguradora intervenga en el proceso económico.
-
-No se debe introducir todavía lógica compleja de seguros hasta documentar los workflows reales.
-
----
-
-# 20. Technician
-
-Technician representa al usuario o colaborador que participa en operaciones Healthcare.
-
-Puede tener funciones:
-
-```text
-comerciales
-+
-operativas
-+
-asistencia en procedimiento
-```
-
-dependiendo de la empresa.
-
----
-
-# 21. Technician no es necesariamente un rol único
-
-El concepto empresarial:
-
-```text
-Technician
-```
-
-no debe confundirse automáticamente con un enum rígido de autorización.
-
-Un User puede tener responsabilidades Healthcare mediante roles/permisos adecuados.
-
----
-
-# 22. Opportunity
-
-Opportunity representa una posibilidad comercial previa a una operación confirmada.
-
-Puede originarse por:
-
-```text
-Doctor request
-Technician prospecting
-Hospital request
-Commercial lead
-Existing Customer
-Other source
-```
-
----
-
-# 23. Opportunity puede existir antes de Case
-
-Debe ser válido:
-
-```text
-Opportunity
-↓
-qualification
-↓
-Healthcare Case
-```
-
----
-
-# 24. Opportunity no reserva inventario
-
-Crear una oportunidad:
-
-```text
-→ no Inventory movement
-→ no reservation automática
-```
-
----
-
-# 25. Opportunity no es Quote
-
-Debe distinguirse:
-
-```text
-Opportunity
-→ posibilidad comercial
-```
-
-de:
-
-```text
-Quote
-→ propuesta económica
-```
-
----
-
-# 26. Opportunity no es Case
-
-También:
-
-```text
-Opportunity
-→ posibilidad
-```
-
-```text
-Case
-→ operación/procedimiento concreto
-```
-
-Una Opportunity puede no convertirse en Case.
-
----
-
-# 27. Healthcare Case
-
-Healthcare Case es el agregado operacional principal de la vertical.
-
-Representa:
-
-> una operación relacionada con un procedimiento o evento Healthcare que requiere coordinación comercial, logística y de materiales.
-
----
-
-# 28. Case no es expediente clínico
-
-Healthcare Case no debe almacenar por defecto:
-
-* diagnóstico detallado;
-* historia médica;
-* tratamiento clínico;
-* notas médicas;
-* estudios;
-* datos clínicos extensos.
-
----
-
-# 29. Información operacional de Case
-
-Un Case puede necesitar conceptualmente:
-
-```text
-identifier / folio
-Company
-scheduled start
-scheduled end
-Doctor
-Hospital
-procedure type
-Technician
-status
-commercial context
-logistics readiness
-notes operativas
-```
-
-El modelo definitivo se diseñará posteriormente.
-
----
-
-# 30. Procedure
-
-`Procedure` representa el tipo o contexto operativo del procedimiento.
-
-Ejemplos pueden incluir categorías empresariales utilizadas por la distribuidora.
-
-No debe utilizarse para construir un sistema clínico.
-
----
-
-# 31. Procedure Catalog
-
-Puede existir posteriormente un catálogo reusable que ayude a:
-
-* preparación;
-* CaseKit;
-* tiempos;
-* Equipment;
-* productos frecuentes.
-
-No se define todavía su schema.
-
----
-
-# 32. Lifecycle de Case
-
-El lifecycle exacto será definido en `CASES.md`.
-
-Conceptualmente debe poder representar etapas como:
-
-```text
-PLANNED
-↓
-READY
-↓
-IN_PROGRESS
-↓
-RECONCILIATION_PENDING
-↓
-COMPLETED
-```
-
-además de cancelación cuando corresponda.
-
----
-
-# 33. Estados no aprobados como enum
-
-Los nombres anteriores describen semántica funcional.
-
-Este documento **no ordena todavía crear esos valores en Prisma**.
-
----
-
-# 34. Case Calendar
-
-Healthcare necesita una lectura temporal especializada:
-
-```text
-Case Calendar
-```
-
-que permita visualizar Cases por fecha y hora.
-
----
-
-# 35. Calendar como Read Model
-
-Case Calendar no necesita ser un agregado independiente.
-
-Conceptualmente:
-
-```text
-Healthcare Cases
-↓
-Calendar Read Model
-```
-
----
-
-# 36. Información del Calendar
-
-Debe permitir visualizar información como:
-
-```text
-Date / Time
-Case
-Hospital
-Doctor
-Technician
-Procedure
-Status
-Readiness
-```
-
----
-
-# 37. Filtros
-
-Capacidades objetivo:
-
-```text
-Technician
-Hospital
-Doctor
-Status
-Procedure
-Date range
-```
-
----
-
-# 38. Conflictos
-
-Calendar deberá evolucionar hacia detección de conflictos.
-
-Ejemplos:
-
-```text
-same Technician
-+
-overlapping Cases
-```
-
-o:
-
-```text
-same Equipment
-+
-overlapping Cases
-```
-
----
-
-# 39. Readiness
-
-Calendar debe ayudar a detectar:
-
-```text
-Case scheduled
-+
-material not prepared
-```
-
-antes de que se convierta en un problema operativo.
-
----
-
-# 40. Preparation
-
-Preparation representa el trabajo previo necesario para que un Case esté listo.
-
-Puede incluir:
-
-```text
-material review
-availability check
-CaseKit assembly
-Equipment assignment
-batch selection
-documentation
-warehouse preparation
-```
-
----
-
-# 41. Preparation no cambia automáticamente ownership
-
-Preparar material:
-
-```text
-→ no significa venta
-```
-
-ni:
-
-```text
-→ salida comercial definitiva
-```
-
----
-
-# 42. KitTemplate
-
-`KitTemplate` representa una configuración reutilizable.
-
-Ejemplo:
-
-```text
-Procedure Type A
-├── Product X × 2
-├── Product Y × 4
-└── Equipment Z
-```
-
----
-
-# 43. KitTemplate no es inventario
-
-Debe cumplirse:
-
-```text
-KitTemplate
-→ recipe / configuration
-```
-
-no:
-
-```text
-KitTemplate
-→ physical stock
-```
-
----
-
-# 44. CaseKit
-
-`CaseKit` representa la preparación real para un Case concreto.
-
-```text
-KitTemplate
-↓ optional basis
-CaseKit
-```
-
----
-
-# 45. CaseKit puede modificarse
-
-El material requerido para un Case real puede diferir del template.
-
-Por tanto:
-
-```text
-CaseKit
-≠
-immutable copy of KitTemplate
-```
-
-antes del Dispatch.
-
----
-
-# 46. Contenido de CaseKit
+what the Case needs
 
 Puede incluir conceptualmente:
 
-```text
-Product
-Quantity
-Batch
-Serial
-Equipment
-Preparation status
-```
+Products
 
-según la trazabilidad del producto.
+quantities
 
----
+Equipment needs
 
-# 47. CaseKit es instancia
+support material
+
+special logistics requirements
+
+Actualmente:
+
+Case Requirements
+→ NOT IMPLEMENTED
+
+38. Requirements ≠ Preparation
 
 Debe mantenerse:
 
-```text
-KitTemplate
-→ reusable definition
-```
+Requirements
+→ what is needed
 
-```text
-CaseKit
-→ actual prepared set
-```
+Preparation
+→ work performed to satisfy those needs
 
----
+No son el mismo concepto.
 
-# 48. CaseKit y disponibilidad
-
-Agregar una partida a CaseKit no implica necesariamente:
-
-```text
-Inventory OUT
-```
-
----
-
-# 49. Reserva futura
-
-Puede existir una futura estrategia de Reservation.
-
-Pero:
-
-```text
-CaseKit
-≠
-automatic reservation
-```
-
-hasta que exista una decisión formal.
-
----
-
-# 50. Dispatch
-
-`CaseDispatch` representa la entrega física de material de la Company a un responsable para atender un Case.
-
----
-
-# 51. Caso operativo típico
-
-```text
-Warehouse
-↓
-prepares CaseKit
-↓
-Technician receives it
-↓
-takes material to Hospital
-```
-
----
-
-# 52. Principio de Custody
-
-El material despachado puede:
-
-```text
-estar físicamente fuera del almacén
-```
-
-mientras sigue siendo:
-
-```text
-propiedad de la Company
-```
-
----
-
-# 53. CaseDispatch no es Delivery
-
-Regla crítica:
-
-```text
-CaseDispatch
-≠
-Sales Delivery
-```
-
----
-
-# 54. Razón
-
-Delivery significa:
-
-```text
-fulfillment comercial definitivo
-```
-
-CaseDispatch significa:
-
-```text
-custodia temporal para un Case
-```
-
----
-
-# 55. CaseDispatch no es Inventory OUT comercial
+39. Requirements ≠ CaseKit
 
 También:
 
-```text
-CaseDispatch
+Requirements
+→ requested / needed
+
+CaseKit
+→ actual prepared set
+
+Ejemplo:
+
+Required Product A: 10
+Prepared Product A: 8
+
+Esto permite representar readiness sin reescribir el requerimiento original.
+
+40. Preparation TARGET
+
+Preparation representa el trabajo previo para dejar un Case listo.
+
+Puede incluir:
+
+requirements review
+
+availability check
+
+material picking
+
+Equipment Assignment
+
+CaseKit assembly
+
+documentation
+
+warehouse preparation
+
+Actualmente:
+
+Preparation workflow
+→ NOT IMPLEMENTED
+
+41. Preparation does not mean Sale
+
+Debe mantenerse:
+
+Preparation
 ≠
-commercial Inventory OUT
-```
-
-El material puede regresar sin haber sido vendido ni consumido.
-
----
-
-# 56. Disponibilidad física
-
-Healthcare introduce una distinción importante entre:
-
-```text
-Company-owned physical inventory
-```
+Sale
 
 y:
 
-```text
-available warehouse inventory
-```
+Preparation
+≠
+commercial Inventory OUT
 
----
+Preparar material no significa que ya fue vendido o consumido.
 
-# 57. Ejemplo
+42. KitTemplate FUTURE
 
-```text
-Product A
-Company-owned quantity: 10
+KitTemplate puede representar una definición reusable.
 
-Warehouse available: 6
-Technician custody: 4
-```
+Ejemplo:
 
-La Company continúa siendo propietaria de las 10 unidades.
+Procedure Type A
 
----
+Product X × 2
 
-# 58. Consecuencia arquitectónica
+Product Y × 4
 
-El modelo actual basado principalmente en:
+Equipment Z
 
-```text
-Product.stock
-```
+Debe mantenerse:
 
-eventualmente necesitará representar mejor:
+KitTemplate
+→ reusable recipe
 
-```text
-location
-custody
-availability
-state
-```
+No:
 
----
+KitTemplate
+→ physical inventory
 
-# 59. No cambiar Inventory todavía
+Actualmente:
+
+KitTemplate
+→ FUTURE
+
+No debe bloquear Requirements ni CaseKit.
+
+43. CaseKit TARGET
+
+CaseKit representa el conjunto real preparado para un Case concreto.
+
+Debe mantenerse:
+
+CaseKit
+≠
+KitTemplate
+
+y:
+
+CaseKit
+≠
+automatic Inventory OUT
+
+Actualmente:
+
+CaseKit model
+→ NOT IMPLEMENTED
+
+44. CaseKit may differ from Requirements
+
+Debe poder ocurrir:
+
+Requirements
+↓
+Preparation
+↓
+CaseKit
+
+sin exigir que CaseKit sea una copia idéntica de Requirements o KitTemplate.
+
+45. CaseKit content TARGET
+
+Puede incluir conceptualmente:
+
+Product
+
+prepared quantity
+
+InventoryBatch when required
+
+serial identity when applicable
+
+EquipmentAsset
+
+preparation status
+
+La estructura técnica se definirá durante el diseño correspondiente.
+
+46. Reservation FUTURE
+
+Agregar una partida a Requirements o CaseKit no implica automáticamente:
+
+Inventory reservation
+
+Debe mantenerse:
+
+CaseKit
+≠
+automatic Reservation
+
+hasta que exista una estrategia formal de disponibilidad/reserva.
+
+47. Equipment Core CURRENT
+
+Healthcare reutiliza Equipment del ERP Core.
+
+Actualmente existen:
+
+EquipmentAsset
+✅
+
+EquipmentInspection
+✅
+
+Healthcare no debe crear un segundo sistema de identidad para activos reutilizables.
+
+48. Product vs EquipmentAsset
+
+Debe mantenerse:
+
+Product
+→ catalog / model
+
+EquipmentAsset
+→ concrete reusable physical unit
+
+Ejemplo:
+
+Product
+Monitor XYZ
+
+EquipmentAsset
+EQ-00041
+Serial SN-99102
+
+49. Equipment identity is already implemented
+
+Debe mantenerse:
+
+EquipmentAsset identity
+→ CURRENT ERP Core
+
+Por tanto Equipment identity no es una capacidad TARGET de Healthcare.
+
+Healthcare construirá relaciones operativas encima de esa identidad.
+
+50. Equipment lifecycle remains ERP Core
+
+Healthcare no debe redefinir EquipmentLifecycle.
+
+CURRENT Equipment Core mantiene su propio lifecycle y condition.
+
+Conceptualmente:
+
+EquipmentAsset
+→ lifecycle / condition
+
+Healthcare debe reutilizarlos.
+
+51. Assignment is not Equipment lifecycle
+
+No debe agregarse automáticamente al lifecycle del activo:
+
+ASSIGNED
+
+IN_CUSTODY
+
+porque representan contexto operacional temporal.
+
+Debe mantenerse:
+
+EquipmentAsset
+→ intrinsic asset state
+
+frente a:
+
+Equipment Assignment
+→ Healthcare operational relationship
+
+52. Equipment Assignment TARGET
+
+Equipment Assignment representará la relación entre:
+
+Healthcare Case
+
+and
+
+EquipmentAsset
+
+cuando una unidad concreta sea destinada a un Case.
+
+Actualmente:
+
+Equipment Assignment
+→ NOT IMPLEMENTED
+
+53. Equipment Assignment must not contaminate EquipmentAsset
+
+No deben agregarse como atajo permanente campos como:
+
+currentCaseId
+
+currentTechnicianId
+
+currentCustodianId
+
+a EquipmentAsset para reemplazar el dominio Healthcare.
+
+La relación debe vivir en entidades o Read Models apropiados.
+
+54. Case Availability TARGET
+
+Healthcare deberá evaluar disponibilidad contextual considerando progresivamente:
+
+Equipment lifecycle
+
+Equipment condition
+
+active Assignments
+
+schedule overlaps
+
+Case requirements
+
+Esto puede producir un:
+
+Case Availability
+
+o Read Model equivalente.
+
+55. Equipment Availability CURRENT vs Healthcare availability TARGET
+
+CURRENT Equipment Availability deriva principalmente de:
+
+lifecycle
+
+condition
+
+TARGET Healthcare podrá agregar:
+
+Case assignment
+
+schedule conflicts
+
+No debe convertir:
+
+Equipment.lifecycle = ASSIGNED
+
+para resolver disponibilidad.
+
+56. Equipment history TARGET
+
+Healthcare deberá permitir reconstruir relaciones como:
+
+EquipmentAsset
+↓
+Assignments
+↓
+Cases
+↓
+Custody
+↓
+Returns
+
+sin reescribir la historia base del Equipment Core.
+
+57. EquipmentInspection CURRENT
+
+EquipmentInspection ya existe como capacidad del ERP Core.
+
+Debe distinguirse de una futura inspección de material retornado Healthcare.
+
+58. Healthcare material inspection TARGET
+
+CaseReturn podrá requerir inspección de:
+
+returned consumables
+
+packaging condition
+
+expiration
+
+damage
+
+other disposition
+
+según el tipo de material.
+
+Actualmente:
+
+general Healthcare returned-material inspection
+→ NOT IMPLEMENTED
+
+59. Returned ≠ automatically available
+
+Debe mantenerse:
+
+Returned
+≠
+Automatically Available
+
+cuando el tipo de material o activo requiera inspección.
+
+60. Do not create one mixed inspection enum
+
+Conceptos como:
+
+AVAILABLE
+
+QUARANTINE
+
+DAMAGED
+
+EXPIRED
+
+MAINTENANCE
+
+pueden pertenecer a dimensiones diferentes.
+
+No deben convertirse automáticamente en un único enum general sin diseño explícito.
+
+61. CaseDispatch TARGET
+
+CaseDispatch representa la transferencia física de material o Equipment desde la Company hacia un responsable para atender un Case.
+
+Actualmente:
+
+CaseDispatch
+→ NOT IMPLEMENTED
+
+62. CaseDispatch = temporary custody
+
+Debe mantenerse:
+
+CaseDispatch
+→ temporary custody
+
+El material puede estar físicamente fuera del almacén mientras sigue siendo propiedad de la Company.
+
+63. CaseDispatch ≠ Delivery
+
+Regla crítica:
+
+CaseDispatch
+≠
+commercial Delivery
+
+Delivery representa fulfillment comercial definitivo.
+
+CaseDispatch representa custodia operacional temporal.
+
+64. CaseDispatch ≠ commercial OUT
+
+Debe mantenerse:
+
+CaseDispatch
+≠
+commercial Inventory OUT
+
+El material puede regresar sin haber sido vendido ni consumido.
+
+65. Inventory custody gap CURRENT
+
+Inventory Core no representa todavía formalmente toda la semántica de:
+
+Location
+
+Custody
+
+TRANSFER
+
+Reserved
+
+Available
 
 Healthcare documenta esta necesidad.
 
-No autoriza todavía modificar el schema de Inventory.
+No autoriza por sí mismo una modificación inmediata del schema.
 
----
+66. Owned vs available TARGET
 
-# 60. Chain of Custody
+Healthcare necesita distinguir en el futuro:
 
-Dispatch debe poder responder:
+Company-owned quantity
 
-```text
-¿Qué salió?
-¿Cuánto?
-¿Qué lote?
-¿Qué serie?
-¿Quién lo entregó?
-¿Quién lo recibió?
-¿Cuándo?
-¿Para qué Case?
-```
+de:
 
----
+Warehouse available quantity
 
-# 61. Responsable
+y:
 
-Debe existir una identidad clara de:
+Technician custody quantity
 
-```text
-responsible Technician
-```
+Ejemplo conceptual:
 
-o responsable equivalente.
+Product A
 
----
+Company-owned: 10
+Warehouse available: 6
+Technician custody: 4
 
-# 62. Warehouse actor
+Esto es una necesidad TARGET de Inventory + Healthcare.
 
-También debe conocerse quién preparó/entregó el material cuando la operación lo requiera.
+67. No invent TRANSFER now
 
----
+Aunque Dispatch represente movimiento físico/custodia:
 
-# 63. Dispatch timestamp
+Dispatch
+≠
+automatically a TRANSFER InventoryMovement
 
-Debe conservarse cuándo se produjo la transferencia de custodia.
+porque TRANSFER no forma parte del modelo CURRENT documentado.
 
----
+La integración exacta deberá diseñarse con Inventory cuando Case Logistics se implemente.
 
-# 64. Hoja de salida
+68. Chain of Custody TARGET
 
-El flujo actual de empresas como INSAP utiliza documentos físicos de salida.
+CaseDispatch futuro debe poder responder:
 
-Healthcare deberá digitalizar progresivamente esa información.
+What left?
 
-Campos operativos importantes incluyen:
+How much?
 
-```text
+Which batch?
+
+Which serial / EquipmentAsset?
+
+Who handed it over?
+
+Who received it?
+
+When?
+
+For which Case?
+
+69. Warehouse actor
+
+La futura cadena de custodia debe poder identificar al actor que preparó o entregó material cuando sea operacionalmente necesario.
+
+70. Responsible custodian
+
+Debe existir una identidad clara del responsable que recibe custodia.
+
+Ese responsable podrá ser un User con responsabilidades de Technician u otro rol operacional.
+
+71. Dispatch timestamp
+
+La transferencia de custodia debe conservar:
+
+when it occurred
+
+como parte del hecho histórico.
+
+72. Physical warehouse form as requirements source
+
+Empresas como INSAP utilizan controles físicos de entrada/salida.
+
+Campos observados incluyen:
+
 entrada / salida
+
 clave producto
+
 descripción
+
 material de apoyo
+
 referencias
+
 responsable
+
 Hospital
+
 procedimiento
+
 fecha
-```
 
----
+Estos campos son:
 
-# 65. Documento digital futuro
+source of operational requirements
 
-CaseDispatch puede generar posteriormente:
+No deben interpretarse automáticamente como el schema final.
 
-```text
+73. Dispatch document FUTURE
+
+CaseDispatch podrá generar posteriormente:
+
 Dispatch document
+
 PDF
+
 QR
+
 signature
-```
 
-sin que el documento se convierta en la fuente de inventario.
+sin que el documento se convierta en la fuente de verdad del Inventory.
 
----
+74. Procedure outcome TARGET
 
-# 66. Procedure Execution
+Después del procedimiento cada partida despachada podrá terminar conceptualmente como:
 
-Durante el procedimiento pueden ocurrir resultados distintos para cada partida:
-
-```text
 Used
+
 Returned
+
 Unresolved
-```
 
----
+75. Used
 
-# 67. Used
+Representa material efectivamente utilizado o consumido durante el Case.
 
-Representa material que efectivamente fue utilizado/consumido.
+76. Returned
 
----
+Representa material que regresa desde la custodia Healthcare.
 
-# 68. Returned
+77. Unresolved
 
-Representa material que regresa a custodia del almacén.
+Representa una disposición todavía no explicada.
 
----
+Puede significar:
 
-# 69. Unresolved
-
-Representa diferencia todavía no explicada.
-
-Ejemplos:
-
-```text
-missing
 pending verification
-incident
-damaged
+
+documentation mismatch
+
+missing item
+
+damaged item
+
 unknown disposition
-```
 
----
+other discrepancy
 
-# 70. Reconciliation
+No significa automáticamente pérdida definitiva.
+
+78. CaseReturn TARGET
+
+CaseReturn representa el regreso de material previamente despachado bajo custodia Healthcare.
+
+Actualmente:
+
+CaseReturn
+→ NOT IMPLEMENTED
+
+79. CaseReturn ≠ Commercial Return
+
+Debe mantenerse:
+
+Healthcare CaseReturn
+≠
+Commercial Return
+
+Healthcare CaseReturn:
+
+company-owned material returns from custody
+
+Commercial Return:
+
+previously sold / commercially fulfilled material returns
+
+Generic Commercial Returns permanece P1 / deferred en ERP Core.
+
+80. Reconciliation TARGET
 
 Reconciliation compara:
 
-```text
-qué salió
-```
+what was dispatched
 
 contra:
 
-```text
-qué ocurrió
-```
+what actually happened
 
----
+Actualmente:
 
-# 71. Invariante central
+Reconciliation
+→ NOT IMPLEMENTED
 
-Debe cumplirse:
+81. Reconciliation invariant
 
-```text
+Debe mantenerse como invariante arquitectónica:
+
 Dispatched Quantity
 =
 Used
@@ -1154,15 +1427,9 @@ Used
 Returned
 +
 Unresolved
-```
 
-para toda partida reconciliada.
+Ejemplo:
 
----
-
-# 72. Ejemplo
-
-```text
 Dispatched: 10
 
 Used:       3
@@ -1170,1422 +1437,1111 @@ Returned:   6
 Unresolved: 1
 
 10 = 3 + 6 + 1
-```
 
----
+82. Reconciliation closure
 
-# 73. Reconciliation completa
+Un Case no debería considerarse logísticamente completamente reconciliado mientras exista:
 
-Un Case no debería considerarse completamente cerrado desde el punto de vista logístico mientras exista:
-
-```text
 Unresolved > 0
-```
 
-salvo workflow excepcional documentado.
+salvo workflow excepcional explícito.
 
----
+83. Incident TARGET
 
-# 74. CaseReturn
+Cuando exista:
 
-`CaseReturn` representa el regreso de material previamente despachado bajo custodia.
-
----
-
-# 75. CaseReturn no es SaleReturn
-
-Debe cumplirse:
-
-```text
-CaseReturn
-≠
-Customer Return
-```
-
----
-
-# 76. Diferencia
-
-```text
-CaseReturn
-→ company-owned material comes back
-```
-
-```text
-SaleReturn
-→ previously commercially delivered material returns
-```
-
----
-
-# 77. Inspection
-
-El material retornado puede necesitar inspección antes de recuperar disponibilidad.
-
----
-
-# 78. Razón
-
-Especialmente en Healthcare:
-
-```text
-Returned
-≠
-Automatically Sellable
-```
-
----
-
-# 79. Resultados conceptuales de Inspection
-
-Una inspección futura puede determinar estados como:
-
-```text
-AVAILABLE
-QUARANTINE
-DAMAGED
-EXPIRED
-MAINTENANCE
-OTHER
-```
-
-No se aprueba todavía un enum.
-
----
-
-# 80. Productos abiertos
-
-Un producto abierto o con empaque comprometido no debe retornar automáticamente a disponibilidad.
-
----
-
-# 81. Productos vencidos
-
-Un producto vencido puede existir físicamente, pero:
-
-```text
-expired
-→ not sellable
-```
-
----
-
-# 82. Material dañado
-
-Material dañado tampoco debe convertirse automáticamente en disponible.
-
----
-
-# 83. Equipment
-
-Healthcare necesita distinguir productos consumibles de activos reutilizables.
-
----
-
-# 84. Product vs EquipmentAsset
-
-Conceptualmente:
-
-```text
-Product
-→ catálogo / modelo
-```
-
-```text
-EquipmentAsset
-→ physical reusable unit
-```
-
----
-
-# 85. Ejemplo
-
-```text
-Product
-Monitor XYZ
-
-EquipmentAsset
-EQ-00041
-Serial SN-99102
-```
-
----
-
-# 86. Stock no es suficiente para Equipment
-
-No debe modelarse un equipo reutilizable únicamente como:
-
-```text
-Product.stock = 3
-```
-
-cuando necesitamos saber:
-
-```text
-qué unidad
-dónde está
-quién la tiene
-en qué condición
-```
-
----
-
-# 87. Equipment lifecycle
-
-Una evolución puede incluir:
-
-```text
-AVAILABLE
-ASSIGNED
-IN_CUSTODY
-MAINTENANCE
-CALIBRATION
-OUT_OF_SERVICE
-```
-
-Los estados definitivos se diseñarán en `EQUIPMENT.md`.
-
----
-
-# 88. Equipment history
-
-Debe poder reconstruirse:
-
-```text
-Asset
-↓
-Cases
-↓
-Custody
-↓
-Returns
-↓
-Condition
-↓
-Maintenance
-```
-
----
-
-# 89. Serial
-
-Equipment es un candidato natural para seguimiento por serial.
-
----
-
-# 90. Maintenance
-
-Mantenimiento pertenece a una evolución posterior.
-
-No debe bloquear la primera implementación de Equipment identity/custody.
-
----
-
-# 91. Calibration
-
-Algunos equipos pueden requerir calibración.
-
-Esta capacidad puede ser relevante para Healthcare futuro, pero debe implementarse según necesidad real y requisitos aplicables.
-
----
-
-# 92. Sales integration
-
-Healthcare no reemplaza Sales.
-
-Después de reconciliar material utilizado:
-
-```text
-Used Material
-↓
-Commercial fulfillment
-```
-
-puede integrarse con:
-
-```text
-SalesOrder / Delivery
-```
-
-según el workflow comercial.
-
----
-
-# 93. Riesgo de doble decremento
-
-Debe evitarse:
-
-```text
-CaseDispatch
-↓
-stock decrement
-
-Used Material
-↓
-Delivery
-↓
-second stock decrement
-```
-
-para la misma unidad física.
-
----
-
-# 94. Regla
-
-> **El sistema nunca debe descontar dos veces la misma existencia por confundir custodia con consumo comercial.**
-
----
-
-# 95. Estrategia conceptual
-
-La arquitectura deberá distinguir entre:
-
-```text
-Location / Custody movement
-```
-
-y:
-
-```text
-Ownership / commercial disposition
-```
-
----
-
-# 96. Inventory integration
-
-Inventory continúa siendo propietario de la verdad física general.
-
-Healthcare proporciona eventos especializados como:
-
-```text
-CaseDispatch
-CaseReturn
-Reconciliation
-```
-
----
-
-# 97. InventoryMovement
-
-No todo evento Healthcare necesita convertirse automáticamente en un:
-
-```text
-InventoryMovement OUT
-```
-
-del modelo comercial actual.
-
-La integración exacta se diseñará con Inventory.
-
----
-
-# 98. SalesOrder antes del Case
-
-También puede existir:
-
-```text
-Quote
-↓
-SalesOrder
-↓
-Healthcare Case
-```
-
-si la operación comercial se confirma previamente.
-
----
-
-# 99. SalesOrder después del Case
-
-En otros escenarios:
-
-```text
-Healthcare Case
-↓
-Procedure
-↓
-Reconciliation
-↓
-SalesOrder / Delivery
-```
-
-puede reflejar mejor la operación real.
-
----
-
-# 100. Invoice
-
-La facturación puede ocurrir:
-
-```text
-antes
-durante
-después
-```
-
-del fulfillment físico según el proceso.
-
-Healthcare no debe acoplar el cierre del Case a la existencia de Invoice.
-
----
-
-# 101. Payer y Billing
-
-La presencia de Payer deberá integrarse posteriormente con Billing.
-
-No se debe implementar ahora un workflow de seguros improvisado dentro de Case.
-
----
-
-# 102. Warehouse Operations
-
-Healthcare necesita una experiencia operacional para almacén.
-
-Conceptualmente:
-
-```text
-Warehouse Operations
-```
-
-puede coordinar:
-
-```text
-Purchase Receipts
-Case Preparation
-Case Dispatch
-Case Returns
-Inspection
-Deliveries
-Customer Returns
-Equipment
-```
-
----
-
-# 103. Workspace, no nuevo dominio
-
-Warehouse Operations debe considerarse principalmente:
-
-```text
-task-oriented workspace
-```
-
-que coordina dominios existentes.
-
-No necesita duplicar sus reglas.
-
----
-
-# 104. Ejemplo de atención
-
-```text
-Hoy
-
-3 recepciones por procesar
-2 Cases por preparar
-1 CaseKit pendiente
-2 devoluciones pendientes de inspección
-1 Equipment sin regresar
-```
-
----
-
-# 105. Healthcare Dashboard
-
-El Dashboard principal puede mostrar resumen Healthcare cuando la Company utilice la vertical.
-
-Ejemplo:
-
-```text
-Cases today
-Cases tomorrow
-Cases not ready
-Equipment conflicts
-Pending reconciliation
-```
-
----
-
-# 106. Core Dashboard no contaminado
-
-Una Company que no utiliza Healthcare no necesita esas métricas.
-
----
-
-# 107. Case 360
-
-La vista principal de un Case debe evolucionar hacia:
-
-```text
-Case identity
-↓
-Schedule
-↓
-Actors
-↓
-Commercial context
-↓
-Preparation
-↓
-CaseKit
-↓
-Dispatch
-↓
-Return
-↓
-Reconciliation
-↓
-Timeline
-```
-
----
-
-# 108. Acción contextual
-
-Ejemplos:
-
-```text
-PLANNED
-→ Preparar
-```
-
-```text
-READY
-→ Despachar
-```
-
-```text
-IN PROCEDURE
-→ Registrar resultado
-```
-
-```text
-RETURNED
-→ Inspeccionar
-```
-
-```text
-RECONCILIATION PENDING
-→ Reconciliar
-```
-
-según lifecycle final.
-
----
-
-# 109. No pedir información repetida
-
-Si Case ya conoce:
-
-```text
-Doctor
-Hospital
-Technician
-```
-
-Preparation y Dispatch no deben pedir nuevamente esos datos sin razón.
-
----
-
-# 110. Identificadores
-
-Healthcare utilizará UUID como identificadores técnicos, siguiendo ADR-004.
-
-Cuando sea útil, Case, Dispatch u otros documentos pueden tener folios empresariales independientes.
-
----
-
-# 111. Multi-tenancy
-
-Todo dato Healthcare debe pertenecer directa o indirectamente a:
-
-```text
-Company
-```
-
----
-
-# 112. Regla cross-tenant
-
-Debe rechazarse cualquier relación como:
-
-```text
-Case Company A
-→ Doctor / Hospital / Product / Technician Company B
-```
-
-si esos recursos son tenant-owned.
-
----
-
-# 113. Doctors/Hospitals y tenant ownership
-
-El diseño exacto de Doctor y Hospital deberá decidir si son:
-
-```text
-Company-owned master data
-```
-
-o entidades más generales con relación tenant específica.
-
-No se decide todavía en este documento.
-
----
-
-# 114. Authorization
-
-Healthcare deberá evolucionar hacia permisos conceptuales como:
-
-```text
-healthcare.cases.read
-healthcare.cases.create
-healthcare.cases.update
-
-healthcare.casekits.prepare
-
-healthcare.dispatch.create
-healthcare.dispatch.confirm
-
-healthcare.return.create
-healthcare.inspect
-healthcare.reconcile
-
-healthcare.equipment.read
-healthcare.equipment.assign
-```
-
-Los nombres definitivos se definirán con RBAC.
-
----
-
-# 115. Separación de funciones
-
-Una empresa puede requerir:
-
-```text
-Technician
-→ request / receive custody
-```
-
-```text
-Warehouse
-→ prepare / dispatch / receive
-```
-
-```text
-Manager
-→ resolve incidents
-```
-
----
-
-# 116. Backend como autoridad
-
-Frontend puede facilitar el workflow.
-
-Backend debe validar:
-
-```text
-tenant
-permissions
-status
-quantities
-batches
-serials
-custody
-reconciliation
-```
-
----
-
-# 117. Concurrencia
-
-Healthcare deberá contemplar escenarios como:
-
-```text
-same Equipment
-→ assigned to two overlapping Cases
-```
-
-o:
-
-```text
-same batch quantity
-→ prepared for multiple operations
-```
-
-cuando existan reservas/asignaciones.
-
----
-
-# 118. Idempotencia
-
-Operaciones críticas como:
-
-```text
-confirm Dispatch
-confirm Return
-confirm Reconciliation
-```
-
-deben evitar duplicación ante retries.
-
----
-
-# 119. Audit
-
-Acciones candidatas a auditoría:
-
-```text
-Case created
-Case scheduled
-Case technician changed
-CaseKit prepared
-Dispatch confirmed
-Custody accepted
-Return registered
-Inspection completed
-Reconciliation confirmed
-Equipment assigned
-Incident resolved
-```
-
----
-
-# 120. Audit minimization
-
-Los eventos de Audit deben guardar únicamente contexto operativo necesario.
-
----
-
-# 121. Incident
-
-Cuando:
-
-```text
 Unresolved > 0
-```
 
-puede requerirse un Incident o excepción operacional.
+puede requerirse una excepción o Incident operacional.
 
----
+Actualmente:
 
-# 122. Incident no significa pérdida automáticamente
+Incident workflow
+→ NOT IMPLEMENTED
 
-`Unresolved` puede representar:
+84. Incident resolution
 
-```text
-pending verification
-documentation mismatch
-missing item
-damaged item
-other discrepancy
-```
+Un futuro workflow deberá permitir:
 
----
-
-# 123. Resolution
-
-El workflow futuro debe permitir convertir:
-
-```text
 Unresolved
 ↓
 Resolved disposition
-```
 
-sin reescribir la reconciliación histórica original de forma silenciosa.
+sin reescribir silenciosamente la reconciliación histórica original.
 
----
+85. Inventory integration
 
-# 124. Current State
+Inventory continúa siendo propietario de la verdad física general.
 
-Actualmente Zaping Healthcare se encuentra en:
+Healthcare aportará eventos especializados como:
 
-```text
-DOMAIN DISCOVERY
+CaseDispatch
+
+CaseReturn
+
+Reconciliation
+
+cuando sean implementados.
+
+86. No automatic InventoryMovement semantics yet
+
+No todo evento Healthcare debe convertirse automáticamente en:
+
+InventoryMovement OUT
+
+ni en otro tipo específico de movement sin diseño previo.
+
+La integración exacta pertenece al diseño conjunto:
+
+Healthcare
 +
-ARCHITECTURE APPROVED
-+
-DOCUMENTATION FOUNDATION
-```
+Inventory
 
-No debe marcarse como módulo implementado.
+87. Double-decrement invariant
 
----
+Debe mantenerse:
 
-# 125. Capacidades ya definidas conceptualmente
+El sistema nunca debe descontar dos veces la misma existencia física por confundir custodia temporal con consumo o disposición comercial.
 
-Se consideran aprobadas las siguientes decisiones:
+Riesgo conceptual:
 
-```text
-Healthcare as vertical over ERP Core
+Dispatch custody handling
+↓
+physical availability changes
 
-Opportunity before Case
+later commercial disposition
+↓
+must not decrement same physical inventory again incorrectly
 
-Doctor ≠ Customer
+88. Commercial integration CURRENT boundary
 
-Hospital ≠ Customer
+ERP Core utiliza actualmente:
 
-Payer ≠ Customer
+Sale
 
-Case Calendar
+como modelo comercial CURRENT.
 
-KitTemplate ≠ CaseKit
+Healthcare todavía no implementa:
 
-CaseDispatch = temporary custody
+Reconciliation
+↓
+Sale
 
-CaseDispatch ≠ Delivery
+ni otro handoff comercial automático.
 
-CaseReturn ≠ SaleReturn
+89. Commercial integration TARGET
 
-Inspection before availability when required
+A largo plazo ADR-011 define:
 
-Reconciliation:
-Dispatched = Used + Returned + Unresolved
+SalesOrder
+↓
+Delivery
 
-EquipmentAsset identity
-```
+como arquitectura comercial objetivo.
 
----
+Healthcare deberá integrarse con esa arquitectura cuando exista.
 
-# 126. Target inicial
+No debe documentarse actualmente como flujo implementado.
 
-La primera versión Healthcare debe enfocarse en:
+90. Case before or after commercial commitment
 
-```text
+El proceso real puede admitir distintos órdenes.
+
+Ejemplo conceptual:
+
+commercial operation
+↓
+Healthcare Case
+
+o:
+
+Healthcare Case
+↓
+Reconciliation
+↓
+commercial consequence
+
+La integración exacta se diseñará posteriormente.
+
+91. Billing boundary
+
+Healthcare no reemplaza Billing.
+
+Debe mantenerse:
+
 Case
-Calendar
+≠
+Invoice
+
+El cierre operativo de un Case no debe depender automáticamente de que exista una Invoice.
+
+92. Payer / Billing FUTURE
+
+La futura relación de Payer deberá diseñarse con Billing.
+
+No debe introducirse un workflow de seguros improvisado dentro de HealthcareCase.
+
+93. Warehouse Operations TARGET
+
+Healthcare podrá beneficiarse de un workspace:
+
+Warehouse Operations
+
+orientado a tareas.
+
+Puede coordinar progresivamente:
+
+Purchase Receipts
+
+Case Requirements
+
 Preparation
-CaseKit
+
+Equipment Assignment
+
 Dispatch
-Custody
+
 Return
-Reconciliation
-Equipment identity
-```
 
----
+Inspection
 
-# 127. Future
+Equipment
 
-Capacidades posteriores pueden incluir:
+según los dominios implementados.
 
-```text
-Opportunity CRM
-Advanced doctor relationships
-Hospital requirements
-Payer workflows
-Insurance authorization
-Equipment maintenance
-Calibration
-QR workflows
-Mobile technician app
-Electronic signatures
-Document management
-Advanced analytics
-Notifications
-AI assistance
-```
+94. Warehouse Operations is a workspace
 
----
+Debe mantenerse:
 
-# 128. No implementar todo simultáneamente
+Warehouse Operations
+→ task-oriented workspace
 
-La existencia de estas capacidades en el diseño no implica construirlas en una sola entrega.
+No:
 
----
+Warehouse Operations
+→ new duplicated domain
 
-# 129. Secuencia documental
+Las reglas continúan perteneciendo a sus módulos propietarios.
 
-Después de `HEALTHCARE.md`, se documentarán:
+95. Healthcare Dashboard TARGET
 
-```text
-OPPORTUNITIES.md
-CASES.md
-CASE_CALENDAR.md
-CASE_KITS.md
-CASE_LOGISTICS.md
-EQUIPMENT.md
-```
+Una futura Company con Healthcare habilitado podrá tener contexto como:
 
----
+Cases today
 
-# 130. Posible documento adicional
+Cases tomorrow
 
-Durante el diseño puede resultar necesario separar posteriormente:
+Cases not ready
 
-```text
-DOCTORS_HOSPITALS.md
-```
+Equipment conflicts
 
-o un módulo equivalente si la complejidad de esas entidades lo justifica.
+Pending reconciliation
 
-No se crea todavía.
+Actualmente:
 
----
+Healthcare Dashboard widgets
+→ NOT IMPLEMENTED
 
-# 131. Secuencia técnica
+96. Core Dashboard boundary
 
-Después de completar documentación Healthcare:
+Una Company que no utiliza Healthcare no debe recibir automáticamente widgets de:
 
-```text
-Domain model
-↓
-Entity boundaries
-↓
-ADR if required
-↓
-Feature plan
-↓
-Prisma design
-↓
-Migration
-↓
-Backend
-↓
-Frontend
-↓
-Tests
-↓
-QA
-```
-
----
-
-# 132. No Prisma todavía
-
-Este documento no autoriza:
-
-```text
-model HealthcareCase
-model Doctor
-model Hospital
-model CaseKit
-model CaseDispatch
-model EquipmentAsset
-```
-
-todavía.
-
-Primero deben consolidarse sus reglas específicas.
-
----
-
-# 133. API
-
-No existen todavía endpoints Healthcare implementados.
-
-Por tanto este documento no declara rutas reales.
-
----
-
-# 134. API objetivo conceptual
-
-En el futuro podrán existir capacidades equivalentes a:
-
-```text
 Cases
-Case Calendar
-CaseKit preparation
-Dispatch
-Return
-Reconciliation
-Equipment
-```
 
-siguiendo `API_GUIDELINES.md`.
+Doctors
 
----
+Hospitals
 
-# 135. OpenAPI
+Case Logistics
 
-Cuando exista implementación, los contratos detallados deberán documentarse mediante OpenAPI.
+en su Dashboard Core.
 
----
+97. Case 360 TARGET
 
-# 136. UX
+La futura experiencia principal de un Case podrá integrar:
 
-Healthcare seguirá los mismos principios de Zaping:
+Case identity
 
-> **Simple por defecto. Poderoso cuando se necesita.**
+Schedule
 
----
+Actors
 
-# 137. Workflow UX
+Requirements
 
-La experiencia debe priorizar:
+Commercial context
 
-```text
-context
-↓
-next task
-↓
-action
-```
+Preparation
 
-en lugar de obligar a navegar por tablas desconectadas.
+Equipment Assignment
 
----
-
-# 138. Mobile future
-
-Healthcare es un candidato especialmente fuerte para una experiencia móvil debido al trabajo de técnicos fuera del almacén.
-
----
-
-# 139. QR future
-
-QR puede ayudar posteriormente con:
-
-```text
 CaseKit
-Equipment
+
 Dispatch
+
 Return
-Batch
-Serial
-```
 
-pero no es requisito para definir correctamente el dominio.
+Reconciliation
 
----
+Timeline
 
-# 140. Notifications
+Actualmente:
 
-Podrán existir alertas como:
+Case 360
+→ NOT IMPLEMENTED
 
-```text
-Case tomorrow not prepared
-Equipment conflict
-CaseKit incomplete
-Return pending
-Reconciliation unresolved
-```
+98. Case 360 actions
 
----
+Las acciones contextuales deberán derivarse del lifecycle real que exista cuando se implementen los workflows logísticos.
 
-# 141. Integración con Products
+No deben fijarse hoy CTAs basados en estados todavía no aprobados.
 
-Healthcare utiliza `Product` como catálogo común.
+99. No repeated data entry
 
-No debe crear un segundo catálogo completo de productos.
+Debe mantenerse como principio UX:
 
----
+known Case context
+→ reused by downstream workflows
 
-# 142. Healthcare Product Profile
+Si Case ya conoce información como responsable o schedule, los workflows posteriores no deben pedirla nuevamente sin necesidad.
 
-Si algunos productos requieren atributos específicos Healthcare, podrá diseñarse posteriormente una extensión.
+100. UUID and business identifiers
 
-No debe llenar `Product` de campos especializados sin evaluar esa frontera.
+Healthcare utiliza UUID para identidad técnica siguiendo ADR-004.
 
----
+Cuando aporte valor operacional, entidades como Case o Dispatch podrán tener folios empresariales.
 
-# 143. Integración con InventoryBatch
+CURRENT HealthcareCase ya utiliza folio.
+
+101. Multi-tenancy
+
+Todo dato Healthcare debe pertenecer directa o indirectamente a:
+
+Company
+
+102. Cross-tenant relations
+
+Debe rechazarse cualquier relación como:
+
+Case Company A
+↓
+resource Company B
+
+para recursos tenant-owned.
+
+Esto aplicará progresivamente a:
+
+Doctor
+
+Hospital
+
+Product
+
+EquipmentAsset
+
+responsible User
+
+Assignments
+
+según sus modelos definitivos.
+
+103. Authorization
+
+Healthcare deberá continuar aplicando:
+
+Authentication
+
+Authorization
+
+Tenant Isolation
+
+Validation
+
+Business Rules
+
+El backend permanece como autoridad.
+
+104. Permission model TARGET
+
+Permisos conceptuales futuros pueden incluir:
+
+healthcare.cases.read
+
+healthcare.cases.create
+
+healthcare.cases.update
+
+healthcare.requirements.manage
+
+healthcare.equipment.assign
+
+healthcare.dispatch.create
+
+healthcare.dispatch.confirm
+
+healthcare.return.create
+
+healthcare.inspect
+
+healthcare.reconcile
+
+Los nombres definitivos deberán coordinarse con la arquitectura RBAC.
+
+105. Separation of duties TARGET
+
+Una Company puede requerir:
+
+Technician
+→ request / receive custody
+
+Warehouse
+→ prepare / dispatch / receive
+
+Manager
+→ resolve incidents
+
+No debe asumirse un único rol para toda la operación.
+
+106. Backend authority
+
+Frontend podrá simplificar el workflow.
+
+Backend deberá validar según corresponda:
+
+tenant
+
+permissions
+
+Case status
+
+quantities
+
+batches
+
+serials / assets
+
+assignment
+
+custody
+
+reconciliation
+
+107. Concurrency TARGET
+
+Healthcare deberá contemplar conflictos como:
+
+same EquipmentAsset
+→ overlapping Cases
+
+o, cuando existan reservas:
+
+same inventory quantity
+→ allocated to multiple Cases
+
+La estrategia técnica de locking/reservation no se define todavía.
+
+108. Idempotency TARGET
+
+Operaciones futuras críticas como:
+
+confirm Dispatch
+
+confirm Return
+
+confirm Reconciliation
+
+deberán protegerse contra duplicación por retries.
+
+Esto es un requirement TARGET de confiabilidad.
+
+109. Audit TARGET
+
+Eventos candidatos:
+
+Case created
+
+Case scheduled
+
+Case responsible User changed
+
+Requirement changed
+
+Equipment assigned
+
+CaseKit prepared
+
+Dispatch confirmed
+
+Custody accepted
+
+Return registered
+
+Inspection completed
+
+Reconciliation confirmed
+
+Incident resolved
+
+Actualmente:
+
+transversal Audit platform
+→ NOT IMPLEMENTED
+
+110. Audit minimization
+
+Cuando Audit exista deberá almacenar únicamente contexto operacional necesario.
+
+No debe convertirse en una vía para acumular información clínica innecesaria.
+
+111. Integración con Products
+
+Healthcare reutiliza:
+
+Product
+
+como catálogo común.
+
+No debe crear un segundo catálogo Healthcare completo.
+
+112. Healthcare Product Profile FUTURE
+
+Si algunos Products requieren atributos específicos Healthcare, podrá diseñarse una extensión separada.
+
+No debe llenarse Product de campos especializados sin revisar la frontera del dominio.
+
+113. Integración con InventoryBatch
 
 Healthcare deberá reutilizar:
 
-```text
 InventoryBatch
-```
 
-para trazabilidad por lote.
+para trazabilidad por lote cuando el workflow lo requiera.
 
----
+No debe crear un segundo sistema de lotes.
 
-# 144. Integración con seriales
+114. Integración con serial identity
 
-Cuando serial tracking exista, Healthcare deberá reutilizar esa identidad física.
+Cuando exista una identidad serializada aplicable, Healthcare deberá reutilizarla.
 
-No crear un segundo sistema de seriales solamente para Healthcare.
+No debe crear un segundo sistema de seriales únicamente para Case Logistics.
 
----
-
-# 145. Integración con Customers
+115. Integración con Customers
 
 Customer permanece como contraparte comercial.
 
-Case puede relacionarse con Customer cuando se conozca.
+Healthcare Case podrá relacionarse con Customer cuando el workflow lo requiera.
 
-No debe exigirse Customer para crear Opportunity o Case si el proceso real todavía no lo conoce.
+No debe exigirse Customer para crear un Case únicamente para forzar una relación comercial antes de tiempo.
 
----
+116. Integración con Equipment
 
-# 146. Integración con Sales
+Healthcare reutiliza:
 
-Sales continúa siendo propietario del compromiso y fulfillment comercial.
+EquipmentAsset
 
-Healthcare no debe duplicar:
+para identidad física.
 
-```text
-SalesOrder
-Delivery
-```
+Healthcare es propietario futuro de:
 
----
+Assignment
 
-# 147. Integración con Returns
+Case relationship
 
-`SaleReturn`/Return continúa siendo devolución comercial.
+custody
 
-Healthcare utiliza:
+dispatch / return operational context
 
-```text
+No de la identidad base del EquipmentAsset.
+
+117. Integración con Commercial Returns
+
+Commercial Return y Healthcare CaseReturn son dominios distintos.
+
+Debe mantenerse:
+
+Commercial Return
+→ ERP commercial domain
+
 CaseReturn
-```
+→ Healthcare custody domain
 
-para custodia temporal.
+118. Integración con Dashboard
 
----
+Dashboard podrá consumir Healthcare Read Models.
 
-# 148. Integración con Audit
+Healthcare no debe mover reglas del dominio hacia Dashboard.
 
-Healthcare proporcionará eventos empresariales importantes a Audit cuando esa infraestructura exista.
+119. Roadmap de implementación Healthcare
 
----
+El roadmap técnico aprobado después del cierre ERP Core es:
 
-# 149. Integración con Dashboard
+Hospital / Doctor
+↓
+Requirements
+↓
+Equipment Assignment
+↓
+Case Availability
+↓
+Dispatch / Custody
+↓
+Return
+↓
+CaseKit / Maletín
+↓
+Calendar
+↓
+Case 360
+↓
+Mobile technician experience
 
-Dashboard puede consumir Healthcare Read Models.
+Este es un orden de implementación, no el orden temporal de una operación real.
 
-Healthcare no debe trasladar lógica empresarial al Dashboard.
+120. Project sequence
 
----
+Healthcare specialization se expande después de:
 
-# 150. Invariantes principales
+H8A
+Documentation Synchronization
 
-```text
+↓
+
+H8B
+Full Automated Regression / Technical Health
+
+↓
+
+UX-B.6
+Full ERP End-to-End QA
+
+↓
+
+ERP Core V1 Closure
+
+↓
+
+Healthcare specialization
+
+La existencia de diseño Healthcare no autoriza a introducir nuevos modelos Prisma durante H8.
+
+121. CURRENT
+
+Actualmente:
+
+HealthcareCase Foundation
+✅
+
+HealthcareCaseStatus
+DRAFT / SCHEDULED / CANCELLED
+✅
+
+Case folio
+✅
+
+Case scheduling context
+✅
+
+responsible User
+✅
+
+tenant isolation
+✅
+
+RBAC
+✅
+
+Case cancellation
+✅
+
+EquipmentAsset ERP Core
+✅
+
+EquipmentInspection ERP Core
+✅
+
+122. CURRENT technical debt
+
+Healthcare Case create idempotency
+⏳
+
+Doctor / Hospital tenancy model decision
+⏳ before implementation
+
+No deben confundirse con workflows TARGET todavía inexistentes.
+
+123. TARGET
+
+Capacidades Healthcare objetivo:
+
+Doctor / Hospital
+
+Case Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+CaseKit / Maletín
+
+CaseDispatch / Custody
+
+CaseReturn
+
+Healthcare material inspection
+
+Reconciliation
+
+Incident handling
+
+Case Calendar
+
+Case 360
+
+Warehouse Operations integration
+
+Healthcare Dashboard context
+
+124. FUTURE
+
+Capacidades posteriores:
+
+Opportunity CRM
+
+Payer workflows
+
+Insurance authorization
+
+KitTemplate
+
+Reservations
+
+Equipment maintenance expansion
+
+Calibration workflows
+
+QR workflows
+
+Mobile technician app
+
+Electronic signatures
+
+Document management
+
+Notifications
+
+Advanced analytics
+
+AI assistance
+
+125. Invariantes principales
+
 Healthcare
 → belongs to one Company context
-```
 
-```text
+HealthcareCase
+≠
+clinical record
+
 Doctor
 ≠
 Customer by definition
-```
 
-```text
 Hospital
 ≠
 Customer by definition
-```
 
-```text
 Payer
 ≠
 Customer by definition
-```
 
-```text
 Opportunity
 ≠
-Case
-```
+HealthcareCase
 
-```text
-Case
+Opportunity
+→ optional
+
+Requirements
 ≠
-clinical record
-```
+Preparation
 
-```text
+Requirements
+≠
+CaseKit
+
 KitTemplate
 ≠
 CaseKit
-```
 
-```text
 CaseKit
 ≠
 automatic Inventory OUT
-```
 
-```text
+EquipmentAsset
+→ ERP Core identity
+
+Equipment Assignment
+→ Healthcare operational relationship
+
+ASSIGNED / IN_CUSTODY
+→ must not be forced into EquipmentLifecycle
+
 CaseDispatch
 ≠
 Delivery
-```
 
-```text
 CaseDispatch
 ≠
 commercial Inventory OUT
-```
 
-```text
 CaseReturn
 ≠
-SaleReturn
-```
+Commercial Return
 
-```text
 Returned
 ≠
 Automatically Available
-```
 
-```text
 Dispatched
 =
 Used + Returned + Unresolved
-```
 
-```text
-Same physical inventory
+same physical inventory
 → must never be decremented twice
-```
 
-```text
-EquipmentAsset
-≠
-Product stock quantity
-```
+126. Anti-patrones
 
----
+Case as clinical record
 
-# 151. Anti-patrones
+Incorrecto almacenar historia clínica detallada sin una necesidad operacional aprobada.
 
-## Case as clinical record
+Doctor as Customer
 
-Agregar historia clínica y diagnósticos sin necesidad operacional.
+Incorrecto forzar:
 
----
-
-## Doctor as Customer
-
-Forzar:
-
-```text
 Doctor
 → Customer
-```
 
 para poder crear Case.
 
----
+Hospital as Customer
 
-## Hospital as Customer
+Incorrecto forzar:
 
-Forzar:
-
-```text
 Hospital
 → Customer
-```
 
-aunque la contraparte comercial sea diferente.
+cuando la contraparte comercial sea distinta.
 
----
+Opportunity required before Case
 
-## CaseDispatch as Sale
+Incorrecto:
 
-Convertir automáticamente cada salida a procedimiento en venta.
-
----
-
-## Inventory OUT on Dispatch
-
-Descontar definitivamente material antes de saber qué fue utilizado.
-
----
-
-## Double Decrement
-
-Descontar en Dispatch y volver a descontar al generar Delivery.
-
----
-
-## CaseKit as Template
-
-Modificar una plantilla compartida para representar un Case concreto.
-
----
-
-## Product stock for Equipment identity
-
-Intentar conocer custodia de equipo reutilizable solo mediante cantidad.
-
----
-
-## Return directly available
-
-Reintegrar automáticamente todo material retornado sin Inspection cuando sea necesaria.
-
----
-
-## Healthcare logic inside ERP Core
-
-Agregar campos como:
-
-```text
-doctorId
-hospitalId
-procedureId
-```
-
-a entidades genéricas únicamente porque Healthcare los utiliza.
-
----
-
-## One giant Healthcare model
-
-Crear:
-
-```text
 HealthcareCase
-```
+→ requires Opportunity
 
-con decenas de responsabilidades:
+HealthcareCase debe poder existir de forma independiente.
 
-```text
+Equipment identity duplicated in Healthcare
+
+Incorrecto crear un segundo modelo de activo en Healthcare cuando ya existe:
+
+EquipmentAsset
+
+en ERP Core.
+
+Assignment as Equipment lifecycle
+
+Incorrecto:
+
+EquipmentLifecycle = ASSIGNED
+
+o:
+
+EquipmentLifecycle = IN_CUSTODY
+
+para representar una relación operacional temporal.
+
+CaseDispatch as Sale
+
+Incorrecto convertir automáticamente cada salida a procedimiento en una Sale.
+
+CaseDispatch as Delivery
+
+Incorrecto tratar custodia temporal como fulfillment comercial.
+
+Commercial OUT on Dispatch
+
+Incorrecto descontar definitivamente Inventory únicamente porque el material salió en custodia.
+
+Double decrement
+
+Incorrecto descontar la misma existencia en Dispatch y nuevamente al registrar su consecuencia comercial.
+
+CaseKit as Inventory
+
+Incorrecto tratar CaseKit como stock físico o movimiento por sí mismo.
+
+Requirements as prepared quantity
+
+Incorrecto reescribir el requerimiento porque Warehouse preparó menos o más.
+
+Product stock as Equipment identity
+
+Incorrecto intentar conocer qué Equipment está asignado únicamente mediante una cantidad agregada.
+
+Return directly available
+
+Incorrecto reintegrar automáticamente todo material retornado a disponibilidad cuando necesita inspección.
+
+Healthcare logic inside ERP Core
+
+Incorrecto agregar a entidades genéricas campos especializados como:
+
+doctorId
+
+hospitalId
+
+currentCaseId
+
+currentCustodianId
+
+únicamente para evitar diseñar el dominio Healthcare.
+
+One giant HealthcareCase model
+
+Incorrecto convertir HealthcareCase en una tabla que contenga simultáneamente:
+
 commercial
+
 inventory
+
 equipment
+
+dispatch
+
 return
+
 billing
+
 insurance
+
 audit
-```
 
-en una sola tabla.
+sin fronteras de dominio.
 
----
+Target documented as Current
 
-# 152. ADR relacionados
+Incorrecto presentar como CURRENT:
 
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-008 — Documentation First.
-* ADR-009 — Modular Monolith.
-* ADR-011 — SalesOrder + Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
+Doctor
 
-ADR-013 es la decisión arquitectónica principal para la separación entre custodia Healthcare e Inventory OUT comercial.
+Hospital
 
----
+Requirements
 
-# 153. Documentos relacionados
+Assignment
 
-```text
-product/PRODUCT_VISION.md
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
+Dispatch
 
-architecture/ARCHITECTURE.md
-architecture/adr/ADR-013-inventory-custody-case-logistics.md
+Return
 
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
+Reconciliation
 
-modules/erp/COMPANIES.md
-modules/erp/IDENTITY_ACCESS.md
-modules/erp/PRODUCTS.md
-modules/erp/INVENTORY.md
-modules/erp/SALES.md
-modules/erp/RETURNS.md
-modules/erp/DASHBOARD.md
-```
+Calendar UI
 
----
+Case 360
 
-# 154. Fuente de verdad
+mientras no estén implementados.
 
-```text
-HEALTHCARE.md
-→ fronteras y workflow general de Healthcare
+127. ADR relacionados
 
-OPPORTUNITIES.md
-→ oportunidad comercial Healthcare
+ADR-001 — Multi-Tenant
 
-CASES.md
-→ lifecycle y comportamiento de Healthcare Case
+ADR-002 — Inventory Movements
 
-CASE_CALENDAR.md
-→ planificación temporal
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-008 — Documentation First
+
+ADR-009 — Modular Monolith
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
+
+ADR-013 — Inventory Custody & Case Logistics
+
+ADR-013 es la decisión principal para separar:
+
+Healthcare custody
+
+de:
+
+commercial Inventory OUT
+
+128. Documentos relacionados
+
+docs/product/PRODUCT_VISION.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/architecture/adr/ADR-013-inventory-custody-case-logistics.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/DASHBOARD.md
+
+docs/modules/healthcare/DOMAIN_MODEL.md
+
+docs/modules/healthcare/CASES.md
+
+Documentos especializados futuros pueden incluir:
+
+DOCTORS_HOSPITALS.md
+
+CASE_REQUIREMENTS.md
+
+EQUIPMENT_ASSIGNMENT.md
+
+CASE_AVAILABILITY.md
 
 CASE_KITS.md
-→ preparación y material requerido
 
 CASE_LOGISTICS.md
-→ Dispatch, Custody, Return, Inspection y Reconciliation
+
+CASE_CALENDAR.md
+
+según la evolución real del proyecto.
+
+129. Fuente de verdad
+
+HEALTHCARE.md
+→ Healthcare boundaries
+→ CURRENT / TARGET / FUTURE split
+→ general operational workflow
+
+CASES.md
+→ CURRENT HealthcareCase behavior
+→ Case lifecycle
+
+DOMAIN_MODEL.md
+→ Healthcare entity boundaries
 
 EQUIPMENT.md
-→ activos reutilizables
+→ ERP Core EquipmentAsset identity / lifecycle / condition
 
-ERP module docs
-→ comportamiento del Core
+INVENTORY.md
+→ physical inventory semantics
+
+SALES.md
+→ CURRENT Sale behavior
+→ TARGET SalesOrder / Delivery direction
 
 ADR-013
-→ decisión de custodia vs commercial OUT
-
-PROJECT_BOARD.md
-→ estado de implementación
+→ Healthcare custody vs commercial OUT architecture
 
 schema.prisma
-→ modelo técnico únicamente cuando sea implementado
-```
+→ CURRENT implemented persistence only
 
----
+backend
+→ CURRENT Healthcare Case implementation
 
-# 155. Principio final
+tests
+→ validated behavior
 
-El centro de Zaping Healthcare no es simplemente:
+PROJECT_BOARD.md
+→ active implementation status / technical debt
 
-```text
-una cirugía
-```
+130. Principio final
 
-ni:
+El centro de Zaping Healthcare no es únicamente:
 
-```text
-una venta
-```
+a procedure
 
 ni:
 
-```text
-un movimiento de inventario
-```
+a Sale
 
-Es la coordinación de una operación completa:
+ni:
 
-```text
-Opportunity
-↓
+an InventoryMovement
+
+Es la coordinación de una operación completa.
+
+CURRENT:
+
+HealthcareCase Foundation
++
+ERP Equipment identity
+
+TARGET:
+
 Case
 ↓
+Requirements
+↓
 Preparation
+↓
+Assignment / CaseKit
 ↓
 Custody
 ↓
 Procedure
 ↓
 Return
+↓
+Inspection
 ↓
 Reconciliation
 ↓
 Commercial consequence
-```
 
-manteniendo separadas las verdades de:
+Debe mantenerse separada la verdad de:
 
-```text
-qué se planeó
-qué se preparó
-qué salió
-quién lo tuvo
-qué se utilizó
-qué regresó
-qué quedó pendiente
-qué se vendió
-```
+what was planned
 
-> **Zaping Healthcare debe conectar operación, inventario y negocio sin confundir custodia temporal con consumo, ni contexto médico con información clínica innecesaria.**
+what was required
+
+what was prepared
+
+what was assigned
+
+what left
+
+who had custody
+
+what was used
+
+what returned
+
+what remains unresolved
+
+what became a commercial consequence
+
+Zaping Healthcare debe conectar operación, inventario y negocio sin confundir custodia temporal con consumo, sin convertir Equipment Assignment en lifecycle del activo y sin transformar Healthcare Case en un expediente clínico.

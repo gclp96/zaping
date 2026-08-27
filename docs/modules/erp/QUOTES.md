@@ -1,147 +1,495 @@
-# Módulo de Cotizaciones — Zaping ERP
+# Quotes — Zaping ERP
 
 **Módulo:** Quotes
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / REQUIERE EVOLUCIÓN COMERCIAL
-**Última actualización:** 2026-08-19
+**Estado de implementación:** QUOTES V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Quotes administra las propuestas comerciales que una Company presenta a sus Customers.
+Quotes administra las propuestas comerciales que una Company presenta a sus
+Customers.
 
 Su responsabilidad principal es responder:
 
 ```text
 ¿Qué estamos ofreciendo?
-¿A qué cliente?
-¿Qué productos?
+
+¿A qué Customer?
+
+¿Qué Products?
+
 ¿Qué cantidades?
-¿A qué precio?
+
+¿A qué precios?
+
 ¿Cuál es el total?
-¿En qué estado se encuentra la propuesta?
-¿Generó posteriormente una operación comercial?
+
+¿En qué estado está la propuesta?
+
+¿Fue convertida posteriormente en una Sale?
 ```
 
-Una Quote representa una **propuesta comercial**.
+Quote representa:
 
-No representa:
+```text
+commercial proposal
++
+commercial snapshot
++
+proposal lifecycle
+```
 
-* una entrega;
-* una salida física;
-* una factura;
-* un movimiento de inventario.
+No representa por sí misma:
+
+```text
+physical delivery
+
+Invoice
+
+Payment
+
+Inventory movement
+```
 
 ---
 
-# 2. Principio fundamental
+# 2. Ownership
+
+Quotes es propietario de:
+
+```text
+Quote
+
+QuoteItem
+
+Quote folio
+
+Customer relationship
+
+offered Products
+
+quoted quantities
+
+quoted prices
+
+subtotal
+
+iva
+
+total
+
+Quote lifecycle
+
+current conversion state
+```
+
+Quotes no es propietario de:
+
+```text
+Inventory stock
+
+InventoryMovement
+
+InventoryBatch
+
+Equipment lifecycle
+
+Sale lifecycle
+
+future SalesOrder lifecycle
+
+future Delivery
+
+Billing
+
+Accounts Receivable
+
+Healthcare Case Logistics
+```
+
+---
+
+# 3. Principio fundamental
+
+Debe mantenerse:
 
 ```text
 Quote
 =
-propuesta comercial
+commercial proposal
 ```
 
 Por tanto:
 
-> **Crear, editar o confirmar una cotización no debe modificar inventario.**
+```text
+Create Quote
+→ no Inventory mutation
+```
+
+```text
+Approve Quote
+→ no Inventory mutation
+```
+
+```text
+Cancel Quote
+→ no Inventory mutation
+```
+
+Una Quote puede participar posteriormente en una operación que sí afecte
+Inventory, pero ese efecto pertenece al dominio comercial resultante.
 
 ---
 
-# 3. Arquitectura comercial objetivo
+# 4. CURRENT vs TARGET vs FUTURE
 
-La dirección aprobada es:
+Este documento distingue:
+
+## CURRENT
+
+Comportamiento implementado actualmente en ERP Core V1.
+
+## TARGET
+
+Arquitectura comercial aprobada para una evolución posterior.
+
+## FUTURE
+
+Capacidades adicionales cuya necesidad deberá validarse antes de implementarse.
+
+---
+
+# 5. Estado CURRENT
+
+Quotes V1 soporta actualmente:
 
 ```text
-Quote
+Quote creation
+
+Quote list
+
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+
+approval
+
+cancellation
+
+Quote PDF
+
+client-side search
+
+status filter
+
+Quote detail from loaded list
+
+Customer active validation
+
+Product active validation
+
+Quote → Sale conversion
+
+conversion state tracking
+
+Sale handoff after conversion
+```
+
+---
+
+# 6. Lifecycle CURRENT
+
+Quote utiliza actualmente:
+
+```text
+DocumentStatus
+
+DRAFT
+CONFIRMED
+CANCELLED
+```
+
+La existencia de estos tres estados no implica que todas las transiciones entre
+ellos estén permitidas arbitrariamente.
+
+Las operaciones deben respetar siempre las reglas del backend vigente.
+
+---
+
+# 7. DRAFT
+
+Una nueva Quote comienza como:
+
+```text
+DRAFT
+```
+
+Representa una propuesta todavía no confirmada.
+
+Debe distinguirse entre:
+
+```text
+DRAFT state
+```
+
+y:
+
+```text
+generic Quote editing workflow
+```
+
+Actualmente no existe un endpoint genérico:
+
+```text
+PATCH /quotes/:id
+```
+
+como parte de la API CURRENT documentada.
+
+Por tanto, no debe afirmarse que la edición completa de Quotes DRAFT ya forma
+parte del contrato vigente.
+
+---
+
+# 8. Quote editing
+
+Una futura evolución puede permitir editar una Quote DRAFT para modificar:
+
+```text
+Customer
+
+Products
+
+quantities
+
+prices
+```
+
+antes de confirmarla.
+
+Actualmente:
+
+```text
+generic Quote editing
+→ NOT PART OF CURRENT API
+```
+
+No debe confundirse con:
+
+```text
+approve
+
+cancel
+```
+
+que sí poseen endpoints específicos.
+
+---
+
+# 9. CONFIRMED
+
+La aprobación produce:
+
+```text
+DRAFT
 ↓
-SalesOrder
-↓
-Delivery
-↓
+CONFIRMED
+```
+
+mediante:
+
+```text
+PATCH /quotes/:id/approve
+```
+
+Una Quote CONFIRMED representa una propuesta que dejó la etapa inicial de
+borrador.
+
+---
+
+# 10. CONFIRMED no significa fulfillment
+
+Debe mantenerse:
+
+```text
+Quote CONFIRMED
+≠
+goods delivered
+```
+
+```text
+Quote CONFIRMED
+≠
 Inventory OUT
 ```
 
-Quote puede ser opcional.
-
-Una operación comercial también puede comenzar directamente mediante:
-
 ```text
-SalesOrder
-↓
-Delivery
+Quote CONFIRMED
+≠
+Invoice issued
 ```
 
-cuando el negocio no requiera cotización previa.
+```text
+Quote CONFIRMED
+≠
+Customer acceptance event
+```
+
+si esa aceptación no está modelada explícitamente.
 
 ---
 
-# 4. Responsabilidades
+# 11. Quote approval no modifica Inventory
 
-Quotes es propietario de:
+La aprobación normal debe mantener:
 
-* Quote;
-* QuoteItem;
-* folio de cotización;
-* Customer de la propuesta;
-* productos ofrecidos;
-* cantidades;
-* precios de la propuesta;
-* subtotal;
-* impuestos calculados;
-* total;
-* lifecycle de Quote;
-* conversión comercial de la propuesta.
+```text
+Quote DRAFT
+↓
+Approve
+↓
+Quote CONFIRMED
+```
 
----
+sin:
 
-# 5. Fuera del alcance
+```text
+Product.stock decrement
+```
 
-Quotes no es propietario de:
+sin:
 
-* stock;
-* InventoryMovement;
-* lotes;
-* disponibilidad física;
-* SalesOrder lifecycle;
-* Delivery;
-* Invoice;
-* Payment;
-* Case Logistics;
-* cuentas por cobrar.
+```text
+InventoryMovement OUT
+```
+
+y sin:
+
+```text
+Equipment mutation
+```
 
 ---
 
-# 6. Modelo actual
+# 12. CANCELLED
 
-El modelo técnico actual contiene conceptualmente:
+Quote utiliza actualmente:
+
+```text
+CANCELLED
+```
+
+como estado terminal para propuestas que dejan de continuar mediante el flujo
+normal.
+
+La API CURRENT expone:
+
+```text
+PATCH /quotes/:id/cancel
+```
+
+Las transiciones exactas admitidas desde otros estados deben corresponder al
+backend vigente.
+
+Este documento no amplía artificialmente esas transiciones.
+
+---
+
+# 13. CANCELLED no significa deleted
+
+Debe mantenerse:
+
+```text
+CANCELLED
+≠
+DELETED
+```
+
+Una Quote cancelada conserva:
+
+```text
+folio
+
+Customer
+
+items
+
+prices
+
+totals
+
+status
+
+timestamps
+```
+
+como documento histórico.
+
+---
+
+# 14. Quote como documento transaccional
+
+Quote no es Master Data.
+
+Por tanto, su identidad histórica se conserva mediante:
+
+```text
+document lifecycle
++
+persisted items
++
+persisted commercial values
+```
+
+y no mediante un simple active/inactive lifecycle.
+
+---
+
+# 15. Modelo Quote actual
+
+Conceptualmente:
 
 ```text
 Quote
-├── id
-├── companyId
-├── customerId
-├── folio
-├── subtotal
-├── iva
-├── total
-├── status
-├── convertedToSale
-├── createdAt
-├── updatedAt
-├── customer
-└── items
+
+id
+companyId
+customerId
+
+folio
+
+subtotal
+iva
+total
+
+status
+
+convertedToSale
+
+createdAt
+updatedAt
+
+customer
+items
 ```
 
-La definición exacta permanece en `schema.prisma`.
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
 
 ---
 
-# 7. QuoteItem
+# 16. QuoteItem
 
 Cada Quote contiene una o más partidas.
 
@@ -156,213 +504,53 @@ Quote
     └── subtotal
 ```
 
----
-
-# 8. Quote como documento transaccional
-
-Quote no es Master Data.
-
-Su lifecycle se expresa principalmente mediante estados de negocio.
-
-Actualmente utiliza:
-
-```text
-DRAFT
-CONFIRMED
-CANCELLED
-```
-
-mediante `DocumentStatus`.
-
----
-
-# 9. DRAFT
-
-Una nueva Quote comienza como:
-
-```text
-DRAFT
-```
-
-Representa una propuesta todavía editable.
-
----
-
-# 10. Capacidades de DRAFT
-
-Mientras una Quote se encuentre en borrador puede permitir:
-
-* cambiar Customer;
-* agregar Products;
-* quitar Products;
-* modificar cantidades;
-* modificar precios permitidos;
-* recalcular totales;
-* confirmar;
-* cancelar.
-
----
-
-# 11. CONFIRMED
-
-Una Quote confirmada representa una propuesta comercial que dejó su fase editable normal.
-
-Conceptualmente:
-
-```text
-DRAFT
-↓
-CONFIRMED
-```
-
----
-
-# 12. Qué no significa CONFIRMED
-
-`CONFIRMED` no debe interpretarse automáticamente como:
-
-```text
-mercancía entregada
-```
-
-ni:
-
-```text
-inventario descontado
-```
-
-ni:
-
-```text
-factura emitida
-```
-
-Tampoco debe asumirse necesariamente que existe aceptación formal del cliente si el módulo aún no registra ese hecho por separado.
-
----
-
-# 13. Inmutabilidad comercial
-
-Una vez confirmada, los valores que definen la propuesta no deben modificarse silenciosamente.
-
-Especialmente:
-
-* Customer;
-* Products;
-* quantities;
-* prices;
-* totals.
-
-Si la cotización debe cambiar sustancialmente, puede requerirse posteriormente:
-
-* revisión;
-* duplicado;
-* nueva versión;
-* nueva Quote.
-
-La estrategia de versiones todavía no forma parte del Core actual.
-
----
-
-# 14. CANCELLED
-
-Una Quote cancelada representa una propuesta que ya no continuará mediante su flujo normal.
-
-```text
-DRAFT / CONFIRMED
-↓
-CANCELLED
-```
-
-Las transiciones exactas permitidas deben corresponder a la implementación vigente.
-
----
-
-# 15. Cancelar no elimina
-
-Una Quote cancelada debe conservar:
-
-* folio;
-* Customer;
-* items;
-* precios;
-* totales;
-* fechas;
-* historial.
-
-```text
-CANCELLED
-≠
-DELETED
-```
-
----
-
-# 16. Lifecycle conceptual
-
-```text
-DRAFT
-├──→ CANCELLED
-│
-└──→ CONFIRMED
-       │
-       ├──→ Commercial conversion
-       │
-       └──→ CANCELLED
-            cuando las reglas lo permitan
-```
-
-La conversión comercial no debe confundirse con un movimiento de inventario.
+La estructura técnica exacta pertenece al schema vigente.
 
 ---
 
 # 17. Folio
 
-Quote utiliza un folio empresarial independiente del UUID.
+Quote utiliza un folio empresarial separado de su UUID técnico.
 
-Ejemplo:
+Debe mantenerse:
 
 ```text
 id
-→ UUID
-
-folio
-→ COT-000421
+→ technical identity
 ```
 
-El formato concreto pertenece a la implementación.
+```text
+folio
+→ business-facing identity
+```
+
+El formato exacto pertenece a la implementación vigente.
 
 ---
 
-# 18. Folio vs UUID
+# 18. Folio en UX
 
-El UUID sirve para identidad técnica.
+El folio puede utilizarse para:
 
-El folio sirve para:
+```text
+search
 
-* usuarios;
-* búsqueda;
-* documentos;
-* comunicación comercial;
-* referencias.
+PDF
 
----
+business communication
 
-# 19. Unicidad del folio
+support
 
-Arquitectónicamente, un folio empresarial debe evitar ambigüedad dentro de su Company.
+cross-module references
+```
 
-Sin embargo, cualquier nueva restricción de base de datos debe validarse contra el schema y los datos existentes antes de crear una migración.
-
-Este documento no ordena una migración inmediata.
+El usuario no necesita trabajar normalmente con el UUID.
 
 ---
 
-# 20. Customer
+# 19. Customer relationship
 
 Toda Quote pertenece a un Customer.
-
-Conceptualmente:
 
 ```text
 Customer
@@ -370,35 +558,65 @@ Customer
 Quote
 ```
 
+Customer identifica la contraparte comercial de la propuesta.
+
 ---
 
-# 21. Validación de Customer
+# 20. Customer validation — CURRENT
 
-Backend debe comprobar:
+Al crear una nueva Quote, backend valida:
 
 ```text
 Customer exists
-AND
+
++
+
 Customer belongs to authenticated Company
+
++
+
+Customer.isActive = true
 ```
 
-y, para nuevas propuestas cuando corresponda:
+Estado:
 
 ```text
-Customer is active
+same-tenant validation
+✅
+```
+
+```text
+active Customer validation
+✅
 ```
 
 ---
 
-# 22. Customer inactivo histórico
+# 21. Inactive Customer
 
-Si un Customer se desactiva posteriormente, una Quote histórica continúa siendo válida.
+Debe mantenerse:
 
-No debe desaparecer ni cambiar automáticamente.
+```text
+Inactive Customer
+↓
+New Quote
+→ BLOCK
+```
+
+pero:
+
+```text
+Customer later becomes inactive
+↓
+Historical Quote
+→ remains valid
+```
+
+La desactivación no reescribe documentos históricos.
 
 ---
 
-# 23. CustomerSelector
+# 22. CustomerSelector
 
 La UI puede utilizar:
 
@@ -406,78 +624,223 @@ La UI puede utilizar:
 CustomerSelector
 ```
 
-para localizar y seleccionar clientes.
+para seleccionar la contraparte comercial.
 
-La selección visual no reemplaza la validación backend.
-
----
-
-# 24. Creación contextual de Customer
-
-El flujo objetivo puede permitir:
+Debe mantenerse:
 
 ```text
-Nueva cotización
-↓
 CustomerSelector
-↓
-Cliente no existe
-↓
-Crear cliente
-↓
-Seleccionarlo
-↓
-Continuar cotización
+→ UX convenience
 ```
 
-sin perder los datos del formulario.
+mientras:
+
+```text
+backend
+→ authoritative Customer validation
+```
 
 ---
 
-# 25. Products
+# 23. CustomerSelector y Customers activos
 
-Cada QuoteItem referencia un Product.
+Para nuevas Quotes:
 
-Backend debe verificar:
+```text
+Inactive Customer
+→ excluded from normal selection
+```
+
+Esto complementa, pero no sustituye, la validación backend.
+
+---
+
+# 24. Contextual Customer creation — TARGET UX
+
+Una futura experiencia puede permitir:
+
+```text
+New Quote
+↓
+Customer not found
+↓
+Create Customer
+↓
+Select Customer
+↓
+Continue Quote
+```
+
+sin perder el estado del formulario.
+
+Actualmente no debe considerarse requisito de Quotes V1 sin implementación
+verificada.
+
+---
+
+# 25. Product relationship
+
+Cada `QuoteItem` referencia un Product.
+
+Debe mantenerse:
+
+```text
+Product
+↓
+QuoteItem
+```
+
+Product identifica lo ofrecido.
+
+QuoteItem conserva las condiciones comerciales de esa propuesta.
+
+---
+
+# 26. Product validation — CURRENT
+
+Al crear una Quote, backend debe validar:
 
 ```text
 Product exists
-AND
-Product belongs to Company
+
++
+
+Product belongs to authenticated Company
+
++
+
+Product.isActive = true
 ```
 
----
-
-# 26. Producto inactivo
-
-Un Product inactivo normalmente no debe agregarse a nuevas Quotes.
-
-Pero debe seguir mostrándose correctamente dentro de Quotes históricas.
-
----
-
-# 27. ProductSelector
-
-La UI puede utilizar:
+Estado:
 
 ```text
-ProductSelector
+same-tenant Product validation
+✅
 ```
 
-para localizar productos por información como:
-
-* SKU;
-* nombre;
-* marca;
-* barcode;
-
-según las capacidades implementadas.
+```text
+active Product validation
+✅
+```
 
 ---
 
-# 28. Productos duplicados
+# 27. Inactive Product
 
-Una Quote no debería contener partidas duplicadas del mismo producto sin una razón explícita.
+Debe mantenerse:
+
+```text
+Inactive Product
+↓
+New Quote
+→ BLOCK
+```
+
+mientras:
+
+```text
+Product becomes inactive later
+↓
+Historical Quote
+→ remains valid
+```
+
+---
+
+# 28. ProductSelector
+
+La UI puede utilizar un ProductSelector o experiencia equivalente para localizar
+Products mediante información como:
+
+```text
+SKU
+
+name
+
+brand
+
+barcode
+```
+
+según las capacidades frontend vigentes.
+
+El backend continúa siendo autoridad sobre existencia, tenant y actividad.
+
+---
+
+# 29. Product tracking
+
+Quote representa una propuesta comercial y no ejecuta por sí misma la semántica
+física de:
+
+```text
+inventoryTracking
+
+lotTracking
+```
+
+Debe mantenerse:
+
+```text
+Quote
+→ proposed Product
+```
+
+frente a:
+
+```text
+Sale / future fulfillment workflow
+→ physical eligibility rules
+```
+
+---
+
+# 30. Quote eligibility ≠ Generic Sale eligibility
+
+Un Product válido para ser identificado dentro del catálogo comercial no implica
+automáticamente que el Generic Sales flow actual pueda realizar su salida física.
+
+Generic Sales CURRENT está limitado a Products compatibles con:
+
+```text
+inventoryTracking = QUANTITY
+```
+
+y:
+
+```text
+lotTracking != REQUIRED
+```
+
+Por tanto, la conversión Quote → Sale debe respetar las reglas vigentes de
+`SALES.md`.
+
+---
+
+# 31. Products no compatibles con Generic Sales
+
+El flujo Generic Sales CURRENT no debe utilizarse para cumplir directamente
+Products con semánticas como:
+
+```text
+ASSET
+
+SERIALIZED
+
+REQUIRED lot fulfillment
+```
+
+mientras sus workflows correspondientes no estén implementados en Generic Sales.
+
+La existencia de una Quote no elimina esa restricción.
+
+---
+
+# 32. Duplicate QuoteItems
+
+Una Quote no debería contener el mismo Product repetido innecesariamente bajo las
+mismas condiciones comerciales.
 
 Preferir:
 
@@ -489,24 +852,24 @@ sobre:
 
 ```text
 Product A × 4
+
 Product A × 6
 ```
 
-cuando representan exactamente la misma condición comercial.
+si representan exactamente la misma partida.
 
 ---
 
-# 29. Quantity
+# 33. Quantity
 
-La cantidad debe ser positiva.
-
-Actualmente el modelo utiliza:
+Actualmente:
 
 ```text
-Int
+quantity
+→ Int
 ```
 
-por lo que conceptualmente:
+y conceptualmente debe mantenerse:
 
 ```text
 quantity >= 1
@@ -514,61 +877,74 @@ quantity >= 1
 
 ---
 
-# 30. Unidades fraccionarias
+# 34. Fractional quantities — FUTURE
 
-Si posteriormente Zaping soporta unidades fraccionarias, deberá revisarse de manera conjunta:
+Si Zaping soporta posteriormente cantidades fraccionarias, deberá revisarse de
+manera transversal:
 
-* Products;
-* Quotes;
-* Purchases;
-* Sales;
-* Inventory.
+```text
+Products
 
-No debe modificarse exclusivamente Quote.
+Quotes
+
+Purchases
+
+Sales
+
+Inventory
+```
+
+No debe modificarse únicamente Quotes.
 
 ---
 
-# 31. Price
+# 35. QuoteItem.price
 
-`QuoteItem.price` representa el precio ofrecido dentro de esa cotización.
+`QuoteItem.price` representa el precio ofrecido dentro de la Quote.
 
-Constituye un snapshot comercial.
+Debe considerarse un valor comercial persistido del documento.
 
 ---
 
-# 32. Precio de Product vs precio de Quote
+# 36. Product.price vs QuoteItem.price
 
-Al crear una partida puede utilizarse como referencia:
+Durante creación puede utilizarse:
 
 ```text
 Product.price
 ```
 
-pero una vez guardado:
+como referencia.
+
+Una vez persistida la Quote:
 
 ```text
 QuoteItem.price
 ```
 
-representa el precio específico de esa propuesta.
+representa el valor específico de esa propuesta.
 
 ---
 
-# 33. Cambio posterior del precio
+# 37. Historical price
 
-Si posteriormente:
+Debe mantenerse:
 
 ```text
-Product.price = 120
+Product.price changes later
+≠
+historical QuoteItem.price changes
 ```
 
-una Quote anterior que fue creada con:
+Ejemplo:
 
 ```text
 QuoteItem.price = 100
+
+later Product.price = 120
 ```
 
-debe conservar:
+La Quote histórica conserva:
 
 ```text
 100
@@ -576,37 +952,47 @@ debe conservar:
 
 ---
 
-# 34. Precio editable
+# 38. Price override
 
-Quotes puede permitir al usuario autorizado ajustar el precio de una propuesta.
+Si el workflow permite capturar un precio diferente al valor base del Product,
+esa capacidad debe respetar las reglas actuales de autorización.
 
-Esto no implica que todos los usuarios deban tener permiso para modificar precios arbitrariamente.
+Una futura política podrá introducir permisos como:
 
-Una futura estrategia RBAC puede separar esa capacidad.
+```text
+quotes.price.override
+```
+
+pero Permission-Based RBAC granular no debe darse por implementado únicamente
+desde este documento.
 
 ---
 
-# 35. Pricing futuro
+# 39. Pricing — FUTURE
 
-El campo `Product.price` y el precio capturado en Quote no constituyen todavía un motor avanzado de pricing.
-
-Capacidades futuras pueden incluir:
+Una futura arquitectura puede incorporar:
 
 ```text
 Price Lists
-Customer-specific Prices
+
+Customer-specific pricing
+
 Discounts
+
 Promotions
+
 Contracts
-Currency
+
+Currencies
+
 Validity
 ```
 
-Estas reglas deberán diseñarse cuando exista necesidad.
+No forman parte del pricing avanzado CURRENT.
 
 ---
 
-# 36. Item Subtotal
+# 40. Item subtotal
 
 Conceptualmente:
 
@@ -616,51 +1002,37 @@ Item Subtotal
 quantity × price
 ```
 
-El backend debe ser autoridad sobre el cálculo final.
+Backend debe permanecer como autoridad sobre los valores persistidos.
 
 ---
 
-# 37. Quote Subtotal
+# 41. Quote subtotal
+
+Conceptualmente:
 
 ```text
 Quote Subtotal
 =
-Σ QuoteItem subtotal
+Σ QuoteItem subtotals
 ```
 
 ---
 
-# 38. IVA
+# 42. IVA
 
-El modelo actual conserva:
+El flujo vigente utiliza:
 
 ```text
-iva
+IVA = 16%
 ```
 
-como importe calculado.
+según la implementación actual.
 
-El flujo histórico de Zaping utiliza 16 % en operaciones actuales.
-
-Esto no debe convertirse en una política fiscal universal permanente.
+No debe convertirse en una política fiscal universal permanente.
 
 ---
 
-# 39. Fiscalidad futura
-
-En el futuro podrán existir:
-
-* productos exentos;
-* tasas diferentes;
-* impuestos adicionales;
-* configuraciones por empresa;
-* reglas CFDI.
-
-Billing y el modelo fiscal deberán formalizar esa arquitectura.
-
----
-
-# 40. Total
+# 43. Total
 
 Conceptualmente:
 
@@ -672,93 +1044,101 @@ subtotal
 iva
 ```
 
-según la lógica fiscal implementada actualmente.
+según las reglas vigentes.
 
 ---
 
-# 41. Backend como autoridad
+# 44. Backend as authority
 
-Frontend puede calcular una vista previa para UX.
+Frontend puede calcular valores para UX.
 
-Pero backend debe recalcular o validar los importes antes de persistir una Quote.
+Backend debe validar o recalcular los importes necesarios antes de persistir la
+Quote.
 
-No debe confiar en:
+No debe confiar ciegamente en valores como:
 
 ```text
-subtotal enviado por cliente
+subtotal
+
+iva
+
+total
 ```
 
-como autoridad absoluta.
+enviados por cliente.
 
 ---
 
-# 42. Dinero
+# 45. Monetary representation
 
-Actualmente Quote utiliza `Float`.
+Quote utiliza actualmente la representación monetaria histórica del modelo
+vigente.
 
 Antes de ampliar significativamente:
 
-* Billing;
-* CFDI;
-* accounting;
-* financial reporting;
+```text
+Billing
 
-debe revisarse la estrategia de precisión monetaria.
+CFDI
 
-Este documento no ordena todavía ese cambio.
+Accounting
+
+financial reporting
+```
+
+deberá revisarse transversalmente:
+
+```text
+precision
+
+rounding
+
+currency representation
+```
+
+Este documento no redefine todavía esa arquitectura.
 
 ---
 
-# 43. Quote no reserva stock
+# 46. Quote no reserva stock
 
-Regla actual:
+Debe mantenerse:
 
 ```text
 Quote
-→ no stock movement
+→ no Inventory reservation
 ```
 
-y además:
+Una propuesta comercial no garantiza que esa cantidad siga físicamente disponible
+cuando posteriormente se convierta en una operación.
+
+---
+
+# 47. Quote puede consultar Inventory
+
+La UI puede utilizar Inventory como contexto.
+
+Ejemplo:
 
 ```text
-Quote
-→ no reservation automática
+Current stock: 4
+
+Quoted quantity: 10
+```
+
+Esto puede ayudar al usuario, pero:
+
+```text
+displayed stock
+≠
+reservation
 ```
 
 ---
 
-# 44. Cotizar sin disponibilidad
+# 48. Quote lifecycle no produce InventoryMovement
 
-Dependiendo de la política comercial, puede ser válido cotizar un producto que no se encuentra físicamente disponible en ese instante.
-
-Esto es diferente a:
-
-```text
-Delivery
-```
-
-que sí debe validar la existencia necesaria antes de confirmar la salida.
-
----
-
-# 45. Información de disponibilidad
-
-La UI puede mostrar contexto como:
-
-```text
-Stock actual: 4
-Cantidad cotizada: 10
-```
-
-para ayudar al vendedor.
-
-Pero no debe tratar ese indicador como una reserva.
-
----
-
-# 46. Quote nunca produce InventoryMovement
-
-Debe cumplirse:
+Debe mantenerse:
 
 ```text
 Create Quote
@@ -766,7 +1146,7 @@ Create Quote
 ```
 
 ```text
-Confirm Quote
+Approve Quote
 → no InventoryMovement
 ```
 
@@ -775,59 +1155,398 @@ Cancel Quote
 → no InventoryMovement
 ```
 
+Esta regla se refiere al lifecycle propio de Quote.
+
 ---
 
-# 47. Modelo comercial legacy
+# 49. CURRENT commercial conversion
 
-Actualmente el schema contiene:
+Actualmente existe:
 
 ```text
-convertedToSale Boolean
+Quote CONFIRMED
+↓
+POST /sales/from-quote/:quoteId
+↓
+Sale CONFIRMED
 ```
 
-Este campo pertenece al modelo histórico:
+Este flujo forma parte del ERP Core V1 vigente.
+
+No debe describirse simplemente como comportamiento histórico ya reemplazado.
+
+---
+
+# 50. Sale como modelo CURRENT
+
+Debe mantenerse:
 
 ```text
-Quote
-↓
 Sale
-↓
-Inventory OUT
+→ CURRENT ERP Core V1
+```
+
+aunque exista una arquitectura futura basada en:
+
+```text
+SalesOrder
++
+Delivery
+```
+
+La terminología recomendada es:
+
+```text
+CURRENT transitional commercial model
+```
+
+y no:
+
+```text
+obsolete model
 ```
 
 ---
 
-# 48. Estado de `convertedToSale`
+# 51. convertedToSale — CURRENT transitional field
 
-A partir de ADR-011:
+El schema actual utiliza:
 
 ```text
 convertedToSale
 ```
 
-debe considerarse:
+para representar que una Quote ya pasó por el workflow actual de conversión.
 
-**LEGACY**
+Debe considerarse:
 
-No debe convertirse en fundamento para nuevas funcionalidades.
+```text
+CURRENT V1 conversion marker
+```
+
+y al mismo tiempo:
+
+```text
+future replacement candidate
+```
+
+cuando exista una relación comercial explícita basada en SalesOrder/Delivery.
 
 ---
 
-# 49. Por qué queda legacy
+# 52. convertedToSale no es destino arquitectónico final
 
-El campo representa una arquitectura que mezclaba:
+Aunque el campo siga siendo CURRENT, un booleano por sí solo no resuelve de forma
+ideal preguntas como:
 
 ```text
-conversión comercial
-+
-venta
-+
-salida física
+¿Qué Sale produjo esta Quote?
+
+¿Qué Quote originó esta Sale?
 ```
 
-en un mismo flujo.
+Por tanto, existe una deuda de identidad histórica entre ambos documentos.
 
-La arquitectura nueva separa:
+---
+
+# 53. Conversión elegible
+
+La conversión CURRENT acepta una Quote que cumpla las reglas vigentes, incluyendo:
+
+```text
+Quote exists
+
+Quote belongs to Company
+
+Quote is CONFIRMED
+
+Quote has not already been converted
+
+Customer is valid
+
+Products satisfy current Sales rules
+```
+
+La implementación de Sales continúa siendo la fuente canónica de las restricciones
+de fulfillment.
+
+---
+
+# 54. Conversión no equivale a Quote approval
+
+Debe distinguirse:
+
+```text
+Approve Quote
+→ Quote CONFIRMED
+→ no Inventory mutation
+```
+
+de:
+
+```text
+Convert Quote
+→ creates Sale CONFIRMED
+→ inventory consequence through Sales
+```
+
+Son dos acciones diferentes.
+
+---
+
+# 55. Inventory effect during CURRENT conversion
+
+La conversión vigente produce:
+
+```text
+Quote CONFIRMED
+↓
+Sale CONFIRMED
+↓
+Product.stock decrement
+↓
+InventoryMovement OUT
+```
+
+dentro del workflow correspondiente.
+
+Esto no significa que Quote sea propietario de Inventory.
+
+Debe interpretarse como:
+
+```text
+Quote conversion
+→ delegates commercial fulfillment to Sales
+```
+
+y:
+
+```text
+Sales
+→ owns Inventory OUT consequence
+```
+
+---
+
+# 56. Conversion atomicity
+
+La conversión es una operación crítica.
+
+No debe producir un estado como:
+
+```text
+Sale created
+✓
+
+Inventory mutation
+✗
+```
+
+ni:
+
+```text
+Inventory OUT
+✓
+
+Sale missing
+✗
+```
+
+La implementación debe conservar consistencia transaccional.
+
+---
+
+# 57. Conversion is physically significant CURRENT
+
+Actualmente la acción:
+
+```text
+Convert to Sale
+```
+
+no es simplemente una navegación o creación administrativa.
+
+Produce una:
+
+```text
+Sale CONFIRMED
+```
+
+con efecto físico sobre Inventory.
+
+Por tanto, la UX debe tratarla como una operación significativa.
+
+---
+
+# 58. No confirmed Sale reversal CURRENT
+
+Una Sale confirmada no posee actualmente un workflow genérico de reversión.
+
+Por tanto, una conversión Quote → Sale debe ejecutarse con intención clara.
+
+La corrección/reversión de una Sale confirmada permanece fuera del flujo normal
+actual.
+
+---
+
+# 59. Duplicate conversion protection
+
+Una Quote ya convertida no puede convertirse normalmente una segunda vez.
+
+Debe mantenerse:
+
+```text
+converted Quote
+↓
+second conversion attempt
+→ rejected
+```
+
+Esto protege contra múltiples Sales para la misma Quote mediante el workflow
+normal.
+
+---
+
+# 60. Conversion idempotency distinction
+
+Debe distinguirse:
+
+```text
+duplicate conversion prevention
+✅
+```
+
+de:
+
+```text
+formal idempotent replay contract
+```
+
+Un contrato idempotente completo implicaría que un retry pudiera identificar y
+devolver de forma determinista la misma operación resultante.
+
+Ese contrato no debe afirmarse como implementado sin una garantía explícita.
+
+---
+
+# 61. Quote remains after conversion
+
+Convertir una Quote no elimina el documento original.
+
+Debe mantenerse:
+
+```text
+Quote
+→ remains persisted
+```
+
+```text
+QuoteItems
+→ remain persisted
+```
+
+```text
+Quote commercial values
+→ remain historical
+```
+
+---
+
+# 62. Current conversion handoff
+
+Después de una conversión exitosa, frontend conserva actualmente:
+
+```text
+Sale.id
+
+Sale.folio
+```
+
+devueltos por la operación.
+
+Esto permite mostrar:
+
+```text
+Ver venta
+```
+
+y navegar a:
+
+```text
+/sales?saleId=<id>
+```
+
+Estado:
+
+```text
+same-session Quote → Sale handoff
+✅ IMPLEMENTED / VALIDATED
+```
+
+---
+
+# 63. Historical Quote → Sale identity debt
+
+Actualmente:
+
+```text
+GET /quotes
+```
+
+expone:
+
+```text
+convertedToSale
+```
+
+pero no proporciona de forma suficiente:
+
+```text
+related Sale.id
+
+related Sale.folio
+```
+
+para reconstruir posteriormente la navegación.
+
+Por tanto:
+
+```text
+Quote converted in previous session
+→ conversion known
+→ resulting Sale identity unavailable from Quote response
+```
+
+Estado:
+
+```text
+historical Quote → Sale identity
+→ TECHNICAL DEBT
+```
+
+---
+
+# 64. Future explicit conversion relationship
+
+La arquitectura futura deberá permitir responder directamente:
+
+```text
+Which commercial document resulted from this Quote?
+```
+
+sin depender únicamente de:
+
+```text
+convertedToSale Boolean
+```
+
+La estructura técnica exacta se definirá durante la futura evolución comercial.
+
+---
+
+# 65. TARGET commercial architecture
+
+La arquitectura aprobada a largo plazo es:
 
 ```text
 Quote
@@ -836,625 +1555,588 @@ SalesOrder
 ↓
 Delivery
 ↓
+Inventory OUT
+```
+
+En este modelo:
+
+```text
+Quote
+→ proposal
+```
+
+```text
+SalesOrder
+→ commercial commitment
+```
+
+```text
+Delivery
+→ physical fulfillment
+```
+
+```text
 Inventory
+→ physical consequence
 ```
 
 ---
 
-# 50. No eliminar el campo todavía
+# 66. TARGET conversion
 
-Este documento **no ordena eliminar `convertedToSale` del schema ahora**.
-
-Primero debe revisarse:
-
-* código backend;
-* frontend;
-* tests;
-* datos existentes;
-* relaciones con Sale;
-* migración hacia SalesOrder.
-
----
-
-# 51. Migración comercial
-
-La secuencia correcta es:
-
-```text
-Documentar modelo objetivo
-↓
-Auditar Sale actual
-↓
-Diseñar SalesOrder
-↓
-Diseñar Delivery
-↓
-Diseñar migración
-↓
-Implementar
-↓
-Migrar consumidores
-↓
-Retirar legacy
-```
-
-No debemos romper el flujo existente simplemente cambiando un campo.
-
----
-
-# 52. Conversión histórica
-
-El comportamiento implementado actualmente puede permitir:
+La futura conversión será conceptualmente:
 
 ```text
 Quote CONFIRMED
-↓
-Convert to Sale
-```
-
-y generar un `Sale` confirmado.
-
-Ese comportamiento constituye compatibilidad legacy mientras se implementa ADR-011.
-
----
-
-# 53. Arquitectura objetivo de conversión
-
-El destino aprobado es:
-
-```text
-Quote CONFIRMED
-↓
-Convert
 ↓
 SalesOrder
 ```
 
+sin Inventory OUT inmediato.
+
 ---
 
-# 54. Conversión objetivo no mueve inventario
+# 67. TARGET inventory boundary
 
-Debe cumplirse:
+Debe mantenerse en la arquitectura futura:
 
 ```text
-Quote
-→ SalesOrder
+Quote → SalesOrder
 → no Inventory OUT
-```
-
-La salida definitiva ocurre posteriormente:
-
-```text
-Delivery CONFIRMED
-↓
-Inventory OUT
-```
-
----
-
-# 55. Idempotencia de conversión
-
-Una misma Quote no debe crear múltiples operaciones comerciales por doble click, retry o request repetido.
-
-Conceptualmente:
-
-```text
-Quote Q-001
-↓ convert
-SalesOrder SO-001
-```
-
-un segundo intento debe detectar que la conversión ya ocurrió.
-
----
-
-# 56. Relación explícita
-
-La arquitectura futura debe poder responder:
-
-```text
-¿De qué Quote nació este SalesOrder?
 ```
 
 y:
 
 ```text
-¿Qué SalesOrder generó esta Quote?
-```
-
-sin depender únicamente de un booleano.
-
----
-
-# 57. No diseñar la FK todavía
-
-La relación futura puede resolverse mediante:
-
-* `sourceQuoteId`;
-* relación Quote ↔ SalesOrder;
-* registro de conversión;
-
-u otra estructura coherente.
-
-El modelo técnico se decidirá durante el refactor de Sales.
-
-No se modifica Prisma desde este documento.
-
----
-
-# 58. Conversion no significa eliminación
-
-Después de convertir una Quote, la Quote original debe permanecer como documento histórico.
-
-No debe:
-
-* borrarse;
-* convertirse físicamente en otra fila;
-* perder sus items.
-
----
-
-# 59. Snapshot al convertir
-
-Cuando una Quote origina un SalesOrder, deben transferirse los datos comerciales necesarios.
-
-Conceptualmente:
-
-```text
-Quote
-├── Customer
-├── Items
-├── Quantities
-├── Prices
-└── Totals
-       ↓
-SalesOrder
-```
-
----
-
-# 60. Independencia posterior
-
-Después de la conversión debe definirse claramente qué cambios posteriores son independientes.
-
-Por ejemplo, si una futura SalesOrder cambia mediante un proceso autorizado, no debe reescribir la Quote histórica que la originó.
-
----
-
-# 61. Quote convertida y Customer
-
-La operación convertida debe conservar correctamente la contraparte comercial.
-
-Backend debe validar tenant y consistencia durante la conversión.
-
----
-
-# 62. Conversión transaccional
-
-La creación de la operación comercial resultante debe mantener consistencia.
-
-No debe ocurrir:
-
-```text
-SalesOrder created
-✓
-
-Quote conversion relationship
-✗
-```
-
-o viceversa.
-
----
-
-# 63. Conversión legacy con inventario
-
-La implementación histórica:
-
-```text
-Quote
-↓
-Sale
+Delivery confirmed
 ↓
 Inventory OUT
 ```
 
-puede seguir existiendo temporalmente.
-
-Pero no debe utilizarse como arquitectura para nuevas funciones.
+Esto sustituirá progresivamente la frontera física actualmente concentrada en
+Sale.
 
 ---
 
-# 64. PDF
+# 68. CURRENT vs TARGET
 
-Una Quote puede necesitar representación documental para entregarse al Customer.
-
-Conceptualmente el PDF puede incluir:
+Debe mantenerse explícitamente:
 
 ```text
-Company
+CURRENT
+
+Quote
+↓
+Sale CONFIRMED
+↓
+Inventory OUT
+```
+
+frente a:
+
+```text
+TARGET
+
+Quote
+↓
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+No debe documentarse TARGET como si ya estuviera implementado.
+
+---
+
+# 69. Direct Sale CURRENT
+
+El ERP Core actual también permite Sales que no provienen necesariamente de una
+Quote.
+
+Conceptualmente:
+
+```text
 Customer
-Folio
-Fecha
-Products
-Quantities
-Prices
-Subtotal
-Taxes
-Total
-Status
+↓
+Sale
+```
+
+Por tanto:
+
+```text
+Quote
+→ optional commercial predecessor
+```
+
+No toda Sale necesita provenir de Quote.
+
+---
+
+# 70. Quote PDF — CURRENT
+
+Actualmente existe:
+
+```text
+GET /quotes/:id/pdf
+```
+
+Por tanto:
+
+```text
+Quote PDF
+→ IMPLEMENTED
 ```
 
 ---
 
-# 65. Estado de PDF
+# 71. Quote PDF semantics
 
-La capacidad concreta de PDF debe verificarse contra el código vigente durante la auditoría final.
+El PDF representa:
 
-Este documento define su lugar funcional, pero no debe utilizarse para afirmar que un endpoint específico existe si la implementación actual no lo confirma.
+```text
+commercial proposal
+```
 
----
+Puede contener información como:
 
-# 66. Quote document
+```text
+Company
 
-El PDF representa la propuesta comercial.
+Customer
+
+folio
+
+date
+
+Products
+
+quantities
+
+prices
+
+subtotal
+
+IVA
+
+total
+
+status
+```
 
 No representa:
 
-* Delivery;
-* Invoice;
-* Receipt;
-* Inventory document.
+```text
+Inventory document
+
+Delivery
+
+Invoice
+
+Receipt
+```
 
 ---
 
-# 67. Vigencia
+# 72. Validity — FUTURE
 
-Una cotización comercial normalmente puede necesitar fecha de vigencia.
-
-El modelo actual revisado no contiene un campo estructurado de vigencia.
-
-Por tanto, no debe documentarse como funcionalidad implementada.
-
----
-
-# 68. Vigencia futura
-
-Puede evolucionarse hacia un campo como concepto:
+El modelo actual no formaliza un campo estructurado de vigencia como:
 
 ```text
 validUntil
 ```
 
-cuando el proceso comercial lo requiera.
+Por tanto:
 
-Su nombre y tipo deberán definirse durante diseño.
+```text
+Quote expiration / validity
+→ FUTURE
+```
 
----
-
-# 69. Notas y términos
-
-Quotes puede necesitar posteriormente:
-
-* notas;
-* condiciones;
-* términos comerciales;
-* tiempo de entrega;
-* condiciones de pago.
-
-Estos campos deben añadirse cuando existan necesidades reales.
-
-No deben almacenarse indiscriminadamente en campos genéricos sin estructura.
+No debe documentarse como comportamiento CURRENT.
 
 ---
 
-# 70. Sales representative
+# 73. Terms — FUTURE
 
-Una Quote puede necesitar saber qué vendedor la gestiona.
+Una futura Quote puede necesitar campos estructurados para:
 
-El modelo actual revisado no formaliza todavía esa relación.
+```text
+terms
 
-Debe diseñarse junto con:
+conditions
 
-* ownership comercial;
-* RBAC;
-* Sales;
-* reporting.
+delivery estimate
+
+payment conditions
+
+commercial notes
+```
+
+Deben agregarse cuando exista necesidad funcional real.
 
 ---
 
-# 71. Quote 360
+# 74. Sales representative — FUTURE
 
-La arquitectura objetivo contempla una vista contextual:
+Quote puede requerir posteriormente una relación formal con:
+
+```text
+Sales Representative
+```
+
+para:
+
+```text
+ownership
+
+reporting
+
+permissions
+
+commission logic
+```
+
+Actualmente no debe asumirse esa relación si no está modelada.
+
+---
+
+# 75. Quote versions — FUTURE
+
+Una futura estrategia puede introducir:
+
+```text
+revision
+
+version
+
+duplicate-and-revise
+```
+
+para modificar propuestas sin reescribir una Quote confirmada.
+
+No forma parte de Quotes V1.
+
+---
+
+# 76. Advanced Quote lifecycle — FUTURE
+
+Capacidades futuras pueden incorporar estados o eventos como:
+
+```text
+Sent
+
+Viewed
+
+Accepted
+
+Rejected
+
+Expired
+```
+
+Actualmente el lifecycle sigue siendo:
+
+```text
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+```
+
+No deben agregarse estados anticipadamente.
+
+---
+
+# 77. Quote 360 — FUTURE UX
+
+Una futura experiencia:
 
 ```text
 Quote 360
 ```
 
----
-
-# 72. Objetivo de Quote 360
-
-Debe responder:
+puede reunir:
 
 ```text
-¿A quién cotizamos?
-¿Qué ofrecimos?
-¿A qué precio?
-¿En qué estado está?
-¿Se convirtió?
-¿Qué operación resultó?
-¿Qué puedo hacer ahora?
-```
+Summary
 
----
-
-# 73. Vista conceptual
-
-Puede incluir progresivamente:
-
-```text
-Resumen
-Productos
 Customer
-Totales
-Actividad
-Documentos
-Operación resultante
-Historial
+
+Products
+
+Totals
+
+Documents
+
+Conversion
+
+Activity
+
+History
 ```
+
+No es requisito para cerrar Quotes V1.
 
 ---
 
-# 74. Acción principal por estado
+# 78. Contextual CTA CURRENT
+
+Las acciones CURRENT deben reflejar el flujo vigente.
 
 Conceptualmente:
 
 ```text
 DRAFT
-→ Editar / Confirmar
+→ Approve / Cancel according to current rules
 ```
 
 ```text
 CONFIRMED
-→ Convertir a SalesOrder
+→ Convert to Sale when eligible
 ```
 
 ```text
-CONVERTED
-→ Abrir SalesOrder
+Converted
+→ View Sale when identity is available
 ```
 
 ```text
 CANCELLED
-→ Ver historial
+→ Historical view
 ```
 
-`CONVERTED` en este ejemplo representa una condición UX, no un nuevo `DocumentStatus` aprobado.
+`Converted` representa una condición derivada y no un nuevo `DocumentStatus`.
 
 ---
 
-# 75. No agregar `CONVERTED` al enum todavía
+# 79. No CONVERTED enum
 
-No debe modificarse:
+No debe agregarse automáticamente:
 
 ```text
-DocumentStatus
+CONVERTED
 ```
 
-únicamente para reflejar este documento.
+a `DocumentStatus`.
 
-La conversión puede representarse mediante una relación o condición derivada.
+Actualmente la condición de conversión se representa mediante el estado de
+conversión vigente.
 
 ---
 
-# 76. Listado
+# 80. Quote list CURRENT
 
-La tabla principal puede priorizar:
-
-```text
-Folio
-Customer
-Fecha
-Total
-Estado
-Conversión
-Acciones
-```
-
-según la experiencia implementada.
-
----
-
-# 77. Filtros
-
-Filtros útiles pueden incluir:
-
-```text
-Status
-Customer
-Date
-Search
-```
-
-y posteriormente:
-
-```text
-Converted / Not Converted
-Sales representative
-Validity
-```
-
-cuando existan esos conceptos.
-
----
-
-# 78. Search
-
-La búsqueda debe permitir localizar Quotes mediante información empresarial reconocible.
-
-Especialmente:
+`/quotes` implementa una experiencia de listado con información como:
 
 ```text
 folio
-customer name
-```
 
-y otros campos cuando el API lo soporte.
-
----
-
-# 79. Empty State
-
-Ejemplo:
-
-```text
-Todavía no hay cotizaciones.
-
-Crea una propuesta comercial para comenzar
-a trabajar con tus clientes.
-
-[Nueva cotización]
-```
-
----
-
-# 80. Customer 360
-
-Desde Customer 360 podrán mostrarse sus Quotes.
-
-Ejemplo:
-
-```text
-Customer ABC
-
-Cotizaciones
-COT-001   $10,000   Confirmada
-COT-002   $25,000   Borrador
-```
-
-Customers no se convierte por ello en propietario de Quotes.
-
----
-
-# 81. Dashboard
-
-Dashboard puede utilizar información de Quotes para mostrar:
-
-```text
-Quotes abiertas
-Quotes recientes
-Quotes pendientes de seguimiento
-```
-
-cuando exista una semántica suficientemente definida.
-
----
-
-# 82. Quote acceptance futura
-
-Un proceso comercial más avanzado puede distinguir:
-
-```text
-Created
-Sent
-Viewed
-Accepted
-Rejected
-Expired
-```
-
-Pero el modelo actual no posee ese lifecycle.
-
-No debemos agregar esos estados anticipadamente.
-
----
-
-# 83. CRM futuro
-
-Cuando Zaping incorpore un CRM más completo, Quote puede relacionarse con:
-
-```text
-Opportunity
-↓
-Quote
-↓
-SalesOrder
-```
-
-Esto no modifica el Core actual.
-
----
-
-# 84. Healthcare
-
-Healthcare puede generar una necesidad comercial mediante:
-
-```text
-Opportunity
-Case
-Doctor request
-Reconciliation
-```
-
-y posteriormente relacionarse con Quote cuando corresponda.
-
-No todos los Cases requieren Quote.
-
----
-
-# 85. Quote no requiere Case
-
-ERP Core debe permitir:
-
-```text
 Customer
-↓
-Quote
+
+date
+
+total
+
+status
+
+conversion state
+
+actions
 ```
 
-sin:
-
-* Hospital;
-* Doctor;
-* Case;
-* Technician.
+según el frontend vigente.
 
 ---
 
-# 86. Reconciliation Healthcare
+# 81. Search CURRENT
 
-Una conciliación puede generar la necesidad de comercializar material consumido.
-
-Dependiendo del workflow puede producir:
+La búsqueda client-side soporta actualmente campos como:
 
 ```text
-Sales draft
+folio
+
+Customer name
+
+Customer email
+
+SKU
+
+Product name
 ```
 
-o utilizar una operación comercial previamente acordada.
-
-No debe crearse una Quote retrospectiva artificial únicamente para completar una cadena.
+sobre las relaciones cargadas.
 
 ---
 
-# 87. Multi-tenancy
+# 82. Status filter CURRENT
+
+El workspace soporta actualmente:
+
+```text
+status filter
+```
+
+combinado con búsqueda local.
+
+---
+
+# 83. Server-side filtering debt
+
+Actualmente búsqueda y filtros funcionan sobre los datos cargados.
+
+Por tanto:
+
+```text
+server-side search
+→ NOT IMPLEMENTED
+```
+
+```text
+server-side filtering
+→ NOT IMPLEMENTED
+```
+
+```text
+server-side pagination
+→ NOT IMPLEMENTED
+```
+
+según la arquitectura actual documentada.
+
+---
+
+# 84. Quote detail CURRENT
+
+La experiencia puede abrir el detalle de una Quote seleccionada desde el listado
+cargado.
+
+Actualmente no existe:
+
+```text
+GET /quotes/:id
+```
+
+como endpoint dedicado documentado.
+
+---
+
+# 85. Quote detail debt
+
+El detalle basado en:
+
+```text
+GET /quotes
+```
+
+funciona mientras la Quote esté contenida en el dataset cargado.
+
+Con futura paginación server-side deberá implementarse:
+
+```text
+GET /quotes/:id
+```
+
+o una estrategia equivalente.
+
+Estado:
+
+```text
+dedicated Quote detail strategy
+→ TECHNICAL DEBT
+```
+
+---
+
+# 86. API CURRENT
+
+Endpoints vigentes:
+
+```text
+POST  /quotes
+
+GET   /quotes
+
+PATCH /quotes/:id/approve
+
+PATCH /quotes/:id/cancel
+
+GET   /quotes/:id/pdf
+
+POST  /sales/from-quote/:quoteId
+```
+
+Este documento no agrega endpoints inexistentes únicamente por consistencia
+estética.
+
+---
+
+# 87. API not CURRENT
+
+No deben documentarse como implementados actualmente:
+
+```text
+GET /quotes/:id
+```
+
+```text
+PATCH /quotes/:id
+```
+
+```text
+POST /quotes/:id/confirm
+```
+
+```text
+POST /quotes/:id/convert
+```
+
+salvo que la implementación cambie posteriormente.
+
+---
+
+# 88. Conversion response
+
+La conversión CURRENT devuelve suficiente identidad de la Sale creada para que
+frontend pueda conservar:
+
+```text
+Sale.id
+
+Sale.folio
+```
+
+durante el handoff inmediato.
+
+El contrato exacto pertenece al backend vigente.
+
+---
+
+# 89. Multi-tenancy
 
 Toda Quote pertenece a una Company.
 
-Debe validarse:
+Debe mantenerse:
 
 ```text
 Quote.companyId
-Customer.companyId
-Product company
 ```
 
-dentro del mismo tenant.
+alineado con:
+
+```text
+Customer.companyId
+
+Product.companyId
+```
+
+según las relaciones utilizadas.
 
 ---
 
-# 88. Cross-tenant Customer
+# 90. Cross-tenant Customer
 
 Debe rechazarse:
 
@@ -1464,11 +2146,11 @@ Company A Quote
 Customer Company B
 ```
 
-aunque el UUID del Customer exista.
+aunque el UUID exista.
 
 ---
 
-# 89. Cross-tenant Product
+# 91. Cross-tenant Product
 
 También debe rechazarse:
 
@@ -1480,450 +2162,71 @@ Product Company B
 
 ---
 
-# 90. Authorization
+# 92. Authorization
 
-El módulo debe aplicar:
+Quotes utiliza la arquitectura transversal de:
 
 ```text
 Authentication
-+
+
 Authorization
-+
+
 Tenant Isolation
-+
+
 Validation
 ```
 
+Los endpoints críticos deben continuar incluidos en la revisión transversal de
+autorización antes de producción.
+
 ---
 
-# 91. RBAC
+# 93. Permission granularity — TARGET
 
-Permisos conceptuales pueden evolucionar hacia:
+Una futura arquitectura RBAC puede incluir conceptos como:
 
 ```text
 quotes.read
+
 quotes.create
-quotes.update
-quotes.confirm
+
+quotes.approve
+
 quotes.cancel
+
 quotes.convert
+
 quotes.price.override
 ```
 
-No todos están implementados actualmente.
+No deben considerarse permisos granulares completamente implementados únicamente
+por estar documentados aquí.
 
 ---
 
-# 92. Price override
+# 94. Audit — TARGET
 
-Modificar el precio comercial puede convertirse en una capacidad sensible.
-
-Una empresa puede posteriormente requerir:
-
-```text
-Salesperson
-→ puede cotizar
-
-Manager
-→ puede autorizar descuento mayor
-```
-
-Ese workflow deberá diseñarse cuando exista necesidad.
-
----
-
-# 93. Auditoría
-
-Acciones relevantes pueden incluir:
+Una futura plataforma transversal de Audit puede registrar eventos como:
 
 ```text
 Quote created
-Quote updated
-Quote confirmed
+
+Quote approved
+
 Quote cancelled
+
 Quote converted
 ```
 
----
-
-# 94. Historial
-
-Una Quote importante debería permitir comprender:
-
-```text
-quién la creó
-cuándo
-quién la modificó
-cuándo se confirmó
-si fue convertida
-qué operación resultó
-```
-
-cuando la infraestructura de auditoría lo soporte.
+Actualmente no existe un Audit transversal completo.
 
 ---
 
-# 95. API actual
+# 95. Healthcare boundary
 
-Los endpoints exactos deben verificarse contra la implementación vigente.
+Quotes pertenece a ERP Core.
 
-Conceptualmente el módulo necesita capacidades equivalentes a:
-
-```text
-GET    /quotes
-GET    /quotes/:id
-POST   /quotes
-PATCH  /quotes/:id
-```
-
-y acciones de lifecycle correspondientes.
-
----
-
-# 96. API de confirmación
-
-Una dirección explícita puede utilizar:
-
-```text
-POST /quotes/:id/confirm
-```
-
-si se alinea con el lifecycle implementado.
-
-No debe hacerse un refactor únicamente por estética de URL.
-
----
-
-# 97. API de conversión objetivo
-
-Conceptualmente:
-
-```text
-POST /quotes/:id/convert
-```
-
-puede producir un SalesOrder.
-
-El contrato exacto se definirá con Sales.
-
----
-
-# 98. Respuesta de conversión
-
-Una conversión exitosa debe permitir al frontend identificar claramente la operación resultante.
-
-Ejemplo conceptual:
-
-```json
-{
-  "quoteId": "...",
-  "salesOrderId": "..."
-}
-```
-
-El contrato definitivo se documentará mediante API/OpenAPI.
-
----
-
-# 99. Validaciones de conversión
-
-Antes de convertir deben comprobarse al menos:
-
-```text
-Quote exists
-Quote belongs to Company
-Quote is in convertible state
-Quote has valid items
-Customer is consistent
-Products are valid
-Quote was not already converted
-User is authorized
-```
-
----
-
-# 100. Inventario durante conversión objetivo
-
-No debe ejecutarse:
-
-```text
-Product.stock -= quantity
-```
-
-durante:
-
-```text
-Quote → SalesOrder
-```
-
----
-
-# 101. Validación de stock en Quote
-
-Puede utilizarse para dar contexto comercial.
-
-Pero la validación definitiva pertenece a Delivery.
-
-Ejemplo:
-
-```text
-Quote today
-stock = 20
-```
-
-no garantiza:
-
-```text
-Delivery next week
-stock = 20
-```
-
----
-
-# 102. Integración con Sales
-
-La frontera oficial es:
-
-```text
-Quotes
-→ proposal
-
-Sales
-→ commercial commitment
-
-Delivery
-→ fulfillment
-```
-
----
-
-# 103. Integración con Inventory
-
-Quotes puede consultar Inventory.
-
-No debe modificarlo.
-
-```text
-Quotes
-→ READ Inventory context
-```
-
-no:
-
-```text
-Quotes
-→ WRITE stock
-```
-
----
-
-# 104. Integración con Billing
-
-Invoice puede utilizar información derivada de SalesOrder y de la responsabilidad fiscal correspondiente.
-
-Quote no debe producir factura automáticamente.
-
----
-
-# 105. Importación
-
-La importación masiva de Quotes no forma parte de las primeras prioridades del módulo Data Import.
-
-Si posteriormente se requiere migrar historia comercial, deberá distinguirse entre:
-
-```text
-Historical Quote
-```
-
-y:
-
-```text
-Operational Quote
-```
-
-para evitar activar workflows de conversión accidentalmente.
-
----
-
-# 106. Estado CURRENT
-
-Confirmado por el modelo y documentación histórica:
-
-```text
-Quote
-QuoteItem
-Customer relation
-Product relation
-folio
-subtotal
-iva
-total
-DRAFT
-CONFIRMED
-CANCELLED
-convertedToSale legacy flag
-commercial conversion legacy flow
-multi-tenant ownership
-```
-
-Las capacidades exactas de frontend, PDF y endpoints deben verificarse contra el código vigente cuando hagamos la auditoría final.
-
----
-
-# 107. Estado TARGET
-
-Arquitectura aprobada:
-
-```text
-Quote never changes stock
-Quote → SalesOrder
-Explicit conversion relationship
-Conversion idempotency
-Quote 360
-Improved lifecycle UX
-Audit
-Granular permissions
-OpenAPI
-```
-
----
-
-# 108. Estado FUTURE
-
-Posibilidades posteriores:
-
-```text
-Validity / expiration
-Quote versions
-Sent status
-Accepted / rejected
-Customer signatures
-Sales representative
-Discount approvals
-Price lists
-Multiple currencies
-Terms and conditions
-Opportunity integration
-Electronic acceptance
-Customer Portal
-Quote analytics
-AI conversion probability
-```
-
-No representan alcance inmediato.
-
----
-
-# 109. Invariantes
-
-```text
-Quote
-→ belongs to one Company
-```
-
-```text
-Quote Customer
-→ same Company
-```
-
-```text
-Quote Products
-→ same Company
-```
-
-```text
-Quote DRAFT
-→ editable according to permissions
-```
-
-```text
-Quote CONFIRMED
-→ historical commercial values protected
-```
-
-```text
-Quote
-→ never Inventory IN
-```
-
-```text
-Quote
-→ never Inventory OUT
-```
-
-```text
-Quote conversion target
-→ SalesOrder
-```
-
-```text
-Quote → SalesOrder
-→ no inventory movement
-```
-
-```text
-convertedToSale
-→ legacy
-```
-
----
-
-# 110. Anti-patrones
-
-## Inventory on Quote
-
-```text
-Confirm Quote
-→ stock -= quantity
-```
-
-Incorrecto.
-
----
-
-## Quote = Sale
-
-Tratar la propuesta y el compromiso comercial como la misma entidad.
-
----
-
-## Quote = Delivery
-
-Asumir que una cotización confirmada significa que el producto fue entregado.
-
----
-
-## Quote = Invoice
-
-Utilizar Quote como documento fiscal.
-
----
-
-## Current Product Price as Historical Price
-
-Recalcular una Quote histórica utilizando el precio actual de Product.
-
----
-
-## Boolean as Permanent Conversion Model
-
-Mantener `convertedToSale` para siempre como única relación entre documentos comerciales.
-
----
-
-## Cross-Tenant Quote
-
-Utilizar Customer o Product de otra Company.
-
----
-
-## Rewrite Confirmed Quote
-
-Modificar silenciosamente una propuesta confirmada para evitar crear una revisión o nuevo documento.
-
----
-
-# 111. Relación con Customers
+Debe ser posible:
 
 ```text
 Customer
@@ -1931,11 +2234,676 @@ Customer
 Quote
 ```
 
-Customer identifica a quién se realiza la propuesta.
+sin requerir:
+
+```text
+Hospital
+
+Doctor
+
+Case
+
+Technician
+```
 
 ---
 
-# 112. Relación con Products
+# 96. Healthcare TARGET
+
+Futuros workflows Healthcare podrán:
+
+```text
+originate commercial demand
+
+reference a Quote
+
+reference a Sale / future SalesOrder
+```
+
+cuando corresponda.
+
+Healthcare no debe convertirse en requisito del módulo Quotes.
+
+---
+
+# 97. Opportunity — FUTURE
+
+Un futuro CRM puede incorporar:
+
+```text
+Opportunity
+↓
+Quote
+```
+
+o integrarse con Healthcare.
+
+Actualmente:
+
+```text
+Opportunity
+→ NOT IMPLEMENTED
+```
+
+No forma parte del ERP Core V1.
+
+---
+
+# 98. Quote does not require Case
+
+Debe mantenerse:
+
+```text
+Quote
+→ independent ERP Core document
+```
+
+No:
+
+```text
+Quote
+→ requires Healthcare Case
+```
+
+---
+
+# 99. Billing boundary
+
+Quote no produce automáticamente:
+
+```text
+Invoice
+
+Payment
+
+Accounts Receivable
+```
+
+Billing podrá utilizar información comercial posteriormente.
+
+La Quote continúa siendo una propuesta.
+
+---
+
+# 100. Dashboard
+
+Dashboard puede consumir información de Quotes para mostrar contexto como:
+
+```text
+recent Quotes
+
+Quote totals
+
+commercial activity
+```
+
+cuando exista semántica suficiente.
+
+Dashboard no es propietario del lifecycle.
+
+---
+
+# 101. Import — FUTURE
+
+La importación masiva de Quotes no es una prioridad inicial de Data Import.
+
+Si se implementa deberá distinguir:
+
+```text
+historical Quote
+```
+
+de:
+
+```text
+operational Quote
+```
+
+para evitar activar conversiones accidentalmente durante una migración.
+
+---
+
+# 102. IMPLEMENTED — Quotes
+
+Actualmente:
+
+```text
+Quote persistence
+
+QuoteItem persistence
+
+Quote creation
+
+Quote list
+
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+
+Quote approval
+
+Quote cancellation
+
+Quote PDF
+
+Customer relationship
+
+Product relationship
+
+Customer active validation
+
+Product active validation
+
+client-side search
+
+status filter
+
+detail from loaded list
+```
+
+---
+
+# 103. IMPLEMENTED — conversion
+
+Actualmente:
+
+```text
+CONFIRMED Quote → Sale
+
+convertedToSale marker
+
+duplicate conversion rejection
+
+Sale CONFIRMED creation
+
+Inventory OUT through Sales
+
+Sale identity returned to frontend
+
+Ver venta handoff
+
+/sales?saleId=<id>
+```
+
+---
+
+# 104. VALIDATED
+
+La validación registrada cubre según los hitos correspondientes:
+
+```text
+Quote creation
+
+Customer validation
+
+Product validation
+
+Quote approval
+
+Quote cancellation
+
+approval without Inventory mutation
+
+Quote PDF
+
+Quote list/search/filter UX
+
+Quote → Sale conversion
+
+converted Quote protection
+
+Sale handoff
+
+Sales deep-link
+```
+
+Los gates técnicos incluyen según el hito:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+```
+
+Los snapshots cuantitativos pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+```
+
+---
+
+# 105. TECHNICAL DEBT
+
+Permanece pendiente:
+
+```text
+historical Quote → Sale identity
+```
+
+```text
+historical converted Quote → direct Sale navigation
+```
+
+```text
+GET /quotes/:id
+or equivalent detail strategy
+```
+
+```text
+server-side pagination
+```
+
+```text
+server-side search/filtering
+```
+
+```text
+generic Quote DRAFT editing workflow if required
+```
+
+```text
+formal conversion idempotent replay if required
+```
+
+```text
+Audit integration
+```
+
+---
+
+# 106. TARGET
+
+La evolución comercial aprobada incluye:
+
+```text
+Quote
+↓
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+además de:
+
+```text
+explicit Quote → SalesOrder relationship
+
+better historical conversion identity
+
+Quote 360
+
+server-side pagination/search
+
+Audit integration
+
+granular permissions
+
+OpenAPI improvements
+```
+
+---
+
+# 107. FUTURE
+
+Capacidades posibles:
+
+```text
+Validity / expiration
+
+Quote versions
+
+Sent status
+
+Viewed status
+
+Accepted / rejected
+
+Customer signatures
+
+Sales representative
+
+Discount approvals
+
+Price Lists
+
+Multiple currencies
+
+Terms and conditions
+
+Opportunity integration
+
+Electronic acceptance
+
+Customer Portal
+
+Quote analytics
+
+AI conversion probability
+```
+
+No forman parte automáticamente del ERP Core V1.
+
+---
+
+# 108. Invariantes
+
+## Tenant
+
+```text
+Quote
+→ belongs to one Company
+```
+
+---
+
+## Customer
+
+```text
+New Quote
+→ active same-tenant Customer required
+```
+
+---
+
+## Product
+
+```text
+New Quote
+→ active same-tenant Product required
+```
+
+---
+
+## Lifecycle
+
+```text
+Quote
+→ DRAFT / CONFIRMED / CANCELLED
+```
+
+---
+
+## Approval
+
+```text
+Quote approval
+→ no Inventory mutation
+```
+
+---
+
+## Cancellation
+
+```text
+Quote cancellation
+→ no Inventory mutation
+```
+
+---
+
+## Quote Inventory ownership
+
+```text
+Quote lifecycle
+→ no InventoryMovement
+```
+
+---
+
+## CURRENT conversion
+
+```text
+Quote CONFIRMED
+↓
+Sale CONFIRMED
+↓
+Inventory OUT through Sales
+```
+
+---
+
+## Conversion uniqueness
+
+```text
+Quote already converted
+→ no second normal Sale conversion
+```
+
+---
+
+## Historical Quote
+
+```text
+Quote conversion
+→ does not delete Quote
+```
+
+---
+
+## Price
+
+```text
+Product.price changes
+≠
+historical QuoteItem.price changes
+```
+
+---
+
+## Reservation
+
+```text
+Quote
+→ no automatic stock reservation
+```
+
+---
+
+## CURRENT commercial model
+
+```text
+Quote
+↓
+Sale
+```
+
+---
+
+## TARGET commercial model
+
+```text
+Quote
+↓
+SalesOrder
+↓
+Delivery
+```
+
+---
+
+# 109. Anti-patrones
+
+## Inventory on approval
+
+Incorrecto:
+
+```text
+Approve Quote
+→ stock -= quantity
+```
+
+---
+
+## Quote = Sale
+
+Incorrecto:
+
+```text
+Quote
+=
+Sale
+```
+
+Son documentos con responsabilidades diferentes.
+
+---
+
+## Quote = Delivery
+
+Incorrecto:
+
+```text
+Quote CONFIRMED
+→ goods delivered
+```
+
+---
+
+## Quote = Invoice
+
+Incorrecto:
+
+```text
+Quote
+→ fiscal Invoice
+```
+
+---
+
+## Current Product price as historical price
+
+Incorrecto:
+
+```text
+historical Quote
+→ recalculated from current Product.price
+```
+
+---
+
+## convertedToSale as permanent architecture
+
+Incorrecto asumir que:
+
+```text
+convertedToSale Boolean
+```
+
+será para siempre la única relación documental.
+
+Sigue siendo CURRENT, pero es transicional.
+
+---
+
+## Sale marked as already obsolete
+
+Incorrecto documentar:
+
+```text
+Sale
+→ historical only
+```
+
+mientras continúa siendo el modelo comercial CURRENT.
+
+---
+
+## Target documented as Current
+
+Incorrecto:
+
+```text
+Quote
+→ SalesOrder
+→ Delivery
+```
+
+como si ya estuviera implementado.
+
+---
+
+## Cross-tenant Quote
+
+Incorrecto utilizar:
+
+```text
+Customer
+
+or Product
+```
+
+de otra Company.
+
+---
+
+## Frontend-only validation
+
+Incorrecto asumir que los selectores sustituyen:
+
+```text
+backend tenant validation
+
+backend active-state validation
+```
+
+---
+
+## Duplicate conversion
+
+Incorrecto:
+
+```text
+Quote
+→ Sale A
+
+same Quote
+→ Sale B
+```
+
+mediante el flujo normal.
+
+---
+
+# 110. Relación con Customers
+
+CURRENT:
+
+```text
+Customer
+↓
+Quote
+```
+
+Customers administra:
+
+```text
+commercial counterpart master data
+```
+
+Quotes administra:
+
+```text
+proposal
+```
+
+El Customer activo es obligatorio para nuevas Quotes.
+
+---
+
+# 111. Relación con Products
+
+CURRENT:
 
 ```text
 Product
@@ -1943,164 +2911,458 @@ Product
 QuoteItem
 ```
 
-Product identifica lo ofrecido.
+Product proporciona identidad de catálogo.
 
-QuoteItem conserva el precio y cantidad de la propuesta.
+QuoteItem conserva:
+
+```text
+quantity
+
+price
+```
+
+de la propuesta.
 
 ---
 
-# 113. Relación con Sales
+# 112. Relación con Sales
 
-Arquitectura objetivo:
+CURRENT:
+
+```text
+Quote CONFIRMED
+↓
+Sale CONFIRMED
+```
+
+cuando se ejecuta la conversión vigente.
+
+`SALES.md` es la fuente canónica para:
+
+```text
+Sale lifecycle
+
+Generic Sales eligibility
+
+Inventory OUT
+
+Sales deep-link
+```
+
+---
+
+# 113. Relación con Inventory
+
+Debe mantenerse:
+
+```text
+Quote lifecycle
+→ may READ Inventory context
+→ does not WRITE Inventory
+```
+
+pero:
+
+```text
+Quote → Sale conversion
+→ invokes CURRENT Sales workflow
+→ Sales produces Inventory OUT
+```
+
+---
+
+# 114. Relación con SalesOrder / Delivery
+
+TARGET:
 
 ```text
 Quote
 ↓
 SalesOrder
-```
-
-La conversión representa que una propuesta genera compromiso comercial.
-
----
-
-# 114. Relación con Inventory
-
-```text
-Quote
-→ puede consultar disponibilidad
-
-Quote
-→ no modifica disponibilidad física
-```
-
----
-
-# 115. Relación con Zaping Way
-
-La experiencia debe permitir que el usuario pase naturalmente de:
-
-```text
-Quote 360
 ↓
-[Convertir]
-↓
-SalesOrder 360
+Delivery
 ```
 
-sin reconstruir información manualmente.
+ADR-011 define la dirección arquitectónica futura.
+
+No significa que SalesOrder/Delivery ya hayan sustituido a Sale.
 
 ---
 
-# 116. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-010 — Quote → Sale — SUPERSEDED.
-* ADR-011 — SalesOrder y Delivery.
-* ADR-012 — Entity Lifecycle.
-
----
-
-# 117. Documentos relacionados
+# 115. ADR relacionados
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-ux/BUSINESS_COMPONENTS.md
-modules/erp/CUSTOMERS.md
-modules/erp/PRODUCTS.md
-modules/erp/INVENTORY.md
+ADR-001 — Multi-Tenant
+
+ADR-002 — Inventory Movements
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-010 — Quote → Sale — superseded as long-term architecture
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
 ```
 
-Futuro documento inmediato:
-
-```text
-modules/erp/SALES.md
-```
+ADR-010 puede estar superado como dirección arquitectónica futura, pero el flujo
+Quote → Sale continúa siendo CURRENT mientras no se complete la migración.
 
 ---
 
-# 118. Fuente de verdad
+# 116. Documentación relacionada
+
+```text
+docs/modules/erp/CUSTOMERS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/ux/BUSINESS_COMPONENTS.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+`SALES.md` es documentación CURRENT relacionada, no un documento futuro.
+
+---
+
+# 117. Fuente de verdad
 
 ```text
 QUOTES.md
-→ reglas funcionales de cotizaciones
+→ CURRENT Quote behavior
+→ Quote lifecycle
+→ Quote conversion entry point
+```
 
+```text
 SALES.md
-→ SalesOrder y Delivery
+→ CURRENT Sale behavior
+→ Generic Sales eligibility
+→ Inventory OUT consequence
+```
 
+```text
+CUSTOMERS.md
+→ Customer master-data lifecycle
+→ active Customer rules
+```
+
+```text
+PRODUCTS.md
+→ Product master-data lifecycle
+→ tracking configuration
+```
+
+```text
 INVENTORY.md
-→ existencias y movimientos
+→ stock and InventoryMovement semantics
+```
 
-schema.prisma
-→ modelo técnico vigente
-
-backend
-→ implementación CURRENT
-
-tests
-→ comportamiento validado
-
+```text
 ADR-011
-→ arquitectura comercial objetivo
+→ TARGET SalesOrder / Delivery architecture
+```
 
+```text
+schema.prisma
+→ CURRENT persistence
+```
+
+```text
+Quotes backend
+→ CURRENT API and business implementation
+```
+
+```text
+Quotes frontend
+→ CURRENT user experience
+```
+
+```text
+tests
+→ validated behavior
+```
+
+```text
 PROJECT_BOARD.md
-→ trabajo pendiente
+→ current status and technical debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 119. Regla de transición
+# 118. Estado consolidado
 
-Mientras exista el modelo legacy:
+Quotes CURRENT:
+
+```text
+Quote creation
+✅ IMPLEMENTED / VALIDATED
+
+Quote list
+✅ IMPLEMENTED / VALIDATED
+
+DRAFT
+✅
+
+CONFIRMED
+✅
+
+CANCELLED
+✅
+
+Quote approval
+✅ IMPLEMENTED / VALIDATED
+
+Quote cancellation
+✅ IMPLEMENTED / VALIDATED
+
+Quote PDF
+✅ IMPLEMENTED
+
+Customer active validation
+✅ IMPLEMENTED / VALIDATED
+
+Product active validation
+✅ IMPLEMENTED / VALIDATED
+
+client-side search
+✅
+
+status filter
+✅
+
+detail from loaded list
+✅
+```
+
+Conversion CURRENT:
+
+```text
+CONFIRMED Quote → Sale
+✅
+
+duplicate conversion prevention
+✅
+
+Sale CONFIRMED
+✅
+
+Inventory OUT through Sales
+✅
+
+Sale identity returned
+✅
+
+Ver venta
+✅
+
+/sales?saleId=<id>
+✅
+```
+
+Technical debt:
+
+```text
+historical Quote → Sale identity/navigation
+⏳
+
+dedicated Quote detail endpoint
+⏳
+
+server-side pagination
+⏳
+
+server-side search/filtering
+⏳
+
+generic DRAFT editing workflow
+⏳ if required
+
+formal conversion idempotent replay
+⏳ if required
+
+Audit integration
+⏳
+```
+
+Target:
 
 ```text
 Quote
-→ Sale
+↓
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
 ```
 
-debe diferenciarse claramente:
+Future:
 
 ```text
-CURRENT IMPLEMENTATION
+Quote versions
+
+Validity
+
+Sent / Viewed
+
+Accepted / Rejected
+
+Customer signatures
+
+Sales representative
+
+Discount approvals
+
+CRM Opportunity
+
+Customer Portal
+
+Advanced pricing
 ```
-
-de:
-
-```text
-TARGET ARCHITECTURE
-Quote
-→ SalesOrder
-→ Delivery
-```
-
-No debemos alterar la historia del proyecto ni fingir que el refactor ya ocurrió.
 
 ---
 
-# 120. Principio final
+# 119. Secuencia de proyecto
 
-Una cotización responde:
+Quotes V1 forma parte del ERP Core actual.
 
-> **¿Qué estamos proponiendo comercialmente al cliente?**
+La secuencia vigente es:
 
-No responde:
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
 
-> ¿Qué se entregó?
+Por tanto, la arquitectura:
+
+```text
+SalesOrder
+↓
+Delivery
+```
+
+no debe introducirse automáticamente durante la normalización documental.
+
+Debe conservarse el flujo CURRENT hasta que exista un refactor comercial
+deliberado y validado.
+
+---
+
+# 120. Regla de transición comercial
+
+Mientras exista el modelo CURRENT:
+
+```text
+Quote
+↓
+Sale
+```
+
+debe documentarse y mantenerse correctamente.
+
+La arquitectura futura:
+
+```text
+Quote
+↓
+SalesOrder
+↓
+Delivery
+```
+
+no debe utilizarse para fingir que la migración ya ocurrió.
+
+La transición deberá realizarse deliberadamente, preservando:
+
+```text
+historical Quotes
+
+historical Sales
+
+Inventory history
+
+document identities
+
+tenant integrity
+```
+
+---
+
+# 121. Principio final
+
+Quote responde:
+
+```text
+¿Qué estamos proponiendo comercialmente al Customer?
+```
+
+No responde directamente:
+
+```text
+¿Qué se entregó?
+```
 
 ni:
 
-> ¿Qué salió del inventario?
+```text
+¿Qué salió del Inventory?
+```
 
-Por tanto:
+CURRENT:
+
+```text
+Quote
+↓
+Proposal
+
+Quote conversion
+↓
+Sale
+↓
+Inventory OUT
+```
+
+TARGET:
 
 ```text
 Quote
@@ -2115,9 +3377,28 @@ Delivery
 ↓
 Fulfillment
 
-InventoryMovement
+Inventory
 ↓
 Physical consequence
 ```
 
-> **Cotizar es proponer. Vender es comprometer. Entregar es cumplir. Inventory registra la consecuencia física.**
+Debe mantenerse:
+
+```text
+Quote lifecycle
+≠
+Inventory mutation
+```
+
+aunque el workflow CURRENT de:
+
+```text
+Quote → Sale
+```
+
+sí genere posteriormente una consecuencia física mediante Sales.
+
+> **Cotizar es proponer. En el ERP Core actual, convertir una Quote crea una Sale
+> confirmada que ejecuta la salida de inventario; en la arquitectura futura,
+> SalesOrder y Delivery separarán explícitamente el compromiso comercial del
+> cumplimiento físico.**

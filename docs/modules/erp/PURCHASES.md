@@ -1,130 +1,289 @@
-# Módulo de Compras — Zaping ERP
+# Purchases — Zaping ERP
 
 **Módulo:** Purchases
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** PURCHASES V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo de Compras administra el proceso mediante el cual una Company solicita productos a un Supplier y posteriormente registra su recepción física.
+Purchases administra el compromiso comercial mediante el cual una Company ordena
+Products a un Supplier.
 
-El dominio debe distinguir claramente:
-
-```text
-Ordenar mercancía
-```
-
-de:
+Su responsabilidad principal es responder:
 
 ```text
-Recibir mercancía
+¿Qué se ordenó?
+
+¿A qué Supplier?
+
+¿Qué cantidad?
+
+¿A qué valor?
+
+¿En qué estado está la orden?
+
+¿Cuánto se ha recibido?
+
+¿Cuánto continúa pendiente?
 ```
 
-Por lo tanto, la regla fundamental es:
+Debe mantenerse una separación estricta entre:
 
-> **Una Purchase no aumenta inventario. Una PurchaseReceipt confirmada representa la entrada física.**
+```text
+Purchase
+→ commercial ordering fact
+```
+
+y:
+
+```text
+PurchaseReceipt
+→ physical receiving fact
+```
+
+Principio fundamental:
+
+```text
+Purchase
+≠
+Inventory IN
+```
+
+La entrada física ocurre mediante:
+
+```text
+Valid PurchaseReceipt creation
+→ Inventory IN
+```
 
 ---
 
-# 2. Alcance
-
-El módulo cubre:
-
-* creación de Purchase;
-* edición en borrador;
-* aprobación;
-* cancelación;
-* Purchase Items;
-* cálculo de totales;
-* generación de folio;
-* generación de PDF;
-* recepciones parciales;
-* múltiples recepciones;
-* cantidades pendientes;
-* lotes;
-* caducidades;
-* relación con Inventory;
-* trazabilidad de recepción.
-
----
-
-# 3. Responsabilidades
+# 2. Ownership
 
 Purchases es propietario de:
 
 ```text
 Purchase
+
 PurchaseItem
+
 Purchase lifecycle
+
 Supplier selection
-Ordered quantities
-Purchase commercial values
-Received vs Pending calculation
+
+ordered quantities
+
+purchase commercial values
+
+Purchase folio
+
+Purchase totals
+
+ordered / received / pending interpretation
 ```
 
-Purchase Receipts coordinan el hecho físico de recepción con Inventory.
+Purchase Receipts es propietario del workflow físico de recepción.
+
+Inventory es propietario de:
+
+```text
+stock mutation
+
+InventoryMovement
+
+InventoryBatch semantics
+
+inventory balances
+```
+
+Equipment es propietario de:
+
+```text
+EquipmentAsset physical identity
+```
+
+cuando un Receipt recibe Products:
+
+```text
+inventoryTracking = ASSET
+```
 
 ---
 
-# 4. Fuera del alcance
+# 3. Fronteras de dominio
+
+Debe mantenerse:
+
+```text
+Purchase
+→ what was ordered
+```
+
+```text
+PurchaseReceipt
+→ what was physically received
+```
+
+```text
+Inventory
+→ resulting quantity / batch / movement effects
+```
+
+```text
+Equipment
+→ physical identities for received ASSET units
+```
 
 Purchases no es propietario de:
 
-* stock;
-* disponibilidad;
-* InventoryMovement;
-* balances;
-* consumo de lotes;
-* Sales;
-* Customer Delivery;
-* Healthcare Case Logistics;
-* facturación de proveedor completa;
-* cuentas por pagar.
+```text
+Inventory stock
+
+InventoryMovement
+
+Inventory availability
+
+Equipment lifecycle
+
+Equipment condition
+
+Sales
+
+Customer Delivery
+
+Healthcare Case Logistics
+
+Supplier Accounts Payable
+
+Supplier invoicing
+```
 
 ---
 
-# 5. Flujo principal
+# 4. CURRENT vs TARGET vs FUTURE
+
+Este documento distingue:
+
+## CURRENT
+
+Capacidades implementadas actualmente.
+
+## TARGET
+
+Evoluciones aprobadas pendientes de implementación.
+
+## FUTURE
+
+Capacidades posteriores que requieren una necesidad funcional específica.
+
+---
+
+# 5. Estado CURRENT
+
+Actualmente Purchases soporta:
+
+```text
+Purchase creation
+
+Purchase list
+
+DRAFT editing
+
+DRAFT approval
+
+DRAFT cancellation
+
+Purchase PDF
+
+Purchase detail experience
+
+client-side search
+
+client-side filters
+
+Purchase deep-link
+
+partial Receipts
+
+multiple Receipts
+
+received / pending calculation
+
+Receipt history
+
+Inventory traceability
+
+ASSET provisioning traceability
+```
+
+Lifecycle actual:
+
+```text
+DRAFT
+
+CONFIRMED
+
+PARTIALLY_RECEIVED
+
+RECEIVED
+
+CANCELLED
+```
+
+---
+
+# 6. Flujo principal
 
 ```text
 Supplier
 ↓
-Purchase
+Purchase DRAFT
 ↓
 Approve
 ↓
 Purchase CONFIRMED
 ↓
-Receive goods
+Physical receiving
 ↓
 PurchaseReceipt
 ↓
 Inventory IN
 ```
 
+Cuando corresponde:
+
+```text
+PurchaseReceipt
+↓
+ASSET Product
+↓
+EquipmentAsset provisioning
+```
+
 ---
 
-# 6. Regla central
+# 7. Principio de orden vs recepción
 
 Incorrecto:
 
 ```text
-Purchase APPROVED
+Purchase approved
 ↓
-Inventory IN
+Inventory stock increases
 ```
 
 Correcto:
 
 ```text
-Purchase APPROVED
+Purchase approved
 ↓
-mercancía esperada
+goods are expected
 ```
 
 y posteriormente:
@@ -132,55 +291,64 @@ y posteriormente:
 ```text
 PurchaseReceipt
 ↓
-mercancía físicamente recibida
+goods physically received
 ↓
 Inventory IN
 ```
 
----
-
-# 7. Razón de la separación
-
-Una orden de compra puede:
-
-* aprobarse hoy;
-* enviarse al proveedor;
-* tardar varios días;
-* recibirse parcialmente;
-* recibirse mediante varios embarques;
-* contener diferencias.
-
-Por tanto:
+Esto permite modelar correctamente:
 
 ```text
-Commercial commitment
-≠
-Physical receipt
+delivery delays
+
+partial shipments
+
+multiple Receipts
+
+pending quantities
+
+physical differences
 ```
 
 ---
 
 # 8. Entidades principales
 
-El dominio utiliza principalmente:
+Purchases utiliza principalmente:
 
 ```text
 Purchase
+
 PurchaseItem
-PurchaseReceipt
-PurchaseReceiptItem
 ```
 
-y se integra con:
+y se relaciona con:
 
 ```text
 Supplier
+
 Product
-InventoryBatch
-InventoryMovement
-User
+
 Company
+
+PurchaseReceipt
+
+PurchaseReceiptItem
 ```
+
+Purchase Receipts se integra posteriormente con:
+
+```text
+InventoryBatch
+
+InventoryMovement
+
+EquipmentAsset
+
+User
+```
+
+según el caso.
 
 ---
 
@@ -188,24 +356,39 @@ Company
 
 `Purchase` representa una orden de compra.
 
-Conceptualmente contiene:
+Conceptualmente conserva:
 
 ```text
 id
+
 companyId
+
 folio
+
 supplierId
+
 subtotal
+
 iva
+
 total
+
 status
+
 createdAt
+
 updatedAt
+
 items
+
 receipts
 ```
 
-El schema real continúa siendo la fuente técnica para campos exactos.
+La estructura técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
 
 ---
 
@@ -224,59 +407,92 @@ Purchase
     └── subtotal
 ```
 
----
+`PurchaseItem` conserva el valor comercial persistido de la operación.
 
-# 11. PurchaseReceipt
-
-`PurchaseReceipt` representa un evento real de recepción.
-
-Información actual relevante:
+No debe depender permanentemente del valor actual de:
 
 ```text
-companyId
-purchaseId
-folio
-receivedAt
-receivedBy
-notes
-items
+Product.cost
 ```
 
 ---
 
-# 12. PurchaseReceiptItem
+# 11. PurchaseReceipt relationship
 
-Representa lo realmente recibido de una partida de compra.
+Una Purchase puede tener:
+
+```text
+0..N PurchaseReceipt
+```
 
 Conceptualmente:
 
 ```text
-purchaseItemId
-productId
-quantityReceived
-lotNumber
-expirationDate
-unitCost
-batchId
+Purchase
+├── Receipt 1
+├── Receipt 2
+└── Receipt N
+```
+
+Esto permite recepciones:
+
+```text
+partial
+
+multiple
+
+progressive
+```
+
+hasta completar las cantidades ordenadas.
+
+Los detalles funcionales del Receipt pertenecen a:
+
+```text
+PURCHASE_RECEIPTS.md
 ```
 
 ---
 
-# 13. Lifecycle de Purchase
+# 12. Purchase lifecycle
 
-El lifecycle actual utiliza:
+Lifecycle vigente:
 
 ```text
 DRAFT
+↓
 CONFIRMED
+↓
 PARTIALLY_RECEIVED
+↓
 RECEIVED
+```
+
+También:
+
+```text
+DRAFT
+↓
 CANCELLED
+```
+
+Una recepción completa puede producir directamente:
+
+```text
+CONFIRMED
+↓
+RECEIVED
+```
+
+sin pasar obligatoriamente por:
+
+```text
+PARTIALLY_RECEIVED
 ```
 
 ---
 
-# 14. DRAFT
+# 13. DRAFT
 
 Una Purchase nueva comienza como:
 
@@ -284,40 +500,78 @@ Una Purchase nueva comienza como:
 DRAFT
 ```
 
-Representa una orden todavía no confirmada.
+Representa una orden todavía editable y no confirmada.
+
+Mientras permanezca en DRAFT pueden realizarse operaciones como:
+
+```text
+edit Supplier
+
+edit Products
+
+edit quantities
+
+edit commercial values through supported workflow
+
+approve
+
+cancel
+```
 
 ---
 
-# 15. Capacidades de DRAFT
+# 14. DRAFT no puede recibirse
 
-Mientras se encuentre en borrador puede permitirse:
+Debe mantenerse:
 
-* modificar Supplier;
-* modificar productos;
-* modificar cantidades;
-* recalcular importes;
-* aprobar;
-* cancelar.
+```text
+Purchase DRAFT
+→ cannot receive goods
+```
+
+Primero debe existir:
+
+```text
+DRAFT
+↓
+Approve
+↓
+CONFIRMED
+```
 
 ---
 
-# 16. Edición después de DRAFT
+# 15. Edición después de DRAFT
 
-Una vez que la compra deja de ser `DRAFT`, sus datos comerciales principales no deben modificarse libremente.
+Una vez que Purchase abandona:
+
+```text
+DRAFT
+```
+
+sus datos comerciales principales no deben editarse libremente.
 
 Esto protege:
 
-* cantidades ordenadas;
-* costos;
-* Supplier;
-* trazabilidad;
-* relación con recepciones.
+```text
+Supplier
+
+ordered quantities
+
+commercial values
+
+Product relationships
+
+Receipt traceability
+```
+
+La edición normal de Purchase está restringida al estado DRAFT.
 
 ---
 
-# 17. CONFIRMED
+# 16. CONFIRMED
 
-La aprobación produce:
+Approval produce:
 
 ```text
 DRAFT
@@ -327,31 +581,51 @@ CONFIRMED
 
 Significa:
 
-> La orden de compra ha sido confirmada y puede comenzar a recibir mercancía.
+```text
+the Purchase is confirmed
+and may begin receiving goods
+```
 
 No significa:
 
-> La mercancía ya se recibió.
-
----
-
-# 18. Aprobar no mueve inventario
-
-La aprobación no debe generar por sí misma:
-
 ```text
-Product.stock increment
-InventoryMovement IN
-InventoryBatch
+goods have already been physically received
 ```
 
-Esos efectos pertenecen al Receipt.
+---
+
+# 17. Approval no modifica Inventory
+
+Debe mantenerse:
+
+```text
+Purchase approval
+→ no Product.stock increment
+```
+
+```text
+Purchase approval
+→ no InventoryMovement IN
+```
+
+```text
+Purchase approval
+→ no InventoryBatch creation
+```
+
+```text
+Purchase approval
+→ no EquipmentAsset provisioning
+```
+
+Todos esos efectos pertenecen al Receipt cuando corresponda.
 
 ---
 
-# 19. PARTIALLY_RECEIVED
+# 18. PARTIALLY_RECEIVED
 
-Cuando una compra ha recibido alguna mercancía, pero todavía existen cantidades pendientes:
+Cuando existe al menos una recepción válida, pero todavía quedan cantidades
+pendientes:
 
 ```text
 CONFIRMED
@@ -359,9 +633,17 @@ CONFIRMED
 PARTIALLY_RECEIVED
 ```
 
+Conceptualmente:
+
+```text
+some quantity received
++
+some quantity pending
+```
+
 ---
 
-# 20. RECEIVED
+# 19. RECEIVED
 
 Cuando todas las cantidades ordenadas han sido recibidas:
 
@@ -371,7 +653,7 @@ PARTIALLY_RECEIVED
 RECEIVED
 ```
 
-o, si todo llega en una sola recepción:
+o:
 
 ```text
 CONFIRMED
@@ -379,119 +661,256 @@ CONFIRMED
 RECEIVED
 ```
 
+si una sola Receipt completa la Purchase.
+
+Una Purchase `RECEIVED` no acepta una nueva Receipt normal.
+
 ---
 
-# 21. CANCELLED
+# 20. CANCELLED
 
-Una Purchase puede pasar a:
+Actualmente solo puede cancelarse:
 
 ```text
+Purchase DRAFT
+```
+
+Flujo:
+
+```text
+DRAFT
+↓
 CANCELLED
 ```
 
-cuando las reglas de lifecycle lo permitan.
+La cancelación en otros estados es rechazada.
 
-La implementación actual permite cancelar principalmente una compra todavía en `DRAFT`.
-
----
-
-# 22. Compra recibida
-
-Una Purchase `RECEIVED` ya no debe aceptar nueva recepción normal.
-
-Esto evita:
-
-```text
-Ordered = 10
-Received = 10
-+
-another Receipt = 2
-```
-
----
-
-# 23. Compra cancelada
-
-Una Purchase `CANCELLED` no puede recibir mercancía mediante el flujo normal.
-
-Si físicamente llega material relacionado con una orden cancelada, se requiere una decisión operacional explícita en lugar de forzar una recepción inconsistente.
-
----
-
-# 24. Compra en borrador
-
-No puede recibirse una Purchase `DRAFT`.
-
-Primero debe existir una orden confirmada.
-
----
-
-# 25. Purchase lifecycle
-
-Vista completa:
-
-```text
-                 ┌──────────────→ CANCELLED
-                 │
-DRAFT ───────────┤
-                 │
-                 ↓
-             CONFIRMED
-                 ↓
-       PARTIALLY_RECEIVED
-                 ↓
-              RECEIVED
-```
-
-Una recepción completa puede provocar:
+Debe mantenerse:
 
 ```text
 CONFIRMED
-↓
+PARTIALLY_RECEIVED
+RECEIVED
+→ not cancelled through current normal flow
+```
+
+---
+
+# 21. CANCELLED no puede recibirse
+
+Debe mantenerse:
+
+```text
+Purchase CANCELLED
+→ no normal PurchaseReceipt
+```
+
+Si físicamente llega material relacionado con una orden cancelada, debe resolverse
+mediante una decisión operacional explícita y no forzando el lifecycle normal.
+
+---
+
+# 22. Received status es derivado
+
+El usuario no debe seleccionar manualmente:
+
+```text
+PARTIALLY_RECEIVED
+```
+
+o:
+
+```text
 RECEIVED
 ```
 
-directamente.
+como simple edición de estado.
+
+Esos estados deben derivarse de las cantidades reales recibidas.
 
 ---
 
-# 26. Creación de Purchase
+# 23. Create Purchase
 
-Para crear una Purchase se requiere como mínimo:
+Para crear una Purchase se requiere conceptualmente:
 
-* Supplier válido;
-* uno o más productos;
-* cantidades válidas.
+```text
+authenticated Company
 
-El backend debe validar todos los recursos dentro de la Company autenticada.
+valid Supplier
 
----
+one or more Products
 
-# 27. Supplier
+valid quantities
 
-El Supplier seleccionado debe:
+valid commercial values
+```
 
-* existir;
-* pertenecer a la Company;
-* ser válido para la operación.
-
-Un Supplier de otro tenant nunca puede utilizarse.
+Los recursos relacionados deben ser validados dentro del tenant autenticado.
 
 ---
 
-# 28. Products
+# 24. Supplier validation — CURRENT
 
-Todos los productos deben pertenecer a la misma Company.
+Actualmente backend valida que Supplier:
 
-Una Purchase no puede incorporar un Product de otro tenant.
+```text
+exists
+
+belongs to authenticated Company
+```
+
+Debe impedirse:
+
+```text
+Company A Purchase
+→ Supplier Company B
+```
 
 ---
 
-# 29. Productos duplicados
+# 25. Supplier active gap
 
-Una misma Purchase no debe contener la misma partida de Product duplicada sin una razón de negocio explícita.
+Actualmente `PurchasesService.create()` y `update()` no exigen todavía de forma
+completa:
 
-La implementación actual rechaza productos duplicados.
+```text
+Supplier.isActive = true
+```
+
+aunque la UI utilice catálogos activos.
+
+Por tanto:
+
+```text
+Supplier same-tenant validation
+→ IMPLEMENTED
+```
+
+mientras:
+
+```text
+Supplier active backend enforcement
+→ TECHNICAL DEBT
+```
+
+Esta validación debe cerrarse antes de considerar definitivo el contrato de nuevas
+Purchases.
+
+---
+
+# 26. Product validation — CURRENT
+
+Los Products utilizados en Purchase deben:
+
+```text
+exist
+
+belong to authenticated Company
+```
+
+Debe impedirse:
+
+```text
+Company A Purchase
+→ Product Company B
+```
+
+---
+
+# 27. Product active gap
+
+Actualmente el backend de Purchase create/update no exige todavía de forma
+completa:
+
+```text
+Product.isActive = true
+```
+
+aunque la UI utilice Products activos.
+
+Por tanto:
+
+```text
+Product active backend enforcement in Purchase
+→ TECHNICAL DEBT
+```
+
+Debe resolverse en backend.
+
+---
+
+# 28. Product tracking configuration
+
+Purchase puede ordenar Products con distintas configuraciones:
+
+```text
+inventoryTracking
+
+lotTracking
+```
+
+Purchase no ejecuta por sí misma la semántica física de esas configuraciones.
+
+Debe mantenerse:
+
+```text
+Purchase
+→ ordered Product + quantity + commercial value
+```
+
+mientras:
+
+```text
+PurchaseReceipt
+→ physical tracking enforcement
+```
+
+---
+
+# 29. ProductInventoryTracking
+
+Products puede utilizar:
+
+```text
+QUANTITY
+
+SERIALIZED
+
+ASSET
+```
+
+La Purchase puede referenciar el Product independientemente de esa estrategia.
+
+Los efectos físicos se aplican posteriormente durante los workflows compatibles.
+
+---
+
+# 30. ProductLotTracking
+
+Products utiliza:
+
+```text
+NONE
+
+OPTIONAL
+
+REQUIRED
+```
+
+La Purchase no captura por sí sola el lote físico de la mercancía todavía no
+recibida.
+
+La aplicación de esas reglas pertenece al Receipt.
+
+---
+
+# 31. Productos duplicados
+
+Una misma Purchase no debe contener dos partidas del mismo Product sin una razón
+explícita de negocio.
+
+La implementación actual rechaza Products duplicados dentro de la misma Purchase.
 
 Preferir:
 
@@ -506,143 +925,209 @@ Product A × 4
 Product A × 6
 ```
 
-dentro de la misma Purchase.
-
 ---
 
-# 30. Quantity
+# 32. Quantity
 
-La cantidad ordenada debe ser:
+La cantidad ordenada actual utiliza:
 
 ```text
 integer >= 1
 ```
 
-salvo que en el futuro el dominio soporte unidades fraccionarias.
+El soporte de cantidades fraccionarias requeriría una futura evolución coordinada
+con:
 
-Ese cambio requerirá revisar el modelo completo de Inventory.
+```text
+Products
+
+Inventory
+
+Purchases
+
+Sales
+```
 
 ---
 
-# 31. Unit Cost
+# 33. Commercial unit value
 
-Actualmente el costo de cada PurchaseItem se obtiene del costo conocido del Product durante la creación/edición de la compra.
+Durante creación/edición, Purchase utiliza el valor comercial correspondiente al
+Product según el workflow vigente.
 
-El PurchaseItem conserva ese valor histórico.
+`PurchaseItem` conserva un snapshot persistido.
 
-Por tanto:
+Debe mantenerse:
 
 ```text
 Product.cost changes later
+≠
+rewrite historical PurchaseItem value
 ```
 
-no debe reescribir automáticamente:
-
-```text
-historical PurchaseItem.price
-```
+La representación técnica exacta del campo pertenece al schema y al código actual.
 
 ---
 
-# 32. Totales
+# 34. Totales
 
 Conceptualmente:
 
 ```text
-Item Subtotal
+Item subtotal
 =
-Quantity × Unit Cost
+quantity × unit value
 ```
 
 ```text
-Purchase Subtotal
+Purchase subtotal
 =
-Σ Item Subtotal
+Σ item subtotals
 ```
 
-Actualmente el sistema utiliza IVA del 16 % en el flujo implementado.
+El flujo vigente utiliza:
 
-La estrategia fiscal completa deberá evolucionar cuando Billing y configuración tributaria sean implementados.
+```text
+IVA = 16%
+```
 
----
+según la implementación actual.
 
-# 33. Dinero
-
-Los cálculos monetarios deben seguir las reglas generales de calidad financiera.
-
-La implementación actual utiliza `Float` en varias entidades históricas.
-
-La estrategia definitiva de precisión monetaria deberá revisarse antes de ampliar significativamente:
-
-* Billing;
-* CFDI;
-* accounting;
-* financial reporting.
-
-Este documento no redefine todavía el modelo monetario.
+La estrategia fiscal completa pertenece a una futura evolución de Billing /
+configuración tributaria.
 
 ---
 
-# 34. Folio
+# 35. Monetary representation
 
-Purchase utiliza un folio empresarial independiente del UUID técnico.
+La implementación actual conserva representación monetaria histórica basada en el
+modelo existente.
 
-Ejemplo:
+Antes de ampliar significativamente:
+
+```text
+Billing
+
+CFDI
+
+Accounting
+
+financial reports
+```
+
+deberá revisarse de manera transversal:
+
+```text
+precision
+
+rounding
+
+currency
+
+Prisma representation
+```
+
+Purchases no redefine por sí solo esa arquitectura.
+
+---
+
+# 36. Folio
+
+Purchase utiliza:
+
+```text
+folio
+```
+
+como identificador empresarial separado del UUID técnico.
+
+Debe mantenerse:
 
 ```text
 id
-→ UUID
+→ technical identity
+```
+
+```text
+folio
+→ business-facing Purchase identity
+```
+
+El formato exacto vigente pertenece a la implementación.
+
+---
+
+# 37. Purchase PDF
+
+Purchase puede generar:
+
+```text
+PDF
+```
+
+representando la orden comercial.
+
+Puede incluir información como:
+
+```text
+Company
+
+Supplier
 
 folio
-→ OC-...
+
+date
+
+status
+
+Products
+
+quantities
+
+commercial values
+
+subtotal
+
+IVA
+
+total
 ```
 
 ---
 
-# 35. PDF
+# 38. Purchase PDF ≠ Receipt evidence
 
-La orden de compra puede generar un documento PDF.
+Debe mantenerse:
 
-El PDF representa la Purchase.
+```text
+Purchase PDF
+≠
+proof of physical receipt
+```
 
-Puede incluir información como:
+Una Purchase documenta lo ordenado.
 
-* Company;
-* RFC;
-* Supplier;
-* folio;
-* fecha;
-* estado;
-* productos;
-* cantidades;
-* costos;
-* subtotal;
-* IVA;
-* total.
+Purchase Receipt documenta lo físicamente recibido.
 
----
+Actualmente:
 
-# 36. PDF no representa Receipt
+```text
+Purchase PDF
+→ IMPLEMENTED
+```
 
-La orden de compra PDF no debe utilizarse como evidencia de que la mercancía fue recibida.
+mientras:
 
-Son hechos distintos.
-
-En el futuro puede existir un documento específico de recepción.
+```text
+PurchaseReceipt PDF
+→ NOT IMPLEMENTED
+```
 
 ---
 
-# 37. Recepción
+# 39. Ordered Quantity
 
-La operación de recepción comienza desde una Purchase confirmada o parcialmente recibida.
-
-La interfaz debe mostrar al usuario las partidas todavía pendientes.
-
----
-
-# 38. Ordered Quantity
-
-Para una PurchaseItem:
+Para cada `PurchaseItem`:
 
 ```text
 Ordered Quantity
@@ -652,9 +1137,7 @@ PurchaseItem.quantity
 
 ---
 
-# 39. Received Quantity
-
-La cantidad recibida se deriva de las recepciones registradas.
+# 40. Received Quantity
 
 Conceptualmente:
 
@@ -664,13 +1147,17 @@ Received Quantity
 Σ PurchaseReceiptItem.quantityReceived
 ```
 
-para la misma `purchaseItemId`.
+para el mismo:
+
+```text
+purchaseItemId
+```
 
 ---
 
-# 40. Pending Quantity
+# 41. Pending Quantity
 
-Regla:
+Debe mantenerse:
 
 ```text
 Pending Quantity
@@ -680,121 +1167,87 @@ Ordered Quantity
 Received Quantity
 ```
 
----
-
-# 41. Ejemplo
+Ejemplo:
 
 ```text
-Ordenado: 10
-Recibido: 4
-Pendiente: 6
-```
-
-Una nueva Receipt para esa partida puede registrar como máximo:
-
-```text
-6
+Ordered: 10
+Received: 4
+Pending: 6
 ```
 
 ---
 
-# 42. No sobre-recepción
+# 42. Partial Receipts
 
-Debe cumplirse:
-
-```text
-new quantityReceived
-<=
-pendingQuantity
-```
-
-Nunca:
-
-```text
-received total
->
-ordered total
-```
-
-dentro del flujo normal.
-
----
-
-# 43. Validación backend
-
-Aunque frontend limite la cantidad mediante UI, backend debe recalcular la cantidad pendiente.
-
-Nunca debe confiar únicamente en:
-
-```text
-max="6"
-```
-
-del input.
-
----
-
-# 44. Recepciones parciales
-
-Una Purchase puede tener múltiples receipts.
+Una Purchase puede recibirse progresivamente.
 
 Ejemplo:
 
 ```text
 Purchase
-100 unidades
-│
-├── Receipt 1
-│   40
-│
-├── Receipt 2
-│   30
-│
-└── Pending
-    30
+Quantity: 100
+
+Receipt 1
+40
+
+Receipt 2
+30
+
+Pending
+30
 ```
+
+Esto es comportamiento CURRENT.
 
 ---
 
-# 45. Receipt de múltiples partidas
+# 43. Multiple Receipt Items
 
-Una misma PurchaseReceipt puede contener varias partidas recibidas.
+Una PurchaseReceipt puede recibir múltiples PurchaseItems dentro de una misma
+operación.
 
 Ejemplo:
 
 ```text
-REC-001
-├── Product A × 10
-├── Product B × 4
-└── Product C × 2
+Receipt
+
+Product A × 10
+Product B × 4
+Product C × 2
 ```
+
+La especificación completa pertenece a `PURCHASE_RECEIPTS.md`.
 
 ---
 
-# 46. Partidas repetidas dentro de Receipt
+# 44. No duplicated PurchaseItem in one Receipt
 
-La misma `purchaseItemId` no debe repetirse dentro de una sola recepción.
+Debe mantenerse:
+
+```text
+same purchaseItemId
+→ only once inside one Receipt request
+```
 
 Incorrecto:
 
 ```text
-Receipt
-├── PurchaseItem A × 2
-└── PurchaseItem A × 3
+PurchaseItem A × 2
+
+PurchaseItem A × 3
 ```
 
 Preferir:
 
 ```text
-Receipt
-└── PurchaseItem A × 5
+PurchaseItem A × 5
 ```
 
 ---
 
-# 47. Pertenencia de partida
+# 45. PurchaseItem ownership
 
-Toda `purchaseItemId` recibida debe pertenecer a la Purchase indicada.
+Toda partida recibida debe pertenecer realmente a la Purchase indicada.
 
 Debe rechazarse:
 
@@ -803,40 +1256,39 @@ Purchase A
 ↓
 Receipt
 ↓
-PurchaseItem belonging to Purchase B
+PurchaseItem from Purchase B
 ```
+
+aunque ambos recursos pertenezcan al mismo tenant.
 
 ---
 
-# 48. Receipt como hecho físico
+# 46. Over-receipt protection
 
-En la implementación actual, registrar la recepción constituye directamente el evento físico confirmado.
-
-No existe actualmente un lifecycle separado:
+Debe mantenerse:
 
 ```text
-Receipt DRAFT
-↓
-Receipt CONFIRMED
+new quantityReceived
+<=
+pendingQuantity
 ```
 
-como requisito general.
-
-Por tanto:
+Nunca debe ocurrir mediante el flujo normal:
 
 ```text
-Create PurchaseReceipt
-↓
-Inventory effect
+total received
+>
+ordered quantity
 ```
 
-es el comportamiento vigente.
+El backend debe recalcular el pendiente y no confiar únicamente en restricciones
+frontend.
 
 ---
 
-# 49. Evolución futura de Receipt
+# 47. PurchaseReceipt como hecho físico
 
-Si el workflow operativo requiere preparar o revisar una recepción antes de aplicarla, podrá evolucionar hacia:
+Actualmente PurchaseReceipt no tiene lifecycle separado:
 
 ```text
 DRAFT
@@ -844,399 +1296,527 @@ DRAFT
 CONFIRMED
 ```
 
-pero esa complejidad no debe agregarse sin necesidad.
+Registrar válidamente:
+
+```text
+POST /purchase-receipts
+```
+
+constituye directamente el hecho físico.
+
+Debe mantenerse:
+
+```text
+Valid PurchaseReceipt creation
+→ Inventory effect
+```
+
+No existe una operación adicional:
+
+```text
+Confirm PurchaseReceipt
+```
+
+en el workflow CURRENT.
 
 ---
 
-# 50. Lote
+# 48. Receipt lot rules
 
-`lotNumber` permite identificar el lote físico recibido.
+Las reglas vigentes dependen de:
 
-Cuando el producto requiere trazabilidad por lote, la recepción constituye el punto natural de captura.
+```text
+Product.lotTracking
+```
 
 ---
 
-# 51. Caducidad
+# 49. LotTracking NONE
 
-`expirationDate` puede registrarse durante Receipt.
+```text
+NONE
+```
 
-Regla vigente:
+significa:
+
+```text
+lotNumber
+→ not allowed
+```
 
 ```text
 expirationDate
-→ requires lotNumber
+→ not allowed
 ```
-
-No debe existir una caducidad desconectada de un lote cuando se utiliza el modelo actual.
 
 ---
 
-# 52. Caducidad inválida
+# 50. LotTracking OPTIONAL
 
-La recepción debe rechazar una fecha de caducidad anterior a la fecha de recepción.
+```text
+OPTIONAL
+```
 
-Conceptualmente:
+significa:
+
+```text
+lotNumber
+→ optional
+```
+
+Cuando se proporciona:
 
 ```text
 expirationDate
->=
-receivedAt date
 ```
 
-según las reglas implementadas.
+debe existir:
+
+```text
+lotNumber
+```
 
 ---
 
-# 53. Producto sin lote
-
-No todos los productos necesitan obligatoriamente lote en la implementación actual.
-
-La política futura debe evolucionar hacia configuración por Product, por ejemplo:
+# 51. LotTracking REQUIRED
 
 ```text
-requiresLotTracking
-requiresExpirationTracking
-requiresSerialTracking
+REQUIRED
 ```
 
-si el dominio lo requiere.
+significa:
 
-No se agregan esos campos únicamente desde este documento.
+```text
+lotNumber
+→ required
+```
+
+mientras:
+
+```text
+expirationDate
+→ optional
+```
+
+No debe documentarse aquí una comparación de `expirationDate` contra
+`receivedAt` como invariante vigente si no forma parte del contrato confirmado.
 
 ---
 
-# 54. InventoryBatch
+# 52. InventoryBatch integration
 
-Cuando existe lote, Receipt puede crear o actualizar un `InventoryBatch`.
-
-Conceptualmente:
+Cuando corresponde utilizar lote:
 
 ```text
-PurchaseReceipt
-↓
 PurchaseReceiptItem
 ↓
 InventoryBatch
 ```
 
----
+El Receipt puede crear o reutilizar la representación de Batch según la
+implementación vigente.
 
-# 55. Información del Batch
-
-Un InventoryBatch puede conservar información como:
+La estructura exacta y sus invariantes pertenecen a:
 
 ```text
-product
-lotNumber
-expirationDate
-initialQuantity
-availableQuantity
-unitCost
-receivedAt
+INVENTORY.md
+
+schema.prisma
 ```
 
-La definición completa pertenece a `INVENTORY.md`.
+Purchases no redefine `InventoryBatch`.
 
 ---
 
-# 56. Unidad de costo
+# 53. Receipt unit cost
 
-El Receipt conserva el costo asociado a la PurchaseItem.
+PurchaseReceiptItem conserva el valor correspondiente a la PurchaseItem de origen
+según la implementación vigente.
 
-Esto permite mantener trazabilidad entre:
+Esto permite mantener trazabilidad:
 
 ```text
 Purchase
 ↓
-Receipt
+PurchaseItem
 ↓
-Batch
+PurchaseReceiptItem
 ↓
-Inventory Movement
+Inventory effects
 ```
+
+La normalización completa del modelo de costos continúa siendo una preocupación
+transversal entre Purchases, Receipts e Inventory.
 
 ---
 
-# 57. Integración con Inventory
+# 54. InventoryMovement reference — CURRENT
 
-La recepción coordina con Inventory para producir:
-
-```text
-InventoryBatch
-+
-InventoryMovement IN
-+
-Stock / balance update
-```
-
-cuando corresponda.
-
----
-
-# 58. Fuente del movimiento
-
-El InventoryMovement generado debe estar relacionado con el evento que realmente produjo el cambio físico.
-
-La dirección arquitectónica es preferir:
-
-```text
-referenceType = PURCHASE_RECEIPT
-referenceId   = receiptId
-```
-
-o una referencia equivalente al Receipt.
-
-No debe continuar conceptualizando la Purchase aprobada como el evento físico.
-
-La implementación concreta de referencias deberá revisarse durante la consolidación de Inventory.
-
----
-
-# 59. Transacción
-
-Registrar una Receipt es una operación crítica.
+Los movimientos generados por Receipt utilizan la recepción física como
+referencia.
 
 Conceptualmente:
 
 ```text
-Create PurchaseReceipt
-+
-Create Receipt Items
-+
-Create / Update InventoryBatch
-+
-Update Inventory
-+
-Create InventoryMovement
-+
-Update Purchase Status
+movementType = IN
+
+referenceType = PURCHASE_RECEIPT
+
+referenceId = PurchaseReceipt.id
 ```
 
-debe conservar consistencia transaccional.
+Debe mantenerse:
+
+```text
+Purchase approval
+≠
+physical movement reference
+```
 
 ---
 
-# 60. Regla atómica
+# 55. Receipt transaction boundary
+
+Purchase Receipt coordina una operación transaccional que puede incluir:
+
+```text
+PurchaseReceipt
+
++
+
+PurchaseReceiptItems
+
++
+
+InventoryBatch when applicable
+
++
+
+EquipmentAsset provisioning when ASSET
+
++
+
+Product.stock
+
++
+
+InventoryMovement IN
+
++
+
+Purchase status recalculation
+```
+
+Los efectos inseparables deben completarse o revertirse juntos.
+
+---
+
+# 56. Receipt atomicity
 
 No debe ocurrir:
 
 ```text
-Receipt created
-✓
-
-Inventory update
-✗
+Receipt persisted
++
+Inventory mutation missing
 ```
 
 ni:
 
 ```text
 Inventory increased
-✓
-
++
 Receipt missing
-✗
 ```
 
-La operación debe completarse o revertirse como unidad.
+ni, para ASSET:
+
+```text
+stock increased
++
+required EquipmentAsset identities missing
+```
+
+cuando el provisioning forma parte de esa misma operación.
 
 ---
 
-# 61. Purchase status después de Receipt
+# 57. Receipt idempotency — CURRENT
 
-Después de registrar la recepción debe recalcularse el estado de la Purchase.
-
-Si existe pendiente:
+`POST /purchase-receipts` utiliza:
 
 ```text
-PARTIALLY_RECEIVED
+Idempotency-Key
 ```
 
-Si todo fue recibido:
+La protección actual incluye:
 
 ```text
-RECEIVED
+tenant-scoped key
+
+request hash
+
+same key + same payload
+→ replay
+
+same key + different payload
+→ 409 Conflict
+
+Serializable transaction
+
+P2002 recovery path
+```
+
+Estado:
+
+```text
+PurchaseReceipt creation idempotency
+→ IMPLEMENTED / VALIDATED
+```
+
+Permanece como deuda:
+
+```text
+real simultaneous PostgreSQL concurrency race QA
+```
+
+La especificación completa pertenece a:
+
+```text
+PURCHASE_RECEIPTS.md
 ```
 
 ---
 
-# 62. Estado derivado del progreso
+# 58. Purchase creation idempotency
 
-El cambio de estado debe responder a las cantidades reales.
+Debe distinguirse de Receipt.
 
-No debe depender de que el usuario manualmente seleccione:
+Actualmente:
 
 ```text
-"Parcialmente recibida"
+POST /purchases
+→ no formal idempotency contract
 ```
 
-o:
+Por tanto:
 
 ```text
-"Recibida"
+Purchase creation idempotency
+→ TECHNICAL DEBT
+```
+
+No debe confundirse con la idempotencia ya implementada para Purchase Receipts.
+
+---
+
+# 59. ASSET provisioning relationship
+
+Cuando un Receipt recibe:
+
+```text
+Product.inventoryTracking = ASSET
+```
+
+entonces:
+
+```text
+quantityReceived = N
+↓
+N EquipmentAsset
+```
+
+según las reglas de Core Equipment.
+
+Purchase no crea EquipmentAsset al ser aprobada.
+
+Debe mantenerse:
+
+```text
+Purchase
+→ ordered quantity
+```
+
+```text
+PurchaseReceipt
+→ physical received quantity
+```
+
+```text
+Equipment
+→ physical ASSET identities
 ```
 
 ---
 
-# 63. Usuario que recibe
+# 60. No duplicate Inventory mutation
 
-La recepción debe conservar, cuando esté disponible:
+Cuando Purchase Receipt crea EquipmentAsset:
 
 ```text
-receivedBy
+Equipment provisioning
+→ does not increment Product.stock again
 ```
 
-derivado del usuario autenticado.
+y:
 
-Frontend no debe elegir arbitrariamente otro usuario como autoridad de auditoría.
+```text
+Equipment provisioning
+→ does not create another InventoryMovement per asset
+```
+
+Purchase Receipt continúa siendo propietario de:
+
+```text
+Inventory IN
+```
 
 ---
 
-# 64. Fecha de recepción
+# 61. Purchase status after Receipt
 
-La operación conserva:
+Después de registrar una Receipt válida:
+
+```text
+remaining pending quantity
+→ PARTIALLY_RECEIVED
+```
+
+```text
+all quantities complete
+→ RECEIVED
+```
+
+El estado debe derivarse de las cantidades reales.
+
+---
+
+# 62. No manual received status
+
+No debe existir una operación normal como:
+
+```text
+User
+→ select RECEIVED
+```
+
+sin comprobar:
+
+```text
+received quantities
+```
+
+El lifecycle debe reflejar el progreso físico real.
+
+---
+
+# 63. receivedBy
+
+Purchase Receipt conserva el actor correspondiente según el workflow vigente.
+
+Debe derivarse del contexto autenticado.
+
+Frontend no debe utilizar un `userId` arbitrario como autoridad del evento físico.
+
+La semántica detallada pertenece a `PURCHASE_RECEIPTS.md`.
+
+---
+
+# 64. receivedAt
+
+Purchase Receipt conserva:
 
 ```text
 receivedAt
 ```
 
-La fecha representa cuándo el sistema reconoce la recepción.
+según la implementación vigente.
 
-Si posteriormente se necesita registrar una fecha física histórica diferente de `createdAt`, debe mantenerse esa distinción.
+Representa el momento reconocido para la recepción física.
 
----
-
-# 65. Notas
-
-Las notas pueden proporcionar contexto administrativo.
-
-No deben utilizarse para sustituir campos estructurados importantes como:
-
-* lote;
-* cantidad;
-* caducidad;
-* responsable.
-
----
-
-# 66. Multi-tenancy
-
-Todas las operaciones deben mantenerse dentro de una Company.
-
-Debe validarse al menos:
+No debe confundirse necesariamente con:
 
 ```text
-Purchase.companyId
-Supplier.companyId
-Product.companyId
-Receipt.companyId
-Inventory data companyId
+createdAt
 ```
 
-según la estructura de relaciones correspondiente.
+si la arquitectura futura diferencia ambos conceptos.
 
 ---
 
-# 67. Seguridad de IDs
+# 65. Receipt notes
 
-Conocer un:
+Las notas pueden complementar contexto administrativo.
 
-```text
-purchaseId
-purchaseItemId
-productId
-```
-
-de otra Company no concede acceso.
-
-Todos los recursos deben validarse en el contexto autenticado.
-
----
-
-# 68. Roles
-
-El módulo debe respetar RBAC.
-
-Conceptualmente pueden existir permisos como:
+No deben sustituir datos estructurados como:
 
 ```text
-purchases.read
-purchases.create
-purchases.update
-purchases.approve
-purchases.cancel
-purchaseReceipts.create
-```
+quantity
 
-La matriz granular es arquitectura objetivo y se implementará progresivamente según ADR-007.
+lot
 
----
+expiration
 
-# 69. Auditoría
+Product
 
-Acciones relevantes deben ser auditables cuando se incorpore el sistema completo de auditoría.
-
-Especialmente:
-
-```text
-Purchase created
-Purchase approved
-Purchase cancelled
-Receipt registered
+responsible actor
 ```
 
 ---
 
-# 70. Inmutabilidad de Receipt
+# 66. Receipt history immutability
 
-Una Receipt registrada que ya generó efectos de Inventory no debe editarse libremente para modificar:
-
-* quantityReceived;
-* lotNumber;
-* product;
-* batch;
-* unitCost;
-
-si hacerlo reescribe historia física.
-
----
-
-# 71. Corrección de Receipt
-
-Si una recepción confirmada contiene un error, debe utilizarse un mecanismo trazable.
-
-Ejemplos futuros:
+Una Receipt que ya produjo efectos físicos no debe editarse libremente para
+reescribir:
 
 ```text
-Receipt Reversal
-Inventory Adjustment
-Supplier Return
-Corrective Receipt
+quantityReceived
+
+Product
+
+lot
+
+Batch
+
+unit value
 ```
 
-según el caso.
+sin una operación de corrección explícita.
 
-No:
+---
+
+# 67. Receipt correction / reversal
+
+Actualmente:
 
 ```text
-editar 10 → 4
+Receipt correction
+→ NOT IMPLEMENTED
 ```
 
-silenciosamente después de haber aumentado inventario.
+```text
+Receipt reversal
+→ NOT IMPLEMENTED
+```
+
+Una futura solución deberá conservar la historia original y producir una operación
+correctiva o compensatoria.
+
+Debe evitarse:
+
+```text
+historical Receipt quantity
+10
+→ silently edited to 4
+```
+
+después de haber afectado Inventory.
 
 ---
 
-# 72. Cancelación de Purchase con Receipts
+# 68. Supplier Return — FUTURE
 
-Una Purchase con recepciones no debe simplemente desaparecer ni cancelar sus efectos históricos.
-
-Cualquier lifecycle posterior debe considerar primero las Receipts existentes.
-
----
-
-# 73. Supplier Return
-
-Una devolución posterior al proveedor es un evento distinto.
+Supplier Return representa un hecho diferente de Purchase Receipt.
 
 Conceptualmente:
 
@@ -1247,403 +1827,1057 @@ Inventory
 ↓
 Supplier Return
 ↓
-Inventory OUT
+Inventory OUT / disposition according to future design
 ```
 
 No debe modificarse la Receipt original para representar una devolución posterior.
 
----
-
-# 74. UI actual
-
-La experiencia de Purchases ya contempla patrones como:
-
-* listado;
-* estados;
-* crear;
-* editar Draft;
-* aprobar;
-* cancelar;
-* detalle;
-* descargar PDF;
-* consultar recepciones;
-* consultar movimientos;
-* registrar recepción.
-
----
-
-# 75. Detalle de compra
-
-La vista de detalle debe evolucionar hacia `Purchase 360`.
-
-Debe permitir comprender:
+Estado:
 
 ```text
-Supplier
-Ordered
-Received
-Pending
-Receipts
-Inventory impact
-Status
-Documents
-History
+Supplier Returns
+→ FUTURE / DEFERRED
 ```
+
+No es un bloqueo del ERP Core V1 actual.
 
 ---
 
-# 76. Acción contextual
+# 69. Purchase con Receipts existentes
 
-La acción principal depende del estado.
+Una Purchase con recepción parcial o completa no debe desaparecer ni reescribir
+sus efectos históricos.
 
-Conceptualmente:
-
-```text
-DRAFT
-→ Aprobar / Editar
-```
+Debe mantenerse:
 
 ```text
-CONFIRMED
-→ Registrar recepción
+Purchase history
++
+Receipt history
++
+Inventory history
 ```
 
-```text
-PARTIALLY_RECEIVED
-→ Registrar recepción restante
-```
-
-```text
-RECEIVED
-→ Ver historial
-```
+como hechos relacionados pero distintos.
 
 ---
 
-# 77. Recepción desde contexto
+# 70. Multi-tenancy
 
-Cuando el usuario inicia una Receipt desde una Purchase, Zaping ya conoce:
+Todas las operaciones Purchase deben ejecutarse dentro de la Company autenticada.
 
-* Purchase;
-* Supplier;
-* Items;
-* Ordered Quantity;
-* Received Quantity;
-* Pending Quantity.
-
-No debe pedirle seleccionar nuevamente esos datos.
-
----
-
-# 78. Formulario de Receipt
-
-La interfaz debe mostrar por partida:
+Debe mantenerse:
 
 ```text
-Producto
-Ordenado
-Recibido
-Pendiente
-Cantidad recibida
-Lote
-Caducidad
+Purchase.companyId
+
+Supplier.companyId
+
+Product.companyId
+
+PurchaseReceipt.companyId
 ```
 
-cuando corresponda.
+alineados con el tenant correspondiente.
 
 ---
 
-# 79. Validaciones UI
+# 71. ID security
 
-La UI puede prevenir errores como:
-
-* ninguna cantidad capturada;
-* cantidad < 1;
-* cantidad > pendiente;
-* caducidad sin lote.
-
-El backend debe repetir las validaciones críticas.
-
----
-
-# 80. Loading y errores
-
-Crear Purchase, aprobar, cancelar, generar PDF y registrar Receipt deben proporcionar feedback independiente.
-
-Una operación no debe dejar al usuario sin saber si:
+Conocer un UUID como:
 
 ```text
-está procesando
-terminó
-falló
+purchaseId
+
+purchaseItemId
+
+supplierId
+
+productId
 ```
+
+de otra Company no concede acceso.
+
+Backend debe validar ownership, no únicamente existencia global.
 
 ---
 
-# 81. Success feedback
+# 72. Authorization
 
-Después de una Receipt, idealmente debe mostrarse contexto como:
+Purchases utiliza la arquitectura transversal de Identity & Access.
+
+Permisos conceptuales futuros pueden incluir:
 
 ```text
-Recepción REC-002 registrada.
+purchases.read
 
-Ordenado: 10
-Recibido: 10
-Pendiente: 0
+purchases.create
 
-Compra recibida completamente.
+purchases.update
+
+purchases.approve
+
+purchases.cancel
+
+purchaseReceipts.create
 ```
+
+Estos nombres representan una dirección TARGET.
+
+No deben interpretarse como un catálogo Permission-Based RBAC completamente
+implementado actualmente.
 
 ---
 
-# 82. Endpoints actuales relevantes
+# 73. Security work before production
 
-La implementación existente utiliza contratos como:
+Purchases participa en la revisión transversal de:
+
+```text
+critical endpoint authorization
+
+systematic tenant-isolation regression
+
+inactive-user enforcement
+
+safe role provisioning
+```
+
+Además debe cerrarse la validación backend de:
+
+```text
+inactive Supplier
+
+inactive Product
+```
+
+antes de considerar definitivo el uso de recursos en nuevas Purchases.
+
+---
+
+# 74. Audit — TARGET
+
+Una futura plataforma transversal de Audit podrá registrar eventos como:
+
+```text
+Purchase created
+
+Purchase updated
+
+Purchase approved
+
+Purchase cancelled
+
+PurchaseReceipt registered
+```
+
+Actualmente existen hechos persistidos y metadatos operacionales, pero no un
+Audit transversal completo.
+
+---
+
+# 75. Purchase API — CURRENT
+
+Endpoints actuales relevantes:
 
 ```text
 GET   /purchases
+
 POST  /purchases
+
 PATCH /purchases/:id
+
 PATCH /purchases/:id/approve
+
 PATCH /purchases/:id/cancel
+
 GET   /purchases/:id/pdf
 ```
 
-y para recepciones:
+---
+
+# 76. No GET Purchase detail endpoint
+
+Actualmente no existe:
 
 ```text
-POST /purchase-receipts
-GET  /purchase-receipts/purchase/:purchaseId
+GET /purchases/:id
 ```
 
-Estos endpoints reflejan la implementación actual.
+La experiencia de detalle utiliza los datos obtenidos mediante:
 
-La convención objetivo puede evolucionar según `API_GUIDELINES.md` sin cambiar las reglas del dominio.
+```text
+GET /purchases
+```
+
+Esto funciona mientras el listado completo contiene la Purchase solicitada.
+
+Permanece como deuda:
+
+```text
+dedicated Purchase detail endpoint
+```
+
+especialmente antes de introducir paginación server-side.
 
 ---
 
-# 83. API objetivo
+# 77. PurchaseReceipt API — CURRENT
 
-Una dirección futura más orientada al recurso podría utilizar:
+Endpoints relacionados:
+
+```text
+POST /purchase-receipts
+
+GET /purchase-receipts
+
+GET /purchase-receipts/:id
+
+GET /purchase-receipts/purchase/:purchaseId
+```
+
+La fuente canónica de esos endpoints es:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+---
+
+# 78. API nesting future
+
+Una futura API podría evaluar contratos como:
 
 ```text
 POST /purchases/:purchaseId/receipts
 ```
 
-pero no se requiere un refactor únicamente por estética de URL.
+pero no debe realizarse un refactor únicamente por estética de URL.
 
-Debe realizarse cuando exista una razón de consistencia o evolución contractual.
+El contrato actual es válido mientras permanezca consistente y mantenible.
 
 ---
 
-# 84. Current vs Target
+# 79. Frontend Purchases V1
 
-## CURRENT
-
-Implementado o validado actualmente:
+La experiencia `/purchases` soporta actualmente:
 
 ```text
-Purchase CRUD funcional
-DRAFT
-CONFIRMED
-PARTIALLY_RECEIVED
-RECEIVED
-CANCELLED
-Purchase approval
-Purchase cancellation
+Purchase list
+
+create Purchase
+
+edit DRAFT
+
+approve DRAFT
+
+cancel DRAFT
+
+Purchase detail
+
 Purchase PDF
-Partial receipts
-Multiple receipts
-Pending quantity validation
-Lot capture
-Expiration capture
-InventoryBatch integration
-InventoryMovement IN
-Frontend receipt flow
+
+Receipt registration
+
+Receipt history
+
+Inventory traceability
+
+search
+
+filters
+
+loading
+
+error
+
+retry
+
+empty states
 ```
 
 ---
 
-# 85. TARGET
+# 80. Search CURRENT
 
-Evolución aprobada:
+La búsqueda client-side puede considerar campos como:
+
+```text
+folio
+
+Supplier
+
+Supplier contact
+
+Supplier email
+
+SKU
+
+Product
+```
+
+sobre las relaciones actualmente cargadas.
+
+---
+
+# 81. Filters CURRENT
+
+El workspace permite actualmente:
+
+```text
+status filter
+
+Supplier filter
+
+combined filters
+```
+
+Los filtros se aplican sobre datos ya cargados.
+
+Actualmente:
+
+```text
+server-side Purchase filtering
+→ NOT IMPLEMENTED
+```
+
+---
+
+# 82. Deep-link CURRENT
+
+Existe:
+
+```text
+/purchases?purchaseId=<id>
+```
+
+que abre el contexto de la Purchase indicada.
+
+Actualmente depende del resultado de:
+
+```text
+GET /purchases
+```
+
+Por tanto:
+
+```text
+deep-link + future server pagination
+→ compatibility debt
+```
+
+---
+
+# 83. Purchase detail
+
+La experiencia de detalle permite comprender:
+
+```text
+Supplier
+
+ordered Items
+
+Purchase status
+
+commercial totals
+
+Receipts
+
+received quantities
+
+pending quantities
+
+Inventory-related traceability
+```
+
+Puede evolucionar hacia una experiencia más amplia tipo:
 
 ```text
 Purchase 360
-Improved audit
-Explicit receipt correction/reversal
-Permission granularity
-Advanced tracking configuration by Product
-OpenAPI documentation
-Multi-Warehouse integration
-Supplier Returns
 ```
+
+pero eso no es necesario para cerrar Purchase V1.
 
 ---
 
-# 86. FUTURE
+# 84. Contextual actions
 
-Posibilidades posteriores:
+Las acciones dependen del lifecycle.
 
 ```text
-Purchase Requests
-Approval workflows
-Supplier quotations
-Expected delivery dates
-Backorders
-Accounts Payable
-Invoice matching
-Purchase analytics
-Automated replenishment recommendations
+DRAFT
+→ Edit
+→ Approve
+→ Cancel
 ```
-
-No deben interpretarse como alcance actual.
-
----
-
-# 87. Replenishment
-
-En el futuro Inventory podrá sugerir compras basándose en:
 
 ```text
-stock
-minStock
-consumption
-lead time
-pending purchases
+CONFIRMED
+→ Register Receipt
 ```
 
-La recomendación genera intención de compra.
+```text
+PARTIALLY_RECEIVED
+→ Register remaining Receipt
+```
 
-No aumenta inventario.
+```text
+RECEIVED
+→ Review history
+```
+
+```text
+CANCELLED
+→ historical/read-only context
+```
 
 ---
 
-# 88. Multi-Warehouse
+# 85. Receipt from Purchase context
 
-Cuando exista Multi-Warehouse, una Receipt deberá indicar el destino físico correspondiente.
+Cuando una Receipt inicia desde una Purchase, el sistema ya conoce:
 
-Ejemplo:
+```text
+Purchase
+
+Supplier
+
+PurchaseItems
+
+Ordered Quantity
+
+Received Quantity
+
+Pending Quantity
+```
+
+No debe obligar al usuario a volver a seleccionar datos ya determinados por el
+contexto.
+
+---
+
+# 86. Receipt form
+
+El frontend puede mostrar por partida:
+
+```text
+Product
+
+Ordered
+
+Received
+
+Pending
+
+Quantity to receive
+
+Lot when applicable
+
+Expiration when applicable
+```
+
+La visibilidad y obligatoriedad deben alinearse con:
+
+```text
+Product.lotTracking
+```
+
+---
+
+# 87. UI validation
+
+Frontend puede prevenir errores como:
+
+```text
+no received quantity
+
+quantity < 1
+
+quantity > pending
+
+lot missing when REQUIRED
+
+expiration without lot when OPTIONAL
+```
+
+Pero backend debe repetir las validaciones críticas.
+
+---
+
+# 88. Operation feedback
+
+Acciones como:
+
+```text
+create Purchase
+
+approve
+
+cancel
+
+generate PDF
+
+register Receipt
+```
+
+deben mantener estados independientes de:
+
+```text
+loading
+
+success
+
+error
+```
+
+para que el usuario pueda distinguir claramente qué operación terminó o falló.
+
+---
+
+# 89. Receipt success handoff
+
+Después de una Receipt válida, frontend conserva la identidad real devuelta por
+backend.
+
+Puede mostrar:
+
+```text
+Receipt folio
+
+success state
+
+View Receipt
+```
+
+y navegar al detalle dedicado correspondiente.
+
+La especificación completa pertenece a:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+---
+
+# 90. Warehouse operations — FUTURE
+
+Un futuro workspace de Warehouse podrá utilizar Purchases en estados:
+
+```text
+CONFIRMED
+
+PARTIALLY_RECEIVED
+```
+
+para representar:
+
+```text
+pending receiving work
+```
+
+sin convertir Warehouse en propietario del Purchase lifecycle.
+
+---
+
+# 91. Multi-Warehouse — FUTURE
+
+Cuando exista Multi-Warehouse, Purchase Receipt podrá necesitar indicar el destino
+físico correspondiente.
+
+Conceptualmente:
 
 ```text
 PurchaseReceipt
 ↓
-Warehouse A
+Warehouse / InventoryLocation
 ↓
-InventoryBatch
+Inventory IN
 ```
 
-Este cambio no debe alterar la regla central:
+Esto no cambia:
 
 ```text
-Receipt
-→ Inventory IN
+Purchase
+≠
+Inventory IN
 ```
 
 ---
 
-# 89. Barcode / QR
+# 92. Replenishment — FUTURE
 
-En etapas futuras, la recepción podrá utilizar:
+Inventory podrá generar señales o recomendaciones basadas en:
 
-* barcode;
-* QR;
-* scanner;
+```text
+stock
 
-para identificar productos, lotes o unidades.
+minStock
 
-Debe simplificar captura sin debilitar validaciones.
+consumption
+
+lead time
+
+pending Purchases
+```
+
+Esto genera intención de abastecimiento.
+
+No genera Inventory automáticamente.
 
 ---
 
-# 90. Importaciones
+# 93. Purchase Requests / approvals — FUTURE
 
-Las Purchases históricas pueden formar parte de procesos futuros de migración de datos.
-
-Debe distinguirse entre:
+Capacidades futuras pueden incluir:
 
 ```text
-historical imported purchase
+Purchase Request
+
+multi-step approval
+
+approval limits
+
+budget validation
+
+Supplier quotation comparison
 ```
 
-y:
-
-```text
-new operational receipt
-```
-
-para no generar inventario accidentalmente durante migraciones.
+No forman parte de Purchase V1.
 
 ---
 
-# 91. Integración con Dashboard
+# 94. Accounts Payable — FUTURE
 
-Dashboard puede mostrar:
+Purchases puede integrarse posteriormente con:
 
 ```text
-Purchases pending receipt
-Partially received purchases
-Recent receipts
+Supplier invoices
+
+Accounts Payable
+
+invoice matching
+
+payment status
 ```
 
-pero no es propietario del lifecycle.
+pero estos dominios no pertenecen al alcance actual.
 
 ---
 
-# 92. Integración con Warehouse Operations
+# 95. Barcode / QR receiving — FUTURE
 
-El Workspace futuro puede mostrar:
-
-```text
-Por recibir
-```
-
-basado en Purchases:
+Purchase Receipt podrá incorporar posteriormente:
 
 ```text
-CONFIRMED
-PARTIALLY_RECEIVED
+barcode
+
+QR
+
+scanner
 ```
 
-con cantidades pendientes.
+para acelerar identificación de:
+
+```text
+Product
+
+lot
+
+physical units
+```
+
+sin debilitar las validaciones backend.
 
 ---
 
-# 93. Integración con Healthcare
+# 96. Historical imports — FUTURE
 
-Healthcare puede consumir productos que originalmente ingresaron mediante Purchase Receipts.
+Importaciones de Purchases históricas deberán distinguir:
 
-El origen trazable puede ser:
+```text
+historical commercial record
+```
+
+de:
+
+```text
+new physical PurchaseReceipt
+```
+
+para evitar generar stock accidentalmente durante una migración.
+
+---
+
+# 97. Healthcare boundary
+
+Purchases no conoce Healthcare Cases.
+
+La trazabilidad Core actual puede ser:
 
 ```text
 Purchase
 ↓
 PurchaseReceipt
 ↓
-InventoryBatch
+InventoryBatch when applicable
 ↓
-CaseDispatch
-↓
-Reconciliation
+InventoryMovement
 ```
 
-Purchases no necesita conocer el Case para mantener esa trazabilidad.
+y, para ASSET:
+
+```text
+PurchaseReceipt
+↓
+EquipmentAsset
+```
+
+Healthcare podrá consumir posteriormente esa procedencia.
+
+Debe mantenerse:
+
+```text
+Purchases
+→ no Case dependency
+```
 
 ---
 
-# 94. Invariantes
+# 98. Healthcare TARGET
 
-El módulo debe proteger como mínimo:
+En el futuro Healthcare podrá utilizar inventario cuya procedencia sea:
+
+```text
+Purchase
+↓
+PurchaseReceipt
+↓
+Inventory / Equipment
+```
+
+y posteriormente relacionarlo con:
+
+```text
+Case
+
+Assignment
+
+Dispatch
+
+Custody
+
+Return
+```
+
+sin trasladar esas relaciones al modelo Purchase.
+
+---
+
+# 99. IMPLEMENTED — Purchase
+
+Actualmente:
+
+```text
+Purchase creation
+
+Purchase list
+
+DRAFT editing
+
+DRAFT approval
+
+DRAFT cancellation
+
+DRAFT / CONFIRMED / PARTIALLY_RECEIVED / RECEIVED / CANCELLED
+
+Purchase folio
+
+Purchase totals
+
+Purchase PDF
+
+client-side search
+
+client-side status filter
+
+client-side Supplier filter
+
+Purchase deep-link
+
+Receipt history integration
+```
+
+---
+
+# 100. IMPLEMENTED — Receipt integration
+
+Actualmente la integración relacionada incluye:
+
+```text
+partial Receipts
+
+multiple Receipts
+
+pending quantity calculation
+
+over-receipt protection
+
+ProductLotTracking NONE
+
+ProductLotTracking OPTIONAL
+
+ProductLotTracking REQUIRED
+
+InventoryBatch integration
+
+InventoryMovement IN
+
+Product.stock increment
+
+Purchase status recalculation
+
+ASSET Equipment provisioning
+
+Receipt idempotency
+
+Receipt detail
+
+Receipt traceability
+```
+
+La fuente canónica del detalle físico es:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+---
+
+# 101. VALIDATED
+
+La validación registrada cubre, según los hitos correspondientes:
+
+```text
+Purchase creation
+
+DRAFT editing
+
+approval
+
+cancellation
+
+approval without Inventory mutation
+
+partial Receipt
+
+full Receipt
+
+pending quantity
+
+over-receipt protection
+
+Inventory IN
+
+ASSET provisioning
+
+Receipt idempotency
+
+Purchase → Receipt handoff
+
+Receipt detail
+
+Inventory traceability
+
+frontend search / filters
+
+Purchase deep-link
+```
+
+Los gates técnicos incluyen:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+```
+
+y Prisma validation/status cuando corresponde.
+
+Los totales específicos se registran en:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+```
+
+---
+
+# 102. TECHNICAL DEBT — Purchase
+
+Permanece pendiente:
+
+```text
+Supplier.isActive backend enforcement
+for Purchase create/update
+```
+
+```text
+Product.isActive backend enforcement
+for Purchase create/update
+```
+
+```text
+Purchase creation idempotency
+```
+
+```text
+GET /purchases/:id
+```
+
+```text
+backend pagination
+```
+
+```text
+server-side search/filtering
+```
+
+```text
+deep-link compatibility after pagination
+```
+
+---
+
+# 103. RELATED RECEIPT DEBT
+
+Relacionada con Purchases, pero propiedad de Purchase Receipts:
+
+```text
+Receipt correction
+```
+
+```text
+Receipt reversal
+```
+
+```text
+Receipt PDF
+```
+
+```text
+real simultaneous PostgreSQL idempotency race QA
+```
+
+No deben confundirse con deuda del lifecycle de Purchase.
+
+---
+
+# 104. TARGET
+
+Evoluciones posteriores pueden incluir:
+
+```text
+Purchase 360
+
+improved Audit integration
+
+granular permissions
+
+OpenAPI documentation improvements
+
+Multi-Warehouse Receipt destination
+
+Supplier Returns
+```
+
+Estas capacidades no son necesarias para considerar funcional Purchase V1.
+
+---
+
+# 105. FUTURE
+
+Capacidades posteriores posibles:
+
+```text
+Purchase Requests
+
+advanced approval workflows
+
+Supplier quotations
+
+expected delivery dates
+
+backorders
+
+Accounts Payable
+
+supplier invoice matching
+
+purchase analytics
+
+automated replenishment recommendations
+
+barcode / QR receiving
+```
+
+No deben considerarse alcance actual únicamente por aparecer aquí.
+
+---
+
+# 106. Invariantes
+
+## Purchase approval
 
 ```text
 Purchase DRAFT
-→ no Inventory IN
+→ Approve
+→ CONFIRMED
 ```
 
+No:
+
 ```text
-Purchase CONFIRMED
-→ puede recibir
+Approve
+→ Inventory IN
 ```
+
+---
+
+## Inventory
+
+```text
+Purchase
+≠
+Inventory IN
+```
+
+---
+
+## Receipt
+
+```text
+Valid PurchaseReceipt creation
+→ physical receipt
+→ Inventory IN
+```
+
+---
+
+## Receipt lifecycle
+
+```text
+PurchaseReceipt
+→ no separate CONFIRMED state currently
+```
+
+---
+
+## Quantity
 
 ```text
 Received Quantity
@@ -1651,166 +2885,740 @@ Received Quantity
 Ordered Quantity
 ```
 
+---
+
+## Pending
+
+```text
+Pending
+=
+Ordered
+-
+Received
+```
+
+---
+
+## Status
+
+```text
+Purchase PARTIALLY_RECEIVED / RECEIVED
+→ derived from Receipt quantities
+```
+
+---
+
+## DRAFT
+
+```text
+DRAFT
+→ editable
+→ approvable
+→ cancellable
+→ not receivable
+```
+
+---
+
+## CONFIRMED
+
+```text
+CONFIRMED
+→ receivable
+→ not normal master-data editable
+```
+
+---
+
+## RECEIVED
+
+```text
+RECEIVED
+→ no additional normal Receipt
+```
+
+---
+
+## CANCELLED
+
+```text
+CANCELLED
+→ no normal Receipt
+```
+
+---
+
+## Tenant
+
+```text
+Purchase Supplier
+→ same Company
+```
+
+```text
+Purchase Product
+→ same Company
+```
+
 ```text
 PurchaseReceipt
-→ belongs to same Company
+→ same Company
 ```
+
+---
+
+## Receipt item
 
 ```text
 PurchaseReceiptItem
 → belongs to Purchase
 ```
 
-```text
-expirationDate
-→ requires lotNumber
-```
+---
+
+## Lot NONE
 
 ```text
-Receipt inventory effects
+NONE
+→ no lot
+→ no expiration
+```
+
+---
+
+## Lot OPTIONAL
+
+```text
+OPTIONAL
+→ lot optional
+→ expiration requires lot
+```
+
+---
+
+## Lot REQUIRED
+
+```text
+REQUIRED
+→ lot required
+```
+
+---
+
+## Atomicity
+
+```text
+Receipt physical effects
 → atomic
 ```
 
 ---
 
-# 95. Anti-patrones
-
-No volver a introducir:
-
-## Inventory on Approval
+## Equipment
 
 ```text
-Approve Purchase
-→ stock += ordered
+Purchase approval
+≠
+EquipmentAsset creation
+```
+
+```text
+ASSET Receipt
+→ EquipmentAsset provisioning
 ```
 
 ---
 
-## Manual Received Status
+# 107. Anti-patrones
+
+## Inventory on approval
 
 ```text
-User selects "RECEIVED"
+Approve Purchase
+→ stock += ordered quantity
+```
+
+Incorrecto.
+
+---
+
+## PurchaseReceipt CONFIRMED
+
+Inventar un estado:
+
+```text
+PurchaseReceipt CONFIRMED
+```
+
+como requisito actual.
+
+Incorrecto.
+
+---
+
+## Manual received state
+
+```text
+User selects RECEIVED
 ```
 
 sin verificar cantidades.
 
+Incorrecto.
+
 ---
 
-## Over Receipt
+## Over-receipt
 
 ```text
-Ordered 10
-Received 13
+Ordered = 10
+Received = 13
 ```
 
-sin un proceso excepcional explícito.
+sin workflow excepcional explícito.
+
+Incorrecto.
 
 ---
 
-## Editing History
+## Editing Receipt history
 
-Modificar una Receipt histórica después de haber generado stock.
+Modificar silenciosamente una Receipt después de que produjo Inventory.
 
----
-
-## Cross-Tenant Purchase
-
-Utilizar Supplier/Product de otra Company.
+Incorrecto.
 
 ---
 
-## Notes as Data Model
-
-Guardar lote, cantidad o caducidad únicamente dentro de una nota.
-
----
-
-# 96. Relación con Inventory
-
-`PURCHASES.md` define:
-
-> por qué y cuánto se compra y recibe.
-
-`INVENTORY.md` define:
-
-> cómo esa recepción se representa como existencia física trazable.
-
-La frontera es:
+## Cross-tenant Supplier
 
 ```text
-PurchaseReceipt
-↓
-Inventory
+Purchase Company A
+→ Supplier Company B
 ```
 
----
-
-# 97. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-012 — Entity Lifecycle.
+Incorrecto.
 
 ---
 
-# 98. Documentos relacionados
+## Cross-tenant Product
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-ux/DESIGN_SYSTEM.md
-product/ZAPING_WAY.md
-modules/erp/INVENTORY.md
+Purchase Company A
+→ Product Company B
 ```
 
----
-
-# 99. Fuente de verdad
-
-Este documento constituye la fuente de verdad documental para las reglas funcionales de Purchases y Purchase Receipts.
-
-El código es la fuente técnica para:
-
-* campos exactos;
-* DTOs;
-* endpoints actualmente disponibles;
-* implementación;
-* tests.
-
-Los ADR constituyen la fuente para decisiones arquitectónicas.
+Incorrecto.
 
 ---
 
-# 100. Principio final
+## Frontend-only active validation
 
-La operación debe representar la realidad:
+Confiar únicamente en que UI mostró Suppliers/Products activos sin validar backend.
+
+Incorrecto como arquitectura definitiva.
+
+---
+
+## Old lot flags
+
+Reintroducir:
 
 ```text
-Comprar
-≠
-Recibir
+requiresLotTracking
+
+requiresExpirationTracking
+
+requiresSerialTracking
 ```
 
-Por tanto:
+cuando ya existen:
+
+```text
+inventoryTracking
+
+lotTracking
+```
+
+Incorrecto.
+
+---
+
+## Notes as structured data
+
+Guardar exclusivamente dentro de notas:
+
+```text
+lot
+
+quantity
+
+expiration
+
+responsible actor
+```
+
+Incorrecto.
+
+---
+
+## Supplier Return by rewriting Receipt
+
+Editar Receipt original para representar una devolución posterior.
+
+Incorrecto.
+
+---
+
+# 108. Relación con Products
+
+Products define:
+
+```text
+Product identity
+
+inventoryTracking
+
+lotTracking
+```
+
+Purchases define:
+
+```text
+ordered quantity
+
+commercial Purchase value
+```
+
+Purchase Receipts aplica el tracking físico correspondiente.
+
+---
+
+# 109. Relación con Suppliers
+
+Supplier identifica al proveedor comercial de la Purchase.
+
+Debe mantenerse:
 
 ```text
 Purchase
-↓
-confirma intención de abastecimiento
-
-PurchaseReceipt
-↓
-confirma recepción física
-
-Inventory
-↓
-registra la consecuencia
+→ Supplier relationship
 ```
 
-> **El inventario aumenta cuando la mercancía realmente entra, no cuando se ordena.**
+y:
+
+```text
+Supplier historical deactivation
+→ does not erase Purchase history
+```
+
+La validación backend de Supplier activo para nuevas Purchases permanece como
+deuda.
+
+---
+
+# 110. Relación con Purchase Receipts
+
+Debe mantenerse:
+
+```text
+PURCHASES.md
+→ what was ordered
+```
+
+```text
+PURCHASE_RECEIPTS.md
+→ what was physically received
+```
+
+Este documento no es la fuente canónica de la implementación detallada de Receipt.
+
+---
+
+# 111. Relación con Inventory
+
+Purchase no modifica Inventory al aprobarse.
+
+Purchase Receipt produce:
+
+```text
+InventoryMovement IN
+
+Product.stock increment
+
+InventoryBatch when applicable
+```
+
+La semántica resultante pertenece a:
+
+```text
+INVENTORY.md
+```
+
+---
+
+# 112. Relación con Equipment
+
+Para Products ASSET:
+
+```text
+PurchaseReceipt
+↓
+Equipment provisioning
+↓
+EquipmentAsset
+```
+
+Purchases no administra:
+
+```text
+assetCode
+
+serial
+
+lifecycle
+
+condition
+
+Inspection
+
+Retirement
+```
+
+Estas reglas pertenecen a:
+
+```text
+EQUIPMENT.md
+```
+
+---
+
+# 113. ADR relacionados
+
+```text
+ADR-001 — Multi-Tenant
+
+ADR-002 — Inventory Movements
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-012 — Entity Lifecycle
+```
+
+---
+
+# 114. Documentación relacionada
+
+```text
+docs/modules/erp/SUPPLIERS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+---
+
+# 115. Fuente de verdad
+
+```text
+PURCHASES.md
+→ Purchase lifecycle
+→ ordered quantities
+→ Supplier relationship
+→ commercial Purchase behavior
+```
+
+```text
+PURCHASE_RECEIPTS.md
+→ physical receiving
+→ lot rules
+→ Receipt idempotency
+→ Inventory mutation orchestration
+→ ASSET provisioning
+```
+
+```text
+INVENTORY.md
+→ stock / movement / Batch semantics
+```
+
+```text
+EQUIPMENT.md
+→ EquipmentAsset identity
+```
+
+```text
+PRODUCTS.md
+→ Product tracking configuration
+```
+
+```text
+SUPPLIERS.md
+→ Supplier lifecycle
+```
+
+```text
+schema.prisma
+→ CURRENT persistence
+```
+
+```text
+Purchases backend
+→ CURRENT Purchase implementation
+```
+
+```text
+Purchase Receipts backend
+→ CURRENT Receipt implementation
+```
+
+```text
+tests
+→ validated behavior
+```
+
+```text
+PROJECT_BOARD.md
+→ current project status and debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
+```
+
+---
+
+# 116. Estado consolidado
+
+```text
+Purchase creation
+✅ IMPLEMENTED / VALIDATED
+
+Purchase list
+✅ IMPLEMENTED / VALIDATED
+
+DRAFT editing
+✅ IMPLEMENTED / VALIDATED
+
+DRAFT approval
+✅ IMPLEMENTED / VALIDATED
+
+DRAFT cancellation
+✅ IMPLEMENTED / VALIDATED
+
+Purchase PDF
+✅ IMPLEMENTED / VALIDATED
+
+DRAFT
+✅
+
+CONFIRMED
+✅
+
+PARTIALLY_RECEIVED
+✅
+
+RECEIVED
+✅
+
+CANCELLED
+✅
+
+client-side Purchase search/filtering
+✅
+
+Purchase deep-link
+✅
+```
+
+Receipt integration:
+
+```text
+Partial Receipts
+✅
+
+Multiple Receipts
+✅
+
+Pending quantity
+✅
+
+Over-receipt protection
+✅
+
+ProductLotTracking rules
+✅
+
+InventoryBatch integration
+✅
+
+InventoryMovement IN
+✅
+
+Product.stock IN
+✅
+
+ASSET provisioning
+✅
+
+Receipt idempotency
+✅
+
+Receipt detail / handoff
+✅
+```
+
+Purchase debt:
+
+```text
+Supplier active backend enforcement
+⏳
+
+Product active backend enforcement
+⏳
+
+Purchase creation idempotency
+⏳
+
+GET /purchases/:id
+⏳
+
+backend pagination
+⏳
+
+server-side search/filtering
+⏳
+```
+
+Related Receipt debt:
+
+```text
+Receipt correction / reversal
+⏳
+
+Receipt PDF
+⏳
+
+real simultaneous PostgreSQL idempotency race QA
+⏳
+```
+
+---
+
+# 117. Secuencia de proyecto
+
+Purchases V1 forma parte del ERP Core normalizado.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto, capacidades como:
+
+```text
+Supplier Returns
+
+Purchase 360
+
+advanced approvals
+
+Multi-Warehouse
+
+replenishment
+```
+
+no deben convertirse automáticamente en el siguiente sprint únicamente por estar
+documentadas.
+
+---
+
+# 118. Principio final
+
+Debe mantenerse siempre:
+
+```text
+Buying
+≠
+Receiving
+```
+
+La secuencia correcta es:
+
+```text
+Supplier
+↓
+Purchase
+↓
+ordered commercial commitment
+↓
+PurchaseReceipt
+↓
+physical receipt
+↓
+Inventory IN
+```
+
+y, cuando el Product utiliza ASSET:
+
+```text
+PurchaseReceipt
+↓
+EquipmentAsset identities
+```
+
+sin duplicar Inventory.
+
+En términos de ownership:
+
+```text
+Purchase
+→ what was ordered
+```
+
+```text
+PurchaseReceipt
+→ what was physically received
+```
+
+```text
+Inventory
+→ quantity consequence
+```
+
+```text
+Equipment
+→ reusable physical identity
+```

@@ -1,208 +1,248 @@
 # Equipment — Zaping ERP
 
 **Módulo:** Core Equipment
-**Producto:** Zaping ERP
-**Versión:** 1.8.0
-**Estado:** Approved
+**Producto:** Zaping ERP Core
+**Versión:** 2.0.0
+**Estado:** Aprobado
 **Estado de implementación:** EQUIPMENT V1 IMPLEMENTED / VALIDATED
-**Última actualización:** 2026-08-25
-**Responsable:** Zaping Team
+**Última actualización:** 2026-08-27
+**Responsable:** Zaping ERP Team
 
 ---
 
-# Estado de esta versión
+# 1. Propósito
 
-Esta versión consolida las decisiones de dominio aprobadas en `EQUIPMENT.md v1.2.0` y registra la primera implementación técnica de Core Equipment.
+Core Equipment administra la identidad, condición y ciclo de vida de activos
+físicos reutilizables.
 
-A partir de esta versión deben distinguirse claramente:
+Su responsabilidad principal es responder:
 
 ```text
-DOMAIN DECISION
-→ approved business / architecture rule
-
-PERSISTENCE
-→ Prisma / PostgreSQL implemented
-
-BACKEND
-→ NestJS API implemented
-
-OPERATIONAL WORKFLOW
-→ future or pending implementation
+¿Qué unidad física exacta existe?
 ```
 
-Estado general:
+y no únicamente:
 
 ```text
-Equipment Core Domain
-→ APPROVED
+¿Qué Product representa?
+```
 
-Equipment Persistence Baseline
-→ IMPLEMENTED
+Debe mantenerse:
 
-Equipment Core Backend — Registration / Read
-→ IMPLEMENTED
+```text
+Product
+≠
+EquipmentAsset
+```
 
-Automatic assetCode Generation
-→ IMPLEMENTED / VALIDATED
+`Product` representa catálogo/modelo.
 
-Purchase Receipt → EquipmentAsset
-→ IMPLEMENTED / VALIDATED
+`EquipmentAsset` representa una unidad física individual.
+
+---
+
+# 2. Alcance
+
+Core Equipment es responsable de:
+
+```text
+EquipmentAsset identity
+
+assetCode
+
+serialNumber
+
+serial normalization
+
+lifecycle
+
+condition
+
+origin
+
+InventoryBatch association when applicable
+
+Purchase Receipt provenance
+
+Inspection history
+
+Retirement
 
 Current Availability
-→ IMPLEMENTED / VALIDATED
-
-Equipment Operational Workflows
-→ V1 IMPLEMENTED / VALIDATED
-
-Equipment Frontend
-→ IMPLEMENTED / VALIDATED
-
-Healthcare Equipment Integration
-→ NOT IMPLEMENTED
 ```
 
----
+También proporciona las capacidades Core que posteriormente utilizará
+Zaping Healthcare.
 
-# Implementación entregada en v1.3.0
-
-Se encuentran implementados:
-
-```text
-ProductInventoryTracking
-ProductLotTracking
-
-EquipmentLifecycle
-EquipmentCondition
-EquipmentOrigin
-EquipmentRetirementReason
-
-EquipmentAsset persistence
-EquipmentInspection persistence baseline
-
-Equipment NestJS Module
-Equipment Controller
-Equipment Service
-CreateEquipmentDto
-
-GET /equipment
-GET /equipment/:id
-GET /equipment/:equipmentId/availability
-POST /equipment
-
-JWT protection
-companyId tenant isolation
-Product ASSET validation
-Product active validation
-Batch ownership validation
-server-generated assetCode
-CompanySequence assetCode allocation
-assetCode duplicate protection
-Purchase Receipt → EquipmentAsset provisioning
-EquipmentProvisioningService
-EquipmentAssetCodeService
-EquipmentAvailabilityService
-pure Current Availability evaluator
-serial normalization
-serial duplicate validation
-DTO validation
-400 / 404 / 409 error handling
-```
-
-También se actualizó Products para permitir definir durante creación:
+Core Equipment no es propietario de:
 
 ```text
-inventoryTracking
-lotTracking
-```
+Healthcare Case
 
-La modificación genérica de esas estrategias mediante `UpdateProductDto` no forma parte de la edición normal.
+Equipment Requirement
 
----
-
-# Capacidades todavía pendientes
-
-No deben considerarse implementadas todavía:
-
-```text
-serial correction operation
-assetCode correction operation
-Inventory / Equipment synchronization policy
-Case Availability
 Case Equipment Assignment
-Custody
+
+Case Availability
+
+CaseKit
+
 Dispatch
-Return
-Maintenance
-Calibration
-Equipment 360
-Healthcare operational integration
-Equipment-specific audit workflow
+
+Custody
+
+Case Return
+
+Case Reconciliation
+```
+
+Estas capacidades pertenecen a Healthcare.
+
+---
+
+# 3. Estado actual
+
+Actualmente están implementados y validados:
+
+```text
+Equipment registration
+
+Equipment list
+
+Equipment detail
+
+automatic assetCode generation
+
+serial normalization
+
+serial duplicate validation
+
+Purchase Receipt → EquipmentAsset provisioning
+
+Current Availability
+
+Inspection
+
+Inspection history
+
+Retirement
+
+tenant-scoped Equipment operations
+
+frontend Equipment workspace
+
+Equipment deep-link
+```
+
+Estado:
+
+```text
+Core Equipment V1
+→ IMPLEMENTED / VALIDATED
 ```
 
 ---
 
-# 1. Ownership del dominio
+# 4. Deuda y capacidades no implementadas
 
-`EquipmentAsset` pertenece a Zaping ERP/Core.
+Actualmente permanecen pendientes dentro o alrededor de Core Equipment:
 
 ```text
-Zaping ERP / Core
+serial correction workflow
+
+manual frontend batch selector
+
+Product.stock ↔ EquipmentAsset formal reconciliation
+
+Equipment-specific Audit integration
+
+server-side pagination
+
+bulk/list Availability if required
+
+retired actor display enrichment
+```
+
+Pertenecen a Healthcare TARGET:
+
+```text
+Equipment Requirement
+
+Case Equipment Assignment
+
+Case Availability
+
+Dispatch
+
+Custody
+
+Return
+
+Case logistics
+```
+
+Pertenecen a evolución futura:
+
+```text
+Maintenance
+
+Calibration
+
+Equipment 360 / advanced read experience
+
+multi-warehouse integration
+```
+
+---
+
+# 5. Ownership del dominio
+
+`EquipmentAsset` pertenece a ERP Core.
+
+```text
+Zaping ERP Core
 │
+├── Products
+├── Inventory
 └── Equipment
     └── EquipmentAsset
 ```
 
-Healthcare consume Equipment mediante:
+Healthcare consume Equipment:
 
 ```text
-Zaping Healthcare
-│
-├── HealthcareCase
-├── CaseKit
-├── Equipment Requirement
-├── Case Equipment Assignment
-└── Case Logistics
-    ├── Preparation
-    ├── Dispatch
-    ├── Custody
-    ├── Return
-    └── Inspection
+Healthcare
+↓
+references
+↓
+EquipmentAsset
 ```
 
 Debe mantenerse:
 
 ```text
 EquipmentAsset
-→ generic reusable physical asset
+→ Core physical identity
 ```
 
 mientras:
 
 ```text
-Case Equipment Assignment
-CaseKit Equipment requirements
-Healthcare Dispatch
-Healthcare Return
-Healthcare Inspection
+Assignment
+Custody
+Dispatch
+Return
+Case Availability
+→ Healthcare operational facts
 ```
 
-pertenecen al dominio Healthcare.
-
-La fuente de verdad documental de la identidad física del activo es:
-
-```text
-modules/erp/EQUIPMENT.md
-```
-
-Healthcare deberá referenciar este documento y no crear una definición paralela de `EquipmentAsset`.
-
-**Estado:** APPROVED / IMPLEMENTED AT CORE DOMAIN.
+Healthcare no debe crear una definición paralela de `EquipmentAsset`.
 
 ---
 
-# 2. Product relationship
+# 6. Relación Product → EquipmentAsset
 
-Todo `EquipmentAsset` pertenece obligatoriamente a un `Product`.
+Todo `EquipmentAsset` pertenece a un `Product`.
 
 ```text
 Product
@@ -212,24 +252,14 @@ Product
     EquipmentAsset
 ```
 
-Debe mantenerse:
-
-```text
-Product
-→ what the resource/model is
-
-EquipmentAsset
-→ which exact physical unit it is
-```
-
-Por tanto:
+Debe cumplirse:
 
 ```text
 EquipmentAsset.productId
 → REQUIRED
 ```
 
-y debe cumplirse:
+y:
 
 ```text
 EquipmentAsset.companyId
@@ -237,43 +267,39 @@ EquipmentAsset.companyId
 Product.companyId
 ```
 
-No debe existir dentro de Equipment un catálogo paralelo para:
+Conceptualmente:
+
+```text
+Product
+→ what the model/resource is
+
+EquipmentAsset
+→ which exact physical unit it is
+```
+
+Equipment no debe duplicar campos de catálogo como:
 
 ```text
 name
 brand
-model
 category
 description
 ```
 
-cuando estos datos pertenecen a Product.
-
-Los recursos internos no vendibles deberán resolverse mediante capacidades/configuración de Product y no haciendo `productId` opcional.
-
-La creación actual del backend valida que el Product:
-
-```text
-exists
-belongs to the authenticated Company
-uses ASSET tracking
-is active
-```
-
-**Estado:** APPROVED / IMPLEMENTED.
+cuando pertenecen a Product.
 
 ---
 
-# 3. Product inventory tracking
+# 7. ProductInventoryTracking
 
-La estrategia técnica definitiva es:
+La estrategia de tracking contempla:
 
 ```text
-enum ProductInventoryTracking {
-  QUANTITY
-  SERIALIZED
-  ASSET
-}
+QUANTITY
+
+SERIALIZED
+
+ASSET
 ```
 
 Semántica:
@@ -281,12 +307,16 @@ Semántica:
 ```text
 QUANTITY
 → units represented primarily through quantities
+```
 
+```text
 SERIALIZED
-→ individually serialized commercial units
+→ individually serialized commercial inventory
+```
 
+```text
 ASSET
-→ reusable physical assets represented by EquipmentAsset
+→ persistent reusable physical units represented by EquipmentAsset
 ```
 
 Debe mantenerse:
@@ -297,59 +327,64 @@ SERIALIZED
 ASSET
 ```
 
-Ejemplos:
+Ejemplos conceptuales:
 
 ```text
-Catéter
+Consumible
 → QUANTITY
 ```
 
 ```text
-Marcapasos
+Unidad comercial serializada
 → SERIALIZED
 ```
 
 ```text
-Programador reutilizable
+Equipo reutilizable
 → ASSET
 ```
 
-Un `EquipmentAsset` solo puede crearse cuando:
+Un `EquipmentAsset` solo puede crearse para:
 
 ```text
 Product.inventoryTracking = ASSET
 ```
 
-La API rechaza productos con cualquier otra estrategia.
-
-**Estado:** APPROVED / PERSISTED / BACKEND ENFORCED.
+La creación Core rechaza Products con otra estrategia.
 
 ---
 
-# 4. Lot tracking
+# 8. SERIALIZED
 
-Lot tracking es una dimensión independiente.
+`SERIALIZED` no utiliza actualmente `EquipmentAsset` como representación automática
+durante Purchase Receipts.
 
-La estrategia técnica definitiva es:
+Actualmente:
 
 ```text
-enum ProductLotTracking {
-  NONE
-  OPTIONAL
-  REQUIRED
-}
+SERIALIZED Receipt provisioning
+→ NOT IMPLEMENTED
 ```
 
-Puede coexistir con diferentes estrategias de identidad.
+Su semántica individual completa permanece como deuda de Inventory.
 
-Ejemplo:
+No debe reutilizarse `EquipmentAsset` para resolver SERIALIZED únicamente porque
+ambos conceptos pueden utilizar números de serie.
+
+---
+
+# 9. ProductLotTracking
+
+Lot Tracking es una dimensión independiente de Inventory Tracking.
+
+Valores:
 
 ```text
-EquipmentAsset
-+
-serialNumber
-+
-InventoryBatch
+NONE
+
+OPTIONAL
+
+REQUIRED
 ```
 
 Debe mantenerse:
@@ -362,2241 +397,187 @@ serial
 asset identity
 ```
 
-En creación manual, cuando se proporciona `batchId`, el backend valida que el lote pertenezca:
+Las reglas completas de recepción:
 
 ```text
-same Company
-+
-same Product
+NONE
+OPTIONAL
+REQUIRED
 ```
 
-La política completa entre `lotTracking` y obligatoriedad del `batchId` deberá cerrarse dentro de la futura integración Inventory / Purchase Receipt / Equipment.
+están implementadas en Purchase Receipts.
 
-**Estado:** APPROVED / PERSISTED / PARTIALLY ENFORCED.
+La fuente funcional de esas reglas es:
+
+```text
+PURCHASE_RECEIPTS.md
+```
 
 ---
 
-# 5. EquipmentAsset como verdad física
+# 10. Equipment y lotes
 
-Para Products con:
+Un `EquipmentAsset` puede relacionarse con:
+
+```text
+InventoryBatch
+```
+
+cuando exista una asociación válida.
+
+En creación manual, si backend recibe:
+
+```text
+batchId
+```
+
+debe validar:
+
+```text
+same Company
+
+same Product
+```
+
+El backend soporta esta asociación.
+
+Actualmente el frontend de creación manual no expone un selector de lote seguro.
+
+Por tanto:
+
+```text
+backend batch association
+→ SUPPORTED
+
+manual frontend batch selector
+→ PENDING
+```
+
+---
+
+# 11. EquipmentAsset como identidad física
+
+Para Products:
 
 ```text
 inventoryTracking = ASSET
 ```
 
-los registros:
+cada fila:
 
 ```text
 EquipmentAsset
 ```
 
-representan las unidades físicas individuales.
+representa una unidad física específica.
 
 Conceptualmente:
 
 ```text
 EquipmentAsset records
-→ physical unit truth
+→ physical identity truth
 ```
 
-`Product.stock` puede mantenerse temporalmente por compatibilidad con el sistema existente, pero deberá evolucionar hacia:
+Mientras:
 
 ```text
-aggregate / projection
+Product.stock
+→ aggregate inventory projection
 ```
 
-y no:
-
-```text
-independent source of truth
-```
-
-Debe impedirse eventualmente:
-
-```text
-Product.stock = 6
-```
-
-cuando solamente existen:
-
-```text
-4 valid EquipmentAssets
-```
-
-sin una operación de dominio que explique la diferencia.
-
-Regla:
-
-> **Un Product controlado mediante EquipmentAsset no puede incrementar su cantidad física sin crear las identidades físicas correspondientes.**
-
-La sincronización completa `Product.stock ↔ EquipmentAsset` todavía no está implementada.
-
-**Estado:** DOMAIN APPROVED / ENFORCEMENT PENDING.
+Debe evitarse que ambas representaciones evolucionen independientemente sin una
+regla que explique sus diferencias.
 
 ---
 
-# 6. Inventory relationship
+# 12. Product.stock y EquipmentAsset
 
-Equipment extiende Inventory.
+Actualmente `Product.stock` continúa siendo utilizado por Inventory.
 
-No lo reemplaza.
+Para Products ASSET:
 
 ```text
-Inventory
+EquipmentAsset
+→ physical identity layer
+```
+
+```text
+Product.stock
+→ aggregate quantity projection
+```
+
+La política formal de reconciliación:
+
+```text
+Product.stock
+↔
+EquipmentAsset
+```
+
+todavía no está implementada completamente.
+
+Esto permanece como deuda importante.
+
+Principio:
+
+> Una operación que incremente físicamente unidades ASSET debe producir también
+> las identidades físicas correspondientes cuando el workflow así lo requiere.
+
+---
+
+# 13. Relación con Inventory
+
+Equipment se integra con Inventory, pero mantiene ownership independiente.
+
+```text
+ERP Core
+
+├── Products
+│   └── catalog + tracking configuration
 │
-├── Quantity tracked Products
-├── Serialized Products
-└── Asset tracked Products
-    │
-    └── EquipmentAsset
-```
-
-Las operaciones futuras de:
-
-```text
-acquisition
-receipt
-creation
-retirement
-disposition
-```
-
-deberán mantener consistencia entre:
-
-```text
-Inventory
-Product
-EquipmentAsset
-```
-
-Cuando varias escrituras formen una sola operación de negocio deberán ejecutarse transaccionalmente.
-
-La integración completa con Inventory todavía está pendiente.
-
-**Estado:** APPROVED / INTEGRATION PENDING.
-
----
-
-# 7. Healthcare Dispatch no es Inventory OUT
-
-Debe mantenerse:
-
-```text
-Reusable Equipment Dispatch
-≠
-Commercial Inventory OUT
-```
-
-Cuando:
-
-```text
-Warehouse
-↓
-Technician
-```
-
-la propiedad física del activo no cambia.
-
-Lo que cambia es:
-
-```text
-Custody
-```
-
-No:
-
-```text
-owned quantity
-```
-
-Igualmente:
-
-```text
-Return
-≠
-Commercial Inventory IN
-```
-
-El Equipment nunca dejó de pertenecer a la Company.
-
-**Estado:** APPROVED / HEALTHCARE WORKFLOW PENDING.
-
----
-
-# 8. Lifecycle
-
-La estrategia técnica definitiva es:
-
-```text
-enum EquipmentLifecycle {
-  ACTIVE
-  RETIRED
-}
-```
-
-`ACTIVE` significa:
-
-```text
-The asset remains part of the managed fleet.
-```
-
-No significa:
-
-```text
-AVAILABLE
-```
-
-`RETIRED` significa:
-
-```text
-The asset permanently left normal operational use.
+├── Inventory
+│   ├── Product.stock
+│   ├── InventoryMovement
+│   └── InventoryBatch
+│
+└── Equipment
+    ├── EquipmentAsset
+    ├── lifecycle
+    ├── condition
+    ├── Inspection
+    ├── Retirement
+    └── Current Availability
 ```
 
 Debe mantenerse:
 
 ```text
-RETIRED
-→ historical record remains
-```
-
-Los nuevos Equipment creados usan:
-
-```text
-lifecycle = ACTIVE
-```
-
-por defecto.
-
-No existe edición genérica de lifecycle mediante la API actual.
-
-**Estado:** APPROVED / PERSISTED / RETIREMENT WORKFLOW PENDING.
-
----
-
-# 9. Disposition
-
-La estrategia técnica definitiva para razones de retiro es:
-
-```text
-enum EquipmentRetirementReason {
-  SOLD
-  LOST
-  DESTROYED
-  END_OF_LIFE
-  REPLACED
-  OTHER
-}
-```
-
-Estas razones no son Lifecycle states.
-
-Conceptualmente:
-
-```text
-ACTIVE
-↓
-Retirement / Disposition
-↓
-RETIRED
-
-Reason:
-SOLD
-LOST
-DESTROYED
-END_OF_LIFE
-REPLACED
-OTHER
-```
-
-Persistencia disponible en `EquipmentAsset`:
-
-```text
-retiredAt
-retiredById
-retiredReason
-retirementNotes
-```
-
-La operación de Retirement todavía no está expuesta mediante API.
-
-**Estado:** APPROVED / PERSISTED / WORKFLOW PENDING.
-
----
-
-# 10. Missing no significa Lost
-
-Debe mantenerse:
-
-```text
-Overdue
+Inventory access
 ≠
-Lost
+Equipment domain ownership
 ```
+
+Inventory no es propietario de:
 
 ```text
-Missing
-≠
-Lost
+Equipment lifecycle
+
+Equipment condition
+
+Equipment retirement
+
+Equipment Current Availability
 ```
-
-```text
-Open incident
-≠
-Lost
-```
-
-Un activo solo puede considerarse perdido mediante resolución explícita y autorizada.
-
-Resultado final:
-
-```text
-Lifecycle:
-RETIRED
-
-Disposition:
-LOST
-```
-
-**Estado:** APPROVED / WORKFLOW PENDING.
 
 ---
 
-# 11. Retirement
+# 14. Modelo EquipmentAsset
 
-Retirement será una operación explícita, autorizada y auditable.
-
-Antes de retirar normalmente deberán resolverse:
-
-```text
-active assignments
-active custody
-open operational dependencies
-```
-
-Una pérdida confirmada puede requerir un flujo excepcional para cerrar custodia sin retorno físico.
-
-Un activo `RETIRED`:
-
-```text
-cannot receive new assignments
-cannot be dispatched
-cannot become available
-```
-
-pero conservará:
-
-```text
-Case history
-Custody history
-Inspection history
-Audit
-Purchase origin
-Disposition history
-```
-
-No existe:
-
-```text
-DELETE /equipment/:id
-```
-
-La eliminación física de un Equipment no forma parte del contrato normal.
-
-**Estado:** APPROVED / API PENDING.
-
----
-
-# 12. Reactivation
-
-Fase 1 no tendrá una operación normal:
-
-```text
-Reactivate Equipment
-```
-
-Retirement representa una decisión definitiva.
-
-Una corrección administrativa futura requerirá una operación:
-
-```text
-exceptional
-authorized
-audited
-```
-
-**Estado:** APPROVED / NOT IMPLEMENTED.
-
----
-
-# 13. Condition
-
-La estrategia técnica definitiva es:
-
-```text
-enum EquipmentCondition {
-  GOOD
-  INSPECTION_PENDING
-  DAMAGED
-  OUT_OF_SERVICE
-}
-```
-
-Condition representa el snapshot operacional actual del activo.
-
-Durante creación manual se exige una condición inicial válida.
-
-No existe una operación genérica de edición de Condition.
-
-**Estado:** APPROVED / PERSISTED / INSPECTION WORKFLOW PENDING.
-
----
-
-# 14. GOOD
-
-```text
-GOOD
-```
-
-significa que no existe una condición física u operacional conocida que impida el uso normal.
-
-No garantiza Availability.
-
-Puede coexistir con blockers externos como:
-
-```text
-active assignment
-external custody
-maintenance
-calibration
-```
-
-**Estado:** APPROVED.
-
----
-
-# 15. INSPECTION_PENDING
-
-Representa:
-
-```text
-Physical condition has not yet been validated.
-```
-
-Debe utilizarse especialmente después de Return cuando la política exige Inspection.
-
-También puede utilizarse durante migraciones o altas iniciales cuando la condición del activo aún no ha sido validada.
-
-La API de creación manual permite registrar esta condición.
-
-**Estado:** APPROVED / PERSISTED.
-
----
-
-# 16. DAMAGED
-
-Representa daño conocido.
-
-En Fase 1:
-
-```text
-DAMAGED
-→ NOT AVAILABLE
-```
-
-No crea automáticamente:
-
-```text
-Maintenance work order
-```
-
-**Estado:** APPROVED / PERSISTED / AVAILABILITY PENDING.
-
----
-
-# 17. OUT_OF_SERVICE
-
-Representa una decisión operacional de impedir utilización.
-
-Puede existir:
-
-```text
-Lifecycle:
-ACTIVE
-
-Condition:
-OUT_OF_SERVICE
-```
-
-porque la unidad continúa perteneciendo a la Company.
-
-**Estado:** APPROVED / PERSISTED.
-
----
-
-# 18. Maintenance no es Condition
-
-No debe existir dentro de Condition una semántica como:
-
-```text
-MAINTENANCE_REQUIRED
-```
-
-Maintenance será una capacidad independiente.
-
-Debe poder existir:
-
-```text
-Condition:
-GOOD
-
-Maintenance blocker:
-YES
-```
-
-**Estado:** APPROVED / FUTURE DOMAIN.
-
----
-
-# 19. Calibration no es Condition
-
-No debe existir dentro de Condition una semántica como:
-
-```text
-CALIBRATION_REQUIRED
-```
-
-Debe poder existir:
-
-```text
-Condition:
-GOOD
-
-Calibration:
-OVERDUE
-
-Availability:
-NO
-```
-
-No todos los Equipment estarán sujetos a calibración.
-
-**Estado:** APPROVED / FUTURE DOMAIN.
-
----
-
-# 20. Maintenance boundary
-
-Equipment Fase 1 no implementará:
-
-```text
-CMMS
-work orders
-service providers
-maintenance costs
-spare parts
-preventive maintenance schedules
-```
-
-Un futuro dominio `EquipmentMaintenance` administrará esas capacidades.
-
-No deben agregarse campos improvisados a `EquipmentAsset` para sustituir dicho dominio.
-
-**Estado:** APPROVED.
-
----
-
-# 21. Calibration boundary
-
-Fase 1 no implementará un sistema completo de calibración.
-
-Futuras capacidades podrán administrar:
-
-```text
-calibration requirements
-calibration records
-next due date
-providers
-certificates
-results
-```
-
-Equipment deberá estar preparado para consumir un:
-
-```text
-Calibration blocker
-```
-
-dentro de Availability.
-
-**Estado:** APPROVED.
-
----
-
-# 22. No blocker booleans manuales
-
-No deben convertirse en fuente de verdad campos manuales como:
-
-```text
-maintenanceBlocked Boolean
-calibrationBlocked Boolean
-available Boolean
-```
-
-Los blockers deberán derivarse de los dominios correspondientes.
-
-**Estado:** APPROVED.
-
----
-
-# 23. Custody
-
-Custody responde:
-
-```text
-¿Quién posee actualmente responsabilidad física sobre el activo?
-```
-
-La custodia cambia mediante transferencias físicas confirmadas.
-
-No mediante edición de master data.
-
-Debe mantenerse:
-
-```text
-Assignment
-≠
-Custody
-```
-
-```text
-Preparation
-≠
-Custody
-```
-
-```text
-Case schedule
-≠
-Custody
-```
-
-**Estado:** APPROVED / HEALTHCARE WORKFLOW PENDING.
-
----
-
-# 24. Dispatch cambia Custody
-
-Cuando un Dispatch se confirma:
-
-```text
-Warehouse
-↓
-Technician
-```
-
-se inicia una custodia externa.
-
-El Dispatch debe conservar:
+La persistencia Core contempla conceptualmente:
 
 ```text
 EquipmentAsset
-Case
-Custodian
-Timestamp
-Actor
-Condition at dispatch
-```
 
-según el contrato final de Case Logistics.
-
-Debe mantenerse:
-
-```text
-Actor performing Dispatch
-≠
-Custodian
-```
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 25. Return cambia Custody
-
-Cuando Return se confirma:
-
-```text
-Technician
-↓
-Warehouse
-```
-
-la custodia externa termina.
-
-Esto no significa:
-
-```text
-AVAILABLE
-```
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 26. Custodia única
-
-Invariante:
-
-> **Un EquipmentAsset no puede poseer más de una custodia física activa simultáneamente.**
-
-Una transferencia futura:
-
-```text
-Carlos
-↓
-Ana
-```
-
-deberá conservar historia.
-
-No deberá implementarse mediante un simple overwrite del custodian actual.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 27. Location
-
-Fase 1 utilizará Location de manera conservadora.
-
-Principalmente:
-
-```text
-Warehouse
-External Custody
-```
-
-Case, hospital y técnico podrán proporcionar contexto.
-
-Ejemplo UI:
-
-```text
-EQ-0041
-
-With:
-Carlos
-
-Case:
-CASE-0145
-
-Destination:
-Hospital ABC
-```
-
-Esto no implica que Zaping conozca ubicación GPS exacta.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 28. Multi-Warehouse
-
-Cuando ERP implemente múltiples almacenes:
-
-```text
-Equipment
-→ must reuse Core Warehouse infrastructure
-```
-
-No deberá existir:
-
-```text
-HealthcareWarehouse
-```
-
-como catálogo paralelo.
-
-**Estado:** APPROVED / FUTURE.
-
----
-
-# 29. Case Equipment Assignment
-
-`CaseEquipmentAssignment` representa:
-
-> **La reserva operacional de un EquipmentAsset específico para un Healthcare Case.**
-
-Debe mantenerse:
-
-```text
-Equipment Requirement
-≠
-Equipment Assignment
-```
-
-```text
-Assignment
-≠
-Dispatch
-```
-
-```text
-Assignment
-≠
-Custody
-```
-
-**Estado:** APPROVED / HEALTHCARE PENDING.
-
----
-
-# 30. Assignment creation
-
-Assignment nace cuando:
-
-```text
-User selects asset
-↓
-Backend validates
-↓
-Assignment confirmed
-```
-
-No cuando el usuario simplemente lo visualiza o selecciona temporalmente en frontend.
-
-Backend deberá revalidar Availability al confirmar.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 31. Assignment conflict
-
-Una misma unidad física no puede poseer Assignments temporalmente incompatibles.
-
-Ejemplo:
-
-```text
-CASE-0145
-08:00–11:00
-EQ-0041
-
-CASE-0146
-09:00–12:00
-EQ-0041
-```
-
-Resultado:
-
-```text
-BLOCK
-```
-
-No warning.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 32. Turnaround
-
-Un riesgo sin overlap directo puede producir inicialmente:
-
-```text
-WARNING
-```
-
-Ejemplo:
-
-```text
-Case A ends:
-11:00
-
-Case B starts:
-11:15
-```
-
-por tiempo insuficiente para:
-
-```text
-transport
-return
-inspection
-preparation
-dispatch
-```
-
-Fase 1 no requiere todavía una política automática de:
-
-```text
-minimumTurnaroundMinutes
-```
-
-**Estado:** APPROVED / FUTURE.
-
----
-
-# 33. Case without schedule
-
-Cuando no exista horario completo:
-
-```text
-Assignment may be allowed
-+
-schedule verification warning
-```
-
-en Fase 1.
-
-El sistema deberá comunicar que el conflicto temporal no pudo validarse completamente.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 34. Reassignment
-
-Antes del Dispatch:
-
-```text
-EQ-0041
-↓
-Reassign
-↓
-EQ-0042
-```
-
-puede permitirse.
-
-Debe conservarse historia.
-
-Después del Dispatch no puede reescribirse cuál activo salió.
-
-Una sustitución requiere:
-
-```text
-new assignment
-+
-new physical operation
-```
-
-según corresponda.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 35. Release Assignment
-
-Antes de Dispatch:
-
-```text
-Case cancelled
-↓
-Release Assignment
-```
-
-puede devolver disponibilidad si no existen otros blockers.
-
-Después de Dispatch:
-
-```text
-Release alone
-→ forbidden
-```
-
-Debe resolverse primero la realidad física mediante Return.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 36. Availability
-
-Availability será:
-
-```text
-derived
-contextual
-explainable
-```
-
-Nunca será un status manual independiente.
-
-**Estado:** APPROVED / EVALUATOR PENDING.
-
----
-
-# 37. Availability evaluator
-
-Debe existir una única lógica de dominio utilizada por:
-
-```text
-Equipment Registry
-Equipment 360
-Equipment Selector
-CaseKit
-Case Calendar
-Warehouse Operations
-Mobile
-API
-```
-
-Todos deben obtener el mismo resultado bajo los mismos hechos.
-
-**Estado:** APPROVED / NOT IMPLEMENTED.
-
----
-
-# 38. Current Availability
-
-Pregunta:
-
-```text
-¿Puede utilizarse esta unidad ahora?
-```
-
-Para EQ-AVL-001 Fase 1 responde:
-
-```text
-Can this EquipmentAsset be used now according to currently implemented Core Equipment facts?
-```
-
-La primera implementación utilizará únicamente hechos Core ya persistidos e implementados:
-
-```text
-EquipmentAsset.lifecycle
-EquipmentAsset.condition
-```
-
-Inspection history existe, pero no será requerida directamente por el evaluator. `EquipmentAsset.condition` es el snapshot operacional actual.
-
-Reglas aprobadas para Fase 1:
-
-```text
-ACTIVE + GOOD
-→ available = true
-
-ACTIVE + INSPECTION_PENDING
-→ available = false
-→ INSPECTION_PENDING
-
-ACTIVE + DAMAGED
-→ available = false
-→ DAMAGED
-
-ACTIVE + OUT_OF_SERVICE
-→ available = false
-→ OUT_OF_SERVICE
-
-RETIRED
-→ available = false
-→ RETIRED
-```
-
-El significado de:
-
-```text
-ACTIVE + GOOD
-→ available = true
-```
-
-es estrictamente:
-
-```text
-available according to currently implemented Core Equipment facts
-```
-
-No garantiza todavía:
-
-```text
-availability for a specific Case
-absence of future Custody blocker
-absence of Maintenance blocker
-absence of Calibration blocker
-absence of Assignment conflict
-```
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 39. Availability for Case
-
-Pregunta:
-
-```text
-¿Puede asignarse esta unidad a este Case?
-```
-
-Necesita además:
-
-```text
-Target Case
-Target schedule
-Existing assignments
-Conflict rules
-```
-
-Case Availability no forma parte de EQ-AVL-001 Fase 1.
-
-Requerirá hechos implementados para:
-
-```text
-Case
-Assignment
-schedule
-custody
-dispatch
-conflicts
-turnaround
-```
-
-Una futura confirmación de Assignment deberá revalidar Availability porque un resultado consultado previamente puede quedar obsoleto.
-
-Por tanto Availability no debe reducirse a:
-
-```text
-available Boolean
-```
-
-persistido permanentemente.
-
-**Estado:** APPROVED / FUTURE IMPLEMENTATION.
-
----
-
-# 40. Availability result
-
-La evaluación deberá devolver razones explicables y se computará al momento del request.
-
-Contrato conceptual externo aprobado:
-
-```json
-{
-  "available": false,
-  "primaryReason": "INSPECTION_PENDING",
-  "reasons": ["INSPECTION_PENDING"],
-  "evaluatedAt": "2026-08-24T00:00:00.000Z"
-}
-```
-
-Contrato conceptual del evaluator puro interno:
-
-```json
-{
-  "available": false,
-  "primaryReason": "INSPECTION_PENDING",
-  "reasons": ["INSPECTION_PENDING"]
-}
-```
-
-El evaluator puro no genera `evaluatedAt`; `EquipmentAvailabilityService` lo agrega al servir la respuesta de aplicación/API.
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 41. Availability blockers conceptuales
-
-Pueden incluir:
-
-```text
-RETIRED
-INSPECTION_PENDING
-DAMAGED
-OUT_OF_SERVICE
-```
-
-Reason codes aprobados para EQ-AVL-001 Fase 1:
-
-```text
-RETIRED
-INSPECTION_PENDING
-DAMAGED
-OUT_OF_SERVICE
-```
-
-No deberán exponerse todavía reason codes futuros como:
-
-```text
-EXTERNAL_CUSTODY
-CASE_CONFLICT
-MAINTENANCE_BLOCKED
-CALIBRATION_BLOCKED
-```
-
-hasta que exista una fuente de verdad implementada.
-
-Los reason codes son valores TypeScript de dominio/aplicación:
-
-```text
-runtime constants
-+
-TypeScript string union
-```
-
-No requieren:
-
-```text
-Prisma enum
-database persistence
-migration
-```
-
-Cuando existan múltiples blockers, deben devolverse todos los aplicables con prioridad determinística:
-
-```text
-1. RETIRED
-2. INSPECTION_PENDING
-3. DAMAGED
-4. OUT_OF_SERVICE
-```
-
-`primaryReason` será el primer valor de `reasons`. Cuando `reasons` está vacío:
-
-```text
-primaryReason = null
-available = true
-```
-
-Ejemplo:
-
-```text
-RETIRED + DAMAGED
-→ available = false
-→ primaryReason = RETIRED
-→ reasons = [RETIRED, DAMAGED]
-```
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 42. No Force Available
-
-No debe existir una operación ordinaria:
-
-```text
-Force Available
-```
-
-Las excepciones deberán resolver la causa real.
-
-Ejemplos:
-
-```text
-Inspection pending
-→ Complete Inspection
-```
-
-```text
-Active Assignment
-→ Release Assignment
-```
-
-```text
-OUT_OF_SERVICE
-→ Authorized Condition resolution
-```
-
-Availability es:
-
-```text
-derived
-contextual
-explainable
-```
-
-No debe persistirse como:
-
-```text
-available Boolean
-```
-
-No debe existir:
-
-```text
-normal mutation endpoint
-application cache
-database cache
-```
-
-Availability cambia únicamente porque cambian sus hechos subyacentes:
-
-```text
-Inspection
-Retirement
-future Custody
-future Assignment
-future Maintenance
-future Calibration
-```
-
-**Estado:** APPROVED.
-
----
-
-# 42.1 EQ-AVL-001 implemented architecture
-
-Arquitectura implementada para Fase 1:
-
-```text
-equipment-availability.types.ts
-→ runtime reason constants
-→ TypeScript reason union
-→ pure/application result types
-
-equipment-availability.evaluator.ts
-→ evaluateEquipmentCurrentAvailability(...)
-→ pure deterministic evaluator
-→ lifecycle + condition facts only
-→ no PrismaService
-→ no database lookup
-→ no I/O
-→ no clock access
-→ no evaluatedAt
-→ no Inspection history requirement
-
-EquipmentAvailabilityService
-→ tenant-safe Equipment lookup
-→ orchestration
-→ evaluatedAt
-→ API-ready result
-
-EquipmentController
-→ GET /equipment/:equipmentId/availability
-→ delegates to EquipmentAvailabilityService
-→ contains no Availability business logic
-```
-
-No debe crearse un framework de plugins/providers en Fase 1.
-
-La arquitectura debe permanecer evolucionable hacia composición futura de blockers desde:
-
-```text
-Core Equipment
-Custody
-Assignment
-Maintenance
-Calibration
-```
-
-sin agregar fuentes persistidas placeholder.
-
-API implementada para Fase 1:
-
-```text
-GET /equipment/:equipmentId/availability
-```
-
-Reglas de tenant:
-
-```text
-Authenticated Company
-→ derived from JWT
-
-lookup
-→ equipmentId + companyId
-
-cross-tenant or nonexistent Equipment
-→ 404 Equipo no encontrado
-```
-
-No debe revelar:
-
-```text
-cross-tenant existence
-lifecycle
-condition
-availability
-reason codes
-```
-
-No debe agregarse Availability a:
-
-```text
-GET /equipment
-```
-
-en Fase 1, para evitar comportamiento N+1 implícito.
-
-Availability tampoco se incluye automáticamente en:
-
-```text
-GET /equipment/:id
-```
-
-Resultado externo:
-
-```json
-{
-  "available": false,
-  "primaryReason": "INSPECTION_PENDING",
-  "reasons": ["INSPECTION_PENDING"],
-  "evaluatedAt": "2026-08-24T00:00:00.000Z"
-}
-```
-
-`evaluatedAt` es agregado por `EquipmentAvailabilityService` con reloj de request. El evaluator puro no genera tiempo.
-
-Validación automatizada:
-
-```text
-EquipmentController
-1 suite
-12/12 passed
-
-EquipmentAvailabilityService
-1 suite
-15/15 passed
-
-Pure Availability evaluator
-1 suite
-12/12 passed
-
-All Equipment tests
-7 suites
-100/100 passed
-
-Full backend tests
-33 suites
-216/216 passed
-
-npx prisma validate
-PASS
-
-npm run build
-PASS
-
-ESLint changed TypeScript
-PASS
-
-Full backend ESLint
-PASS
-
-git diff --check
-PASS
-```
-
-Manual PostgreSQL / API QA registrada:
-
-```text
-Asset
-→ assetCode EQ-000021
-→ id 9eac7f6a-45ad-49b7-a423-2b182f98860e
-→ origin PURCHASE_RECEIPT
-
-Initial state
-→ lifecycle ACTIVE
-→ condition INSPECTION_PENDING
-
-GET availability
-→ available false
-→ primaryReason INSPECTION_PENDING
-→ reasons [INSPECTION_PENDING]
-→ PASS
-
-Inspection
-→ INSPECTION_PENDING → GOOD
-
-GET availability
-→ available true
-→ primaryReason null
-→ reasons []
-→ PASS
-
-Inspection
-→ GOOD → DAMAGED
-
-GET availability
-→ available false
-→ primaryReason DAMAGED
-→ reasons [DAMAGED]
-→ PASS
-
-Retirement
-→ lifecycle ACTIVE → RETIRED
-→ condition remained DAMAGED
-
-GET availability
-→ available false
-→ primaryReason RETIRED
-→ reasons [RETIRED, DAMAGED]
-→ PASS
-
-Nonexistent Equipment
-→ GET /equipment/{random-uuid}/availability
-→ 404 Equipo no encontrado
-→ PASS
-```
-
-Cross-tenant QA:
-
-```text
-real manual second-tenant QA
-→ NOT PERFORMED
-
-tenant-scoped lookup / null lookup behavior
-→ covered by automated tests
-```
-
-Invalid Retirement QA note:
-
-```text
-invalid request used reason / notes
-expected fields are retiredReason / retirementNotes
-→ ValidationPipe returned 400
-→ no retirement occurred
-→ Availability remained DAMAGED until valid Retirement request
-```
-
-Prisma:
-
-```text
-new Prisma model
-→ NOT REQUIRED
-
-new field
-→ NOT REQUIRED
-
-new enum
-→ NOT REQUIRED
-
-migration
-→ NOT REQUIRED
-```
-
-Fases completadas:
-
-```text
-B.1
-Pure evaluator + reason types/constants
-
-B.2
-EquipmentAvailabilityService with tenant-safe lookup
-
-B.3
-GET /equipment/:equipmentId/availability
-
-B.4
-Automated tests and technical validation
-
-B.5
-Manual PostgreSQL/API QA using real Equipment state transitions
-
-C
-Final documentation synchronization
-```
-
-Manual QA plan ejecutado:
-
-```text
-manual ACTIVE + GOOD
-→ available true
-
-Purchase Receipt ACTIVE + INSPECTION_PENDING
-→ false / INSPECTION_PENDING
-
-Inspection:
-INSPECTION_PENDING → GOOD
-→ available true
-
-GOOD → DAMAGED
-→ available false / DAMAGED
-
-ACTIVE + OUT_OF_SERVICE
-→ unavailable
-
-GOOD → RETIRED
-→ unavailable / RETIRED
-
-RETIRED + DAMAGED
-→ reasons [RETIRED, DAMAGED]
-
-cross-tenant Equipment
-→ real manual second-tenant QA NOT PERFORMED
-→ automated tenant isolation coverage exists
-```
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 43. Return
-
-Return responde:
-
-```text
-¿La unidad física regresó bajo control de la Company?
-```
-
-Debe procesarse por `EquipmentAsset`.
-
-Un Return general del Case no puede ocultar unidades faltantes.
-
-**Estado:** APPROVED / HEALTHCARE PENDING.
-
----
-
-# 44. Return parcial
-
-Ejemplo:
-
-```text
-Dispatched:
-EQ-0041
-EQ-0042
-
-Returned:
-EQ-0041
-
-Pending:
-EQ-0042
-```
-
-Resultado:
-
-```text
-EQ-0041
-→ returned
-
-EQ-0042
-→ remains in external custody
-```
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 45. Return no significa Available
-
-En Healthcare Fase 1:
-
-```text
-Return confirmed
-↓
-Warehouse custody
-↓
-Condition = INSPECTION_PENDING
-↓
-Availability = NO
-```
-
-hasta completar Inspection.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 46. Inspection policy Fase 1
-
-Todo Equipment despachado para un Healthcare Case requerirá Inspection después de Return.
-
-Más adelante podrá existir política configurable según:
-
-```text
-Product
-Equipment type
-Company
-workflow
-```
-
-**Estado:** APPROVED / WORKFLOW PENDING.
-
----
-
-# 47. Inspection
-
-Inspection debe poder validar al menos:
-
-```text
-correct asset
-serial
-physical condition
-operational condition
-required accessories/support items
-incident
-notes
-```
-
-La persistencia base para `EquipmentInspection` existe.
-
-La API y reglas completas de Inspection todavía están pendientes.
-
-**Estado:** PERSISTENCE BASELINE IMPLEMENTED / WORKFLOW PENDING.
-
----
-
-# 48. Inspection result
-
-Flujo:
-
-```text
-INSPECTION_PENDING
-↓
-Inspection
-├── GOOD
-├── DAMAGED
-└── OUT_OF_SERVICE
-```
-
-Inspection actualiza Condition.
-
-No Availability directamente.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 49. Availability después de Inspection
-
-Debe mantenerse:
-
-```text
-Inspection GOOD
-↓
-Availability evaluator
-```
-
-No:
-
-```text
-Inspection GOOD
-↓
-available = true
-```
-
-porque pueden existir otros blockers.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 50. Serial mismatch
-
-Si:
-
-```text
-Expected:
-EQ-0041 / SN-99102
-```
-
-pero se recibe:
-
-```text
-EQ-0042 / SN-99103
-```
-
-debe producirse:
-
-```text
-RETURN EXCEPTION
-```
-
-Nunca una sustitución silenciosa.
-
-**Estado:** APPROVED / PENDING.
-
----
-
-# 51. Inspection history
-
-Condition actual funciona como snapshot operacional.
-
-Las inspecciones deberán conservar historia.
-
-Ejemplo:
-
-```text
-Aug 13
-CASE-0101
-Inspection GOOD
-
-Sep 12
-CASE-0145
-Inspection DAMAGED
-```
-
-No deberá reescribirse una Inspection histórica para alterar el pasado.
-
-**Estado:** APPROVED / PERSISTENCE BASELINE AVAILABLE.
-
----
-
-# 52. assetCode
-
-Todo `EquipmentAsset` posee obligatoriamente:
-
-```text
-assetCode
-```
-
-La restricción técnica implementada es:
-
-```text
-companyId + assetCode
-→ UNIQUE
-```
-
-`assetCode` es:
-
-```text
-unique inside Company
-stable
-immutable through normal operations
-never reused after Retirement
-operational identity only
-```
-
-No codifica:
-
-```text
-Product
-category
-brand
-warehouse
-location
-condition
-```
-
-**Estado:** APPROVED / IMPLEMENTED.
-
----
-
-# 53. assetCode generation
-
-Zaping genera `assetCode` automáticamente por defecto durante el registro normal de Equipment.
-
-Formato implementado:
-
-```text
-EQ-000001
-EQ-000002
-...
-EQ-999999
-EQ-1000000
-```
-
-Los seis dígitos son ancho mínimo de presentación, no límite máximo.
-
-El registro normal:
-
-```text
-POST /equipment
-→ does not accept client-controlled assetCode
-```
-
-`CreateEquipmentDto` no expone `assetCode`.
-
-La generación utiliza la persistencia existente:
-
-```text
-CompanySequence
-companyId + key = EQUIPMENT_ASSET_CODE
-```
-
-`CompanySequence.nextValue` representa el siguiente valor numérico disponible para asignación.
-
-Bootstrap:
-
-```text
-createMany
-data:
-  companyId
-  key = EQUIPMENT_ASSET_CODE
-  nextValue = 1
-skipDuplicates = true
-```
-
-Asignación:
-
-```text
-atomic update:
-  nextValue += 1
-
-allocatedValue = returned nextValue - 1
-```
-
-Formato:
-
-```text
-EQ-${value.toString().padStart(6, '0')}
-```
-
-La asignación de secuencia y la creación de `EquipmentAsset` ocurren dentro de la misma transacción Prisma.
-
-Antes del insert se verifica si el candidato ya está ocupado:
-
-```text
-companyId + assetCode
-```
-
-Si el candidato ya existe:
-
-```text
-allocate next sequence value
-↓
-check next candidate
-↓
-continue until free
-```
-
-Esto permite saltar códigos históricos o manuales con forma generada.
-
-Los códigos de Equipment retirado permanecen reservados. La verificación de ocupación no filtra por Lifecycle.
-
-Si `EquipmentAsset.create` produce un `P2002`, no se reintenta dentro de la misma transacción PostgreSQL. El error sigue el manejo normal y la transacción revierte.
-
-No se requirió cambio de Prisma schema.
-
-No se requirió migración.
-
-Los gaps de secuencia son aceptables. La numeración gapless no es requisito de dominio.
-
-Validación:
-
-```text
-Equipment tests
-3 suites
-42 tests
-42 passed
-
-Full backend
-29 suites
-154 tests
-154 passed
-
-npx prisma validate
-PASS
-
-npm run build
-PASS
-
-ESLint
-PASS
-```
-
-QA PostgreSQL real:
-
-```text
-10 simultaneous POST /equipment requests
-10 successes
-10 unique assetCodes
-0 failures
-
-5 simultaneous POST /equipment requests after transaction correction
-5 successes
-5 unique assetCodes
-0 failures
-```
-
-QA HTTP:
-
-```text
-assetCode = CUSTOM-001
-→ 400 Bad Request
-→ property assetCode should not exist
-
-POST /equipment without assetCode
-→ 201 Created
-→ server-generated assetCode
-```
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 54. Imported assetCode
-
-Importaciones y migraciones podrán preservar un código existente cuando sea:
-
-```text
-valid
-unique inside Company
-```
-
-Esto evita obligar a clientes a reetiquetar activos existentes durante onboarding.
-
-La persistencia permite esta estrategia.
-
-El workflow específico de importación todavía no está implementado.
-
-**Estado:** APPROVED / IMPORT WORKFLOW PENDING.
-
----
-
-# 55. assetCode immutability
-
-`assetCode` será identidad operacional estable.
-
-Una corrección excepcional futura deberá ser:
-
-```text
-authorized
-validated
-audited
-```
-
-y no una edición normal.
-
-Por esta razón la API Core actual no expone:
-
-```text
-PATCH /equipment/:id
-```
-
-para modificación genérica del activo.
-
-Una futura corrección deberá diseñarse como operación explícita.
-
-**Estado:** APPROVED / API ALIGNED.
-
----
-
-# 56. assetCode reuse
-
-Un `assetCode` nunca podrá reutilizarse.
-
-Incluso cuando:
-
-```text
-Lifecycle = RETIRED
-```
-
-Ejemplo inválido:
-
-```text
-Old Equipment:
-EQ-0041
-RETIRED
-
-New Equipment:
-EQ-0041
-```
-
-La combinación:
-
-```text
-companyId + assetCode
-```
-
-es única en persistencia.
-
-Mientras los activos retirados conserven su registro histórico, el código no puede reutilizarse.
-
-**Estado:** APPROVED / DATABASE ENFORCED.
-
----
-
-# 57. serialNumber
-
-`serialNumber` es:
-
-```text
-optional
-```
-
-Debe conservarse cuando exista.
-
-No posee restricción global:
-
-```text
-serialNumber @unique
-```
-
-El sistema utiliza además:
-
-```text
-serialNumberKey
-```
-
-como representación normalizada para detección consistente de duplicados.
-
-Ejemplo:
-
-```text
-serialNumber:
-sn-test-001
-
-serialNumberKey:
-SN-TEST-001
-```
-
-Un Equipment puede existir correctamente con:
-
-```text
-serialNumber = null
-serialNumberKey = null
-```
-
-**Estado:** APPROVED / IMPLEMENTED.
-
----
-
-# 58. Serial duplicate validation
-
-La restricción técnica definitiva es:
-
-```text
-companyId
-+
-productId
-+
-serialNumberKey
-→ UNIQUE
-```
-
-En operación normal:
-
-```text
-SN-TEST-001
-sn-test-001
-```
-
-se consideran el mismo serial normalizado para el mismo Product dentro de la misma Company.
-
-La API responde:
-
-```text
-409 Conflict
-```
-
-cuando detecta el duplicado.
-
-El serial no es globalmente único entre Products o Companies.
-
-**Estado:** APPROVED / DATABASE + BACKEND ENFORCED.
-
----
-
-# 59. Serial correction
-
-`serialNumber` podrá corregirse cuando exista error de captura.
-
-La futura corrección deberá:
-
-```text
-require authorization
-validate duplicates
-generate audit
-```
-
-y no cambiará la identidad del `EquipmentAsset`.
-
-No existe actualmente un endpoint genérico para modificar serial.
-
-Una futura implementación deberá utilizar una operación explícita, por ejemplo conceptualmente:
-
-```text
-Correct Equipment Serial
-```
-
-y no un PATCH genérico de master data.
-
-**Estado:** APPROVED / NOT IMPLEMENTED.
-
----
-
-# 60. Asset creation
-
-El backend implementa registro normal de Equipment con `assetCode` generado por servidor.
-
-Flujo actual:
-
-```text
-Authenticated User
-↓
-POST /equipment
-↓
-Read companyId from authenticated context
-↓
-Validate CreateEquipmentDto
-  assetCode is not accepted
-↓
-Find Product inside same Company
-↓
-Validate Product exists
-↓
-Validate Product.inventoryTracking = ASSET
-↓
-Validate Product.isActive = true
-↓
-If batchId exists:
-  validate same Company
-  validate same Product
-↓
-Normalize optional serialNumber
-↓
-Generate serialNumberKey
-↓
-Validate companyId + productId + serialNumberKey uniqueness
-↓
-BEGIN Prisma transaction
-↓
-Ensure CompanySequence:
-  companyId
-  key = EQUIPMENT_ASSET_CODE
-↓
-Allocate next sequence value atomically
-↓
-Format assetCode
-↓
-Validate candidate is not already occupied inside Company
-↓
-If occupied:
-  allocate next value
-  check next candidate
-↓
-Create EquipmentAsset
-↓
-origin = MANUAL
-lifecycle = ACTIVE
-↓
-COMMIT
-↓
-Return Equipment + Product + optional Batch
-```
-
-Datos aceptados por el endpoint:
-
-```text
-productId
-serialNumber?
-condition
-batchId?
-```
-
-Datos que no son controlados directamente por el cliente:
-
-```text
-companyId
-assetCode
-serialNumberKey
-lifecycle
-origin
-purchaseReceiptItemId
-retiredAt
-retiredById
-retiredReason
-retirementNotes
-```
-
-Resultado:
-
-```text
-EquipmentAsset created
-```
-
-**Estado:** IMPLEMENTED.
-
----
-
-# 61. EquipmentAsset persistence baseline
-
-La persistencia Core contempla al menos:
-
-```text
 id
 companyId
 productId
@@ -2626,1446 +607,789 @@ Relaciones principales:
 
 ```text
 Company
+
 Product
+
 InventoryBatch?
+
 PurchaseReceiptItem?
+
 User? as retiredBy
+
 EquipmentInspection[]
 ```
 
-Constraints e índices implementados incluyen:
+La definición exacta pertenece a:
+
+```text
+schema.prisma
+```
+
+---
+
+# 15. Constraints principales
+
+La persistencia implementa constraints equivalentes a:
 
 ```text
 UNIQUE id + companyId
-UNIQUE companyId + assetCode
-UNIQUE companyId + productId + serialNumberKey
 
-INDEX companyId + productId
-INDEX companyId + serialNumberKey
-INDEX companyId + lifecycle
-INDEX companyId + condition
-INDEX batchId
-INDEX purchaseReceiptItemId
-INDEX retiredById
+UNIQUE companyId + assetCode
+
+UNIQUE companyId + productId + serialNumberKey
 ```
 
-**Estado:** IMPLEMENTED.
+También existen índices para soportar consultas operacionales.
+
+Estas constraints complementan, pero no sustituyen, las validaciones de dominio.
 
 ---
 
-# 62. EquipmentOrigin
+# 16. EquipmentOrigin
 
-La estrategia técnica definitiva es:
-
-```text
-enum EquipmentOrigin {
-  MANUAL
-  PURCHASE_RECEIPT
-  IMPORT
-  INITIAL_MIGRATION
-}
-```
-
-La baseline actual implementa:
+Valores:
 
 ```text
-POST /equipment
-→ origin = MANUAL
+MANUAL
 
-Purchase Receipt provisioning
-→ origin = PURCHASE_RECEIPT
-```
+PURCHASE_RECEIPT
 
-Todavía están pendientes los workflows:
-
-```text
 IMPORT
+
 INITIAL_MIGRATION
 ```
 
-**Estado:** PERSISTED / MANUAL + PURCHASE RECEIPT FLOWS IMPLEMENTED.
-
----
-
-# 63. Core Equipment API v1.3.0
-
-Endpoints implementados:
+Actualmente:
 
 ```text
-GET /equipment
-GET /equipment/:id
 POST /equipment
+→ MANUAL
 ```
-
-No existen actualmente:
 
 ```text
-PATCH /equipment/:id
-DELETE /equipment/:id
+Purchase Receipt provisioning
+→ PURCHASE_RECEIPT
 ```
 
-La ausencia de `DELETE` protege el historial del activo.
-
-La ausencia de PATCH genérico protege:
+Los workflows específicos para:
 
 ```text
-asset identity
-condition
-lifecycle
-origin
-retirement data
-product relationship
+IMPORT
+
+INITIAL_MIGRATION
 ```
 
-hasta disponer de operaciones específicas y auditables.
+todavía no están implementados.
 
 ---
 
-# 64. Multi-tenant security
+# 17. Lifecycle
 
-Todas las operaciones Core implementadas están aisladas mediante:
-
-```text
-companyId
-```
-
-obtenido del usuario autenticado.
-
-El cliente no envía:
+Valores:
 
 ```text
-companyId
+ACTIVE
+
+RETIRED
 ```
 
-como parte de `CreateEquipmentDto`.
-
-Las consultas utilizan el tenant autenticado.
-
-Un Product perteneciente a otra Company se considera no accesible.
-
-La misma regla se aplica al `InventoryBatch` utilizado durante creación.
-
-Debe mantenerse:
-
-> **Nunca confiar en un companyId enviado por el cliente para autorizar acceso a Equipment.**
-
-**Estado:** IMPLEMENTED.
-
----
-
-# 65. Validation and error contract
-
-La aplicación utiliza globalmente:
+`ACTIVE` significa:
 
 ```text
-ValidationPipe
-
-whitelist = true
-forbidNonWhitelisted = true
-transform = true
+asset remains part of the managed fleet
 ```
 
-Por tanto campos no permitidos son rechazados.
-
-Errores validados durante QA:
+No significa:
 
 ```text
-400 Bad Request
-→ invalid DTO
-→ Product not ASSET
-→ invalid business input
-
-404 Not Found
-→ Equipment not found
-→ Product not found
-→ Batch not found for Product
-
-409 Conflict
-→ duplicate assetCode
-→ duplicate normalized serial
+AVAILABLE
 ```
 
-Errores de unicidad de Prisma también son protegidos para evitar convertir conflictos esperados en errores `500`.
-
-**Estado:** IMPLEMENTED.
-
----
-
-# 66. QA baseline
-
-QA manual ejecutado durante la primera implementación:
+`RETIRED` significa:
 
 ```text
-01 GET /equipment
-→ PASS
-
-02 POST /equipment valid ASSET
-→ PASS
-
-03 duplicate assetCode
-→ 409 PASS
-
-04 duplicate normalized serial
-→ 409 PASS
-
-05 Product QUANTITY
-→ 400 PASS
-
-06 GET /equipment/:id
-→ PASS
-
-07 DTO protected operational fields
-→ 400 PASS
-
-08 nonexistent Equipment
-→ 404 PASS
-
-09 invalid CreateEquipmentDto
-→ 400 PASS
-
-10 Equipment without serial
-→ PASS
-
-11 assetCode normalization during creation
-→ PASS
+asset permanently left normal operational use
 ```
-
-Nota:
-
-Durante el desarrollo se validó temporalmente edición genérica mediante PATCH.
-
-Ese endpoint fue posteriormente retirado para mantener consistencia con las reglas de identidad y auditoría de Equipment.
-
-El QA vigente de v1.3.0 corresponde al contrato final:
-
-```text
-GET
-GET by ID
-POST
-```
-
----
-
-# 67. Automated tests
-
-Tests vigentes de Equipment:
-
-```text
-EquipmentService
-8 / 8 PASS
-
-EquipmentController
-4 / 4 PASS
-
-Equipment total
-12 / 12 PASS
-```
-
-Regression suite completa del backend después de la limpieza final:
-
-```text
-Test Suites:
-28 passed / 28 total
-
-Tests:
-124 passed / 124 total
-```
-
-Quality Gates finales:
-
-```text
-Prisma migrate status
-→ Database schema up to date
-
-Prisma validate
-→ PASS
-
-Prisma generate
-→ PASS
-
-npm test
-→ 124 / 124 PASS
-
-npm run build
-→ PASS
-
-ESLint
-→ PASS
-```
-
----
-
-# 68. Known technical debt
-
-No forma parte del alcance inmediato de Equipment, pero se observaron patrones existentes que deberán corregirse mediante trabajo técnico separado:
-
-```text
-req.user currently typed as any in controllers
-```
-
-Debe evolucionar hacia un tipo autenticado común.
-
-También deberá revisarse de forma transversal:
-
-```text
-PrismaService module/provider consistency
-```
-
-sin introducir un patrón exclusivo para Equipment.
-
-La actualización de Prisma:
-
-```text
-6.x
-→
-7.x
-```
-
-es un cambio mayor y deberá evaluarse como iniciativa separada.
-
-No debe mezclarse con esta implementación.
-
----
-
-# 69. EQ-INS-001 — Equipment Inspection Workflow
-
-Equipment Inspection representa una operación explícita de dominio mediante la cual se evalúa el estado físico u operacional actual de un `EquipmentAsset`.
 
 Debe mantenerse:
 
 ```text
-Inspection
-→ evaluates Equipment condition
+Lifecycle
+≠
+Availability
 ```
-
-y:
-
-```text
-Inspection
-→ may update EquipmentCondition
-```
-
-pero nunca:
-
-```text
-Inspection
-→ directly sets Availability
-```
-
-Availability continúa siendo una evaluación derivada.
-
-Estado: IMPLEMENTED / VALIDATED.
 
 ---
 
-# 70. Inspection ownership
+# 18. Retirement es terminal
 
-La inspección base pertenece a Core Equipment.
-
-Core es responsable de:
+El flujo normal es:
 
 ```text
-EquipmentInspection
-EquipmentAsset
-conditionBefore
-conditionAfter
-inspector
-inspection timestamp
-notes
-inspection history
+ACTIVE
+↓
+Retirement
+↓
+RETIRED
 ```
 
-Healthcare puede originar una Inspection como consecuencia de:
+En Equipment V1:
 
 ```text
-Case Return
-Case Logistics
-Warehouse Return
+RETIRED
+→ terminal normal state
 ```
 
-pero no redefine la inspección Core.
-
-Debe mantenerse:
+No existe una operación normal de:
 
 ```text
-Core EquipmentInspection
-→ physical condition event
+Reactivate Equipment
 ```
 
-mientras:
+Una corrección futura tendría que ser:
 
 ```text
-Healthcare
-→ operational context that caused the inspection
+explicit
+
+authorized
+
+audited
+
+exceptional
 ```
 
-Por tanto, Core `EquipmentInspection` no debe incorporar directamente campos como:
-
-```text
-caseId
-hospitalId
-technicianId
-caseReturnId
-```
-
-solo para satisfacer un workflow Healthcare.
-
-Cuando sea necesario, Healthcare deberá relacionar su contexto con la Inspection Core mediante su propio contrato.
-
-**Estado:** APPROVED.
+No un `PATCH lifecycle`.
 
 ---
 
-# 71. When Inspection is allowed
+# 19. Condition
 
-En Fase 1 una Inspection puede ejecutarse sobre cualquier Equipment activo.
-
-Regla:
-
-```text
-Lifecycle = ACTIVE
-→ Inspection may be allowed
-```
-
-Esto incluye Equipment actualmente en:
+Valores:
 
 ```text
 GOOD
+
 INSPECTION_PENDING
+
 DAMAGED
+
 OUT_OF_SERVICE
+```
+
+`Condition` representa el snapshot físico u operacional actual.
+
+Debe mantenerse:
+
+```text
+Lifecycle
+≠
+Condition
 ```
 
 Ejemplos válidos:
 
 ```text
-INSPECTION_PENDING
-↓
-Inspection
-↓
-GOOD
+ACTIVE + GOOD
+
+ACTIVE + DAMAGED
+
+ACTIVE + OUT_OF_SERVICE
+
+RETIRED + GOOD
+
+RETIRED + DAMAGED
 ```
+
+Retirement no necesita falsificar Condition para expresar indisponibilidad.
+
+---
+
+# 20. GOOD
 
 ```text
 GOOD
-↓
-Ad-hoc Inspection
-↓
-DAMAGED
 ```
+
+significa que no existe una condición Core conocida que impida el uso normal.
+
+En Current Availability:
+
+```text
+ACTIVE + GOOD
+→ available = true
+```
+
+Esto significa únicamente:
+
+```text
+available according to currently implemented Core Equipment facts
+```
+
+No significa:
+
+```text
+guaranteed available for a Healthcare Case
+```
+
+---
+
+# 21. INSPECTION_PENDING
+
+Significa:
+
+```text
+physical/operational condition
+has not yet been validated
+```
+
+Puede utilizarse, entre otros casos:
+
+```text
+Purchase Receipt provisioning
+
+initial registration
+
+future Healthcare Return
+```
+
+Current Availability devuelve:
+
+```text
+available = false
+```
+
+para esta condición.
+
+---
+
+# 22. DAMAGED
+
+Representa daño conocido.
+
+Actualmente:
 
 ```text
 DAMAGED
-↓
-Reinspection
-↓
-GOOD
+→ Current Availability = false
 ```
+
+No crea automáticamente:
+
+```text
+Maintenance work order
+```
+
+Maintenance permanece como dominio futuro.
+
+---
+
+# 23. OUT_OF_SERVICE
+
+Representa una decisión operacional de impedir utilización.
+
+Puede existir:
+
+```text
+Lifecycle = ACTIVE
+
+Condition = OUT_OF_SERVICE
+```
+
+porque el activo continúa perteneciendo a la Company.
+
+Current Availability:
 
 ```text
 OUT_OF_SERVICE
-↓
-Reinspection
-↓
-GOOD
+→ unavailable
 ```
-
-No debe limitarse Inspection exclusivamente a:
-
-```text
-condition = INSPECTION_PENDING
-```
-
-porque también debe permitir:
-
-```text
-periodic inspection
-ad-hoc inspection
-damage verification
-post-repair reinspection
-operational reinspection
-```
-
-Un Equipment:
-
-```text
-Lifecycle = RETIRED
-```
-
-no puede recibir una nueva Inspection operacional normal.
-
-Resultado:
-
-```text
-RETIRED
-→ Inspection BLOCKED
-```
-
-Las inspecciones históricas existentes permanecen disponibles.
-
-**Estado:** APPROVED.
 
 ---
 
-# 72. Inspection result
+# 24. Maintenance y Calibration
 
-Una Inspection completada debe finalizar con una condición conocida.
+Maintenance y Calibration no son `EquipmentCondition`.
 
-Resultados permitidos en Fase 1:
-
-```text
-GOOD
-DAMAGED
-OUT_OF_SERVICE
-```
-
-No se permite como resultado final:
+No deben introducirse artificialmente valores como:
 
 ```text
-INSPECTION_PENDING
+MAINTENANCE_REQUIRED
+
+CALIBRATION_REQUIRED
 ```
 
-porque:
+dentro del enum Condition únicamente para representar esos dominios.
+
+Futuro:
 
 ```text
-Inspection completed
-+
-INSPECTION_PENDING
+EquipmentMaintenance
+
+Calibration
 ```
 
-representaría una contradicción operacional.
+pueden proporcionar blockers adicionales para Availability.
 
-Por tanto:
-
-```text
-conditionAfter
-∈
-GOOD
-DAMAGED
-OUT_OF_SERVICE
-```
-
-**Estado:** APPROVED.
-
----
-
-# 73. conditionBefore
-
-`conditionBefore` representa la condición real almacenada inmediatamente antes de ejecutar la Inspection.
-
-Debe obtenerse exclusivamente desde:
-
-```text
-EquipmentAsset.condition
-```
-
-por el backend.
-
-El cliente no debe proporcionar:
-
-```text
-conditionBefore
-```
-
-mediante DTO.
-
-Flujo:
-
-```text
-Load EquipmentAsset
-↓
-Read current condition
-↓
-conditionBefore
-```
-
-Esto evita que el cliente pueda reconstruir o falsificar el estado histórico anterior.
-
-**Estado:** APPROVED.
-
----
-
-# 74. conditionAfter
-
-`conditionAfter` representa el resultado de la Inspection.
-
-Será proporcionado como resultado operacional validado.
-
-El backend deberá aceptar únicamente:
-
-```text
-GOOD
-DAMAGED
-OUT_OF_SERVICE
-```
-
-Una vez confirmada la Inspection:
-
-```text
-EquipmentInspection.conditionAfter
-=
-EquipmentAsset.condition
-```
-
-al finalizar la misma transacción.
-
-**Estado:** APPROVED.
-
----
-
-# 75. Inspector
-
-El inspector será siempre el usuario autenticado que confirma la operación.
-
-Debe derivarse de:
-
-```text
-JWT / authenticated request context
-```
-
-y no de un campo libre enviado por el cliente.
-
-Por tanto:
-
-```text
-inspectedById
-→ SERVER DERIVED
-```
-
-No:
-
-```text
-POST body
-→ inspectedById
-```
-
-La relación actual utiliza:
-
-```text
-EquipmentInspection.inspectedById
-→ User.id
-```
-
-El backend deberá validar que el usuario autenticado pertenece al mismo tenant.
-
-**Estado:** APPROVED.
-
----
-
-# 76. Inspection timestamp
-
-En Fase 1:
-
-```text
-inspectedAt
-→ SERVER GENERATED
-```
-
-utilizando el tiempo de confirmación de la operación.
-
-El cliente no podrá proporcionar libremente una fecha histórica durante la operación normal.
-
-Importaciones o migraciones históricas futuras deberán utilizar un workflow diferente y explícito.
-
-**Estado:** APPROVED.
-
----
-
-# 77. Inspection notes
-
-Inspection podrá aceptar:
-
-```text
-notes?
-```
-
-como información opcional.
-
-Las notas pueden utilizarse para registrar:
-
-```text
-physical observations
-damage description
-operational observations
-inspection comments
-relevant exceptions
-```
-
-No deben utilizarse como sustituto de futuros dominios estructurados como:
+Actualmente:
 
 ```text
 Maintenance
+→ NOT IMPLEMENTED
+
 Calibration
-Incident Management
+→ NOT IMPLEMENTED
 ```
-
-**Estado:** APPROVED.
 
 ---
 
-# 78. Atomic Inspection transaction
+# 25. assetCode
 
-Completar una Inspection constituye una sola operación de negocio.
-
-Debe ejecutarse transaccionalmente:
+Todo `EquipmentAsset` posee un:
 
 ```text
-BEGIN TRANSACTION
-
-Read EquipmentAsset
-↓
-Validate Lifecycle
-↓
-Capture conditionBefore
-↓
-Create EquipmentInspection
-↓
-Update EquipmentAsset.condition
-↓
-COMMIT
+assetCode
 ```
 
-No debe ser posible:
+operacional.
+
+Constraint:
 
 ```text
-Inspection created
-+
-Equipment condition not updated
-```
-
-ni:
-
-```text
-Equipment condition updated
-+
-Inspection history missing
-```
-
-Si cualquier escritura falla:
-
-```text
-ROLLBACK
-```
-
-**Estado:** APPROVED.
-
----
-
-# 79. Inspection history
-
-`EquipmentInspection` constituye historia operacional.
-
-Una Inspection confirmada no debe modificarse posteriormente mediante CRUD genérico.
-
-No debe existir una operación ordinaria:
-
-```text
-PATCH EquipmentInspection
-```
-
-ni:
-
-```text
-DELETE EquipmentInspection
-```
-
-para alterar un evento histórico.
-
-Si una evaluación posterior cambia el conocimiento sobre el activo:
-
-```text
-New Inspection
-```
-
-debe registrar el nuevo hecho.
-
-Ejemplo:
-
-```text
-10:00
-Inspection
-GOOD
-```
-
-```text
-15:00
-Inspection
-DAMAGED
-```
-
-Ambos eventos permanecen en historia.
-
-`EquipmentAsset.condition` representa únicamente el snapshot actual.
-
-**Estado:** APPROVED.
-
----
-
-# 80. Inspection and Availability
-
-Debe mantenerse estrictamente:
-
-```text
-Inspection
-≠
-Availability
-```
-
-Ejemplo:
-
-```text
-Inspection result:
-GOOD
-```
-
-no implica automáticamente:
-
-```text
-available = true
-```
-
-Después de una Inspection:
-
-```text
-Equipment condition updated
-↓
-Availability Evaluator
-↓
-Current Availability determined
-```
-
-Otros blockers pueden continuar activos:
-
-```text
-external custody
-case assignment
-maintenance
-calibration
-other operational constraints
-```
-
-**Estado:** APPROVED.
-
----
-
-# 81. Healthcare Return integration
-
-La política Healthcare Fase 1 continúa siendo:
-
-```text
-Case Dispatch
-↓
-External Custody
-↓
-Case Return
-↓
-Warehouse Custody
-↓
-Condition = INSPECTION_PENDING
-↓
-Core Equipment Inspection
-↓
-GOOD / DAMAGED / OUT_OF_SERVICE
-↓
-Availability Evaluator
-```
-
-El workflow Healthcare podrá posteriormente relacionar:
-
-```text
-Case
-Return
-EquipmentAsset
-EquipmentInspection
-```
-
-sin trasladar la identidad del Case al modelo Core.
-
-**Estado:** APPROVED / HEALTHCARE INTEGRATION PENDING.
-
----
-
-# 82. Prisma baseline
-
-La persistencia actual de `EquipmentInspection` contiene:
-
-```text
-id
 companyId
-equipmentAssetId
-conditionBefore
-conditionAfter
-inspectedAt
-inspectedById
-notes
-createdAt
++
+assetCode
+→ UNIQUE
 ```
 
-y relaciones con:
+Características:
+
+```text
+server generated during normal creation
+
+unique inside Company
+
+stable
+
+not normally editable
+
+never reused
+
+preserved after Retirement
+```
+
+No debe codificar:
+
+```text
+Product
+
+category
+
+warehouse
+
+condition
+
+location
+
+lifecycle
+```
+
+---
+
+# 26. Generación de assetCode
+
+El formato actual utiliza:
+
+```text
+EQ-000001
+EQ-000002
+...
+```
+
+El ancho de seis dígitos es mínimo visual, no límite máximo.
+
+La generación utiliza:
+
+```text
+CompanySequence
+```
+
+con una clave específica de Equipment.
+
+Conceptualmente:
 
 ```text
 Company
-EquipmentAsset
-User
-```
-
-La estructura es suficiente para la primera versión del workflow Core.
-
-No se requieren nuevos campos para `EQ-INS-001`.
-
-**Estado:** PERSISTENCE BASELINE AVAILABLE.
-
----
-
-# 83. Tenant integrity
-
-Debe cumplirse:
-
-```text
-EquipmentInspection.companyId
-=
-EquipmentAsset.companyId
-=
-Authenticated User.companyId
-```
-
-La aplicación deberá validar esta regla.
-
-Adicionalmente, la relación:
-
-```text
-EquipmentInspection
-→ EquipmentAsset
-```
-
-deberá reforzarse a nivel de base de datos mediante la clave compuesta existente:
-
-```text
-EquipmentAsset
-@@unique([id, companyId])
-```
-
-Dirección Prisma:
-
-```text
-fields:
-[equipmentAssetId, companyId]
-
-references:
-[id, companyId]
-```
-
-Esto impide relacionar accidentalmente una Inspection de una Company con Equipment perteneciente a otra.
-
-La relación con `User` continuará inicialmente utilizando:
-
-```text
-inspectedById
-→ User.id
-```
-
-junto con validación de tenant en el backend.
-
-No se modificará el modelo global `User` únicamente para este workflow.
-
-**Estado:** IMPLEMENTED / DATABASE ENFORCED.
-
-Migration:
-
-20260821221133_equipment_inspection_tenant_fk
-
----
-
-# 84. Inspection API direction
-
-Contrato inicial propuesto:
-
-```text
-POST /equipment/:equipmentId/inspections
-GET  /equipment/:equipmentId/inspections
-```
-
-No se implementarán inicialmente:
-
-```text
-PATCH /equipment/:equipmentId/inspections/:inspectionId
-DELETE /equipment/:equipmentId/inspections/:inspectionId
-```
-
-porque Inspection representa historia operacional.
-
-Implementation status:
-
-POST /equipment/:equipmentId/inspections
-→ IMPLEMENTED
-
-GET /equipment/:equipmentId/inspections
-→ IMPLEMENTED
-
----
-
-# 85. Create Inspection input
-
-El DTO conceptual aceptará únicamente:
-
-```text
-conditionAfter
-notes?
-```
-
-No aceptará:
-
-```text
-companyId
-equipmentAssetId
-conditionBefore
-inspectedById
-inspectedAt
-createdAt
-```
-
-Estos valores serán obtenidos o generados por backend.
-
-Conceptualmente:
-
-```text
-POST /equipment/:equipmentId/inspections
-
-{
-  "conditionAfter": "GOOD",
-  "notes": "Inspección física y funcional correcta"
-}
-```
-
-**Estado:** APPROVED.
-
----
-
-# 86. Create Inspection validation flow
-
-Flujo esperado:
-
-```text
-Authenticated User
-↓
-Read companyId + userId
-↓
-Validate DTO
-↓
-Find EquipmentAsset by:
-  id
-  companyId
-↓
-Equipment exists?
-├── NO → 404
-└── YES
-↓
-Lifecycle = ACTIVE?
-├── NO → 400
-└── YES
-↓
-conditionAfter valid?
-├── NO → 400
-└── YES
-↓
-conditionAfter != INSPECTION_PENDING?
-├── NO → 400
-└── YES
-↓
-conditionBefore =
-EquipmentAsset.condition
-↓
-BEGIN TRANSACTION
-↓
-Create EquipmentInspection
-↓
-Update EquipmentAsset.condition
-↓
-COMMIT
-↓
-Return Inspection
-```
-
-**Estado:** APPROVED.
-
----
-
-# 87. Inspection query
-
-El historial deberá poder consultarse por Equipment.
-
-Conceptualmente:
-
-```text
-GET /equipment/:equipmentId/inspections
-```
-
-deberá:
-
-```text
-validate authenticated Company
-↓
-validate Equipment exists in Company
-↓
-return inspections
-↓
-order by inspectedAt DESC
-```
-
-Una Company nunca deberá poder consultar inspecciones de Equipment perteneciente a otro tenant.
-
-**Estado:** APPROVED.
-
----
-
-# 88. Error contract
-
-Errores esperados:
-
-```text
-400 Bad Request
-→ invalid DTO
-→ invalid conditionAfter
-→ INSPECTION_PENDING used as final result
-→ RETIRED Equipment inspection attempt
-```
-
-```text
-404 Not Found
-→ Equipment not found inside authenticated Company
-```
-
-Errores inesperados de persistencia no deberán exponer detalles internos de Prisma o PostgreSQL.
-
-**Estado:** APPROVED.
-
----
-
-# 89. Authorization
-
-La baseline actual de Equipment dispone de autenticación JWT, pero el Permission-Based RBAC completo todavía no está implementado.
-
-Fase inicial:
-
-```text
-JwtAuthGuard
 +
-tenant validation
-```
-
-Antes de producción deberá existir autorización explícita para Inspection.
-
-Permiso conceptual futuro:
-
-```text
-equipment.inspect
-```
-
-Los nombres definitivos deberán alinearse con el diseño global de Permissions.
-
-**Estado:** AUTHENTICATION AVAILABLE / AUTHORIZATION EVOLUTION PENDING.
-
----
-
-# 90. EQ-INS-001 acceptance criteria
-
-La primera versión ha sido implementada y validada.
-
-```text
-POST Inspection works
-✅
-
-GET Inspection history works
-✅
-
-conditionBefore is server-derived
-✅
-
-conditionAfter is validated
-✅
-
-INSPECTION_PENDING cannot be final result
-✅
-
-RETIRED Equipment is blocked by domain logic
-✅
-
-Inspection creation
-+
-Equipment condition update
-are atomic
-✅
-
-Inspection history is immutable through API
-✅
-
-tenant isolation is enforced
-✅
-
-composite Equipment FK is enforced
-✅
-
-service tests pass
-✅
-
-controller tests pass
-✅
-
-full regression passes
-✅
-
-build passes
-✅
-
-lint passes
-✅
-
-manual QA passes
-✅
-```
-
-Automated validation:
-
-```text
-EquipmentService
-18 / 18 PASS
-
-EquipmentController
-6 / 6 PASS
-
-Equipment total
-24 / 24 PASS
-```
-
-Backend regression:
-
-```text
-Test Suites
-28 / 28 PASS
-
-Tests
-136 / 136 PASS
-```
-
-Quality Gates:
-
-```text
-Prisma validate
-✅
-
-Prisma migration
-✅
-
-Prisma migrate status
-✅
-
-npm test
-✅
-
-npm run build
-✅
-
-ESLint
-✅
-```
-
-Manual QA validated:
-
-```text
-INSPECTION_PENDING → GOOD
-✅
-
-GOOD → DAMAGED
-✅
-
-DAMAGED → OUT_OF_SERVICE
-✅
-
-INSPECTION_PENDING as final result
-→ 400 ✅
-
-nonexistent Equipment
-→ 404 ✅
-
-inspection history
-✅
-
-history ordered newest → oldest
-✅
-
-inspector derived from JWT
-✅
-
-Equipment condition snapshot updated
-✅
-
-failed validation creates no history
-✅
-```
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
----
-
-# 91. Pending Equipment workflows
-
-Estado actualizado:
-
-```text
-Equipment Registration
-✅
-
-Equipment Read
-✅
-
-Equipment Inspection
-✅
-
-Equipment Retirement
-✅
-
-Automatic assetCode generation
-✅
-
-Purchase Receipt Equipment creation
-✅
-
-Explicit identity correction operations
-⏳
-
-Equipment Audit
-⏳
-
-Availability Evaluator
-✅
-```
-
-Healthcare consumirá posteriormente estas capacidades mediante:
-
-```text
-Case Equipment Assignment
-Case Logistics
-Dispatch
-Custody
-Return
-Inspection integration
-```
-
----
-
-# 92. Próxima prioridad recomendada
-
-El siguiente workflow documentado recomendado es:
-
-```text
-Healthcare Equipment Assignment
-```
-
-Estado de EQ-AVL-001:
-
-```text
-IMPLEMENTED / VALIDATED
-```
-
-Workflow cerrado:
-
-```text
-EQ-AVL-001
-Current Equipment Availability
-→ IMPLEMENTED / VALIDATED
-```
-
-El workflow anterior quedó cerrado:
-
-```text
-EQ-PR-001
-Purchase Receipt → EquipmentAsset
-→ IMPLEMENTED / VALIDATED
-```
-
-Orden:
-
-```text
-1. Business Analysis
-2. Purchase Receipt / Equipment documentation
-3. Architecture Review
-4. Prisma review
-5. Backend domain operation
-6. Authorization review
-7. Automated tests
-8. Manual QA
-9. Full regression
-10. Build + lint
-11. Documentation synchronization
-```
-
-Diseño de dominio aprobado para la primera implementación:
-
-```text
-Status
-→ IMPLEMENTED / VALIDATED
-
-Implementation
-→ IMPLEMENTED
-→ VALIDATED
-```
-
-Regla de creación:
-
-```text
-Product.inventoryTracking = ASSET
-PurchaseReceiptItem.quantityReceived = N
+EQUIPMENT_ASSET_CODE sequence
 ↓
-create exactly N EquipmentAsset rows
+atomic allocation
+↓
+EQ-xxxxxx
 ```
 
-No debe usarse `PurchaseItem.quantity` para determinar cuántos `EquipmentAsset` crear.
-
-Para EQ-PR-001:
+La asignación es:
 
 ```text
-QUANTITY
-→ no EquipmentAsset creation
+tenant-scoped
 
-SERIALIZED
-→ no EquipmentAsset creation
+transaction-aware
 
-ASSET
-→ EquipmentAsset creation from PurchaseReceiptItem.quantityReceived
+collision-safe
 ```
 
-Los `EquipmentAsset` creados desde recepción pueden nacer sin serial:
+Los gaps son aceptables.
+
+No existe requerimiento:
+
+```text
+gapless sequence
+```
+
+---
+
+# 27. assetCode no pertenece al cliente
+
+El flujo normal:
+
+```text
+POST /equipment
+```
+
+no permite que frontend controle:
+
+```text
+assetCode
+```
+
+`CreateEquipmentDto` no debe aceptar ese campo.
+
+Debe mantenerse:
+
+```text
+server
+→ owns assetCode allocation
+```
+
+---
+
+# 28. assetCode después de Retirement
+
+Retirement no modifica:
+
+```text
+assetCode
+```
+
+Debe mantenerse:
+
+```text
+RETIRED EQ-0041
+↓
+EQ-0041 remains permanently reserved
+```
+
+No debe crearse otro activo con el mismo código dentro de la Company.
+
+---
+
+# 29. Importación futura de assetCode
+
+Un futuro workflow de importación o migración puede necesitar conservar códigos
+existentes.
+
+Esto deberá requerir:
+
+```text
+valid code
+
+unique inside Company
+
+explicit import workflow
+```
+
+No forma parte de la creación manual normal.
+
+---
+
+# 30. serialNumber
+
+`serialNumber` es opcional.
+
+Puede existir:
 
 ```text
 serialNumber = null
 serialNumberKey = null
 ```
 
-La recepción no debe bloquearse esperando números de serie. La asignación o corrección futura de serial deberá ocurrir mediante una operación explícita de identidad de Equipment fuera de EQ-PR-001.
+El sistema utiliza:
 
-Estado inicial aprobado:
+```text
+serialNumberKey
+```
+
+como representación normalizada para detección de duplicados.
+
+Ejemplo:
+
+```text
+serialNumber
+→ sn-test-001
+
+serialNumberKey
+→ SN-TEST-001
+```
+
+---
+
+# 31. Unicidad de serial
+
+La regla técnica es:
+
+```text
+companyId
++
+productId
++
+serialNumberKey
+→ UNIQUE
+```
+
+Por tanto:
+
+```text
+SN-TEST-001
+```
+
+y:
+
+```text
+sn-test-001
+```
+
+se consideran equivalentes para el mismo Product dentro de la misma Company.
+
+El serial no es globalmente único entre:
+
+```text
+different Products
+
+different Companies
+```
+
+Conflictos válidos se traducen a:
+
+```text
+409 Conflict
+```
+
+---
+
+# 32. Corrección de serial
+
+La corrección de `serialNumber` permanece pendiente.
+
+Una futura operación deberá ser:
+
+```text
+explicit
+
+authorized
+
+duplicate-safe
+
+auditable
+```
+
+Debe mantener la misma identidad:
+
+```text
+EquipmentAsset.id
+```
+
+No debe resolverse mediante un `PATCH` genérico de master data.
+
+Estado:
+
+```text
+Serial correction
+→ TECHNICAL DEBT
+```
+
+---
+
+# 33. Creación manual
+
+Endpoint:
+
+```text
+POST /equipment
+```
+
+Datos aceptados conceptualmente:
+
+```text
+productId
+
+condition
+
+serialNumber?
+
+batchId?
+```
+
+El backend controla:
+
+```text
+companyId
+
+assetCode
+
+serialNumberKey
+
+lifecycle
+
+origin
+
+purchaseReceiptItemId
+
+retirement fields
+
+timestamps
+```
+
+Flujo:
+
+```text
+Authenticated User
+↓
+companyId from authenticated context
+↓
+Validate DTO
+↓
+Find Product inside same Company
+↓
+Product exists?
+↓
+Product active?
+↓
+inventoryTracking = ASSET?
+↓
+Validate optional Batch
+↓
+Normalize optional serial
+↓
+Validate duplicate serial
+↓
+Allocate assetCode
+↓
+Create EquipmentAsset
+```
+
+Valores iniciales:
+
+```text
+origin = MANUAL
+
+lifecycle = ACTIVE
+```
+
+La condición inicial es proporcionada mediante el contrato permitido.
+
+---
+
+# 34. Purchase Receipt → EquipmentAsset
+
+Purchase Receipts integra Equipment automáticamente para Products:
+
+```text
+inventoryTracking = ASSET
+```
+
+Regla:
+
+```text
+PurchaseReceiptItem.quantityReceived = N
+↓
+create exactly N EquipmentAsset
+```
+
+No debe utilizarse:
+
+```text
+PurchaseItem.quantity
+```
+
+para determinar cuántos activos crear.
+
+---
+
+# 35. Tracking durante Receipt provisioning
+
+Actualmente:
+
+```text
+QUANTITY
+→ no EquipmentAsset
+```
+
+```text
+SERIALIZED
+→ no EquipmentAsset
+```
+
+```text
+ASSET
+→ one EquipmentAsset per received unit
+```
+
+Esto mantiene:
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+---
+
+# 36. Estado inicial de Equipment recibido
+
+Cada Equipment creado desde Purchase Receipt utiliza:
 
 ```text
 lifecycle = ACTIVE
+
 condition = INSPECTION_PENDING
+
 origin = PURCHASE_RECEIPT
+
+serialNumber = null
+
+serialNumberKey = null
 ```
 
-Razón:
+Principio:
 
 ```text
 physical receipt
 ≠
-inspection successfully passed
+successful Equipment inspection
 ```
 
-Todo `EquipmentAsset` creado desde una recepción debe conservar permanentemente:
+La Recepción no debe bloquearse únicamente porque todavía no se conozca el serial.
+
+---
+
+# 37. Trazabilidad de origen
+
+Cada activo aprovisionado conserva:
 
 ```text
 purchaseReceiptItemId
 ```
 
-La trazabilidad queda:
+permitiendo:
 
 ```text
 EquipmentAsset
@@ -4079,69 +1403,106 @@ Purchase
 Supplier
 ```
 
-Si el `PurchaseReceiptItem` quedó asociado a un `InventoryBatch`:
+Si el Receipt Item utiliza `InventoryBatch`:
 
 ```text
-EquipmentAsset.batchId = InventoryBatch.id
+EquipmentAsset.batchId
+=
+PurchaseReceiptItem.batchId
 ```
 
-Si no existe batch:
+cuando corresponde.
 
-```text
-batchId = null
-```
+---
 
-EQ-PR-001 no redefine ni amplía la política general de:
+# 38. No duplicar stock
 
-```text
-ProductLotTracking.REQUIRED
-ProductLotTracking.OPTIONAL
-ProductLotTracking.NONE
-```
-
-La aplicación completa de `lotTracking` queda como preocupación separada.
-
-Política de stock aprobada:
+Purchase Receipt es propietario de la mutación de Inventory.
 
 ```text
 PurchaseReceipt
 → Product.stock += quantityReceived
-
-EquipmentAsset creation
-→ does not increment Product.stock again
 ```
 
-Para Products `ASSET`:
-
-```text
-EquipmentAsset
-→ physical unit identity truth
-
-Product.stock
-→ aggregate inventory projection maintained by Inventory / PurchaseReceipt
-```
-
-La reconciliación final `Product.stock ↔ EquipmentAsset` queda fuera de EQ-PR-001.
-
-Unidad transaccional requerida:
+y:
 
 ```text
 PurchaseReceipt
-+
-PurchaseReceiptItems
-+
-InventoryBatch
-+
-InventoryMovement
-+
-Product.stock mutation
-+
-CompanySequence allocation
-+
-EquipmentAsset creation
+→ InventoryMovement IN
 ```
 
-Todo debe ocurrir dentro de la misma transacción Prisma. Si falla la creación de cualquier `EquipmentAsset`, debe revertirse la recepción completa.
+Equipment provisioning:
+
+```text
+→ creates physical identities
+```
+
+pero:
+
+```text
+does not increment Product.stock again
+```
+
+y:
+
+```text
+does not create one additional InventoryMovement per EquipmentAsset
+```
+
+Principio:
+
+```text
+Receipt
+→ Inventory mutation
+
+Equipment provisioning
+→ physical identity creation
+```
+
+---
+
+# 39. Transacción de Purchase Receipt
+
+Equipment provisioning participa en la transacción propiedad de Purchase Receipts.
+
+Conceptualmente:
+
+```text
+PurchaseReceipt
+
++
+
+PurchaseReceiptItems
+
++
+
+InventoryBatch when applicable
+
++
+
+EquipmentAsset provisioning when ASSET
+
++
+
+Product.stock
+
++
+
+InventoryMovement IN
+
++
+
+Purchase status
+```
+
+se coordinan atómicamente cuando forman parte de la misma operación.
+
+Si el provisioning requerido falla:
+
+```text
+Receipt transaction
+→ rollback
+```
 
 Debe evitarse:
 
@@ -4151,563 +1512,728 @@ stock committed
 missing required EquipmentAsset identities
 ```
 
-y:
+---
 
-```text
-EquipmentAsset identities
-+
-missing corresponding receipt
-```
+# 40. Servicios de provisioning
 
-Los `assetCode` de Equipment creado desde recepción reutilizan el mecanismo ya implementado:
-
-```text
-CompanySequence
-companyId + key = EQUIPMENT_ASSET_CODE
-
-EQ-000001
-EQ-000002
-...
-```
-
-`PurchaseReceiptsService` no debe duplicar el algoritmo de secuencia. La lógica reutilizable del dominio Equipment deberá aceptar `Prisma.TransactionClient` para participar en la transacción propiedad de Receipt.
-
-Propiedad arquitectónica:
-
-```text
-Equipment domain / application logic
-→ Equipment identity generation
-→ EquipmentAsset provisioning rules
-
-PurchaseReceiptsService
-→ Purchase Receipt orchestration
-→ transaction boundary
-```
-
-Deben evitarse dependencias circulares de módulos NestJS.
-
-Idempotencia:
-
-```text
-Formal PurchaseReceipt request idempotency
-→ OUT OF SCOPE for EQ-PR-001
-```
-
-Riesgo existente:
-
-```text
-committed PurchaseReceipt
-↓
-client retries after timeout
-↓
-another legitimate receipt may be created if pending quantity remains
-```
-
-Este riesgo queda registrado como preocupación separada de confiabilidad de Purchase Receipt.
-
-Correcciones y reversas:
-
-```text
-Purchase Receipt correction / reversal
-→ OUT OF SCOPE
-```
-
-No debe usarse `DELETE` de `EquipmentAsset` para representar correcciones. Un diseño futuro deberá definir explícitamente efectos sobre Inventory, EquipmentAsset, Lifecycle e historia financiera/operativa.
-
-Persistencia:
-
-```text
-new Prisma model
-→ not required
-
-new field
-→ not required
-
-new enum
-→ not required
-
-new migration
-→ not required
-```
-
-La implementación mínima reutiliza:
-
-```text
-EquipmentAsset.purchaseReceiptItemId
-EquipmentAsset.batchId
-EquipmentAsset.origin
-EquipmentOrigin.PURCHASE_RECEIPT
-CompanySequence
-UNIQUE companyId + assetCode
-```
-
-Fases previstas:
-
-```text
-Phase B.1
-Extract / reuse transaction-aware Equipment assetCode allocation
-
-Phase B.2
-Add Equipment receipt provisioning capability
-
-Phase B.3
-Integrate provisioning into PurchaseReceiptsService transaction
-
-Phase B.4
-Tests and technical validation
-
-Phase C
-Manual QA and final documentation synchronization
-```
-
-Implementación validada:
+La implementación utiliza responsabilidades separadas equivalentes a:
 
 ```text
 EquipmentAssetCodeService
-→ owns CompanySequence allocation
-→ owns EQ-000001 formatting
-→ owns historical / retired generated-looking code reservation
+→ Equipment assetCode allocation
+```
 
+```text
 EquipmentProvisioningService
-→ owns PurchaseReceiptItem lookup
-→ owns tenant-safe provisioning
-→ owns inventoryTracking decision
-→ owns Equipment identity creation
-
-provisionFromPurchaseReceiptItem(
-  tx: Prisma.TransactionClient,
-  companyId: string,
-  purchaseReceiptItemId: string
-): Promise<EquipmentAsset[]>
-→ participates in caller-owned transaction
-→ does not open its own transaction
-
-PurchaseReceiptsService
-→ owns Purchase Receipt transaction
-→ calls Equipment provisioning after PurchaseReceiptItem.create
+→ Equipment creation from PurchaseReceiptItem
 ```
 
-Module dependency:
+Purchase Receipts conserva:
 
 ```text
-PurchasesReceiptsModule
-→ imports EquipmentModule
-→ no forwardRef
-→ no circular dependency
+transaction ownership
 ```
 
-Flujo transaccional implementado:
+El servicio de provisioning participa mediante:
 
 ```text
-InventoryBatch create / resolve
-↓
-PurchaseReceiptItem.create
-↓
-EquipmentProvisioningService.provisionFromPurchaseReceiptItem(
-  tx,
-  companyId,
-  createdReceiptItem.id
-)
-↓
-Product.stock += quantityReceived
-↓
-InventoryMovement IN
-↓
-Purchase status recalculation
-↓
-COMMIT
+Prisma.TransactionClient
 ```
 
-Todo ocurre dentro de la misma transacción Prisma propiedad de `PurchaseReceiptsService`.
+y no abre una transacción independiente.
 
-Reglas implementadas:
-
-```text
-Product.inventoryTracking = ASSET
-PurchaseReceiptItem.quantityReceived = N
-→ creates exactly N EquipmentAsset rows
-
-Product.inventoryTracking = QUANTITY
-→ creates no EquipmentAsset
-
-Product.inventoryTracking = SERIALIZED
-→ creates no EquipmentAsset
-→ SERIALIZED provisioning remains out of scope
-
-Receipt-created EquipmentAsset
-→ lifecycle = ACTIVE
-→ condition = INSPECTION_PENDING
-→ origin = PURCHASE_RECEIPT
-→ serialNumber = null
-→ serialNumberKey = null
-→ purchaseReceiptItemId preserved permanently
-→ batchId = PurchaseReceiptItem.batchId when available
-```
-
-Stock e InventoryMovement:
+Esto evita:
 
 ```text
-Product.stock
-→ mutated only by PurchaseReceipt
-→ Product.stock += quantityReceived
-→ provisioning does not mutate stock
-
-InventoryMovement
-→ one IN movement per receipt item flow
-→ no extra movement per EquipmentAsset
-```
-
-Validación automatizada registrada:
-
-```text
-Purchase Receipt tests
-2 suites
-26/26 passed
-
-Equipment tests
-5 suites
-68/68 passed
-
-Full backend tests
-31 suites
-184/184 passed
-
-npx prisma validate
-PASS
-
-npm run build
-PASS
-
-ESLint changed TypeScript
-PASS
-
-Full backend ESLint
-PASS
-
-git diff --check
-PASS
-```
-
-Manual PostgreSQL / API QA registrada:
-
-```text
-Purchase quantity
-→ 5
-
-Receipt A
-→ quantityReceived = 2
-→ Purchase status CONFIRMED → PARTIALLY_RECEIVED
-→ created 2 EquipmentAsset rows
-→ one InventoryMovement IN, quantity 2, balance 2
-→ Product.stock = 2
-
-Receipt B
-→ quantityReceived = 3
-→ Purchase status PARTIALLY_RECEIVED → RECEIVED
-→ created 3 EquipmentAsset rows
-→ one InventoryMovement IN, quantity 3, balance 5
-→ Product.stock = 5
-
-Final totals
-→ EquipmentAssets = 5
-→ InventoryMovements = 2
-→ Total IN = 5
-→ Product.stock = 5
-```
-
-Traceability QA:
-
-```text
-Receipt A PurchaseReceiptItem
-→ 4a93d639-e25e-4018-98a7-46e5aa36a422
-→ linked exactly 2 EquipmentAsset rows
-
-Receipt B PurchaseReceiptItem
-→ 86319c8a-0e79-451c-84cb-b1471c9ffe4b
-→ linked exactly 3 EquipmentAsset rows
-
-Equipment origin
-→ PURCHASE_RECEIPT
-
-Equipment lifecycle
-→ ACTIVE
-
-Equipment condition
-→ INSPECTION_PENDING
-
-batchId
-→ null in this QA because Product lotTracking = NONE
-```
-
-Over-receipt protection QA:
-
-```text
-After Purchase status RECEIVED and Product.stock = 5
-additional receipt quantityReceived = 1
-→ 400 Bad Request
-→ La compra ya fue recibida completamente
-
-After failed request
-→ Product.stock remained 5
-→ InventoryMovements remained exactly 2
-→ EquipmentAssets linked to valid partial receipts remained exactly 5
-→ no extra Receipt / stock / movement / Equipment mutation
-```
-
-Rollback evidence:
-
-```text
-transaction rollback behavior
-→ structurally implemented and unit-tested
-
-Provisioning failure
-→ propagates through the existing receipt Prisma transaction
-→ no second transaction is opened
-→ downstream Product.stock and InventoryMovement operations are not executed
-
-manual forced database provisioning failure
-→ NOT PERFORMED
-```
-
-Debe mantenerse:
-
-```text
-Retirement
-≠
-DELETE
-
-ACTIVE
-↓
-Retirement
-↓
-RETIRED
-
-RETIRED
-→ historical record preserved
+nested independent business transactions
 ```
 
 ---
 
-# Equipment V1 — estado vigente (2026-08-25)
+# 41. Purchase Receipt idempotency
 
-**Estado:** IMPLEMENTED / VALIDATED.
-
-Frontera de dominio:
+La idempotencia de Purchase Receipts está actualmente:
 
 ```text
-Product
-→ definición de catálogo / modelo
-
-EquipmentAsset
-→ unidad física individual
+IMPLEMENTED / VALIDATED
 ```
 
-Para Products con `inventoryTracking = ASSET`, `EquipmentAsset` es la capa de unidad física. La reconciliación `Product.stock ↔ EquipmentAsset` continúa como deuda conocida y no se considera resuelta.
-
-## Ruta y capacidades V1
-
-La ruta frontend `/equipment` aparece como **Equipos** bajo **INVENTARIO** y ofrece:
+mediante:
 
 ```text
-list
-search
-lifecycle filter
-condition filter
-origin filter
-detail
-current availability
-inspection history
-inspection registration
-manual Equipment creation
-retirement
+Idempotency-Key
+
+tenant-scoped identity
+
+request hash
+
+replay
+
+409 conflict
+
+Serializable transaction
+
+P2002 recovery path
 ```
 
-Lista y detalle muestran los campos operacionales disponibles:
+Esto protege también contra duplicación accidental del provisioning de Equipment
+cuando el mismo request lógico es reintentado correctamente.
+
+Permanece como deuda de QA:
 
 ```text
-assetCode
-Product
-SKU
-serialNumber
-lifecycle
-condition
-origin
-batch / lot when present
-registration date
+real simultaneous PostgreSQL race
+for PurchaseReceipt idempotency
 ```
 
-`assetCode` es el identificador operacional generado por servidor. El UUID no es el identificador principal mostrado al usuario.
-
-## Lifecycle y condition V1
-
-Lifecycle implementado:
+La fuente funcional de esta capacidad es:
 
 ```text
-ACTIVE  → Activo
-RETIRED → Retirado
+PURCHASE_RECEIPTS.md
 ```
 
-El retiro es terminal. Equipment V1 no incluye `DELETE` ni reactivación.
+---
 
-Condiciones implementadas:
+# 42. Current Availability
+
+Core Equipment implementa:
 
 ```text
-GOOD               → Bueno
-INSPECTION_PENDING → Inspección pendiente
-DAMAGED            → Dañado
-OUT_OF_SERVICE     → Fuera de servicio
+Current Availability
 ```
 
-Condition y Availability son conceptos separados. `GOOD` no garantiza por sí solo que una unidad esté disponible.
+Pregunta:
 
-## Current Availability V1
+```text
+¿Puede utilizarse esta unidad ahora
+según los hechos Core actualmente implementados?
+```
+
+Endpoint:
 
 ```text
 GET /equipment/:equipmentId/availability
 ```
 
-Respuesta:
+---
+
+# 43. Availability es derivada
+
+Availability no se almacena como:
 
 ```text
-available
-primaryReason
-reasons
-evaluatedAt
+available Boolean
 ```
 
-Razones implementadas:
+Es:
+
+```text
+derived
+
+contextual
+
+explainable
+```
+
+Actualmente utiliza:
+
+```text
+EquipmentAsset.lifecycle
+
+EquipmentAsset.condition
+```
+
+No consulta directamente Inspection history.
+
+`EquipmentAsset.condition` representa el snapshot operacional actual.
+
+---
+
+# 44. Reglas actuales de Availability
+
+```text
+ACTIVE + GOOD
+→ available = true
+```
+
+```text
+ACTIVE + INSPECTION_PENDING
+→ available = false
+→ INSPECTION_PENDING
+```
+
+```text
+ACTIVE + DAMAGED
+→ available = false
+→ DAMAGED
+```
+
+```text
+ACTIVE + OUT_OF_SERVICE
+→ available = false
+→ OUT_OF_SERVICE
+```
 
 ```text
 RETIRED
-INSPECTION_PENDING
-DAMAGED
-OUT_OF_SERVICE
-```
-
-Availability es evaluada por backend; el frontend no la infiere desde `condition`. Se consulta sólo al abrir detalle, sin llamadas N+1 desde la lista.
-
-## Inspecciones V1
-
-```text
-GET  /equipment/:equipmentId/inspections
-POST /equipment/:equipmentId/inspections
-```
-
-Resultados seleccionables:
-
-```text
-GOOD
-DAMAGED
-OUT_OF_SERVICE
-```
-
-`INSPECTION_PENDING` no es resultado final seleccionable. El payload frontend es:
-
-```json
-{
-  "conditionAfter": "GOOD | DAMAGED | OUT_OF_SERVICE",
-  "notes": "optional"
-}
-```
-
-Servidor controla inspector, timestamps y `conditionBefore`. Después del POST, el frontend refresca detalle, inspecciones, Availability y lista.
-
-## Creación manual V1
-
-```text
-POST /equipment
-Frontend action: Nuevo equipo
-```
-
-El selector incluye sólo Products activos con `inventoryTracking = ASSET`.
-
-`CreateEquipmentDto` requiere `productId` y `condition`; permite opcionalmente `serialNumber` y `batchId`. El payload V1 del frontend es:
-
-```json
-{
-  "productId": "uuid",
-  "condition": "GOOD | INSPECTION_PENDING | DAMAGED | OUT_OF_SERVICE",
-  "serialNumber": "optional"
-}
-```
-
-`batchId` no se expone porque todavía no existe un selector de lote seguro. Servidor controla `assetCode`, `origin = MANUAL`, lifecycle inicial, `serialNumberKey`, tenant y timestamps.
-
-## Retiro V1
-
-```text
-POST /equipment/:equipmentId/retirement
-```
-
-Payload:
-
-```json
-{
-  "retiredReason": "SOLD | LOST | DESTROYED | END_OF_LIFE | REPLACED | OTHER",
-  "retirementNotes": "optional"
-}
-```
-
-Para `OTHER`, `retirementNotes` no vacías son obligatorias. Servidor controla `retiredAt` y `retiredById`.
-
-El retiro:
-
-* preserva `EquipmentAsset`, `assetCode`, serial, Product, condition e historia;
-* cambia lifecycle a `RETIRED`;
-* hace que Current Availability reporte no disponible con razón `RETIRED`;
-* impide nuevas inspecciones conforme a las reglas de lifecycle;
-* no elimina ni reactiva la unidad.
-
-## QA y validación V1
-
-La evidencia de proyecto registra:
-
-```text
-real API list / detail QA
-PASS
-
-inspection workflow manual QA
-PASS
-
-manual Equipment creation QA
-PASS
-
-retirement workflow manual QA
-PASS
-```
-
-El activo descartable de G1/G2 fue identificado por el serial `QA-G1-001`. No se documentan un `assetCode` ni timestamps exactos porque no existe evidencia persistida suficiente para afirmarlos aquí.
-
-Validación frontend final:
-
-```text
-Equipment
-61 tests PASS
-
-Full frontend
-25 files / 336 tests PASS
-
-build / lint / git diff --check
-PASS
-```
-
-## Deuda abierta después de V1
-
-```text
-serial correction / edit workflow
-batch selector for manual create
-retired actor name resolution
-Product.stock ↔ EquipmentAsset reconciliation
-bulk / list Availability endpoint if needed later
-pagination
-Equipment Assignment / Case logistics as Healthcare work
+→ available = false
+→ RETIRED
 ```
 
 ---
 
-# 93. EQ-RET-001 — Equipment Retirement
+# 45. Availability result
 
-Equipment Retirement representa la salida permanente de un `EquipmentAsset` de la flota operacional normal.
+Respuesta:
+
+```text
+available
+
+primaryReason
+
+reasons
+
+evaluatedAt
+```
+
+Reason codes actuales:
+
+```text
+RETIRED
+
+INSPECTION_PENDING
+
+DAMAGED
+
+OUT_OF_SERVICE
+```
+
+Cuando existen múltiples blockers:
+
+```text
+reasons
+→ contains all applicable Core blockers
+```
+
+La prioridad actual es determinística:
+
+```text
+1. RETIRED
+2. INSPECTION_PENDING
+3. DAMAGED
+4. OUT_OF_SERVICE
+```
+
+`primaryReason` corresponde al primer reason aplicable.
+
+---
+
+# 46. Arquitectura de Availability
+
+La implementación separa:
+
+```text
+pure evaluator
+```
+
+de:
+
+```text
+application service
+```
+
+Conceptualmente:
+
+```text
+Equipment Availability Evaluator
+→ lifecycle + condition
+→ pure
+→ deterministic
+→ no database
+→ no clock
+```
+
+```text
+EquipmentAvailabilityService
+→ tenant-safe lookup
+→ orchestration
+→ evaluatedAt
+```
+
+```text
+EquipmentController
+→ HTTP boundary
+```
+
+No se requiere actualmente infraestructura de plugins o providers dinámicos.
+
+---
+
+# 47. Availability no se calcula en frontend
+
+Frontend no debe inferir Availability utilizando:
+
+```text
+condition
+```
+
+por su cuenta.
+
+Debe consumir el resultado backend.
+
+Esto evita divergencias entre:
+
+```text
+list/detail UI logic
+
+future Healthcare selectors
+
+other clients
+```
+
+---
+
+# 48. Availability en lista
+
+Current Availability no se agrega automáticamente a:
+
+```text
+GET /equipment
+```
+
+para evitar consultas adicionales implícitas por activo.
+
+Actualmente se consulta cuando la experiencia necesita el detalle.
+
+Un futuro endpoint bulk puede evaluarse si existe necesidad real.
+
+---
+
+# 49. Current Availability ≠ Case Availability
+
+Debe mantenerse:
+
+```text
+Current Equipment Availability
+→ Core Equipment
+```
+
+y:
+
+```text
+Case Availability
+→ Healthcare
+```
+
+Current Availability responde utilizando hechos Core actuales.
+
+Case Availability deberá considerar además, cuando existan:
+
+```text
+Target Case
+
+schedule
+
+Assignments
+
+Custody
+
+Dispatch state
+
+turnaround
+
+Maintenance
+
+Calibration
+```
+
+Por tanto:
+
+```text
+ACTIVE + GOOD
+→ Current Availability = true
+```
+
+no garantiza:
+
+```text
+Case Availability = true
+```
+
+---
+
+# 50. No Force Available
+
+No debe existir una operación ordinaria:
+
+```text
+Force Available
+```
+
+Para cambiar Availability debe cambiarse la causa real.
+
+Ejemplos:
+
+```text
+INSPECTION_PENDING
+→ perform Inspection
+```
+
+```text
+OUT_OF_SERVICE
+→ valid future condition resolution
+```
+
+```text
+RETIRED
+→ remains unavailable
+```
+
+Futuros blockers deberán resolverse en su dominio propietario.
+
+---
+
+# 51. EquipmentInspection
+
+Inspection pertenece a Core Equipment.
+
+Representa:
+
+```text
+physical / operational condition event
+```
+
+Healthcare puede originar una Inspection como consecuencia de un Return, pero no
+debe redefinir la entidad Core.
+
+Por tanto `EquipmentInspection` no debe incorporar directamente por conveniencia:
+
+```text
+caseId
+
+hospitalId
+
+technicianId
+
+caseReturnId
+```
+
+El contexto Healthcare deberá relacionarse mediante su propio dominio cuando se
+implemente.
+
+---
+
+# 52. Inspection API
+
+Endpoints implementados:
+
+```text
+GET  /equipment/:equipmentId/inspections
+
+POST /equipment/:equipmentId/inspections
+```
+
+No existen operaciones normales:
+
+```text
+PATCH EquipmentInspection
+
+DELETE EquipmentInspection
+```
+
+porque Inspection representa historia operacional.
+
+---
+
+# 53. Inspection input
+
+La creación acepta conceptualmente:
+
+```text
+conditionAfter
+
+notes?
+```
+
+No acepta desde cliente:
+
+```text
+companyId
+
+equipmentAssetId
+
+conditionBefore
+
+inspectedById
+
+inspectedAt
+
+createdAt
+```
+
+Estos valores son determinados por backend.
+
+---
+
+# 54. Inspection eligibility
+
+Una Inspection normal puede ejecutarse sobre Equipment:
+
+```text
+Lifecycle = ACTIVE
+```
+
+Esto incluye condiciones actuales:
+
+```text
+GOOD
+
+INSPECTION_PENDING
+
+DAMAGED
+
+OUT_OF_SERVICE
+```
+
+Ejemplos válidos:
+
+```text
+INSPECTION_PENDING
+→ GOOD
+```
+
+```text
+GOOD
+→ DAMAGED
+```
+
+```text
+DAMAGED
+→ GOOD
+```
+
+```text
+OUT_OF_SERVICE
+→ GOOD
+```
+
+Un Equipment:
+
+```text
+RETIRED
+```
+
+no puede recibir una nueva Inspection operacional normal.
+
+---
+
+# 55. Inspection result
+
+Resultados finales permitidos:
+
+```text
+GOOD
+
+DAMAGED
+
+OUT_OF_SERVICE
+```
+
+No:
+
+```text
+INSPECTION_PENDING
+```
+
+porque una Inspection completada debe finalizar con una condición conocida.
+
+---
+
+# 56. conditionBefore
+
+`conditionBefore` se deriva desde:
+
+```text
+EquipmentAsset.condition
+```
+
+inmediatamente antes de ejecutar la operación.
+
+El cliente no controla este valor.
+
+Esto protege la integridad del historial.
+
+---
+
+# 57. conditionAfter
+
+Después de una Inspection exitosa:
+
+```text
+EquipmentInspection.conditionAfter
+=
+EquipmentAsset.condition
+```
+
+al finalizar la operación.
+
+Debe ejecutarse atómicamente.
+
+---
+
+# 58. Inspector y timestamp
+
+Backend deriva:
+
+```text
+inspectedById
+→ authenticated User
+```
+
+y:
+
+```text
+inspectedAt
+→ server time
+```
+
+El cliente no debe elegir libremente:
+
+```text
+inspector
+
+historical timestamp
+```
+
+durante la operación normal.
+
+---
+
+# 59. Atomic Inspection
+
+Inspection es una sola operación de negocio.
+
+Conceptualmente:
+
+```text
+BEGIN
+
+load tenant-scoped EquipmentAsset
+
+validate Lifecycle
+
+capture conditionBefore
+
+create EquipmentInspection
+
+update EquipmentAsset.condition
+
+COMMIT
+```
+
+Debe evitarse:
+
+```text
+Inspection history created
++
+condition snapshot unchanged
+```
+
+y:
+
+```text
+condition changed
++
+Inspection history missing
+```
+
+Si ocurre un error:
+
+```text
+ROLLBACK
+```
+
+---
+
+# 60. Inspection history
+
+Inspection confirmada debe permanecer histórica.
+
+Si una inspección posterior encuentra otra condición:
+
+```text
+new EquipmentInspection
+```
+
+debe registrar ese nuevo hecho.
+
+No debe reescribirse una Inspection anterior.
+
+`EquipmentAsset.condition` representa:
+
+```text
+current snapshot
+```
+
+mientras:
+
+```text
+EquipmentInspection[]
+→ history
+```
+
+---
+
+# 61. Inspection y Availability
+
+Debe mantenerse:
+
+```text
+Inspection
+≠
+Availability
+```
+
+En el modelo Core actual:
+
+```text
+Inspection
+↓
+updates Condition
+↓
+Current Availability evaluator
+```
+
+Por ejemplo:
+
+```text
+ACTIVE
++
+Inspection result GOOD
+↓
+Current Core Availability = true
+```
+
+pero esto no implica:
+
+```text
+Healthcare Case Availability = true
+```
+
+porque Healthcare podrá incorporar blockers adicionales.
+
+---
+
+# 62. Equipment Retirement
+
+Retirement representa la salida permanente del activo de la flota operacional
+normal.
+
+Endpoint:
+
+```text
+POST /equipment/:equipmentId/retirement
+```
 
 Debe mantenerse:
 
@@ -4717,7 +2243,7 @@ Retirement
 DELETE
 ```
 
-El flujo permitido en Fase 1 es:
+Flujo:
 
 ```text
 ACTIVE
@@ -4727,128 +2253,44 @@ Retirement
 RETIRED
 ```
 
-El registro físico y su historia permanecen en el sistema.
-
-Retirement no elimina:
-
-```text
-EquipmentAsset
-Inspection history
-Purchase origin
-serialNumber
-assetCode
-timestamps
-future Case history
-future Custody history
-```
-
-**Estado:** DOMAIN DESIGN APPROVED / VALIDATED.
-
 ---
 
-# 94. Retirement finality
+# 63. Retirement reasons
 
-En Fase 1:
-
-```text
-RETIRED
-→ terminal normal lifecycle state
-```
-
-No existirá una operación normal:
-
-```text
-Reactivate Equipment
-```
-
-Una corrección administrativa futura deberá ser:
-
-```text
-exceptional
-authorized
-audited
-```
-
-y diseñada como una operación independiente.
-
-No deberá resolverse mediante:
-
-```text
-PATCH lifecycle = ACTIVE
-```
-
-**Estado:** APPROVED.
-
----
-
-# 95. Retirement reasons
-
-La razón de retiro utilizará el enum Core existente:
-
-```text
-EquipmentRetirementReason
-
-SOLD
-LOST
-DESTROYED
-END_OF_LIFE
-REPLACED
-OTHER
-```
-
-Semántica:
+Valores:
 
 ```text
 SOLD
-→ ownership or operational possession permanently transferred by sale
-```
 
-```text
 LOST
-→ asset formally resolved as lost after appropriate operational review
-```
 
-```text
 DESTROYED
-→ asset physically destroyed or permanently unusable
-```
 
-```text
 END_OF_LIFE
-→ asset intentionally retired because its useful operational life ended
-```
 
-```text
 REPLACED
-→ asset removed from normal operation because it was replaced
-```
 
-```text
 OTHER
-→ exceptional retirement reason not represented by another enum value
 ```
 
-Debe mantenerse:
+Reason:
 
 ```text
-Retirement reason
 ≠
 Lifecycle
 ```
 
-Lifecycle siempre termina en:
+Lifecycle final:
 
 ```text
 RETIRED
 ```
 
-**Estado:** APPROVED / PERSISTED.
-
 ---
 
-# 96. Missing does not imply LOST
+# 64. Missing no significa LOST
 
-Debe mantenerse estrictamente:
+Debe mantenerse:
 
 ```text
 Missing
@@ -4857,306 +2299,89 @@ LOST
 ```
 
 ```text
-Overdue Return
+Overdue
 ≠
 LOST
 ```
 
 ```text
-Open Custody Exception
+Open custody exception
 ≠
 LOST
 ```
 
-La razón:
+`LOST` requiere una resolución explícita.
 
-```text
-LOST
-```
-
-solo podrá utilizarse cuando exista una decisión explícita de resolver el activo como perdido.
-
-Healthcare o Custody podrán detectar:
-
-```text
-missing
-unreturned
-overdue
-unresolved
-```
-
-pero no deberán cambiar automáticamente Core Equipment a:
-
-```text
-RETIRED / LOST
-```
-
-**Estado:** APPROVED.
+Futuros workflows Healthcare/Custody no deben retirar automáticamente un activo
+como `LOST` únicamente porque no fue devuelto a tiempo.
 
 ---
 
-# 97. Retirement input
+# 65. Retirement input
 
-El cliente proporcionará únicamente:
+El cliente proporciona:
 
 ```text
 retiredReason
+
 retirementNotes?
 ```
 
-No proporcionará:
+Backend controla:
 
 ```text
+equipmentId from route
+
 companyId
-equipmentId
-lifecycle
+
+lifecycle transition
+
 retiredAt
+
 retiredById
 ```
 
-Estos datos serán obtenidos o generados por backend.
-
-Conceptualmente:
-
-```json
-{
-  "retiredReason": "END_OF_LIFE",
-  "retirementNotes": "Equipo sustituido después de finalizar su vida útil."
-}
-```
-
-**Estado:** APPROVED.
-
----
-
-# 98. retirementNotes policy
-
-`retirementNotes` será opcional para:
-
-```text
-SOLD
-LOST
-DESTROYED
-END_OF_LIFE
-REPLACED
-```
-
-pero será obligatorio cuando:
+Para:
 
 ```text
 retiredReason = OTHER
 ```
 
-Regla:
-
-```text
-OTHER
-+
-empty retirementNotes
-→ 400 Bad Request
-```
-
-Las notas deberán almacenarse normalizadas:
-
-```text
-trim
-```
-
-Una cadena vacía deberá convertirse conceptualmente en:
-
-```text
-null
-```
-
-cuando la razón permita notas opcionales.
-
-Para `OTHER`, después de `trim` deberá existir contenido real.
-
-**Estado:** APPROVED.
+se requieren notas con contenido real después de normalización.
 
 ---
 
-# 99. Server-derived retirement data
+# 66. Retirement server-owned fields
 
-Los siguientes campos son controlados por servidor:
+Una operación exitosa establece:
+
+```text
+lifecycle = RETIRED
+
+retiredAt = server timestamp
+
+retiredById = authenticated User
+
+retiredReason = validated input
+
+retirementNotes = normalized input
+```
+
+El cliente no controla:
 
 ```text
 retiredAt
+
 retiredById
+
 lifecycle
 ```
 
-Flujo:
-
-```text
-authenticated User
-↓
-retiredById
-
-server timestamp
-↓
-retiredAt
-
-successful Retirement
-↓
-lifecycle = RETIRED
-```
-
-El cliente no puede elegir quién retiró el activo ni alterar la fecha normal del evento.
-
-**Estado:** APPROVED.
-
 ---
 
-# 100. Equipment eligibility
+# 67. Retirement preserva Condition
 
-La operación normal de Retirement solo puede ejecutarse cuando:
-
-```text
-Equipment exists
-+
-same Company
-+
-Lifecycle = ACTIVE
-```
-
-Si el activo no existe dentro del tenant:
-
-```text
-404 Not Found
-```
-
-Si ya está:
-
-```text
-Lifecycle = RETIRED
-```
-
-la nueva solicitud deberá rechazarse como conflicto de estado:
-
-```text
-409 Conflict
-```
-
-No deberá:
-
-```text
-overwrite retiredAt
-overwrite retiredById
-overwrite retiredReason
-overwrite retirementNotes
-```
-
-**Estado:** APPROVED.
-
----
-
-# 101. Retirement is not idempotent overwrite
-
-Una segunda solicitud sobre un Equipment ya retirado no debe considerarse una nueva operación válida.
-
-Ejemplo:
-
-```text
-First request
-ACTIVE
-→ RETIRED / END_OF_LIFE
-✅
-```
-
-Después:
-
-```text
-Second request
-RETIRED
-→ RETIRED / SOLD
-❌
-```
-
-Resultado:
-
-```text
-409 Conflict
-```
-
-La primera decisión histórica permanece intacta.
-
-Esto protege:
-
-```text
-retiredAt
-retiredById
-retiredReason
-retirementNotes
-```
-
-de sobrescritura accidental.
-
-**Estado:** APPROVED.
-
----
-
-# 102. Active operational dependencies
-
-Antes de Retirement deberán resolverse dependencias operacionales activas cuando dichas capacidades existan.
-
-Conceptualmente:
-
-```text
-active Case Assignment
-active external Custody
-active Dispatch
-open Return
-other blocking operational dependency
-```
-
-deberán producir:
-
-```text
-Retirement BLOCKED
-```
-
-hasta que la realidad operacional sea resuelta.
-
-Debe mantenerse:
-
-```text
-Retire Equipment
-≠
-silently close Assignment
-```
-
-```text
-Retire Equipment
-≠
-silently close Custody
-```
-
-```text
-Retire Equipment
-≠
-fake Return
-```
-
-Excepción conceptual:
-
-```text
-LOST
-```
-
-podrá necesitar en el futuro un workflow coordinado para cerrar una custodia sin retorno físico.
-
-Ese comportamiento pertenece a la futura integración Core + Healthcare/Custody y no deberá improvisarse dentro del primer endpoint Core.
-
-En la implementación actual, estas dependencias todavía no existen como modelos Core integrados, por lo que no se crearán estructuras ficticias únicamente para EQ-RET-001.
-
-**Estado:** RULE APPROVED / CROSS-DOMAIN ENFORCEMENT FUTURE.
-
----
-
-# 103. Condition after Retirement
-
-Retirement cambia:
+Retirement modifica:
 
 ```text
 Lifecycle
@@ -5171,78 +2396,147 @@ Condition
 Ejemplo válido:
 
 ```text
-Before:
-Lifecycle = ACTIVE
-Condition = OUT_OF_SERVICE
+Before
 
-After:
-Lifecycle = RETIRED
-Condition = OUT_OF_SERVICE
+ACTIVE
+DAMAGED
+
+After
+
+RETIRED
+DAMAGED
 ```
 
-También puede existir históricamente:
+También:
 
 ```text
-Before:
-Lifecycle = ACTIVE
-Condition = GOOD
-
-After:
-Lifecycle = RETIRED
-Condition = GOOD
-Reason = SOLD
+ACTIVE
+GOOD
+↓
+SOLD
+↓
+RETIRED
+GOOD
 ```
 
-La razón es que:
-
-```text
-Condition
-→ last known physical/operational condition
-```
-
-mientras:
-
-```text
-Lifecycle
-→ whether asset remains part of active fleet
-```
-
-Retirement no debe falsificar Condition solo para expresar indisponibilidad.
-
-**Estado:** APPROVED.
+Condition conserva el último estado conocido.
 
 ---
 
-# 104. Retirement and Availability
+# 68. Retirement preserva identidad e historia
+
+Retirement no elimina ni modifica automáticamente:
+
+```text
+EquipmentAsset
+
+assetCode
+
+serialNumber
+
+serialNumberKey
+
+Product relationship
+
+Purchase origin
+
+InventoryBatch relation
+
+Inspection history
+```
+
+Los datos de retiro también permanecen históricos.
+
+---
+
+# 69. Segundo Retirement
+
+Una vez:
+
+```text
+RETIRED
+```
+
+una nueva solicitud de Retirement no debe sobrescribir la primera.
+
+Ejemplo:
+
+```text
+ACTIVE
+→ RETIRED / END_OF_LIFE
+✅
+```
+
+después:
+
+```text
+RETIRED
+→ RETIRED / SOLD
+❌
+```
+
+Resultado esperado:
+
+```text
+409 Conflict
+```
+
+La primera decisión permanece intacta.
+
+---
+
+# 70. Retirement y concurrencia
+
+La transición debe protegerse contra solicitudes concurrentes.
+
+La escritura debe exigir conceptualmente:
+
+```text
+id
+
+companyId
+
+lifecycle = ACTIVE
+```
+
+Solo una transición:
+
+```text
+ACTIVE → RETIRED
+```
+
+puede ganar.
+
+Una segunda operación debe detectar el cambio de estado y no sobrescribir los
+datos del primer retiro.
+
+---
+
+# 71. Retirement y Availability
 
 Debe mantenerse:
 
 ```text
-Lifecycle = RETIRED
-→ Availability = NO
+RETIRED
+↓
+Current Availability
+↓
+available = false
 ```
 
-pero Retirement no escribirá:
+Retirement no escribe:
 
 ```text
 available = false
 ```
 
-La futura lógica será:
+como campo persistido.
 
-```text
-Lifecycle RETIRED
-↓
-Availability Evaluator
-↓
-not available
-```
-
-**Estado:** APPROVED / AVAILABILITY EVALUATOR PENDING.
+Availability continúa siendo derivada.
 
 ---
 
-# 105. Retirement and Inspection
+# 72. Retirement y Inspection
 
 Después de:
 
@@ -5250,738 +2544,1459 @@ Después de:
 Lifecycle = RETIRED
 ```
 
-no deberán permitirse nuevas inspecciones operacionales normales.
+nuevas inspecciones operacionales normales son bloqueadas.
 
-Esto ya está protegido por el workflow de Inspection:
-
-```text
-RETIRED
-→ Inspection blocked
-```
-
-Las Inspection históricas anteriores permanecen disponibles.
-
-Retirement no deberá eliminarlas ni modificarlas.
-
-**Estado:** APPROVED / INSPECTION ENFORCEMENT IMPLEMENTED.
+Las inspecciones históricas permanecen disponibles.
 
 ---
 
-# 106. assetCode after Retirement
+# 73. Dependencias operacionales futuras
 
-Retirement no modifica:
-
-```text
-assetCode
-```
-
-El código continúa reservado permanentemente.
-
-Debe mantenerse:
+Cuando existan:
 
 ```text
-RETIRED EQ-0041
-↓
-assetCode EQ-0041 remains owned by historical asset
+Case Assignment
+
+external Custody
+
+Dispatch
+
+open Return
 ```
 
-No podrá crearse posteriormente otro Equipment con:
+Retirement deberá validar blockers operacionales cuando corresponda.
+
+Debe evitarse:
 
 ```text
-EQ-0041
+Retirement
+→ silently closes Assignment
 ```
-
-dentro de la misma Company.
-
-La constraint existente:
 
 ```text
-companyId + assetCode
-→ UNIQUE
+Retirement
+→ silently closes Custody
 ```
 
-continúa protegiendo esta regla.
+```text
+Retirement
+→ fakes Return
+```
 
-**Estado:** APPROVED / DATABASE ENFORCED.
+Una pérdida real durante Custody podrá necesitar un workflow coordinado futuro.
+
+Actualmente estos modelos Healthcare todavía no existen.
 
 ---
 
-# 107. Serial after Retirement
+# 74. API actual
 
-Retirement no modifica ni elimina:
-
-```text
-serialNumber
-serialNumberKey
-```
-
-El serial registrado forma parte de la identidad histórica del activo.
-
-No debe limpiarse para permitir reutilización artificial.
-
-**Estado:** APPROVED.
-
----
-
-# 108. Retirement persistence
-
-La persistencia existente de `EquipmentAsset` ya dispone de:
+Endpoints Core implementados:
 
 ```text
-lifecycle
-retiredAt
-retiredById
-retiredReason
-retirementNotes
-```
+GET  /equipment
 
-y de la relación:
+GET  /equipment/:id
 
-```text
-retiredBy
-→ User
-```
+POST /equipment
 
-Por tanto, no se requieren nuevos campos conceptuales para la primera versión de EQ-RET-001.
+GET  /equipment/:equipmentId/availability
 
-Antes de implementar se revisará si las constraints y relaciones actuales son suficientes para tenant integrity.
+GET  /equipment/:equipmentId/inspections
 
-Prisma review result:
+POST /equipment/:equipmentId/inspections
 
-No new columns required
-✅
-
-No new enums required
-✅
-
-No new relations required
-✅
-
-No migration required
-✅
-
-**Estado:** IMPLEMENTED / EXISTING PERSISTENCE REUSED.
-
----
-
-# 109. Tenant integrity
-
-Debe cumplirse:
-
-```text
-EquipmentAsset.companyId
-=
-Authenticated User.companyId
-```
-
-El Equipment deberá buscarse siempre mediante:
-
-```text
-id
-+
-companyId
-```
-
-El cliente nunca enviará `companyId` como mecanismo de autorización.
-
-`retiredById` será tomado del usuario autenticado.
-
-El backend deberá validar que dicho usuario pertenece al mismo tenant.
-
-Debe evaluarse si la relación:
-
-```text
-retiredBy
-→ User
-```
-
-continúa bajo el patrón actual de actor con FK simple o si una evolución transversal de User deberá reforzarla posteriormente.
-
-EQ-RET-001 no deberá introducir cambios aislados al modelo global `User` salvo necesidad demostrada.
-
-**Estado:** IMPLEMENTED AT SERVICE LAYER / GLOBAL USER FK EVOLUTION PENDING.
-
----
-
-# 110. Concurrency protection
-
-Retirement deberá protegerse contra dos solicitudes concurrentes.
-
-Conceptualmente:
-
-```text
-Request A
-reads ACTIVE
-
-Request B
-reads ACTIVE
-```
-
-solo una deberá poder completar:
-
-```text
-ACTIVE → RETIRED
-```
-
-La segunda deberá detectar que el estado esperado cambió y producir:
-
-```text
-409 Conflict
-```
-
-sin sobrescribir los datos del primer Retirement.
-
-La implementación deberá utilizar una condición equivalente a:
-
-```text
-id
-companyId
-lifecycle = ACTIVE
-```
-
-en la escritura final.
-
-**Estado:** APPROVED.
-
----
-
-# 111. Atomic Retirement operation
-
-Retirement constituye una única operación de negocio.
-
-Conceptualmente:
-
-```text
-BEGIN TRANSACTION
-↓
-validate authenticated User
-↓
-load EquipmentAsset
-↓
-validate tenant
-↓
-validate Lifecycle ACTIVE
-↓
-validate retirement reason
-↓
-validate retirement notes policy
-↓
-validate current operational blockers
-↓
-update EquipmentAsset:
-  lifecycle = RETIRED
-  retiredAt = now
-  retiredById = authenticated user
-  retiredReason = input reason
-  retirementNotes = normalized notes
-↓
-COMMIT
-```
-
-Si alguna validación o escritura falla:
-
-```text
-ROLLBACK
-```
-
-No debe existir un estado parcial como:
-
-```text
-lifecycle = RETIRED
-+
-retiredReason = null
-```
-
-producido por la operación normal.
-
-**Estado:** APPROVED.
-
----
-
-# 112. Retirement API direction
-
-Contrato inicial:
-
-```text
 POST /equipment/:equipmentId/retirement
 ```
 
-No se utilizará:
+No existen actualmente:
 
 ```text
-DELETE /equipment/:equipmentId
+PATCH /equipment/:id
+
+DELETE /equipment/:id
 ```
 
-ni:
+La ausencia de estas operaciones genéricas protege:
 
 ```text
-PATCH /equipment/:equipmentId
+identity
+
+lifecycle
+
+condition
+
+origin
+
+retirement history
+```
+
+Las modificaciones sensibles deben diseñarse como operaciones explícitas.
+
+---
+
+# 75. Frontend Equipment V1
+
+Ruta principal:
+
+```text
+/equipment
+```
+
+Capacidades actuales:
+
+```text
+list
+
+search
+
+lifecycle filter
+
+condition filter
+
+origin filter
+
+detail
+
+Current Availability
+
+Inspection history
+
+Inspection creation
+
+manual Equipment creation
+
+Retirement
+
+deep-link
+```
+
+Deep-link:
+
+```text
+/equipment?assetId=<id>
+```
+
+El detalle se resuelve mediante:
+
+```text
+GET /equipment/:id
+```
+
+y no requiere que el activo esté presente en la página actual de la lista.
+
+---
+
+# 76. Datos mostrados
+
+La experiencia actual puede presentar:
+
+```text
+assetCode
+
+Product
+
+SKU
+
+serialNumber
+
+lifecycle
+
+condition
+
+origin
+
+batch / lot when present
+
+registration date
+```
+
+`assetCode` es el identificador operacional principal mostrado.
+
+El UUID permanece como identidad técnica.
+
+---
+
+# 77. Frontend manual creation
+
+La acción:
+
+```text
+Nuevo equipo
+```
+
+permite seleccionar Products:
+
+```text
+active
++
+inventoryTracking = ASSET
+```
+
+Payload actual de frontend:
+
+```json
 {
-  "lifecycle": "RETIRED"
+  "productId": "uuid",
+  "condition": "GOOD | INSPECTION_PENDING | DAMAGED | OUT_OF_SERVICE",
+  "serialNumber": "optional"
 }
 ```
 
-porque Retirement posee reglas de negocio propias.
-
-Tampoco se implementará inicialmente:
+Aunque backend soporta conceptualmente:
 
 ```text
-DELETE retirement
-PATCH retirement
-Reactivate Equipment
+batchId?
 ```
-Implementation status:
 
-POST /equipment/:equipmentId/retirement
-→ IMPLEMENTED
-
-**Estado:** APPROVED.
+el selector frontend de Batch todavía no existe.
 
 ---
 
-# 113. Retirement response
+# 78. Multi-tenancy
 
-Después de una operación exitosa, el backend deberá devolver el Equipment actualizado con al menos:
+Las operaciones Equipment implementadas utilizan:
 
 ```text
-id
 companyId
-productId
-assetCode
-serialNumber
-lifecycle
-condition
-retiredAt
-retiredById
-retiredReason
-retirementNotes
 ```
 
-Podrá incluir relaciones seguras necesarias para la experiencia de usuario.
+derivado del usuario autenticado.
 
-Nunca debe exponer datos sensibles del usuario que ejecutó la operación.
+Principio:
 
-**Estado:** APPROVED.
+```text
+Authenticated Company
+→ Equipment scope
+```
+
+No:
+
+```text
+client companyId
+→ trusted authorization
+```
+
+Product y Batch relacionados deben pertenecer al mismo tenant.
 
 ---
 
-# 114. Error contract
+# 79. Tenant behavior
 
-Errores esperados:
+Un Equipment inexistente o perteneciente a otra Company debe tratarse como no
+accesible para el tenant autenticado.
+
+La API no debe revelar innecesariamente:
+
+```text
+cross-tenant existence
+
+condition
+
+lifecycle
+
+Availability
+
+Inspection history
+```
+
+La regresión sistemática cross-tenant de toda la plataforma continúa siendo una
+prioridad de seguridad general, aunque Equipment tenga scoping implementado.
+
+---
+
+# 80. Authorization
+
+Actualmente Equipment utiliza:
+
+```text
+JwtAuthGuard
+
+tenant validation
+```
+
+Permission-Based RBAC completo todavía no está implementado globalmente.
+
+Operaciones sensibles deberán formar parte de la revisión de autorización antes
+de producción.
+
+Permisos conceptuales futuros pueden incluir:
+
+```text
+equipment.read
+
+equipment.create
+
+equipment.inspect
+
+equipment.retire
+```
+
+Estos nombres no deben interpretarse como Permissions actualmente persistidos.
+
+---
+
+# 81. Validación HTTP
+
+La API utiliza globalmente:
+
+```text
+ValidationPipe
+
+whitelist = true
+
+forbidNonWhitelisted = true
+
+transform = true
+```
+
+Los DTOs deben rechazar campos controlados por servidor.
+
+Ejemplos:
+
+```text
+companyId
+
+assetCode
+
+serialNumberKey
+
+lifecycle
+
+origin
+
+retiredAt
+
+retiredById
+```
+
+cuando no forman parte del contrato permitido.
+
+---
+
+# 82. Error contract
+
+Errores esperados incluyen:
 
 ```text
 400 Bad Request
-→ invalid retiredReason
-→ OTHER without retirementNotes
-→ invalid retirementNotes
+→ invalid DTO
+→ Product not ASSET
+→ invalid condition
+→ invalid retirement reason
+→ OTHER without notes
+→ inspection invalid for current lifecycle
 ```
 
 ```text
 404 Not Found
-→ Equipment not found inside authenticated Company
-```
-
-```text
-403 Forbidden
-→ authenticated actor fails tenant/authorization validation
+→ Equipment not found in tenant
+→ Product not found
+→ Batch not found / incompatible
 ```
 
 ```text
 409 Conflict
-→ Equipment already RETIRED
-→ concurrent lifecycle change
-→ unresolved operational blocker
+→ duplicate normalized serial
+→ duplicate assetCode
+→ already RETIRED
+→ concurrent lifecycle transition
 ```
 
-Para blockers futuros puede evaluarse un reason code específico sin cambiar la semántica HTTP.
-
-Detalles internos de Prisma/PostgreSQL no deberán exponerse.
-
-**Estado:** APPROVED.
+Detalles internos de Prisma o PostgreSQL no deben exponerse.
 
 ---
 
-# 115. Authorization
+# 83. Transactions y atomicidad
 
-Actualmente Core Equipment dispone de:
+Operaciones con múltiples efectos inseparables deben ser atómicas.
 
-```text
-JwtAuthGuard
-tenant isolation
-```
-
-El Permission-Based RBAC completo todavía está pendiente.
-
-Permiso conceptual:
+Ejemplos:
 
 ```text
-equipment.retire
+Purchase Receipt + Equipment provisioning
 ```
-
-Retirement es una operación sensible y antes de producción deberá requerir autorización explícita.
-
-La implementación inicial no debe presentar JWT authentication como equivalente a autorización completa.
-
-**Estado:** AUTHENTICATION AVAILABLE / AUTHORIZATION EVOLUTION PENDING.
-
----
-
-# 116. Audit
-
-La primera versión conservará dentro del Equipment:
 
 ```text
-retiredAt
-retiredById
-retiredReason
-retirementNotes
+Inspection + Equipment condition update
 ```
-
-Esto proporciona trazabilidad básica del Retirement.
-
-Sin embargo:
 
 ```text
-Equipment Retirement
-→ should eventually emit AuditEvent
+Retirement state + retirement metadata
 ```
-
-cuando `AUD-001` esté disponible.
 
 Debe mantenerse:
 
 ```text
-retirement fields
+partial business mutation
+→ not acceptable
+```
+
+---
+
+# 84. Concurrencia
+
+Equipment contiene operaciones donde la concurrencia importa.
+
+Ejemplos:
+
+```text
+assetCode allocation
+
+normalized serial uniqueness
+
+Retirement lifecycle transition
+```
+
+La combinación de:
+
+```text
+database constraints
+
+atomic operations
+
+state-aware writes
+
+transactions
+```
+
+debe proteger la integridad.
+
+La generación concurrente de `assetCode` fue validada contra PostgreSQL durante
+la implementación.
+
+Los detalles históricos de cada ejecución pertenecen a los registros de proyecto,
+no a este documento funcional.
+
+---
+
+# 85. Healthcare boundary
+
+Healthcare utiliza Equipment como fuente de identidad física.
+
+Conceptualmente:
+
+```text
+Healthcare Case
+↓
+Equipment Requirement
+↓
+Case Equipment Assignment
+↓
+EquipmentAsset
+```
+
+Debe mantenerse:
+
+```text
+Equipment Requirement
 ≠
-complete audit platform
+Equipment Assignment
 ```
 
-**Estado:** BASELINE TRACEABILITY AVAILABLE / AUDIT INTEGRATION PENDING.
+```text
+Assignment
+≠
+Dispatch
+```
+
+```text
+Assignment
+≠
+Custody
+```
+
+```text
+Dispatch
+≠
+Commercial Inventory OUT
+```
+
+```text
+Return
+≠
+Commercial Inventory IN
+```
+
+Estas reglas pertenecen a la arquitectura Healthcare objetivo.
 
 ---
 
-# 117. Retirement immutability
+# 86. Dispatch y Custody
 
-Una vez confirmado Retirement, los campos:
-
-```text
-retiredAt
-retiredById
-retiredReason
-retirementNotes
-```
-
-no deberán editarse mediante operaciones normales.
-
-Una corrección futura requerirá:
+Core Equipment no debe almacenar directamente por conveniencia:
 
 ```text
-explicit correction operation
-authorization
-reason
-audit
+currentCaseId
+
+currentCustodianId
+
+hospitalId
+
+doctorId
 ```
 
-No debe existir edición genérica del Retirement.
+Healthcare deberá modelar:
 
-**Estado:** APPROVED.
+```text
+Assignment
+
+Dispatch
+
+Custody
+
+Return
+```
+
+mediante sus propias relaciones operacionales.
+
+Esto evita contaminar `EquipmentAsset`.
 
 ---
 
-# 118. Proposed DTO
+# 87. Healthcare Return
 
-El DTO conceptual será equivalente a:
-
-```text
-RetireEquipmentDto
-
-retiredReason
-retirementNotes?
-```
-
-Validaciones:
+Un futuro Return responde:
 
 ```text
-retiredReason
-→ EquipmentRetirementReason
-
-retirementNotes
-→ optional string
-→ trim
-
-OTHER
-→ non-empty retirementNotes required
+¿La unidad física volvió bajo control de la Company?
 ```
 
-No debe incluir:
+No significa automáticamente:
 
 ```text
-companyId
-equipmentId
-retiredAt
-retiredById
-lifecycle
+available
 ```
 
-**Estado:** APPROVED.
+La política objetivo Healthcare es:
+
+```text
+Return
+↓
+Warehouse custody
+↓
+INSPECTION_PENDING
+↓
+Core Inspection
+↓
+Current Availability evaluation
+```
+
+La integración todavía no está implementada.
 
 ---
 
-# 119. Proposed backend flow
+# 88. Current Availability vs Healthcare Availability
+
+Debe mantenerse:
 
 ```text
-POST /equipment/:equipmentId/retirement
-↓
-JwtAuthGuard
-↓
-companyId + userId from authenticated context
-↓
-validate DTO
-↓
-validate User belongs to Company
-↓
-find Equipment by id + companyId
-↓
-exists?
-├── NO → 404
-└── YES
-↓
-Lifecycle ACTIVE?
-├── NO → 409
-└── YES
-↓
-validate reason / notes
-↓
-validate current blockers
-↓
-atomic ACTIVE → RETIRED update
-↓
-store retirement metadata
-↓
-return updated Equipment
+Core Equipment
+→ Current Availability
 ```
 
-**Estado:** APPROVED.
-
----
-
-# 120. EQ-RET-001 acceptance criteria
-
-La primera implementación ha sido completada y validada.
+y:
 
 ```text
-POST Retirement works
-✅
-
-only ACTIVE Equipment can retire
-✅
-
-already RETIRED returns 409
-✅
-
-retiredReason is required and validated
-✅
-
-OTHER requires retirementNotes
-✅
-
-retirementNotes are normalized
-✅
-
-retiredAt is server-generated
-✅
-
-retiredById comes from authenticated User
-✅
-
-Condition is preserved
-✅
-
-assetCode is preserved
-✅
-
-serial is preserved
-✅
-
-Equipment history remains available
-✅
-
-new Inspection is blocked after Retirement
-✅
-
-tenant isolation is enforced
-✅
-
-concurrent Retirement cannot overwrite first result
-✅
-
-no DELETE endpoint exists
-✅
-
-no generic lifecycle PATCH exists
-✅
-
-service tests pass
-✅
-
-controller tests pass
-✅
-
-manual QA passes
-✅
-
-full backend regression passes
-✅
-
-build passes
-✅
-
-lint passes
-✅
-
-La primera implementación se considerará completa cuando:
-
-```text
-POST Retirement works
-
-only ACTIVE Equipment can retire
-
-already RETIRED returns conflict
-
-retiredReason is required and validated
-
-OTHER requires retirementNotes
-
-retirementNotes are normalized
-
-retiredAt is server-generated
-
-retiredById comes from authenticated User
-
-Condition is preserved
-
-assetCode is preserved
-
-serial is preserved
-
-Equipment history remains available
-
-new Inspection is blocked after Retirement
-
-tenant isolation is enforced
-
-concurrent Retirement cannot overwrite first result
-
-no DELETE endpoint exists
-
-no generic lifecycle PATCH exists
-
-service tests pass
-
-controller tests pass
-
-manual QA passes
-
-full backend regression passes
-
-build passes
-
-lint passes
-
-documentation is synchronized
+Healthcare
+→ Case Availability
 ```
 
-**Estado:** APPROVED / IMPLEMENTATION PENDING.
-
----
-
-# 121. Equipment workflow status
+Una unidad puede ser:
 
 ```text
-Equipment Registration
-✅
+ACTIVE
+GOOD
+Current Availability = true
+```
 
-Equipment Read
-✅
+y aun así, en el futuro:
 
-Equipment Inspection
-✅
+```text
+Case Availability = false
+```
 
-Equipment Retirement Design
-✅
+por:
 
-Equipment Retirement Implementation
-✅
+```text
+schedule conflict
 
-Automatic assetCode generation
-✅
+Assignment
 
-Purchase Receipt Equipment creation
-✅
+Custody
 
-Explicit identity correction operations
-⏳
+turnaround
 
-Equipment Audit
-⏳
+Maintenance
 
-Availability Evaluator
-✅
+Calibration
 ```
 
 ---
 
-# 122. Próximo paso técnico
+# 89. Maintenance boundary
 
-Core Equipment actualmente dispone de:
+Core Equipment V1 no implementa:
 
 ```text
-Registration
-✅
+CMMS
 
-Read
-✅
+work orders
 
-Inspection
-✅
+service providers
 
-Retirement
-✅
+maintenance cost
 
-Automatic assetCode Generation
-✅
+spare parts
 
-Purchase Receipt → EquipmentAsset
-✅
+preventive schedules
+```
+
+No deben agregarse campos improvisados a `EquipmentAsset` para simular estas
+capacidades.
+
+---
+
+# 90. Calibration boundary
+
+Core Equipment V1 tampoco implementa un dominio completo de Calibration.
+
+Un futuro dominio podrá administrar:
+
+```text
+requirements
+
+records
+
+due dates
+
+providers
+
+certificates
+
+results
+```
+
+y contribuir con blockers a Availability.
+
+---
+
+# 91. IMPLEMENTED
+
+Actualmente:
+
+```text
+EquipmentAsset persistence
+
+Product ASSET validation
+
+manual Equipment creation
+
+Equipment list
+
+Equipment detail
+
+automatic assetCode generation
+
+CompanySequence integration
+
+serial normalization
+
+serial uniqueness protection
+
+optional Batch validation
+
+Purchase Receipt ASSET provisioning
+
+Purchase Receipt traceability
 
 Current Availability
-✅
+
+Availability endpoint
+
+Inspection creation
+
+Inspection history
+
+Condition update through Inspection
+
+Retirement
+
+Retirement metadata
+
+frontend Equipment workspace
+
+Equipment deep-link
+
+tenant-scoped operations
 ```
 
-El siguiente paso técnico documentado es:
+---
+
+# 92. VALIDATED
+
+La validación registrada incluye comportamiento automatizado y QA manual sobre:
 
 ```text
-Healthcare Equipment Assignment
+Equipment creation
+
+Product ASSET validation
+
+serial conflicts
+
+assetCode allocation
+
+list / detail
+
+Purchase Receipt provisioning
+
+partial Purchase Receipts
+
+no duplicate stock mutation
+
+Current Availability transitions
+
+Inspection
+
+Inspection history
+
+Retirement
+
+Retirement finality
+
+tenant-scoped lookups
+
+invalid DTOs
+
+error contracts
 ```
 
-Estado:
+También forman parte de los gates técnicos:
 
 ```text
-EQ-AVL-001
-Current Equipment Availability
-→ IMPLEMENTED / VALIDATED
+backend regression
+
+Prisma validation/status when applicable
+
+build
+
+lint
+
+git diff --check
 ```
 
-# Final Principle
+Los totales de tests y snapshots históricos pertenecen a:
 
-Equipment representa realidad física.
+```text
+PROJECT_BOARD.md
 
-Debe mantenerse siempre:
+CHANGELOG.md
+```
+
+y no deben fijarse permanentemente en este documento.
+
+---
+
+# 93. TECHNICAL DEBT
+
+Permanece abierto:
+
+```text
+serial correction workflow
+```
+
+```text
+manual frontend Batch selector
+```
+
+```text
+Product.stock
+↔
+EquipmentAsset reconciliation
+```
+
+```text
+retired actor name enrichment
+```
+
+```text
+server-side pagination
+```
+
+```text
+bulk/list Availability if scale requires it
+```
+
+```text
+Equipment Audit integration
+```
+
+```text
+typed authenticated request context
+instead of repeated req.user typing workarounds
+```
+
+Además:
+
+```text
+SERIALIZED inventory semantics
+```
+
+continúa pendiente dentro de la evolución Inventory/Product tracking.
+
+---
+
+# 94. PROJECT SECURITY WORK
+
+Antes de producción, Equipment participa en la revisión transversal de:
+
+```text
+authorization for sensitive operations
+
+systematic tenant-isolation regression
+
+inactive-user enforcement
+
+safe role provisioning
+```
+
+No deben resolverse creando un sistema de autorización aislado solo para
+Equipment.
+
+Identity & Access continúa siendo la fuente transversal.
+
+---
+
+# 95. HEALTHCARE TARGET
+
+Después del cierre del ERP Core, Healthcare podrá consumir Equipment mediante:
+
+```text
+Equipment Requirements
+
+Case Equipment Assignment
+
+Case Availability
+
+Preparation
+
+Dispatch
+
+Custody
+
+Return
+
+Inspection integration
+
+Reconciliation
+
+Calendar
+
+Case 360
+```
+
+Estos workflows no forman parte de Equipment V1.
+
+---
+
+# 96. FUTURE
+
+Capacidades posteriores pueden incluir:
+
+```text
+serial correction
+
+Equipment Audit integration
+
+Equipment 360
+
+Maintenance
+
+Calibration
+
+multi-warehouse Equipment support
+
+advanced availability composition
+
+bulk availability
+
+barcode / QR Equipment workflows
+
+import / migration workflows
+
+advanced reconciliation
+```
+
+Solo deben incorporarse cuando exista una necesidad clara.
+
+---
+
+# 97. Invariantes
+
+## Product identity
 
 ```text
 Product
 ≠
 EquipmentAsset
+```
+
+---
+
+## Tracking
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+---
+
+## Physical identity
+
+```text
+ASSET physical unit
+→ EquipmentAsset
+```
+
+---
+
+## Inventory
+
+```text
+EquipmentAsset provisioning
+≠
+second Product.stock increment
+```
+
+---
+
+## Lifecycle
+
+```text
+Lifecycle
+≠
+Condition
+```
+
+---
+
+## Availability
+
+```text
+Condition
+≠
+Availability
+```
+
+---
+
+## Current vs Case Availability
+
+```text
+Current Availability
+≠
+Case Availability
+```
+
+---
+
+## Inspection
+
+```text
+Inspection
+→ Condition
+```
+
+```text
+Inspection
+≠
+direct Availability mutation
+```
+
+---
+
+## Retirement
+
+```text
+Retirement
+≠
+DELETE
+```
+
+```text
+RETIRED
+→ historical identity preserved
+```
+
+---
+
+## Lost
+
+```text
+Missing
+≠
+LOST
+```
+
+---
+
+## Healthcare
+
+```text
+Assignment
+≠
+Custody
+```
+
+```text
+Dispatch
+≠
+Inventory OUT
+```
+
+```text
+Return
+≠
+Inventory IN
+```
+
+```text
+Return
+≠
+Available
+```
+
+---
+
+## Tenant
+
+```text
+Company A Equipment
+≠
+Company B access
+```
+
+---
+
+# 98. Anti-patrones
+
+## Duplicar catálogo
+
+```text
+EquipmentAsset
+├── duplicated Product name
+├── duplicated brand
+└── duplicated category
+```
+
+como fuente paralela.
+
+---
+
+## Tratar ASSET como cantidad únicamente
+
+```text
+Product.stock += 5
+without required Equipment identities
+```
+
+cuando el workflow debe representar unidades físicas.
+
+---
+
+## Duplicar Inventory mutation
+
+```text
+PurchaseReceipt increments stock
++
+Equipment provisioning increments stock
+```
+
+Incorrecto.
+
+---
+
+## EquipmentAsset por SERIALIZED
+
+```text
+SERIALIZED
+→ automatically create EquipmentAsset
+```
+
+Incorrecto en la implementación actual.
+
+---
+
+## available Boolean manual
+
+```text
+EquipmentAsset.available
+→ manually edited
+```
+
+Incorrecto.
+
+---
+
+## Lifecycle como Availability
+
+```text
+ACTIVE
+→ always available
+```
+
+Incorrecto.
+
+---
+
+## Condition como Case Availability
+
+```text
+GOOD
+→ always assignable to Case
+```
+
+Incorrecto.
+
+---
+
+## Healthcare contamination
+
+```text
+EquipmentAsset.currentCaseId
+
+EquipmentAsset.currentCustodianId
+
+EquipmentAsset.hospitalId
+```
+
+agregados únicamente para resolver Healthcare.
+
+---
+
+## Generic lifecycle PATCH
+
+```text
+PATCH /equipment/:id
+
+{
+  "lifecycle": "RETIRED"
+}
+```
+
+en lugar de Retirement explícito.
+
+---
+
+## Equipment DELETE
+
+```text
+DELETE EquipmentAsset
+```
+
+para representar retiro o corrección histórica.
+
+---
+
+## Silent Inspection rewrite
+
+Editar una Inspection histórica en lugar de registrar un nuevo evento.
+
+---
+
+# 99. Relación con Products
+
+`PRODUCTS.md` define:
+
+```text
+Product catalog
+
+inventoryTracking
+
+lotTracking
+```
+
+`EQUIPMENT.md` define:
+
+```text
+physical ASSET identity
+```
+
+---
+
+# 100. Relación con Inventory
+
+`INVENTORY.md` define:
+
+```text
+stock
+
+InventoryMovement
+
+InventoryBatch
+
+inventory traceability
+```
+
+`EQUIPMENT.md` define:
+
+```text
+EquipmentAsset
+
+lifecycle
+
+condition
+
+Inspection
+
+Retirement
+
+Current Availability
+```
+
+---
+
+# 101. Relación con Purchase Receipts
+
+`PURCHASE_RECEIPTS.md` define:
+
+```text
+physical receipt
+
+Inventory IN
+
+lot rules
+
+idempotency
+
+Receipt transaction
+```
+
+Equipment participa mediante:
+
+```text
+ASSET provisioning
+```
+
+sin apropiarse del transaction boundary completo de Receipt.
+
+---
+
+# 102. Relación con Healthcare
+
+Healthcare debe referenciar `EquipmentAsset` como identidad Core.
+
+Los detalles de:
+
+```text
+Requirement
+
+Assignment
+
+Case Availability
+
+Dispatch
+
+Custody
+
+Return
+```
+
+deben documentarse en:
+
+```text
+docs/modules/healthcare/
+```
+
+y no duplicarse completamente dentro de Equipment.
+
+---
+
+# 103. Documentación relacionada
+
+```text
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/PURCHASES.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/modules/healthcare/HEALTHCARE.md
+
+docs/modules/healthcare/CASES.md
+
+docs/modules/healthcare/DOMAIN_MODEL.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+---
+
+# 104. Fuente de verdad
+
+```text
+EQUIPMENT.md
+→ Core Equipment functional/domain behavior
+
+PRODUCTS.md
+→ Product tracking strategy
+
+INVENTORY.md
+→ Inventory semantics
+
+PURCHASE_RECEIPTS.md
+→ Receipt and provisioning orchestration
+
+Healthcare documentation
+→ Assignment / Custody / Case Logistics
+
+ARCHITECTURE.md
+→ architectural boundaries
+
+schema.prisma
+→ current persistence model
+
+Equipment backend
+→ CURRENT implementation
+
+Equipment frontend
+→ CURRENT user experience
+
+tests
+→ validated behavior
+
+PROJECT_BOARD.md
+→ current project state and active debt
+
+CHANGELOG.md
+→ historical implementation evolution
+```
+
+---
+
+# 105. Estado consolidado
+
+```text
+Equipment Registration
+✅ IMPLEMENTED / VALIDATED
+
+Equipment Read
+✅ IMPLEMENTED / VALIDATED
+
+Automatic assetCode
+✅ IMPLEMENTED / VALIDATED
+
+Purchase Receipt → EquipmentAsset
+✅ IMPLEMENTED / VALIDATED
+
+Current Availability
+✅ IMPLEMENTED / VALIDATED
+
+Inspection
+✅ IMPLEMENTED / VALIDATED
+
+Retirement
+✅ IMPLEMENTED / VALIDATED
+
+Frontend Equipment V1
+✅ IMPLEMENTED / VALIDATED
+```
+
+Pendiente:
+
+```text
+Serial correction
+⏳
+
+Manual Batch selector
+⏳
+
+Product.stock ↔ EquipmentAsset reconciliation
+⏳
+
+Equipment Audit integration
+⏳
+
+Pagination / scaling improvements
+⏳
+```
+
+Healthcare:
+
+```text
+Case Equipment Assignment
+⏳ TARGET
+
+Case Availability
+⏳ TARGET
+
+Dispatch
+⏳ TARGET
+
+Custody
+⏳ TARGET
+
+Return
+⏳ TARGET
+```
+
+---
+
+# 106. Secuencia de proyecto
+
+Equipment V1 forma parte del ERP Core ya normalizado.
+
+La secuencia vigente del proyecto es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto:
+
+```text
+Healthcare Equipment Assignment
+```
+
+es una capacidad futura de Healthcare después del cierre correspondiente del ERP
+Core, no el siguiente cambio inmediato dentro de Core Equipment.
+
+---
+
+# 107. Principio final
+
+Equipment representa realidad física.
+
+Debe mantenerse:
+
+```text
+Product
+≠
+EquipmentAsset
+
+SERIALIZED
+≠
+ASSET
 
 Lifecycle
 ≠
@@ -5990,6 +4005,10 @@ Condition
 Condition
 ≠
 Availability
+
+Current Availability
+≠
+Case Availability
 
 Assignment
 ≠
@@ -6007,214 +4026,34 @@ Return
 ≠
 Available
 
-Inspection GOOD
+Inspection
 ≠
-Available
+Availability
 
 Missing
 ≠
-Lost
+LOST
 
 Retirement
 ≠
 DELETE
 ```
 
-La identidad, historia, custodia y condición de una unidad física nunca deben sacrificarse por simplificar un CRUD.
-
-
-La primera versión ha sido implementada y validada.
+La dirección correcta es:
 
 ```text
-POST Inspection works
-✅
-
-GET Inspection history works
-✅
-
-conditionBefore is server-derived
-✅
-
-conditionAfter is validated
-✅
-
-INSPECTION_PENDING cannot be final result
-✅
-
-RETIRED Equipment is blocked by domain logic
-✅
-
-Inspection creation
-+
-Equipment condition update
-are atomic
-✅
-
-Inspection history is immutable through API
-✅
-
-tenant isolation is enforced
-✅
-
-composite Equipment FK is enforced
-✅
-
-service tests pass
-✅
-
-controller tests pass
-✅
-
-full regression passes
-✅
-
-build passes
-✅
-
-lint passes
-✅
-
-manual QA passes
-✅
-
----
-
-# 91. Pending Equipment workflows
-
-Estado actualizado:
-
-```text
-Equipment Registration
-✅
-
-Equipment Read
-✅
-
-Equipment Inspection
-✅
-
-Automatic assetCode generation
-✅
-
-Purchase Receipt Equipment creation
-✅
-
-Equipment Retirement
-✅
-
-Explicit identity correction operations
-⏳
-
-Equipment Audit
-⏳
-
-Availability Evaluator
-✅
+Product
+↓
+Inventory strategy
+↓
+EquipmentAsset identity
+↓
+Condition / Lifecycle
+↓
+Core Availability
+↓
+Healthcare operational orchestration
 ```
 
----
-
-# 92. Prioridad posterior a Equipment V1
-
-El siguiente trabajo del proyecto es:
-
-```text
-UX-B.5H
-Purchase Receipts + remaining ERP normalization
-```
-
-`Healthcare Equipment Assignment` permanece como trabajo futuro de Healthcare después de estabilizar el ERP Core UI/UX; no forma parte de Equipment V1 ni de UX-B.5H.
-
-Estado:
-
-```text
-EQ-AVL-001
-Current Equipment Availability
-→ IMPLEMENTED / VALIDATED
-```
-
-Orden:
-
-1. Business Analysis
-2. Domain design approval
-3. Purchase Receipt / Equipment documentation
-4. Prisma review
-5. Backend domain operation
-6. Authorization review
-7. Automated tests
-8. Manual QA
-9. Full regression
-10. Build + lint
-11. Documentation synchronization
-
-Estado de EQ-PR-001:
-
-```text
-IMPLEMENTED / VALIDATED
-```
-
-Reglas aprobadas:
-
-```text
-Product.inventoryTracking = ASSET
-PurchaseReceiptItem.quantityReceived = N
-→ create exactly N EquipmentAsset rows
-
-serialNumber = null
-serialNumberKey = null
-→ allowed at receipt
-
-lifecycle = ACTIVE
-condition = INSPECTION_PENDING
-origin = PURCHASE_RECEIPT
-
-Product.stock
-→ still mutated by PurchaseReceipt only
-→ EquipmentAsset creation does not increment stock again
-
-CompanySequence
-key = EQUIPMENT_ASSET_CODE
-→ reused inside the receipt transaction
-```
-
-Validación registrada:
-
-```text
-Purchase Receipt tests
-26/26 passed
-
-Equipment tests
-68/68 passed
-
-Full backend tests
-184/184 passed
-
-Manual PostgreSQL / API QA
-PASS
-
-Partial receipt
-→ 2 + 3 = 5 EquipmentAssets
-
-Over-receipt protection
-→ 400 Bad Request
-→ no extra Receipt / stock / movement / Equipment mutation
-```
-
-Fuera de alcance:
-
-```text
-PurchaseReceipt request idempotency
-Receipt correction / reversal
-Product.stock ↔ EquipmentAsset reconciliation
-broader lotTracking enforcement
-SERIALIZED receipt behavior
-```
-
-Debe mantenerse:
-
-Retirement
-≠
-DELETE
-
-RETIRED
-→ historical record preserved
+sin sacrificar identidad física, historial, tenant isolation ni ownership de
+dominio para simplificar un CRUD.

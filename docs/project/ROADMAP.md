@@ -1,80 +1,123 @@
-# Roadmap — Zaping
+Producto: Zaping Platform
+Versión del documento: 1.3.0
+Estado: Activo
+Última actualización: 2026-08-27
+Responsable: Zaping Team
 
-**Producto:** Zaping Platform
-**Versión del documento:** 1.0.0
-**Estado:** Activo
-**Última actualización:** 2026-08-19
-**Responsable:** Zaping Team
-
----
-
-# 1. Propósito
-
+1. Propósito
 Este documento define la dirección futura de Zaping.
 
 Debe responder:
 
-```text
 ¿Qué capacidades necesitamos después?
-¿Por qué son importantes?
-¿Qué depende de qué?
-¿Qué pertenece al Core?
-¿Qué pertenece a Healthcare?
-¿Qué debe esperar?
-```
 
-El Roadmap representa intención y prioridad.
+¿Por qué son importantes?
+
+¿Qué depende de qué?
+
+¿Qué pertenece al ERP Core?
+
+¿Qué pertenece a Healthcare?
+
+¿Qué debe esperar?
+
+¿Qué líneas de producto vienen después?
+El Roadmap representa intención estratégica, prioridad y dependencias.
 
 No representa:
 
-* estado diario de tareas;
-* historial de desarrollo;
-* compromisos contractuales;
-* fechas garantizadas;
-* una lista exhaustiva de tickets.
+el estado diario de tareas;
 
----
+el historial de desarrollo;
 
-# 2. Responsabilidades documentales
+compromisos contractuales;
 
-```text
+fechas garantizadas;
+
+una lista exhaustiva de tickets;
+
+snapshots de cada implementación.
+
+2. Responsabilidades documentales
 ROADMAP.md
+
 → dirección futura
-```
 
-```text
+→ prioridades estratégicas
+
+→ dependencias
+
+→ evolución del producto
 PROJECT_BOARD.md
-→ ejecución y estado actual
-```
 
-```text
+→ ejecución actual
+
+→ estado vigente
+
+→ blockers
+
+→ deuda activa
+
+→ siguiente trabajo
 CHANGELOG.md
-→ historia completada
-```
 
+→ historia completada
+
+→ entregas cerradas
+
+→ snapshots históricos
 Cuando una iniciativa pase a ejecución:
 
-```text
 ROADMAP
 ↓
 PROJECT_BOARD
-```
-
 Cuando quede completada:
 
-```text
 PROJECT_BOARD
 ↓
 CHANGELOG
-```
+3. Secuencia estratégica vigente
+La normalización funcional H7 del ERP Core está completada.
 
----
+La secuencia inmediata actual es:
 
-# 3. Visión de evolución
+H8A — Documentation Synchronization
+↓
+H8B — Full Automated Regression / Technical Health
+↓
+UX-B.6 — Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Zaping Healthcare
+Healthcare Case Foundation ya existe en backend.
 
+Permanecen como TARGET Healthcare:
+
+Hospital / Doctor
+
+Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Dispatch / Custody
+
+Return
+
+CaseKit / Maletín
+
+Calendar
+
+Case 360
+
+Mobile Technician
+Después del cierre del ERP Core V1, Healthcare se convierte en el workstream principal de producto.
+
+4. Visión de evolución
 La dirección general es:
 
-```text
 Zaping Platform
 │
 ├── ERP Core
@@ -88,26 +131,26 @@ Zaping Platform
 │
 └── Zaping AI
     └── capa futura de inteligencia
-```
-
 El desarrollo debe preservar esta jerarquía.
 
----
+Healthcare debe construirse sobre ERP Core.
 
-# 4. Principio de prioridad
+Radar debe mantener una identidad propia dentro del ecosistema.
 
-La prioridad no es construir la mayor cantidad de módulos.
+AI debe construirse sobre dominios y datos confiables.
+
+5. Principio de prioridad
+La prioridad no es construir la mayor cantidad posible de módulos.
 
 La prioridad es construir:
 
-> **un ERP confiable, comercializable y claramente diferenciado.**
+un ERP confiable, comercializable y claramente diferenciado.
 
-Por tanto, el orden general es:
+Orden estratégico:
 
-```text
 Stability
 ↓
-Commercial Readiness
+Security / Release Readiness
 ↓
 Healthcare Differentiation
 ↓
@@ -116,290 +159,1031 @@ ERP Expansion
 External Intelligence
 ↓
 AI
-```
+6. Regla de enfoque
+Mientras el ERP Core tenga riesgos importantes de:
 
----
+seguridad;
 
-# 5. Regla de enfoque
+consistencia;
 
-Mientras el ERP Core todavía tenga riesgos importantes de:
+aislamiento tenant;
 
-* seguridad;
-* consistencia;
-* onboarding;
-* migración de datos;
-* UX operativa;
-* ventas/inventario;
+UX operativa;
+
+migración de datos;
+
+confiabilidad;
+
+ventas/inventario;
+
+release readiness;
 
 no debe desplazarse esfuerzo significativo hacia funcionalidades experimentales.
 
-Una guía estratégica razonable durante esta etapa es:
+Durante la fase actual de cierre del ERP Core, una distribución orientativa puede ser:
 
-```text
 ≈ 80 %
-ERP comercializable y workflows principales
 
+ERP stability
+
+release readiness
+
+QA
+
+security
+
+documentation
 ≈ 15 %
-UX, onboarding e implementación inicial de Healthcare
 
+UX
+
+Healthcare design readiness
+
+product preparation
 ≈ 5 %
-investigación / definición de Radar
 
+Radar research / definition
 ≈ 0 %
-desarrollo productivo de AI
-```
 
-La distribución es orientativa, no contractual.
+AI product implementation
+Esta distribución no es contractual.
 
----
+Después del cierre del ERP Core V1:
 
-# 6. Etapa 0 — Documentation & Architecture Baseline
-
-**Estado:** En cierre
+Healthcare
+→ principal workstream estratégico
+7. Etapa 0 — Documentation & Architecture Baseline
+Estado: En cierre
 
 Objetivo:
 
-> establecer una fuente documental única y coherente antes de continuar ampliando el producto.
+establecer una fuente documental coherente antes de ampliar nuevamente el producto.
 
 Incluye:
 
-```text
 Product
-Architecture
-ADR
-Engineering
-UX
-ERP Modules
-Project Planning
-Templates
-```
 
+Architecture
+
+ADR
+
+Engineering
+
+Security
+
+UX
+
+ERP Modules
+
+Healthcare Modules
+
+Project Planning
+
+Templates
 Resultado esperado:
 
-```text
 Documentación vigente
+
 +
-sin duplicados
+
+sin duplicados críticos
+
 +
-sin archivos vacíos
-+
+
 sin arquitectura legacy presentada como actual
-```
 
----
++
 
-# 7. Salida de Etapa 0
+fuentes de verdad claras
 
-Para considerar cerrada esta etapa:
++
 
-* documentación raíz saneada;
-* Project Board consolidado;
-* Roadmap consolidado;
-* Changelog consolidado;
-* templates corregidos;
-* auditoría completa de `docs/`;
-* referencias internas verificadas;
-* diferencias documentación ↔ código identificadas;
-* commit del refactor documental.
+CURRENT / TARGET / FUTURE diferenciados
 
----
++
 
-# 8. Etapa 1 — ERP Core Release Readiness
+deuda separada de implementación
+Salida de esta etapa:
 
-**Prioridad:** P0
+docs/README saneado
+
+PROJECT_BOARD consolidado
+
+ROADMAP consolidado
+
+CHANGELOG consolidado
+
+módulos sincronizados
+
+arquitectura revisada
+
+seguridad revisada
+
+referencias internas verificadas
+Cierre H8A requiere además:
+
+final cross-document synchronization
+
+security blocker synchronization
+
+Markdown consistency
+
+git status review
+
+git diff --check
+
+credential / .env backup review
+8. Etapa 1 — ERP Core Release Readiness
+Prioridad: P0
 
 Objetivo:
 
-> transformar la base funcional actual en un Core suficientemente seguro, consistente y verificable para comenzar pilotos reales.
+transformar el ERP Core funcional actual en una base suficientemente segura, consistente y verificable para comenzar pilotos reales.
 
----
+Esta etapa comprende:
 
-# 9. Security Hardening
-
-Capacidades prioritarias:
-
-```text
-Safe authentication responses
+H8A
 ↓
-Explicit user roles
+H8B
 ↓
+UX-B.6
+↓
+ERP Core V1 Closure
+8.1 Security Hardening
+Capacidades P0 pendientes:
+
+Secure password recovery
+
+↓
+
+Explicit user role safety
+
+↓
+
 Inactive-user enforcement
+
 ↓
-Tenant isolation regression tests
+
+Tenant isolation regression
+
 ↓
-Authorization review
-```
 
----
+Critical authorization review
 
-# 10. Authentication Response Safety
+↓
 
-Debe eliminarse cualquier exposición de:
+Protected-route / session hardening
 
-```text
-passwordHash
-```
+↓
 
-desde:
+Authentication abuse protection / rate limiting
 
-* login;
-* `/auth/me`;
-* Users API;
-* serializers;
-* otros contratos.
+↓
 
----
+Production secrets / configuration review
+La sanitización histórica de passwordHash ya fue resuelta y no forma parte del trabajo futuro.
 
-# 11. Safe User Provisioning
+8.2 Secure Password Recovery
+El endpoint CURRENT de password reset no debe considerarse apto para pilot/commercial production si permite restablecer una contraseña sin demostrar control de la cuenta.
 
+Debe existir una estrategia equivalente a:
+
+recovery request
+
+↓
+
+secure random token
+
+↓
+
+single use
+
+↓
+
+short expiration
+
+↓
+
+account-control proof
+
+↓
+
+password reset
+
+↓
+
+token invalidation
+Además debe contemplar:
+
+safe response semantics
+
+no account enumeration
+
+abuse protection
+
+audit where appropriate
+Regla:
+
+public password reset
+without secure recovery proof
+→ P0 blocker
+8.3 Safe User Provisioning
 Debe revisarse:
 
-```text
 User.role @default(ADMIN)
-```
+Objetivo:
 
-para impedir elevación accidental de privilegios.
+normal user creation
+→ explicit authorized role
+Debe evitarse cualquier elevación accidental de privilegios.
 
-La creación normal de usuarios debe utilizar roles explícitos y autorizados.
+Cobertura necesaria:
 
----
+user creation flows
 
-# 12. Tenant Isolation
+role assignment
 
-Debe existir una cobertura sistemática que pruebe:
+authorization
 
-```text
+privilege escalation regression
+8.4 Inactive User Enforcement
+Debe garantizarse:
+
+User.isActive = false
+↓
+no normal application access
+La desactivación debe afectar autenticación y sesión de manera consistente.
+
+8.5 Tenant Isolation
+Debe existir cobertura sistemática:
+
 Company A
 ↛
 Company B resources
-```
+Para operaciones críticas de:
 
-en:
+Customers
 
-* Customers;
-* Suppliers;
-* Products;
-* Purchases;
-* Inventory;
-* Quotes;
-* Sales;
-* Returns;
-* archivos;
-* exports;
-* futuros módulos.
+Suppliers
 
----
+Products
 
-# 13. Returns Completion
+Purchases
 
-Completar:
+Purchase Receipts
 
-```text
-RET-004
-```
-
-y la primera versión operacional de Returns.
-
-Debe incluir:
-
-```text
-Create
-Read
-Confirm
-Cancel
-Quantity validation
-Concurrency
-Inventory integration
-Tenant isolation
-Tests
-```
-
-sin profundizar innecesariamente dependencias legacy que serán reemplazadas por Delivery.
-
----
-
-# 14. Core Regression
-
-Antes de pilotos:
-
-```text
-Backend tests
-Frontend tests
-Lint
-Build
-Critical flows
-Manual QA
-Tenant isolation
-Authorization
-Error handling
-```
-
-deben ejecutarse como un paquete de readiness.
-
----
-
-# 15. Operational Reliability
-
-Los workflows principales deben quedar suficientemente sólidos:
-
-```text
-Customer
-Product
-Supplier
-
-Purchase
-↓
-PurchaseReceipt
-↓
 Inventory
 
+Equipment
+
+Quotes
+
+Sales
+
+Healthcare Cases
+
+future resources
+Debe cubrir:
+
+read
+
+create
+
+update
+
+lifecycle actions
+
+exports where applicable
+
+cross-module navigation
+8.6 Critical Authorization Review
+Debe verificarse:
+
+sensitive endpoints
+
+RolesGuard / authorization coverage
+
+server-side authorization
+
+business-action permissions
+
+no frontend-only access assumptions
+antes de release productivo.
+
+8.7 Protected Route / Session Architecture
+CURRENT frontend utiliza:
+
+authenticated route group
+
+AppShell
+
+JWT client-side storage
+
+API interceptor / 401 handling
+Antes de producción debe revisarse formalmente:
+
+session bootstrap
+
+protected deep-link refresh
+
+unauthenticated access behavior
+
+logout consistency
+
+token/session storage strategy
+
+protected-page flash
+La estrategia CURRENT de JWT en localStorage no debe tratarse como irreversible para producción.
+
+8.8 Authentication Abuse Protection
+Antes de producción deben protegerse especialmente:
+
+/auth/login
+
+/auth/register
+
+password recovery endpoints
+mediante controles apropiados como:
+
+rate limiting
+
+retry controls where appropriate
+
+monitoring
+
+safe error semantics
+La estrategia debe evitar introducir un lockout fácilmente explotable como denial-of-service.
+
+8.9 Production Secrets / Configuration
+Antes de pilot/commercial production debe revisarse:
+
+JWT_SECRET / secrets management
+
+environment separation
+
+no committed credentials
+
+production database configuration
+
+debug/dev settings
+
+production-safe defaults
+8.10 Core Regression
+H8B debe ejecutar:
+
+Backend tests
+
+Frontend tests
+
+Backend lint
+
+Frontend lint
+
+Backend build
+
+Frontend build
+
+Prisma validate
+
+Prisma migrate status
+
+Git health
+Si la ejecución paralela de frontend tests falla por agotamiento de workers/recursos:
+
+infrastructure/resource failure
+≠
+application test failure
+y la suite completa puede ejecutarse de forma serial para obtener un resultado confiable.
+
+8.11 Operational Reliability
+UX-B.6 debe validar los workflows V1 principales:
+
+Supplier
+↓
+Purchase
+↓
+Purchase Receipt
+↓
+Inventory IN
+Customer
+↓
 Quote
 ↓
-Sales legacy temporal
+Sale
+↓
+Inventory OUT
+Purchase Receipt ASSET
+↓
+Equipment
+↓
+Inspection
+↓
+Current Availability
+También:
 
-Return
-```
+folios
 
-antes de ampliar agresivamente el alcance.
+statuses
 
----
+deep-links
 
-# 16. Etapa 2 — Commercial ERP Experience
+PDFs
 
-**Prioridad:** P1
+lifecycle
+
+traceability
+
+tenant isolation
+
+authorization
+
+idempotency replay/conflict where implemented
+
+historical deactivation behavior
+8.12 ERP Core V1 Closure
+La salida de esta etapa debe significar:
+
+ERP Core
+→ functionally closed for V1
+
+→ documented
+
+→ regression validated
+
+→ end-to-end QA validated
+
+→ security P0 resolved or formally closed
+
+→ known debt explicitly recorded
+No significa que el ERP esté terminado para siempre.
+
+Significa que la base V1 es suficientemente estable para dejar de abrir nuevas funcionalidades Core de manera indiscriminada.
+
+9. Etapa 2 — Zaping Healthcare
+Prioridad: P1 estratégica inmediata después del cierre ERP Core V1
 
 Objetivo:
 
-> reducir fricción y convertir módulos funcionales en una experiencia ERP coherente.
+convertir la especialización Healthcare en el principal diferenciador inicial de Zaping frente a ERP genéricos.
 
----
+Healthcare se construye:
 
-# 17. 360 Views
+sobre ERP Core
+no:
 
-Prioridad inicial:
+dentro de cada tabla del ERP Core
+Debe evitarse contaminar el modelo genérico con conceptos específicos del vertical.
 
-```text
+9.1 Estado de partida
+Healthcare Case Foundation ya está:
+
+IMPLEMENTED / VALIDATED
+Incluye:
+
+HealthcareCase
+
+folio
+
+planning schedule
+
+responsible User
+
+minimal lifecycle
+
+cancellation
+
+tenant context
+
+localized audit facts
+Estados CURRENT:
+
+DRAFT
+
+SCHEDULED
+
+CANCELLED
+También existe en ERP Core:
+
+EquipmentAsset
+
+EquipmentInspection
+Permanecen fuera de Foundation:
+
+Hospital
+
+Doctor
+
+Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+Dispatch
+
+Custody
+
+Return
+
+CaseKit
+
+Calendar
+
+Case 360
+
+Mobile Technician
+9.2 Orden recomendado Healthcare
+1. Hospital / Doctor
+
+2. Requirements
+
+3. Equipment Assignment
+
+4. Case Availability
+
+5. Dispatch / Custody
+
+6. Return
+
+7. CaseKit / Maletín
+
+8. Case Calendar
+
+9. Case 360
+
+10. Mobile Technician
+El orden puede ajustarse cuando aparezca evidencia operacional real, pero deben respetarse las dependencias.
+
+9.3 Healthcare Actors
+Mantener conceptualmente separados:
+
+Doctor
+
+Hospital
+
+Customer
+
+Payer
+
+responsible User / Technician function
+porque representan responsabilidades distintas.
+
+No asumir:
+
+Customer
+=
+Hospital
+=
+Doctor
+=
+Payer
+Technician utiliza inicialmente:
+
+User
+como identidad operacional.
+
+No debe crearse una identidad Healthcare separada sin una necesidad real de dominio.
+
+9.4 Healthcare Case
+HealthcareCase representa una operación desde el punto de vista:
+
+operacional
+
++
+
+logístico
+y puede relacionarse posteriormente con contexto comercial.
+
+No debe convertirse en:
+
+clinical record
+
+patient record
+
+PHI repository
+9.5 Hospital / Doctor
+Hospital y Doctor serán master data Healthcare TARGET.
+
+Debe mantenerse:
+
+Doctor
+≠
+Customer
+Hospital
+≠
+Customer
+La estrategia exacta de tenant ownership debe decidirse antes de implementación:
+
+Company-owned master data
+vs:
+
+shared identity
++
+tenant-specific relation
+No debe asumirse todavía una estrategia definitiva en Prisma.
+
+9.6 Requirements
+Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
+
+Conceptualmente:
+
+Case
+↓
+Requirements
+
+├── Products / Materials
+
+└── Equipment needs
+Debe mantenerse:
+
+Requirements
+→ what is needed
+Preparation
+→ work performed to satisfy the need
+CaseKit
+→ actual prepared set
+Estos conceptos no deben confundirse.
+
+9.7 Equipment Assignment
+Debe relacionar:
+
+HealthcareCase
+
++
+
+EquipmentAsset
+sin duplicar la identidad física del Equipment.
+
+Principio:
+
+ERP Core
+→ EquipmentAsset identity
+
+Healthcare
+→ operational Assignment
+Assignment deberá considerar los hechos necesarios para evitar conflictos, pero el schema exacto se decidirá en su slice.
+
+Debe mantenerse:
+
+Assignment
+≠
+EquipmentLifecycle
+y:
+
+Assignment
+≠
+Custody
+9.8 Case Availability
+Current Equipment Availability ya está implementado en ERP Core.
+
+Actualmente:
+
+ACTIVE + GOOD
+→ available
+
+INSPECTION_PENDING
+→ unavailable
+
+DAMAGED
+→ unavailable
+
+OUT_OF_SERVICE
+→ unavailable
+
+RETIRED
+→ unavailable
+Healthcare deberá extender esta evaluación hacia:
+
+Case Availability
+considerando cuando existan:
+
+Assignment conflicts
+
+Case schedule
+
+active custody
+
+other operational blockers
+No debe reemplazarse Availability con un boolean persistido manualmente.
+
+Maintenance, Calibration y Turnaround permanecen evoluciones posteriores.
+
+9.9 Preparation
+Preparation representa el trabajo necesario para satisfacer Requirements.
+
+Puede incluir:
+
+requirements review
+
+availability checks
+
+material picking
+
+Equipment Assignment
+
+CaseKit assembly
+
+documentation
+Preparation no debe implicar automáticamente:
+
+commercial Inventory OUT
+9.10 CaseKit / Maletín
+CaseKit representa la preparación real de material para un Case específico.
+
+Puede contener conceptualmente:
+
+Products
+
+quantities
+
+batches
+
+Equipment
+
+preparation state
+La cardinalidad y schema exactos se definirán posteriormente.
+
+Debe mantenerse:
+
+CaseKit
+≠
+Requirements
+y:
+
+CaseKit
+≠
+automatic Inventory OUT
+KitTemplate permanece FUTURE como capacidad de productividad reutilizable y no debe bloquear la primera implementación de CaseKit.
+
+9.11 Dispatch / Custody
+Debe formalizar:
+
+Preparation
+↓
+Dispatch
+↓
+Custody
+Regla crítica:
+
+CaseDispatch
+≠
+Delivery
+y:
+
+CaseDispatch
+≠
+commercial Inventory OUT
+El material puede estar:
+
+fuera del almacén
+pero continuar siendo propiedad de la Company.
+
+La semántica técnica exacta de ubicación/custodia deberá resolverse mediante diseño/ADR antes de Dispatch real.
+
+No debe asumirse de forma anticipada:
+
+Dispatch
+→ InventoryMovement TRANSFER
+como contrato CURRENT.
+
+9.12 Return
+Después del Case:
+
+Custody
+↓
+Return
+↓
+Inspection where required
+↓
+Reconciliation
+El Return Healthcare no debe confundirse con Commercial Return.
+
+Debe mantenerse:
+
+CaseReturn
+≠
+Commercial Return
+y:
+
+Returned
+≠
+Automatically Available
+cuando se requiera inspección.
+
+9.13 Reconciliation
+Debe cumplirse conceptualmente:
+
+Dispatched
+=
+Consumed
++
+Returned
++
+Unresolved
+Unresolved debe preferirse como valor derivado.
+
+Consumed
+La cantidad consumida representa verdad operacional.
+
+No debe significar automáticamente:
+
+Sale
+
+Delivery
+
+Invoice
+La consecuencia comercial debe diseñarse por separado.
+
+Returned
+Puede requerir inspección y disposición antes de recuperar disponibilidad.
+
+Para EquipmentAsset debe reutilizarse EquipmentInspection cuando la semántica aplique.
+
+9.14 Equipment Boundary
+EquipmentAsset debe conservar identidad física ERP Core:
+
+EquipmentAsset
+
+├── assetCode
+├── Product
+├── serialNumber
+├── lifecycle
+├── condition
+├── origin
+├── batch
+└── history
+Healthcare debe ser responsable de:
+
+Assignment
+
+Custody
+
+Dispatch
+
+Return
+
+Case relation
+No agregar directamente a EquipmentAsset campos específicos como:
+
+currentCase
+
+currentCustodian
+si esos hechos pertenecen a workflows Healthcare.
+
+9.15 Inventory / Custody Architecture Candidate
+Healthcare introduce una necesidad futura de representar:
+
+physical positioning
+
+custody
+
+availability
+
+staging
+Soluciones posibles incluyen:
+
+InventoryLocation
+
+InventoryPosition
+
+internal transfer semantics
+pero permanecen:
+
+ARCHITECTURAL CANDIDATES
+hasta que un ADR o diseño específico los apruebe.
+
+9.16 Case Calendar
+Debe proporcionar una lectura temporal de Cases.
+
+Puede consumir:
+
+Case schedule
+
+responsible User
+
+Hospital / Doctor context
+
+Readiness
+
+conflicts
+Calendar debe ser inicialmente:
+
+Read Model
+y no una segunda fuente del schedule.
+
+9.17 Case 360
+Debe concentrar:
+
+Case identity
+
+Schedule
+
+Hospital
+
+Doctor
+
+Responsible User
+
+Requirements
+
+Preparation
+
+CaseKit
+
+Equipment Assignment
+
+Dispatch
+
+Custody
+
+Return
+
+Reconciliation
+
+Commercial references
+sin duplicar ownership de cada dominio.
+
+9.18 Healthcare Mobile
+Una experiencia móvil especializada puede apoyar a técnicos con:
+
+Cases
+
+Schedule
+
+CaseKit
+
+Custody
+
+Return
+
+Reconciliation
+
+Equipment
+Debe consumir las mismas APIs y reglas de negocio.
+
+9.19 Healthcare Opportunity
+Una capa comercial previa puede existir posteriormente:
+
+Doctor request
+
+Technician prospecting
+
+Commercial lead
+
+↓
+
+Opportunity
+
+↓
+
+Healthcare Case
+Opportunity permanece:
+
+FUTURE / optional
+No es requisito para crear un HealthcareCase.
+
+9.20 Payer / Insurance
+Payer es un concepto reconocido, pero permanece FUTURE.
+
+Debe mantenerse:
+
+Payer
+≠
+Customer
+y no debe introducirse un Patient model por defecto.
+
+10. Etapa 3 — Commercial ERP Experience
+Prioridad: P1
+
+Objetivo:
+
+reducir fricción y convertir módulos funcionales en una experiencia ERP más eficiente.
+
+Healthcare será el workstream principal después del Core, pero mejoras UX seleccionadas pueden ejecutarse en paralelo si no retrasan dependencias Healthcare.
+
+10.1 360 Views
+Prioridad:
+
 Customer 360
+
 Product 360
+
 Supplier 360
+
 Purchase 360
-```
 
-posteriormente:
+Equipment 360
+Posteriormente:
 
-```text
 SalesOrder 360
-Return 360
+
+Commercial Return 360
+
 Healthcare Case 360
-```
+Principio:
 
----
-
-# 18. Principio 360
-
-Una vista 360 debe proporcionar:
-
-```text
 Identity
 ↓
 Current state
@@ -407,77 +1191,61 @@ Current state
 Related activity
 ↓
 Next actions
-```
+10.2 Action Dashboard
+Dashboard 2.0 ya existe.
 
-sin trasladar ownership de los dominios.
+La evolución futura busca pasar de:
 
----
-
-# 19. Action Dashboard
-
-Evolucionar:
-
-```text
 Counters
-↓
+a:
+
 Operational Context
 ↓
 Attention
 ↓
 Action
-```
-
 Ejemplo:
 
-```text
 3 compras pendientes de recepción
 [Revisar]
 
 5 productos con bajo stock
 [Reabastecer]
 
-2 pedidos pendientes de entrega
-[Preparar]
-```
+2 casos pendientes de retorno
+[Revisar]
+10.3 Global Search
+Búsqueda transversal para:
 
----
+Customers
 
-# 20. Global Search
+Suppliers
 
-Implementar búsqueda transversal para recursos empresariales relevantes.
+Products
+
+Purchases
+
+Quotes
+
+Sales / SalesOrders
+
+Equipment
+
+Healthcare Cases
+según disponibilidad.
 
 Debe respetar:
 
-```text
 Tenant
 +
 Permissions
 +
 Resource lifecycle
-```
-
-Resultados iniciales candidatos:
-
-```text
-Customers
-Suppliers
-Products
-Purchases
-Quotes
-SalesOrders
-```
-
-según disponibilidad.
-
----
-
-# 21. Contextual Creation
-
+10.4 Contextual Creation
 Reducir navegación innecesaria.
 
 Ejemplo:
 
-```text
 New Purchase
 ↓
 SupplierSelector
@@ -487,60 +1255,49 @@ Supplier does not exist
 Create Supplier
 ↓
 continue Purchase
-```
+Sin perder formularios independientes.
 
-Sin perder el formulario actual.
-
----
-
-# 22. UX Consistency
-
+10.5 UX Consistency
 Continuar estandarizando:
 
-```text
 Page layout
+
 Actions
+
 Forms
+
 Tables
+
 Filters
+
 Statuses
+
 Confirmation
+
 Loading
-Empty
-Error
-```
 
-mediante:
+Empty states
 
-```text
-DESIGN_SYSTEM.md
-BUSINESS_COMPONENTS.md
-ZAPING_WAY.md
-```
+Errors
 
----
+Modals
 
-# 23. Onboarding
+Navigation
 
+Responsive behavior
+
+Accessibility
+Sin introducir un rediseño total innecesario.
+
+10.6 Onboarding
 Una Company nueva debe poder pasar rápidamente de:
 
-```text
 Account created
-```
-
 a:
 
-```text
 Useful ERP
-```
+Flujo conceptual:
 
----
-
-# 24. Onboarding Flow
-
-Conceptualmente:
-
-```text
 Company setup
 ↓
 Users
@@ -554,65 +1311,42 @@ Suppliers
 Initial Inventory / Purchases
 ↓
 First commercial operation
-```
+10.7 Setup Checklist
+Dashboard puede mostrar:
 
----
-
-# 25. Setup Checklist
-
-El Dashboard puede evolucionar para mostrar:
-
-```text
 Configura tu empresa      ✓
 Agrega productos          ○
 Importa clientes          ○
 Registra proveedores      ○
 Crea primera cotización   ○
-```
+para tenants nuevos.
 
-en Companies nuevas.
-
----
-
-# 26. Etapa 3 — Data Import & Migration
-
-**Prioridad:** P1
+11. Etapa 4 — Data Import & Migration
+Prioridad: P1
 
 Objetivo:
 
-> reducir significativamente el costo de adopción de Zaping.
+reducir significativamente el costo de adopción de Zaping.
 
-Una PyME con años de información no puede depender de captura manual para comenzar.
+Una PyME con años de información no puede depender exclusivamente de captura manual.
 
----
+11.1 Importaciones iniciales
+Prioridad:
 
-# 27. Importaciones iniciales
-
-Primera prioridad:
-
-```text
 Customers
+
 Suppliers
+
 Products
+
 Inventory
-```
+11.2 Formatos
+Inicialmente:
 
----
-
-# 28. Formatos
-
-Soportar inicialmente:
-
-```text
 CSV
+
 XLSX
-```
-
----
-
-# 29. Flujo
-
-```text
+11.3 Flujo de importación
 Upload
 ↓
 Column Mapping
@@ -626,61 +1360,48 @@ Preview
 Batch Import
 ↓
 Result Report
-```
+11.4 Sistemas de origen
+La arquitectura debe permitir migraciones desde:
 
----
-
-# 30. Sistemas de origen
-
-La arquitectura debe permitir migraciones desde escenarios como:
-
-```text
 Excel
+
 CONTPAQi
+
 Aspel
+
 Microsip
+
 Odoo
+
 SAP
+
 otros ERP
-```
+sin construir un conector completo para cada sistema desde la primera versión.
 
-sin construir un conector completo para todos desde la primera versión.
-
----
-
-# 31. Initial Inventory
-
+11.5 Initial Inventory
 Importar Products debe mantenerse separado de:
 
-```text
 Initial Inventory
-```
+El inventario inicial requiere una operación:
 
-El inventario inicial requiere una operación controlada y trazable.
+controlled
 
+traceable
+
+auditable
 No debe traducirse en:
 
-```text
 Product.stock = spreadsheet value
-```
+sin origen ni contexto.
 
-sin contexto.
-
----
-
-# 32. Etapa 4 — SalesOrder + Delivery
-
-**Prioridad:** P1 estratégica
+12. Etapa 5 — SalesOrder + Delivery
+Prioridad: P1 estratégica
 
 Objetivo:
 
-> separar compromiso comercial de fulfillment físico.
+separar compromiso comercial de fulfillment físico.
 
----
-
-# 33. Modelo objetivo
-
-```text
+12.1 Modelo objetivo
 Quote
 ↓ optional
 SalesOrder
@@ -688,46 +1409,45 @@ SalesOrder
 Delivery
 ↓
 Inventory OUT
-```
-
----
-
-# 34. SalesOrder
-
+12.2 SalesOrder
 Debe representar:
 
-* Customer;
-* Products;
-* quantities;
-* prices;
-* totals;
-* compromiso comercial;
-* cantidades pendientes;
-* relación opcional con Quote.
+Customer
 
----
+Products
 
-# 35. Delivery
+quantities
 
+prices
+
+totals
+
+commercial commitment
+
+pending quantities
+
+optional Quote relation
+12.3 Delivery
 Debe representar:
 
-* fulfillment físico;
-* cantidades realmente entregadas;
-* entregas parciales;
-* lotes;
-* series cuando corresponda;
-* fecha;
-* destino;
-* responsable;
-* efecto Inventory OUT.
+physical fulfillment
 
----
+actual delivered quantities
 
-# 36. Entregas parciales
+partial deliveries
 
-Debe soportarse:
+batches
 
-```text
+serialized units when applicable
+
+date
+
+destination
+
+responsible actor
+
+Inventory OUT
+12.4 Entregas parciales
 Ordered 100
 ↓
 Delivery 40
@@ -735,660 +1455,310 @@ Delivery 40
 Delivery 30
 ↓
 Pending 30
-```
+12.5 Quote Conversion
+Evolución futura:
 
----
-
-# 37. Quote Conversion
-
-La conversión debe evolucionar de:
-
-```text
-Quote
-↓
-Sale
-↓
-Inventory OUT
-```
-
-a:
-
-```text
 Quote
 ↓
 SalesOrder
-```
-
 sin modificar inventario.
 
----
+La implementación V1 CURRENT:
 
-# 38. Legacy Migration
-
-La migración deberá conservar:
-
-* folios;
-* Customers;
-* items;
-* precios;
-* status;
-* InventoryMovement histórico;
-* Quote relationships;
-* Returns.
-
-No debe producir nuevamente OUT para Sales ya procesadas.
-
----
-
-# 39. Returns Migration
-
-Returns deberá evolucionar:
-
-```text
-SaleItem
+Quote
 ↓
-ReturnItem
-```
+Sale
+permanece mientras no exista la nueva arquitectura.
 
-hacia:
+12.6 Legacy Migration
+La futura migración debe conservar:
 
-```text
-DeliveryItem
+folios
+
+Customers
+
+items
+
+prices
+
+statuses
+
+InventoryMovement history
+
+Quote relationships
+
+Commercial Return relationships
+No debe volver a producir:
+
+Inventory OUT
+para Sales ya procesadas.
+
+12.7 Commercial Returns Evolution
+Commercial Returns Backend no es blocker P0 del ERP Core V1.
+
+Prioridad: P1 estratégica / Deferred
+
+Diseño existente:
+
+RET-001
+→ completed
+
+RET-002
+→ completed
+
+RET-003
+→ schema/migration completed
+
+RET-004
+→ backend operational pending
+Su evolución debe coordinarse con:
+
+SalesOrder
 ↓
-ReturnItem
-```
+Delivery
+↓
+Commercial Return
+↓
+Inspection / Disposition
+↓
+Inventory
+Debe mantenerse:
 
-de forma coordinada con Sales.
+Commercial Return
+≠
+Healthcare CaseReturn
+No profundizar innecesariamente dependencias físicas sobre Sale.
 
----
-
-# 40. Etapa 5 — Inventory Traceability
-
-**Prioridad:** P1
+13. Etapa 6 — Inventory Traceability
+Prioridad: P1
 
 Objetivo:
 
-> convertir Inventory en una ventaja competitiva clara para distribuidores de suministros médicos.
+convertir Inventory en una ventaja competitiva para distribuidores médicos.
 
----
-
-# 41. FEFO
-
+13.1 FEFO
 Implementar:
 
-> **First Expired, First Out**
-
-para productos con caducidad.
+First Expired, First Out
 
 Debe considerar:
 
-```text
 Expiration
+
 Availability
+
 Batch state
+
 Quantity
-Location future
-Custody future
-```
 
----
-
-# 42. Expiration Management
-
+future location/custody context when implemented
+13.2 Expiration Management
 Incluir progresivamente:
 
-```text
 Expired
+
 Near Expiration
+
 30 / 60 / 90 day visibility
+
 Sellability
+
 Alerts
+
 Dashboard integration
-```
+13.3 Batch Allocation
+Future Delivery debe conocer:
 
----
-
-# 43. Batch Allocation
-
-Delivery debe conocer:
-
-```text
 qué lote
 +
 qué cantidad
-```
+se entregó.
 
-fue entregado.
+Esto habilita:
 
-Esto desbloquea:
+Commercial Returns
 
-* Returns confiables;
-* Healthcare traceability;
-* FEFO;
-* lot history.
+commercial traceability
 
----
+FEFO
 
-# 44. Serial Tracking
+lot history
+Healthcare tendrá su propia integración logística sin depender necesariamente de Delivery para reconciliar custodia.
 
-Después de estabilizar lotes:
+13.4 SERIALIZED vs ASSET
+Zaping distingue:
 
-```text
-Product
-↓
-Serialized Unit
-```
+SERIALIZED
+≠
+ASSET
+SERIALIZED representa inventario unitario serializado que no necesariamente es Equipment reutilizable.
 
-permitirá seguimiento unitario.
+ASSET representa identidad física persistente de Equipment.
 
-Especialmente importante para Equipment.
+Ambos pueden utilizar seriales, pero pertenecen a workflows distintos.
 
----
+La semántica operacional de SERIALIZED permanece pendiente.
 
-# 45. Kardex
+13.5 Kardex
+Inventory debe proporcionar una lectura operativa:
 
-Inventory debe proporcionar una lectura operativa como:
-
-```text
 Date
+
 Origin
+
 IN
+
 OUT
+
 Balance
+
 Lot
+
 User
-```
+sin sustituir InventoryMovement como fuente histórica.
 
-sin sustituir la fuente histórica de InventoryMovement.
-
----
-
-# 46. Etapa 6 — Zaping Healthcare
-
-**Prioridad:** P1 estratégica
+14. Etapa 7 — Audit & Advanced Authorization
+Prioridad: P1 / P2
 
 Objetivo:
 
-> convertir la especialización Healthcare en el principal diferenciador inicial de Zaping frente a ERP genéricos.
+aumentar trazabilidad y control conforme Zaping entre a operaciones empresariales más sensibles.
 
----
-
-# 47. Frontera
-
-Healthcare se construye:
-
-```text
-sobre ERP Core
-```
-
-no:
-
-```text
-dentro de cada tabla del ERP Core
-```
-
-Debe evitarse contaminación del modelo genérico.
-
----
-
-# 48. Flujo general
-
-```text
-Opportunity
-↓
-Healthcare Case
-↓
-Calendar
-↓
-Preparation
-↓
-CaseKit
-↓
-Dispatch
-↓
-Technician Custody
-↓
-Procedure
-↓
-Return
-↓
-Inspection
-↓
-Reconciliation
-```
-
----
-
-# 49. Opportunity
-
-Debe soportar oportunidades originadas por:
-
-```text
-Doctor request
-Technician prospecting
-Commercial lead
-```
-
-Puede existir antes de conocer todos los datos comerciales definitivos.
-
----
-
-# 50. Healthcare Case
-
-Case representa un procedimiento desde el punto de vista:
-
-```text
-operacional
-+
-logístico
-+
-comercial
-```
-
-No debe convertirse en un expediente clínico.
-
----
-
-# 51. Relaciones Healthcare
-
-Mantener separados:
-
-```text
-Doctor
-Hospital
-Customer
-Payer
-Technician
-```
-
-porque pueden representar actores diferentes.
-
----
-
-# 52. Case Calendar
-
-Debe proporcionar una lectura temporal de Cases.
-
-Filtros relevantes:
-
-```text
-Technician
-Hospital
-Doctor
-Status
-Procedure
-```
-
-y permitir detectar:
-
-* conflictos de técnico;
-* conflictos de Equipment;
-* readiness.
-
----
-
-# 53. CaseKit
-
-Separar:
-
-```text
-KitTemplate
-```
-
-de:
-
-```text
-CaseKit
-```
-
----
-
-# 54. KitTemplate
-
-Representa una configuración reusable.
-
-Ejemplo:
-
-```text
-Procedimiento X
-├── Product A × 2
-├── Product B × 4
-└── Equipment C
-```
-
----
-
-# 55. CaseKit
-
-Representa la preparación real para un Case específico.
-
-Puede contener:
-
-* quantities;
-* batches;
-* serials;
-* Equipment;
-* estado de preparación.
-
----
-
-# 56. Case Logistics
-
-Debe formalizar:
-
-```text
-Preparation
-↓
-Dispatch
-↓
-Custody
-↓
-Return
-↓
-Inspection
-↓
-Reconciliation
-```
-
----
-
-# 57. Regla crítica Healthcare
-
-```text
-CaseDispatch
-≠
-Delivery
-```
-
-y:
-
-```text
-CaseDispatch
-≠
-definitive Inventory OUT
-```
-
----
-
-# 58. Technician Custody
-
-El material puede encontrarse:
-
-```text
-fuera del almacén
-```
-
-pero continuar siendo:
-
-```text
-propiedad de la Company
-```
-
----
-
-# 59. Reconciliation
-
-Debe cumplirse:
-
-```text
-Dispatched
-=
-Used
-+
-Returned
-+
-Unresolved
-```
-
----
-
-# 60. Used
-
-La cantidad utilizada puede generar posteriormente la consecuencia comercial apropiada.
-
-Debe evitarse decremento doble de Inventory.
-
----
-
-# 61. Returned
-
-Material regresado puede requerir:
-
-```text
-Inspection
-↓
-Available
-Quarantine
-Damaged
-Maintenance
-```
-
-antes de volver a disponibilidad.
-
----
-
-# 62. Equipment
-
-Healthcare necesita identidad física individual para equipos reutilizables.
-
-Conceptualmente:
-
-```text
-EquipmentAsset
-├── assetCode
-├── Product / Model
-├── serial
-├── status
-├── custodian
-├── Case
-├── condition
-└── history
-```
-
----
-
-# 63. Equipment evolución
-
-Posteriormente:
-
-```text
-Maintenance
-Calibration
-Service history
-Availability
-Scheduling
-```
-
----
-
-# 64. Warehouse Operations Workspace
-
-Healthcare y ERP deben converger en una experiencia operacional de almacén.
-
-Puede reunir:
-
-```text
-Purchase Receipts
-Case Preparation
-Deliveries
-Returns
-Equipment
-Inventory alerts
-```
-
-sin crear un nuevo dominio que duplique reglas.
-
----
-
-# 65. Etapa 7 — Audit & Advanced Authorization
-
-**Prioridad:** P1/P2
-
-Objetivo:
-
-> aumentar trazabilidad y control conforme Zaping entre a operaciones empresariales más sensibles.
-
----
-
-# 66. Audit Foundation
-
+14.1 Audit Foundation
 Primera versión:
 
-```text
 AuditEvent
+
 companyId
+
 actor
+
 action
+
 resource
+
 timestamp
+
 safe metadata
-```
+Comportamiento:
 
-con comportamiento append-only.
-
----
-
-# 67. Cobertura inicial de Audit
-
+append-only
+14.2 Cobertura inicial
 Prioridad:
 
-```text
 Identity
+
 Company
+
 Inventory
+
 Purchases
+
 Receipts
+
 Sales / Deliveries
-Returns
-```
 
----
+Commercial Returns
 
-# 68. Permission-Based RBAC
+Healthcare Cases
 
+Equipment
+14.3 Permission-Based RBAC
 Evolucionar:
 
-```text
 UserRole
-```
-
+↓
+RolesGuard
 hacia:
 
-```text
 Role
 ↓
 Permissions
-```
+↓
+PermissionsGuard
+14.4 Default Roles
+Los roles actuales pueden convertirse en presets:
 
----
-
-# 69. Default Roles
-
-Los roles existentes pueden convertirse en presets:
-
-```text
 Administrator
+
 Manager
+
 Sales
+
 Warehouse
-```
+14.5 Custom Roles
+Posteriormente:
 
-sin depender permanentemente del enum para todas las decisiones.
-
----
-
-# 70. Custom Roles
-
-Posteriormente puede permitirse:
-
-```text
 Compras
+
 Supervisor de Almacén
+
 Auditor
+
 Ventas Junior
-```
 
-basándose en Permissions.
+Healthcare Technician
+basados en Permissions.
 
----
-
-# 71. Etapa 8 — Multi-Warehouse & Advanced Inventory
-
-**Prioridad:** P2
+15. Etapa 8 — Multi-Warehouse & Advanced Inventory
+Prioridad: P2 / architectural evolution
 
 Objetivo:
 
-> soportar empresas con mayor complejidad logística.
+soportar empresas con mayor complejidad logística.
 
----
+Las estructuras exactas deben aprobarse mediante diseño/ADR antes de implementación.
 
-# 72. Warehouses
+15.1 Warehouses
+Warehouse es una capacidad TARGET razonable para empresas con múltiples almacenes.
 
-Introducir explícitamente:
+El schema definitivo deberá diseñarse cuando exista prioridad real.
 
-```text
-Warehouse
-```
+15.2 Locations
+Una futura estrategia puede representar:
 
-como unidad de almacenamiento empresarial.
-
----
-
-# 73. Locations
-
-Dentro de Warehouse pueden existir posteriormente:
-
-```text
 Zone
+
 Rack
+
 Bin
+
 Quarantine
+
 Staging
-```
+según necesidad real.
 
-según las necesidades reales.
+InventoryLocation permanece architectural candidate hasta aprobación formal.
 
----
+15.3 Inventory Position
+Una futura posición puede requerir dimensiones como:
 
-# 74. Inventory Balance
-
-El modelo deberá distinguir:
-
-```text
 Product
+
 +
+
 Batch
+
 +
+
 Location
+
 +
+
 State
-```
+La estrategia de persistencia/source of truth debe definirse mediante ADR.
 
-cuando corresponda.
+15.4 Internal Transfers
+Debe existir en el futuro una semántica para:
 
----
-
-# 75. Transfers
-
-```text
-Warehouse A
+Location A
 ↓
-Transfer
-↓
-Warehouse B
-```
+Location B
+sin tratar automáticamente el hecho como una salida comercial.
 
-cambia ubicación.
+La implementación exacta no se fija todavía.
 
-No necesariamente cambia propiedad de la Company.
-
----
-
-# 76. Stock Counts
-
-Incluir:
-
-```text
+15.5 Stock Counts
 System Quantity
 vs
 Physical Quantity
@@ -1396,83 +1766,64 @@ Physical Quantity
 Difference
 ↓
 Authorized Adjustment
-```
-
----
-
-# 77. Reservations
-
+15.6 Reservations
 Antes de implementarlas debe definirse:
 
-```text
 Physical
-Reserved
-Available
-```
 
+Reserved
+
+Available
 y su interacción con:
 
-* SalesOrder;
-* Healthcare;
-* Warehouse;
-* Delivery.
+SalesOrder
 
----
+Healthcare
 
-# 78. Etapa 9 — Billing & Mexican Commercial Requirements
+Warehouse
 
-**Prioridad:** P2 / necesaria para madurez comercial en México
+Delivery
+16. Etapa 9 — Billing & Mexican Commercial Requirements
+Prioridad: P2 / necesaria para madurez comercial en México
 
 Objetivo:
 
-> completar el ciclo económico sin mezclarlo con fulfillment físico.
+completar el ciclo económico sin mezclarlo con fulfillment físico.
 
----
-
-# 79. Invoice
-
-Mantener:
-
-```text
+16.1 Separación de responsabilidades
 SalesOrder
 ≠
 Delivery
 ≠
 Invoice
-```
-
----
-
-# 80. CFDI
-
+16.2 CFDI
 La implementación mexicana requerirá revisar:
 
-* RFC;
-* razón social;
-* régimen fiscal;
-* código postal;
-* uso CFDI;
-* impuestos;
-* timbrado;
-* cancelación;
-* XML;
-* PDF.
+RFC
 
----
+razón social
 
-# 81. Fiscal Profiles
+régimen fiscal
 
-Customer y Company necesitarán una estructura fiscal más completa.
+código postal
 
-No debe improvisarse agregando campos aislados antes de diseñar Billing.
+uso CFDI
 
----
+impuestos
 
-# 82. Accounts Receivable
+timbrado
 
-Después de Invoice podrá evolucionarse hacia:
+cancelación
 
-```text
+XML
+
+PDF
+16.3 Fiscal Profiles
+Customer y Company requerirán estructuras fiscales diseñadas explícitamente.
+
+No agregar campos fiscales aislados sin diseño de Billing.
+
+16.4 Accounts Receivable
 Invoice
 ↓
 Balance
@@ -1480,170 +1831,116 @@ Balance
 Payment
 ↓
 Accounts Receivable
-```
+16.5 Credit Management
+Solo con saldos confiables tendrá sentido utilizar:
 
----
-
-# 83. Credit Management
-
-Solo cuando existan saldos confiables tendrá sentido utilizar:
-
-```text
 Customer.creditLimit
-```
+como control operacional real.
 
-como parte de controles operativos reales.
+16.6 Supplier Finance
+Posible evolución:
 
----
-
-# 84. Supplier Finance
-
-Posteriormente:
-
-```text
 Accounts Payable
-Supplier Invoices
-Payments
-```
 
+Supplier Invoices
+
+Payments
 si el alcance comercial lo requiere.
 
----
-
-# 85. Etapa 10 — Portals & Mobile
-
-**Prioridad:** P2
+17. Etapa 10 — Portals & Mobile
+Prioridad: P2
 
 Objetivo:
 
-> extender Zaping fuera de la interfaz interna de escritorio.
+extender Zaping fuera de la interfaz interna principal.
 
----
+17.1 Customer Portal
+Capacidades progresivas:
 
-# 86. Customer Portal
-
-Permitirá progresivamente:
-
-```text
 Quotes
-Orders
-Deliveries
-Invoices
-Documents
-```
 
+Orders
+
+Deliveries
+
+Invoices
+
+Documents
 según permisos.
 
----
-
-# 87. External Identity
-
-Customer Portal necesita un modelo de identidad externo seguro.
+17.2 External Identity
+Customer Portal requerirá identidad externa segura.
 
 No debe utilizar:
 
-```text
 Customer.email
-```
-
 como login implícito.
 
----
-
-# 88. Sales Mobile App
-
-Aplicación móvil para vendedores.
-
+17.3 Sales Mobile
 Capacidades candidatas:
 
-```text
 Customers
+
 Products
+
 Quotes
+
 SalesOrders
+
 Field activity
-```
+17.4 Healthcare Mobile
+Capacidades:
 
----
-
-# 89. Healthcare Mobile
-
-Una evolución especializada puede ayudar a técnicos con:
-
-```text
 Cases
+
 CaseKit
+
 Custody
+
 Return
+
 Reconciliation
+
 Equipment
-```
-
----
-
-# 90. API reutilizable
-
-Portal y Mobile deben consumir las mismas capacidades de negocio mediante APIs bien diseñadas.
+17.5 API reutilizable
+Portal y Mobile deben consumir las mismas capacidades de negocio.
 
 No crear reglas independientes por canal.
 
----
-
-# 91. Etapa 11 — Zaping Radar
-
-**Prioridad:** Future / exploración estratégica
+18. Etapa 11 — Zaping Radar
+Prioridad: Future / exploración estratégica
 
 Objetivo:
 
-> convertir oportunidades externas en inteligencia accionable para empresas que venden al sector público y Healthcare.
+convertir oportunidades externas en inteligencia accionable para empresas que venden al sector público y Healthcare.
 
----
+18.1 Alcance inicial
+Regiones iniciales consideradas:
 
-# 92. Alcance inicial
-
-Radar se ha identificado inicialmente para:
-
-```text
 Sonora
-Baja California
-Baja California Sur
-Nuevo León
-Sinaloa
-```
 
+Baja California
+
+Baja California Sur
+
+Nuevo León
+
+Sinaloa
 con énfasis en:
 
-```text
-licitaciones y oportunidades del sector salud
-```
+licitaciones
 
----
+oportunidades del sector salud
+18.2 Radar como producto
+Radar puede funcionar:
 
-# 93. Radar como producto
-
-Radar debe mantener identidad propia dentro del ecosistema.
-
-Puede funcionar:
-
-```text
 Standalone
-```
-
 y:
 
-```text
 Integrated with Zaping ERP
-```
+cuando aporte valor.
 
-cuando exista valor.
-
----
-
-# 94. Integración potencial
-
-Conceptualmente:
-
-```text
+18.3 Integración potencial
 Tender / Opportunity
 ↓
 Radar
@@ -1652,362 +1949,356 @@ ERP Opportunity
 ↓
 Quote
 ↓
-Sales process
-```
+Commercial process
+sin acoplar Radar directamente al dominio transaccional.
 
-sin acoplar directamente Radar al dominio transaccional.
-
----
-
-# 95. Capacidades futuras
-
-```text
+18.4 Capacidades futuras
 Source Monitoring
+
 Opportunity Normalization
+
 Filters
+
 Alerts
+
 Saved Searches
+
 Tender Workspace
+
 Document Analysis
+
 Commercial Fit
+
 ERP Integration
-```
+18.5 Regla
+Radar no debe retrasar:
 
----
+Security
 
-# 96. No construir Radar antes del Core
+Release readiness
 
-El valor estratégico de Radar es alto.
+Healthcare
 
-Sin embargo, no debe retrasar:
+Data adoption
 
-* seguridad;
-* Sales refactor;
-* importaciones;
-* onboarding;
-* Healthcare;
-* release readiness.
-
----
-
-# 97. Etapa 12 — Zaping AI
-
-**Prioridad:** Future
+Core reliability
+19. Etapa 12 — Zaping AI
+Prioridad: Future
 
 Objetivo:
 
-> convertir información operacional confiable en asistencia y automatización explicable.
+convertir información operacional confiable en asistencia y automatización explicable.
 
----
-
-# 98. Principio
-
-```text
+19.1 Principio
 Reliable Data
 +
 Reliable Workflows
 ↓
 Useful AI
-```
-
 No al revés.
 
----
-
-# 99. Capacidades candidatas
-
-```text
+19.2 Capacidades candidatas
 Natural Language Queries
+
 Operational Summaries
+
 Replenishment Suggestions
+
 Sales Insights
+
 Anomaly Detection
+
 Tender Analysis
+
 Document Assistance
+
 Workflow Recommendations
-```
-
----
-
-# 100. AI explicable
-
+19.3 AI explicable
 Toda recomendación debe poder relacionarse con datos reales.
 
 Ejemplo:
 
-```text
 Revisar Product CAT-001
 
 Stock actual: 4
+
 MinStock: 10
+
 Pending Purchases: 0
-```
-
----
-
-# 101. AI no debe saltarse autorización
-
+19.4 Authorization
 Una consulta AI debe aplicar:
 
-```text
 Identity
-Tenant
-Permissions
-Domain Rules
-```
 
+Tenant
+
+Permissions
+
+Domain Rules
 igual que cualquier otra interfaz.
 
----
-
-# 102. AI no debe ejecutar silenciosamente
-
+19.5 Acciones automáticas
 Debe distinguirse:
 
-```text
 Recommendation
-```
-
 de:
 
-```text
 Automated Business Action
-```
+Acciones automáticas futuras requerirán:
 
-Las acciones automáticas requerirán controles, permisos y Audit.
+authorization
 
----
+audit
 
-# 103. Capacidades transversales futuras
+confirmation
 
-Algunas capacidades afectan varias etapas y se implementarán cuando sus dependencias estén maduras.
+safe execution
 
-Incluyen:
+failure handling
+20. Capacidades transversales futuras
+Algunas capacidades afectan varias etapas:
 
-```text
 Notifications
+
 Document Management
+
 Advanced Reporting
-Advanced Analytics
+
+Analytics
+
 Integrations
+
 Public API
+
 Webhooks
+
 Localization
+
 Internationalization
-```
 
----
+Observability
 
-# 104. Notifications
+Backups
+Se implementarán cuando sus dependencias estén maduras.
 
-Pueden incluir:
-
-```text
-Low Stock
-Expiration
-Pending Receipt
-Pending Delivery
-Healthcare Case
-Return
-Tender Opportunity
-```
-
-según producto y preferencias.
-
----
-
-# 105. Document Management
-
-Puede dar soporte a:
-
-* cotizaciones;
-* órdenes;
-* licitaciones;
-* contratos;
-* certificados;
-* documentos regulatorios;
-* PDFs;
-* attachments.
-
-Debe incluir tenant isolation.
-
----
-
-# 106. Reporting
-
-La evolución puede incluir:
-
-```text
-Operational Reports
-Commercial Reports
-Inventory Reports
-Healthcare Reports
-Exports
-```
-
-sin convertir Dashboard en una plataforma BI completa prematuramente.
-
----
-
-# 107. Integraciones
-
-Conforme el mercado lo requiera pueden aparecer:
-
-```text
-CONTPAQi
-email
-CFDI/PAC
-carriers
-supplier systems
-public procurement sources
-```
-
-Cada integración deberá tener:
-
-* ownership;
-* security;
-* retries;
-* audit;
-* failure handling.
-
----
-
-# 108. Public API
-
-Debe distinguirse:
-
-```text
-Application API
-```
-
-de:
-
-```text
-Public API
-```
-
-La segunda puede requerir:
-
-* versioning;
-* credentials;
-* quotas;
-* webhooks;
-* stronger compatibility guarantees.
-
----
-
-# 109. Lo que no debe priorizarse todavía
-
-No invertir significativamente en:
-
-```text
-Microservices
-Kubernetes
-Complex Event Bus
-Data Warehouse
-Advanced ML infrastructure
-Marketplace
-Plugin ecosystem
-Global multi-region
-```
-
-sin una necesidad demostrada.
-
----
-
-# 110. Principio arquitectónico
-
-Zaping continúa con:
-
-> **Modular Monolith until evidence says otherwise.**
-
-La evolución del producto no exige transformar cada capacidad en un servicio independiente.
-
----
-
-# 111. Dependencias principales
-
-La secuencia de capacidades no es arbitraria.
-
+20.1 Notifications
 Ejemplos:
 
-```text
+Low Stock
+
+Expiration
+
+Pending Receipt
+
+Pending Delivery
+
+Healthcare Case
+
+Return
+
+Tender Opportunity
+20.2 Document Management
+Puede soportar:
+
+quotes
+
+orders
+
+licitaciones
+
+contracts
+
+certificates
+
+regulatory documents
+
+PDFs
+
+attachments
+Debe respetar tenant isolation.
+
+20.3 Reporting
+Evolución:
+
+Operational Reports
+
+Commercial Reports
+
+Inventory Reports
+
+Healthcare Reports
+
+Exports
+sin convertir prematuramente Dashboard en una plataforma BI.
+
+20.4 Integrations
+Posibles integraciones:
+
+CONTPAQi
+
+email
+
+CFDI / PAC
+
+carriers
+
+supplier systems
+
+public procurement sources
+Cada integración deberá contemplar:
+
+ownership
+
+security
+
+retries
+
+audit
+
+failure handling
+20.5 Public API
+Debe distinguirse:
+
+Application API
+de:
+
+Public API
+Una Public API futura puede requerir:
+
+versioning
+
+credentials
+
+quotas
+
+webhooks
+
+compatibility guarantees
+21. Lo que no debe priorizarse todavía
+No invertir significativamente en:
+
+Microservices
+
+Kubernetes for product complexity alone
+
+Complex Event Bus
+
+Data Warehouse
+
+Advanced ML infrastructure
+
+Marketplace
+
+Plugin ecosystem
+
+Global multi-region
+sin necesidad demostrada.
+
+22. Principio arquitectónico
+Zaping continúa con:
+
+Modular Monolith until evidence says otherwise.
+
+La evolución del producto no exige convertir cada capacidad en un servicio independiente.
+
+Debe priorizarse:
+
+clear domain boundaries
+
++
+
+testability
+
++
+
+tenant safety
+
++
+
+reliable transactions
+
++
+
+maintainability
+antes que complejidad distribuida.
+
+23. Dependencias principales
+La secuencia de capacidades no es arbitraria.
+
+HealthcareCase
++
+EquipmentAsset
+↓
+Equipment Assignment
+↓
+Case Availability
+↓
+Dispatch / Custody
+HealthcareCase
++
+Requirements
+↓
+Preparation
+↓
+CaseKit
+Dispatch / Custody
+↓
+Return
+↓
+Reconciliation
+Healthcare Reconciliation no depende de que SalesOrder / Delivery estén implementados.
+
+La consecuencia comercial posterior es un dominio separado.
+
 SalesOrder
 ↓
 Delivery
 ↓
 Batch Allocation
 ↓
-Reliable Returns
-```
-
----
-
-```text
+Reliable Commercial Returns
 InventoryBatch
 ↓
 Expiration
 ↓
 FEFO
-```
-
----
-
-```text
-Delivery
-+
-Inventory Traceability
-↓
-Healthcare Reconciliation
-```
-
----
-
-```text
 Reliable Domains
 ↓
 Audit
 ↓
 Advanced Automation
-```
-
----
-
-```text
 Reliable Operational Data
 ↓
 Analytics
 ↓
 AI
-```
+24. Priorización comercial
+Al evaluar iniciativas considerar:
 
----
-
-# 112. Priorización comercial
-
-Al evaluar una nueva iniciativa deben considerarse:
-
-```text
 Customer Value
+
 Operational Risk
+
 Revenue Potential
+
 Differentiation
+
 Dependencies
+
 Development Cost
+
 Security Impact
+
 Migration Impact
+
 UX Impact
-```
+No priorizar únicamente por facilidad técnica.
 
----
+25. Regla para nuevas ideas
+Una idea no entra automáticamente a desarrollo.
 
-# 113. Regla para nuevas ideas
+Debe pasar por:
 
-Una nueva idea no entra automáticamente a desarrollo.
-
-Debe pasar conceptualmente por:
-
-```text
 Idea
 ↓
 Product fit
@@ -2021,372 +2312,338 @@ Roadmap
 Project Board
 ↓
 Implementation
-```
+26. Estrategia competitiva
+Zaping no debe copiar feature por feature a:
 
----
-
-# 114. Features de competidores
-
-Zaping no debe intentar copiar feature por feature a:
-
-```text
 Odoo
+
 CONTPAQi
+
 Bind ERP
+
 Microsip
+
 Dynamics
+
 NetSuite
+
 SAP
-```
+La estrategia es competir mediante:
 
----
-
-# 115. Estrategia competitiva
-
-La dirección es competir mediante:
-
-```text
 ERP Core sólido
-+
-UX más simple
-+
-Healthcare specialization
-+
-Traceability
-+
-Faster adoption
-```
 
++
+
+UX más simple
+
++
+
+Healthcare specialization
+
++
+
+Traceability
+
++
+
+Faster adoption
 y posteriormente:
 
-```text
 Radar
+
 +
+
 AI
-```
+27. Comercialización
+El producto debe avanzar progresivamente:
 
-como ventajas adicionales.
-
----
-
-# 116. Comercialización
-
-El producto debe avanzar progresivamente hacia:
-
-```text
-Internal use
+Internal Use
 ↓
-Controlled pilot
+Controlled Pilot
 ↓
-Early customers
+Early Customers
 ↓
-Repeatable onboarding
+Repeatable Onboarding
 ↓
 Scalable SaaS
-```
-
----
-
-# 117. Pilotos
-
+27.1 Pilotos
 Antes de pilotos externos debe existir al menos:
 
-* seguridad P0 resuelta;
-* flows principales estables;
-* data isolation validada;
-* backups básicos;
-* error handling;
-* QA;
-* onboarding razonable;
-* soporte operativo;
-* documentación interna confiable.
+secure password recovery
 
----
+authentication abuse protection
 
-# 118. SaaS Operations futuro
+safe role provisioning
 
-Posteriormente deberán formalizarse:
+inactive-user enforcement
 
-```text
+critical flows stable
+
+tenant isolation validated
+
+critical authorization reviewed
+
+protected-route/session behavior reviewed
+
+production secrets/configuration reviewed
+
+basic backups
+
+error handling
+
+QA
+
+reasonable onboarding
+
+operational support
+
+internal documentation
+27.2 SaaS Operations futuras
+Posteriormente:
+
 Subscriptions
+
 Plans
-Feature entitlement
-Tenant provisioning
-Tenant suspension
-Usage limits
+
+Feature Entitlements
+
+Tenant Provisioning
+
+Tenant Suspension
+
+Usage Limits
+
 Support
+
 Backups
+
 Observability
-```
+No pertenecen todavía al ERP funcional principal.
 
-No pertenecen aún al ERP funcional principal.
+28. Release Strategy
+No utilizar números de versión como promesas de features futuras.
 
----
+Una versión debe representar:
 
-# 119. Release Strategy
+real
 
-No se utilizarán números de versión únicamente para asignar una feature futura.
+verifiable
 
-Ejemplo antiguo:
+completed
 
-```text
-v0.10 Quotes
-v0.11 Sales
-```
+changes
+Flujo de release:
 
-queda descartado como estrategia vigente.
-
----
-
-# 120. Versiones
-
-Una versión debe representar un conjunto real y verificable de cambios.
-
-No una promesa histórica desactualizada.
-
----
-
-# 121. Release Candidate
-
-Antes de una release importante puede utilizarse:
-
-```text
-Feature complete
+Feature Complete
 ↓
 Regression
 ↓
-Security review
+Security Review
 ↓
-Migration validation
+Migration Validation
 ↓
-Release candidate
+Release Candidate
 ↓
 Release
-```
+29. Backlog y Sprints
+No mantener un segundo backlog general dentro del Roadmap.
 
----
+Trabajo accionable:
 
-# 122. Backlog
-
-No se mantendrá un segundo Backlog general dentro de `docs/roadmap/`.
-
-El trabajo aprobado y accionable debe vivir en:
-
-```text
 PROJECT_BOARD.md
-```
+o sistema de tickets.
 
-o en el sistema de tickets utilizado por el proyecto.
+Sprints pueden utilizarse operacionalmente, pero:
 
----
-
-# 123. Sprint Documents
-
-No se crearán archivos permanentes como:
-
-```text
-Sprint-11.md
-Sprint-12.md
-Sprint-13.md
-```
-
-como principal fuente del estado del producto.
-
----
-
-# 124. Sprints
-
-Los Sprints pueden utilizarse operacionalmente para organizar trabajo.
-
-Pero:
-
-```text
 architecture
+
 product behavior
+
 roadmap
-```
+deben permanecer en sus fuentes responsables.
 
-deben permanecer en sus documentos responsables.
+Trabajo histórico relevante:
 
----
-
-# 125. Historial de Sprint
-
-Un Sprint completado puede aportar hechos relevantes a:
-
-```text
 CHANGELOG.md
-```
+30. Criterio de avance entre etapas
+Las etapas no requieren completar el 100 % de todas las ideas.
 
-No necesita conservarse indefinidamente como documentación oficial separada.
+La transición debe basarse en:
 
----
-
-# 126. Criterio de avance entre etapas
-
-Las etapas de este Roadmap no requieren terminar el 100 % de todas las ideas antes de comenzar la siguiente.
-
-La transición se basa en:
-
-```text
 Critical dependencies resolved
+
 +
-acceptable risk
+
+Acceptable risk
+
 +
-business value
-```
 
----
+Business value
+El Roadmap no es lineal rígido.
 
-# 127. Roadmap no lineal rígido
+Algunas iniciativas pueden ejecutarse en paralelo cuando no violen dependencias ni distraigan del workstream principal.
 
-Algunas iniciativas pueden ejecutarse en paralelo.
-
-Ejemplo:
-
-```text
-Healthcare documentation
-```
-
-puede avanzar mientras:
-
-```text
-Security hardening
-```
-
-se implementa.
-
-Pero las dependencias técnicas deben respetarse.
-
----
-
-# 128. Prioridades actuales resumidas
-
-## P0
-
-```text
+31. Prioridades actuales resumidas
+P0 — Release / Integrity / Security
 Documentation closure
-Security hardening
-Returns backend
+
+Secure password recovery
+
+Authentication abuse protection
+
+Safe role provisioning
+
+Inactive-user enforcement
+
+Tenant isolation regression
+
+Critical authorization review
+
+Protected-route / session review
+
+Production secrets / configuration
+
 Core regression
+
+ERP end-to-end QA
+
 Release readiness
-```
+Commercial Returns Backend no es P0.
 
----
+P1 estratégica inmediata
+Zaping Healthcare
 
-## P1
+Hospital / Doctor
 
-```text
+Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Dispatch / Custody
+
+Return
+
+CaseKit / Maletín
+
+Calendar
+
+Case 360
+
+Mobile Technician
+P1 posterior / paralelo
 UX / 360
+
 Action Dashboard
+
 Global Search
+
+Onboarding
+
 Data Import
+
 SalesOrder + Delivery
-Inventory traceability
-Healthcare
+
+Commercial Returns evolution
+
+Inventory Traceability
+
 Audit
-Permission-based RBAC
-```
 
----
-
-## P2
-
-```text
+Permission-Based RBAC
+P2
 Multi-Warehouse
-Serial Tracking
-Inventory Counts
+
+Advanced Inventory
+
 Billing / CFDI
+
 Accounts Receivable
+
 Portals
-Mobile
+
+Sales Mobile
+
 Advanced Reporting
-```
 
----
+SaaS operations
+Future
+Healthcare Opportunity
 
-## Future
+Payer / Insurance
 
-```text
+KitTemplate
+
 Radar
+
 AI
+
 Advanced automation
+
 Broader ecosystem
-```
-
----
-
-# 129. Fuente de verdad
-
-```text
+32. Fuente de verdad
 ROADMAP.md
-→ dirección futura y prioridades
-```
-
-```text
+→ dirección futura
+→ prioridades estratégicas
 PROJECT_BOARD.md
-→ iniciativas activas y estado
-```
-
-```text
+→ estado actual
+→ trabajo activo
+→ blockers
 CHANGELOG.md
 → historia
-```
-
-```text
 PRODUCT_VISION.md
 → visión de largo plazo
-```
-
-```text
 PRODUCT_REQUIREMENTS.md
-→ capacidades que el producto debe satisfacer
-```
-
-```text
+→ capacidades esperadas
 ADR
 → decisiones arquitectónicas
-```
-
-```text
-modules/
-→ comportamiento funcional
-```
-
----
-
-# 130. Regla de mantenimiento
-
+docs/modules/
+→ comportamiento funcional por dominio
+33. Regla de mantenimiento
 Este Roadmap debe revisarse cuando:
 
-* cambie una prioridad estratégica;
-* se apruebe una nueva línea de producto;
-* una dependencia importante sea resuelta;
-* un aprendizaje real cambie el orden de implementación;
-* una capacidad deje de tener valor.
+cambie una prioridad estratégica;
+
+se apruebe una nueva línea de producto;
+
+una dependencia importante sea resuelta;
+
+un aprendizaje real cambie el orden;
+
+una capacidad deje de aportar valor;
+
+se cierre una etapa estratégica importante.
 
 No necesita modificarse con cada commit.
 
----
+34. Principio final
+Zaping debe crecer por capas:
 
-# 131. Principio final
-
-Zaping debe crecer por capas.
-
-```text
 Reliable Core
 ↓
-Great Operational Experience
+Secure / Release-Ready Core
 ↓
 Healthcare Differentiation
+↓
+Great Operational Experience
 ↓
 Broader ERP Capabilities
 ↓
 External Intelligence
 ↓
 AI
-```
+La prioridad inmediata es:
 
-No debe crecer agregando features aisladas sin consolidar las capas anteriores.
+H8A
+↓
+H8B
+↓
+UX-B.6
+↓
+ERP Core V1 Closure
+↓
+Healthcare
+No deben abrirse nuevas funcionalidades importantes del ERP Core antes de completar H8 y UX-B.6, salvo correcciones P0 necesarias para el cierre.
 
-> **La meta no es construir el ERP con más funciones. Es construir una plataforma que resuelva mejor el trabajo real de sus usuarios y pueda crecer sin perder claridad, seguridad ni trazabilidad.**
+Healthcare TARGET tampoco debe expandirse en Prisma durante H8.

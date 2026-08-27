@@ -1,225 +1,371 @@
-# Módulo de Clientes — Zaping ERP
+# Customers — Zaping ERP
 
 **Módulo:** Customers
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** CUSTOMERS V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Customers administra el catálogo maestro de clientes de una Company.
+Customers administra el catálogo maestro de clientes de una Company.
 
 Su responsabilidad principal es responder:
 
 ```text
-¿A quién le vendemos?
-¿Cómo identificamos al cliente?
-¿Cómo podemos contactarlo?
-¿Puede participar actualmente en nuevas operaciones?
-¿Qué actividad comercial existe con él?
+¿Quién es nuestra contraparte comercial?
+
+¿Cómo la identificamos?
+
+¿Cómo podemos contactarla?
+
+¿Está habilitada para nuevas operaciones?
+
+¿Qué Quotes y Sales históricas están relacionadas con ella?
 ```
 
-Customer representa una contraparte comercial del ERP.
+Customer representa:
+
+```text
+commercial counterpart
++
+master-data identity
++
+master-data lifecycle
+```
+
+No representa por sí mismo una operación comercial.
 
 ---
 
-# 2. Principio fundamental
-
-```text
-Customer
-=
-contraparte comercial
-```
-
-mientras:
-
-```text
-Quote
-=
-propuesta comercial
-```
-
-y:
-
-```text
-SalesOrder
-=
-compromiso comercial
-```
-
-Por tanto:
-
-> Customer identifica a la parte comercial. Sales administra las operaciones realizadas con ella.
-
----
-
-# 3. Responsabilidades
+# 2. Ownership
 
 Customers es propietario de información maestra como:
 
-* nombre;
-* tipo;
-* email;
-* teléfono;
-* dirección;
-* contacto;
-* límite de crédito de referencia;
-* notas;
-* estado activo/inactivo;
-* identidad dentro de la Company.
+```text
+name
 
----
+type
 
-# 4. Fuera del alcance
+email
+
+phone
+
+address
+
+contactName
+
+creditLimit
+
+notes
+
+isActive
+
+tenant ownership
+```
 
 Customers no es propietario de:
 
-* Quote lifecycle;
-* SalesOrder lifecycle;
-* Delivery;
-* Inventory;
-* facturación;
-* cuentas por cobrar;
-* pagos;
-* Hospital;
-* Doctor;
-* Healthcare Case;
-* Payer;
-* pricing avanzado.
+```text
+Quote lifecycle
+
+Sale lifecycle
+
+Inventory
+
+Delivery future
+
+Billing
+
+Accounts Receivable
+
+payments
+
+Hospital
+
+Doctor
+
+Healthcare Case
+
+Payer
+```
 
 ---
 
-# 5. Modelo actual
+# 3. Fronteras de dominio
 
-El modelo vigente contiene conceptualmente:
+Debe mantenerse:
 
 ```text
 Customer
-├── id
-├── companyId
-├── name
-├── type
-├── email
-├── phone
-├── address
-├── contactName
-├── creditLimit
-├── notes
-├── isActive
-├── createdAt
-├── updatedAt
-├── quotes
-└── sales
+→ commercial counterpart
 ```
-
-La definición técnica exacta permanece en `schema.prisma`.
-
-La relación actual con `Sale` pertenece al modelo comercial legacy y deberá evolucionar junto con ADR-011.
-
----
-
-# 6. Identificador
-
-Customer utiliza UUID como identificador técnico.
-
-```text
-id
-→ UUID
-```
-
-El usuario normalmente identifica al cliente mediante su nombre y, en etapas futuras, mediante códigos empresariales adicionales cuando sean necesarios.
-
----
-
-# 7. Multi-tenancy
-
-Cada Customer pertenece a una Company.
-
-```text
-Company
-↓
-Customer
-```
-
-Un Customer de una Company no debe ser accesible desde otra.
-
----
-
-# 8. Customer como Master Data
-
-Customer sigue ADR-012.
-
-Su lifecycle principal debe ser:
-
-```text
-ACTIVE
-↓
-INACTIVE
-```
-
-y no:
-
-```text
-EXISTS
-↓
-DELETED
-```
-
-como estrategia predeterminada.
-
----
-
-# 9. Customer activo
-
-Un Customer activo puede utilizarse normalmente en nuevas operaciones como:
 
 ```text
 Quote
+→ commercial proposal
+```
+
+```text
+Sale
+→ CURRENT commercial sale workflow
+```
+
+y, en arquitectura futura:
+
+```text
+SalesOrder
+→ commercial commitment
+```
+
+```text
+Delivery
+→ physical fulfillment
+```
+
+---
+
+# 4. CURRENT vs TARGET vs FUTURE
+
+Este documento distingue:
+
+## CURRENT
+
+Capacidades implementadas actualmente.
+
+## TARGET
+
+Evoluciones aprobadas pendientes de implementación.
+
+## FUTURE
+
+Capacidades posteriores cuya necesidad deberá validarse.
+
+---
+
+# 5. Estado CURRENT
+
+Customers V1 soporta actualmente:
+
+```text
+Customer create
+
+active Customer list
+
+Customer detail
+
+master-data update
+
+soft-deactivation
+
+inactive historical detail
+
+tenant-scoped operations
+
+Quote relationship
+
+Sale relationship
+
+active Customer validation for new Quotes
+
+active Customer validation for new Sales
+
+CustomerSelector
+
+Customers frontend
+```
+
+Lifecycle vigente:
+
+```text
+ACTIVE
+↓
+INACTIVE
+```
+
+---
+
+# 6. Modelo Customer actual
+
+Conceptualmente:
+
+```text
+Customer
+
+id
+companyId
+
+name
+type
+
+email
+phone
+address
+contactName
+
+creditLimit
+
+notes
+
+isActive
+
+createdAt
+updatedAt
+
+quotes
+sales
+```
+
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
+
+---
+
+# 7. Customer como Master Data
+
+Customer utiliza un lifecycle de Master Data.
+
+La transición normal es:
+
+```text
+ACTIVE
+↓
+INACTIVE
+```
+
+No:
+
+```text
+ACTIVE
+↓
+physical DELETE
+```
+
+como operación empresarial ordinaria.
+
+---
+
+# 8. Customer ACTIVE
+
+Un Customer activo puede utilizarse en nuevas operaciones comerciales compatibles.
+
+Actualmente:
+
+```text
+Quote
+✅
+```
+
+```text
+Sale
+✅
+```
+
+Futuro:
+
+```text
 SalesOrder
 ```
 
-y otros workflows comerciales autorizados.
+cuando ese modelo sea implementado.
 
 ---
 
-# 10. Customer inactivo
+# 9. Customer INACTIVE
 
 Un Customer inactivo:
 
-* continúa existiendo;
-* conserva sus documentos históricos;
-* puede consultarse;
-* permanece relacionado con Quotes y Sales existentes;
-* normalmente no debe participar en nuevas operaciones.
+```text
+remains persisted
+
+remains historically referenceable
+
+retains Quote history
+
+retains Sale history
+```
+
+No debe utilizarse normalmente en nuevas operaciones comerciales.
 
 ---
 
-# 11. Desactivación
+# 10. Desactivación CURRENT
 
-Cuando el objetivo sea dejar de trabajar comercialmente con un cliente, la acción correcta es:
-
-```text
-Desactivar cliente
-```
-
-no:
+Actualmente:
 
 ```text
-Eliminar cliente
+DELETE /customers/:id
 ```
 
-si ya existe historia relacionada.
+implementa:
+
+```text
+isActive = false
+```
+
+No elimina físicamente el registro.
+
+Debe interpretarse como:
+
+```text
+Deactivate Customer
+```
+
+y no como:
+
+```text
+Hard Delete Customer
+```
 
 ---
 
-# 12. Reactivación
+# 11. Desactivación tenant-scoped
 
-Cuando sea válido:
+La operación debe ejecutarse dentro de la Company autenticada.
+
+Debe impedirse:
+
+```text
+Company A User
+↓
+deactivate Customer Company B
+```
+
+aunque el UUID sea conocido.
+
+---
+
+# 12. Desactivación idempotente
+
+La operación actual tolera que un Customer ya inactivo vuelva a recibir la orden
+de desactivación.
+
+Debe mantenerse:
+
+```text
+repeated deactivation
+→ no destructive additional effect
+```
+
+---
+
+# 13. Reactivación
+
+Actualmente:
+
+```text
+Customer reactivation
+→ NOT IMPLEMENTED
+```
+
+Una futura transición:
 
 ```text
 INACTIVE
@@ -227,258 +373,300 @@ INACTIVE
 ACTIVE
 ```
 
-puede reactivarse.
+deberá realizarse mediante un workflow explícito.
 
-La operación debe respetar:
-
-* tenant;
-* autorización;
-* reglas vigentes.
+No debe introducirse accidentalmente como un PATCH genérico.
 
 ---
 
-# 13. Hard Delete
+# 14. Hard Delete
 
-La eliminación física únicamente puede considerarse cuando el Customer:
+Customers V1 no expone hard delete.
 
-* fue creado por error;
-* no tiene Quotes;
-* no tiene Sales/SalesOrders;
-* no tiene relaciones históricas;
-* y la operación está permitida explícitamente.
-
-No es la estrategia habitual.
-
----
-
-# 14. Comportamiento legacy de eliminación
-
-Versiones previas de la UI o API pueden contener una acción denominada:
+Las relaciones históricas con:
 
 ```text
-Delete Customer
+Quote
+
+Sale
 ```
 
-o un `DELETE /customers/:id`.
+deben preservarse.
 
-Eso no convierte Soft Delete global en una regla vigente.
+Una futura eliminación física requeriría una decisión específica sobre:
 
-El comportamiento deberá revisarse progresivamente contra ADR-012.
+```text
+retention
+
+history
+
+auditability
+
+relations
+```
 
 ---
 
-# 15. Regla histórica descartada
+# 15. Active list
 
-La documentación API antigua indicaba:
-
-```text
-DELETE /customers/:id
-→ Soft Delete
-```
-
-como comportamiento oficial.
-
-Esa regla queda descartada.
-
-El modelo actual utiliza:
+Actualmente:
 
 ```text
-isActive
+GET /customers
+→ active Customers
 ```
 
-y la semántica correcta es lifecycle empresarial.
+Esto permite utilizar el listado como catálogo operativo para nuevas operaciones.
 
 ---
 
-# 16. Nombre
+# 16. Historical detail
 
-`name` es actualmente la identidad empresarial principal del Customer.
+Actualmente:
+
+```text
+GET /customers/:id
+```
+
+puede recuperar un Customer inactivo dentro del tenant autenticado.
+
+Esto permite conservar:
+
+```text
+historical Quote context
+
+historical Sale context
+
+audit / support context
+```
+
+Debe mantenerse:
+
+```text
+Inactive
+≠
+Historically invisible
+```
+
+---
+
+# 17. Name
+
+`name` representa actualmente la identificación comercial principal del Customer.
 
 Ejemplos:
 
 ```text
 Hospital San José
-```
 
-```text
-Distribuidora Médica ABC
-```
-
-```text
 Clínica del Norte
+
+Distribuidora Médica ABC
 ```
 
 ---
 
-# 17. Unicidad del nombre
+# 18. Customer name no es unique
 
-El modelo actual **no establece una restricción única sobre `Customer.name`**.
-
-Por tanto, este documento no introduce una regla ficticia como:
+El modelo actual no establece:
 
 ```text
 unique(companyId, name)
 ```
 
----
+para Customer.
 
-# 18. Clientes con nombres iguales
-
-Dos Customers pueden tener nombres similares o incluso iguales si el modelo técnico lo permite.
-
-En esos casos el usuario debe poder diferenciarlos mediante contexto adicional.
-
-Ejemplos futuros:
-
-* RFC;
-* sucursal;
-* dirección;
-* código de cliente.
+Por tanto, no debe documentarse una restricción ficticia de unicidad por nombre.
 
 ---
 
-# 19. Detección de duplicados futura
+# 19. Customers con nombres iguales
 
-Conforme crezca el catálogo puede ser necesario advertir posibles duplicados.
+El modelo puede permitir Customers con nombres iguales o similares.
 
-Por ejemplo:
+En ese caso la diferenciación puede depender de información como:
 
 ```text
-Nombre similar
+contactName
+
+address
+
+email
+
+future customer code
+
+future fiscal identity
+```
+
+---
+
+# 20. Duplicate detection — FUTURE
+
+Una futura capacidad de calidad de datos puede detectar posibles duplicados.
+
+Ejemplos:
+
+```text
+same name
 +
-mismo RFC
+same address
 ```
 
-o:
+o, cuando exista:
 
 ```text
-Nombre
-+
-misma dirección
+same RFC
 ```
 
-Pero esa lógica no existe formalmente todavía.
+Actualmente:
+
+```text
+formal Customer duplicate detection
+→ NOT IMPLEMENTED
+```
 
 ---
 
-# 20. Identificador fiscal
+# 21. Fiscal identifier
 
-El modelo actual de Customer **no contiene un campo fiscal específico como RFC**.
-
-Por tanto, queda descartada la antigua regla documental:
-
-```text
-Duplicate tax identifiers are not allowed.
-```
-
-hasta que exista realmente un identificador fiscal estructurado.
-
----
-
-# 21. Perfil fiscal futuro
-
-Billing / CFDI probablemente requerirá posteriormente información como:
+Customer no contiene actualmente un campo fiscal oficial como:
 
 ```text
 RFC
-Razón social
-Régimen fiscal
-Código postal fiscal
-Uso CFDI
 ```
 
-La estructura deberá diseñarse junto con Billing.
+Por tanto no debe existir una regla documental como:
 
-No debe agregarse de forma aislada únicamente dentro de Customers.
+```text
+Customer RFC must be unique
+```
+
+mientras ese campo no exista formalmente.
 
 ---
 
-# 22. Persona comercial vs razón social
+# 22. Fiscal Profile — FUTURE
 
-En algunos negocios puede existir diferencia entre:
+Billing / CFDI puede requerir posteriormente:
 
 ```text
-Nombre comercial
+RFC
+
+legal name
+
+tax regime
+
+fiscal postal code
+
+CFDI use
+```
+
+El modelo debe diseñarse junto con Billing y no añadirse de forma aislada a
+Customers.
+
+---
+
+# 23. Commercial Name vs Legal Name
+
+Puede existir diferencia entre:
+
+```text
+commercial name
 ```
 
 y:
 
 ```text
-Razón social
+legal / fiscal name
 ```
 
-El modelo actual no formaliza completamente esta distinción.
+El modelo actual no formaliza completamente esa distinción.
 
-Debe abordarse junto con el diseño fiscal futuro.
+Pertenece a la futura evolución fiscal/comercial.
 
 ---
 
-# 23. Type
+# 24. Type
 
-El modelo vigente contiene:
+Customer contiene actualmente:
 
 ```text
 type String?
 ```
 
-como clasificación opcional.
+Es una clasificación opcional.
 
 ---
 
-# 24. Semántica actual de Type
+# 25. Type no es discriminador fuerte
 
-La semántica de `type` no está suficientemente formalizada como para convertirla todavía en una regla arquitectónica fuerte.
+Mientras `type` sea:
 
-Puede utilizarse actualmente como clasificación cuando la implementación lo permita.
+```text
+String?
+```
+
+no debe gobernar lógica crítica como:
+
+```text
+authorization
+
+Billing
+
+Healthcare
+
+Payer rules
+
+Hospital behavior
+
+Customer lifecycle
+```
 
 ---
 
-# 25. No usar Type como solución universal
+# 26. No utilizar Type como modelo Healthcare
 
-No debemos convertir:
+Debe evitarse utilizar valores libres como:
+
+```text
+HOSPITAL
+
+DOCTOR
+
+PAYER
+```
+
+para reemplazar dominios especializados.
+
+Debe mantenerse:
 
 ```text
 Customer.type
+→ optional classification
 ```
 
-en una forma de representar indistintamente:
+No:
 
 ```text
-Hospital
-Doctor
-Insurer
-Distributor
-Government Agency
-Payer
+Customer.type
+→ universal domain discriminator
 ```
 
-sin diseñar primero sus diferencias reales.
-
 ---
 
-# 26. Free-form type
+# 27. Evolución de Type — FUTURE
 
-Mientras `type` continúe siendo un `String?`, no debe utilizarse como fundamento crítico para:
+Si aparecen categorías estables, `type` podrá evolucionar hacia:
 
-* permisos;
-* facturación;
-* lifecycle;
-* Healthcare;
-* reglas fiscales.
+```text
+enum
 
-Una cadena libre no proporciona suficiente integridad para esas decisiones.
+catalog
 
----
+configurable classification
+```
 
-# 27. Evolución de Type
-
-Si aparecen categorías estables y útiles, podrá evolucionar hacia:
-
-* enum;
-* catálogo;
-* clasificación configurable;
-
-dependiendo de las necesidades reales.
+según la necesidad real.
 
 No debe decidirse prematuramente.
 
@@ -490,107 +678,97 @@ No debe decidirse prematuramente.
 
 Puede utilizarse para:
 
-* comunicación;
-* envío futuro de documentos;
-* contacto comercial;
-* Customer Portal futuro.
+```text
+commercial contact
+
+future document delivery
+
+notifications
+
+future Customer Portal
+```
 
 ---
 
-# 29. Email no es identidad de login
+# 29. Customer email ≠ User identity
 
-Actualmente:
+Debe mantenerse:
 
 ```text
 Customer.email
+≠
+User.email authentication identity
 ```
 
-no debe confundirse con:
-
-```text
-User.email
-```
-
-Un Customer no se convierte automáticamente en usuario autenticado de Zaping.
+Un Customer no se convierte automáticamente en un usuario autenticado.
 
 ---
 
-# 30. Customer Portal
-
-El futuro Customer Portal requerirá una identidad externa o mecanismo de acceso controlado.
-
-Conceptualmente:
-
-```text
-Customer
-↓
-External Portal Access
-↓
-Authorized External User
-```
-
-No debe reutilizarse directamente el registro Customer como credencial.
-
----
-
-# 31. Phone
+# 30. Phone
 
 `phone` es opcional.
 
-Se utiliza como dato de contacto.
+Actualmente funciona como dato de contacto.
 
-No debe ser utilizado como identificador único sin una decisión explícita.
+No debe utilizarse como identificador único sin una decisión específica.
 
 ---
 
-# 32. Address
+# 31. Address
 
-Actualmente Customer utiliza:
+Customer utiliza actualmente:
 
 ```text
 address
 ```
 
-como información de dirección.
+como campo simple.
 
-El modelo todavía no posee una estructura avanzada de múltiples domicilios.
+No representa necesariamente:
+
+```text
+billing address
+
+shipping address
+
+fiscal address
+
+Healthcare hospital location
+```
+
+simultáneamente.
 
 ---
 
-# 33. Múltiples direcciones
+# 32. Multiple Addresses — FUTURE
 
-Una evolución comercial puede requerir:
+Una futura evolución puede necesitar:
 
 ```text
 Billing Address
+
 Shipping Address
-Branch Address
+
 Fiscal Address
+
+Branch Address
 ```
 
-Estas necesidades deberán diseñarse con Sales, Delivery y Billing.
-
----
-
-# 34. No sobrecargar address
-
-Mientras exista un único campo, no debe asumirse que sirve simultáneamente como:
+Debe diseñarse junto con:
 
 ```text
-dirección fiscal
-+
-dirección de entrega
-+
-hospital del Case
-```
+Sales
 
-Esos conceptos pueden diferir.
+Delivery
+
+Billing
+```
 
 ---
 
-# 35. Contact Name
+# 33. Contact Name
 
-`contactName` representa actualmente el contacto principal del Customer.
+`contactName` representa actualmente el contacto principal conocido.
 
 Ejemplo:
 
@@ -598,108 +776,135 @@ Ejemplo:
 Customer
 Hospital ABC
 
-Contacto
+Contact
 Lic. María Pérez
 ```
 
 ---
 
-# 36. Contacto no es Customer
+# 34. Contact ≠ Customer
 
-El contacto es una persona relacionada con el Customer.
+La persona de contacto no constituye necesariamente la entidad contractual.
 
-No constituye necesariamente la contraparte contractual.
+Debe mantenerse:
+
+```text
+contactName
+→ descriptive contact
+```
 
 ---
 
-# 37. Contacto no es User
+# 35. Contact ≠ User
 
 También:
 
 ```text
 Customer.contactName
 ≠
-Zaping User
+authenticated Zaping User
 ```
 
-No se deben derivar permisos o acceso desde este campo.
+No deben derivarse permisos o autenticación desde este campo.
 
 ---
 
-# 38. Múltiples contactos
+# 36. Multiple Contacts — FUTURE
 
-En una etapa posterior puede ser necesario representar:
+Una futura evolución puede requerir:
 
 ```text
 Customer
 └── Contacts[]
 ```
 
-con roles como:
+con responsabilidades como:
 
-* compras;
-* administración;
-* almacén;
-* pagos;
-* dirección.
+```text
+Purchasing
 
-No se implementa hasta tener una necesidad real.
+Administration
+
+Warehouse
+
+Payments
+
+Management
+```
+
+No forma parte de Customers V1.
 
 ---
 
-# 39. Credit Limit
+# 37. creditLimit
 
-El modelo vigente contiene:
+Customer contiene actualmente:
 
 ```text
 creditLimit Decimal?
 ```
 
----
-
-# 40. Significado actual de Credit Limit
-
-`creditLimit` debe considerarse actualmente información comercial de referencia.
-
-Su mera existencia no significa que Zaping ya cuente con:
-
-* cuentas por cobrar;
-* crédito disponible;
-* cartera;
-* antigüedad de saldos;
-* bloqueo automático;
-* motor de riesgo.
-
----
-
-# 41. Credit Limit no equivale a available credit
-
-No debe suponerse:
+Debe tratarse como:
 
 ```text
-Available Credit
+commercial reference
+```
+
+---
+
+# 38. creditLimit no es Credit Engine
+
+La existencia del campo no significa que Zaping ya implemente:
+
+```text
+Accounts Receivable
+
+available credit
+
+aging
+
+payment reconciliation
+
+automatic blocking
+
+credit risk
+```
+
+---
+
+# 39. creditLimit ≠ Available Credit
+
+No debe utilizarse una fórmula simplista:
+
+```text
+availableCredit
 =
 creditLimit
 -
 Sales total
 ```
 
-porque esto requeriría considerar:
+porque un cálculo financiero real deberá considerar:
 
-* facturas;
-* pagos;
-* notas de crédito;
-* vencimientos;
-* saldos;
-* documentos pendientes.
+```text
+Invoices
 
-Ese dominio todavía no está formalizado.
+Payments
+
+Credit Notes
+
+open balances
+
+due dates
+
+pending documents
+```
 
 ---
 
-# 42. Enforcement futuro
+# 40. Credit Management — FUTURE
 
-Cuando se implemente Credit Management podrá definirse una regla como:
+Una evolución futura podrá introducir:
 
 ```text
 SalesOrder
@@ -709,26 +914,33 @@ Credit Check
 Approve / Warn / Block
 ```
 
-pero requerirá una decisión funcional específica.
+cuando existan suficientes dominios financieros para hacerlo correctamente.
 
 ---
 
-# 43. Decimal
+# 41. Decimal handling
 
-`creditLimit` utiliza actualmente `Decimal`, lo cual debe preservarse correctamente en:
+`creditLimit` utiliza `Decimal` según el modelo actual.
 
-* DTO;
-* serialización;
-* frontend;
-* cálculos.
+Debe preservarse correctamente en:
 
-No debe convertirse accidentalmente a un valor impreciso sin revisar su tratamiento.
+```text
+backend
+
+DTO handling
+
+serialization
+
+frontend
+```
+
+y evitar conversiones imprecisas innecesarias.
 
 ---
 
-# 44. Notes
+# 42. Notes
 
-`notes` permite almacenar contexto administrativo secundario.
+`notes` contiene contexto administrativo secundario.
 
 Ejemplo:
 
@@ -738,24 +950,151 @@ Solicita cotizaciones por correo antes de las 14:00.
 
 ---
 
-# 45. Notes no debe convertirse en modelo oculto
+# 43. Notes no es modelo estructurado
 
-No almacenar únicamente en notes información estructurada que controle operaciones.
-
-Ejemplo problemático:
+No debe utilizarse `notes` como única fuente de información que gobierne:
 
 ```text
-"Crédito 30 días, pagador AXA,
-entregar siempre en Hospital Norte"
+payment terms
+
+Payer
+
+Hospital
+
+delivery address
+
+fiscal data
+
+credit rules
 ```
 
-si esos datos posteriormente determinan workflows.
+Si esos datos comienzan a afectar workflows, deberán modelarse explícitamente.
 
 ---
 
-# 46. Customer y Quote
+# 44. Create Customer
 
-El flujo actual y objetivo conserva:
+La creación debe obtener:
+
+```text
+companyId
+```
+
+desde el contexto autenticado.
+
+Debe mantenerse:
+
+```text
+JWT / authenticated context
+↓
+companyId
+↓
+Create Customer
+```
+
+No:
+
+```text
+client-provided companyId
+→ tenant authority
+```
+
+---
+
+# 45. Update Customer
+
+PATCH puede modificar únicamente los campos maestros permitidos por el DTO vigente.
+
+No debe aceptar Mass Assignment de:
+
+```text
+companyId
+
+createdAt
+
+internal relations
+```
+
+ni otros atributos no autorizados.
+
+---
+
+# 46. Lifecycle separado de PATCH
+
+Debe mantenerse:
+
+```text
+PATCH /customers/:id
+→ master-data update
+```
+
+```text
+DELETE /customers/:id
+→ ACTIVE → INACTIVE
+```
+
+```text
+INACTIVE → ACTIVE
+→ NOT IMPLEMENTED
+```
+
+El lifecycle no debe convertirse en un switch arbitrario dentro del formulario
+maestro.
+
+---
+
+# 47. API CURRENT
+
+Endpoints actuales:
+
+```text
+GET    /customers
+
+GET    /customers/:id
+
+POST   /customers
+
+PATCH  /customers/:id
+
+DELETE /customers/:id
+```
+
+Semántica:
+
+```text
+DELETE
+→ deactivate
+→ not hard delete
+```
+
+---
+
+# 48. Tenant isolation
+
+Todas las operaciones deben mantenerse tenant-scoped.
+
+Debe impedirse:
+
+```text
+Company A User
+→ GET Customer Company B
+```
+
+```text
+Company A User
+→ PATCH Customer Company B
+```
+
+```text
+Company A User
+→ deactivate Customer Company B
+```
+
+---
+
+# 49. Customer ↔ Quote — CURRENT
+
+Actualmente:
 
 ```text
 Customer
@@ -763,299 +1102,133 @@ Customer
 Quote
 ```
 
-Una Quote debe referenciar un Customer válido dentro de la Company.
+Quote utiliza Customer como contraparte comercial.
+
+Backend debe validar para nuevas Quotes:
+
+```text
+Customer exists
+
++
+
+Customer belongs to authenticated Company
+
++
+
+Customer.isActive = true
+```
+
+Estado:
+
+```text
+active Customer validation for new Quotes
+→ IMPLEMENTED
+```
 
 ---
 
-# 47. Customer y SalesOrder
+# 50. Inactive Customer + Quote
 
-Arquitectura objetivo:
+Debe mantenerse:
+
+```text
+Inactive Customer
+↓
+New Quote
+→ BLOCK
+```
+
+pero:
+
+```text
+Customer becomes inactive later
+↓
+Historical Quote
+→ remains valid
+```
+
+La desactivación no reescribe historia.
+
+---
+
+# 51. Customer ↔ Sale — CURRENT
+
+Actualmente:
 
 ```text
 Customer
 ↓
-SalesOrder
+Sale
 ```
 
-SalesOrder representa el compromiso comercial con el Customer.
+Sale representa el documento comercial vigente de Sales V1.
 
----
-
-# 48. Customer y Delivery
-
-Delivery representa el cumplimiento físico.
-
-El destino físico puede coincidir o no con la dirección principal del Customer.
-
-Por tanto:
+Backend debe validar para nuevas Sales:
 
 ```text
-Customer
-≠
-Delivery Address
+Customer exists
+
++
+
+Customer belongs to authenticated Company
+
++
+
+Customer.isActive = true
 ```
 
-como regla universal.
-
----
-
-# 49. Customer histórico
-
-Si el Customer cambia:
-
-* dirección;
-* teléfono;
-* email;
-* nombre;
-
-posteriormente, debe evaluarse qué información histórica del documento debe conservarse como snapshot.
-
----
-
-# 50. Document snapshots
-
-Una futura estrategia puede requerir que documentos como:
+Estado:
 
 ```text
-Quote
-SalesOrder
-Invoice
+active Customer validation for new Sales
+→ IMPLEMENTED
 ```
 
-conserven información comercial relevante tal como existía cuando fueron emitidos.
-
-No todo documento debe depender eternamente del registro maestro actualizado.
-
 ---
 
-# 51. Customer vs Organization
+# 52. Inactive Customer + Sale
 
-Healthcare y otras verticales requerirán distinguir un concepto organizacional más amplio.
-
-Conceptualmente:
+Debe mantenerse:
 
 ```text
-Organization
-```
-
-puede representar una entidad del mundo real como:
-
-* hospital;
-* clínica;
-* aseguradora;
-* distribuidor;
-* institución pública.
-
----
-
-# 52. Customer no siempre equivale a Organization
-
-Una Organization puede existir operacionalmente sin ser todavía un Customer.
-
-Ejemplo:
-
-```text
-Hospital X
+Inactive Customer
 ↓
-Case occurs there
+New Sale
+→ BLOCK
 ```
 
-pero la contraparte comercial puede ser:
+mientras:
 
 ```text
-Distributor Y
-```
-
----
-
-# 53. Organization puede asumir roles
-
-Una evolución posible es:
-
-```text
-Organization
-├── Customer role
-├── Hospital role
-├── Payer role
-└── Supplier role
-```
-
-si el dominio real justifica un modelo común.
-
-Este ADR/documento no decide todavía esa arquitectura.
-
----
-
-# 54. No crear Organization todavía desde Customers
-
-Aunque el concepto es importante, no debemos reemplazar inmediatamente Customer por una entidad genérica sin revisar:
-
-* Suppliers;
-* Healthcare;
-* Billing;
-* Contacts;
-* migrations;
-* APIs.
-
-La separación conceptual se establece ahora para evitar errores futuros.
-
----
-
-# 55. Customer vs Doctor
-
-Regla Healthcare:
-
-```text
-Customer
-≠
-Doctor
-```
-
-Un Doctor puede:
-
-* solicitar un producto;
-* participar en un Case;
-* generar una oportunidad;
-* trabajar en varios hospitales;
-
-sin ser quien compra o paga.
-
----
-
-# 56. Doctor que también compra
-
-Es posible que en ciertos negocios un Doctor pueda actuar además como Customer.
-
-Eso debe representarse como dos roles reales.
-
-No significa que todas las entidades Doctor deban convertirse en Customers.
-
----
-
-# 57. Customer vs Hospital
-
-También:
-
-```text
-Customer
-≠
-Hospital
-```
-
-El hospital puede ser:
-
-* lugar del procedimiento;
-* comprador;
-* pagador;
-* ninguno de los anteriores;
-
-según la operación.
-
----
-
-# 58. Hospital como Customer
-
-En una operación determinada:
-
-```text
-Hospital ABC
-```
-
-puede ser la contraparte comercial.
-
-En ese caso puede existir una relación correspondiente con Customer.
-
-Pero no debe asumirse globalmente:
-
-```text
-Hospital
-=
-Customer
-```
-
----
-
-# 59. Customer vs Payer
-
-Otra distinción fundamental:
-
-```text
-Customer
-≠
-Payer
-```
-
-La entidad que recibe o solicita el producto puede no ser quien finalmente paga.
-
----
-
-# 60. Ejemplo Healthcare
-
-Puede existir:
-
-```text
-Doctor
-Dr. López
-
-Hospital
-Hospital Central
-
-Customer
-Distribuidora ABC
-
-Payer
-Aseguradora XYZ
-```
-
-dentro del contexto ampliado de una operación.
-
----
-
-# 61. No inferir pagador
-
-Zaping no debe asumir automáticamente:
-
-```text
-customerId
-=
-payerId
-```
-
-cuando Billing soporte múltiples responsables económicos.
-
----
-
-# 62. Case
-
-Healthcare Case puede relacionarse con Customer cuando exista contexto comercial.
-
-Pero Case no debe requerir Customer en todos los escenarios si la operación comienza antes de conocer la contraparte comercial.
-
----
-
-# 63. Opportunity antes de Customer definitivo
-
-Un flujo Healthcare puede ser:
-
-```text
-Doctor contact
+Customer becomes inactive later
 ↓
-Opportunity
-↓
-Case
-↓
-Commercial responsibility resolved
-↓
-Customer / Payer
+Historical Sale
+→ remains valid
 ```
-
-Esto permite que la operación real ocurra sin inventar prematuramente un Customer.
 
 ---
 
-# 64. Direct Sales
+# 53. Sale es CURRENT
 
-Fuera de Healthcare, el flujo continúa siendo simple:
+Debe mantenerse claramente:
+
+```text
+CURRENT
+
+Customer
+↓
+Sale
+```
+
+`Sale` no debe describirse todavía como un modelo meramente legacy.
+
+Forma parte del ERP Core V1 vigente.
+
+---
+
+# 54. SalesOrder / Delivery — TARGET
+
+La arquitectura comercial futura podrá evolucionar hacia:
 
 ```text
 Customer
@@ -1065,74 +1238,232 @@ SalesOrder
 Delivery
 ```
 
-No debe requerirse Hospital, Doctor o Case.
-
----
-
-# 65. CustomerSelector
-
-`CustomerSelector` es un Business Component implementado.
-
-Permite localizar clientes dentro de workflows comerciales.
-
----
-
-# 66. Arquitectura de CustomerSelector
+En esa arquitectura:
 
 ```text
-Quote / SalesOrder
+SalesOrder
+→ commercial commitment
+```
+
+```text
+Delivery
+→ physical fulfillment
+```
+
+Actualmente:
+
+```text
+SalesOrder
+→ NOT IMPLEMENTED
+```
+
+```text
+Delivery
+→ NOT IMPLEMENTED
+```
+
+como sustitutos del flujo Sale V1.
+
+---
+
+# 55. CURRENT vs TARGET commercial model
+
+Debe mantenerse:
+
+```text
+CURRENT
+
+Customer
+↓
+Quote
+↓
+Sale
+```
+
+frente a:
+
+```text
+TARGET
+
+Customer
+↓
+Quote
+↓
+SalesOrder
+↓
+Delivery
+```
+
+La arquitectura TARGET no debe documentarse como estado operativo actual.
+
+---
+
+# 56. Delivery Address — TARGET
+
+Cuando exista Delivery, su destino físico puede diferir de:
+
+```text
+Customer.address
+```
+
+Debe mantenerse:
+
+```text
+Customer
+≠
+Delivery Address
+```
+
+como regla general.
+
+---
+
+# 57. Historical document data
+
+Cambiar posteriormente:
+
+```text
+Customer name
+
+address
+
+email
+
+phone
+```
+
+no debe reinterpretar de manera incorrecta la transacción histórica.
+
+Los documentos deben conservar sus propios datos persistidos cuando el modelo
+actual así lo haga.
+
+---
+
+# 58. Customer identity snapshots — FUTURE
+
+Cuando exista necesidad de congelar formalmente datos como:
+
+```text
+Customer legal name
+
+commercial address
+
+fiscal information
+```
+
+en un documento emitido, deberá diseñarse una estrategia explícita de snapshot.
+
+No se asume que todos esos snapshots existen actualmente.
+
+---
+
+# 59. CustomerSelector — CURRENT
+
+`CustomerSelector` es un Business Component implementado para seleccionar Customers
+dentro de workflows comerciales.
+
+CURRENT:
+
+```text
+Quote
+Sale
 ↓
 CustomerSelector
 ↓
 Customer
 ```
 
-El componente no es propietario de las reglas de Customer.
+Future consumers pueden incluir:
+
+```text
+SalesOrder
+```
 
 ---
 
-# 67. Búsqueda
+# 60. CustomerSelector no es autoridad de dominio
 
-CustomerSelector debe evolucionar para localizar clientes mediante información útil como:
+Debe mantenerse:
+
+```text
+CustomerSelector
+→ UX selection
+```
+
+mientras:
+
+```text
+backend
+→ authoritative validation
+```
+
+Aunque UI filtre Customers, backend debe volver a validar:
+
+```text
+tenant
+
+existence
+
+isActive
+
+workflow rules
+```
+
+---
+
+# 61. Inactive Customer in selector
+
+Para nuevas operaciones:
+
+```text
+Customer.isActive = false
+→ excluded from normal selection
+```
+
+Esto complementa la validación backend.
+
+Debe mantenerse:
+
+```text
+UI filtering
++
+backend validation
+```
+
+---
+
+# 62. Search
+
+Criterios útiles incluyen:
 
 ```text
 name
+
 contactName
+
 email
 ```
 
 y posteriormente:
 
-* RFC;
-* código;
-* organización;
-
-cuando esos campos existan.
-
----
-
-# 68. Clientes inactivos en selector
-
-Normalmente:
-
 ```text
-Customer.isActive = false
+RFC
+
+Customer code
+
+Organization context
 ```
 
-debe excluirlo de nuevas operaciones.
-
-La documentación histórica continúa mostrándolo donde ya exista relación.
+cuando existan esos campos.
 
 ---
 
-# 69. Creación contextual
+# 63. Contextual Customer creation — TARGET UX
 
-Una de las capacidades UX más útiles es:
+Una futura experiencia puede permitir:
 
 ```text
 New Quote
-↓
-CustomerSelector
 ↓
 Customer not found
 ↓
@@ -1143,341 +1474,545 @@ Select new Customer
 Continue Quote
 ```
 
+sin perder:
+
+```text
+items
+
+quantities
+
+prices
+
+notes
+
+commercial context
+```
+
+No debe marcarse como CURRENT sin implementación verificada.
+
 ---
 
-# 70. Preservar formulario
+# 64. Frontend Customers V1
 
-La creación contextual no debe provocar pérdida de:
-
-* items;
-* cantidades;
-* precios;
-* notas;
-* contexto comercial.
-
----
-
-# 71. Formulario actual
-
-La UI puede organizar información mediante secciones como:
+La experiencia actual puede presentar información en secciones como:
 
 ```text
 General
+
 Contacto
+
 Dirección
+
 Crédito
+
 Notas
 ```
 
-cuando el número de campos lo justifique.
+y soporta el lifecycle vigente de Customers.
 
----
-
-# 72. General
-
-Puede contener:
+Capacidades principales:
 
 ```text
-Nombre
-Tipo
-Estado
+list
+
+create
+
+edit
+
+deactivate
+
+active state
+
+historical detail
+
+Customer selection in commercial workflows
 ```
 
 ---
 
-# 73. Contacto
+# 65. Customer 360 — FUTURE UX
 
-Puede contener:
-
-```text
-Contacto
-Email
-Teléfono
-```
-
----
-
-# 74. Dirección
-
-Actualmente representa principalmente:
-
-```text
-address
-```
-
-sin afirmar todavía soporte de múltiples direcciones.
-
----
-
-# 75. Crédito
-
-Puede contener:
-
-```text
-creditLimit
-```
-
-dejando claro que el módulo aún no tiene un motor completo de crédito.
-
----
-
-# 76. Listado
-
-La tabla principal debe priorizar información reconocible.
-
-Ejemplo:
-
-```text
-Cliente
-Contacto
-Email
-Teléfono
-Estado
-Acciones
-```
-
-Los campos exactos pueden evolucionar según la experiencia.
-
----
-
-# 77. Customer 360
-
-La arquitectura objetivo contempla:
+Una futura experiencia:
 
 ```text
 Customer 360
 ```
 
-como una vista contextual importante.
+puede reunir contexto de múltiples dominios.
 
----
-
-# 78. Objetivo de Customer 360
-
-Debe responder:
+Puede responder:
 
 ```text
-¿Quién es?
-¿Está activo?
-¿Cómo lo contacto?
-¿Qué le hemos cotizado?
-¿Qué ha comprado?
-¿Qué entregas tiene?
-¿Qué documentos existen?
-¿Qué necesita atención?
+Who is this Customer?
+
+Are they active?
+
+How do we contact them?
+
+What have we quoted?
+
+What have they purchased?
+
+What documents exist?
+
+What requires attention?
 ```
 
 ---
 
-# 79. Estructura conceptual
+# 66. Customer 360 content
 
-Una evolución posible:
+Puede incluir progresivamente:
 
 ```text
 General
-Cotizaciones
-Pedidos
-Entregas
-Facturación
-Actividad
-Documentos
-Historial
+
+Quotes
+
+Sales
+
+future Sales Orders
+
+future Deliveries
+
+future Billing
+
+Activity
+
+Documents
+
+History
 ```
 
-No todas las secciones necesitan existir en el primer release.
+Debe mantenerse:
+
+```text
+Customer 360
+→ read model / contextual UX
+```
+
+No:
+
+```text
+Customers
+→ owns Quote or Sale lifecycle
+```
 
 ---
 
-# 80. Customer 360 no absorbe Sales
+# 67. Customer analytics — FUTURE
 
-La vista consume datos de otros dominios.
+Una futura vista puede mostrar:
 
-No convierte Customers en propietario de:
+```text
+total sales
 
-* Quote;
-* SalesOrder;
-* Delivery;
-* Invoice.
+last sale
+
+open Quotes
+
+purchase frequency
+
+commercial inactivity
+```
+
+cuando exista información suficiente.
+
+No deben inventarse métricas sin datos confiables.
 
 ---
 
-# 81. Métricas comerciales
+# 68. Customer ≠ Organization
 
-En el futuro Customer 360 puede mostrar:
+Customer representa:
 
 ```text
-Ventas acumuladas
-Última compra
-Cotizaciones abiertas
-Saldo
-Pedidos pendientes
+commercial relationship
 ```
 
-cuando existan fuentes confiables.
+No necesariamente una abstracción universal de cualquier organización del mundo
+real.
+
+Una entidad como:
+
+```text
+Hospital
+```
+
+puede existir operacionalmente sin ser automáticamente Customer.
 
 ---
 
-# 82. No inventar métricas
+# 69. Generic Organization — FUTURE DECISION
 
-No mostrar conceptos como:
-
-```text
-Customer profitability
-```
-
-o:
+Una futura arquitectura podría evaluar una entidad común como:
 
 ```text
-payment risk
+Organization
 ```
 
-si Zaping todavía no cuenta con los datos y reglas para calcularlos correctamente.
+para ciertos roles empresariales.
+
+Sin embargo:
+
+```text
+Organization model
+→ NOT DECIDED
+```
+
+No debe introducirse desde Customers sin revisar:
+
+```text
+Suppliers
+
+Healthcare
+
+Billing
+
+Contacts
+
+migrations
+
+APIs
+```
 
 ---
 
-# 83. API
+# 70. Customer ≠ Doctor
 
-El módulo utiliza conceptualmente:
+Debe mantenerse:
 
 ```text
-GET    /customers
-GET    /customers/:id
-POST   /customers
-PATCH  /customers/:id
+Customer
+≠
+Doctor
 ```
 
-La implementación técnica vigente debe verificarse en el backend.
+Un Doctor puede:
+
+```text
+request a Product
+
+participate in a Case
+
+influence demand
+
+work at multiple Hospitals
+```
+
+sin ser la contraparte comercial.
 
 ---
 
-# 84. DELETE legacy
+# 71. Doctor who is also Customer
 
-Si actualmente existe:
+Una misma persona real podría desempeñar ambos roles en determinados escenarios.
+
+Eso no significa:
 
 ```text
-DELETE /customers/:id
+all Doctors
+→ Customers
 ```
 
-debe revisarse para determinar si:
-
-* desactiva;
-* elimina físicamente;
-* o debe sustituirse.
-
-No debe describirse automáticamente como Soft Delete.
+Los roles deben mantenerse conceptualmente separados.
 
 ---
 
-# 85. Lifecycle API objetivo
+# 72. Customer ≠ Hospital
 
-Para desactivación puede preferirse:
+Debe mantenerse:
 
 ```text
-PATCH /customers/:id
-
-{
-  "isActive": false
-}
+Customer
+≠
+Hospital
 ```
 
-o una acción explícita equivalente.
+Hospital puede representar:
+
+```text
+procedure location
+
+buyer
+
+payer
+
+operational organization
+
+none of the above
+```
+
+según el contexto.
 
 ---
 
-# 86. Create Customer
+# 73. Hospital as Customer
 
-El backend debe obtener:
+En una operación concreta, Hospital puede actuar como contraparte comercial.
+
+Eso no implica:
 
 ```text
-companyId
+Hospital
+=
+Customer
 ```
 
-del contexto autenticado.
-
-No debe confiar en un valor de tenant enviado libremente por frontend.
+como equivalencia universal.
 
 ---
 
-# 87. Update Customer
+# 74. Customer ≠ Payer
 
-La operación puede actualizar campos maestros permitidos.
-
-No debe permitir Mass Assignment de:
+También:
 
 ```text
-companyId
-createdAt
-internal relations
+Customer
+≠
+Payer
 ```
 
-u otros campos no autorizados.
+Quien compra, recibe o solicita un producto puede no ser quien finalmente paga.
 
 ---
 
-# 88. Tenant isolation
+# 75. No inferir Payer
 
-Debe impedirse:
+Cuando Billing soporte múltiples responsabilidades económicas, no debe asumirse:
 
 ```text
-Company A user
+customerId
+=
+payerId
+```
+
+sin reglas explícitas.
+
+---
+
+# 76. Healthcare boundary
+
+Customers pertenece a ERP Core.
+
+Healthcare puede utilizar contexto comercial de Customer cuando corresponda.
+
+Pero debe mantener separados:
+
+```text
+Customer
+
+Doctor
+
+Hospital
+
+Payer
+
+Case
+```
+
+---
+
+# 77. Healthcare Foundation
+
+La existencia de Healthcare Case Foundation no modifica automáticamente Customer.
+
+No deben agregarse a Customer campos como:
+
+```text
+doctorId
+
+hospitalId
+
+payerId
+
+caseId
+
+diagnosis
+```
+
+para resolver la vertical.
+
+---
+
+# 78. Healthcare commercial context — TARGET
+
+Futuros workflows pueden relacionar:
+
+```text
+Case
++
+Customer
++
+Payer
+```
+
+cuando el contexto comercial haya sido determinado.
+
+No todos los Cases necesitan conocer Customer desde el primer momento.
+
+---
+
+# 79. Opportunity — FUTURE
+
+Un posible futuro flujo CRM/Healthcare podría ser:
+
+```text
+Doctor contact
 ↓
-GET Customer Company B
-```
-
-y:
-
-```text
-Company A user
+Opportunity
 ↓
-PATCH Customer Company B
+Case
+↓
+commercial responsibility
+↓
+Customer / Payer
 ```
 
----
-
-# 89. Customer relacionado en Quote
-
-Al crear Quote, backend debe validar:
+Actualmente:
 
 ```text
-Customer exists
-AND
-Customer belongs to Company
+Opportunity
+→ FUTURE
 ```
 
-y, cuando aplique:
+No forma parte de Customers V1 ni Healthcare Case Foundation actual.
+
+---
+
+# 80. Direct commercial flow
+
+Fuera de Healthcare:
 
 ```text
-Customer is active
+CURRENT
+
+Customer
+↓
+Sale
+```
+
+y posteriormente:
+
+```text
+TARGET
+
+Customer
+↓
+SalesOrder
+↓
+Delivery
+```
+
+No debe requerirse:
+
+```text
+Hospital
+
+Doctor
+
+Case
+```
+
+para una venta comercial normal.
+
+---
+
+# 81. Privacy
+
+Customer contiene información empresarial y potencialmente información personal
+de contactos.
+
+Debe aplicarse:
+
+```text
+data minimization
+
+authorization
+
+tenant isolation
+
+limited exposure
 ```
 
 ---
 
-# 90. Customer relacionado en SalesOrder
+# 82. Personal contact data
 
-La misma regla se aplica al flujo comercial objetivo.
+Campos como:
 
-Frontend no constituye autoridad suficiente.
+```text
+contactName
+
+email
+
+phone
+```
+
+pueden representar datos personales de personas relacionadas con el Customer.
+
+Solo deben utilizarse para fines empresariales necesarios.
 
 ---
 
-# 91. RBAC
+# 83. Customer ≠ Patient
 
-Permisos conceptuales futuros:
+Debe mantenerse:
+
+```text
+Customer
+≠
+Patient
+```
+
+Customers no debe convertirse en un repositorio de:
+
+```text
+diagnosis
+
+clinical history
+
+medical record
+
+patient health data
+```
+
+---
+
+# 84. Patient domain
+
+Actualmente Zaping no necesita un Patient master para resolver el ERP Core ni el
+Healthcare Case Foundation vigente.
+
+Si una futura capacidad requiere información de paciente, deberá evaluarse como
+una decisión específica por su sensibilidad.
+
+---
+
+# 85. Authorization
+
+Customers utiliza la arquitectura transversal de Identity & Access.
+
+Permisos conceptuales futuros pueden incluir:
 
 ```text
 customers.read
+
 customers.create
+
 customers.update
+
 customers.deactivate
 ```
 
-La implementación granular seguirá ADR-007.
+El Permission-Based RBAC completo continúa como TARGET.
 
 ---
 
-# 92. Credit permissions
+# 86. Credit permissions — FUTURE
 
-En etapas futuras puede tener sentido separar:
+Si `creditLimit` se convierte posteriormente en una configuración financiera
+sensible, puede ser necesario distinguir:
 
 ```text
 customers.update
@@ -1489,92 +2024,46 @@ de:
 customers.credit.update
 ```
 
-si modificar límites de crédito se convierte en una operación sensible.
-
-No se requiere todavía.
+No se requiere actualmente.
 
 ---
 
-# 93. Auditoría
+# 87. Audit — TARGET
 
-Eventos relevantes pueden incluir:
+Una futura capacidad transversal de Audit puede registrar:
 
 ```text
 Customer created
+
 Customer updated
+
 Customer deactivated
+
 Customer reactivated
-Credit limit changed
+
+creditLimit changed
 ```
 
-cuando exista auditoría suficiente.
+Actualmente no existe un Audit transversal completo.
 
 ---
 
-# 94. Privacidad
+# 88. Data Import — FUTURE
 
-Customer contiene información empresarial y posiblemente datos de contacto de personas.
-
-Deben aplicarse:
-
-* minimización;
-* autorización;
-* tenant isolation;
-* exposición limitada.
-
----
-
-# 95. Datos personales
-
-Campos como:
+Customers es candidato natural para importación desde:
 
 ```text
-contactName
-email
-phone
+CSV
+
+XLSX
+
+external systems
 ```
 
-pueden representar información personal.
-
-No deben utilizarse fuera del propósito empresarial sin necesidad.
-
----
-
-# 96. Healthcare privacy
-
-Customer no debe convertirse en un lugar para almacenar:
-
-* diagnóstico;
-* expediente médico;
-* historia clínica;
-* datos del paciente.
-
-Healthcare debe seguir la política de minimización definida en `SECURITY_PRINCIPLES.md`.
-
----
-
-# 97. Patient
-
-Zaping no necesita actualmente:
+Flujo conceptual:
 
 ```text
-Customer = Patient
-```
-
-ni un Patient master para resolver sus procesos comerciales/logísticos.
-
-Si algún proceso futuro requiere información de paciente, deberá evaluarse específicamente debido a su sensibilidad.
-
----
-
-# 98. Importación
-
-Customers es una entidad prioritaria para Data Import.
-
-Debe soportarse posteriormente:
-
-```text
-CSV / XLSX
+File
 ↓
 Mapping
 ↓
@@ -1582,222 +2071,373 @@ Validation
 ↓
 Duplicate analysis
 ↓
+Preview
+↓
 Import
 ```
 
 ---
 
-# 99. Migraciones
+# 89. External systems
 
-Al importar desde sistemas como:
+Una futura migración puede recibir datos desde sistemas como:
 
 ```text
 CONTPAQi
+
 Aspel
+
 Microsip
+
 Odoo
+
 SAP
+
 Excel
 ```
 
-puede existir información como:
+Debe mantenerse:
 
-* código externo;
-* razón social;
-* RFC;
-* crédito;
-* contactos;
-* direcciones.
-
-La estrategia debe mapearla explícitamente.
+```text
+external identifier
+≠
+Zaping Customer UUID
+```
 
 ---
 
-# 100. External customer code
+# 90. Customer Code — FUTURE
 
-Muchos ERP utilizan un código de cliente.
+Muchos ERP utilizan un código empresarial de Customer.
 
-El modelo actual no documenta uno como campo oficial.
+Actualmente no existe un campo oficial documentado para ello.
 
-Si los clientes reales lo requieren, debe añadirse deliberadamente en lugar de reutilizar UUID o `type`.
+Si el negocio lo requiere deberá añadirse deliberadamente.
+
+No debe reutilizarse:
+
+```text
+UUID
+
+type
+```
+
+para cumplir esa función.
 
 ---
 
-# 101. Customer Portal
+# 91. Customer Portal — FUTURE
 
-En el futuro Customer 360 interno y Customer Portal externo son experiencias diferentes.
+Debe distinguirse:
 
 ```text
 Customer 360
-→ usuarios internos
+→ internal Zaping users
+```
 
+de:
+
+```text
 Customer Portal
-→ usuarios externos autorizados
+→ authorized external users
 ```
 
-No deben confundirse.
+Customer master no constituye por sí mismo una credencial de acceso.
 
 ---
 
-# 102. Portal capabilities futuras
+# 92. Customer Portal identity
 
-El portal puede permitir:
+Una futura experiencia externa requerirá:
 
 ```text
-Quotes
-Sales Orders
-Deliveries
+external identity
+
+authentication
+
+authorization
+
+Customer relationship
+```
+
+sin reutilizar directamente:
+
+```text
+Customer.email
+```
+
+como identidad autenticada automática.
+
+---
+
+# 93. Accounts Receivable — FUTURE
+
+Capacidades futuras pueden incluir:
+
+```text
 Invoices
-Documents
+
+Payments
+
+Accounts Receivable
+
+Credit Notes
+
+Aging
+
+Payment Terms
 ```
 
-según permisos y alcance.
-
-El Customer master continúa siendo la contraparte empresarial.
+Estas capacidades financieras no pertenecen actualmente a Customer V1.
 
 ---
 
-# 103. Dashboard
+# 94. Dashboard
 
-Dashboard puede consumir información de Customers como:
+Dashboard puede consumir Customers para métricas como:
 
 ```text
-total customers
-active customers
-recent customers
-sales by customer
+active Customers
+
+total Customers
+
+recent Customers
+
+sales by Customer
 ```
 
-cuando sea útil.
+cuando sean útiles.
 
-No debe convertirse en propietario de Customers.
+Dashboard no es propietario del catálogo.
 
 ---
 
-# 104. Sales analytics
+# 95. Analytics — FUTURE
 
 Métricas como:
 
 ```text
 Top Customers
-Sales by Customer
+
 Customer inactivity
+
+purchase frequency
+
+commercial trend
 ```
 
-deben derivarse de operaciones comerciales reales.
+deben derivarse de operaciones reales.
 
-No deben almacenarse manualmente en Customer.
+No deben almacenarse manualmente como propiedades arbitrarias del Customer.
 
 ---
 
-# 105. AI futura
+# 96. AI — FUTURE
 
-Una capa de inteligencia podría identificar:
+Una futura capa de inteligencia podrá identificar patrones como:
 
 ```text
-Este cliente lleva 90 días sin comprar.
+This Customer has not purchased recently.
 ```
 
 o:
 
 ```text
-Las compras de este cliente han disminuido 30 %.
+Purchase frequency decreased.
 ```
 
-pero solo cuando exista suficiente historial confiable.
+solo cuando existan datos suficientes y reglas confiables.
 
 ---
 
-# 106. Customer Value
+# 97. IMPLEMENTED
 
-Una futura segmentación puede considerar:
-
-* facturación;
-* frecuencia;
-* margen;
-* recurrencia;
-* productos;
-* comportamiento.
-
-No debe introducirse un campo manual genérico como:
+Actualmente:
 
 ```text
-customerValue = HIGH
-```
+Customer persistence
 
-sin un modelo definido.
+Customer create
 
----
+active Customer list
 
-# 107. Estado CURRENT
+Customer detail
 
-El modelo consolidado actual contempla:
+Customer update
 
-```text
-Customer
-companyId
-name
-type
-email
-phone
-address
-contactName
+soft-deactivation
+
+inactive historical detail
+
+tenant-scoped operations
+
+type String?
+
+contact data
+
 creditLimit
-notes
-isActive
-Quote relationship
-legacy Sale relationship
-CustomerSelector
-CRUD UI
-```
 
-La implementación exacta continúa verificándose en código.
+Quote relationship
+
+Sale relationship
+
+CustomerSelector
+
+active Customer validation for new Quotes
+
+active Customer validation for new Sales
+
+Customers frontend
+```
 
 ---
 
-# 108. Estado TARGET
+# 98. VALIDATED
 
-Evolución aprobada:
+La validación registrada cubre según los hitos correspondientes:
 
 ```text
-Correct active/inactive lifecycle
-Customer 360
-Improved searchable selection
-Contextual creation
-Audit improvements
-SalesOrder integration
-OpenAPI documentation
-Import support
-Clear commercial identity
+Customer create
+
+Customer update
+
+tenant-scoped detail
+
+soft-deactivation
+
+repeated deactivation
+
+active-only list
+
+inactive historical detail
+
+historical Quote compatibility
+
+historical Sale compatibility
+
+inactive Customer rejection in new Quote
+
+inactive Customer rejection in new Sale
+
+frontend Customer workflows
+
+CustomerSelector-dependent flows
+```
+
+Los gates técnicos incluyen según el hito:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+```
+
+Los snapshots cuantitativos pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
 ```
 
 ---
 
-# 109. Estado FUTURE
+# 99. TECHNICAL DEBT
 
-Posibilidades posteriores:
+Permanece pendiente:
+
+```text
+Customer reactivation workflow
+```
+
+```text
+server-side Customer search / pagination when required
+```
+
+```text
+Audit integration
+```
+
+```text
+formal Customer identity snapshot strategy where needed
+```
+
+La detección avanzada de duplicados también puede evaluarse cuando exista mejor
+identidad fiscal/comercial.
+
+---
+
+# 100. TARGET
+
+Evoluciones posteriores pueden incluir:
+
+```text
+Customer reactivation
+
+server-side search / pagination
+
+Customer 360
+
+Contextual Customer creation
+
+Audit integration
+
+Data Import
+
+SalesOrder integration
+
+Delivery integration
+```
+
+No todas tienen la misma prioridad.
+
+---
+
+# 101. FUTURE
+
+Capacidades posibles:
 
 ```text
 Fiscal Profile
+
 Multiple Contacts
+
 Multiple Addresses
+
 Customer Code
+
 Credit Management
+
 Accounts Receivable
+
 Payment Terms
+
 Price Lists
+
 Customer Segmentation
+
 Customer Portal
+
 Documents
+
 Advanced Analytics
+
 AI Recommendations
+
+generic Organization model if justified
 ```
 
-No constituyen alcance inmediato.
+No forman parte automáticamente del ERP Core V1.
 
 ---
 
-# 110. Invariantes
+# 102. Invariantes
+
+## Tenant
 
 ```text
 Customer
@@ -1806,23 +2446,122 @@ Customer
 
 ```text
 Customer companyId
-→ comes from authenticated tenant
+→ derives from authenticated tenant
+```
+
+---
+
+## Lifecycle
+
+```text
+ACTIVE
+→ may participate in new compatible commercial operations
 ```
 
 ```text
-Inactive Customer
+INACTIVE
 → remains historically visible
 ```
 
+---
+
+## Deactivation
+
 ```text
-Inactive Customer
-→ normally unavailable for new commercial operations
+DELETE /customers/:id
+→ isActive = false
 ```
+
+No:
+
+```text
+physical deletion
+```
+
+---
+
+## Reactivation
+
+```text
+INACTIVE → ACTIVE
+→ NOT IMPLEMENTED
+```
+
+---
+
+## Quote
+
+```text
+New Quote
+→ active same-tenant Customer required
+```
+
+---
+
+## Sale
+
+```text
+New Sale
+→ active same-tenant Customer required
+```
+
+---
+
+## Historical operations
 
 ```text
 Customer deactivation
-→ does not delete Quotes or Sales
+→ does not invalidate historical Quotes or Sales
 ```
+
+---
+
+## Name
+
+```text
+Customer.name
+→ not unique by current schema
+```
+
+---
+
+## Type
+
+```text
+Customer.type
+→ optional classification
+→ not authoritative domain discriminator
+```
+
+---
+
+## Email
+
+```text
+Customer.email
+≠
+User login identity
+```
+
+---
+
+## Credit
+
+```text
+creditLimit
+≠
+available credit
+```
+
+```text
+creditLimit
+≠
+complete Credit Management
+```
+
+---
+
+## Healthcare
 
 ```text
 Customer
@@ -1843,77 +2582,165 @@ Payer
 ```
 
 ```text
-Customer.email
+Customer
 ≠
-User login identity
-```
-
-```text
-creditLimit
-≠
-complete credit engine
+Patient
 ```
 
 ---
 
-# 111. Anti-patrones
+# 103. Anti-patrones
 
-## Universal Soft Delete
+## Hard Delete
 
-Asumir:
+Eliminar físicamente un Customer histórico.
 
-```text
-DELETE Customer
-→ deletedAt
-```
-
-cuando el modelo no posee esa estrategia.
+Incorrecto.
 
 ---
 
-## Fake Tax Identifier Rule
+## Lifecycle through arbitrary PATCH
 
-Documentar unicidad de RFC/tax ID cuando el campo ni siquiera existe.
+```text
+PATCH Customer
+isActive = true / false
+```
+
+como mecanismo genérico de lifecycle.
+
+Incorrecto para el contrato vigente.
+
+---
+
+## Fake Customer name uniqueness
+
+Documentar:
+
+```text
+unique(companyId, name)
+```
+
+cuando el schema actual no lo define.
+
+Incorrecto.
+
+---
+
+## Fake RFC rule
+
+Documentar unicidad o validación de:
+
+```text
+Customer.rfc
+```
+
+cuando el campo no existe.
+
+Incorrecto.
+
+---
+
+## Inactive Customer accepted by UI only
+
+Depender exclusivamente de que frontend oculte Customers inactivos.
+
+Incorrecto.
+
+Backend debe validar.
 
 ---
 
 ## Customer = Hospital
 
-Utilizar Customer como sustituto obligatorio de Hospital en Healthcare.
+Usar Customer como reemplazo universal de Hospital.
+
+Incorrecto.
 
 ---
 
 ## Customer = Doctor
 
-Crear Doctors dentro de Customers únicamente para evitar modelar el dominio correspondiente.
+Usar Customer como reemplazo universal de Doctor.
+
+Incorrecto.
 
 ---
 
 ## Customer = Payer
 
-Asumir que quien compra, recibe y paga siempre es la misma entidad.
+Asumir que quien compra es necesariamente quien paga.
+
+Incorrecto.
+
+---
+
+## Customer = Patient
+
+Guardar información clínica dentro del catálogo de Customers.
+
+Incorrecto.
 
 ---
 
 ## Contact = User
 
-Utilizar el email de contacto como credencial automática.
+Utilizar automáticamente:
+
+```text
+Customer.email
+```
+
+o:
+
+```text
+contactName
+```
+
+como identidad autenticada.
+
+Incorrecto.
+
+---
+
+## Type as universal discriminator
+
+Utilizar un `String?` libre para determinar:
+
+```text
+Hospital
+
+Doctor
+
+Payer
+
+permissions
+
+billing rules
+```
+
+Incorrecto.
 
 ---
 
 ## Credit Limit = Available Credit
 
-Bloquear ventas mediante una resta incompleta sin Accounts Receivable.
+Bloquear ventas mediante una resta incompleta sin dominio financiero.
+
+Incorrecto.
 
 ---
 
-## Notes as Structured Model
+## Notes as structured model
 
-Guardar fiscal, pago, Hospital, Payer y direcciones múltiples dentro de notes.
+Guardar dentro de notes información estructurada que gobierna workflows.
+
+Incorrecto.
 
 ---
 
-# 112. Relación con Quotes
+# 104. Relación con Quotes
+
+CURRENT:
 
 ```text
 Customer
@@ -1921,15 +2748,50 @@ Customer
 Quote
 ```
 
-Customer identifica la contraparte.
+Customers identifica la contraparte.
 
-Quote conserva la propuesta.
+Quotes administra:
+
+```text
+proposal
+
+items
+
+commercial values
+
+Quote lifecycle
+```
+
+El Customer activo se valida en nuevas Quotes.
 
 ---
 
-# 113. Relación con Sales
+# 105. Relación con Sales
 
-Arquitectura objetivo:
+CURRENT:
+
+```text
+Customer
+↓
+Sale
+```
+
+Sales administra el workflow comercial actual.
+
+Debe mantenerse:
+
+```text
+Sale
+→ CURRENT
+```
+
+No describirlo todavía como un modelo únicamente histórico.
+
+---
+
+# 106. Relación con SalesOrder / Delivery
+
+TARGET:
 
 ```text
 Customer
@@ -1939,144 +2801,392 @@ SalesOrder
 Delivery
 ```
 
-Cada capa conserva su responsabilidad.
+Esta arquitectura pertenece a la evolución futura del flujo comercial.
+
+No sustituye todavía el comportamiento CURRENT de Sale.
 
 ---
 
-# 114. Relación con Healthcare
+# 107. Relación con Healthcare
 
-Healthcare puede asociar contexto comercial con Customer cuando corresponda.
+Healthcare puede asociar Customer cuando exista contexto comercial.
 
-Pero mantiene separados:
+Debe mantener independientes:
 
 ```text
 Doctor
+
 Hospital
+
 Customer
+
 Payer
+
+Case
 ```
 
----
-
-# 115. Relación con Billing
-
-Billing utilizará Customer o la estructura comercial/fiscal correspondiente para generar documentos financieros.
-
-La definición fiscal no pertenece completamente a Customers en este momento.
+Customers no absorbe esos dominios.
 
 ---
 
-# 116. Relación con Business Components
+# 108. Relación con Billing
 
-`CustomerSelector` pertenece a:
+Billing utilizará Customer o la estructura fiscal/comercial correspondiente para
+documentos financieros.
+
+La definición de:
+
+```text
+Payer
+
+Fiscal Profile
+
+Accounts Receivable
+```
+
+no pertenece completamente a Customers V1.
+
+---
+
+# 109. Relación con Business Components
+
+`CustomerSelector` pertenece conceptualmente a:
 
 ```text
 ux/BUSINESS_COMPONENTS.md
 ```
 
-Customers proporciona el recurso.
-
-CustomerSelector proporciona la experiencia reutilizable de selección.
-
----
-
-# 117. Relación con Zaping Way
-
-`Customer 360`, creación contextual y búsqueda deben reducir navegación sin alterar las fronteras del dominio.
-
----
-
-# 118. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-011 — SalesOrder y Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
-
----
-
-# 119. Documentos relacionados
+Customers proporciona:
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-ux/BUSINESS_COMPONENTS.md
-modules/erp/PRODUCTS.md
-modules/erp/SUPPLIERS.md
+resource + business rules
 ```
 
-Futuros documentos relacionados:
+CustomerSelector proporciona:
 
 ```text
-modules/erp/QUOTES.md
-modules/erp/SALES.md
-modules/healthcare/HEALTHCARE.md
+reusable selection experience
 ```
 
 ---
 
-# 120. Fuente de verdad
+# 110. ADR relacionados
+
+```text
+ADR-001 — Multi-Tenant
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
+
+ADR-013 — Inventory Custody & Case Logistics
+```
+
+ADR-011 representa arquitectura comercial TARGET y no significa que
+SalesOrder/Delivery ya estén implementados.
+
+---
+
+# 111. Documentación relacionada
+
+```text
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/modules/erp/SUPPLIERS.md
+
+docs/modules/healthcare/HEALTHCARE.md
+
+docs/modules/healthcare/DOMAIN_MODEL.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/ux/BUSINESS_COMPONENTS.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+`QUOTES.md` y `SALES.md` son documentación CURRENT relacionada, no documentos
+futuros.
+
+---
+
+# 112. Fuente de verdad
 
 ```text
 CUSTOMERS.md
-→ reglas del catálogo de clientes
+→ Customer master-data behavior
+→ Customer lifecycle
+```
 
-QUOTES / SALES
-→ operaciones comerciales
+```text
+QUOTES.md
+→ CURRENT Quote behavior
+→ active Customer validation for Quotes
+```
 
-Healthcare
-→ Doctor / Hospital / Case
+```text
+SALES.md
+→ CURRENT Sale behavior
+→ active Customer validation for Sales
+```
 
-Billing
-→ Payer / fiscal / financial behavior
+```text
+ADR-011
+→ TARGET SalesOrder / Delivery architecture
+```
 
+```text
+Healthcare documentation
+→ Doctor / Hospital / Case boundaries
+```
+
+```text
+Billing future
+→ fiscal / Payer / financial behavior
+```
+
+```text
 schema.prisma
-→ modelo técnico vigente
+→ CURRENT persistence
+```
 
-backend
-→ implementación actual
+```text
+Customers backend
+→ CURRENT API/business implementation
+```
 
+```text
+Customers frontend
+→ CURRENT user experience
+```
+
+```text
 tests
-→ comportamiento validado
+→ validated behavior
+```
 
+```text
 PROJECT_BOARD.md
-→ estado del trabajo
+→ current project status and debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 121. Principio final
+# 113. Estado consolidado
+
+```text
+Customer create
+✅ IMPLEMENTED / VALIDATED
+
+active Customer list
+✅ IMPLEMENTED / VALIDATED
+
+Customer detail
+✅ IMPLEMENTED / VALIDATED
+
+Customer master-data update
+✅ IMPLEMENTED / VALIDATED
+
+soft-deactivation
+✅ IMPLEMENTED / VALIDATED
+
+inactive historical detail
+✅ IMPLEMENTED / VALIDATED
+
+tenant-scoped operations
+✅ IMPLEMENTED / VALIDATED
+
+CustomerSelector
+✅ IMPLEMENTED
+
+Quote integration
+✅ IMPLEMENTED / VALIDATED
+
+Sale integration
+✅ IMPLEMENTED / VALIDATED
+
+active Customer validation for new Quotes
+✅ IMPLEMENTED / VALIDATED
+
+active Customer validation for new Sales
+✅ IMPLEMENTED / VALIDATED
+```
+
+Pendiente:
+
+```text
+Customer reactivation
+⏳
+
+server-side Customer search / pagination
+⏳
+
+Audit integration
+⏳
+
+formal identity snapshot strategy where required
+⏳
+```
+
+Target / Future:
+
+```text
+SalesOrder / Delivery integration
+
+Customer 360
+
+Contextual Customer creation
+
+Fiscal Profile
+
+Credit Management
+
+Multiple Contacts
+
+Multiple Addresses
+
+Data Import
+
+Customer Portal
+
+Accounts Receivable
+
+Price Lists
+
+Advanced Analytics
+```
+
+---
+
+# 114. Secuencia de proyecto
+
+Customers V1 forma parte del ERP Core ya normalizado.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto, capacidades como:
+
+```text
+Customer 360
+
+Customer Portal
+
+Credit Management
+
+SalesOrder / Delivery
+
+generic Organization model
+```
+
+no deben convertirse automáticamente en el siguiente sprint únicamente porque
+aparecen documentadas.
+
+---
+
+# 115. Principio final
 
 Customer debe responder una pregunta clara:
 
-> **¿Quién es nuestra contraparte comercial?**
+```text
+¿Quién es nuestra contraparte comercial?
+```
 
-No debe convertirse en una entidad genérica donde se introduzca cualquier persona u organización relacionada con una operación.
-
-La separación correcta es:
+CURRENT:
 
 ```text
 Customer
-→ relación comercial
-
-Doctor
-→ participante Healthcare
-
-Hospital
-→ contexto organizacional / lugar
-
-Payer
-→ responsabilidad económica
+↓
+Quote
+↓
+Sale
 ```
 
-Estas funciones pueden coincidir en ciertos escenarios, pero Zaping no debe asumir que son equivalentes.
+TARGET:
 
-> **Modelar correctamente a quién vendemos es diferente de modelar dónde ocurre la operación, quién genera la demanda o quién finalmente paga.**
+```text
+Customer
+↓
+Quote
+↓
+SalesOrder
+↓
+Delivery
+```
+
+Healthcare mantiene otros conceptos independientes:
+
+```text
+Doctor
+→ Healthcare participant
+
+Hospital
+→ organizational / procedure context
+
+Customer
+→ commercial counterpart
+
+Payer
+→ economic responsibility
+```
+
+Estas funciones pueden coincidir en una misma entidad del mundo real, pero Zaping
+no debe asumir que son equivalentes.
+
+Debe mantenerse:
+
+```text
+Customer identity
+≠
+commercial transaction
+≠
+Healthcare participant
+≠
+physical location
+≠
+economic payer
+```

@@ -1,435 +1,304 @@
-# Healthcare Cases — Zaping
+Healthcare Cases — Zaping
 
-**Módulo:** Healthcare Cases
-**Producto:** Zaping Healthcare
-**Versión:** 1.0.0
-**Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / VALIDATED
-**Última actualización:** 2026-08-24
-**Responsable:** Zaping Healthcare Team
+Módulo: Healthcare Cases
+Producto: Zaping Healthcare
+Versión: 1.1.0
+Estado: Aprobado
+Estado de implementación: CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL CASE WORKFLOWS TARGET
+Última actualización: 2026-08-27
+Responsable: Zaping Healthcare Team
 
----
-
-# 1. Propósito
+1. Propósito
 
 Healthcare Case representa la unidad operacional principal de Zaping Healthcare.
 
-Un Case permite coordinar una operación Healthcare concreta relacionada con un procedimiento o evento que requiere combinar:
+Su objetivo CURRENT es proporcionar una referencia estable para coordinar una operación Healthcare concreta mediante:
 
-```text
-agenda
-+
-personas
-+
-Hospital
-+
-material
-+
-Equipment
-+
-custodia
-+
-reconciliación
-+
-contexto comercial
-```
+identity
 
-Su objetivo es responder:
+tenant context
 
-```text
-¿Qué operación estamos coordinando?
-¿Cuándo ocurrirá?
-¿Dónde?
-¿Con qué Doctor?
-¿Quién es responsable?
-¿Qué necesita prepararse?
-¿Qué salió del almacén?
-¿Qué ocurrió con el material?
-¿Qué falta resolver?
-¿La operación ya está cerrada?
-```
+operational title
 
----
+procedure description
 
-# 2. Principio fundamental
+planning schedule
+
+responsible User
+
+minimal lifecycle
+
+creation / cancellation audit facts
+
+La evolución TARGET permitirá que el Case coordine además:
+
+Doctor / Hospital
+
+Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+CaseKit / Maletín
+
+Dispatch / Custody
+
+Return
+
+Inspection
+
+Reconciliation
+
+Calendar
+
+Case 360
+
+commercial context
+
+Healthcare Case no debe convertirse en un modelo gigante ni absorber responsabilidades que pertenecen a otros dominios.
+
+2. Principio fundamental
 
 Healthcare Case representa:
 
-> **la coordinación operacional de un procedimiento Healthcare.**
+la coordinación operacional de un procedimiento o evento Healthcare.
 
 No representa por sí mismo:
 
-```text
-una oportunidad
-una cotización
-una venta
-una entrega comercial
-una factura
-un expediente clínico
-```
-
----
-
-# 3. Case como agregado operacional
-
-Conceptualmente:
-
-```text
-Healthcare Case
-│
-├── Schedule
-├── Doctor
-├── Hospital
-├── Technician
-├── Procedure Context
-├── Commercial Context
-├── Preparation
-├── CaseKit
-├── Dispatches
-├── Returns
-├── Reconciliation
-└── Equipment
-```
-
-No todos estos conceptos necesariamente serán columnas directas del mismo modelo.
-
----
-
-# 4. Case no es un modelo gigante
-
-El Case debe funcionar como punto de coordinación.
-
-No debe absorber dentro de una sola tabla toda la información de:
-
-```text
-CaseKit
-Dispatch
-Inventory
-Return
-Equipment
-Sales
-Billing
-Audit
-```
-
-Cada subdominio debe conservar su propia responsabilidad.
-
----
-
-# 5. Relación con Opportunity
-
-Un Case puede originarse desde:
-
-```text
-Healthcare Opportunity
-```
-
-pero esa relación es opcional.
-
-Flujo válido:
-
-```text
 Opportunity
-↓
-Case
-```
 
----
-
-# 6. Case directo
-
-También debe ser válido:
-
-```text
-Doctor contacts Technician
-↓
-procedure confirmed
-↓
-Case
-```
-
-sin crear una Opportunity artificial.
-
----
-
-# 7. Regla
-
-> **Opportunity es útil cuando existe incertidumbre comercial; Case es correcto cuando ya existe una operación suficientemente concreta que coordinar.**
-
----
-
-# 8. Case no requiere Opportunity
-
-No debe existir una regla:
-
-```text
-Every Case
-→ must have Opportunity
-```
-
----
-
-# 9. Case y Quote
-
-Un Case puede relacionarse posteriormente con una Quote.
-
-Ejemplos válidos:
-
-```text
-Opportunity
-↓
 Quote
-↓
-Case
-```
 
-```text
-Opportunity
-↓
-Case
-↓
-Quote
-```
+Sale
 
-```text
-Case
-↓
-Quote
-```
-
----
-
-# 10. Case y SalesOrder
-
-También puede relacionarse con una operación comercial ya confirmada:
-
-```text
 SalesOrder
-↓
-Case
-```
 
-cuando el proceso comercial ocurre antes del procedimiento.
-
----
-
-# 11. Case antes de SalesOrder
-
-En otras operaciones:
-
-```text
-Case
-↓
-Procedure
-↓
-Reconciliation
-↓
-SalesOrder / Delivery
-```
-
-puede representar mejor el proceso real.
-
----
-
-# 12. No imponer un único orden comercial
-
-Healthcare no debe asumir que siempre existe:
-
-```text
-Quote
-↓
-SalesOrder
-↓
-Case
-```
-
-ni:
-
-```text
-Case
-↓
-Quote
-↓
-SalesOrder
-```
-
-El proceso comercial puede variar.
-
----
-
-# 13. El Case continúa siendo operacional
-
-Independientemente del orden comercial:
-
-```text
-Case
-→ coordina la operación Healthcare
-```
-
-mientras:
-
-```text
-Quote
-SalesOrder
 Delivery
+
 Invoice
-```
 
-pertenecen a sus respectivos dominios.
-
----
-
-# 14. Información conceptual del Case
-
-Un Case puede requerir información semejante a:
-
-```text
-id
-companyId
-folio
-title / summary
-
-opportunityId?
-doctorId?
-hospitalId?
-technicianId?
-
-procedureType?
-scheduledStart?
-scheduledEnd?
-
-status
-readiness
-
-customerId?
-payer context?
-
-operational notes
-
-createdAt
-updatedAt
-```
-
-La estructura anterior no representa todavía el schema Prisma definitivo.
-
----
-
-# 15. UUID
-
-El identificador técnico seguirá ADR-004:
-
-```text
-Case.id
-→ UUID
-```
-
----
-
-# 16. Folio
-
-Para operación humana es recomendable contar con un folio.
-
-Ejemplo:
-
-```text
-CASE-000145
-```
-
-o una convención empresarial futura.
-
----
-
-# 17. UUID vs folio
-
-```text
-UUID
-→ identity técnica
-```
-
-```text
-folio
-→ identity operacional
-```
-
-No deben confundirse.
-
----
-
-# 18. Folio tenant-aware
-
-Si se implementa folio secuencial:
-
-```text
-Company A
-CASE-000001
-```
-
-y:
-
-```text
-Company B
-CASE-000001
-```
-
-podrían coexistir si esa estrategia se aprueba.
-
-La definición técnica debe seguir las reglas de folios empresariales de Zaping.
-
----
-
-# 18.1 Healthcare Case Foundation implementado
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
-`HealthcareCase` es el root operacional persistido para un Case medico/quirurgico.
-
-Foundation implementa solamente:
-
-```text
-identity
-tenant
-planning schedule
-minimal lifecycle
-operational responsibility
-creation / cancellation audit facts
-stable references for future Healthcare domains
-```
-
-Foundation no posee:
-
-```text
-Equipment Assignment
-Equipment Requirement
-CaseKit
-Dispatch
-Custody
-Return
 Inventory
+
+EquipmentAsset identity
+
+clinical record
+
+3. CURRENT vs TARGET vs FUTURE
+
+Este documento distingue tres niveles.
+
+CURRENT
+
+Capacidades implementadas y validadas en Healthcare Case Foundation.
+
+TARGET
+
+Capacidades operacionales Healthcare aprobadas como dirección, pero todavía no implementadas.
+
+FUTURE
+
+Capacidades posteriores que no pertenecen al primer cierre operacional Healthcare.
+
+4. Estado CURRENT consolidado
+
+Actualmente:
+
+HealthcareCase Foundation
+✅ IMPLEMENTED / VALIDATED
+
+Incluye:
+
+UUID technical identity
+
+CASE-* operational folio
+
+tenant ownership
+
+title
+
+procedureDescription?
+
+planning schedule
+
+responsible User
+
+DRAFT / SCHEDULED / CANCELLED
+
+createdBy audit fact
+
+cancellation audit facts
+
+create
+
+list
+
+detail
+
+planning update
+
+cancel
+
+tenant-scoped API
+
+RBAC
+
+5. Fuera de CURRENT Foundation
+
+No existen todavía como parte implementada de HealthcareCase:
+
+Doctor relation
+
+Hospital relation
+
+Customer relation
+
+Payer relation
+
+Opportunity relation
+
+Case Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+CaseKit
+
+Dispatch
+
+Custody
+
+Return
+
+Healthcare material inspection
+
+Reconciliation
+
+advanced lifecycle
+
+Case Calendar UI
+
+Case 360
+
+Healthcare frontend
+
+6. HealthcareCase como agregado operacional
+
+HealthcareCase debe funcionar como punto de coordinación.
+
+Conceptualmente podrá conectar:
+
+Schedule
+
+Actors
+
+Requirements
+
+Preparation
+
+Equipment
+
+CaseKit
+
+Dispatch
+
+Return
+
+Reconciliation
+
+Commercial context
+
+sin convertir todos esos conceptos en columnas directas del mismo modelo.
+
+7. Case no es un modelo gigante
+
+No debe absorber dentro de una sola tabla:
+
+CaseKit items
+
+Inventory positions
+
+Dispatch items
+
+Return items
+
+Equipment history
+
+Sales
+
 Billing
-Insurance
-Patient records
-Clinical records
-```
 
-Modelo Prisma implementado:
+Audit
 
-```text
+Cada módulo conserva ownership sobre sus propios hechos.
+
+8. HealthcareCase ≠ clinical record
+
+Debe mantenerse:
+
 HealthcareCase
-```
+≠
+Clinical Record
 
-Campos implementados para Foundation:
+Case representa una operación empresarial y logística.
 
-```text
+No representa expediente médico.
+
+9. Minimización clínica
+
+HealthcareCase Foundation no debe almacenar por defecto:
+
+patientName
+
+patientId
+
+patientDOB
+
+diagnosis
+
+treatment history
+
+medical history
+
+clinical notes
+
+clinical record identifiers
+
+Los campos CURRENT:
+
+title
+
+procedureDescription
+
+son operacionales, no clínicos.
+
+10. Modelo Prisma CURRENT
+
+Foundation implementa:
+
+HealthcareCase
+
+con campos:
+
 id
+
 companyId
+
 folio
 
 title
+
 procedureDescription?
 
 status
 
 scheduledStart?
+
 scheduledEnd?
 
 responsibleUserId?
@@ -437,185 +306,343 @@ responsibleUserId?
 createdById
 
 cancelledAt?
+
 cancelledById?
+
 cancellationReason?
 
 createdAt
+
 updatedAt
-```
 
-Persistencia implementada mediante la migracion:
+11. Migración CURRENT
 
-```text
+Healthcare Case Foundation fue persistido mediante:
+
 20260824162849_add_healthcare_case_foundation
-```
 
-La migracion creo solamente el Foundation aprobado:
+La migración introdujo únicamente el alcance Foundation aprobado:
 
-```text
 HealthcareCaseStatus enum
+
 HealthcareCase table
+
 Company relation
+
 responsible User relation
+
 creator User relation
+
 cancellation actor User relation
-approved uniqueness constraints
-approved indexes
-```
 
-No hubo reset ni SQL destructivo no relacionado.
+constraints
 
-Politica conservadora de borrado para auditoria:
+indexes
 
-```text
-Company
-→ onDelete Restrict
+No incluyó:
 
-responsibleUser
-→ onDelete Restrict
+Doctor
 
-createdBy
-→ onDelete Restrict
+Hospital
 
-cancelledBy
-→ onDelete Restrict
-```
+CaseKit
 
-Identity:
+Dispatch
 
-```text
-id
+Return
+
+Equipment Assignment
+
+12. Delete policy CURRENT
+
+HealthcareCase Foundation utiliza una política conservadora para relaciones críticas de auditoría.
+
+Las relaciones relevantes utilizan comportamiento restrictivo según la implementación documentada.
+
+El Case no debe perder historia automáticamente por eliminación de actores relacionados.
+
+13. Identidad técnica
+
+Debe mantenerse:
+
+HealthcareCase.id
 → UUID
-→ technical identity
-→ immutable
+
+El UUID es:
+
+technical identity
+
+immutable
+
+14. Folio operacional CURRENT
+
+HealthcareCase utiliza folio generado por servidor.
+
+Formato CURRENT:
+
+CASE-000001
+
+Debe mantenerse:
 
 folio
-→ human identity
-→ generated server-side
+→ human operational identity
 → immutable
 → unique per Company
 → not submitted by client
-```
 
-Formato implementado:
+15. CompanySequence CURRENT
 
-```text
-CASE-000001
-```
+Healthcare Case utiliza:
 
-La generacion de folio pertenece a la transaccion de creacion del Case y utiliza `CompanySequence`.
+CompanySequence
 
-La implementacion extrajo la asignacion compartida a:
+mediante infraestructura compartida:
 
-```text
-src/company-sequences
 CompanySequenceAllocatorService
-```
 
-Comportamiento publico:
+con key:
 
-```text
-allocateNext(
-  tx,
-  companyId,
-  key
-)
-```
+HEALTHCARE_CASE_FOLIO
 
-El allocator compartido:
+La asignación ocurre dentro de la transacción de creación del Case.
 
-```text
-receives caller-owned Prisma transaction
-createMany skipDuplicates
-↓
-atomic update nextValue increment
-↓
-allocated value = returned nextValue - 1
-returns numeric allocation
-does not format Equipment or Case codes
-```
+16. Shared sequence infrastructure
 
-Case folio usa:
+Healthcare y Equipment pueden reutilizar el allocator numérico.
 
-```text
-key = HEALTHCARE_CASE_FOLIO
-```
+Pero cada dominio conserva:
 
-Equipment conserva su formato `EQ-` y su logica de colisiones. Healthcare Case conserva su formato `CASE-` y su logica de colisiones. Healthcare no depende de Equipment para generar folios.
+own sequence key
 
-Constraints / indexes implementados:
+own code formatting
 
-```text
+own collision behavior
+
+own operational identity
+
+Healthcare no depende de Equipment para generar folios.
+
+17. Constraints / indexes CURRENT
+
+HealthcareCase Foundation implementa:
+
 @@unique([companyId, folio])
+
 @@unique([id, companyId])
 
 @@index([companyId, status])
+
 @@index([companyId, scheduledStart])
+
 @@index([companyId, responsibleUserId])
-```
 
-Status conceptual aprobado para Phase 1:
+18. Lifecycle CURRENT
 
-```text
+HealthcareCaseStatus CURRENT:
+
 DRAFT
+
 SCHEDULED
+
 CANCELLED
-```
 
-No incluir todavia:
+No deben tratarse como CURRENT:
 
-```text
+READY
+
 IN_PROGRESS
-COMPLETED
+
 RECONCILIATION_PENDING
+
 RETURN_PENDING
+
 DISPATCHED
-```
 
-`status` es server-managed y no debe ser libremente escribible desde DTOs.
+COMPLETED
 
-Semantica aprobada:
+19. Status server-managed
 
-```text
+status no debe ser libremente modificable desde DTOs.
+
+Debe derivarse de business actions y reglas del service.
+
+20. Semántica DRAFT / SCHEDULED
+
+CURRENT:
+
 scheduledStart absent
 → DRAFT
 
 scheduledStart present
 → SCHEDULED
 
-cancel command
-→ CANCELLED
-```
+Mientras no exista Equipment Assignment ni otros workflows dependientes, planning PATCH puede permitir:
 
-Mientras Equipment Assignment no exista, un PATCH de planeacion puede modificar/remover schedule y el service puede transicionar:
-
-```text
 DRAFT ↔ SCHEDULED
-```
 
-segun `scheduledStart`.
+según scheduledStart.
 
-`CANCELLED` es terminal en Phase 1.
+21. CANCELLED CURRENT
 
-No existe comando de reopen en Foundation.
+Cancel command produce:
 
-Schedule aprobado:
+DRAFT / SCHEDULED
+↓
+CANCELLED
 
-```text
+CANCELLED es terminal en Foundation.
+
+No existe comando CURRENT de reopen.
+
+22. Advanced lifecycle TARGET
+
+Healthcare podrá necesitar posteriormente semántica para:
+
+procedure execution
+
+post-procedure logistics
+
+return
+
+reconciliation
+
+operational closure
+
+Los nombres exactos del futuro lifecycle no están aprobados todavía.
+
+23. Case Status ≠ Readiness
+
+Debe mantenerse:
+
+Case Status
+≠
+Case Readiness
+
+Ejemplo conceptual:
+
+Status:
+SCHEDULED
+
+Readiness:
+NOT READY
+
+sin convertir READY en status principal.
+
+24. Readiness TARGET
+
+Readiness responde:
+
+¿Está este Case preparado para ejecutarse?
+
+Debe considerarse inicialmente:
+
+DERIVED
+
+No como verdad manual independiente.
+
+25. Readiness inputs TARGET
+
+Podrá derivarse de hechos como:
+
+schedule
+
+Doctor / Hospital context
+
+responsible User
+
+Requirements
+
+Preparation state
+
+CaseKit
+
+Equipment Assignment
+
+Case Availability
+
+blockers
+
+según los workflows implementados.
+
+26. No manual READY fiction
+
+Debe evitarse:
+
+User clicks READY
+
+cuando siguen faltando requisitos reales.
+
+La UI futura debe explicar:
+
+what is missing
+
+what blocks the Case
+
+what requires attention
+
+27. Title CURRENT
+
+title es requerido.
+
+Representa:
+
+operational title / summary
+
+Ejemplos válidos pueden describir la operación sin convertirse en sustituto permanente de relaciones estructuradas futuras.
+
+28. Title ≠ Doctor / Hospital relation
+
+No debe utilizarse únicamente:
+
+"Cirugía Dr. X Hospital ABC"
+
+como sustituto definitivo de futuras relaciones con Doctor y Hospital.
+
+29. procedureDescription CURRENT
+
+procedureDescription es opcional.
+
+Representa:
+
+operational procedure description
+
+No un diagnóstico ni historia clínica.
+
+30. No procedure taxonomy CURRENT
+
+Foundation no introduce:
+
+procedureType enum
+
+surgeryType enum
+
+specialty taxonomy
+
+clinical taxonomy
+
+Una capacidad reusable de Procedure Catalog permanece FUTURE si se justifica.
+
+31. Scheduling CURRENT
+
+HealthcareCase es propietario de su planificación temporal.
+
+Campos CURRENT:
+
 scheduledStart DateTime?
+
 scheduledEnd DateTime?
-```
 
-Invariantes:
+32. Schedule invariants CURRENT
 
-```text
+Debe mantenerse:
+
 start null
 end null
 → valid unscheduled Case
 
 start present
 end null
-→ valid scheduled Case with unknown duration/end
+→ valid scheduled Case with unknown end/duration
 
 start present
 end present
@@ -624,225 +651,934 @@ end present
 start null
 end present
 → invalid
-```
 
-Los valores API deben ser timestamps ISO-8601 no ambiguos. Persistencia utiliza `DateTime`; los valores almacenados representan instantes absolutos. `Company.timezone` es el contexto operacional/display cuando aplique.
+33. Timestamp semantics
 
-`title` es requerido y representa un titulo/resumen operacional.
+Los valores API deben utilizar timestamps ISO-8601 no ambiguos.
 
-`procedureDescription` es opcional y representa una descripcion operacional.
+Persistencia utiliza:
 
-No introducir en Phase 1:
+DateTime
 
-```text
-procedureType enum
-surgeryType enum
-specialty taxonomy
-clinical taxonomy
-```
+como instante absoluto.
 
-Hospital / Doctor / Customer / Payer:
+Company.timezone puede proporcionar contexto operacional/display cuando corresponda.
 
-```text
-hospitalId
-→ DEFERRED
+34. Case owns schedule
+
+Debe mantenerse:
+
+HealthcareCase
+→ schedule source of truth
+
+Case Calendar
+→ future Read Model
+
+No:
+
+CalendarEvent
+→ independent source of truth for Case schedule
+
+35. Planning update CURRENT
+
+Existe:
+
+PATCH /healthcare/cases/:caseId
+
+para planeación del Case.
+
+Campos editables CURRENT:
+
+title
+
+procedureDescription
+
+scheduledStart
+
+scheduledEnd
+
+responsibleUserId
+
+36. Partial PATCH semantics CURRENT
+
+Debe mantenerse:
+
+omitted / undefined
+→ retain persisted value
+
+explicit null where allowed
+→ clear value
+
+Los campos server-managed no deben aceptarse desde cliente.
+
+37. Reschedule CURRENT
+
+Modificar:
+
+scheduledStart
+
+scheduledEnd
+
+sobre el mismo Case representa una reprogramación.
+
+Debe mantenerse:
+
+same operational occurrence
+→ same HealthcareCase
+
+No debe crearse un nuevo Case solamente porque cambió la fecha.
+
+38. Reschedule history TARGET
+
+Actualmente no existe un historial formal de reprogramaciones.
+
+Futuro:
+
+old schedule
+
+new schedule
+
+actor
+
+timestamp
+
+reason?
+
+podrá integrarse con Audit o historial especializado.
+
+39. One occurrence → one Case
+
+Como regla conceptual inicial:
+
+Cada ocurrencia operacional relevante debe tener su propio HealthcareCase.
+
+No debe reutilizarse un mismo Case durante meses para procedimientos distintos.
+
+40. responsibleUser CURRENT
+
+HealthcareCase Foundation implementa:
+
+responsibleUserId
+→ nullable
+→ references User
+
+El responsable operacional CURRENT se representa mediante User.
+
+41. Technician initially maps to User
+
+Debe mantenerse:
+
+Technician
+→ User acting in Healthcare
+
+No crear en Foundation:
+
+HealthcareTechnician identity
+
+TECHNICIAN role
+
+únicamente para representar responsabilidad operacional.
+
+42. Authorization role ≠ operational function
+
+Debe mantenerse:
+
+User role
+≠
+Healthcare operational function
+
+Un User puede actuar operacionalmente como Technician sin requerir una identidad duplicada.
+
+43. Healthcare Technician Profile FUTURE
+
+Si posteriormente se requieren atributos como:
+
+certifications
+
+specialties
+
+territory
+
+availability rules
+
+puede existir un profile ligado a User.
+
+No cambia la identidad principal CURRENT.
+
+44. responsibleUser validation CURRENT
+
+Cuando responsibleUserId se proporciona, backend debe validar:
+
+exists
+
+belongs to authenticated Company
+
+is active
+
+45. createdBy CURRENT
+
+createdById:
+
+required
+
+derived from authenticated User
+
+never accepted from client payload
+
+46. Cancellation audit facts CURRENT
+
+Cancel command administra:
+
+cancelledAt
+
+cancelledById
+
+cancellationReason
+
+Estos campos no deben establecerse mediante generic PATCH.
+
+47. Cancellation endpoint CURRENT
+
+Existe:
+
+POST /healthcare/cases/:caseId/cancel
+
+48. Cancellation source states CURRENT
+
+Origen permitido:
+
+DRAFT
+
+SCHEDULED
+
+Destino:
+
+CANCELLED
+
+49. Cancellation reason CURRENT
+
+Cancel command requiere:
+
+non-empty operational cancellationReason
+
+No existe un segundo campo de cancellation notes aprobado para Foundation.
+
+50. Cancellation preserves history
+
+Un Case cancelado permanece en el sistema.
+
+Debe mantenerse:
+
+cancel
+≠
+delete
+
+51. DELETE CURRENT
+
+No existe:
+
+DELETE /healthcare/cases/:caseId
+
+como workflow normal.
+
+Cancellation es la operación terminal soportada por Foundation.
+
+52. Completion CURRENT
+
+Actualmente:
+
+COMPLETED
+→ NOT IMPLEMENTED
+
+y:
+
+complete command
+→ NOT IMPLEMENTED
+
+53. Procedure ended ≠ Case complete
+
+Debe mantenerse:
+
+procedure occurred
+≠
+Case operationally closed
+
+porque futuros workflows pueden mantener pendientes:
+
+custody
+
+Return
+
+Inspection
+
+Reconciliation
+
+54. Operational closure ≠ commercial closure
+
+Debe mantenerse:
+
+Case operational closure
+≠
+Sale lifecycle
+
+y:
+
+Case operational closure
+≠
+Invoice / payment lifecycle
+
+55. Cancellation after Dispatch TARGET
+
+Cuando Case Logistics exista, cancelar un Case no deberá eliminar obligaciones ya creadas.
+
+Futuro:
+
+Case cancelled
++
+existing custody
+→ logistics obligations still require resolution
+
+Esta regla no altera el comportamiento CURRENT de Foundation mientras Dispatch no exista.
+
+56. Opportunity FUTURE
+
+Opportunity puede representar una posibilidad comercial previa.
+
+Actualmente:
+
+Opportunity
+→ FUTURE / optional
+
+HealthcareCase no requiere Opportunity.
+
+57. Direct Case is valid
+
+Debe mantenerse válido:
+
+Doctor / Hospital operational request
+↓
+HealthcareCase
+
+sin crear una Opportunity artificial.
+
+58. Case ≠ Opportunity
+
+Debe mantenerse:
+
+Opportunity
+→ possibility
+
+HealthcareCase
+→ concrete operation requiring coordination
+
+59. Commercial context CURRENT boundary
+
+HealthcareCase Foundation no persiste todavía relaciones con:
+
+Quote
+
+Sale
+
+SalesOrder
+
+Delivery
+
+Invoice
+
+60. Sale CURRENT
+
+ERP Core utiliza actualmente:
+
+Sale
+
+como modelo comercial vigente.
+
+No existe hoy un handoff automático:
+
+HealthcareCase
+↓
+Sale
+
+como parte de Foundation.
+
+61. SalesOrder / Delivery TARGET
+
+ADR-011 define como arquitectura comercial futura:
+
+SalesOrder
+↓
+Delivery
+
+Por tanto:
+
+SalesOrder
+→ TARGET
+
+Delivery
+→ TARGET
+
+No deben presentarse como relaciones CURRENT de HealthcareCase.
+
+62. No single mandatory commercial ordering
+
+En el futuro puede haber operaciones donde:
+
+commercial commitment
+↓
+HealthcareCase
+
+y otras donde:
+
+HealthcareCase
+↓
+procedure / reconciliation
+↓
+commercial consequence
+
+Healthcare no debe imponer un único orden universal.
+
+63. Case does not own commercial totals
+
+No debe almacenar copias permanentes como:
+
+quoteTotal
+
+saleTotal
+
+invoiceTotal
+
+si esos valores pertenecen a documentos ERP.
+
+64. Doctor TARGET
+
+HealthcareCase podrá relacionarse con Doctor cuando Doctor master data exista.
+
+Actualmente:
 
 doctorId
 → DEFERRED
 
+65. Doctor ≠ Customer
+
+Debe mantenerse:
+
+Doctor
+≠
+Customer
+
+66. Hospital TARGET
+
+HealthcareCase podrá relacionarse con Hospital cuando Hospital master data exista.
+
+Actualmente:
+
+hospitalId
+→ DEFERRED
+
+67. Hospital ≠ Customer
+
+Debe mantenerse:
+
+Hospital
+≠
+Customer
+
+68. Doctor / Hospital ownership TBD
+
+La estrategia tenant de Doctor/Hospital debe decidirse antes de implementación.
+
+No debe asumirse todavía un modelo global o Company-owned definitivo sin esa decisión.
+
+69. Do not persist Doctor/Hospital as permanent text truth
+
+No debe reemplazarse master data futuro mediante campos permanentes como:
+
+doctorName
+
+hospitalName
+
+dentro del Case.
+
+El title continúa siendo únicamente resumen operacional.
+
+70. Customer TARGET
+
+HealthcareCase podrá relacionarse con Customer cuando el contexto comercial lo requiera.
+
+Actualmente:
+
 customerId
 → DEFERRED
 
-payer / insurance fields
-→ DEFERRED
-```
+71. Customer not required CURRENT
 
-Decision aprobada:
+No debe bloquearse HealthcareCase Foundation únicamente porque no se conozca:
 
-```text
-Customer
-≠
-Hospital
+who will be billed
 
-Customer
-≠
-Doctor
+72. Payer FUTURE
 
-Customer
-≠
+Payer es una frontera reconocida, pero no implementada.
+
+Debe mantenerse:
+
 Payer
-```
+≠
+Customer
 
-No crear verdad permanente en texto como:
+y:
 
-```text
-hospitalName
-doctorName
-```
+Payer
+→ FUTURE
 
-Hospital y Doctor seran master data Healthcare de primera clase en follow-ups separados.
+73. Case Requirements TARGET
 
-Responsible User:
+Case Requirements representa:
 
-```text
-responsibleUserId
-→ nullable
-→ references User
-```
+what the Case needs
 
-No crear en Case Foundation:
+Puede incluir conceptualmente:
 
-```text
-Technician model
-Technician profile
-TECHNICIAN auth role
-```
+material
 
-Authentication role y operational function son conceptos separados.
+quantity
 
-La implementacion debera validar que `responsibleUser`:
+Equipment need
 
-```text
-exists
-belongs to authenticated Company
-is active
-```
+support material
 
-Actor fields:
+special logistics context
 
-```text
-createdById
-→ required
-→ derived from authenticated User
-→ never accepted from client payload
+Actualmente:
 
-cancelledAt
-cancelledById
-→ set only by cancel command
-→ never accepted through generic PATCH
-```
+Requirements
+→ NOT IMPLEMENTED
 
-Cancellation:
+74. Requirements ≠ Preparation
 
-```text
-POST /healthcare/cases/:id/cancel
-```
+Debe mantenerse:
 
-Valid source states:
+Requirements
+→ what is needed
 
-```text
-DRAFT
-SCHEDULED
-```
+Preparation
+→ work performed to satisfy those needs
 
-Target:
+75. Requirements ≠ CaseKit
 
-```text
-CANCELLED
-```
+También:
 
-Cancellation requires a non-empty operational `cancellationReason`.
+Requirements
+→ requested / needed
 
-No second cancellation notes field is approved for Foundation.
-
-Completion:
-
-```text
-COMPLETED
-→ DEFERRED
-```
-
-No complete command exists in Foundation.
-
-Do not equate:
-
-```text
-procedure occurred
-```
-
-with:
-
-```text
-Case completed
-```
-
-because future Dispatch, Custody, Return and Reconciliation may remain unresolved.
-
-Delete policy:
-
-```text
-DELETE /healthcare/cases/:id
-→ NOT APPROVED in Phase 1
-```
-
-Cancellation is the supported terminal operation.
-
-PHI / patient boundary:
-
-Healthcare Case Foundation must not store patient identity or clinical record data.
-
-Do not add:
-
-```text
-patientName
-patientId
-patientDOB
-diagnosis
-treatment history
-medical history
-clinical notes
-clinical record identifiers
-```
-
-`title` and `procedureDescription` are operational fields, not patient medical-record fields.
-
-Future domain references:
-
-```text
-CaseEquipmentRequirement
-CaseMaterialRequirement
-CaseEquipmentAssignment
 CaseKit
-Dispatch
+→ actual prepared set
+
+76. Preparation TARGET
+
+Preparation representa el trabajo previo para dejar el Case listo.
+
+Puede incluir:
+
+requirements review
+
+availability checks
+
+material picking
+
+Equipment Assignment
+
+CaseKit assembly
+
+documentation
+
+Actualmente:
+
+Preparation
+→ NOT IMPLEMENTED
+
+77. Preparation eligibility TARGET
+
+Un futuro workflow puede permitir Preparation cuando exista suficiente contexto para responder:
+
+what Case
+
+when
+
+where
+
+who is responsible
+
+what is required
+
+La obligatoriedad exacta de Doctor, Hospital, Customer o Payer deberá validarse por workflow.
+
+78. Customer / Payer must not block preparation by default
+
+Healthcare no debe imponer universalmente:
+
+Customer required before Preparation
+
+ni:
+
+Payer required before Preparation
+
+salvo política empresarial explícita.
+
+79. CaseKit TARGET
+
+CaseKit representa el conjunto realmente preparado para el Case.
+
+Actualmente:
+
+CaseKit
+→ NOT IMPLEMENTED
+
+80. CaseKit ≠ JSON inside Case
+
+No debe utilizarse permanentemente:
+
+HealthcareCase.caseKitJson
+
+como sustituto de un dominio CaseKit real si el workflow requiere lifecycle e integridad propios.
+
+81. CaseKit cardinality TBD
+
+No se fija todavía:
+
+one CaseKit
+
+multiple CaseKits
+
+como cardinalidad Prisma.
+
+La estructura se decidirá en el slice correspondiente.
+
+82. EquipmentAsset CURRENT
+
+Equipment reutilizable utiliza:
+
+EquipmentAsset
+
+del ERP Core.
+
+Debe mantenerse:
+
+EquipmentAsset
+→ CURRENT ERP Core identity
+
+83. Equipment Assignment TARGET
+
+Healthcare necesita relacionar:
+
+HealthcareCase
+↔
+EquipmentAsset
+
+mediante un concepto de Assignment.
+
+Actualmente:
+
+Equipment Assignment
+→ NOT IMPLEMENTED
+
+84. Equipment Assignment ≠ lifecycle
+
+Debe mantenerse:
+
+Equipment Assignment
+≠
+EquipmentLifecycle
+
+No utilizar estados como:
+
+ASSIGNED
+
+IN_CUSTODY
+
+para reemplazar la relación Healthcare.
+
+85. Equipment Assignment ≠ Custody
+
+Debe mantenerse:
+
+Assignment
+≠
 Custody
-Return
-```
 
-will reference:
+Un Equipment puede estar asignado antes de ser entregado físicamente.
 
-```text
-HealthcareCase.id
-company ownership
-```
+86. Case Availability TARGET
 
-but are not implemented in Foundation.
+La futura disponibilidad Healthcare podrá considerar:
 
-API namespace aprobado:
+Equipment lifecycle
 
-```text
-/healthcare/cases
-```
+Equipment condition
 
-API implementada:
+active Assignment
 
-```text
+schedule overlap
+
+other blockers
+
+sin almacenar un flag contradictorio independiente.
+
+87. Equipment conflict TARGET
+
+La futura Calendar/Case Availability puede detectar:
+
+same EquipmentAsset
++
+overlapping Cases
+
+Actualmente:
+
+Equipment Assignment
+❌
+
+conflict detection
+❌
+
+88. Responsible User conflict TARGET
+
+También podrá detectarse:
+
+same responsible User
++
+overlapping Cases
+
+cuando el scheduling avanzado exista.
+
+89. CaseDispatch TARGET
+
+CaseDispatch representa futura transferencia de custodia para atender el Case.
+
+Actualmente:
+
+CaseDispatch
+→ NOT IMPLEMENTED
+
+90. Multiple Dispatches TARGET
+
+Un Case podrá requerir:
+
+initial Dispatch
+
+additional Dispatch
+
+La operación no debe asumir un único movimiento físico.
+
+91. CaseDispatch ≠ Delivery
+
+Debe mantenerse:
+
+CaseDispatch
+≠
+commercial Delivery
+
+92. CaseDispatch ≠ commercial OUT
+
+También:
+
+CaseDispatch
+≠
+commercial Inventory OUT
+
+CaseDispatch representa custodia temporal, no disposición comercial definitiva.
+
+93. CaseReturn TARGET
+
+Un mismo Case podrá requerir uno o más Returns.
+
+Actualmente:
+
+CaseReturn
+→ NOT IMPLEMENTED
+
+94. Returned ≠ automatically available
+
+Debe mantenerse:
+
+Returned
+≠
+Automatically Available
+
+cuando exista necesidad de Inspection.
+
+95. Returned-material inspection TARGET
+
+Healthcare podrá requerir inspección de material retornado.
+
+Para EquipmentAsset, cuando corresponda, debe reutilizar:
+
+EquipmentInspection
+
+del ERP Core.
+
+96. Reconciliation TARGET
+
+Reconciliation determina si todas las obligaciones logísticas del Case fueron explicadas.
+
+Actualmente:
+
+Reconciliation
+→ NOT IMPLEMENTED
+
+97. Reconciliation invariant
+
+Debe mantenerse conceptualmente:
+
+Dispatched
+=
+Returned
++
+Consumed
++
+Unresolved
+
+98. Unresolved derived
+
+Preferencia:
+
+Unresolved
+→ derived
+
+No una cantidad manual independiente que pueda contradecir Dispatch / Return / Consumption.
+
+99. Unresolved blocks normal closure
+
+Debe mantenerse:
+
+Unresolved > 0
+→ normal logistical closure blocked
+
+sin obligar todavía a un status específico como RECONCILIATION_PENDING.
+
+100. Closure TARGET
+
+En el futuro el cierre operacional deberá considerar:
+
+all dispatched quantities resolved
+
+Equipment custody resolved
+
+required inspections completed
+
+blocking discrepancies resolved
+
+La regla exacta se definirá cuando existan esos dominios.
+
+101. Case does not mutate stock directly
+
+Nunca:
+
+HealthcareCaseService
+↓
+product.stock -= quantity
+
+HealthcareCase coordina la operación.
+
+Inventory conserva ownership sobre las consecuencias físicas.
+
+102. Inventory/Custody architecture boundary
+
+Healthcare requerirá una forma segura de representar:
+
+availability
+
+physical positioning
+
+custody
+
+double-use prevention
+
+La solución técnica exacta sigue siendo una decisión futura de Inventory/Healthcare.
+
+No debe fijarse aquí como InventoryLocation/TRANSFER ya implementado.
+
+103. No double decrement
+
+Debe mantenerse:
+
+same physical inventory
+→ never decremented twice
+
+por confundir:
+
+custody
+
+con:
+
+commercial disposition
+
+104. API CURRENT
+
+Healthcare Case Foundation implementa:
+
 POST /healthcare/cases
+
 GET /healthcare/cases
-GET /healthcare/cases/:id
-PATCH /healthcare/cases/:id
-POST /healthcare/cases/:id/cancel
-```
 
-No:
+GET /healthcare/cases/:caseId
 
-```text
-DELETE
+PATCH /healthcare/cases/:caseId
+
+POST /healthcare/cases/:caseId/cancel
+
+105. API NOT CURRENT
+
+No existe:
+
+DELETE /healthcare/cases/:caseId
+
 complete command
-```
 
-RBAC implementado:
+reopen command
 
-```text
+start command
+
+Equipment Assignment API
+
+Dispatch API
+
+Return API
+
+Reconciliation API
+
+106. Create transaction CURRENT
+
+Create Case ejecuta dentro de una sola transacción:
+
+creator validation
+
+responsible User validation when supplied
+
+CompanySequence folio allocation
+
+HealthcareCase create
+
+107. Read CURRENT
+
+GET /healthcare/cases
+→ tenant scoped
+→ createdAt DESC
+
+GET /healthcare/cases/:caseId
+→ id + companyId
+
+Missing o cross-tenant devuelve:
+
+Caso no encontrado
+
+según el contrato actual.
+
+108. RBAC CURRENT
+
+La implementación documentada utiliza roles explícitos.
+
+CURRENT:
+
 ADMIN
 → create / read / edit / cancel
 
@@ -854,2859 +1590,1108 @@ SALES
 
 WAREHOUSE
 → read
-```
 
-No se agrego rol `TECHNICIAN`.
+No existe:
 
-Create transaction:
+TECHNICIAN role
 
-```text
-creator validation
-responsible-user validation when supplied
-CompanySequence folio allocation
-HealthcareCase create
-```
+agregado específicamente para Case Foundation.
 
-No abre una segunda transaccion. Errores inesperados de create se propagan.
+109. Permission model TARGET
 
-Read:
+Permisos futuros pueden evolucionar hacia capacidades más granulares como:
 
-```text
-GET /healthcare/cases
-→ tenant scoped
-→ createdAt DESC
+healthcare.cases.read
 
-GET /healthcare/cases/:caseId
-→ id + companyId
-```
+healthcare.cases.create
 
-Missing/cross-tenant:
+healthcare.cases.update
 
-```text
-Caso no encontrado
-```
+healthcare.cases.schedule
 
-PATCH planning:
+healthcare.cases.assign
 
-```text
-PATCH /healthcare/cases/:caseId
-```
+Los nombres definitivos deben coordinarse con la arquitectura RBAC.
 
-Campos editables:
+110. Backend authority
 
-```text
-title
-procedureDescription
-scheduledStart
-scheduledEnd
-responsibleUserId
-```
+Frontend puede facilitar el workflow.
 
-Semantica parcial:
+Backend debe seguir siendo autoridad para:
 
-```text
-omitted / undefined
-→ retain persisted value
+tenant
 
-explicit null where allowed
-→ clear value
-```
+authorization
 
-Los campos server-managed no se aceptan desde cliente.
+status
 
-B.4.1 QA/fix evidence:
+schedule
 
-```text
-schedule-only PATCH with title omitted
-→ originally returned 400 El título del caso es obligatorio
+responsible User
 
-root cause
-→ update normalization treated own undefined as supplied value
+future relationships
 
-fix
-→ undefined / omitted retains existing value
-→ explicit value applies normalization/update
+future logistics invariants
 
-manual retest
-→ passed
-```
+111. Case create idempotency CURRENT debt
 
-Idempotency:
+Actualmente:
 
-```text
-Case creation idempotency
-→ NOT IMPLEMENTED in Foundation
-```
+same logical create request submitted twice
+→ may create two Cases
+→ may consume two folios
 
-Reliability debt:
+Esto es:
 
-```text
-successful commit
-lost response
-client retry
-→ another Case may be created
-→ another folio may be consumed
-```
+request idempotency not implemented
 
-No resolver Purchase Receipt idempotency dentro de Case Foundation.
+No es un bug del sequence allocator.
 
-Concurrency:
+112. Idempotency future requirement
 
-```text
-Case create folio allocation
-→ transaction-safe through CompanySequenceAllocatorService
+Además del create CURRENT, acciones críticas futuras como:
 
-normal planning update concurrency
-→ current project behavior acceptable for Foundation
+confirm Dispatch
+
+confirm Return
+
+confirm Reconciliation
+
+deberán ser duplicate-safe.
+
+113. Concurrency CURRENT
+
+La asignación de folio utiliza infraestructura transaccional.
+
+Cancel utiliza validación de estado y mutación condicional según el comportamiento documentado.
+
+Planning concurrency Foundation es aceptable para el alcance actual.
+
+114. Concurrency TARGET
+
+Cuando existan:
+
+Assignment
+
+Case Availability
+
+conflict-sensitive reschedule
+
+será necesaria revalidación más fuerte.
+
+Puede evaluarse:
+
+updatedAt
+
+version
+
+locking / transactional checks
+
+según el riesgo real.
+
+115. Automated validation summary
+
+La validación automatizada registrada cubre:
+
+HealthcareCaseService
+
+controller
+
+DTO contracts
+
+folio allocation
+
+tenant-scoped access
+
+planning updates
+
+cancellation lifecycle
+
+backend regression
+
+Los snapshots cuantitativos pertenecen a:
+
+PROJECT_BOARD.md
+
+CHANGELOG.md
+
+116. Manual QA summary
+
+La evidencia manual registrada validó de forma resumida:
+
+sequential Case folios
+
+create
+
+detail
+
+list
+
+DRAFT → SCHEDULED
+
+reschedule
+
+invalid schedule rejection
+
+SCHEDULED → DRAFT by clearing schedule
+
+reschedule again
 
 cancel
-→ tenant pre-read + conditional update on active eligible status
-→ zero affected count after eligible pre-read is a concurrency conflict
 
-future conflict-sensitive reschedule
-→ stronger revalidation/concurrency required once Assignment exists
-```
+terminal CANCELLED protection
 
-Prisma assessment:
+cancellation audit preservation
 
-Case Foundation requirio una migracion enfocada:
+117. QA limitations CURRENT
 
-```text
-new HealthcareCase model
-new HealthcareCaseStatus enum
-relations
-indexes / constraints
-migration
-```
+Permanece pendiente:
 
-Hospital y Doctor no forman parte de esta migracion.
+real second-Company manual cross-tenant QA
 
-Automated validation final after B.4.1:
+real simultaneous concurrent cancellation race QA
 
-```text
-HealthcareCaseService
-59 tests PASS
+Automated tests sí cubren tenant-scoped queries y conditional cancellation behavior.
 
-Controller + DTOs
-46 tests PASS
+118. Handoff to UX TARGET
 
-Full Healthcare Case
-6 suites
-116 tests PASS
+No existe todavía frontend Healthcare.
 
-Full backend
-40 suites
-341 tests PASS
+La futura UI deberá consumir el Foundation existente sin duplicar lifecycle en frontend.
 
-Prisma validate
-PASS
+119. Case Calendar TARGET
 
-Build
-PASS
+CURRENT:
 
-Changed TypeScript ESLint
-PASS
+Case schedule data
+✅
 
-Full backend ESLint
-PASS
+TARGET:
 
-git diff --check
-PASS
-```
+Calendar UI
 
-Manual PostgreSQL / API QA:
+Calendar Read Model
 
-```text
-CASE-000001 and CASE-000002 were generated for two independent create requests
-GET one
-GET list
-DRAFT → SCHEDULED by schedule-only PATCH
-SCHEDULED → SCHEDULED by reschedule
-invalid end <= start rejected with no mutation
-SCHEDULED → DRAFT by clearing schedule
-DRAFT → SCHEDULED again
-SCHEDULED → CANCELLED
-PATCH CANCELLED → 409
-second cancel → 409
-final GET preserved original cancellation audit facts
-```
+filters
 
-Manual QA limits:
+readiness context
 
-```text
-real manual second-company cross-tenant QA
-→ NOT PERFORMED
+conflict detection
 
-real simultaneous concurrent cancellation race
-→ NOT PERFORMED
-```
+120. Case 360 TARGET
 
-Unit tests cover tenant-scoped queries and conditional cancellation mutation.
+La futura vista Case 360 podrá presentar:
 
-Idempotency remains unresolved:
-
-```text
-same logical Case create submitted twice
-→ two valid Cases
-→ two folios
-```
-
-This is expected under the current non-idempotent API and is not a sequence bug.
-
-Implementation phases completed:
-
-```text
-B.1
-Prisma HealthcareCase model + HealthcareCaseStatus + migration
-
-B.2
-Case folio allocation + HealthcareCaseService create/read/list
-
-B.3
-DTOs + HealthcareCaseController + authenticated API
-
-B.4
-planning update + cancellation lifecycle rules
-
-B.5
-automated validation + PostgreSQL/API manual QA
-
-C
-final documentation synchronization
-```
-
----
-
-# 19. Título
-
-Puede existir un resumen legible como:
-
-```text
-Implante — Dr. X — Hospital ABC
-```
-
-sin depender únicamente de notas libres.
-
----
-
-# 20. El título no sustituye relaciones
-
-No debe almacenarse únicamente:
-
-```text
-"Cirugía Dr. X Hospital ABC"
-```
-
-y perder relaciones estructuradas con Doctor y Hospital.
-
----
-
-# 21. Doctor
-
-Case puede relacionarse con el Doctor principal del procedimiento.
-
----
-
-# 22. Doctor como contexto operacional
-
-Doctor ayuda a:
-
-* identificar el Case;
-* preparar material;
-* comprender preferencias;
-* buscar historial;
-* organizar agenda;
-* relacionar futuras oportunidades.
-
----
-
-# 23. Doctor no es Customer
-
-Se mantiene:
-
-```text
-Doctor
-≠
-Customer
-```
-
----
-
-# 24. Doctor requerido
-
-En la operación Healthcare típica, Doctor probablemente será un dato muy importante.
-
-Sin embargo, este documento no declara todavía:
-
-```text
-doctorId NOT NULL
-```
-
-hasta cerrar el modelo específico de Doctors/Hospitals.
-
----
-
-# 25. Razón
-
-Puede existir un Case originado por un Hospital donde inicialmente:
-
-```text
-Doctor
-→ pendiente de asignar
-```
-
----
-
-# 26. Requisito operacional posterior
-
-Aunque Doctor pueda faltar inicialmente, el workflow puede exigirlo antes de determinadas etapas.
-
-Ejemplo:
-
-```text
-Case Draft
-→ Doctor pendiente permitido
-
-Case scheduled / prepared
-→ Doctor requerido
-```
-
-si los casos reales confirman esa necesidad.
-
----
-
-# 27. Hospital
-
-Case debe relacionarse con el lugar u organización donde ocurrirá la operación cuando se conozca.
-
----
-
-# 28. Hospital no es Customer
-
-Se mantiene:
-
-```text
-Hospital
-≠
-Customer
-```
-
----
-
-# 29. Hospital como contexto logístico
-
-Hospital puede influir en:
-
-* ubicación;
-* horario;
-* acceso;
-* preparación;
-* Equipment;
-* documentos;
-* contactos;
-* tiempos de traslado.
-
----
-
-# 30. Customer
-
-Case puede relacionarse con Customer cuando se conozca la contraparte comercial.
-
----
-
-# 31. Customer opcional inicialmente
-
-Un Case no debe quedar bloqueado únicamente porque todavía no esté determinado:
-
-```text
-quién será facturado
-```
-
-si la operación Healthcare ya necesita coordinarse.
-
----
-
-# 32. Payer
-
-Payer también puede conocerse antes o después.
-
----
-
-# 33. Payer no bloquea operación logística
-
-No debe impedirse preparar un Case porque:
-
-```text
-insurance authorization
-```
-
-o el Payer definitivo todavía estén pendientes, salvo que la empresa defina explícitamente esa regla.
-
----
-
-# 34. Separación
-
-```text
-Doctor
-→ medical demand context
-
-Hospital
-→ procedure location / organization
-
-Customer
-→ commercial counterpart
-
-Payer
-→ economic responsibility
-
-Technician
-→ operational responsibility
-```
-
-Estas relaciones pueden coincidir parcialmente en una operación, pero no son conceptualmente equivalentes.
-
----
-
-# 35. Technician
-
-Case debe tener un responsable operacional principal cuando corresponda.
-
-En el modelo inicial se denomina conceptualmente:
-
-```text
-Technician
-```
-
----
-
-# 36. Technician y User
-
-El Technician probablemente deberá relacionarse con una identidad interna de Zaping.
-
-Pero aún debe decidirse si será:
-
-```text
-User with Healthcare profile
-```
-
-o:
-
-```text
-separate Technician entity linked to User
-```
-
----
-
-# 37. No crear un User duplicado
-
-No debe existir:
-
-```text
-User Leonardo
-+
-Technician Leonardo
-```
-
-como identidades desconectadas para la misma persona sin una razón de dominio.
-
----
-
-# 38. Technician principal
-
-Case debería permitir identificar claramente:
-
-```text
-responsible technician
-```
-
----
-
-# 39. Participantes adicionales
-
-En el futuro podría existir:
-
-```text
-secondary technician
-support personnel
-salesperson
-```
-
-pero no debe sobrearquitectarse la primera versión.
-
----
-
-# 40. Procedure Context
-
-Case debe describir qué tipo de procedimiento o necesidad operacional se atenderá.
-
----
-
-# 41. Procedure no es información clínica profunda
-
-Ejemplo válido:
-
-```text
-Implante de marcapasos
-```
-
-como categoría operacional.
-
-No implica almacenar:
-
-```text
-diagnóstico completo
-tratamiento médico
-historia clínica
-```
-
----
-
-# 42. Procedure Catalog futuro
-
-Puede ser útil un catálogo:
-
-```text
-ProcedureType
-```
-
-que permita definir posteriormente:
-
-* nombre;
-* categoría;
-* KitTemplate sugerido;
-* Equipment frecuente;
-* duración estimada.
-
----
-
-# 43. No bloquear Foundation
-
-Un catálogo ProcedureType no debe ser requisito para comenzar la primera implementación si texto estructurado/simple es suficiente.
-
----
-
-# 44. Patient Data
-
-La primera versión de Healthcare Case **no debe requerir datos personales de paciente**.
-
----
-
-# 45. Regla de minimización
-
-No agregar inicialmente campos como:
-
-```text
-patientName
-patientBirthDate
-diagnosis
-medicalRecord
-```
-
-sin un requisito operacional real.
-
----
-
-# 46. Referencia externa futura
-
-Si posteriormente se demuestra que la empresa necesita identificar un procedimiento contra un sistema hospitalario, puede evaluarse:
-
-```text
-externalCaseReference
-```
-
-u otra referencia mínima.
-
----
-
-# 47. Revisión de privacidad
-
-Cualquier incorporación futura de datos de paciente debe pasar por revisión específica de:
-
-```text
-necessity
-privacy
-security
-retention
-permissions
-audit
-```
-
----
-
-# 48. Scheduling
-
-Case es propietario de su planificación temporal.
-
-Conceptualmente puede necesitar:
-
-```text
-scheduledStart
-scheduledEnd
-```
-
----
-
-# 49. Case Calendar
-
-`Case Calendar` consume estos datos.
-
-Conceptualmente:
-
-```text
-Case.schedule
-↓
-Case Calendar Read Model
-```
-
----
-
-# 50. Calendar no es propietario del schedule
-
-No debe ocurrir:
-
-```text
-CalendarEvent
-→ source of truth
-```
-
-mientras:
-
-```text
-Case
-```
-
-desconoce cuándo ocurre.
-
----
-
-# 51. Fecha y hora
-
-Los procedimientos requieren timestamps, no únicamente fechas.
-
-Ejemplo:
-
-```text
-2026-09-12
-08:30
-```
-
----
-
-# 52. Timezone
-
-La interpretación deberá respetar:
-
-```text
-Company.timezone
-```
-
-según la política temporal de Zaping.
-
----
-
-# 53. scheduledStart
-
-Representa el inicio planificado.
-
----
-
-# 54. scheduledEnd
-
-Puede representar:
-
-* duración esperada;
-* ventana de uso del Technician;
-* ventana de Equipment;
-* detección de conflictos.
-
----
-
-# 55. End opcional
-
-La primera versión puede permitir que `scheduledEnd` sea opcional si la empresa no lo conoce con precisión.
-
-Pero eso limita detección de conflictos.
-
----
-
-# 56. Duración estimada
-
-Otra estrategia futura puede utilizar:
-
-```text
-scheduledStart
-+
-estimatedDuration
-```
-
-La decisión final pertenece al diseño técnico.
-
----
-
-# 57. Expected Date vs Schedule
-
-Debe mantenerse:
-
-```text
-Opportunity.expectedDate
-≠
-Case.scheduledStart
-```
-
----
-
-# 58. Schedule confirmado
-
-Cuando se crea Case desde Opportunity, una fecha estimada puede prellenar el schedule.
-
-Pero el usuario debe poder confirmar/corregirla.
-
----
-
-# 59. Reprogramación
-
-Debe existir un workflow explícito para:
-
-```text
-Reschedule Case
-```
-
----
-
-# 60. Reprogramar no crea nuevo Case
-
-Si el mismo procedimiento cambia de horario:
-
-```text
-Case 145
-Sep 12
-↓
-rescheduled
-↓
-Sep 13
-```
-
-sigue siendo:
-
-```text
-Case 145
-```
-
----
-
-# 61. Historial de reprogramación
-
-Idealmente debe conservarse posteriormente información como:
-
-```text
-old schedule
-new schedule
-actor
-timestamp
-reason?
-```
-
-mediante Audit o un historial apropiado.
-
----
-
-# 62. No reescribir historia silenciosamente
-
-Cambiar el schedule no debería hacer imposible saber que hubo una reprogramación cuando esa información sea operacionalmente relevante.
-
----
-
-# 63. Cases recurrentes
-
-Cada procedimiento real debe representarse como un Case independiente.
-
----
-
-# 64. Anti-patrón
-
-No crear:
-
-```text
-Case "Cirugías Dr. X"
-```
-
-y utilizarlo durante meses para múltiples procedimientos.
-
----
-
-# 65. Un procedimiento → un Case
-
-Como regla conceptual inicial:
-
-> **Cada ocurrencia operacional relevante debe tener su propio Case.**
-
----
-
-# 66. Lifecycle vs Readiness
-
-Esta separación es fundamental.
-
-```text
-Lifecycle Status
-→ en qué etapa está el Case
-```
-
-```text
-Readiness
-→ si está preparado para ejecutarse
-```
-
----
-
-# 67. Refinamiento de HEALTHCARE.md
-
-`HEALTHCARE.md` utilizó conceptualmente:
-
-```text
-READY
-```
-
-dentro del lifecycle inicial.
-
-Este documento refina esa idea.
-
-La recomendación actual es:
-
-> **READY debe tratarse preferentemente como una condición de readiness, no necesariamente como un estado principal del lifecycle.**
-
----
-
-# 68. Razón
-
-Un Case puede estar:
-
-```text
-SCHEDULED
-```
-
-pero:
-
-```text
-NOT_READY
-```
-
----
-
-# 69. Ejemplo
-
-```text
-Case
-Status: SCHEDULED
-
-Readiness:
-Technician        ✓
-Hospital          ✓
-CaseKit           ✗
-Equipment         ✓
-Documents         ✗
-```
-
----
-
-# 70. Lifecycle conceptual
-
-Una primera semántica puede ser:
-
-```text
-DRAFT
-↓
-SCHEDULED
-↓
-IN_PROGRESS
-↓
-RECONCILIATION_PENDING
-↓
-COMPLETED
-```
-
-con:
-
-```text
-CANCELLED
-```
-
-como salida alternativa.
-
----
-
-# 71. No es enum Prisma aprobado
-
-Los nombres anteriores representan el comportamiento que necesitamos.
-
-No se deben crear aún automáticamente en `schema.prisma`.
-
----
-
-# 72. DRAFT
-
-Case existe pero todavía puede faltar información necesaria para planificación operacional.
-
-Ejemplos:
-
-```text
-Hospital pendiente
-schedule pendiente
-Technician pendiente
-```
-
----
-
-# 73. DRAFT no significa Opportunity
-
-Un Case Draft sigue siendo una operación identificable.
-
-Una Opportunity representa todavía incertidumbre sobre si la operación ocurrirá.
-
----
-
-# 74. Cuándo crear Case
-
-La pregunta recomendada es:
-
-> **¿Ya existe una operación que alguien necesita coordinar?**
-
-Si sí:
-
-```text
-Case
-```
-
-Si todavía estamos evaluando una posibilidad:
-
-```text
-Opportunity
-```
-
----
-
-# 75. SCHEDULED
-
-Representa que existe una fecha/hora operacional aceptada.
-
----
-
-# 76. SCHEDULED no significa preparado
-
-Puede existir:
-
-```text
-SCHEDULED
-+
-NOT_READY
-```
-
----
-
-# 77. IN_PROGRESS
-
-Representa que la operación/procedimiento está ocurriendo o ha iniciado desde el punto de vista operacional.
-
----
-
-# 78. No registrar información clínica
-
-`IN_PROGRESS` no requiere documentar lo que médicamente está sucediendo.
-
-Solo su estado operacional.
-
----
-
-# 79. Procedure Completion
-
-Al concluir el procedimiento puede ocurrir:
-
-```text
-Case
-↓
-procedure completed
-↓
-material reconciliation required
-```
-
----
-
-# 80. RECONCILIATION_PENDING
-
-Representa que el procedimiento operativo terminó, pero todavía deben resolverse:
-
-* material utilizado;
-* material devuelto;
-* Equipment;
-* inspecciones;
-* diferencias;
-* incidencias.
-
----
-
-# 81. Importancia
-
-El Case no debe considerarse completamente cerrado únicamente porque:
-
-```text
-la cirugía terminó
-```
-
-si todavía existe material bajo custodia o sin reconciliar.
-
----
-
-# 82. COMPLETED
-
-Case puede considerarse operacionalmente completado cuando:
-
-```text
-procedure ended
-+
-custody resolved
-+
-returns processed
-+
-reconciliation complete
-+
-no blocking unresolved items
-```
-
-según las reglas de `CASE_LOGISTICS.md`.
-
----
-
-# 83. COMPLETED no significa facturado
-
-Debe mantenerse:
-
-```text
-Case COMPLETED
-≠
-Invoice paid
-```
-
----
-
-# 84. COMPLETED no significa Sales closed
-
-También puede existir:
-
-```text
-Case COMPLETED
-+
-commercial follow-up pending
-```
-
----
-
-# 85. Separación
-
-```text
-Case closure
-→ operational/logistical closure
-```
-
-```text
-Sales closure
-→ commercial lifecycle
-```
-
-```text
-Invoice/payment
-→ financial lifecycle
-```
-
----
-
-# 86. CANCELLED
-
-Representa que el procedimiento/operación ya no ocurrirá.
-
----
-
-# 87. Cancelación conserva historia
-
-Un Case cancelado:
-
-```text
-→ remains in system
-```
-
-No debe eliminarse para desaparecer del Calendar.
-
----
-
-# 88. Cancel reason
-
-Puede ser útil registrar:
-
-```text
-cancelReason
-```
-
-o un reason code futuro.
-
----
-
-# 89. Ejemplos
-
-```text
-Procedure cancelled
-Doctor unavailable
-Hospital rescheduled indefinitely
-Patient no longer proceeds
-Material unavailable
-Commercial cancellation
-Other
-```
-
-Debe evitarse almacenar detalle clínico innecesario.
-
----
-
-# 90. Cancelación antes de Dispatch
-
-Conceptualmente:
-
-```text
-Case
-↓
-CANCELLED
-```
-
-es relativamente simple si todavía no existe material bajo custodia.
-
----
-
-# 91. Cancelación después de Dispatch
-
-Si ya existe:
-
-```text
-CaseDispatch
-```
-
-la cancelación no puede ignorar el material que salió.
-
-Debe primero garantizar:
-
-```text
-custody
-↓
-return
-↓
-inspection
-↓
-reconciliation
-```
-
-según corresponda.
-
----
-
-# 92. Regla
-
-> **Cancelar el Case no elimina obligaciones logísticas existentes.**
-
----
-
-# 93. Readiness
-
-Readiness responde:
-
-```text
-¿Está este Case preparado para ejecutarse?
-```
-
----
-
-# 94. Readiness conceptual
-
-Puede representarse inicialmente como:
-
-```text
-NOT_READY
-PARTIALLY_READY
-READY
-BLOCKED
-```
-
-o mediante indicadores derivados.
-
-El modelo definitivo se definirá en `CASE_CALENDAR.md` y `CASE_KITS.md`.
-
----
-
-# 95. Preferencia por derivación
-
-Siempre que sea posible, Readiness debería derivarse de hechos reales.
-
-Ejemplo:
-
-```text
-required CaseKit prepared
-+
-required Equipment assigned
-+
-Technician assigned
-+
-required data complete
-=
-READY
-```
-
----
-
-# 96. Evitar status manual falso
-
-Incorrecto:
-
-```text
-User clicks "READY"
-```
-
-aunque:
-
-```text
-CaseKit incomplete
-Equipment missing
-```
-
----
-
-# 97. Readiness checklist
-
-Una futura vista puede mostrar:
-
-```text
-Schedule        ✓
-Hospital        ✓
-Doctor          ✓
-Technician      ✓
-CaseKit         ✗
-Equipment       ✓
-Documents       ○
-```
-
----
-
-# 98. Bloqueadores
-
-Readiness debe poder explicar:
-
-```text
-¿Por qué no está listo?
-```
-
----
-
-# 99. Ejemplo
-
-```text
-NOT READY
-
-Missing:
-- CaseKit preparation
-- Equipment EQ-004 unavailable
-```
-
----
-
-# 100. Preparation eligibility
-
-Un Case puede pasar a Preparation cuando exista suficiente información para que almacén sepa:
-
-```text
-qué operación
-cuándo
-dónde
-quién es responsable
-qué se necesita preparar
-```
-
----
-
-# 101. Datos mínimos conceptuales para Preparation
-
-Normalmente:
-
-```text
 Case identity
-schedule sufficiently known
-Hospital / destination
-responsible Technician
-material/equipment requirements
-```
 
----
+Schedule
 
-# 102. Doctor para Preparation
+Actors
 
-Doctor puede ser importante para preferencias y contexto.
+Requirements
 
-La obligatoriedad exacta deberá validarse con el workflow Healthcare real.
+Preparation
 
----
+Equipment Assignment
 
-# 103. Customer no requerido para Preparation
+CaseKit
 
-Debe ser posible preparar material aunque todavía esté pendiente:
+Dispatch
 
-```text
-Customer
-```
+Return
 
-si la operación lo permite.
+Reconciliation
 
----
+Commercial context
 
-# 104. Payer no requerido para Preparation
+Timeline
 
-También:
+Actualmente:
 
-```text
-Payer
-```
+Case 360
+→ NOT IMPLEMENTED
 
-no debe bloquear preparación por defecto.
+121. Case 360 primary action
 
----
+Debe mantenerse como principio UX futuro:
 
-# 105. Business blockers configurables
+one clear primary action
++
+contextual secondary actions
 
-En el futuro una Company podría decidir:
+Los CTAs exactos deben derivarse del lifecycle real implementado.
 
-```text
-No preparar sin autorización comercial
-```
+No deben fijarse ahora usando estados todavía inexistentes.
 
-pero esto debe ser una política explícita.
+122. Missing information vs blocker
 
-No una dependencia universal de Healthcare.
+Case 360 futuro deberá distinguir:
 
----
+missing information
 
-# 106. CaseKit
+de:
 
-Un Case puede tener un CaseKit específico.
+operational blocker
 
----
+Ejemplo:
 
-# 107. CaseKit no debe vivir como JSON dentro de Case
+Customer pending
+→ informational
 
-Incorrecto:
+Required Equipment unavailable
+→ blocker
 
-```text
-HealthcareCase.caseKitJson
-```
+cuando esas relaciones existan.
 
-como sustituto permanente de un agregado CaseKit real.
+123. Dashboard TARGET
 
----
+Healthcare Dashboard podrá consumir Read Models como:
 
-# 108. Multiple CaseKits
+Cases today
 
-Debe evaluarse si un Case puede requerir más de un CaseKit.
+Cases tomorrow
+
+Cases requiring attention
+
+availability conflicts
+
+pending reconciliation
+
+Actualmente:
+
+Healthcare Dashboard widgets
+→ NOT IMPLEMENTED
+
+124. Search FUTURE
+
+Global Search futuro podrá localizar Case por:
+
+folio
+
+Doctor
+
+Hospital
+
+responsible User
+
+cuando esas relaciones existan.
+
+125. Notifications FUTURE
+
+Candidatos:
+
+Case tomorrow requires attention
+
+responsible User conflict
+
+Equipment conflict
+
+Case rescheduled
+
+Case cancelled
+
+reconciliation pending
+
+Actualmente Notifications no es una dependencia CURRENT de Cases.
+
+126. Mobile FUTURE
+
+HealthcareCase es candidato fuerte para experiencia móvil.
+
+Prioridades futuras:
+
+Today's Cases
+
+Case details
+
+CaseKit
+
+Custody
+
+Return
+
+Reconciliation
+
+127. Offline FUTURE
+
+Trabajo hospitalario puede justificar soporte offline.
+
+No pertenece al alcance CURRENT ni al primer cierre Healthcare.
+
+128. Attachments FUTURE
+
+HealthcareCase podrá relacionarse posteriormente con documentos operativos.
 
 Ejemplos:
 
-```text
-consumables kit
-instrument kit
-backup kit
-```
+hospital instructions
 
-La primera versión puede mantener simplicidad si un solo CaseKit agregado es suficiente.
+commercial authorization
 
----
+photos of returned Equipment
 
-# 109. Dispatch
+PDF documents
 
-Un Case puede tener uno o más Dispatches.
+Debe existir una estrategia transversal de documentos antes de almacenar referencias arbitrarias.
 
----
+129. Attachment security
 
-# 110. Múltiples Dispatches
+Todo archivo Healthcare futuro debe respetar:
 
-Debe permitirse conceptualmente:
+tenant
 
-```text
-Initial Dispatch
-+
-Additional Dispatch
-```
+permissions
 
-si durante el procedimiento se requiere material extra.
+data minimization
 
----
+security
 
-# 111. No asumir un único maletín
+retention
 
-La operación real puede requerir:
-
-```text
-Case
-↓
-multiple physical movements
-```
-
----
-
-# 112. CaseReturn
-
-De igual forma puede haber más de un retorno físico relacionado con el mismo Case.
-
----
-
-# 113. Reconciliation agregada
-
-El Case debe poder conocer si todas sus operaciones logísticas están reconciliadas.
-
----
-
-# 114. Case closure invariant
-
-Para cierre normal:
-
-```text
-all Dispatch quantities resolved
-+
-all Equipment custody resolved
-+
-required inspections completed
-```
-
----
-
-# 115. Unresolved
-
-Si existe:
-
-```text
-Unresolved > 0
-```
-
-el Case debería permanecer:
-
-```text
-RECONCILIATION_PENDING
-```
-
-salvo resolución autorizada.
-
----
-
-# 116. Equipment
-
-Case puede requerir Equipment reutilizable.
-
----
-
-# 117. Equipment assignment
-
-Asignar Equipment debe permitir verificar:
-
-```text
-availability
-schedule conflict
-condition
-custody
-```
-
-cuando esas capacidades existan.
-
----
-
-# 118. Equipment no es consumible
-
-No debe mezclarse:
-
-```text
-Product quantity
-```
-
-con:
-
-```text
-EquipmentAsset identity
-```
-
----
-
-# 119. Calendar conflict
-
-Un Case puede estar correctamente agendado y aun así presentar:
-
-```text
-Equipment conflict
-```
-
----
-
-# 120. Technician conflict
-
-También:
-
-```text
-same Technician
-+
-overlapping Cases
-```
-
-debe ser detectable.
-
----
-
-# 121. Conflicto no necesariamente bloquea creación
-
-Puede permitirse crear el Case y marcar:
-
-```text
-BLOCKED / CONFLICT
-```
-
-en lugar de impedir capturarlo completamente.
-
----
-
-# 122. Razón
-
-La operación puede estar confirmada aunque todavía deba resolverse la asignación.
-
----
-
-# 123. Commercial Context
-
-Case debe permitir navegar a su información comercial sin duplicarla.
-
-Puede mostrar:
-
-```text
-Opportunity
-Quote
-SalesOrder
-Delivery
-Invoice future
-```
-
-cuando existan.
-
----
-
-# 124. No copiar totales
-
-Case no debe almacenar permanentemente copias como:
-
-```text
-quoteTotal
-salesTotal
-invoiceTotal
-```
-
-si esos valores pertenecen a otros documentos.
-
----
-
-# 125. Used Material
-
-Después del procedimiento, la reconciliación determinará material utilizado.
-
----
-
-# 126. Used no significa Invoice
-
-Debe mantenerse:
-
-```text
-Used Material
-→ operational truth
-```
-
-separado de:
-
-```text
-Invoice
-→ financial document
-```
-
----
-
-# 127. Used y Delivery
-
-La arquitectura deberá definir cómo material utilizado genera o se relaciona con Delivery sin producir doble movimiento.
-
----
-
-# 128. Case no modifica stock directamente
-
-Nunca:
-
-```text
-CaseService
-↓
-product.stock -= quantity
-```
-
----
-
-# 129. Inventory integration
-
-Las consecuencias físicas deben pasar por la arquitectura Inventory/Custody aprobada.
-
----
-
-# 130. Ownership
+130. Cross-tenant invariant
 
 Todo Case pertenece a una Company.
 
----
+Debe mantenerse:
 
-# 131. Tenant Context
-
-Conceptualmente:
-
-```text
 Authenticated User
 ↓
 Company
 ↓
-Healthcare Case
-```
+HealthcareCase
 
----
-
-# 132. Relaciones cross-tenant
+131. Cross-tenant relationships TARGET
 
 Nunca:
 
-```text
 Case Company A
 → Product Company B
-```
 
-o:
-
-```text
 Case Company A
-→ Technician Company B
-```
+→ EquipmentAsset Company B
 
----
+Case Company A
+→ responsible User Company B
 
-# 133. Doctor/Hospital ownership pendiente
+Y, cuando Doctor/Hospital existan, deberá preservarse la frontera tenant definida para esos modelos.
 
-Cuando diseñemos Doctors/Hospitals deberá definirse cómo se garantiza esta frontera.
+132. Audit TARGET
 
----
+Acciones candidatas futuras:
 
-# 134. Authorization
-
-Permisos conceptuales futuros pueden incluir:
-
-```text
-healthcare.cases.read
-healthcare.cases.create
-healthcare.cases.update
-healthcare.cases.schedule
-healthcare.cases.assign
-healthcare.cases.start
-healthcare.cases.cancel
-healthcare.cases.complete
-```
-
----
-
-# 135. Warehouse permissions
-
-Warehouse puede necesitar:
-
-```text
-read Case operational context
-prepare CaseKit
-dispatch
-receive return
-inspect
-```
-
-sin permiso para modificar toda la información comercial.
-
----
-
-# 136. Technician permissions
-
-Technician puede requerir:
-
-```text
-read assigned Cases
-acknowledge custody
-view CaseKit
-register operational result
-```
-
-según el diseño final.
-
----
-
-# 137. Manager
-
-Puede requerir:
-
-* reassign;
-* cancel;
-* resolve blockers;
-* oversee reconciliation.
-
----
-
-# 138. Least Privilege
-
-No todo usuario Healthcare debe poder modificar:
-
-```text
-schedule
-commercial links
-custody
-reconciliation
-```
-
-indistintamente.
-
----
-
-# 139. API
-
-Healthcare Case Foundation implementa actualmente:
-
-```text
-POST /healthcare/cases
-GET /healthcare/cases
-GET /healthcare/cases/:caseId
-PATCH /healthcare/cases/:caseId
-POST /healthcare/cases/:caseId/cancel
-```
-
-No existe:
-
-```text
-DELETE /healthcare/cases/:caseId
-complete command
-reopen command
-```
-
----
-
-# 140. Acciones conceptuales
-
-Una API futura necesitará capacidades equivalentes a:
-
-```text
-Create Case
-Read Case
-Update Draft/allowed fields
-Schedule
-Reschedule
-Assign Technician
-Cancel
-Start
-Register Procedure Completion
-Close
-```
-
----
-
-# 141. Business Actions
-
-Las transiciones relevantes deberían preferir acciones empresariales explícitas sobre un:
-
-```text
-PATCH status = ...
-```
-
-sin reglas.
-
----
-
-# 142. Ejemplo conceptual
-
-```text
-Schedule Case
-```
-
-debe validar:
-
-```text
-tenant
-permissions
-date
-relationships
-current status
-```
-
----
-
-# 143. Start Case
-
-Debe impedirse iniciar un Case:
-
-```text
-CANCELLED
-COMPLETED
-```
-
----
-
-# 144. Complete Case
-
-No debería permitirse cerrar si existen obligaciones logísticas pendientes.
-
----
-
-# 145. Idempotencia
-
-Acciones como:
-
-```text
-start
-cancel
-complete
-```
-
-deben manejar retries sin producir estados inconsistentes.
-
----
-
-# 146. Concurrencia
-
-Dos usuarios pueden intentar:
-
-```text
-reschedule
-assign technician
-cancel
-```
-
-simultáneamente.
-
-La implementación debe evitar pérdida silenciosa de información crítica.
-
----
-
-# 147. Optimistic concurrency futuro
-
-Puede evaluarse:
-
-```text
-updatedAt
-version
-```
-
-u otra estrategia si el uso real lo requiere.
-
----
-
-# 148. Audit
-
-Acciones candidatas:
-
-```text
 case.created
+
 case.updated
+
 case.scheduled
+
 case.rescheduled
-case.technician_assigned
-case.started
-case.procedure_completed
+
+case.responsible_user_changed
+
 case.cancelled
-case.completed
-```
 
----
+y posteriormente eventos logísticos.
 
-# 149. Datos sensibles en Audit
+Actualmente no existe una plataforma transversal completa de Audit.
 
-No registrar información clínica o personal innecesaria.
+133. Audit ≠ domain history
 
----
+Debe mantenerse:
 
-# 150. Case Timeline
-
-Case 360 puede combinar:
-
-```text
-Domain events
 Audit
-Logistics
-Commercial documents
-```
+≠
+Inventory history
 
-para mostrar una línea de tiempo útil.
+Audit
+≠
+Custody history
 
----
+Audit
+≠
+Case Timeline
 
-# 151. Ejemplo
+134. Case Timeline TARGET
 
-```text
-08:30 Case created
-09:10 Technician assigned
-10:45 Schedule confirmed
-Sep 12 07:00 CaseKit prepared
-Sep 12 07:30 Dispatch confirmed
-Sep 12 12:20 Procedure completed
-Sep 12 14:00 Material returned
-Sep 12 15:10 Reconciliation completed
-```
+Case 360 podrá combinar hechos de:
 
----
+Case
 
-# 152. Timeline no es fuente de verdad
+future logistics
 
-La línea de tiempo es una vista.
+future commercial links
 
-Los documentos de dominio continúan siendo la fuente real.
+future Audit
 
----
+como Read Model cronológico.
 
-# 153. UX principal
+Timeline no sustituye las fuentes de dominio.
 
-Case debe tener una vista:
+135. CURRENT technical debt
 
-```text
-Case 360
-```
+Permanece abierto:
 
----
+Case create request idempotency
 
-# 154. Header
+real manual second-Company cross-tenant QA
 
-Puede mostrar:
+real simultaneous cancellation-race QA
 
-```text
-CASE-000145
-Status
-Readiness
-Date / Time
-Hospital
-Doctor
-Technician
-Primary Action
-```
+formal reschedule history / audit
 
----
+136. TARGET Healthcare Case capabilities
 
-# 155. Sección Context
+Después del cierre ERP Core V1, Healthcare evolucionará progresivamente hacia:
 
-```text
-Procedure
-Doctor
-Hospital
-Technician
-Customer
-Payer
-Opportunity
-```
+Doctor / Hospital
 
----
-
-# 156. Sección Preparation
-
-```text
 Requirements
-CaseKit
-Equipment
-Readiness
-Blockers
-```
 
----
-
-# 157. Sección Logistics
-
-```text
-Dispatches
-Current Custody
-Returns
-Inspection
-Reconciliation
-```
-
----
-
-# 158. Sección Commercial
-
-```text
-Opportunity
-Quote
-SalesOrder
-Delivery
-Invoice future
-```
-
----
-
-# 159. Sección Timeline
-
-Actividad relevante en orden cronológico.
-
----
-
-# 160. Primary Action
-
-La acción principal debe depender del estado y contexto.
-
-Ejemplos:
-
-```text
-DRAFT
-→ Agendar
-```
-
-```text
-SCHEDULED + NOT_READY
-→ Preparar
-```
-
-```text
-SCHEDULED + READY
-→ Ver preparación / Despachar
-```
-
-```text
-IN_PROGRESS
-→ Registrar finalización
-```
-
-```text
-RECONCILIATION_PENDING
-→ Reconciliar
-```
-
-```text
-COMPLETED
-→ Ver resumen
-```
-
----
-
-# 161. Una acción primaria
-
-Seguir `ZAPING_WAY.md`:
-
-> una acción principal clara y acciones secundarias contextuales.
-
----
-
-# 162. Calendar navigation
-
-Desde Calendar:
-
-```text
-Case card
-↓
-open Case 360
-```
-
----
-
-# 163. Warehouse navigation
-
-Desde Warehouse Operations:
-
-```text
-Case requiring preparation
-↓
-open relevant preparation workspace
-```
-
----
-
-# 164. Doctor history
-
-Desde Doctor futuro:
-
-```text
-Doctor 360
-↓
-Cases
-```
-
-sin duplicar Case.
-
----
-
-# 165. Hospital history
-
-También:
-
-```text
-Hospital
-↓
-Cases
-```
-
----
-
-# 166. Empty / Missing data
-
-Case 360 debe mostrar datos faltantes claramente.
-
-Ejemplo:
-
-```text
-Customer
-Pendiente de definir
-```
-
-No ocultarlos como si fueran errores del sistema.
-
----
-
-# 167. Blockers
-
-Debe distinguirse:
-
-```text
-Missing information
-```
-
-de:
-
-```text
-Operational blocker
-```
-
----
-
-# 168. Ejemplo
-
-```text
-Customer pending
-→ informational
-```
-
-```text
-Required Equipment unavailable
-→ operational blocker
-```
-
----
-
-# 169. Notifications futuro
-
-Candidatos:
-
-```text
-Case tomorrow not ready
-Technician conflict
-Equipment conflict
-Case rescheduled
-Case cancelled
-Reconciliation pending
-```
-
----
-
-# 170. Dashboard
-
-Healthcare Dashboard puede mostrar:
-
-```text
-Cases today
-Cases tomorrow
-Not ready
-In progress
-Reconciliation pending
-```
-
----
-
-# 171. Dashboard metric semantics
-
-No mezclar:
-
-```text
-Scheduled Cases
-```
-
-con:
-
-```text
-Opportunities expected this week
-```
-
----
-
-# 172. Search
-
-Global Search futuro debería permitir localizar Case por:
-
-```text
-folio
-Doctor
-Hospital
-Technician
-```
-
-respetando permisos.
-
----
-
-# 173. Mobile
-
-Case es candidato principal para futura experiencia móvil de Technicians.
-
----
-
-# 174. Mobile priorities
-
-En móvil sería especialmente importante:
-
-```text
-Today's Cases
-Case details
-CaseKit
-Custody
-Return
-Reconciliation
-```
-
----
-
-# 175. Offline future
-
-Trabajo hospitalario podría justificar capacidades offline en el futuro.
-
-No forma parte de la primera implementación.
-
----
-
-# 176. Attachments futuro
-
-Case puede requerir documentos operativos.
-
-Ejemplos:
-
-```text
-hospital instructions
-commercial authorization
-PDF
-photos of returned equipment
-```
-
----
-
-# 177. Document Management
-
-Attachments deberán integrarse con una capacidad transversal futura.
-
-No guardar rutas arbitrarias dentro del Case sin estrategia.
-
----
-
-# 178. Seguridad de archivos
-
-Todo archivo Healthcare debe respetar:
-
-```text
-tenant
-permissions
-sensitive data minimization
-```
-
----
-
-# 179. Case deletion
-
-Case es un documento operacional/histórico.
-
-No debe utilizarse:
-
-```text
-hard delete
-```
-
-como lifecycle normal.
-
----
-
-# 180. Draft creado por error
-
-La política para Cases Draft creados accidentalmente deberá definirse con ADR-012.
-
-Puede requerir:
-
-```text
-cancel
-```
-
-o una eliminación limitada antes de actividad relevante.
-
----
-
-# 181. Confirmed Case
-
-Una vez que exista historia operacional:
-
-```text
-schedule
-dispatch
-return
-```
-
-el Case debe preservarse.
-
----
-
-# 182. CURRENT
-
-Actualmente:
-
-```text
-Healthcare Case
-→ Foundation implemented / validated
-```
-
-Existe evidencia de:
-
-```text
-Prisma model
-migration
-backend
-API
-tests
-```
-
-No existe todavía evidencia de:
-
-```text
-frontend
 Equipment Assignment
-CaseKit
-Dispatch
-Custody
+
+Case Availability
+
+Preparation
+
+Dispatch / Custody
+
 Return
-Case Calendar UI
+
+CaseKit / Maletín
+
+Calendar
+
 Case 360
-```
 
----
+137. FUTURE Case capabilities
 
-# 183. TARGET inicial
+Posteriormente pueden incluirse:
 
-La primera implementación debería permitir:
+Opportunity integration
 
-```text
-Create Case
-↓
-Add operational context
-↓
-Schedule
-↓
-Assign Technician
-↓
-Prepare
-↓
-Execute
-↓
-Reconcile
-↓
-Complete
-```
+Payer / Insurance
 
----
+Procedure Catalog
 
-# 184. Target de primera fase
-
-No necesita incluir inmediatamente:
-
-```text
-Billing
-Insurance workflows
-Advanced patient data
-Advanced analytics
-Mobile offline
-Maintenance
-AI
-```
-
----
-
-# 185. FUTURE
-
-Evoluciones posibles:
-
-```text
 multi-technician participation
-advanced Hospital requirements
-external case references
-documents
+
+attachments
+
 notifications
-mobile
+
+mobile / offline
+
+advanced analytics
+
 AI assistance
-performance metrics
-advanced scheduling
-```
 
----
+138. Roadmap Healthcare aprobado
 
-# 186. Invariantes
+La secuencia de implementación de referencia es:
 
-```text
-Case
+Hospital / Doctor
+↓
+Requirements
+↓
+Equipment Assignment
+↓
+Case Availability
+↓
+Dispatch / Custody
+↓
+Return
+↓
+CaseKit / Maletín
+↓
+Calendar
+↓
+Case 360
+↓
+Mobile technician experience
+
+Este es un orden de implementación.
+
+No representa necesariamente el orden temporal de cada Case real.
+
+139. Project sequence global
+
+Healthcare specialization se expande después de:
+
+H8A
+Documentation Synchronization
+
+↓
+
+H8B
+Full Automated Regression / Technical Health
+
+↓
+
+UX-B.6
+Full ERP End-to-End QA
+
+↓
+
+ERP Core V1 Closure
+
+↓
+
+Healthcare specialization
+
+140. No Prisma expansion during H8
+
+Este documento no autoriza durante H8:
+
+Doctor / Hospital models
+
+Requirements models
+
+Equipment Assignment models
+
+CaseKit models
+
+Dispatch models
+
+Return models
+
+Reconciliation models
+
+advanced Case statuses
+
+141. Estado consolidado CURRENT
+
+HealthcareCase model
+✅
+
+HealthcareCaseStatus
+DRAFT / SCHEDULED / CANCELLED
+✅
+
+UUID identity
+✅
+
+CASE-* folio
+✅
+
+CompanySequence
+✅
+
+title
+✅
+
+procedureDescription?
+✅
+
+scheduledStart?
+✅
+
+scheduledEnd?
+✅
+
+responsibleUserId?
+✅
+
+createdById
+✅
+
+cancellation audit facts
+✅
+
+create/list/detail
+✅
+
+planning PATCH
+✅
+
+cancel
+✅
+
+tenant-scoped backend
+✅
+
+RBAC
+✅
+
+no DELETE
+✅
+
+no clinical/patient fields
+✅
+
+142. Estado consolidado TARGET
+
+Doctor / Hospital relationships
+
+Case Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Preparation
+
+CaseKit
+
+CaseDispatch / Custody
+
+CaseReturn
+
+returned-material inspection
+
+Reconciliation
+
+advanced operational lifecycle
+
+Readiness
+
+Calendar UI
+
+Case 360
+
+143. Estado consolidado FUTURE
+
+Opportunity
+
+Payer / Insurance
+
+Procedure Catalog
+
+multi-technician support
+
+advanced attachments
+
+Notifications
+
+Mobile
+
+Offline
+
+Analytics
+
+AI
+
+144. Invariantes principales
+
+HealthcareCase
 → one operational occurrence
-```
 
-```text
-Case
+HealthcareCase
 ≠
 Opportunity
-```
 
-```text
-Case
+HealthcareCase
 ≠
 Quote
-```
 
-```text
-Case
+HealthcareCase
+≠
+Sale
+
+HealthcareCase
 ≠
 SalesOrder
-```
 
-```text
-Case
+HealthcareCase
 ≠
 Delivery
-```
 
-```text
-Case
+HealthcareCase
 ≠
 Invoice
-```
 
-```text
-Case
+HealthcareCase
 ≠
-clinical record
-```
+Clinical Record
 
-```text
 Doctor
 ≠
 Customer
-```
 
-```text
 Hospital
 ≠
 Customer
-```
 
-```text
 Payer
 ≠
 Customer
-```
 
-```text
+Technician
+→ User initially
+
 Case Status
 ≠
 Readiness
-```
 
-```text
 SCHEDULED
 ≠
 READY
-```
 
-```text
-Case cancelled
-→ historical record remains
-```
-
-```text
-Case completion
+Requirements
 ≠
-commercial payment completion
-```
+Preparation
 
-```text
-Case
-→ never directly edits Product.stock
-```
+Requirements
+≠
+CaseKit
 
-```text
+EquipmentAsset
+→ CURRENT ERP Core
+
+Equipment Assignment
+≠
+EquipmentLifecycle
+
+Equipment Assignment
+≠
+Custody
+
 CaseDispatch
 ≠
 Delivery
-```
 
-```text
+CaseDispatch
+≠
+commercial Inventory OUT
+
+CaseReturn
+≠
+Commercial Return
+
+Returned
+≠
+Automatically Available
+
+Unresolved
+→ derived
+
 Unresolved logistics
-→ prevents normal operational closure
-```
+→ blocks normal operational closure
 
-```text
-Cross-tenant Case relationships
+HealthcareCase
+→ never directly mutates Product.stock
+
+same physical inventory
+→ never decremented twice
+
+cross-tenant Case relationships
 → forbidden
-```
 
----
+145. Anti-patrones
 
-# 187. Anti-patrones
+Case for every lead
 
-## Case for every lead
+No crear HealthcareCase cuando todavía existe únicamente una posibilidad comercial.
 
-Crear Case cuando todavía solo existe una posibilidad comercial.
+Opportunity required forever
 
----
+No obligar a crear Opportunity cuando ya existe una operación concreta que coordinar.
 
-## Opportunity forever
+Case as clinical record
 
-Mantener Opportunity cuando ya existe una operación concreta que coordinar.
+No agregar información clínica innecesaria.
 
----
+Duplicate Technician identity
 
-## Case as clinical record
+No crear una identidad paralela desconectada de User sin necesidad de dominio.
 
-Agregar información clínica innecesaria.
+Customer required too early
 
----
+No bloquear la operación porque todavía no se sabe quién será facturado.
 
-## Customer required too early
+Doctor/Hospital as free-text permanent truth
 
-Bloquear operación porque todavía no se sabe quién será facturado.
+No usar doctorName / hospitalName permanentes como sustituto de master data futuro.
 
----
+One giant Case table
 
-## One giant Case table
+No guardar todos los Requirements, Dispatches, Returns, Equipment y Billing dentro de HealthcareCase.
 
-Guardar todos los items, dispatches, returns y equipment directamente dentro de Case.
+READY as manual fiction
 
----
+No marcar manualmente un Case listo cuando faltan requisitos reales.
 
-## READY as manual fiction
+Advanced status documented as CURRENT
 
-Marcar Case listo aunque faltan requisitos.
+No utilizar:
 
----
+IN_PROGRESS
 
-## Schedule in Calendar only
+RECONCILIATION_PENDING
 
-Guardar fecha en un widget/evento independiente y no en Case.
+COMPLETED
 
----
+como contrato CURRENT.
 
-## New Case on reschedule
+Schedule only in Calendar
 
-Crear un Case nuevo cada vez que cambia la fecha.
+No crear una fuente paralela del schedule fuera del Case.
 
----
+New Case on reschedule
 
-## Delete cancelled Case
+No crear un Case nuevo únicamente porque cambió la fecha.
 
-Eliminarlo del sistema para limpiar la agenda.
+Delete cancelled Case
 
----
+No eliminar Case para limpiar la agenda.
 
-## Close after procedure only
+Complete after procedure only
 
-Marcar `COMPLETED` aunque continúe material sin regresar o reconciliar.
+No asumir que el Case está cerrado cuando pueden quedar obligaciones logísticas.
 
----
+Case completion = invoice
 
-## Case completion = invoice
+No acoplar cierre operacional con facturación/pago.
 
-Bloquear cierre operacional hasta recibir pago.
+Direct stock mutation
 
----
+No modificar Product.stock directamente desde HealthcareCase.
 
-## Direct stock mutation
+Duplicate commercial domains
 
-Modificar `Product.stock` desde Cases.
+No crear:
 
----
-
-## Duplicate sales concepts
-
-Crear:
-
-```text
 HealthcareSale
+
 HealthcareDelivery
+
 HealthcareInvoice
-```
 
 sin necesidad.
 
----
+146. Relación con HEALTHCARE.md
 
-# 188. Relación con Opportunities
+HEALTHCARE.md gobierna:
 
-```text
-Opportunity
-→ possibility
-```
+vertical boundaries
 
-```text
-Case
-→ concrete operation
-```
+CURRENT / TARGET / FUTURE separation
 
----
+general Healthcare workflow
 
-# 189. Relación con Case Calendar
+CASES.md gobierna:
 
-Case mantiene schedule.
+HealthcareCase Foundation
 
-Calendar organiza y visualiza Cases en el tiempo.
+Case lifecycle CURRENT
 
----
+Case operational behavior
 
-# 190. Relación con CaseKit
+147. Relación con DOMAIN_MODEL.md
 
-CaseKit representa material realmente preparado para ese Case.
+DOMAIN_MODEL.md gobierna:
 
----
+cross-domain ownership
 
-# 191. Relación con Case Logistics
+entity boundaries
 
-Case Logistics controla:
+derived concepts
 
-```text
-Dispatch
-Custody
-Return
-Inspection
-Reconciliation
-```
+architectural candidates
 
----
+CASES.md no debe aprobar por sí solo nuevos modelos de Inventory, Equipment o Logistics.
 
-# 192. Relación con Equipment
+148. Relación con ERP Core
 
-Equipment permite asignar activos físicos reutilizables al Case.
+HealthcareCase utiliza o podrá relacionarse con Core sin duplicarlo.
 
----
+Ejemplos:
 
-# 193. Relación con ERP Customers
+User
 
-Customer representa la contraparte comercial.
+Customer
 
-Puede ser opcional inicialmente dentro del Case.
+Product
 
----
+Inventory
 
-# 194. Relación con Quotes
+EquipmentAsset
 
-Quote representa propuesta económica.
+Quote
 
----
+Sale
 
-# 195. Relación con Sales
+y en TARGET:
 
-SalesOrder/Delivery representan compromiso y fulfillment comercial.
+SalesOrder
 
----
+Delivery
 
-# 196. Relación con Inventory
+149. Relación con Equipment
+
+CURRENT:
+
+EquipmentAsset
+→ ERP Core
+
+TARGET:
+
+Case Equipment Assignment
+→ Healthcare
+
+150. Relación con Inventory
 
 Inventory conserva la verdad física general.
 
-Healthcare coordina custodia especializada.
+HealthcareCase coordina el contexto operacional.
 
----
+Healthcare Case Foundation no modifica stock.
 
-# 197. Relación con Dashboard
+151. Relación con Dashboard
 
-Dashboard consume el estado de Cases y readiness.
+Healthcare Dashboard podrá consumir estado/readiness de Cases.
 
-No los gobierna.
+Dashboard no gobierna lifecycle de HealthcareCase.
 
----
+152. ADR relacionados
 
-# 198. ADR relacionados
+ADR-001 — Multi-Tenant
 
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-008 — Documentation First.
-* ADR-009 — Modular Monolith.
-* ADR-011 — SalesOrder + Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
+ADR-002 — Inventory Movements
 
----
+ADR-004 — UUID
 
-# 199. Documentos relacionados
+ADR-005 — Layered Architecture
 
-```text
-modules/healthcare/HEALTHCARE.md
-modules/healthcare/OPPORTUNITIES.md
-modules/healthcare/CASE_CALENDAR.md
-modules/healthcare/CASE_KITS.md
-modules/healthcare/CASE_LOGISTICS.md
-modules/healthcare/EQUIPMENT.md
+ADR-006 — API First
 
-modules/erp/CUSTOMERS.md
-modules/erp/PRODUCTS.md
-modules/erp/INVENTORY.md
-modules/erp/QUOTES.md
-modules/erp/SALES.md
-modules/erp/RETURNS.md
+ADR-007 — RBAC
 
-product/ZAPING_WAY.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-```
+ADR-008 — Documentation First
 
----
+ADR-009 — Modular Monolith
 
-# 200. Fuente de verdad
+ADR-011 — SalesOrder + Delivery
 
-```text
-CASES.md
-→ lifecycle y comportamiento de Healthcare Case
+ADR-012 — Entity Lifecycle
 
-HEALTHCARE.md
-→ frontera general Healthcare
+ADR-013 — Inventory Custody & Case Logistics
 
-OPPORTUNITIES.md
-→ etapa previa
+153. Documentos relacionados
 
-CASE_CALENDAR.md
-→ planificación y conflictos
+docs/modules/healthcare/HEALTHCARE.md
+
+docs/modules/healthcare/DOMAIN_MODEL.md
+
+docs/modules/erp/CUSTOMERS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/DASHBOARD.md
+
+docs/product/ZAPING_WAY.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+
+Documentos especializados futuros pueden incluir:
+
+DOCTORS_HOSPITALS.md
+
+CASE_REQUIREMENTS.md
+
+EQUIPMENT_ASSIGNMENT.md
+
+CASE_AVAILABILITY.md
 
 CASE_KITS.md
-→ preparación
 
 CASE_LOGISTICS.md
-→ custodia y reconciliación
 
-EQUIPMENT.md
-→ activos reutilizables
+CASE_CALENDAR.md
 
-ERP docs
-→ comportamiento del Core
+154. Fuente de verdad
+
+CASES.md
+→ HealthcareCase Foundation
+→ CURRENT lifecycle
+→ Case behavior
+
+HEALTHCARE.md
+→ Healthcare vertical boundaries
+
+DOMAIN_MODEL.md
+→ cross-domain ownership / relationships
 
 schema.prisma
-→ modelo técnico cuando sea aprobado
+→ CURRENT persistence only
+
+backend
+→ CURRENT Case API / behavior
+
+tests
+→ validated behavior
 
 PROJECT_BOARD.md
-→ estado de implementación
-```
+→ active implementation state / debt
 
----
+CHANGELOG.md
+→ historical implementation evidence
 
-# 201. Estado final de Case Foundation
+155. Principio final
 
-Healthcare Case Foundation implemento el alcance minimo aprobado para:
+Healthcare Case debe responder CURRENT:
 
-```text
-model HealthcareCase
-```
-
-Decisiones implementadas:
-
-```text
-model name
-→ HealthcareCase
-
-technical id
-→ UUID
-
-folio
-→ CASE-000001 conceptual format
-→ server-generated
-→ immutable
-→ unique per Company
-→ CompanySequence-based
-
-Phase 1 status
-→ DRAFT / SCHEDULED / CANCELLED
-
-responsibility
-→ nullable responsibleUserId
-→ references User
-
-Hospital / Doctor
-→ deferred to first-class Healthcare master data follow-ups
-
-Customer / Payer
-→ deferred commercial integration
-
-schedule
-→ scheduledStart? / scheduledEnd?
-→ unscheduled Case allowed
-
-completion
-→ deferred
-
-delete
-→ no DELETE in Phase 1
-
-PHI / clinical records
-→ not part of Foundation
-```
-
-Fuera de Foundation:
-
-```text
-Hospital / Doctor master data
-Equipment / Material Requirements
-Equipment Assignment
-Case Availability
-Dispatch / Custody
-Return
-CaseKit / Maletín
-Case Calendar UI
-Case 360
-Mobile technician experience
-```
-
----
-
-# 202. Principio final
-
-Healthcare Case debe responder siempre:
-
-```text
 ¿Qué operación estamos coordinando?
-↓
-¿Cuándo y dónde?
-↓
+
+¿Cuál es su identidad?
+
+¿Cuál es su estado de planeación?
+
+¿Cuándo está programada?
+
 ¿Quién es responsable?
-↓
+
+¿Fue cancelada?
+
+Y debe evolucionar para responder TARGET:
+
+¿Qué requiere?
+
 ¿Está preparada?
-↓
-¿Qué ocurrió con los materiales y equipos?
-↓
-¿Queda algo por resolver?
-```
+
+¿Qué Equipment fue asignado?
+
+¿Qué salió bajo custodia?
+
+¿Qué regresó?
+
+¿Qué se utilizó?
+
+¿Qué quedó pendiente?
+
+¿La logística quedó reconciliada?
 
 sin confundir:
 
-```text
-operación
-con
-oportunidad
+operation
+with
+opportunity
 
-agenda
-con
+status
+with
 readiness
 
-custodia
-con
-venta
+custody
+with
+commercial fulfillment
 
-cierre logístico
-con
-facturación
-```
+operational closure
+with
+billing/payment
 
-> **Un Case está realmente completo cuando la operación puede explicarse de principio a fin y todas sus obligaciones operativas y logísticas quedaron resueltas, no simplemente cuando terminó el procedimiento.**
+HealthcareCase es el root operacional de la vertical. Foundation ya proporciona identidad, planeación, responsabilidad y cancelación; los futuros dominios Healthcare deben conectarse a ese root sin convertirlo en una tabla gigante ni adelantar lifecycle, logística o información clínica que todavía no existen.

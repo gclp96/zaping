@@ -1,163 +1,279 @@
-# Módulo de Productos — Zaping ERP
+# Products — Zaping ERP
 
 **Módulo:** Products
 **Producto:** Zaping ERP Core
-**Versión:** 2.1.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
 **Estado de implementación:** PRODUCTS V1 IMPLEMENTED / VALIDATED
-**Última actualización:** 2026-08-25
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Products administra el catálogo maestro de productos de una Company.
+Products administra el catálogo maestro de productos de una Company.
 
 Su responsabilidad principal es responder:
 
 ```text
 ¿Qué producto es?
-¿Cómo lo identifica la empresa?
-¿Cómo debe describirse?
-¿A qué categoría pertenece?
+
+¿Cómo lo identifica la Company?
+
+¿Cómo se describe?
+
+¿A qué Category pertenece?
+
 ¿Cuál es su marca?
+
 ¿Cuáles son sus valores comerciales de referencia?
+
+¿Cómo debe rastrearse en Inventory?
+
 ¿Puede utilizarse en nuevas operaciones?
 ```
 
-Products representa **identidad comercial y de catálogo**.
+Products representa:
 
-No representa una existencia física específica.
+```text
+catalog identity
++
+tracking configuration
++
+master-data lifecycle
+```
+
+No representa por sí mismo una existencia física específica.
 
 ---
 
-# 2. Principio fundamental
+# 2. Ownership
+
+Products es propietario de:
+
+```text
+Product identity
+
+SKU
+
+name
+
+description
+
+brand
+
+Category relationship
+
+barcode
+
+reference cost
+
+reference price
+
+minStock
+
+inventoryTracking
+
+lotTracking
+
+active / inactive lifecycle
+```
+
+`Product.stock` existe en el modelo, pero su mutación pertenece a Inventory.
+
+---
+
+# 3. Fronteras de dominio
+
+Debe mantenerse:
 
 ```text
 Product
-=
-qué producto es
+→ catalog identity
 ```
-
-mientras:
 
 ```text
 Inventory
-=
-cuánto existe
-cómo llegó
-qué lote existe
-qué movimientos ocurrieron
+→ quantities
+→ batches
+→ movement history
+```
+
+```text
+Equipment
+→ individual physical identity
+   for reusable ASSET products
 ```
 
 Por tanto:
 
-> Product define el catálogo. Inventory define las existencias.
-
----
-
-# 3. Responsabilidades
-
-Products es propietario de información maestra como:
-
-* SKU;
-* nombre;
-* descripción;
-* marca;
-* categoría;
-* código de barras;
-* costo de referencia;
-* precio de referencia;
-* stock resumido mientras exista esa proyección;
-* mínimo de stock;
-* estado activo/inactivo.
-
----
-
-# 4. Fuera del alcance
-
-Products no es propietario de:
-
-* Supplier de una compra específica;
-* lote;
-* caducidad;
-* InventoryMovement;
-* Purchase;
-* PurchaseReceipt;
-* SalesOrder;
-* Delivery;
-* Customer;
-* Case;
-* custodia;
-* factura;
-* precio histórico de una operación.
-
----
-
-# 5. Entidades principales
-
-El dominio contiene actualmente dos conceptos principales:
+```text
+Product
+≠
+InventoryBatch
+```
 
 ```text
-Products
-├── Product
-└── Category
+Product
+≠
+InventoryMovement
+```
+
+```text
+Product
+≠
+EquipmentAsset
 ```
 
 ---
 
-# 6. Product
+# 4. CURRENT vs TARGET vs FUTURE
 
-`Product` representa un artículo comercial dentro de una Company.
+Este documento distingue:
 
-Conceptualmente puede contener:
+## CURRENT
+
+Capacidad implementada actualmente.
+
+## TARGET
+
+Evolución aprobada pendiente de implementación.
+
+## FUTURE
+
+Capacidad posible cuya implementación dependerá de necesidad real.
+
+---
+
+# 5. Estado CURRENT
+
+Products V1 administra actualmente:
 
 ```text
+Product CRUD
+
+Category integration
+
+SKU
+
+name
+
+description
+
+brand
+
+barcode
+
+cost
+
+price
+
+stock read-only projection
+
+minStock
+
+inventoryTracking
+
+lotTracking
+
+active / inactive lifecycle
+
+ProductSelector integration
+
+tenant-safe Category validation
+```
+
+Estado:
+
+```text
+PRODUCTS V1
+→ IMPLEMENTED / VALIDATED
+```
+
+---
+
+# 6. Modelo Product actual
+
+Conceptualmente:
+
+```text
+Product
+
 id
 companyId
+
 sku
 name
 description
 brand
+
 categoryId
 barcode
+
 cost
 price
+
 stock
 minStock
+
+inventoryTracking
+lotTracking
+
 isActive
+
 createdAt
 updatedAt
 ```
 
-La definición técnica exacta debe verificarse contra el `schema.prisma` vigente.
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
 
 ---
 
 # 7. Category
 
-`Category` permite organizar productos dentro del catálogo.
+Category organiza Products dentro del tenant.
 
 Conceptualmente:
 
 ```text
 Category
-├── id
-├── companyId
-├── name
-├── description
-├── isActive
-└── products
+
+id
+companyId
+
+name
+description
+
+isActive
+
+createdAt
+updatedAt
 ```
+
+Relación:
+
+```text
+Category
+1
+│
+└── *
+    Product
+```
+
+La relación Product → Category puede ser opcional.
 
 ---
 
-# 8. Product es Master Data
+# 8. Product como Master Data
 
-Product sigue la estrategia de lifecycle de Master Data establecida en ADR-012.
+Product sigue un lifecycle de Master Data.
 
-La transición principal es:
+Flujo normal:
 
 ```text
 ACTIVE
@@ -168,91 +284,152 @@ INACTIVE
 No:
 
 ```text
-EXISTS
+ACTIVE
 ↓
-DELETED
+physical DELETE
 ```
 
-como comportamiento empresarial predeterminado.
+como mecanismo empresarial ordinario.
 
 ---
 
-# 9. Producto activo
+# 9. Product activo
 
-Un producto activo puede utilizarse normalmente en nuevas operaciones como:
-
-* Purchase;
-* Quote;
-* SalesOrder;
-* Receipt;
-* otros workflows autorizados.
-
----
-
-# 10. Producto inactivo
-
-Un producto inactivo continúa existiendo históricamente.
-
-Debe permanecer visible cuando ya forma parte de:
-
-* compras;
-* recepciones;
-* movimientos;
-* cotizaciones;
-* ventas;
-* devoluciones;
-* Cases.
-
-Pero normalmente no debe aparecer como opción predeterminada para nuevas operaciones.
-
----
-
-# 11. Desactivación
-
-La acción empresarial recomendada es:
+Un Product activo puede ser utilizado por workflows compatibles como:
 
 ```text
-Desactivar producto
+Purchase
+
+Purchase Receipt
+
+Quote
+
+Sale
+
+Equipment creation when ASSET
 ```
 
-no:
+y posteriormente por capacidades Healthcare que consuman Product.
+
+La compatibilidad final depende también de:
 
 ```text
-Eliminar producto
+inventoryTracking
+
+lotTracking
+
+workflow rules
 ```
 
-cuando el objetivo real es impedir su uso futuro.
+---
+
+# 10. Product inactivo
+
+Un Product inactivo:
+
+```text
+remains persisted
+
+remains historically referenceable
+
+must not disappear from existing documents
+```
+
+Puede seguir apareciendo dentro de:
+
+```text
+Purchases
+
+Purchase Receipts
+
+Quotes
+
+Sales
+
+Inventory Movements
+
+Equipment history
+
+future Healthcare history
+```
+
+pero normalmente no debe ofrecerse como opción para nuevas operaciones.
 
 ---
 
-# 12. Implementación legacy de eliminación
+# 11. Desactivación CURRENT
 
-Versiones anteriores de Products pueden contener un flujo CRUD con acción de eliminación.
+Actualmente:
 
-Ese comportamiento debe auditarse contra ADR-012.
+```text
+DELETE /products/:id
+```
 
-No debe utilizarse como precedente para implementar nuevas eliminaciones físicas de productos con historia relacionada.
+implementa:
+
+```text
+isActive = false
+```
+
+No elimina físicamente el registro.
+
+Debe interpretarse como:
+
+```text
+Deactivate Product
+```
+
+y no como hard delete.
 
 ---
 
-# 13. Hard Delete
+# 12. Desactivación idempotente
 
-La eliminación física puede considerarse únicamente cuando un producto:
+Si el Product ya está inactivo, repetir la operación de desactivación no debe
+crear un nuevo efecto destructivo.
 
-* fue creado accidentalmente;
-* no participa en documentos;
-* no tiene movimientos;
-* no tiene lotes;
-* no tiene relaciones históricas relevantes;
-* y la operación está explícitamente permitida.
-
-No es la estrategia normal.
+La historia existente permanece intacta.
 
 ---
 
-# 14. SKU
+# 13. Reactivación
 
-`sku` constituye el identificador comercial interno principal del Product dentro de una Company.
+Actualmente:
+
+```text
+Product reactivation
+→ NOT IMPLEMENTED
+```
+
+Una futura transición:
+
+```text
+INACTIVE
+↓
+ACTIVE
+```
+
+deberá ser una operación explícita y autorizada.
+
+No debe aparecer accidentalmente mediante un PATCH genérico.
+
+---
+
+# 14. Hard Delete
+
+Products V1 no expone hard delete.
+
+Una futura eliminación física requeriría una decisión específica de dominio,
+retención y dependencias históricas.
+
+No forma parte del contrato normal.
+
+---
+
+# 15. SKU
+
+`sku` es el identificador comercial interno principal del Product dentro de una
+Company.
 
 Ejemplo:
 
@@ -262,235 +439,200 @@ CAT-15MM-001
 
 Debe ser:
 
-* obligatorio;
-* estable;
-* legible;
-* único dentro de la Company.
+```text
+required
+
+operationally readable
+
+unique within Company
+```
 
 ---
 
-# 15. Unicidad del SKU
-
-La regla es:
-
-```text
-Company A
-SKU XYZ
-→ único
-```
-
-Otra Company puede utilizar el mismo SKU.
-
-Por tanto:
-
-```text
-unique(companyId, sku)
-```
-
-representa correctamente la semántica multi-tenant.
-
----
-
-# 16. SKU no es UUID
+# 16. SKU y UUID
 
 Debe distinguirse:
 
 ```text
-id
-→ identificador técnico UUID
+Product.id
+→ technical UUID
 ```
 
 de:
 
 ```text
-sku
-→ identificador comercial
+Product.sku
+→ business/catalog identifier
 ```
 
-El usuario normalmente busca y reconoce el SKU, no el UUID.
+El UUID preserva identidad técnica aunque un dato maestro editable cambie.
 
 ---
 
-# 17. Cambio de SKU
+# 17. Unicidad del SKU
 
-Modificar un SKU debe realizarse con precaución porque puede ser utilizado:
-
-* en documentos;
-* búsquedas;
-* integraciones;
-* reportes;
-* etiquetas;
-* procesos físicos.
-
-El UUID continúa proporcionando identidad técnica aunque cambie el SKU.
-
----
-
-# 18. Nombre
-
-`name` representa el nombre corto y reconocible del producto.
-
-Ejemplo:
+La regla es:
 
 ```text
-Catéter diagnóstico 15 mm
+companyId
++
+sku
+→ UNIQUE
 ```
+
+Por tanto:
+
+```text
+Company A → SKU-001
+Company B → SKU-001
+```
+
+puede ser válido.
+
+---
+
+# 18. Cambio de SKU
+
+Modificar SKU debe hacerse con precaución porque puede utilizarse en:
+
+```text
+search
+
+documents
+
+reports
+
+labels
+
+integrations
+
+physical workflows
+```
+
+El cambio no modifica:
+
+```text
+Product.id
+```
+
+Los documentos históricos no deben reinterpretarse silenciosamente debido a un
+cambio posterior de datos maestros.
+
+---
+
+# 19. Name
+
+`name` representa el nombre corto y reconocible del Product.
 
 Debe ser adecuado para:
 
-* tablas;
-* selectores;
-* documentos;
-* búsquedas.
+```text
+tables
+
+selectors
+
+search
+
+documents
+
+operational UI
+```
 
 ---
 
-# 19. Descripción
+# 20. Description
 
-`description` permite guardar información más extensa o técnica.
+`description` permite información extendida.
 
-No debe utilizarse para almacenar datos estructurados que posteriormente necesiten:
+No debe utilizarse como sustituto de datos estructurados que posteriormente
+necesiten:
 
-* búsqueda;
-* validación;
-* filtros;
-* reglas.
+```text
+validation
+
+filtering
+
+business rules
+
+reporting
+```
 
 ---
 
-# 20. Marca
+# 21. Brand
 
-`brand` pertenece al Product maestro.
+`brand` pertenece actualmente directamente a Product.
+
+Es opcional.
 
 Ejemplo:
 
 ```text
-Catéter 15 mm
-Marca: Terumo
+Product A
+Brand: Terumo
+
+Product B
+Brand: Cordis
 ```
 
-y:
-
-```text
-Catéter 15 mm
-Marca: Cordis
-```
-
-pueden representar productos comerciales diferentes.
+pueden representar productos comerciales distintos.
 
 ---
 
-# 21. Regla de marca
+# 22. Brand no es entidad independiente
 
-`brand` es:
-
-```text
-opcional
-```
-
-El Product continúa siendo válido aunque no tenga marca registrada.
-
----
-
-# 22. Marca editable
-
-La marca puede modificarse como parte de los datos maestros del producto cuando el usuario tenga autorización.
-
-Los documentos históricos pueden conservar su propia información contextual si posteriormente es necesario congelarla.
-
----
-
-# 23. Catálogo de marcas
-
-Actualmente:
-
-```text
-brand
-→ campo de Product
-```
-
-No existe necesidad aprobada de introducir:
+Actualmente no existe una necesidad aprobada para crear:
 
 ```text
 Brand
-→ entidad independiente
+
+Brand API
+
+Brand lifecycle
+
+Brand permissions
 ```
 
----
+como dominio separado.
 
-# 24. No sobrearquitecturar Brand
-
-No crear por anticipado:
-
-* Brand table;
-* Brand permissions;
-* Brand lifecycle;
-* Brand API;
-* Brand admin module;
-
-sin una necesidad funcional concreta.
+No debe sobrearquitecturarse sin necesidad funcional.
 
 ---
 
-# 25. Category
+# 23. Category ownership
 
-Una Category agrupa productos con propósitos de:
+Category pertenece a una Company.
 
-* organización;
-* búsqueda;
-* navegación;
-* clasificación;
-* futuros reportes.
+Debe mantenerse:
 
----
+```text
+Category.companyId
+=
+Product.companyId
+```
 
-# 26. Category opcional
-
-La relación Product → Category puede ser opcional.
-
-Un Product no debe quedar inválido únicamente porque todavía no haya sido clasificado, salvo que una futura configuración empresarial establezca lo contrario.
+cuando Product utiliza Category.
 
 ---
 
-# 27. Category por Company
-
-Las categorías pertenecen al tenant.
+# 24. Category uniqueness
 
 Conceptualmente:
 
 ```text
-Company A
-├── Cardiología
-└── Hemodinamia
+companyId
++
+Category.name
+→ UNIQUE
 ```
 
-es independiente de:
-
-```text
-Company B
-├── Cardiología
-└── Hemodinamia
-```
+La misma categoría textual puede existir en tenants distintos.
 
 ---
 
-# 28. Nombre de Category
+# 25. Category lifecycle
 
-El nombre debe ser único dentro de la Company.
-
-Conceptualmente:
-
-```text
-unique(companyId, name)
-```
-
----
-
-# 29. Lifecycle de Category
-
-Category es también Master Data.
-
-La estrategia principal es:
+Category también utiliza:
 
 ```text
 ACTIVE
@@ -498,120 +640,164 @@ ACTIVE
 INACTIVE
 ```
 
----
+como estrategia de Master Data.
 
-# 30. Category inactiva
+Una Category inactiva:
 
-Desactivar una Category:
+```text
+does not delete Products
 
-* no elimina sus Products;
-* no elimina historia;
-* no modifica documentos anteriores.
-
-Normalmente debe impedir utilizarla para nuevas clasificaciones mientras permanezca inactiva.
+does not erase historical relations
+```
 
 ---
 
-# 31. Producto dentro de Category inactiva
+# 26. Category validation CURRENT
 
-Un Product no debe desaparecer únicamente porque su Category haya sido desactivada.
+Cuando Product recibe:
 
-La interfaz debe representar la relación histórica correctamente.
+```text
+categoryId
+```
+
+backend debe validar:
+
+```text
+Category exists
+
++
+
+same authenticated Company
+
++
+
+Category.isActive = true
+```
+
+para nuevas asociaciones.
 
 ---
 
-# 32. Barcode
+# 27. Category PATCH semantics
 
-`barcode` identifica el Product mediante código de barras cuando existe.
+En actualización:
 
-Es útil para:
+```text
+categoryId omitted
+→ preserve current Category
+```
 
-* búsqueda;
-* recepción;
-* inventario;
-* picking;
-* futuras operaciones de scanner.
+```text
+categoryId = null
+→ remove Category association
+```
+
+```text
+categoryId = uuid
+→ validate active same-tenant Category
+```
 
 ---
 
-# 33. Barcode opcional
+# 28. Inactive Category history
 
-No todos los productos necesitan actualmente un barcode.
+Un Product histórico no debe desaparecer únicamente porque su Category haya sido
+desactivada.
 
-Por tanto:
+La UI debe representar esa relación de forma segura cuando sea necesaria para
+contexto histórico.
+
+---
+
+# 29. Barcode
+
+`barcode` identifica el Product cuando existe un código comercial escaneable.
+
+Puede utilizarse para:
+
+```text
+search
+
+receiving
+
+inventory
+
+future picking
+
+future scanner workflows
+```
+
+---
+
+# 30. Barcode optional
+
+Actualmente:
 
 ```text
 barcode
 → optional
 ```
 
+No todos los Products necesitan uno.
+
 ---
 
-# 34. Unicidad del Barcode
+# 31. Barcode uniqueness
 
-Cuando existe, debe mantenerse único dentro de la Company.
-
-Conceptualmente:
+Cuando existe:
 
 ```text
-unique(companyId, barcode)
+companyId
++
+barcode
+→ UNIQUE
 ```
+
+El mismo barcode no debe corresponder a dos Products distintos dentro del mismo
+tenant.
 
 ---
 
-# 35. Barcode no es lote
+# 32. Barcode ≠ Lot
 
-Debe distinguirse:
+Debe mantenerse:
 
 ```text
 Product.barcode
-→ identifica producto
+→ identifies catalog Product
 ```
-
-de:
 
 ```text
 InventoryBatch.lotNumber
-→ identifica lote físico
+→ identifies physical lot
 ```
 
-Un mismo Product puede tener muchas existencias por lote conservando el mismo código de producto.
+Un Product puede tener múltiples lotes conservando el mismo barcode de catálogo.
 
 ---
 
-# 36. QR futuro
+# 33. Cost
 
-El uso de QR podrá complementar Barcode para:
-
-* inventario;
-* Cases;
-* Equipment;
-* documentos;
-* tracking.
-
-No requiere convertir QR en un atributo universal del Product.
-
----
-
-# 37. Cost
-
-`cost` representa actualmente un costo de referencia del Product.
-
-Puede utilizarse como valor inicial para operaciones como Purchase.
-
----
-
-# 38. Costo histórico
-
-Cuando un Product participa en una Purchase:
+`Product.cost` representa actualmente:
 
 ```text
-Product.cost
-↓
-PurchaseItem.price / unitCost snapshot
+reference purchase cost
 ```
 
-el documento debe conservar su valor histórico.
+No representa obligatoriamente un valor histórico universal.
+
+Puede utilizarse como referencia inicial para operaciones comerciales de compra.
+
+---
+
+# 34. Historical purchase value
+
+Cuando una Purchase guarda el valor de una partida:
+
+```text
+PurchaseItem persisted unit value
+→ historical transaction snapshot
+```
 
 Cambiar posteriormente:
 
@@ -619,560 +805,855 @@ Cambiar posteriormente:
 Product.cost
 ```
 
-no debe modificar una Purchase existente.
+no debe reescribir una Purchase histórica.
+
+La representación exacta del costo en Purchase/PurchaseReceipt pertenece a esos
+dominios.
 
 ---
 
-# 39. Price
+# 35. Price
 
-`price` representa actualmente un precio de venta de referencia.
+`Product.price` representa actualmente:
 
-Puede utilizarse para precargar:
+```text
+reference sale price
+```
 
-* Quote;
-* SalesOrder;
-* otros documentos comerciales.
+Puede utilizarse como valor inicial para:
+
+```text
+Quote
+
+Sale
+```
+
+según el workflow.
 
 ---
 
-# 40. Precio histórico
+# 36. Historical sale price
 
-Cuando un documento comercial guarda su precio:
+Una vez un documento comercial guarda su propio valor:
 
 ```text
 Product.price changes
 ```
 
-no debe reescribir automáticamente:
+no debe modificar automáticamente:
 
 ```text
-QuoteItem.price
-SalesOrderItem.price
-historical SaleItem.price
+QuoteItem historical value
+
+SaleItem historical value
 ```
 
-Los documentos representan la operación realizada en ese momento.
+Los documentos conservan la operación realizada en ese momento.
 
 ---
 
-# 41. Price no es pricing engine
+# 37. Price no es Pricing Engine
 
-El campo `price` no debe interpretarse como un sistema completo de pricing.
-
-Una evolución futura puede necesitar:
-
-* listas de precios;
-* precios por cliente;
-* descuentos;
-* monedas;
-* vigencias;
-* reglas comerciales.
-
-No deben añadirse hasta que el dominio lo requiera.
-
----
-
-# 42. Dinero
-
-Los campos actuales de costo y precio utilizan el modelo monetario existente.
-
-Antes de ampliar significativamente capacidades financieras deberá revisarse:
-
-* precisión;
-* redondeo;
-* moneda;
-* representación en Prisma.
-
-Products no resuelve por sí solo esa decisión.
-
----
-
-# 43. Stock
-
-`Product.stock` existe como resumen operativo de inventario.
-
-Pero la regla arquitectónica es:
+`Product.price` no representa todavía:
 
 ```text
-Product.stock
-=
-projection / summary
+price lists
+
+customer-specific prices
+
+discount engine
+
+currencies
+
+effective dates
+
+complex commercial rules
 ```
 
-no:
-
-```text
-Product.stock
-=
-manual catalog property
-```
+Estas capacidades requieren dominio propio si se implementan.
 
 ---
 
-# 44. Stock no pertenece al formulario maestro
+# 38. Monetary model
 
-Crear o editar Product no debe utilizarse para cambiar arbitrariamente su existencia física.
-
-Incorrecto:
+Antes de ampliar capacidades financieras deberá revisarse transversalmente:
 
 ```text
-Editar producto
-↓
-stock = 100
+precision
+
+rounding
+
+currency
+
+Prisma representation
 ```
 
-como operación cotidiana.
+Products por sí solo no define la arquitectura monetaria completa.
 
 ---
 
-# 45. Fuente del stock
+# 39. minStock
 
-El stock debe modificarse mediante Inventory.
+`minStock` representa un umbral operativo configurado.
 
-Ejemplos:
+Puede utilizarse para:
 
 ```text
-PurchaseReceipt
-Delivery
-Return
-Adjustment
+low-stock indicators
+
+alerts
+
+future recommendations
 ```
 
 ---
 
-# 46. Relación con Inventory
+# 40. minStock no crea Purchase
 
-Products proporciona:
-
-```text
-Product identity
-```
-
-Inventory proporciona:
-
-```text
-Product quantity
-Product history
-Product batches
-Product availability
-```
-
----
-
-# 47. minStock
-
-`minStock` representa el nivel mínimo operativo configurado para el Product.
-
-Puede utilizarse para detectar:
-
-```text
-Low Stock
-```
-
----
-
-# 48. minStock no crea compras
-
-La regla:
+Debe mantenerse:
 
 ```text
 stock <= minStock
-```
-
-puede producir:
-
-* alerta;
-* indicador;
-* recomendación futura.
-
-No debe generar una Purchase automáticamente sin una decisión explícita del workflow.
-
----
-
-# 49. Estado de inventario
-
-Actualmente Product puede presentarse mediante estados como:
-
-```text
-Sin stock
-Bajo stock
-En stock
-```
-
-La lógica pertenece a Inventory.
-
-Products aporta los datos necesarios como `minStock`.
-
----
-
-# 50. Lote
-
-`lotNumber` **no pertenece a Product**.
-
-Un mismo Product puede existir en:
-
-```text
-Lot A
-Lot B
-Lot C
-```
-
-simultáneamente.
-
----
-
-# 51. Caducidad
-
-`expirationDate` **no pertenece a Product**.
-
-Pertenece a la existencia física correspondiente, actualmente representada mediante `InventoryBatch`.
-
----
-
-# 52. Supplier
-
-Supplier tampoco constituye una propiedad universal del Product.
-
-Un producto puede comprarse a diferentes proveedores.
-
-La relación ocurre mediante contextos como:
-
-```text
-Purchase
-PurchaseReceipt
-InventoryBatch
-```
-
-según el diseño vigente.
-
----
-
-# 53. Product comercial vs existencia
-
-Ejemplo:
-
-```text
-Product
-
-SKU: CAT-15MM-001
-Nombre: Catéter 15 mm
-Marca: Terumo
-```
-
-puede tener:
-
-```text
-Batch L001
-Proveedor A
-Caduca 2027
-20 unidades
-```
-
-y:
-
-```text
-Batch L002
-Proveedor B
-Caduca 2028
-30 unidades
-```
-
----
-
-# 54. Identidad de Product
-
-La identidad comercial no debe depender del lote.
-
-Correcto:
-
-```text
-1 Product
-N InventoryBatches
+→ signal / warning
 ```
 
 No:
 
 ```text
-1 Product nuevo
-por cada lote recibido
+stock <= minStock
+→ automatically create Purchase
+```
+
+sin un workflow aprobado.
+
+---
+
+# 41. Product.stock
+
+`Product.stock` existe actualmente como campo persistido.
+
+Su semántica es:
+
+```text
+persisted aggregate Inventory projection
+```
+
+No:
+
+```text
+catalog master-data value
 ```
 
 ---
 
-# 55. Serialización
+# 42. Product CRUD no controla stock
 
-Los números de serie tampoco deben convertirse en campos simples del Product maestro.
-
-Conceptualmente:
+Actualmente:
 
 ```text
-Product
-→ modelo o tipo de artículo
+POST /products
+→ does not accept stock from client
+```
 
-Serial
-→ unidad física específica
+Un nuevo Product utiliza:
+
+```text
+stock = 0
+```
+
+según el default vigente.
+
+También:
+
+```text
+PATCH /products/:id
+→ does not accept stock
+```
+
+Frontend muestra stock como:
+
+```text
+read-only
 ```
 
 ---
 
-# 56. Configuración futura de trazabilidad
+# 43. Stock ownership
 
-El modelo futuro puede necesitar distinguir productos:
-
-```text
-sin tracking especial
-con lote obligatorio
-con caducidad
-serializados
-reutilizables
-```
-
-Una posible dirección podría utilizar capacidades como:
+Debe mantenerse:
 
 ```text
-requiresLotTracking
-requiresExpirationTracking
-requiresSerialTracking
+Products
+→ exposes stock projection
 ```
 
-pero los nombres y estructura **no están aprobados como schema** en este documento.
+mientras:
+
+```text
+Inventory workflows
+→ mutate stock
+```
+
+Ejemplos CURRENT:
+
+```text
+PurchaseReceipt
+→ Inventory IN
+→ stock increase
+```
+
+```text
+Sale CONFIRMED
+→ Inventory OUT
+→ stock decrease
+```
 
 ---
 
-# 57. No cambiar Prisma todavía
+# 44. Sources of stock CURRENT
 
-No deben agregarse estos flags únicamente porque aparecen como necesidad futura.
+Actualmente:
 
-Primero debe diseñarse:
+```text
+PurchaseReceipt
+→ IN
+```
 
-* Inventory;
-* Delivery;
-* Returns;
-* Healthcare;
-* Equipment;
+y:
 
-de manera conjunta.
+```text
+Sale approval / CONFIRMED
+→ OUT
+```
+
+son workflows implementados que afectan stock.
+
+No deben documentarse como CURRENT:
+
+```text
+Delivery
+
+generic Return
+```
+
+porque pertenecen a evolución posterior.
 
 ---
 
-# 58. Healthcare
+# 45. Stock ≠ Availability
 
-Products continúa siendo genérico aun cuando Healthcare sea la primera vertical.
+Actualmente `Product.stock` es una cantidad agregada.
 
-Información médica especializada no debe incorporarse al Core automáticamente.
+No debe asumirse permanentemente:
+
+```text
+Product.stock
+=
+available quantity
+```
+
+La futura evolución location-aware de Inventory podrá separar:
+
+```text
+Owned
+
+Available
+```
 
 ---
 
-# 59. Datos regulatorios
+# 46. inventoryTracking
 
-Capacidades futuras pueden necesitar información como:
-
-* registro sanitario;
-* fabricante;
-* clasificación;
-* documentación regulatoria.
-
-Debe decidirse si esos datos pertenecen a:
+Product contiene actualmente:
 
 ```text
-Product Core
+inventoryTracking
 ```
 
-o a:
+con valores:
 
 ```text
-Healthcare Product Extension
+QUANTITY
+
+SERIALIZED
+
+ASSET
 ```
 
-antes de modificar el modelo.
+Esta configuración está:
+
+```text
+IMPLEMENTED
+```
 
 ---
 
-# 60. Principio de no contaminación
-
-Incorrecto:
+# 47. Semántica de inventoryTracking
 
 ```text
-Product
-├── doctorId
-├── surgeryType
-└── hospitalId
+QUANTITY
+→ represented primarily as quantity
 ```
 
-solo porque Healthcare utilice Products.
+```text
+SERIALIZED
+→ commercial inventory requiring individual serial semantics
+```
 
-Product debe seguir siendo reutilizable por otras verticales.
+```text
+ASSET
+→ reusable physical units represented through EquipmentAsset
+```
+
+Debe mantenerse:
+
+```text
+SERIALIZED
+≠
+ASSET
+```
 
 ---
 
-# 61. Equipment
+# 48. QUANTITY
 
-Un equipo reutilizable puede tener un Product asociado.
+`QUANTITY` representa Products administrados principalmente mediante cantidades.
 
-Ejemplo:
+Es compatible con los workflows genéricos actuales de Inventory y, sujeto a otras
+reglas, Sales V1.
+
+---
+
+# 49. SERIALIZED
+
+`SERIALIZED` representa productos comerciales individualizados por serial.
+
+Actualmente:
 
 ```text
-Product
-Angiógrafo modelo X
+complete SERIALIZED operational semantics
+→ NOT IMPLEMENTED
 ```
 
-mientras cada equipo físico podría representarse posteriormente como:
+No debe resolverse automáticamente mediante `EquipmentAsset`.
+
+---
+
+# 50. ASSET
+
+`ASSET` representa Products cuyas unidades reutilizables tienen identidad física
+individual mediante:
 
 ```text
 EquipmentAsset
-Serial 001
-
-EquipmentAsset
-Serial 002
 ```
 
-No deben confundirse catálogo y activo físico.
+Debe mantenerse:
+
+```text
+Product
+→ catalog/model
+```
+
+```text
+EquipmentAsset
+→ exact reusable physical unit
+```
+
+Core Equipment está actualmente:
+
+```text
+IMPLEMENTED / VALIDATED
+```
 
 ---
 
-# 62. Create Product
+# 51. lotTracking
 
-La creación de Product debe validar como mínimo:
+Product contiene actualmente:
 
-* Company autenticada;
-* SKU;
-* nombre;
-* campos numéricos;
-* Category si existe;
-* unicidad;
-* Barcode si existe.
+```text
+lotTracking
+```
+
+con valores:
+
+```text
+NONE
+
+OPTIONAL
+
+REQUIRED
+```
+
+Esta configuración está:
+
+```text
+IMPLEMENTED
+```
 
 ---
 
-# 63. companyId
+# 52. inventoryTracking y lotTracking son dimensiones distintas
 
-Frontend no debe determinar arbitrariamente el tenant.
+Debe mantenerse:
+
+```text
+inventoryTracking
+→ how units are represented
+```
+
+mientras:
+
+```text
+lotTracking
+→ how lot traceability is required
+```
+
+No son flags intercambiables.
+
+---
+
+# 53. Lot tracking semantics
+
+Las reglas operativas completas actualmente implementadas para Purchase Receipts
+pertenecen a:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+Resumen:
+
+```text
+NONE
+→ lot / expiration not accepted
+```
+
+```text
+OPTIONAL
+→ lot optional
+→ expiration requires lot
+```
+
+```text
+REQUIRED
+→ lot required
+→ expiration optional
+```
+
+Products únicamente conserva la configuración.
+
+---
+
+# 54. Tracking configuration CURRENT
+
+Durante:
+
+```text
+POST /products
+```
+
+pueden seleccionarse:
+
+```text
+inventoryTracking
+
+lotTracking
+```
+
+El backend persiste ambas estrategias según el contrato vigente.
+
+---
+
+# 55. Tracking inmutable en PATCH normal
+
+Actualmente:
+
+```text
+PATCH /products/:id
+```
+
+no permite modificar normalmente:
+
+```text
+inventoryTracking
+
+lotTracking
+```
+
+Esto es deliberado.
+
+Cambiar:
+
+```text
+QUANTITY → ASSET
+```
+
+o:
+
+```text
+OPTIONAL → REQUIRED
+```
+
+cuando existen operaciones históricas puede requerir migración de datos y reglas
+de dominio.
+
+---
+
+# 56. Tracking migration workflow
+
+Una futura modificación de tracking deberá diseñarse como:
+
+```text
+explicit migration workflow
+```
+
+con validaciones sobre:
+
+```text
+stock
+
+InventoryMovement
+
+InventoryBatch
+
+Purchase Receipts
+
+Sales
+
+EquipmentAsset
+```
+
+Actualmente:
+
+```text
+Tracking migration
+→ NOT IMPLEMENTED
+```
+
+---
+
+# 57. Lot no pertenece a Product
+
+Debe mantenerse:
+
+```text
+Product.lotNumber
+→ incorrect
+```
+
+Un Product puede existir simultáneamente en:
+
+```text
+Lot A
+
+Lot B
+
+Lot C
+```
+
+---
+
+# 58. Expiration no pertenece a Product
+
+Debe mantenerse:
+
+```text
+Product.expirationDate
+→ incorrect
+```
+
+La caducidad corresponde a la existencia física representada mediante lote cuando
+aplica.
+
+---
+
+# 59. Serial no pertenece al Product maestro
+
+Debe mantenerse:
+
+```text
+Product
+→ model/catalog identity
+```
+
+mientras una identidad individual puede pertenecer a:
+
+```text
+SERIALIZED inventory future
+```
+
+o:
+
+```text
+EquipmentAsset when ASSET
+```
+
+según estrategia.
+
+---
+
+# 60. Supplier no es propiedad universal de Product
+
+Un Product puede adquirirse a distintos Suppliers.
+
+No debe modelarse:
+
+```text
+Product.supplierId
+```
+
+como una única relación universal si el negocio permite varios proveedores.
+
+La relación ocurre mediante operaciones como:
+
+```text
+Purchase
+
+PurchaseReceipt
+```
+
+---
+
+# 61. Create Product
+
+La creación debe validar al menos:
+
+```text
+authenticated Company
+
+SKU
+
+name
+
+numeric fields
+
+optional Category
+
+SKU uniqueness
+
+optional Barcode uniqueness
+
+inventoryTracking
+
+lotTracking
+```
+
+Cuando existe Category:
+
+```text
+same Company
++
+active Category
+```
+
+---
+
+# 62. companyId
+
+Frontend no controla arbitrariamente:
+
+```text
+companyId
+```
+
+Debe derivarse de:
+
+```text
+authenticated context
+```
 
 Conceptualmente:
 
 ```text
 JWT
 ↓
-Authenticated User
+authenticated User
 ↓
 companyId
 ↓
-Create Product
+Product operation
 ```
 
 ---
 
-# 64. Duplicado de SKU
+# 63. Update Product
 
-Debe rechazarse:
+La edición normal puede modificar, según contrato:
 
 ```text
-Company A
-SKU CAT-001
+sku
+
+name
+
+description
+
+brand
+
+categoryId
+
+barcode
+
+cost
+
+price
+
+minStock
 ```
 
-si ya existe otro Product de Company A con el mismo SKU.
-
----
-
-# 65. SKU entre Companies
-
-Sí puede existir:
+No controla:
 
 ```text
-Company A → CAT-001
-Company B → CAT-001
+stock
 ```
 
-porque los tenants son independientes.
-
----
-
-# 66. Barcode duplicado
-
-Cuando se captura Barcode, debe verificarse su unicidad dentro de la Company.
-
-El mensaje debe ser empresarial y comprensible.
-
-Ejemplo:
+ni cambia normalmente:
 
 ```text
-Ya existe un producto con este código de barras.
+inventoryTracking
+
+lotTracking
 ```
 
 ---
 
-# 67. Category validation
-
-Si se envía `categoryId`, backend debe verificar:
-
-```text
-Category exists
-AND
-Category belongs to authenticated Company
-```
-
-No basta con que el UUID exista.
-
----
-
-# 68. Update Product
-
-La edición puede permitir modificar, según las reglas actuales:
-
-* SKU;
-* nombre;
-* descripción;
-* marca;
-* Category;
-* Barcode;
-* costo;
-* precio;
-* mínimo;
-* estado.
-
-Stock físico debe quedar fuera de edición arbitraria.
-
----
-
-# 69. Actualización y unicidad
+# 64. Update uniqueness
 
 Al modificar:
 
 ```text
 sku
+
 barcode
 ```
 
-deben ejecutarse nuevamente las validaciones de unicidad excluyendo al Product actual.
+deben volver a aplicarse reglas tenant-scoped de unicidad excluyendo al Product
+actual.
 
 ---
 
-# 70. Reactivación
+# 65. Lifecycle separado de master-data PATCH
 
-Cuando un Product inactivo vuelva a utilizarse:
+Debe mantenerse:
 
 ```text
-INACTIVE
-↓
-ACTIVE
+PATCH /products/:id
+→ master-data edit
 ```
 
-debe verificarse que continúe cumpliendo las reglas aplicables.
+y:
+
+```text
+DELETE /products/:id
+→ deactivate
+```
+
+No conviene mezclar el lifecycle con un PATCH arbitrario de todos los campos.
 
 ---
 
-# 71. ProductSelector
+# 66. API CURRENT
 
-`ProductSelector` es un Business Component implementado para localizar Products dentro de workflows.
+Endpoints Products incluyen:
+
+```text
+GET    /products
+
+GET    /products/low-stock
+
+GET    /products/:id
+
+POST   /products
+
+PATCH  /products/:id
+
+DELETE /products/:id
+```
+
+Semántica:
+
+```text
+DELETE
+→ soft-deactivation
+→ not physical deletion
+```
+
+Los contratos exactos pertenecen al backend vigente.
+
+---
+
+# 67. Product detail
+
+La consulta individual utiliza el tenant autenticado.
+
+Conceptualmente:
+
+```text
+find Product
+by
+id + companyId
+```
+
+Un Product de otra Company no debe exponerse al usuario autenticado.
+
+---
+
+# 68. Active list vs historical detail
+
+La convención actual es:
+
+```text
+GET /products
+→ active Products
+```
+
+mientras:
+
+```text
+GET /products/:id
+→ may recover inactive Product for history/audit context
+```
+
+Esto permite preservar relaciones históricas sin ofrecer Products inactivos como
+opciones nuevas.
+
+---
+
+# 69. Multi-tenancy
+
+Products y Categories deben mantenerse tenant-scoped.
+
+Debe impedirse:
+
+```text
+Company A User
+→ read Product Company B
+```
+
+```text
+Company A User
+→ modify Product Company B
+```
+
+```text
+Product Company A
+→ Category Company B
+```
+
+---
+
+# 70. ProductSelector
+
+`ProductSelector` es un Business Component utilizado por varios workflows.
 
 Conceptualmente:
 
 ```text
 Purchase
 Quote
-Sales
-Healthcare
+Sale
+future Healthcare
 ↓
 ProductSelector
 ↓
@@ -1181,269 +1662,436 @@ Product
 
 ---
 
-# 72. ProductSelector no valida el dominio
+# 71. ProductSelector no es autoridad de dominio
 
-Seleccionar un Product desde UI no elimina la necesidad de verificar en backend:
+Aunque frontend filtre opciones:
 
-* tenant;
-* existencia;
-* estado;
-* reglas del workflow.
+```text
+backend
+→ still validates Product
+```
+
+según:
+
+```text
+tenant
+
+existence
+
+isActive
+
+tracking configuration
+
+workflow-specific rules
+```
+
+UI filtering nunca sustituye validación backend.
 
 ---
 
-# 73. Productos inactivos en selector
+# 72. Inactive Products en selectores
 
-Normalmente:
+Para nuevas operaciones:
 
 ```text
 Product.isActive = false
+→ normally excluded
 ```
 
-debe excluirlo de nuevas selecciones.
-
-Pero debe seguir mostrándose correctamente dentro de documentos históricos.
+Pero documentos históricos deben poder seguir mostrando correctamente ese Product.
 
 ---
 
-# 74. Búsqueda
+# 73. Search
 
-El catálogo debe poder localizar productos utilizando datos operativos relevantes.
-
-Especialmente:
+Los criterios operativos más útiles incluyen:
 
 ```text
 SKU
-Nombre
-Marca
-Barcode
+
+name
+
+brand
+
+barcode
 ```
 
-y posteriormente otros criterios cuando exista necesidad.
+Otros filtros pueden añadirse cuando exista necesidad real.
 
 ---
 
-# 75. Búsqueda Healthcare
+# 74. Filters
 
-Para empresas de suministros médicos resulta especialmente útil identificar un producto combinando:
+Filtros útiles pueden incluir:
 
 ```text
-SKU
-Nombre
-Marca
+Category
+
+active state
+
+brand
+
+stock status
 ```
 
-porque productos técnicamente similares pueden representar artículos comerciales distintos.
+Su implementación puede evolucionar progresivamente.
 
 ---
 
-# 76. Filtros
+# 75. Frontend Products V1
 
-Filtros útiles pueden incluir progresivamente:
-
-* Category;
-* Active / Inactive;
-* Brand;
-* stock status.
-
-No todos necesitan estar implementados inmediatamente.
-
----
-
-# 77. Listado
-
-La tabla principal debe priorizar información útil para identificación.
-
-Ejemplo:
+La ruta:
 
 ```text
-SKU
-Producto
-Marca
-Categoría
-Precio
-Stock
-Estado
-Acciones
+/products
 ```
 
-La composición exacta puede evolucionar con UX.
-
----
-
-# 78. Product 360
-
-La arquitectura objetivo contempla una vista `Product 360`.
-
-Debe responder:
+incluye actualmente capacidades como:
 
 ```text
-¿Qué producto es?
-¿Cuánto existe?
-¿Dónde está?
-¿Qué lotes tiene?
-¿Qué está por caducar?
-¿Cómo se compra?
-¿Cómo se vende?
-¿Qué ocurrió históricamente?
+Product list
+
+create Product
+
+edit Product
+
+deactivate Product
+
+Category selector
+
+brand
+
+inventoryTracking selector on create
+
+lotTracking selector on create
+
+tracking read-only during edit
+
+stock read-only
+
+minStock editable
+
+non-destructive lifecycle language
+
+responsive table/form behavior
 ```
 
 ---
 
-# 79. Tabs conceptuales de Product 360
+# 76. Purchase integration — CURRENT
 
-Una evolución posible:
+Purchases consume Product para definir:
 
 ```text
-General
-Inventario
-Lotes
-Movimientos
-Compras
-Ventas
-Historial
+what is being ordered
 ```
 
-No todas deben implementarse simultáneamente.
+El documento comercial conserva sus propios valores necesarios para mantener
+historia.
+
+Cambios posteriores en Product no deben reescribir una Purchase ya creada.
 
 ---
 
-# 80. Product 360 no absorbe dominios
+# 77. Purchase Receipt integration — CURRENT
 
-Mostrar Purchases o Inventory dentro de Product 360 no convierte Products en propietario de esas reglas.
-
-La vista es un Read Model / experiencia contextual.
-
----
-
-# 81. API
-
-Conceptualmente Products utiliza operaciones como:
+Purchase Receipts consume:
 
 ```text
-GET    /products
-GET    /products/:id
-POST   /products
-PATCH  /products/:id
+Product
+
+inventoryTracking
+
+lotTracking
 ```
 
-La operación de lifecycle debe alinearse progresivamente con ADR-012.
-
----
-
-# 82. Desactivación API objetivo
-
-Preferir una semántica explícita como:
+para decidir reglas como:
 
 ```text
-PATCH /products/:id
+Inventory IN
 
-{
-  "isActive": false
-}
+lot validation
+
+EquipmentAsset provisioning when ASSET
 ```
 
-o una acción equivalente claramente documentada.
+Products configura.
 
-No utilizar `DELETE` para aparentar que un Product histórico dejó de existir.
+Purchase Receipts ejecuta el workflow físico.
 
 ---
 
-# 83. Categories API
+# 78. Quote integration — CURRENT
 
-Category constituye un recurso propio dentro del catálogo.
+Quotes utiliza Product para construir propuestas comerciales.
 
-Puede utilizar operaciones conceptuales como:
+Quote Item debe conservar el valor de la propuesta sin depender permanentemente de:
 
 ```text
-GET   /categories
-POST  /categories
-PATCH /categories/:id
+current Product.price
 ```
 
-respetando tenant y lifecycle.
-
 ---
 
-# 84. Multi-tenancy
+# 79. Sale integration — CURRENT
 
-Todas las operaciones de Products y Categories deben filtrar por Company.
+Sales V1 utiliza Product para identificar el artículo vendido.
 
-Debe impedirse:
+Actualmente el flujo genérico soporta Products compatibles con:
 
 ```text
-Company A user
-↓
-GET Product Company B
+inventoryTracking = QUANTITY
 ```
 
 y:
 
 ```text
-Company A user
-↓
-PATCH Product Company B
+lotTracking != REQUIRED
 ```
+
+según las reglas vigentes de Sales.
 
 ---
 
-# 85. Relaciones cross-tenant
+# 80. Sale tracking limitations
 
-Debe rechazarse:
+Sales V1 no resuelve completamente:
 
 ```text
-Product Company A
-↓
-Category Company B
+ASSET commercial fulfillment
+
+SERIALIZED commercial fulfillment
+
+REQUIRED-lot allocation
 ```
 
-aunque ambos IDs existan.
+Estas limitaciones deben permanecer visibles.
 
----
-
-# 86. RBAC
-
-Permisos futuros pueden incluir:
+Principio:
 
 ```text
-products.read
-products.create
-products.update
-products.deactivate
-
-categories.read
-categories.create
-categories.update
-categories.deactivate
+Product tracking configuration
+→ constrains downstream workflow compatibility
 ```
-
-La granularidad se implementará progresivamente según ADR-007.
 
 ---
 
-# 87. Auditoría
+# 81. SalesOrder / Delivery — TARGET
 
-Cambios relevantes podrán registrar:
+La evolución comercial futura puede utilizar:
+
+```text
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+Actualmente:
+
+```text
+Sale
+→ CURRENT
+```
+
+mientras:
+
+```text
+SalesOrder / Delivery
+→ TARGET
+```
+
+No deben mezclarse como si fueran el mismo estado de implementación.
+
+---
+
+# 82. Equipment integration — CURRENT
+
+Para:
+
+```text
+inventoryTracking = ASSET
+```
+
+Core Equipment utiliza Product como catálogo/modelo.
+
+Conceptualmente:
+
+```text
+Product
+↓
+EquipmentAsset
+EquipmentAsset
+EquipmentAsset
+```
+
+Cada `EquipmentAsset` representa una unidad física específica.
+
+---
+
+# 83. Product.stock ↔ EquipmentAsset
+
+Para Products ASSET:
+
+```text
+EquipmentAsset
+→ physical unit identity
+```
+
+mientras:
+
+```text
+Product.stock
+→ aggregate Inventory projection
+```
+
+La reconciliación formal:
+
+```text
+Product.stock
+↔
+EquipmentAsset
+```
+
+continúa como deuda conocida.
+
+---
+
+# 84. Healthcare boundary
+
+Products debe permanecer genérico aunque Healthcare sea una vertical principal.
+
+No debe incorporar campos como:
+
+```text
+doctorId
+
+hospitalId
+
+surgeryType
+
+caseId
+```
+
+únicamente porque Healthcare utiliza Products.
+
+---
+
+# 85. Healthcare TARGET
+
+Healthcare podrá utilizar Product en capacidades como:
+
+```text
+Requirements
+
+CaseKit
+
+Case preparation
+
+Dispatch
+
+Reconciliation
+```
+
+cuando esos workflows sean implementados.
+
+Products sigue siendo únicamente la identidad Core del artículo.
+
+---
+
+# 86. Regulatory extension — FUTURE
+
+Healthcare puede requerir posteriormente información como:
+
+```text
+regulatory registration
+
+manufacturer
+
+classification
+
+regulatory documents
+```
+
+Antes de modificar Product deberá decidirse si pertenece a:
+
+```text
+Product Core
+```
+
+o:
+
+```text
+Healthcare Product Extension
+```
+
+---
+
+# 87. Returns — FUTURE
+
+Generic Commercial Returns no forma parte del flujo actual de ERP Core V1.
+
+Una futura implementación deberá relacionarse con la operación original y
+preservar trazabilidad.
+
+No debe inferir qué existencia regresó utilizando únicamente:
+
+```text
+productId
+```
+
+cuando existan:
+
+```text
+lot
+
+serial
+
+asset identity
+```
+
+---
+
+# 88. Dashboard integration
+
+Dashboard puede consumir Product para métricas como:
+
+```text
+total active Products
+
+low-stock Products
+```
+
+sin convertirse en propietario de reglas de Products o Inventory.
+
+---
+
+# 89. Audit — TARGET
+
+Una futura capacidad transversal de Audit puede registrar:
 
 ```text
 Product created
+
 Product updated
+
 Product deactivated
+
 Product reactivated
+
+tracking migration
+
+sensitive price/cost changes
 ```
 
-especialmente modificaciones sensibles como:
-
-* SKU;
-* precio;
-* costo;
-* estado.
+Actualmente no existe un Audit transversal completo.
 
 ---
 
-# 88. Cambios de precio
+# 90. Price history — FUTURE
 
-Una futura auditoría de precios puede necesitar registrar:
+Si el negocio lo requiere podrá existir historia específica:
 
 ```text
 Price 100
@@ -1451,32 +2099,28 @@ Price 100
 Price 120
 ```
 
-en lugar de conocer únicamente el valor actual.
-
-No se introduce todavía un historial de precios sin un caso funcional aprobado.
+No debe agregarse anticipadamente sin caso funcional aprobado.
 
 ---
 
-# 89. Importación
+# 91. Import — FUTURE
 
-Products es una de las entidades prioritarias del futuro módulo de Data Import.
+Products es candidato natural para Data Import desde:
 
-Debe soportarse posteriormente importación desde:
+```text
+CSV
 
-* CSV;
-* XLSX;
-* sistemas externos.
+XLSX
 
----
-
-# 90. Flujo de importación
+external systems
+```
 
 Conceptualmente:
 
 ```text
 File
 ↓
-Column mapping
+Mapping
 ↓
 Validation
 ↓
@@ -1487,296 +2131,564 @@ Preview
 Import
 ```
 
-No debe insertarse directamente información inválida en Product.
-
 ---
 
-# 91. Identificación de duplicados en importación
+# 92. Import duplicate detection
 
-Debe evaluarse al menos:
+Un futuro import deberá considerar al menos:
 
 ```text
 SKU
+
 Barcode
 ```
 
 dentro del tenant.
 
-La estrategia exacta para merge/update deberá definirse en el módulo de importaciones.
-
----
-
-# 92. Initial Stock durante importación
-
-Importar Products no debe significar automáticamente:
+La política de:
 
 ```text
-Product.stock = imported value
+create
+
+skip
+
+merge
+
+update
 ```
 
-sin una operación controlada de Initial Inventory.
-
-Catálogo e inventario continúan siendo conceptos distintos.
+deberá definirse explícitamente.
 
 ---
 
-# 93. Integración con Purchases
+# 93. Initial stock durante Import
 
-Purchases consume Products para definir:
+Importar catálogo:
 
 ```text
-qué se está ordenando
+≠
+import physical inventory
 ```
 
-y conserva snapshots de información comercial necesaria.
-
----
-
-# 94. Integración con Inventory
-
-Inventory consume Product como identidad maestra.
-
-Conceptualmente:
+No debe hacerse:
 
 ```text
-Product
+Product import
 ↓
-InventoryBatch
-↓
-InventoryMovement
+arbitrary Product.stock assignment
 ```
 
----
-
-# 95. Integración con Quotes
-
-Quotes utiliza Products para construir propuestas comerciales.
-
-QuoteItem debe conservar la información económica de la propuesta sin depender permanentemente del precio actual del Product.
+sin un workflow controlado de Initial Inventory.
 
 ---
 
-# 96. Integración con Sales
+# 94. Product 360 — FUTURE
 
-SalesOrder utiliza Product para identificar qué artículo se está vendiendo.
-
-Delivery e Inventory determinan qué existencia física se entrega.
-
----
-
-# 97. Integración con Returns
-
-Returns debe vincularse a la operación original.
-
-No debe utilizar únicamente:
+Una futura experiencia Product 360 puede responder:
 
 ```text
-productId
+¿Qué Product es?
+
+¿Cuánto existe?
+
+¿Qué lotes tiene?
+
+¿Qué movimientos tiene?
+
+¿Cómo se compra?
+
+¿Cómo se vende?
+
+¿Qué historia posee?
 ```
 
-para asumir qué existencia física regresó cuando existe trazabilidad por lote.
-
----
-
-# 98. Integración con Healthcare
-
-Healthcare puede utilizar Product para construir:
-
-* KitTemplate;
-* CaseKit;
-* CaseDispatch;
-* Reconciliation.
-
-La vertical puede añadir contexto especializado sin modificar la identidad genérica del catálogo.
-
----
-
-# 99. Dashboard
-
-Dashboard puede consumir Products para métricas como:
+Tabs conceptuales podrían incluir:
 
 ```text
-total products
-low stock products
-inactive products
+General
+
+Inventory
+
+Batches
+
+Movements
+
+Purchases
+
+Sales
+
+History
 ```
 
-pero no es propietario de sus reglas.
-
----
-
-# 100. Estado CURRENT
-
-La documentación consolidada identifica como actuales:
+Esto representa:
 
 ```text
-Product CRUD
-Category support
-SKU
-Name
-Description
-Brand
-Barcode
-Cost
-Price
-Stock projection
-minStock
-isActive
-ProductSelector
-multi-tenant uniqueness
+read model / contextual UX
 ```
 
-El estado técnico exacto debe validarse contra el repositorio vigente durante la auditoría final.
+y no transfiere ownership de otros dominios hacia Products.
 
 ---
 
-# 101. Estado TARGET
+# 95. Units of Measure — FUTURE
 
-Evolución aprobada:
+Actualmente las cantidades utilizan el modelo existente.
 
-```text
-Correct deactivate lifecycle
-Product 360
-Improved search
-Brand filtering
-Category filtering
-OpenAPI documentation
-Audit improvements
-Inventory context
-Import support
-Tracking configuration
-```
-
----
-
-# 102. Estado FUTURE
-
-Capacidades posibles:
-
-```text
-Price Lists
-Units of Measure
-Product Variants
-Multiple Barcodes
-Images
-Documents
-Supplier Catalog Codes
-Regulatory Product Profile
-Advanced Search
-QR workflows
-AI classification
-Demand recommendations
-```
-
-Estas capacidades no deben considerarse comprometidas únicamente por aparecer aquí.
-
----
-
-# 103. Units of Measure
-
-El modelo actual utiliza cantidades enteras.
-
-Antes de introducir productos vendidos por:
+Antes de soportar plenamente:
 
 ```text
 kg
-litros
-metros
-cajas con conversiones
+
+liters
+
+meters
+
+boxes with conversion
 ```
 
-debe diseñarse una estrategia de unidades consistente con:
+debe diseñarse una estrategia coherente entre:
 
-* Products;
-* Purchases;
-* Inventory;
-* Sales.
+```text
+Products
+
+Purchases
+
+Inventory
+
+Sales
+```
 
 ---
 
-# 104. Variants
+# 96. Variants — FUTURE
 
-No debe agregarse un sistema complejo de variantes hasta que exista una necesidad real.
+No debe introducirse un sistema complejo de variantes sin necesidad real.
 
 Ejemplo futuro:
 
 ```text
 Product Family
 ↓
-Size / Presentation / Variant
+Presentation / Size / Variant
 ```
 
-requiere una decisión específica.
+requiere diseño propio.
 
 ---
 
-# 105. Manufacturer
+# 97. Manufacturer — FUTURE
 
-Marca y fabricante pueden representar conceptos distintos.
+Brand y Manufacturer pueden ser conceptos distintos.
 
-Actualmente no deben crearse entidades nuevas únicamente para anticipar esta distinción.
+Actualmente no deben crearse nuevas entidades únicamente para anticipar esa
+distinción.
 
-Healthcare podrá requerir formalizarla posteriormente.
+Healthcare podrá hacerla relevante posteriormente.
 
 ---
 
-# 106. Nombre comercial vs descripción técnica
+# 98. QR — FUTURE
 
-Zaping debe permitir que el usuario identifique rápidamente el Product sin convertir el nombre en una ficha técnica completa.
-
-Preferir:
+QR puede utilizarse posteriormente para:
 
 ```text
-Name
-→ corto y operativo
+Products
 
-Description
-→ información extendida
+Inventory
+
+Equipment
+
+Healthcare workflows
+```
+
+No requiere convertir QR en un campo universal adicional de Product desde ahora.
+
+---
+
+# 99. IMPLEMENTED
+
+Actualmente están implementados:
+
+```text
+Product persistence
+
+Category integration
+
+SKU
+
+name
+
+description
+
+brand
+
+barcode
+
+cost
+
+price
+
+stock projection
+
+minStock
+
+inventoryTracking
+
+lotTracking
+
+isActive
+
+tenant-scoped Product detail
+
+tenant-safe active Category validation
+
+stock excluded from create/update input
+
+tracking selection on creation
+
+tracking protected from normal update
+
+soft-deactivation through DELETE
+
+inactive historical detail
+
+Product frontend
+
+ProductSelector integration
+
+low-stock route
 ```
 
 ---
 
-# 107. Invariantes
+# 100. VALIDATED
+
+La validación registrada incluye:
+
+```text
+Product create
+
+Product update
+
+SKU uniqueness
+
+Barcode uniqueness
+
+Category same-tenant validation
+
+inactive Category rejection
+
+stock read-only contract
+
+tracking creation
+
+tracking immutability
+
+soft-deactivation
+
+inactive historical lookup
+
+frontend Product workflows
+
+related regression
+```
+
+Los gates técnicos incluyen según el hito:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+```
+
+Los snapshots cuantitativos se mantienen en:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+```
+
+---
+
+# 101. TECHNICAL DEBT
+
+Permanece abierto:
+
+```text
+Product reactivation workflow
+```
+
+```text
+tracking migration workflow
+```
+
+```text
+SERIALIZED operational semantics
+```
+
+```text
+Product.stock
+↔
+EquipmentAsset reconciliation
+```
+
+```text
+backend pagination
+```
+
+```text
+server-side Product search/filtering
+```
+
+```text
+Audit integration
+```
+
+---
+
+# 102. TARGET
+
+Evoluciones aprobadas o razonables posteriores incluyen:
+
+```text
+Product reactivation
+
+tracking migration
+
+Product 360
+
+better server-side search
+
+Audit integration
+
+Data Import
+```
+
+Su prioridad debe definirse dentro del plan general del ERP y no únicamente desde
+Products.
+
+---
+
+# 103. FUTURE
+
+Capacidades posibles:
+
+```text
+Price Lists
+
+Units of Measure
+
+Product Variants
+
+Multiple Barcodes
+
+Images
+
+Documents
+
+Supplier Catalog Codes
+
+Regulatory Product Profile
+
+Advanced Search
+
+QR workflows
+
+AI classification
+
+Demand recommendations
+```
+
+No deben considerarse comprometidas únicamente por aparecer en esta lista.
+
+---
+
+# 104. Seguridad y autorización
+
+Products utiliza el modelo transversal de Identity & Access.
+
+Debe mantenerse:
+
+```text
+authenticated companyId
+→ tenant authority
+```
+
+No:
+
+```text
+client companyId
+→ authorization
+```
+
+Permissions conceptuales futuras pueden incluir:
+
+```text
+products.read
+
+products.create
+
+products.update
+
+products.deactivate
+
+categories.read
+
+categories.create
+
+categories.update
+
+categories.deactivate
+```
+
+Actualmente el Permission-Based RBAC completo permanece TARGET.
+
+---
+
+# 105. Trabajo de seguridad preproducción
+
+Products participa en la revisión transversal de:
+
+```text
+critical endpoint authorization
+
+systematic tenant-isolation regression
+
+inactive-user enforcement
+
+safe role provisioning
+```
+
+No debe crear una solución de seguridad aislada del resto de la plataforma.
+
+---
+
+# 106. Invariantes
+
+## Tenant
 
 ```text
 Product
 → belongs to one Company
 ```
 
-```text
-SKU
-→ unique within Company
-```
+---
+
+## SKU
 
 ```text
-Barcode
-→ unique within Company when present
+companyId + sku
+→ unique
 ```
 
+---
+
+## Barcode
+
 ```text
-Category relation
+companyId + barcode
+→ unique when present
+```
+
+---
+
+## Category
+
+```text
+Product Category
 → same Company
 ```
 
+Para una nueva asignación:
+
 ```text
-Product stock
-→ not arbitrary master-data input
+Category
+→ active
+```
+
+---
+
+## Stock
+
+```text
+Product.stock
+→ not arbitrary Product CRUD input
+```
+
+---
+
+## Tracking
+
+```text
+inventoryTracking
+→ selected at creation
 ```
 
 ```text
-Lot
-→ not Product field
+lotTracking
+→ selected at creation
 ```
 
 ```text
-Expiration
-→ not Product field
+normal PATCH
+→ does not migrate tracking strategy
 ```
 
+---
+
+## Lot
+
 ```text
-Historical documents
-→ not rewritten when Product changes
+lotNumber
+→ not Product master field
 ```
+
+---
+
+## Expiration
+
+```text
+expirationDate
+→ not Product master field
+```
+
+---
+
+## Equipment
+
+```text
+Product
+≠
+EquipmentAsset
+```
+
+---
+
+## Serialization
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+---
+
+## Historical documents
+
+```text
+Product master-data change
+→ does not rewrite historical transaction values
+```
+
+---
+
+## Lifecycle
 
 ```text
 Inactive Product
@@ -1785,41 +2697,9 @@ Inactive Product
 
 ---
 
-# 108. Anti-patrones
+# 107. Anti-patrones
 
-## Lote dentro de Product
-
-```text
-Product.lotNumber
-```
-
-Incorrecto para productos con múltiples lotes.
-
----
-
-## Caducidad dentro de Product
-
-```text
-Product.expirationDate
-```
-
-Incorrecto porque cada lote puede caducar en una fecha distinta.
-
----
-
-## Proveedor fijo
-
-```text
-Product.supplierId
-```
-
-como única fuente universal de proveedor.
-
-Un Product puede obtenerse desde proveedores distintos.
-
----
-
-## Stock editable
+## Editable stock
 
 ```text
 Edit Product
@@ -1827,144 +2707,473 @@ Edit Product
 stock = arbitrary value
 ```
 
----
-
-## Duplicar Product por lote
-
-Crear un Product nuevo cada vez que llega otro lote.
+Incorrecto.
 
 ---
 
-## Borrar historia
+## Product per lot
 
-Eliminar Product porque ya no se vende.
+```text
+new lot
+↓
+new Product
+```
 
-Preferir desactivarlo.
+Incorrecto.
+
+---
+
+## Lot inside Product
+
+```text
+Product.lotNumber
+```
+
+Incorrecto.
+
+---
+
+## Expiration inside Product
+
+```text
+Product.expirationDate
+```
+
+Incorrecto.
+
+---
+
+## Serial inside Product master
+
+Utilizar un único `Product.serialNumber` para representar unidades físicas
+individuales.
+
+Incorrecto.
+
+---
+
+## Fixed Supplier
+
+```text
+Product.supplierId
+```
+
+como proveedor universal único.
+
+Incorrecto si el producto puede adquirirse a varios Suppliers.
+
+---
+
+## Tracking PATCH
+
+```text
+PATCH Product
+QUANTITY → ASSET
+```
+
+como simple edición de master data.
+
+Incorrecto.
+
+---
+
+## ASSET as normal quantity only
+
+Ignorar `EquipmentAsset` para Products reutilizables ASSET.
+
+Incorrecto.
+
+---
+
+## SERIALIZED = ASSET
+
+Utilizar Equipment automáticamente para cualquier Product serializado.
+
+Incorrecto.
+
+---
+
+## Hard deleting history
+
+Eliminar físicamente Product porque ya no se utiliza.
+
+Preferir desactivación.
 
 ---
 
 ## Healthcare contamination
 
-Agregar campos exclusivos de Cases directamente al Product Core sin analizar la frontera vertical.
-
----
-
-# 109. Relación con Category
+Agregar directamente a Product:
 
 ```text
-Category
-→ organiza Products
+doctorId
+
+hospitalId
+
+caseId
+
+surgeryType
 ```
 
-pero no determina:
-
-* Inventory;
-* precio;
-* disponibilidad;
-* Supplier.
+para resolver workflows Healthcare.
 
 ---
 
-# 110. Relación con Inventory
+## Frontend-only validation
+
+Confiar en que ProductSelector filtró correctamente y omitir validación backend.
+
+---
+
+# 108. Relación con Inventory
+
+Debe mantenerse:
 
 ```text
 Product
-=
-identity
+→ catalog identity + tracking configuration
 ```
 
 ```text
 Inventory
-=
-physical state
+→ quantity + batches + movement history
 ```
 
-Esta separación constituye una de las fronteras principales del ERP Core.
+`Product.stock` es una proyección persistida de Inventory y no una propiedad
+maestra libremente editable.
 
 ---
 
-# 111. Relación con Business Components
+# 109. Relación con Equipment
 
-`ProductSelector` pertenece a:
+Para Products:
 
 ```text
-ux/BUSINESS_COMPONENTS.md
+inventoryTracking = ASSET
 ```
 
-Products proporciona los datos y reglas del recurso.
+Equipment administra:
 
-El selector proporciona una interacción reutilizable para encontrarlo.
+```text
+EquipmentAsset
+```
+
+como identidad física individual.
+
+Products no administra:
+
+```text
+lifecycle
+
+condition
+
+Inspection
+
+Retirement
+
+Current Equipment Availability
+```
 
 ---
 
-# 112. Relación con Zaping Way
+# 110. Relación con Purchase Receipts
 
-La experiencia debe reducir la necesidad de navegar manualmente.
+Products define:
 
-Por ejemplo, desde `Product 360` el usuario podrá consultar Inventory o movimientos sin perder el contexto del Product.
+```text
+inventoryTracking
+
+lotTracking
+```
+
+Purchase Receipts aplica esas configuraciones durante la entrada física.
+
+Debe mantenerse:
+
+```text
+Product configuration
+≠
+Receipt execution
+```
+
+---
+
+# 111. Relación con Sales
+
+Products identifica el artículo.
+
+Sales CURRENT decide el workflow comercial vigente.
+
+Actualmente:
+
+```text
+Sale
+→ CURRENT
+```
+
+Futuro:
+
+```text
+SalesOrder
++
+Delivery
+→ TARGET
+```
+
+Products no decide por sí solo cuándo se produce un Inventory OUT.
+
+---
+
+# 112. Relación con Healthcare
+
+Healthcare consume Product como catálogo Core.
+
+Las reglas específicas de:
+
+```text
+Case
+
+Kit
+
+Dispatch
+
+Custody
+
+Return
+```
+
+pertenecen a Healthcare.
 
 ---
 
 # 113. ADR relacionados
 
-* ADR-001 — Multi-Tenant.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-012 — Entity Lifecycle.
+```text
+ADR-001 — Multi-Tenant
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-012 — Entity Lifecycle
+```
 
 ---
 
-# 114. Documentos relacionados
+# 114. Documentación relacionada
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-ux/BUSINESS_COMPONENTS.md
-modules/erp/INVENTORY.md
-modules/erp/PURCHASES.md
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/ux/BUSINESS_COMPONENTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/PURCHASES.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
 ```
 
 ---
 
 # 115. Fuente de verdad
 
-La división de responsabilidades es:
-
 ```text
 PRODUCTS.md
-→ reglas funcionales de catálogo
+→ Product / Category functional behavior
 
 INVENTORY.md
-→ existencias y trazabilidad
+→ stock, batches and movement semantics
+
+EQUIPMENT.md
+→ reusable ASSET physical identity
+
+PURCHASE_RECEIPTS.md
+→ physical receipt behavior
+
+SALES.md
+→ CURRENT Sale behavior
+
+Healthcare docs
+→ vertical-specific Product usage
 
 schema.prisma
-→ modelo técnico vigente
+→ CURRENT persistence model
 
-backend
-→ implementación actual
+Products backend
+→ CURRENT API/business implementation
+
+Products frontend
+→ CURRENT UX
 
 tests
-→ comportamiento validado
+→ validated behavior
 
 PROJECT_BOARD.md
-→ estado de trabajo
+→ current status and active debt
+
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 116. Principio final
+# 116. Estado consolidado
 
-Products debe representar de forma estable **qué artículo comercial existe**.
+```text
+Product CRUD
+✅ IMPLEMENTED / VALIDATED
 
-Inventory representa **qué existencias físicas de ese artículo existen**.
+Category integration
+✅ IMPLEMENTED / VALIDATED
 
-Por tanto:
+SKU tenant uniqueness
+✅ IMPLEMENTED / VALIDATED
+
+Barcode tenant uniqueness
+✅ IMPLEMENTED / VALIDATED
+
+Product.stock read-only in Product CRUD
+✅ IMPLEMENTED / VALIDATED
+
+minStock
+✅ IMPLEMENTED / VALIDATED
+
+inventoryTracking
+✅ IMPLEMENTED / VALIDATED
+
+lotTracking
+✅ IMPLEMENTED / VALIDATED
+
+tracking immutable in normal PATCH
+✅ IMPLEMENTED / VALIDATED
+
+active tenant-safe Category validation
+✅ IMPLEMENTED / VALIDATED
+
+Product soft-deactivation
+✅ IMPLEMENTED / VALIDATED
+
+inactive historical Product retrieval
+✅ IMPLEMENTED / VALIDATED
+
+ProductSelector
+✅ IMPLEMENTED
+
+Products frontend V1
+✅ IMPLEMENTED / VALIDATED
+```
+
+Pendiente:
+
+```text
+Product reactivation
+⏳
+
+tracking migration workflow
+⏳
+
+SERIALIZED operational semantics
+⏳
+
+Product.stock ↔ EquipmentAsset reconciliation
+⏳
+
+server-side pagination/search
+⏳
+
+Product Audit integration
+⏳
+```
+
+---
+
+# 117. Secuencia de proyecto
+
+Products V1 forma parte del ERP Core ya normalizado.
+
+La secuencia vigente del proyecto es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto, capacidades como:
+
+```text
+Product 360
+
+Data Import
+
+advanced pricing
+
+tracking migration
+```
+
+no deben convertirse automáticamente en el siguiente sprint únicamente por estar
+documentadas.
+
+Su prioridad deberá evaluarse después del cierre correspondiente del ERP Core.
+
+---
+
+# 118. Principio final
+
+Products debe representar de forma estable:
+
+```text
+¿Qué artículo comercial es?
+```
+
+Inventory debe responder:
+
+```text
+¿Cuánto existe?
+¿Qué lote existe?
+¿Qué movimientos ocurrieron?
+```
+
+Equipment debe responder, cuando el Product es ASSET:
+
+```text
+¿Qué unidad física exacta es?
+```
+
+La separación correcta es:
 
 ```text
 Product
@@ -1976,151 +3185,30 @@ Product
 ├── Barcode
 ├── Reference Cost
 ├── Reference Price
+├── minStock
+├── inventoryTracking
+├── lotTracking
 └── Catalog Lifecycle
 ```
 
-mientras:
-
 ```text
 Inventory
-├── Stock
-├── Batch
-├── Expiration
-├── Movement
-├── Availability
-└── Physical Traceability
+├── Product.stock projection
+├── InventoryBatch
+└── InventoryMovement
 ```
 
-> **El catálogo identifica el producto. El inventario explica sus existencias.**
-
----
-
-# 117. Products V1 — estado vigente
-
-**Estado:** IMPLEMENTED / VALIDATED.
-
-Products V1 administra datos maestros de catálogo por Company:
-
 ```text
-SKU
-name
-description
-brand
-Category
-barcode
-cost
-price
-minStock
-inventoryTracking
-lotTracking
-active / inactive lifecycle
+Equipment
+└── EquipmentAsset
 ```
 
-`Product.stock` continúa persistido como estado operacional, pero Product CRUD no es propietario de sus movimientos.
-
-## 117.1 Política de stock
+Debe mantenerse:
 
 ```text
-POST /products
-→ no acepta stock del cliente
-→ Product nuevo usa el default backend / Prisma stock = 0
-
-PATCH /products/:id
-→ no acepta stock
-```
-
-El stock actual se muestra como solo lectura en `/products`. `minStock` permanece editable.
-
-## 117.2 Estrategias de tracking
-
-Valores implementados:
-
-```text
-inventoryTracking
-├── QUANTITY
-├── SERIALIZED
-└── ASSET
-
-lotTracking
-├── NONE
-├── OPTIONAL
-└── REQUIRED
-```
-
-Ambas estrategias pueden elegirse al crear un Product. El `PATCH` normal no permite modificar `inventoryTracking` ni `lotTracking`; cualquier migración futura requiere un workflow explícito que todavía no existe.
-
-## 117.3 Seguridad de Category
-
-Cuando se proporciona `categoryId`, la Category debe pertenecer a la Company autenticada y estar activa. Se rechazan categorías inexistentes, inactivas o de otro tenant.
-
-```text
-categoryId = null
-→ limpia la Category
-
-categoryId omitido en PATCH
-→ conserva la Category actual
-```
-
-## 117.4 Consulta y ciclo de vida
-
-La convención vigente es:
-
-```text
-ProductsService.findOne(companyId, productId)
-```
-
-`GET /products/:id` está aislado por tenant. `GET /products/low-stock` se declara antes de la ruta dinámica y ya no queda sombreado por `GET /products/:id`.
-
-La ruta pública `DELETE /products/:id` implementa desactivación, no eliminación física:
-
-```text
-ACTIVE Product
-→ isActive = false
-
-GET /products
-→ sólo Products activos
-
-GET /products/:id
-→ Product inactivo recuperable para auditoría e historia
-```
-
-La desactivación repetida es segura e idempotente. No existe workflow de reactivación.
-
-## 117.5 Frontend Products V1
-
-`/products` incluye:
-
-* Brand corregido;
-* selector de Category;
-* selectores de `inventoryTracking` y `lotTracking` en creación;
-* tracking de solo lectura durante edición;
-* stock actual de solo lectura;
-* stock mínimo editable;
-* lenguaje de desactivación no destructivo;
-* lista de Products activos;
-* tabla y formulario responsivos.
-
-## 117.6 Validación y deuda
-
-Evidencia registrada:
-
-```text
-Products backend
-43 suites / 413 tests PASS
-
-Products frontend
-14 tests PASS
-
-Frontend final vigente
-25 files / 336 tests PASS
-
-build / lint / git diff --check
-PASS
-```
-
-Deuda abierta:
-
-```text
-Product reactivation workflow
-tracking migration workflow
+Catalog identity
+≠
+Inventory quantity
+≠
+Physical ASSET identity
 ```
