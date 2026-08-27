@@ -25,6 +25,7 @@ type PurchaseDetailModalProps = {
   movementsError: string;
 
   downloading: boolean;
+  actionError: string;
 
   formatDate: (value: string) => string;
   formatMoney: (value: number) => string;
@@ -46,6 +47,7 @@ export default function PurchaseDetailModal({
   movementsLoading,
   movementsError,
   downloading,
+  actionError,
   formatDate,
   formatMoney,
   onClose,
@@ -192,6 +194,15 @@ export default function PurchaseDetailModal({
               <span>{formatMoney(purchase.total)}</span>
             </div>
           </div>
+
+          {actionError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+            >
+              {actionError}
+            </div>
+          ) : null}
 
           <div className="sticky bottom-0 z-10 -mx-6 flex flex-wrap justify-end gap-3 border-t border-gray-200 bg-white/95 px-6 py-4 backdrop-blur">
             {purchase.status === 'DRAFT' ? (

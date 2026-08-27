@@ -1,5 +1,12 @@
 import type { StatusTone } from '@/app/components/business/StatusBadge';
 
+export type PurchaseStatus =
+  | 'DRAFT'
+  | 'CONFIRMED'
+  | 'PARTIALLY_RECEIVED'
+  | 'RECEIVED'
+  | 'CANCELLED';
+
 export type PurchaseReceiptFormField =
   | 'quantityReceived'
   | 'lotNumber'
@@ -104,7 +111,7 @@ export type PurchaseItem = {
 export type Purchase = {
   id: string;
   folio: string;
-  status: string;
+  status: PurchaseStatus;
   subtotal: number;
   iva: number;
   total: number;
@@ -113,6 +120,9 @@ export type Purchase = {
   supplier: {
     id: string;
     name: string;
+    email?: string | null;
+    contactName?: string | null;
+    isActive?: boolean;
   };
 
   items: PurchaseItem[];
@@ -128,6 +138,7 @@ export type Supplier = {
   name: string;
   email?: string | null;
   contactName?: string | null;
+  isActive?: boolean;
 };
 
 export type Product = {

@@ -20,6 +20,7 @@ export function usePurchaseActions({
 
   const [approving, setApproving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const [
     downloadingPurchaseId,
@@ -27,6 +28,7 @@ export function usePurchaseActions({
   ] = useState<string | null>(null);
 
   function openApproveDialog(purchase: Purchase) {
+    setActionError('');
     setPurchaseToApprove(purchase);
   }
 
@@ -36,9 +38,11 @@ export function usePurchaseActions({
     }
 
     setPurchaseToApprove(null);
+    setActionError('');
   }
 
   function openCancelDialog(purchase: Purchase) {
+    setActionError('');
     setPurchaseToCancel(purchase);
   }
 
@@ -48,15 +52,21 @@ export function usePurchaseActions({
     }
 
     setPurchaseToCancel(null);
+    setActionError('');
+  }
+
+  function clearActionError() {
+    setActionError('');
   }
 
   async function handleApprovePurchase() {
-    if (!purchaseToApprove) {
+    if (!purchaseToApprove || approving) {
       return;
     }
 
     try {
       setApproving(true);
+      setActionError('');
 
       await api.patch(
         `/purchases/${purchaseToApprove.id}/approve`,
@@ -68,7 +78,7 @@ export function usePurchaseActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible aprobar la compra.',
@@ -80,12 +90,13 @@ export function usePurchaseActions({
   }
 
   async function handleCancelPurchase() {
-    if (!purchaseToCancel) {
+    if (!purchaseToCancel || cancelling) {
       return;
     }
 
     try {
       setCancelling(true);
+      setActionError('');
 
       await api.patch(
         `/purchases/${purchaseToCancel.id}/cancel`,
@@ -97,7 +108,7 @@ export function usePurchaseActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible cancelar la compra.',
@@ -115,6 +126,7 @@ export function usePurchaseActions({
 
     try {
       setDownloadingPurchaseId(purchase.id);
+      setActionError('');
 
       const response = await api.get(
         `/purchases/${purchase.id}/pdf`,
@@ -138,7 +150,7 @@ export function usePurchaseActions({
     } catch (error: unknown) {
       console.error(error);
 
-      window.alert(
+      setActionError(
         getApiErrorMessage(
           error,
           'No fue posible descargar el PDF.',
@@ -160,12 +172,15 @@ export function usePurchaseActions({
     approving,
     cancelling,
     downloadingPurchaseId,
+    actionError,
 
     openApproveDialog,
     closeApproveDialog,
 
     openCancelDialog,
     closeCancelDialog,
+
+    clearActionError,
 
     handleApprovePurchase,
     handleCancelPurchase,

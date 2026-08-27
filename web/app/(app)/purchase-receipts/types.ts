@@ -1,3 +1,5 @@
+import type { PurchaseStatus } from '@/app/(app)/purchases/types';
+
 export type ReceiptUser = {
   id: string;
   firstName: string;
@@ -62,7 +64,7 @@ export type ReceiptInventoryMovement = {
 type ReceiptPurchaseSummary = {
   id: string;
   folio: string;
-  status: string;
+  status: PurchaseStatus;
   supplier: {
     id: string;
     name: string;

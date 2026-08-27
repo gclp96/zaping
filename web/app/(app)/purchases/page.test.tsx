@@ -22,6 +22,8 @@ import { api } from '@/services/api';
 
 import PurchasesPage from './page';
 
+import type { Purchase } from './types';
+
 const routerMock = vi.hoisted(() => ({
   push: vi.fn(),
   replace: vi.fn(),
@@ -51,7 +53,7 @@ vi.mock('next/navigation', () => ({
 const receiptIdempotencyKey =
   '11111111-1111-4111-8111-111111111111';
 
-const purchase = {
+const purchase: Purchase = {
   id: 'purchase-1',
   folio: 'OC-0001',
   status: 'CONFIRMED',
@@ -62,6 +64,8 @@ const purchase = {
   supplier: {
     id: 'supplier-1',
     name: 'Proveedor médico',
+    email: 'proveedor@example.com',
+    contactName: 'Responsable de compras',
   },
   items: [
     {
@@ -79,9 +83,55 @@ const purchase = {
   ],
 };
 
-const draftPurchase = {
+const draftPurchase: Purchase = {
   ...purchase,
   status: 'DRAFT',
+};
+
+const confirmedFilterPurchase: Purchase = {
+  ...purchase,
+  id: 'purchase-5',
+  folio: 'OC-0005',
+};
+
+const partialPurchase: Purchase = {
+  ...purchase,
+  id: 'purchase-2',
+  folio: 'OC-0002',
+  status: 'PARTIALLY_RECEIVED',
+  supplier: {
+    id: 'supplier-2',
+    name: 'Clínica del Desierto',
+    contactName: 'María Torres',
+    email: 'compras@desierto.test',
+    isActive: false,
+  },
+  items: [
+    {
+      ...purchase.items[0],
+      id: 'purchase-item-2',
+      productId: 'product-2',
+      product: {
+        id: 'product-2',
+        sku: 'RX-200',
+        name: 'Reactivo especializado',
+      },
+    },
+  ],
+};
+
+const receivedPurchase: Purchase = {
+  ...purchase,
+  id: 'purchase-3',
+  folio: 'OC-0003',
+  status: 'RECEIVED',
+};
+
+const cancelledPurchase: Purchase = {
+  ...purchase,
+  id: 'purchase-4',
+  folio: 'OC-0004',
+  status: 'CANCELLED',
 };
 
 
@@ -141,14 +191,16 @@ const previousReceipt = {
   ],
 };
 
-function configureApiMocks() {
+function configureApiMocks(
+  purchases: Purchase[] = [purchase],
+) {
   vi.mocked(api.get).mockImplementation(
     async (url) => {
       const endpoint = String(url);
 
       if (endpoint === '/purchases') {
         return {
-          data: [purchase],
+          data: purchases,
         } as never;
       }
 
@@ -281,6 +333,275 @@ describe('PurchasesPage — navegación trazable', () => {
     await user.click(screen.getByRole('button', { name: 'Volver a compras' }));
 
     expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
+  });
+});
+
+describe('PurchasesPage — normalización de lista', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configureApiMocks();
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    cleanup();
+  });
+
+  it('busca por folio, proveedor, contacto, email, SKU y producto', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([purchase, partialPurchase]);
+
+    render(<PurchasesPage />);
+
+    const initialFolio = await screen.findByText(purchase.folio);
+    const initialRow = initialFolio.closest('tr');
+
+    expect(initialRow).not.toBeNull();
+    expect(
+      within(initialRow as HTMLTableRowElement).getByText('$1,160.00'),
+    ).toBeTruthy();
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar compras',
+    });
+
+    for (const term of [
+      '  oc-0002  ',
+      'CLÍNICA DEL DESIERTO',
+      'maría torres',
+      'compras@desierto.test',
+      'rx-200',
+      'REACTIVO ESPECIALIZADO',
+    ]) {
+      await user.clear(search);
+      await user.type(search, term);
+      expect(screen.getByText(partialPurchase.folio)).toBeTruthy();
+      expect(screen.queryByText(purchase.folio)).toBeNull();
+    }
+
+    await user.clear(search);
+    await user.type(search, 'sin coincidencias');
+    expect(screen.getByText('No se encontraron compras')).toBeTruthy();
+  });
+
+  it('combina los cinco estados reales con el proveedor derivado y limpia filtros', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([
+      draftPurchase,
+      confirmedFilterPurchase,
+      partialPurchase,
+      receivedPurchase,
+      cancelledPurchase,
+    ]);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText(draftPurchase.folio);
+
+    const status = screen.getByRole('combobox', { name: 'Estado' });
+    const supplierFilter = screen.getByRole('combobox', {
+      name: 'Proveedor',
+    });
+
+    for (const [value, label, folio] of [
+      ['DRAFT', 'Borrador', draftPurchase.folio],
+      ['CONFIRMED', 'Confirmada', confirmedFilterPurchase.folio],
+      [
+        'PARTIALLY_RECEIVED',
+        'Parcialmente recibida',
+        partialPurchase.folio,
+      ],
+      ['RECEIVED', 'Recibida', receivedPurchase.folio],
+      ['CANCELLED', 'Cancelada', cancelledPurchase.folio],
+    ]) {
+      expect(within(status).getByRole('option', { name: label })).toBeTruthy();
+      await user.selectOptions(status, value);
+      expect(screen.getByText(folio)).toBeTruthy();
+      expect(
+        screen.getAllByRole('button', { name: 'Ver detalle' }),
+      ).toHaveLength(1);
+    }
+
+    expect(within(supplierFilter).getAllByRole('option')).toHaveLength(3);
+    expect(
+      within(supplierFilter).getByRole('option', {
+        name: 'Todos los proveedores',
+      }),
+    ).toBeTruthy();
+
+    await user.selectOptions(status, 'PARTIALLY_RECEIVED');
+    await user.selectOptions(supplierFilter, 'supplier-2');
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar compras' }),
+      'reactivo',
+    );
+
+    expect(screen.getByText(partialPurchase.folio)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: 'Ver detalle' })).toHaveLength(
+      1,
+    );
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar compras',
+    });
+    await user.clear(search);
+    await user.type(search, 'sin resultados');
+    expect(screen.getByText('No se encontraron compras')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+
+    expect(screen.getByText(draftPurchase.folio)).toBeTruthy();
+    expect(screen.getByText(confirmedFilterPurchase.folio)).toBeTruthy();
+    expect(screen.getByText(partialPurchase.folio)).toBeTruthy();
+    expect(screen.getByText(receivedPurchase.folio)).toBeTruthy();
+    expect(screen.getByText(cancelledPurchase.folio)).toBeTruthy();
+    expect(
+      vi.mocked(api.get).mock.calls.filter(
+        ([url]) => String(url) === '/suppliers',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('muestra el error de carga y permite reintentar con recuperación', async () => {
+    const user = userEvent.setup();
+    let purchaseRequests = 0;
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (endpoint === '/purchases') {
+        purchaseRequests += 1;
+
+        if (purchaseRequests === 1) {
+          throw new Error('Sin conexión');
+        }
+
+        return { data: [purchase] } as never;
+      }
+
+      if (endpoint === '/suppliers') {
+        return { data: [supplier] } as never;
+      }
+
+      if (endpoint === '/products') {
+        return { data: [product] } as never;
+      }
+
+      throw new Error(`Solicitud GET no configurada: ${endpoint}`);
+    });
+
+    render(<PurchasesPage />);
+
+    expect(
+      await screen.findByText(
+        'No fue posible cargar la información de compras.',
+      ),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText(purchase.folio)).toBeTruthy();
+    expect(purchaseRequests).toBe(2);
+  });
+
+  it('muestra un estado vacío útil cuando no hay compras', async () => {
+    configureApiMocks([]);
+
+    render(<PurchasesPage />);
+
+    expect(
+      await screen.findByText('No hay compras registradas'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('Comienza creando tu primera orden de compra.'),
+    ).toBeTruthy();
+  });
+
+  it('conserva visible una compra histórica de proveedor inactivo', async () => {
+    configureApiMocks([partialPurchase]);
+
+    render(<PurchasesPage />);
+
+    const folio = await screen.findByText(partialPurchase.folio);
+    const row = folio.closest('tr');
+
+    expect(row).not.toBeNull();
+    expect(
+      within(row as HTMLTableRowElement).getByText(
+        partialPurchase.supplier.name,
+      ),
+    ).toBeTruthy();
+  });
+
+  it.each([
+    {
+      action: 'Aprobar',
+      dialog: 'Aprobar compra',
+      endpoint: '/purchases/purchase-1/approve',
+      error: 'No fue posible aprobar la compra.',
+    },
+    {
+      action: 'Cancelar',
+      dialog: 'Cancelar compra',
+      endpoint: '/purchases/purchase-1/cancel',
+      error: 'No fue posible cancelar la compra.',
+    },
+  ])(
+    'muestra un error estructurado cuando falla $action',
+    async ({ action, dialog, endpoint, error }) => {
+      const user = userEvent.setup();
+      configureApiMocks([draftPurchase]);
+      vi.mocked(api.patch).mockRejectedValue(new Error('Error del servidor'));
+
+      render(<PurchasesPage />);
+
+      await screen.findByText(draftPurchase.folio);
+      await user.click(screen.getByRole('button', { name: action }));
+
+      const dialogHeading = await screen.findByRole('heading', {
+        name: dialog,
+      });
+      const dialogElement = dialogHeading.parentElement?.parentElement;
+
+      expect(dialogElement).not.toBeNull();
+
+      await user.click(
+        within(dialogElement as HTMLElement).getByRole('button', {
+          name: dialog === 'Aprobar compra' ? 'Aprobar' : 'Cancelar compra',
+        }),
+      );
+
+      expect(await screen.findByText(error)).toBeTruthy();
+      expect(api.patch).toHaveBeenCalledWith(endpoint);
+      expect(screen.getAllByText(draftPurchase.folio).length).toBeGreaterThan(
+        0,
+      );
+    },
+  );
+
+  it('muestra un error estructurado cuando falla el PDF', async () => {
+    const user = userEvent.setup();
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/purchases/purchase-1/pdf') {
+        throw new Error('PDF no disponible');
+      }
+
+      return await defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    await user.click(screen.getByRole('button', { name: 'Descargar PDF' }));
+
+    expect(
+      await screen.findByText('No fue posible descargar el PDF.'),
+    ).toBeTruthy();
   });
 });
 
@@ -1050,14 +1371,17 @@ describe('PurchasesPage — formulario de compra', () => {
       }),
     );
 
-    expect(
-      await screen.findByRole('heading', {
-        name: /nueva compra/i,
-      }),
-    ).toBeTruthy();
+    const formHeading = await screen.findByRole('heading', {
+      name: /nueva compra/i,
+    });
+    const formModal = formHeading.parentElement?.parentElement;
+
+    expect(formModal).not.toBeNull();
 
     const supplierSelect =
-      screen.getByLabelText(/proveedor/i);
+      within(formModal as HTMLElement).getByRole('combobox', {
+        name: /^proveedor$/i,
+      });
 
     const quantityInput = screen.getByRole(
       'spinbutton',

@@ -1,7 +1,10 @@
-import type { PurchaseStatusDescriptor } from './types';
+import type {
+  PurchaseStatus,
+  PurchaseStatusDescriptor,
+} from './types';
 
 export function getPurchaseStatusDescriptor(
-  status: string,
+  status: PurchaseStatus,
 ): PurchaseStatusDescriptor {
   if (status === 'CONFIRMED') {
     return {

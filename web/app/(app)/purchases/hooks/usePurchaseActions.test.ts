@@ -79,7 +79,6 @@ function setupHook() {
 }
 
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-let alertSpy: ReturnType<typeof vi.spyOn>;
 let linkClickSpy: ReturnType<typeof vi.spyOn>;
 
 const createObjectURLMock = vi.fn();
@@ -119,10 +118,6 @@ describe('usePurchaseActions', () => {
       .spyOn(console, 'error')
       .mockImplementation(() => undefined);
 
-    alertSpy = vi
-      .spyOn(window, 'alert')
-      .mockImplementation(() => undefined);
-
     linkClickSpy = vi
       .spyOn(
         HTMLAnchorElement.prototype,
@@ -133,7 +128,6 @@ describe('usePurchaseActions', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
-    alertSpy.mockRestore();
     linkClickSpy.mockRestore();
 
     cleanup();
@@ -156,6 +150,7 @@ describe('usePurchaseActions', () => {
     expect(
       result.current.downloadingPurchaseId,
     ).toBeNull();
+    expect(result.current.actionError).toBe('');
   });
 
   it('abre y cierra los diálogos de aprobación y cancelación', () => {
@@ -226,7 +221,7 @@ describe('usePurchaseActions', () => {
     ).toBeNull();
 
     expect(result.current.approving).toBe(false);
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(result.current.actionError).toBe('');
   });
 
   it('mantiene abierto el diálogo cuando falla la aprobación', async () => {
@@ -255,7 +250,7 @@ describe('usePurchaseActions', () => {
       onPurchaseChanged,
     ).not.toHaveBeenCalled();
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible aprobar la compra.',
     );
 
@@ -296,7 +291,7 @@ describe('usePurchaseActions', () => {
     ).toBeNull();
 
     expect(result.current.cancelling).toBe(false);
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(result.current.actionError).toBe('');
   });
 
   it('mantiene abierto el diálogo cuando falla la cancelación', async () => {
@@ -325,7 +320,7 @@ describe('usePurchaseActions', () => {
       onPurchaseChanged,
     ).not.toHaveBeenCalled();
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible cancelar la compra.',
     );
 
@@ -381,7 +376,7 @@ describe('usePurchaseActions', () => {
       result.current.downloadingPurchaseId,
     ).toBeNull();
 
-    expect(alertSpy).not.toHaveBeenCalled();
+    expect(result.current.actionError).toBe('');
   });
 
   it('muestra un error cuando falla la descarga del PDF', async () => {
@@ -397,7 +392,7 @@ describe('usePurchaseActions', () => {
       );
     });
 
-    expect(alertSpy).toHaveBeenCalledWith(
+    expect(result.current.actionError).toBe(
       'No fue posible descargar el PDF.',
     );
 

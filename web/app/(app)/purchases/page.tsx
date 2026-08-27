@@ -1,6 +1,12 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import {
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { api } from '@/services/api';
@@ -19,18 +25,46 @@ import { usePurchaseActions } from './hooks/usePurchaseActions';
 import type {
   Product,
   Purchase,
+  PurchaseStatus,
   Supplier,
 } from './types';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import EmptyState from '@/app/components/ui/EmptyState';
+import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
 import Table from '@/app/components/ui/Table';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+
+type StatusFilter = 'ALL' | PurchaseStatus;
+
+const statusFilterOptions: Array<{
+  value: StatusFilter;
+  label: string;
+}> = [
+  { value: 'ALL', label: 'Todos' },
+  { value: 'DRAFT', label: getPurchaseStatusDescriptor('DRAFT').label },
+  {
+    value: 'CONFIRMED',
+    label: getPurchaseStatusDescriptor('CONFIRMED').label,
+  },
+  {
+    value: 'PARTIALLY_RECEIVED',
+    label: getPurchaseStatusDescriptor('PARTIALLY_RECEIVED').label,
+  },
+  {
+    value: 'RECEIVED',
+    label: getPurchaseStatusDescriptor('RECEIVED').label,
+  },
+  {
+    value: 'CANCELLED',
+    label: getPurchaseStatusDescriptor('CANCELLED').label,
+  },
+];
 
 const moneyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
@@ -63,6 +97,32 @@ export default function PurchasesPage() {
   );
 }
 
+function purchaseMatchesSearch(
+  purchase: Purchase,
+  search: string,
+): boolean {
+  const normalizedSearch = search.trim().toLocaleLowerCase('es-MX');
+
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  const values = [
+    purchase.folio,
+    purchase.supplier.name,
+    purchase.supplier.contactName,
+    purchase.supplier.email,
+    ...purchase.items.flatMap((item) => [
+      item.product.sku,
+      item.product.name,
+    ]),
+  ];
+
+  return values.some((value) =>
+    value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
+  );
+}
+
 function PurchasesPageContent() {
 
 const router = useRouter();
@@ -76,6 +136,10 @@ const [ products, setProducts ] = useState<Product[]>([]);
 
 const [ pageLoading, setPageLoading ] = useState(true);
 const [ pageError, setPageError ] = useState('');
+const [search, setSearch] = useState('');
+const [statusFilter, setStatusFilter] =
+  useState<StatusFilter>('ALL');
+const [supplierFilter, setSupplierFilter] = useState('ALL');
 
 async function loadPurchases() {
     const response = await api.get<Purchase[]>('/purchases');
@@ -89,6 +153,7 @@ const {
   approving,
   cancelling,
   downloadingPurchaseId,
+  actionError,
 
   openApproveDialog,
   closeApproveDialog,
@@ -96,12 +161,39 @@ const {
   openCancelDialog,
   closeCancelDialog,
 
+  clearActionError,
+
   handleApprovePurchase,
   handleCancelPurchase,
   handleDownloadPdf,
 } = usePurchaseActions({
   onPurchaseChanged: loadPurchases,
 });
+
+const supplierFilterOptions = useMemo(() => {
+  const suppliersById = new Map(
+    purchases.map((purchase) => [
+      purchase.supplier.id,
+      purchase.supplier,
+    ]),
+  );
+
+  return [...suppliersById.values()].sort((first, second) =>
+    first.name.localeCompare(second.name, 'es-MX'),
+  );
+}, [purchases]);
+
+const filteredPurchases = useMemo(
+  () =>
+    purchases.filter(
+      (purchase) =>
+        (statusFilter === 'ALL' || purchase.status === statusFilter) &&
+        (supplierFilter === 'ALL' ||
+          purchase.supplier.id === supplierFilter) &&
+        purchaseMatchesSearch(purchase, search),
+    ),
+  [purchases, search, statusFilter, supplierFilter],
+);
 
 const {
   purchaseToView,
@@ -243,13 +335,24 @@ async function loadPageData() {
 
   function closePurchaseDetailWithUrlCleanup() {
     closePurchaseDetail();
+    clearActionError();
 
     if (purchaseId) {
       router.replace('/purchases');
     }
   }
 
-const tableData = purchases.map((purchase) => {
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('ALL');
+    setSupplierFilter('ALL');
+  }
+
+  const actionErrorHasModal = Boolean(
+    purchaseToView || purchaseToApprove || purchaseToCancel,
+  );
+
+const tableData = filteredPurchases.map((purchase) => {
     const statusDescriptor =
       getPurchaseStatusDescriptor(purchase.status);
 
@@ -273,7 +376,10 @@ const tableData = purchases.map((purchase) => {
             variant="secondary"
             size="sm"
             className="min-w-24"
-            onClick={() => void openPurchaseDetail(purchase)}
+            onClick={() => {
+              clearActionError();
+              void openPurchaseDetail(purchase);
+            }}
             >
               Ver detalle
             </Button>
@@ -356,6 +462,23 @@ const tableData = purchases.map((purchase) => {
           </div>
         ) : null}
 
+        {actionError && !actionErrorHasModal ? (
+          <div
+            role="alert"
+            className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>{actionError}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={clearActionError}
+            >
+              Cerrar mensaje
+            </Button>
+          </div>
+        ) : null}
+
         {pageLoading ? (
           <Loading message="Cargando compras..." />
         ) : pageError ? (
@@ -378,21 +501,93 @@ const tableData = purchases.map((purchase) => {
           <EmptyState
             title="No hay compras registradas"
             description="Comienza creando tu primera orden de compra."
+            action={
+              <Button type="button" onClick={openCreateModal}>
+                Nueva compra
+              </Button>
+            }
           />
         ) : (
           <Section>
-            <Table
-              headers={[
-                'Folio',
-                'Proveedor',
-                'Fecha',
-                'Partidas',
-                'Total',
-                'Estado',
-                'Acciones',
-              ]}
-              data={tableData}
-            />
+            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_260px]">
+              <Input
+                label="Buscar compras"
+                type="search"
+                value={search}
+                placeholder="Folio, proveedor, email, SKU o producto"
+                onChange={(event) => setSearch(event.target.value)}
+              />
+
+              <div className="flex w-full flex-col gap-2">
+                <label
+                  htmlFor="purchases-status-filter"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Estado
+                </label>
+                <select
+                  id="purchases-status-filter"
+                  value={statusFilter}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as StatusFilter)
+                  }
+                >
+                  {statusFilterOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex w-full flex-col gap-2">
+                <label
+                  htmlFor="purchases-supplier-filter"
+                  className="text-sm font-medium text-gray-700"
+                >
+                  Proveedor
+                </label>
+                <select
+                  id="purchases-supplier-filter"
+                  value={supplierFilter}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(event) => setSupplierFilter(event.target.value)}
+                >
+                  <option value="ALL">Todos los proveedores</option>
+                  {supplierFilterOptions.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {filteredPurchases.length === 0 ? (
+              <EmptyState
+                title="No se encontraron compras"
+                description="No hay compras que coincidan con la búsqueda y los filtros seleccionados."
+                action={
+                  <Button type="button" variant="outline" onClick={clearFilters}>
+                    Limpiar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <Table
+                headers={[
+                  'Folio',
+                  'Proveedor',
+                  'Fecha',
+                  'Partidas',
+                  'Total',
+                  'Estado',
+                  'Acciones',
+                ]}
+                data={tableData}
+              />
+            )}
           </Section>
         )}
       </PageContainer>
@@ -442,6 +637,7 @@ const tableData = purchases.map((purchase) => {
             purchaseToView !== null &&
             downloadingPurchaseId === purchaseToView.id
           }
+          actionError={actionError}
           formatDate={formatDate}
           formatMoney={formatMoney}
           onClose={closePurchaseDetailWithUrlCleanup}
@@ -485,15 +681,22 @@ const tableData = purchases.map((purchase) => {
           isOpen={purchaseToApprove !== null}
           title="Aprobar compra"
           message={
-            <>
-              ¿Seguro que deseas aprobar la compra{' '}
-              <span className="font-semibold">
-                {purchaseToApprove?.folio}
-              </span>
-              ? La compra quedará confirmada y podrá
-              recibir mercancía. El inventario no
-              cambiará hasta registrar una recepción.
-            </>
+            <div className="space-y-3">
+              <p>
+                ¿Seguro que deseas aprobar la compra{' '}
+                <span className="font-semibold">
+                  {purchaseToApprove?.folio}
+                </span>
+                ? La compra quedará confirmada y podrá
+                recibir mercancía. El inventario no
+                cambiará hasta registrar una recepción.
+              </p>
+              {actionError ? (
+                <p role="alert" className="text-sm text-red-700">
+                  {actionError}
+                </p>
+              ) : null}
+            </div>
           }
           confirmText="Aprobar"
           loadingText="Aprobando..."
@@ -508,14 +711,21 @@ const tableData = purchases.map((purchase) => {
         isOpen={purchaseToCancel !== null}
         title="Cancelar compra"
         message={
-          <>
-            ¿Seguro que deseas cancelar la compra{' '}
-            <span className="font-semibold">
-              {purchaseToCancel?.folio}
-            </span>
-            ? La compra permanecerá registrada, pero
-            ya no podrá aprobarse.
-          </>
+          <div className="space-y-3">
+            <p>
+              ¿Seguro que deseas cancelar la compra{' '}
+              <span className="font-semibold">
+                {purchaseToCancel?.folio}
+              </span>
+              ? La compra permanecerá registrada, pero
+              ya no podrá aprobarse.
+            </p>
+            {actionError ? (
+              <p role="alert" className="text-sm text-red-700">
+                {actionError}
+              </p>
+            ) : null}
+          </div>
         }
         confirmText="Cancelar compra"
         loadingText="Cancelando..."
