@@ -15,24 +15,26 @@ export default function Section({
 }: SectionProps) {
   return (
     <section className="space-y-4">
-      {(title || action) && (
-        <div className="flex items-center justify-between">
-          <div>
-            {title && (
-              <h2 className="text-xl font-semibold">
-                {title}
-              </h2>
-            )}
+      {(title || description || action) && (
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {(title || description) && (
+            <div className="min-w-0 flex-1">
+              {title && (
+                <h2 className="break-words text-xl font-semibold text-text">
+                  {title}
+                </h2>
+              )}
 
-            {description && (
-              <p className="mt-1 text-muted-foreground">
-                {description}
-              </p>
-            )}
-          </div>
+              {description && (
+                <p className={`${title ? 'mt-1 ' : ''}text-text-muted`}>
+                  {description}
+                </p>
+              )}
+            </div>
+          )}
 
           {action && (
-            <div className="shrink-0">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:shrink-0 sm:justify-end">
               {action}
             </div>
           )}
