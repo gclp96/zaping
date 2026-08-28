@@ -10,8 +10,8 @@ export default function PageContainer({
   className = '',
 }: PageContainerProps) {
   return (
-    <main className={`space-y-8 p-8 ${className}`}>
+    <div className={`space-y-8 p-8 ${className}`}>
       {children}
-    </main>
+    </div>
   );
 }

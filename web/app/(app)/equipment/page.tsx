@@ -73,6 +73,7 @@ export default function EquipmentPage() {
     <Suspense
       fallback={
         <PageContainer>
+          <h1 className="sr-only">Equipos</h1>
           <Loading message="Cargando equipos..." />
         </PageContainer>
       }

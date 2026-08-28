@@ -98,6 +98,7 @@ export default function SalesPage() {
     <Suspense
       fallback={
         <PageContainer>
+          <h1 className="sr-only">Ventas</h1>
           <Loading message="Cargando ventas..." />
         </PageContainer>
       }

@@ -42,6 +42,7 @@ export default function InventoryPage() {
     <Suspense
       fallback={
         <PageContainer>
+          <h1 className="sr-only">Inventario</h1>
           <Loading message="Cargando inventario..." />
         </PageContainer>
       }

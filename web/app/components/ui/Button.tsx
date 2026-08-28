@@ -68,7 +68,7 @@ export default function Button({
         gap-2
         ${variants[variant]}
         ${sizes[size]}
-        ${fullWidth ? 'fullWidth' : ''}
+        ${fullWidth ? 'w-full' : ''}
         rounded-lg
         font-medium
         transition-colors

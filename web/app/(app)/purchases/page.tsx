@@ -88,6 +88,7 @@ export default function PurchasesPage() {
     <Suspense
       fallback={
         <PageContainer>
+          <h1 className="sr-only">Compras</h1>
           <Loading message="Cargando compras..." />
         </PageContainer>
       }

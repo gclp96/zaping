@@ -236,6 +236,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <PageContainer>
+        <h1 className="sr-only">Resumen operativo</h1>
         <Loading message="Cargando dashboard..." />
       </PageContainer>
     );
@@ -244,6 +245,7 @@ export default function DashboardPage() {
   if (error || !data) {
     return (
       <PageContainer>
+        <h1 className="sr-only">Resumen operativo</h1>
         <Card className="border border-red-100">
           <div className="space-y-4">
             <div>

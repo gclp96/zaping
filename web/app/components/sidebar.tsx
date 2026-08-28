@@ -27,7 +27,7 @@ export default function Sidebar({
       className={`min-h-screen w-64 flex-col overflow-y-auto bg-slate-900 p-6 text-white ${className}`}
     >
       <div className="flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold">Zaping ERP</h1>
+        <p className="text-2xl font-bold">Zaping ERP</p>
 
         {showCloseButton ? (
           <button

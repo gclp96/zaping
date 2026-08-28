@@ -23,9 +23,9 @@ export default function Header({
           </span>
         </button>
 
-        <h1 className="truncate text-2xl font-bold text-slate-900">
+        <p className="truncate text-2xl font-bold text-slate-900">
           {title}
-        </h1>
+        </p>
       </div>
 
       <div

@@ -20,6 +20,7 @@ import {
 import { api } from '@/services/api';
 
 import AuthenticatedAppLayout from './layout';
+import CategoriesPage from './categories/page';
 import CustomersPage from './customers/page';
 import DashboardPage from './dashboard/page';
 import ProductsPage from './products/page';
@@ -28,6 +29,8 @@ import SalesPage from './sales/page';
 import ForgotPasswordPage from '../(public)/forgot-password/page';
 import LoginPage from '../(public)/login/page';
 import RegisterPage from '../(public)/register/page';
+import PageContainer from '../components/ui/layout/PageContainer';
+import PageHeader from '../components/ui/layout/PageHeader';
 
 const navigationMock = vi.hoisted(() => ({
   pathname: '/dashboard',
@@ -111,7 +114,15 @@ describe('AuthenticatedAppLayout', () => {
   it('renders the Header with the current route title', () => {
     renderInShell(<div>Shell child</div>);
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy();
+    expect(
+      within(screen.getByRole('banner')).getByText('Dashboard'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        level: 1,
+        name: 'Dashboard',
+      }),
+    ).toBeNull();
     expect(screen.queryByText('Leonardo')).toBeNull();
     expect(screen.getByLabelText('Cuenta')).toBeTruthy();
   });
@@ -132,6 +143,75 @@ describe('AuthenticatedAppLayout', () => {
     ).toBeTruthy();
     expect(container.querySelectorAll('aside')).toHaveLength(1);
     expect(screen.getAllByText('Zaping ERP')).toHaveLength(1);
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('heading', { level: 1 }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Resumen operativo',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('keeps a single page heading while Dashboard is loading', () => {
+    vi.mocked(api.get).mockImplementation(
+      () => new Promise(() => undefined),
+    );
+
+    const { container } = renderInShell(<DashboardPage />);
+
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('heading', { level: 1 }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Resumen operativo',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('keeps PageHeader as the single page heading inside the shell', () => {
+    const { container } = renderInShell(
+      <PageContainer>
+        <PageHeader title="Página de prueba" />
+      </PageContainer>,
+    );
+
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('heading', { level: 1 }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Página de prueba',
+      }),
+    ).toBeTruthy();
+  });
+
+  it('preserves the Categories page heading exception', async () => {
+    navigationMock.pathname = '/categories';
+
+    const { container } = renderInShell(<CategoriesPage />);
+
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/categories');
+    });
+
+    expect(container.querySelectorAll('main')).toHaveLength(1);
+    expect(
+      screen.getAllByRole('heading', { level: 1 }),
+    ).toHaveLength(1);
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'Categorías',
+      }),
+    ).toBeTruthy();
   });
 
   it('renders all approved existing navigation groups', () => {
@@ -365,8 +445,14 @@ describe('AuthenticatedAppLayout', () => {
       renderInShell(<div>Shell child</div>);
 
       expect(
-        screen.getByRole('heading', { name: title }),
+        within(screen.getByRole('banner')).getByText(title),
       ).toBeTruthy();
+      expect(
+        screen.queryByRole('heading', {
+          level: 1,
+          name: title,
+        }),
+      ).toBeNull();
     },
   );
 
