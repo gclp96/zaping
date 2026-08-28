@@ -9,6 +9,10 @@ import Table from '@/app/components/ui/Table';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Button from '@/app/components/ui/Button';
 import EmptyState from '@/app/components/ui/EmptyState';
+import Loading from '@/app/components/ui/Loading';
+import PageContainer from '@/app/components/ui/layout/PageContainer';
+import PageHeader from '@/app/components/ui/layout/PageHeader';
+import Section from '@/app/components/ui/layout/Section';
 
 type Category = {
   id: string;
@@ -140,61 +144,62 @@ export default function CategoriesPage() {
 
   return (
     <>
-      <div className="p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Categorías</h1>
-
-          <Button
-            onClick={() => {
-              setEditingCategory(null);
-              setName('');
-              setDescription('');
-              setIsActive(true);
-              setOpenModal(true);
-            }}
-          >
-            Nueva Categoría
-          </Button>
-        </div>
+      <PageContainer>
+        <PageHeader
+          title="Categorías"
+          action={
+            <Button
+              onClick={() => {
+                setEditingCategory(null);
+                setName('');
+                setDescription('');
+                setIsActive(true);
+                setOpenModal(true);
+              }}
+            >
+              Nueva Categoría
+            </Button>
+          }
+        />
 
         {pageLoading ? (
-          <div className="bg-white rounded-xl shadow p-12 text-center">
-            Cargando categorías...
-          </div>
+          <Loading message="Cargando categorías..." />
         ) : categories.length === 0 ? (
           <EmptyState
-              title="No hay categorías registradas"
-              description="Crea la primera categoría para organizar tus productos."
+            title="No hay categorías registradas"
+            description="Crea la primera categoría para organizar tus productos."
           />
         ) : (
-          <Table
-            headers={['Nombre', 'Estado', 'Acciones']}
-            data={categories.map((category) => ({
-              name: category.name,
-              status: category.isActive ? 'Activa' : 'Inactiva',
-              actions: (
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    size="md"
-                    onClick={() => openEditModal(category)}
-                  >
-                    Editar
-                  </Button>
+          <Section>
+            <Table
+              headers={['Nombre', 'Estado', 'Acciones']}
+              data={categories.map((category) => ({
+                name: category.name,
+                status: category.isActive ? 'Activa' : 'Inactiva',
+                actions: (
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={() => openEditModal(category)}
+                    >
+                      Editar
+                    </Button>
 
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => openDeleteModal(category)}
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              ),
-            }))}
-          />
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => openDeleteModal(category)}
+                    >
+                      Eliminar
+                    </Button>
+                  </div>
+                ),
+              }))}
+            />
+          </Section>
         )}
-      </div>
+      </PageContainer>
 
       <Modal
         isOpen={openModal}
