@@ -3,6 +3,10 @@ import type {
   PurchaseStatusDescriptor,
 } from './types';
 
+export function canRegisterPurchaseReceipt(status: PurchaseStatus): boolean {
+  return status === 'CONFIRMED' || status === 'PARTIALLY_RECEIVED';
+}
+
 export function getPurchaseStatusDescriptor(
   status: PurchaseStatus,
 ): PurchaseStatusDescriptor {

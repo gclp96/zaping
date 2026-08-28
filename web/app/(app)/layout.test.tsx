@@ -249,6 +249,11 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(
       screen
+        .getByRole('link', { name: 'Inicio' })
+        .getAttribute('href'),
+    ).toBe('/home');
+    expect(
+      screen
         .getByRole('link', { name: 'Dashboard' })
         .getAttribute('href'),
     ).toBe('/dashboard');
@@ -327,6 +332,18 @@ describe('AuthenticatedAppLayout', () => {
     ).toEqual(['Productos', 'Inventario', 'Equipos']);
   });
 
+  it('renders Inicio before Dashboard in the INICIO group', () => {
+    renderInShell(<div>Shell child</div>);
+
+    const startGroup = screen.getByText('INICIO').parentElement;
+    expect(startGroup).toBeTruthy();
+    expect(
+      within(startGroup as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Inicio', 'Dashboard']);
+  });
+
   it('renders Recepciones after Compras in the COMPRAS group', () => {
     renderInShell(<div>Shell child</div>);
 
@@ -347,6 +364,18 @@ describe('AuthenticatedAppLayout', () => {
     expect(
       screen
         .getByRole('link', { name: 'Dashboard' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('marks Home active for the Home route', () => {
+    navigationMock.pathname = '/home';
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Inicio' })
         .getAttribute('aria-current'),
     ).toBe('page');
   });
@@ -450,6 +479,7 @@ describe('AuthenticatedAppLayout', () => {
   });
 
   it.each([
+    ['/home', 'Inicio'],
     ['/dashboard', 'Dashboard'],
     ['/products', 'Productos'],
     ['/purchases', 'Compras'],

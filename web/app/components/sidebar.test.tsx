@@ -15,6 +15,7 @@ import {
 import Sidebar from './sidebar';
 
 const expectedNavigation = [
+  ['Inicio', '/home'],
   ['Dashboard', '/dashboard'],
   ['Clientes', '/customers'],
   ['Cotizaciones', '/quotes'],
@@ -61,6 +62,17 @@ describe('Sidebar', () => {
 
     expect(activeLink.getAttribute('aria-current')).toBe('page');
     expect(activeLink.classList.contains('border-primary')).toBe(true);
+  });
+
+  it('marks Home active without changing the Dashboard route', () => {
+    render(<Sidebar pathname="/home" />);
+
+    expect(
+      screen.getByRole('link', { name: 'Inicio' }).getAttribute('aria-current'),
+    ).toBe('page');
+    expect(
+      screen.getByRole('link', { name: 'Dashboard' }).getAttribute('href'),
+    ).toBe('/dashboard');
   });
 
   it('renders expanded mode and exposes the collapse command', async () => {

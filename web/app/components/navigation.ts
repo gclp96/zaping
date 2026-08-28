@@ -2,6 +2,7 @@ import {
   Boxes,
   ClipboardList,
   FileText,
+  House,
   LayoutDashboard,
   Package,
   PackageCheck,
@@ -28,6 +29,11 @@ export const navigationGroups: NavigationGroup[] = [
   {
     label: 'INICIO',
     items: [
+      {
+        label: 'Inicio',
+        href: '/home',
+        icon: House,
+      },
       {
         label: 'Dashboard',
         href: '/dashboard',

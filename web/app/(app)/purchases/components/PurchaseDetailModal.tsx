@@ -2,7 +2,10 @@ import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import Modal from '@/app/components/ui/Modal';
 
-import { getPurchaseStatusDescriptor } from '../purchase-status';
+import {
+  canRegisterPurchaseReceipt,
+  getPurchaseStatusDescriptor,
+} from '../purchase-status';
 
 import type {
   InventoryMovement,
@@ -230,8 +233,7 @@ export default function PurchaseDetailModal({
               </>
             ) : null}
 
-            {purchase.status === 'CONFIRMED' ||
-            purchase.status === 'PARTIALLY_RECEIVED' ? (
+            {canRegisterPurchaseReceipt(purchase.status) ? (
               <Button
                 variant="success"
                 className="min-w-44"
