@@ -198,13 +198,17 @@ como capacidades de ERP Core.
 
 # 8. Nueva semántica fundamental
 
-Inventory distinguirá tres clases principales de movimiento físico:
+Inventory distinguirá tres clases principales de operación física:
 
 ```text
 IN
 TRANSFER
 OUT
 ```
+
+En el ledger, `IN` y `OUT` son las únicas direcciones de un
+`InventoryMovement`. `TRANSFER` describe la operación interna que relaciona
+una salida de la posición origen con una entrada en la posición destino.
 
 además de mecanismos explícitos de:
 
@@ -981,12 +985,12 @@ InventoryMovement
 ├── companyId
 ├── productId
 ├── batchId?
-├── movementType
+├── direction (IN | OUT)
 ├── quantity
 ├── fromLocationId?
 ├── toLocationId?
-├── referenceType?
-├── referenceId?
+├── sourceType?
+├── sourceId?
 ├── notes?
 ├── createdBy
 └── createdAt
@@ -1007,7 +1011,7 @@ El diseño exacto se hará después de aprobar documentación.
 Conceptualmente:
 
 ```text
-movementType = IN
+direction = IN
 
 fromLocation = null
 toLocation = Warehouse
@@ -1018,7 +1022,7 @@ toLocation = Warehouse
 # 69. Movimiento OUT válido
 
 ```text
-movementType = OUT
+direction = OUT
 
 fromLocation = Current Location
 toLocation = null
@@ -1026,14 +1030,21 @@ toLocation = null
 
 ---
 
-# 70. Movimiento TRANSFER válido
+# 70. Operación TRANSFER válida
 
 ```text
-movementType = TRANSFER
+TRANSFER operation
+
+origin movement: direction = OUT
+destination movement: direction = IN
 
 fromLocation = A
 toLocation = B
 ```
+
+`TRANSFER` no es una tercera dirección del ledger ni requiere un enum
+gigante de tipos de movimiento. Su significado de negocio se conserva en
+`sourceType` / `sourceId` y en la relación entre sus movimientos asociados.
 
 ---
 
@@ -1353,10 +1364,10 @@ Cada movimiento generado por otro módulo debe conservar suficiente referencia p
 Ejemplo:
 
 ```text
-referenceType:
+sourceType:
 PURCHASE_RECEIPT
 
-referenceId:
+sourceId:
 receiptId
 ```
 
@@ -1369,7 +1380,7 @@ o representación equivalente.
 Ejemplo:
 
 ```text
-referenceType:
+sourceType:
 HEALTHCARE_CASE_DISPATCH
 ```
 
@@ -2867,9 +2878,11 @@ where is the physical stock now
 
 ---
 
-# 215. Reservation future
+# 215. InventoryReservation target
 
-Reservations siguen siendo compatibles y podrán agregarse posteriormente para stock comprometido que todavía permanece físicamente disponible.
+`InventoryReservation` forma parte del diseño aprobado de Advanced Inventory,
+pero permanece `NOT IMPLEMENTED`. Afecta availability sin crear un movimiento
+hasta que ocurra el movimiento físico real.
 
 ---
 
@@ -3061,6 +3074,8 @@ Después de aprobar ADR-014 deben sincronizarse:
 ```text
 modules/erp/INVENTORY.md
 
+modules/erp/ADVANCED_INVENTORY.md
+
 modules/healthcare/HEALTHCARE.md
 modules/healthcare/DOMAIN_MODEL.md
 modules/healthcare/CASE_KITS.md
@@ -3132,7 +3147,7 @@ InventoryPosition
 → current inventory projection by location
 
 TRANSFER
-→ first-class Inventory movement semantics
+→ first-class Inventory operation semantics using IN / OUT ledger entries
 
 IN
 → ownership enters

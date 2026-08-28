@@ -62,11 +62,11 @@ inventory IN
 
 inventory OUT
 
-future InventoryLocation
+approved target InventoryLocation
 
-future InventoryPosition
+approved target InventoryPosition
 
-future TRANSFER
+approved target TRANSFER
 ```
 
 Inventory no es propietario de:
@@ -1456,7 +1456,7 @@ Otros workflows deberán incorporar protección cuando su riesgo lo justifique.
 
 # 57. TARGET — Location-aware Inventory
 
-ADR-014 aprueba la evolución futura hacia:
+ADR-014 y `ADVANCED_INVENTORY.md` aprueban el diseño objetivo hacia:
 
 ```text
 InventoryLocation
@@ -1464,10 +1464,14 @@ InventoryLocation
 InventoryPosition
 
 InventoryMovement
-├── IN
-├── TRANSFER
-├── OUT
-└── ADJUSTMENT / correction
+├── direction = IN
+└── direction = OUT
+
+TRANSFER
+→ operación interna relacionada con una entrada y una salida
+
+ADJUSTMENT / correction
+→ workflow explícito cuando corresponda
 ```
 
 Estas capacidades pertenecen a:
@@ -2012,9 +2016,9 @@ quantity-only tracking
 
 ---
 
-# 80. Reservations — FUTURE
+# 80. InventoryReservation — TARGET
 
-Reservation representará conceptualmente:
+`InventoryReservation` representará conceptualmente:
 
 ```text
 inventory committed
@@ -2024,7 +2028,7 @@ but not yet physically moved
 Debe distinguirse de Staging:
 
 ```text
-Reservation
+InventoryReservation
 → logical claim
 ```
 
@@ -2036,7 +2040,7 @@ Staging
 Actualmente:
 
 ```text
-Reservations
+InventoryReservation
 → NOT IMPLEMENTED
 ```
 
@@ -2061,10 +2065,10 @@ advanced FEFO
 
 ---
 
-# 82. Multi-Warehouse — FUTURE
+# 82. Multi-Warehouse — TARGET
 
-InventoryLocation deberá diseñarse de manera compatible con una evolución
-Multi-Warehouse.
+La jerarquía Company → Branch → Warehouse → StorageLocation está definida en
+`ADVANCED_INVENTORY.md` como diseño objetivo aprobado.
 
 Sin embargo:
 
@@ -2520,6 +2524,14 @@ InventoryLocation
 
 InventoryPosition
 
+Company → Branch → Warehouse → StorageLocation
+
+InventoryReservation
+
+InventoryRelocation
+
+InventoryTransfer
+
 TRANSFER
 
 Owned vs Available
@@ -2537,16 +2549,12 @@ SalesOrder → Delivery → OUT
 
 ---
 
-# 100. FUTURE
+# 100. FUTURE / OUTSIDE APPROVED ADVANCED INVENTORY DESIGN
 
 Fuera del Inventory V1 actual:
 
 ```text
-Reservations
-
 advanced FEFO
-
-full Multi-Warehouse
 
 bins
 
@@ -2924,6 +2932,8 @@ docs/modules/erp/SALES.md
 
 docs/modules/erp/EQUIPMENT.md
 
+docs/modules/erp/ADVANCED_INVENTORY.md
+
 docs/modules/erp/IDENTITY_ACCESS.md
 
 docs/modules/healthcare/DOMAIN_MODEL.md
@@ -2968,7 +2978,10 @@ ADR-002
 → Inventory Movement architecture
 
 ADR-014
-→ future Locations / Positions / Transfers
+→ approved Locations / Positions / Transfers architecture
+
+ADVANCED_INVENTORY.md
+→ canonical Advanced Inventory target design
 
 schema.prisma
 → CURRENT technical persistence
@@ -3047,6 +3060,12 @@ InventoryLocation
 InventoryPosition
 ⏳
 
+InventoryReservation
+⏳
+
+InventoryRelocation / InventoryTransfer
+⏳
+
 TRANSFER
 ⏳
 
@@ -3064,8 +3083,9 @@ SalesOrder → Delivery → OUT
 
 # 108. Secuencia de proyecto
 
-Inventory Location/Position continúa siendo una evolución aprobada del ERP Core,
-pero no representa el siguiente cambio inmediato del proyecto.
+Advanced Inventory continúa siendo un diseño aprobado del ERP Core, pero no
+representa el siguiente cambio inmediato del proyecto. Su diseño canónico es
+`ADVANCED_INVENTORY.md` y su ejecución se registra en `PROJECT_BOARD.md`.
 
 La secuencia vigente es:
 

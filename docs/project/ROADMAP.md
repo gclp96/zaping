@@ -1707,15 +1707,18 @@ Objetivo:
 
 soportar empresas con mayor complejidad logística.
 
-Las estructuras exactas deben aprobarse mediante diseño/ADR antes de implementación.
+El diseño objetivo está aprobado por ADR-014 y consolidado en
+`docs/modules/erp/ADVANCED_INVENTORY.md`. La implementación y el diseño técnico
+de schema permanecen pendientes.
 
 15.1 Warehouses
-Warehouse es una capacidad TARGET razonable para empresas con múltiples almacenes.
+La fundación Branch / Warehouse es una capacidad TARGET aprobada para empresas
+con múltiples almacenes.
 
 El schema definitivo deberá diseñarse cuando exista prioridad real.
 
 15.2 Locations
-Una futura estrategia puede representar:
+El diseño objetivo puede representar:
 
 Zone
 
@@ -1728,10 +1731,11 @@ Quarantine
 Staging
 según necesidad real.
 
-InventoryLocation permanece architectural candidate hasta aprobación formal.
+InventoryLocation / StorageLocation es una capacidad TARGET aprobada, todavía no
+implementada.
 
 15.3 Inventory Position
-Una futura posición puede requerir dimensiones como:
+`InventoryPosition` objetivo puede requerir dimensiones como:
 
 Product
 
@@ -1746,17 +1750,20 @@ Location
 +
 
 State
-La estrategia de persistencia/source of truth debe definirse mediante ADR.
+La semántica de la posición y su reconciliación contra el ledger están aprobadas;
+la estrategia técnica de persistencia/source of truth se definirá durante el
+diseño técnico previo a implementación.
 
 15.4 Internal Transfers
-Debe existir en el futuro una semántica para:
+El diseño objetivo define una semántica para:
 
 Location A
 ↓
 Location B
 sin tratar automáticamente el hecho como una salida comercial.
 
-La implementación exacta no se fija todavía.
+La implementación exacta permanece pendiente y debe seguir el diseño canónico
+de Advanced Inventory.
 
 15.5 Stock Counts
 System Quantity
@@ -1767,7 +1774,7 @@ Difference
 ↓
 Authorized Adjustment
 15.6 Reservations
-Antes de implementarlas debe definirse:
+El diseño aprobado distingue:
 
 Physical
 
@@ -1783,6 +1790,8 @@ Healthcare
 Warehouse
 
 Delivery
+
+El backlog accionable de esta etapa se mantiene en `PROJECT_BOARD.md`.
 16. Etapa 9 — Billing & Mexican Commercial Requirements
 Prioridad: P2 / necesaria para madurez comercial en México
 
@@ -2555,7 +2564,7 @@ Permission-Based RBAC
 P2
 Multi-Warehouse
 
-Advanced Inventory
+Advanced Inventory — DESIGNED / APPROVED / NOT IMPLEMENTED
 
 Billing / CFDI
 
@@ -2598,6 +2607,8 @@ PRODUCT_REQUIREMENTS.md
 → capacidades esperadas
 ADR
 → decisiones arquitectónicas
+ADVANCED_INVENTORY.md
+→ diseño objetivo aprobado de Advanced Inventory
 docs/modules/
 → comportamiento funcional por dominio
 33. Regla de mantenimiento

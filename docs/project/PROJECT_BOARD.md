@@ -641,7 +641,8 @@ physical counts
 
 barcode / QR
 
-Location, Position e internal TRANSFER permanecen TARGET / architectural candidates cuando una futura necesidad lo requiera.
+Location, Position e internal TRANSFER están aprobados como capacidades
+TARGET de Advanced Inventory, pero no son CURRENT.
 
 No son CURRENT.
 
@@ -1350,7 +1351,7 @@ alerts
 
 Dashboard integration
 
-Future Inventory
+Advanced Inventory — approved target (not implemented)
 
 Necesidades futuras:
 
@@ -1374,7 +1375,32 @@ P2
 
 salvo cuando una capacidad sea prerequisite para un workflow P0/P1.
 
-InventoryLocation, InventoryPosition e internal TRANSFER permanecen architectural candidates hasta decisión formal.
+Advanced Inventory cuenta con diseño aprobado y permanece no implementado.
+La fuente canónica es:
+
+```text
+docs/modules/erp/ADVANCED_INVENTORY.md
+```
+
+Backlog aprobado:
+
+| ID | Item | Estado |
+| --- | --- | --- |
+| INV-WH-001 | Branch / Warehouse foundation | 🎯 TARGET |
+| INV-LOC-001 | Storage Locations | 🎯 TARGET |
+| INV-LOC-002 | Inventory by Location | 🎯 TARGET |
+| INV-LOC-003 | Preferred Storage Location | 🎯 TARGET |
+| INV-LOC-004 | Receipt Put-away | 🎯 TARGET |
+| INV-LOC-005 | Internal Relocation | 🎯 TARGET |
+| INV-TRF-001 | Warehouse Transfers | 🎯 TARGET |
+| INV-RES-001 | Inventory Reservations | 🎯 TARGET |
+| INV-CNT-001 | Physical / Cycle Counts | 🎯 TARGET |
+| INV-SCN-001 | Location QR / Barcode | 🎯 TARGET |
+| INV-LED-001 | Inventory Ledger V2 | 🎯 TARGET |
+| EQ-AVL-001 | Derived Equipment Availability | 🎯 TARGET |
+| EQ-MNT-001 | Equipment Maintenance | 🎯 TARGET |
+
+Estos items no implican ejecución inmediata, versión ni fecha de entrega.
 
 17. Healthcare — Estado actual
 
@@ -2140,6 +2166,9 @@ Equipment
 
 Inventory
 → docs/modules/erp/INVENTORY.md
+
+Advanced Inventory target design
+→ docs/modules/erp/ADVANCED_INVENTORY.md
 
 Sales
 → docs/modules/erp/SALES.md

@@ -181,17 +181,15 @@ Return
 Case logistics
 ```
 
-Pertenecen a evolución futura:
+Pertenecen al diseño aprobado de Advanced Inventory, pero no están implementadas:
 
 ```text
 Maintenance
-
-Calibration
-
-Equipment 360 / advanced read experience
-
 multi-warehouse integration
 ```
+
+`Calibration` y `Equipment 360 / advanced read experience` permanecen como
+capacidades futuras independientes.
 
 ---
 
@@ -879,7 +877,8 @@ No crea automáticamente:
 Maintenance work order
 ```
 
-Maintenance permanece como dominio futuro.
+Maintenance permanece como workflow independiente, aprobado como parte del
+diseño de Advanced Inventory, pero todavía no implementado.
 
 ---
 
@@ -920,15 +919,15 @@ CALIBRATION_REQUIRED
 
 dentro del enum Condition únicamente para representar esos dominios.
 
-Futuro:
+Advanced Inventory target — NOT IMPLEMENTED:
 
 ```text
 EquipmentMaintenance
-
-Calibration
 ```
 
-pueden proporcionar blockers adicionales para Availability.
+Puede proporcionar blockers adicionales para Availability.
+
+`Calibration` permanece fuera de este diseño y continúa siendo futura.
 
 Actualmente:
 
@@ -1646,6 +1645,21 @@ EquipmentAsset.condition
 No consulta directamente Inspection history.
 
 `EquipmentAsset.condition` representa el snapshot operacional actual.
+
+La composición avanzada de Availability deberá considerar además, cuando
+exista la capacidad correspondiente:
+
+```text
+warehouse / storage location / custody
+case assignment
+tender assignment
+maintenance
+transfer
+reservation
+```
+
+Esto amplía el evaluador objetivo sin convertir `isAvailable` en source of
+truth ni cambiar las reglas CURRENT de Equipment V1.
 
 ---
 
@@ -3399,7 +3413,7 @@ Estos workflows no forman parte de Equipment V1.
 
 ---
 
-# 96. FUTURE
+# 96. FUTURE / OUTSIDE APPROVED ADVANCED INVENTORY DESIGN
 
 Capacidades posteriores pueden incluir:
 
@@ -3409,8 +3423,6 @@ serial correction
 Equipment Audit integration
 
 Equipment 360
-
-Maintenance
 
 Calibration
 
@@ -3740,6 +3752,10 @@ InventoryBatch
 inventory traceability
 ```
 
+`ADVANCED_INVENTORY.md` define el diseño aprobado, todavía no implementado,
+para ubicaciones, posiciones, reservas, transferencias y disponibilidad
+operacional compuesta.
+
 `EQUIPMENT.md` define:
 
 ```text
@@ -3821,6 +3837,8 @@ docs/modules/erp/PRODUCTS.md
 
 docs/modules/erp/INVENTORY.md
 
+docs/modules/erp/ADVANCED_INVENTORY.md
+
 docs/modules/erp/PURCHASES.md
 
 docs/modules/erp/PURCHASE_RECEIPTS.md
@@ -3857,6 +3875,9 @@ PRODUCTS.md
 
 INVENTORY.md
 → Inventory semantics
+
+ADVANCED_INVENTORY.md
+→ approved Advanced Inventory target design
 
 PURCHASE_RECEIPTS.md
 → Receipt and provisioning orchestration

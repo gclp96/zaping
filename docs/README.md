@@ -115,8 +115,11 @@ Recepciones e idempotencia
 Equipment identity / lifecycle / condition
 → modules/erp/EQUIPMENT.md
 
-Inventory
+Inventory CURRENT
 → modules/erp/INVENTORY.md
+
+Advanced Inventory target design
+→ modules/erp/ADVANCED_INVENTORY.md
 
 Sales CURRENT
 → modules/erp/SALES.md
@@ -444,6 +447,7 @@ modules/erp/
 ├── PURCHASES.md
 ├── PURCHASE_RECEIPTS.md
 ├── INVENTORY.md
+├── ADVANCED_INVENTORY.md
 ├── EQUIPMENT.md
 ├── QUOTES.md
 ├── SALES.md
