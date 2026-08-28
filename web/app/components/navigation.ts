@@ -1,6 +1,22 @@
+import {
+  Boxes,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  Package,
+  PackageCheck,
+  ShoppingCart,
+  Tags,
+  Truck,
+  UsersRound,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
+
 export type NavigationItem = {
   label: string;
   href: string;
+  icon: LucideIcon;
 };
 
 export type NavigationGroup = {
@@ -15,6 +31,7 @@ export const navigationGroups: NavigationGroup[] = [
       {
         label: 'Dashboard',
         href: '/dashboard',
+        icon: LayoutDashboard,
       },
     ],
   },
@@ -24,14 +41,17 @@ export const navigationGroups: NavigationGroup[] = [
       {
         label: 'Clientes',
         href: '/customers',
+        icon: UsersRound,
       },
       {
         label: 'Cotizaciones',
         href: '/quotes',
+        icon: FileText,
       },
       {
         label: 'Ventas',
         href: '/sales',
+        icon: ShoppingCart,
       },
     ],
   },
@@ -41,14 +61,17 @@ export const navigationGroups: NavigationGroup[] = [
       {
         label: 'Proveedores',
         href: '/suppliers',
+        icon: Truck,
       },
       {
         label: 'Compras',
         href: '/purchases',
+        icon: ClipboardList,
       },
       {
         label: 'Recepciones',
         href: '/purchase-receipts',
+        icon: PackageCheck,
       },
     ],
   },
@@ -58,14 +81,17 @@ export const navigationGroups: NavigationGroup[] = [
       {
         label: 'Productos',
         href: '/products',
+        icon: Package,
       },
       {
         label: 'Inventario',
         href: '/inventory',
+        icon: Boxes,
       },
       {
         label: 'Equipos',
         href: '/equipment',
+        icon: Wrench,
       },
     ],
   },
@@ -75,6 +101,7 @@ export const navigationGroups: NavigationGroup[] = [
       {
         label: 'Categorías',
         href: '/categories',
+        icon: Tags,
       },
     ],
   },

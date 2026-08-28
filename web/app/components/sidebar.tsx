@@ -1,5 +1,6 @@
 'use client';
 
+import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import Link from 'next/link';
 
 import {
@@ -9,47 +10,104 @@ import {
 
 type SidebarProps = {
   pathname: string;
+  collapsed?: boolean;
+  collapsible?: boolean;
   className?: string;
+  id?: string;
   onNavigate?: () => void;
+  onToggleCollapsed?: () => void;
   showCloseButton?: boolean;
   onClose?: () => void;
+  transitionEnabled?: boolean;
 };
 
 export default function Sidebar({
   pathname,
+  collapsed = false,
+  collapsible = false,
   className = '',
+  id,
   onNavigate,
+  onToggleCollapsed,
   showCloseButton = false,
   onClose,
+  transitionEnabled = true,
 }: SidebarProps) {
   return (
     <aside
-      className={`min-h-screen w-64 flex-col overflow-y-auto bg-slate-900 p-6 text-white ${className}`}
+      id={id}
+      className={`min-h-screen flex-col overflow-y-auto bg-slate-950 py-4 text-white ${
+        collapsed ? 'w-20 px-2' : 'w-64 px-4'
+      } ${
+        transitionEnabled
+          ? 'transition-[width,padding] duration-[var(--motion-duration-normal)] ease-[var(--motion-easing-standard)]'
+          : ''
+      } ${className}`}
     >
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-2xl font-bold">Zaping ERP</p>
+      <div
+        className={
+          collapsed
+            ? 'flex flex-col items-center gap-2'
+            : 'flex items-center justify-between gap-3'
+        }
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-ui-md bg-primary text-base font-bold text-primary-foreground"
+          >
+            Z
+          </span>
+
+          {collapsed ? null : (
+            <p className="truncate text-lg font-semibold">Zaping ERP</p>
+          )}
+        </div>
 
         {showCloseButton ? (
           <button
             type="button"
             aria-label="Cerrar navegación"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 text-white transition hover:bg-white/10"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-ui-md border border-white/15 text-slate-200 transition-colors duration-[var(--motion-duration-fast)] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
             onClick={onClose}
           >
-            <span aria-hidden="true" className="text-2xl leading-none">
-              ×
-            </span>
+            <X aria-hidden="true" size={19} />
+          </button>
+        ) : null}
+
+        {collapsible ? (
+          <button
+            type="button"
+            aria-label={
+              collapsed ? 'Expandir navegación' : 'Colapsar navegación'
+            }
+            aria-controls={id}
+            aria-expanded={!collapsed}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-ui-md border border-white/15 text-slate-300 transition-colors duration-[var(--motion-duration-fast)] hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? (
+              <PanelLeftOpen aria-hidden="true" size={19} />
+            ) : (
+              <PanelLeftClose aria-hidden="true" size={19} />
+            )}
           </button>
         ) : null}
       </div>
 
       <nav
-        className="mt-10 space-y-8"
+        className={`${collapsed ? 'mt-6 space-y-6' : 'mt-8 space-y-7'}`}
         aria-label="Navegación principal"
       >
         {navigationGroups.map((group) => (
           <div key={group.label}>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p
+              className={
+                collapsed
+                  ? 'sr-only'
+                  : 'mb-2 px-3 text-xs font-semibold uppercase text-slate-500'
+              }
+            >
               {group.label}
             </p>
 
@@ -59,20 +117,33 @@ export default function Sidebar({
                   pathname,
                   item.href,
                 );
+                const Icon = item.icon;
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`rounded-lg px-3 py-2 text-base font-medium transition ${
+                    aria-label={collapsed ? item.label : undefined}
+                    title={collapsed ? item.label : undefined}
+                    className={`flex min-h-10 items-center rounded-ui-md border-l-2 text-sm font-medium transition-colors duration-[var(--motion-duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                      collapsed ? 'justify-center px-2' : 'gap-3 px-3'
+                    } ${
                       active
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-slate-200 hover:bg-white/10 hover:text-white'
+                        ? 'border-primary bg-primary text-primary-foreground shadow-subtle'
+                        : 'border-transparent text-slate-300 hover:bg-white/10 hover:text-white'
                     }`}
                     onClick={onNavigate}
                   >
-                    {item.label}
+                    <Icon
+                      aria-hidden="true"
+                      className="shrink-0"
+                      size={19}
+                      strokeWidth={1.8}
+                    />
+                    <span className={collapsed ? 'sr-only' : 'truncate'}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               })}

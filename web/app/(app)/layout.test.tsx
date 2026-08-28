@@ -18,6 +18,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/app/components/AppShell';
 
 import AuthenticatedAppLayout from './layout';
 import CategoriesPage from './categories/page';
@@ -95,20 +96,33 @@ function renderInShell(children: ReactNode) {
 
 describe('AuthenticatedAppLayout', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     navigationMock.pathname = '/dashboard';
     configureApiMocks();
   });
 
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
+    document.body.style.overflow = '';
     vi.clearAllMocks();
   });
 
   it('renders the Sidebar', () => {
-    renderInShell(<div>Shell child</div>);
+    const { container } = renderInShell(<div>Shell child</div>);
 
     expect(screen.getByText('Zaping ERP')).toBeTruthy();
     expect(screen.getByText('Clientes')).toBeTruthy();
+    expect(
+      container.querySelector('#desktop-navigation')?.classList.contains(
+        'xl:flex',
+      ),
+    ).toBe(true);
+    expect(
+      container.querySelector('#desktop-navigation')?.classList.contains(
+        'lg:flex',
+      ),
+    ).toBe(false);
   });
 
   it('renders the Header with the current route title', () => {
@@ -124,7 +138,13 @@ describe('AuthenticatedAppLayout', () => {
       }),
     ).toBeNull();
     expect(screen.queryByText('Leonardo')).toBeNull();
-    expect(screen.getByLabelText('Cuenta')).toBeTruthy();
+    expect(screen.queryByLabelText('Cuenta')).toBeNull();
+
+    const menuButton = screen.getByLabelText('Abrir navegación');
+    expect(menuButton.getAttribute('aria-expanded')).toBe('false');
+    expect(menuButton.getAttribute('aria-controls')).toBe(
+      'mobile-navigation-drawer',
+    );
   });
 
   it('renders children in the main content region', () => {
@@ -552,6 +572,46 @@ describe('AuthenticatedAppLayout', () => {
     expect(screen.getByLabelText('Abrir navegación')).toBeTruthy();
   });
 
+  it('persists desktop Sidebar collapse and expand commands', async () => {
+    const user = userEvent.setup();
+
+    renderInShell(<div>Shell child</div>);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Colapsar navegación' }),
+    );
+
+    expect(
+      window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY),
+    ).toBe('true');
+    expect(
+      screen.getByRole('button', { name: 'Expandir navegación' }),
+    ).toBeTruthy();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Expandir navegación' }),
+    );
+
+    expect(
+      window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY),
+    ).toBe('false');
+  });
+
+  it('restores a persisted collapsed Sidebar after hydration', async () => {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, 'true');
+
+    renderInShell(<div>Shell child</div>);
+
+    expect(
+      await screen.findByRole('button', {
+        name: 'Expandir navegación',
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'Productos' }).getAttribute('title'),
+    ).toBe('Productos');
+  });
+
   it('opens and closes the mobile navigation drawer', async () => {
     const user = userEvent.setup();
 
@@ -559,11 +619,60 @@ describe('AuthenticatedAppLayout', () => {
 
     await user.click(screen.getByLabelText('Abrir navegación'));
 
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toBeTruthy();
+    expect(dialog.classList.contains('xl:hidden')).toBe(true);
+    expect(dialog.classList.contains('lg:hidden')).toBe(false);
+    expect(
+      screen.getByLabelText('Abrir navegación').getAttribute(
+        'aria-expanded',
+      ),
+    ).toBe('true');
 
-    await user.click(screen.getAllByLabelText('Cerrar navegación')[0]);
+    const closeButtons = screen.getAllByLabelText('Cerrar navegación');
+    await user.click(closeButtons[closeButtons.length - 1]);
 
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('closes the drawer through its backdrop', async () => {
+    const user = userEvent.setup();
+
+    renderInShell(<div>Shell child</div>);
+
+    await user.click(screen.getByLabelText('Abrir navegación'));
+    await user.click(screen.getByTestId('navigation-backdrop'));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('closes the drawer with Escape', async () => {
+    const user = userEvent.setup();
+
+    renderInShell(<div>Shell child</div>);
+
+    await user.click(screen.getByLabelText('Abrir navegación'));
+    await user.keyboard('{Escape}');
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('locks body scroll and restores focus after closing the drawer', async () => {
+    const user = userEvent.setup();
+
+    renderInShell(<div>Shell child</div>);
+
+    const menuButton = screen.getByLabelText('Abrir navegación');
+    await user.click(menuButton);
+
+    const dialog = screen.getByRole('dialog');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.activeElement).toBe(dialog);
+
+    await user.click(screen.getByTestId('navigation-backdrop'));
+
+    expect(document.body.style.overflow).toBe('');
+    expect(document.activeElement).toBe(menuButton);
   });
 
   it('closes the mobile navigation drawer after selecting a link', async () => {
