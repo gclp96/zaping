@@ -1,26 +1,128 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+
+  /* Application */
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-elevated: #ffffff;
+
+  /* Text */
+  --text: #171717;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+
+  /* Borders and focus */
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --focus-ring: #2563eb;
+  --focus-ring-offset: #ffffff;
+  --focus-ring-width: 2px;
+
+  /* Primary interaction */
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --primary-hover: #1d4ed8;
+
+  /* Semantic states */
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --success-subtle: #f0fdf4;
+  --warning: #b45309;
+  --warning-foreground: #ffffff;
+  --warning-subtle: #fffbeb;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --danger-subtle: #fef2f2;
+  --info: #1d4ed8;
+  --info-foreground: #ffffff;
+  --info-subtle: #eff6ff;
+  --neutral: #475569;
+  --neutral-foreground: #ffffff;
+  --neutral-subtle: #f1f5f9;
+
+  /* Radius foundation; existing Tailwind radius values remain unchanged. */
+  --radius-small: 0.25rem;
+  --radius-medium: 0.5rem;
+  --radius-large: 0.75rem;
+
+  /* Elevation communicates hierarchy without changing existing components. */
+  --elevation-subtle: 0 1px 2px rgb(15 23 42 / 0.06);
+  --elevation-popover:
+    0 10px 15px -3px rgb(15 23 42 / 0.1),
+    0 4px 6px -4px rgb(15 23 42 / 0.1);
+  --elevation-modal:
+    0 20px 25px -5px rgb(15 23 42 / 0.14),
+    0 8px 10px -6px rgb(15 23 42 / 0.1);
+
+  /* Layer order: base < sticky < popover < drawer < modal < toast. */
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-popover: 30;
+  --z-drawer: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
+  /* Motion foundation only; no new animations are applied in UX-01.1. */
+  --motion-duration-fast: 120ms;
+  --motion-duration-normal: 180ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-text: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-subtle: var(--info-subtle);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-neutral-subtle: var(--neutral-subtle);
+  --color-focus-ring: var(--focus-ring);
+  --color-focus-ring-offset: var(--focus-ring-offset);
+
+  /* Compatibility aliases already referenced by shared UI components. */
+  --color-card: var(--surface);
+  --color-muted: var(--surface-subtle);
+  --color-muted-foreground: var(--text-muted);
+  --color-ring: var(--focus-ring);
+
+  --radius-ui-sm: var(--radius-small);
+  --radius-ui-md: var(--radius-medium);
+  --radius-ui-lg: var(--radius-large);
+  --shadow-subtle: var(--elevation-subtle);
+  --shadow-popover: var(--elevation-popover);
+  --shadow-modal: var(--elevation-modal);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
