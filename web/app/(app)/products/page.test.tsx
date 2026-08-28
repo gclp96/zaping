@@ -101,7 +101,38 @@ const noBrandProduct: Product = {
   name: 'SIN MARCA',
   brand: null,
   categoryId: null,
+  barcode: null,
 };
+
+const assetProduct: Product = {
+  ...bluntTipProduct,
+  id: 'product-asset',
+  sku: 'EQP900',
+  name: 'EQUIPO ZETA',
+  brand: 'Beta Health',
+  categoryId: inactiveCategory.id,
+  barcode: '750000000900',
+  stock: 3,
+  isActive: false,
+  inventoryTracking: 'ASSET',
+  lotTracking: 'REQUIRED',
+};
+
+function buildProductList(count: number): Product[] {
+  return Array.from({ length: count }, (_, index) => {
+    const number = index + 1;
+    const suffix = number.toString().padStart(3, '0');
+
+    return {
+      ...bluntTipProduct,
+      id: `product-${suffix}`,
+      sku: `SKU${suffix}`,
+      name: `Producto ${suffix}`,
+      barcode: `750000${suffix}`,
+      lotTracking: number === count ? 'REQUIRED' : 'OPTIONAL',
+    };
+  });
+}
 
 function configureApiMocks({
   products = [bluntTipProduct, noBrandProduct],
@@ -164,15 +195,7 @@ async function openEditProductModal(productName = 'BLUNT TIP') {
   const user = userEvent.setup();
 
   await renderProductsPage();
-
-  const productRow = screen.getAllByText(productName)[0].closest('tr');
-  expect(productRow).toBeTruthy();
-
-  await user.click(
-    within(productRow as HTMLTableRowElement).getByRole('button', {
-      name: /editar/i,
-    }),
-  );
+  await clickEditProduct(user, productName);
 
   return user;
 }
@@ -186,9 +209,42 @@ async function clickEditProduct(
 
   await user.click(
     within(productRow as HTMLTableRowElement).getByRole('button', {
-      name: /editar/i,
+      name: /acciones del producto/i,
     }),
   );
+  await user.click(screen.getByRole('menuitem', { name: 'Editar' }));
+}
+
+async function clickDeactivateProduct(
+  user: ReturnType<typeof userEvent.setup>,
+  productName = 'BLUNT TIP',
+) {
+  const productRow = screen.getAllByText(productName)[0].closest('tr');
+  expect(productRow).toBeTruthy();
+
+  await user.click(
+    within(productRow as HTMLTableRowElement).getByRole('button', {
+      name: /acciones del producto/i,
+    }),
+  );
+  await user.click(
+    screen.getByRole('menuitem', {
+      name: 'Acción destructiva: Desactivar',
+    }),
+  );
+}
+
+function getFormSelect(name: RegExp) {
+  const matches = screen.getAllByRole('combobox', { name });
+
+  return matches[matches.length - 1] as HTMLSelectElement;
+}
+
+function getRenderedProductNames() {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell')[1]?.textContent);
 }
 
 function fillRequiredProductFields() {
@@ -342,7 +398,12 @@ describe('ProductsPage', () => {
   it('muestra categoria, tracking y estado en la lista', async () => {
     await renderProductsPage();
 
-    expect(screen.getByText('Quirúrgico')).toBeTruthy();
+    const productRow = screen.getByText('BLUNT TIP').closest('tr');
+
+    expect(productRow).toBeTruthy();
+    expect(
+      within(productRow as HTMLTableRowElement).getByText('Quirúrgico'),
+    ).toBeTruthy();
     expect(
       screen.getAllByLabelText('Seguimiento de inventario: Por cantidad')
         .length,
@@ -352,24 +413,244 @@ describe('ProductsPage', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('expone caption y prioridades responsive del piloto', async () => {
+    await renderProductsPage();
+
+    expect(
+      screen.getByRole('table', { name: 'Catálogo de productos' }),
+    ).toBeTruthy();
+
+    const productHeader = screen.getByRole('columnheader', {
+      name: 'Producto',
+    });
+    const statusHeader = screen.getByRole('columnheader', { name: 'Estado' });
+    const skuHeader = screen.getByRole('columnheader', { name: 'SKU' });
+    const brandHeader = screen.getByRole('columnheader', { name: 'Marca' });
+    const actionsHeader = screen.getByRole('columnheader', {
+      name: 'Acciones',
+    });
+
+    expect(productHeader.classList.contains('hidden')).toBe(false);
+    expect(statusHeader.classList.contains('hidden')).toBe(false);
+    expect(actionsHeader.classList.contains('hidden')).toBe(false);
+    expect(skuHeader.classList.contains('hidden')).toBe(true);
+    expect(skuHeader.classList.contains('sm:table-cell')).toBe(true);
+    expect(brandHeader.classList.contains('hidden')).toBe(true);
+    expect(brandHeader.classList.contains('md:table-cell')).toBe(true);
+  });
+
+  it('busca por nombre, SKU, marca y barcode sin distinguir mayúsculas', async () => {
+    const user = userEvent.setup();
+
+    await renderProductsPage();
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar productos',
+    });
+
+    for (const query of [
+      'blunt tip',
+      'lf1837',
+      'acme medical',
+      '750000000001',
+    ]) {
+      await user.clear(search);
+      await user.type(search, query);
+
+      expect(screen.getByText('BLUNT TIP')).toBeTruthy();
+      expect(screen.queryByText('SIN MARCA')).toBeNull();
+    }
+
+    await user.clear(search);
+    await user.type(search, 'sin coincidencias');
+
+    expect(
+      screen.getByRole('heading', {
+        name: 'No hay productos que coincidan',
+      }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect((search as HTMLInputElement).value).toBe('');
+    expect(screen.getByText('BLUNT TIP')).toBeTruthy();
+    expect(screen.getByText('SIN MARCA')).toBeTruthy();
+  });
+
+  it('combina categoría, seguimiento de inventario y seguimiento por lote', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({
+      products: [bluntTipProduct, noBrandProduct, assetProduct],
+    });
+
+    render(<ProductsPage />);
+    await screen.findByText('LF1837');
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /^categoría$/i }),
+      surgicalCategory.id,
+    );
+    expect(screen.getByText('BLUNT TIP')).toBeTruthy();
+    expect(screen.queryByText('EQUIPO ZETA')).toBeNull();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', {
+        name: /^seguimiento de inventario$/i,
+      }),
+      'QUANTITY',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /^seguimiento por lote$/i }),
+      'REQUIRED',
+    );
+    expect(
+      screen.getByRole('heading', {
+        name: 'No hay productos que coincidan',
+      }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', {
+        name: /^seguimiento de inventario$/i,
+      }),
+      'ASSET',
+    );
+    expect(screen.getByText('EQUIPO ZETA')).toBeTruthy();
+    expect(screen.queryByText('BLUNT TIP')).toBeNull();
+  });
+
+  it('ordena establemente asc, desc, none y comienza asc al cambiar columna', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({
+      products: [assetProduct, noBrandProduct, bluntTipProduct],
+    });
+
+    render(<ProductsPage />);
+    await screen.findByText('NB001');
+
+    expect(getRenderedProductNames()).toEqual([
+      'EQUIPO ZETA',
+      'SIN MARCA',
+      'BLUNT TIP',
+    ]);
+
+    const productSort = screen.getByRole('button', { name: 'Producto' });
+    await user.click(productSort);
+    expect(getRenderedProductNames()).toEqual([
+      'BLUNT TIP',
+      'EQUIPO ZETA',
+      'SIN MARCA',
+    ]);
+    await user.click(productSort);
+    expect(getRenderedProductNames()).toEqual([
+      'SIN MARCA',
+      'EQUIPO ZETA',
+      'BLUNT TIP',
+    ]);
+    await user.click(productSort);
+    expect(getRenderedProductNames()).toEqual([
+      'EQUIPO ZETA',
+      'SIN MARCA',
+      'BLUNT TIP',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'SKU' }));
+    expect(getRenderedProductNames()).toEqual([
+      'EQUIPO ZETA',
+      'BLUNT TIP',
+      'SIN MARCA',
+    ]);
+    expect(
+      screen.getByRole('columnheader', { name: 'SKU' }).getAttribute('aria-sort'),
+    ).toBe('ascending');
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Producto' })
+        .hasAttribute('aria-sort'),
+    ).toBe(false);
+  });
+
+  it('pagina client-side y reinicia página al cambiar tamaño, búsqueda o filtro', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({ products: buildProductList(30) });
+
+    render(<ProductsPage />);
+    await screen.findByText('SKU001');
+
+    expect(getRenderedProductNames()).toHaveLength(25);
+    expect(screen.getByText('Producto 025')).toBeTruthy();
+    expect(screen.queryByText('Producto 026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Página 2 de 2')).toBeTruthy();
+    expect(getRenderedProductNames()).toHaveLength(5);
+    expect(screen.getByText('Producto 026')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página anterior' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Página 1 de 3')).toBeTruthy();
+    expect(getRenderedProductNames()).toHaveLength(10);
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Página 3 de 3')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: /^seguimiento por lote$/i }),
+      'REQUIRED',
+    );
+    expect(screen.getByText('Página 1 de 1')).toBeTruthy();
+    expect(getRenderedProductNames()).toEqual(['Producto 030']);
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar productos' }),
+      'producto 030',
+    );
+    expect(screen.getByText('Página 1 de 1')).toBeTruthy();
+    expect(getRenderedProductNames()).toEqual(['Producto 030']);
+  });
+
   it('renderiza selectores de tracking en create con defaults backend', async () => {
     const user = await openCreateProductModal();
 
-    const inventoryTrackingSelect = screen.getByRole('combobox', {
-      name: /seguimiento de inventario/i,
-    }) as HTMLSelectElement;
-    const lotTrackingSelect = screen.getByRole('combobox', {
-      name: /seguimiento por lote/i,
-    }) as HTMLSelectElement;
+    const inventoryTrackingSelect = getFormSelect(
+      /^seguimiento de inventario$/i,
+    );
+    const lotTrackingSelect = getFormSelect(/^seguimiento por lote$/i);
 
-    expect(screen.getByRole('option', { name: 'Por cantidad' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Serializado' })).toBeTruthy();
     expect(
-      screen.getByRole('option', { name: 'Equipo / activo físico' }),
+      within(inventoryTrackingSelect).getByRole('option', {
+        name: 'Por cantidad',
+      }),
     ).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Sin lote' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Lote opcional' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Lote requerido' })).toBeTruthy();
+    expect(
+      within(inventoryTrackingSelect).getByRole('option', {
+        name: 'Serializado',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(inventoryTrackingSelect).getByRole('option', {
+        name: 'Equipo / activo físico',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(lotTrackingSelect).getByRole('option', { name: 'Sin lote' }),
+    ).toBeTruthy();
+    expect(
+      within(lotTrackingSelect).getByRole('option', {
+        name: 'Lote opcional',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(lotTrackingSelect).getByRole('option', {
+        name: 'Lote requerido',
+      }),
+    ).toBeTruthy();
     expect(inventoryTrackingSelect.value).toBe('QUANTITY');
     expect(lotTrackingSelect.value).toBe('OPTIONAL');
 
@@ -386,21 +667,15 @@ describe('ProductsPage', () => {
 
     fillRequiredProductFields();
     await user.selectOptions(
-      screen.getByRole('combobox', {
-        name: /categoría/i,
-      }),
+      getFormSelect(/^categoría$/i),
       surgicalCategory.id,
     );
     await user.selectOptions(
-      screen.getByRole('combobox', {
-        name: /seguimiento de inventario/i,
-      }),
+      getFormSelect(/^seguimiento de inventario$/i),
       'ASSET',
     );
     await user.selectOptions(
-      screen.getByRole('combobox', {
-        name: /seguimiento por lote/i,
-      }),
+      getFormSelect(/^seguimiento por lote$/i),
       'REQUIRED',
     );
 
@@ -432,9 +707,7 @@ describe('ProductsPage', () => {
     const user = await openCreateProductModal();
 
     await user.selectOptions(
-      screen.getByRole('combobox', {
-        name: /seguimiento de inventario/i,
-      }),
+      getFormSelect(/^seguimiento de inventario$/i),
       'ASSET',
     );
     await user.click(screen.getByLabelText('Cerrar modal'));
@@ -445,11 +718,7 @@ describe('ProductsPage', () => {
     );
 
     expect(
-      (
-        screen.getByRole('combobox', {
-          name: /seguimiento de inventario/i,
-        }) as HTMLSelectElement
-      ).value,
+      getFormSelect(/^seguimiento de inventario$/i).value,
     ).toBe('QUANTITY');
   });
 
@@ -459,18 +728,19 @@ describe('ProductsPage', () => {
     expect(screen.getByText('Stock actual')).toBeTruthy();
     expect(screen.getByText('Las operaciones de inventario administran este valor.'))
       .toBeTruthy();
-    expect(screen.getByText('Por cantidad')).toBeTruthy();
-    expect(screen.getByText('Lote opcional')).toBeTruthy();
+    expect(screen.getByText('Inventario controlado por unidades.')).toBeTruthy();
+    expect(screen.getByText('El lote puede capturarse cuando aplique.'))
+      .toBeTruthy();
     expect(
-      screen.queryByRole('combobox', {
-        name: /seguimiento de inventario/i,
+      screen.getAllByRole('combobox', {
+        name: /^seguimiento de inventario$/i,
       }),
-    ).toBeNull();
+    ).toHaveLength(1);
     expect(
-      screen.queryByRole('combobox', {
-        name: /seguimiento por lote/i,
+      screen.getAllByRole('combobox', {
+        name: /^seguimiento por lote$/i,
       }),
-    ).toBeNull();
+    ).toHaveLength(1);
 
     await user.clear(screen.getByLabelText(/nombre/i));
     await user.type(screen.getByLabelText(/nombre/i), 'BLUNT TIP EDITADO');
@@ -503,12 +773,7 @@ describe('ProductsPage', () => {
   it('cambia y limpia categoria en edit', async () => {
     const user = await openEditProductModal();
 
-    await user.selectOptions(
-      screen.getByRole('combobox', {
-        name: /categoría/i,
-      }),
-      '',
-    );
+    await user.selectOptions(getFormSelect(/^categoría$/i), '');
     await user.click(screen.getByRole('button', { name: /^guardar$/i }));
 
     expect(api.patch).toHaveBeenCalledWith(
@@ -540,11 +805,7 @@ describe('ProductsPage', () => {
     );
 
     expect(
-      (
-        screen.getByRole('combobox', {
-          name: /categoría/i,
-        }) as HTMLSelectElement
-      ).disabled,
+      getFormSelect(/^categoría$/i).disabled,
     ).toBe(true);
   });
 
@@ -580,19 +841,27 @@ describe('ProductsPage', () => {
     const productRow = screen.getByText('BLUNT TIP').closest('tr');
     expect(productRow).toBeTruthy();
 
-    const deactivateButton = within(
+    const actionsTrigger = within(
       productRow as HTMLTableRowElement,
     ).getByRole('button', {
-      name: 'Desactivar producto LF1837',
+      name: 'Acciones del producto LF1837',
     });
 
-    expect(deactivateButton.textContent).toBe('Desactivar');
-    expect(deactivateButton.getAttribute('title')).toBe(
-      'Desactivar producto LF1837',
+    expect(actionsTrigger.getAttribute('title')).toBe(
+      'Acciones del producto LF1837',
     );
     expect(screen.queryByText(/eliminar/i)).toBeNull();
 
-    await user.click(deactivateButton);
+    await user.click(actionsTrigger);
+    const actionsMenu = screen.getByRole('menu', {
+      name: 'Acciones del producto LF1837',
+    });
+    const deactivateAction = within(actionsMenu).getByRole('menuitem', {
+      name: 'Acción destructiva: Desactivar',
+    });
+    expect(deactivateAction.textContent).toContain('Desactivar');
+
+    await user.click(deactivateAction);
 
     expect(
       screen.getByRole('heading', {
@@ -647,14 +916,7 @@ describe('ProductsPage', () => {
     const user = userEvent.setup();
 
     await renderProductsPage();
-    const productRow = screen.getByText('BLUNT TIP').closest('tr');
-    expect(productRow).toBeTruthy();
-
-    await user.click(
-      within(productRow as HTMLTableRowElement).getByRole('button', {
-        name: 'Desactivar producto LF1837',
-      }),
-    );
+    await clickDeactivateProduct(user);
     await user.click(
       screen.getByRole('button', {
         name: /^desactivar$/i,
@@ -682,14 +944,7 @@ describe('ProductsPage', () => {
     const user = userEvent.setup();
 
     await renderProductsPage();
-    const productRow = screen.getByText('BLUNT TIP').closest('tr');
-    expect(productRow).toBeTruthy();
-
-    await user.click(
-      within(productRow as HTMLTableRowElement).getByRole('button', {
-        name: 'Desactivar producto LF1837',
-      }),
-    );
+    await clickDeactivateProduct(user);
     await user.click(
       screen.getByRole('button', {
         name: /^desactivar$/i,

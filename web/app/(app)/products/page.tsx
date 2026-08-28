@@ -6,7 +6,12 @@ import MoneyInput from '@/app/components/business/MoneyInput';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
-import EmptyState from '@/app/components/ui/EmptyState';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type DataTableSelectFilter,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
 import Modal from '@/app/components/ui/Modal';
@@ -14,7 +19,6 @@ import Select, { type SelectOption } from '@/app/components/ui/Select';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
-import Table from '@/app/components/ui/Table';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -50,6 +54,13 @@ type Product = {
 
 const DEFAULT_INVENTORY_TRACKING: ProductInventoryTracking = 'QUANTITY';
 const DEFAULT_LOT_TRACKING: ProductLotTracking = 'OPTIONAL';
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const productCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 const inventoryTrackingOptions: SelectOption[] = [
   {
@@ -127,8 +138,49 @@ function buildCategoryOptions(categories: Category[]): SelectOption[] {
     }));
 }
 
+function getProductCategoryName(
+  product: Product,
+  categoryNameById: ReadonlyMap<string, string>,
+) {
+  return (
+    product.category?.name ||
+    (product.categoryId ? categoryNameById.get(product.categoryId) : null) ||
+    ''
+  );
+}
+
+function normalizeSearchValue(value: string) {
+  return value.trim().toLocaleLowerCase('es-MX');
+}
+
+function compareProducts(
+  first: Product,
+  second: Product,
+  columnId: string,
+  categoryNameById: ReadonlyMap<string, string>,
+) {
+  if (columnId === 'stock' || columnId === 'price') {
+    return first[columnId] - second[columnId];
+  }
+
+  const firstValue =
+    columnId === 'category'
+      ? getProductCategoryName(first, categoryNameById)
+      : columnId === 'sku' || columnId === 'name' || columnId === 'brand'
+        ? first[columnId] || ''
+        : '';
+  const secondValue =
+    columnId === 'category'
+      ? getProductCategoryName(second, categoryNameById)
+      : columnId === 'sku' || columnId === 'name' || columnId === 'brand'
+        ? second[columnId] || ''
+        : '';
+
+  return productCollator.compare(firstValue, secondValue);
+}
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -155,6 +207,14 @@ export default function ProductsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [inventoryTrackingFilter, setInventoryTrackingFilter] = useState('');
+  const [lotTrackingFilter, setLotTrackingFilter] = useState('');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
   const categoryOptions = useMemo(
     () => buildCategoryOptions(categories),
     [categories],
@@ -166,9 +226,175 @@ export default function ProductsPage() {
     );
   }, [categories]);
 
+  const categoryFilterOptions = useMemo<SelectOption[]>(() => {
+    return categories
+      .map((category) => ({
+        value: category.id,
+        label: category.name,
+      }))
+      .sort((first, second) => productCollator.compare(first.label, second.label));
+  }, [categories]);
+
+  const isFiltered = Boolean(
+    search ||
+      categoryFilter ||
+      inventoryTrackingFilter ||
+      lotTrackingFilter,
+  );
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = normalizeSearchValue(search);
+
+    return rawProducts.filter((product) => {
+      const matchesSearch =
+        !normalizedSearch ||
+        [product.sku, product.name, product.brand || '', product.barcode || '']
+          .map(normalizeSearchValue)
+          .some((value) => value.includes(normalizedSearch));
+      const matchesCategory =
+        !categoryFilter || product.categoryId === categoryFilter;
+      const matchesInventoryTracking =
+        !inventoryTrackingFilter ||
+        product.inventoryTracking === inventoryTrackingFilter;
+      const matchesLotTracking =
+        !lotTrackingFilter || product.lotTracking === lotTrackingFilter;
+
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesInventoryTracking &&
+        matchesLotTracking
+      );
+    });
+  }, [
+    categoryFilter,
+    inventoryTrackingFilter,
+    lotTrackingFilter,
+    rawProducts,
+    search,
+  ]);
+
+  const sortedProducts = useMemo(() => {
+    if (!sorting) {
+      return filteredProducts;
+    }
+
+    const direction = sorting.direction === 'asc' ? 1 : -1;
+
+    return filteredProducts
+      .map((product, originalIndex) => ({ product, originalIndex }))
+      .sort((first, second) => {
+        const comparison = compareProducts(
+          first.product,
+          second.product,
+          sorting.columnId,
+          categoryNameById,
+        );
+
+        return comparison === 0
+          ? first.originalIndex - second.originalIndex
+          : comparison * direction;
+      })
+      .map(({ product }) => product);
+  }, [categoryNameById, filteredProducts, sorting]);
+
+  const paginatedProducts = useMemo(() => {
+    const firstRowIndex = pageIndex * pageSize;
+
+    return sortedProducts.slice(firstRowIndex, firstRowIndex + pageSize);
+  }, [pageIndex, pageSize, sortedProducts]);
+
+  const productColumns = useMemo<DataTableColumn<Product>[]>(
+    () => [
+      {
+        id: 'sku',
+        header: 'SKU',
+        cell: (product) => product.sku,
+        sortable: true,
+        priority: 'secondary',
+        minWidth: 120,
+      },
+      {
+        id: 'name',
+        header: 'Producto',
+        cell: (product) => product.name,
+        sortable: true,
+        priority: 'primary',
+        minWidth: 180,
+      },
+      {
+        id: 'brand',
+        header: 'Marca',
+        cell: (product) => product.brand || '-',
+        sortable: true,
+        priority: 'tertiary',
+        minWidth: 140,
+      },
+      {
+        id: 'category',
+        header: 'Categoría',
+        cell: (product) =>
+          getProductCategoryName(product, categoryNameById) || '-',
+        sortable: true,
+        priority: 'tertiary',
+        minWidth: 150,
+      },
+      {
+        id: 'tracking',
+        header: 'Seguimiento',
+        cell: (product) => (
+          <StatusBadge
+            label={inventoryTrackingShortLabels[product.inventoryTracking]}
+            tone={product.inventoryTracking === 'ASSET' ? 'info' : 'neutral'}
+            ariaLabel={`Seguimiento de inventario: ${
+              inventoryTrackingLabels[product.inventoryTracking]
+            }`}
+          />
+        ),
+        priority: 'tertiary',
+        minWidth: 140,
+      },
+      {
+        id: 'price',
+        header: 'Precio',
+        cell: (product) => formatMoney(product.price),
+        sortable: true,
+        align: 'end',
+        priority: 'tertiary',
+        minWidth: 120,
+      },
+      {
+        id: 'stock',
+        header: 'Inventario',
+        cell: (product) => product.stock,
+        sortable: true,
+        align: 'end',
+        priority: 'secondary',
+        minWidth: 110,
+      },
+      {
+        id: 'status',
+        header: 'Estado',
+        cell: (product) => (
+          <StatusBadge
+            label={product.isActive ? 'Activo' : 'Inactivo'}
+            tone={product.isActive ? 'success' : 'neutral'}
+            ariaLabel={`Estado del producto: ${
+              product.isActive ? 'Activo' : 'Inactivo'
+            }`}
+          />
+        ),
+        priority: 'primary',
+        minWidth: 110,
+      },
+    ],
+    [categoryNameById],
+  );
+
   async function loadProducts() {
     const response = await api.get<Product[]>('/products');
-    setProducts(response.data);
+    setRawProducts(response.data);
+    setPageIndex(0);
   }
 
   async function loadCategories() {
@@ -330,6 +556,55 @@ export default function ProductsPage() {
     }
   }
 
+  function resetTableControls() {
+    setSearch('');
+    setCategoryFilter('');
+    setInventoryTrackingFilter('');
+    setLotTrackingFilter('');
+    setPageIndex(0);
+  }
+
+  const productTableFilters: DataTableSelectFilter[] = [];
+
+  if (!categoryError) {
+    productTableFilters.push({
+      id: 'category',
+      label: 'Categoría',
+      value: categoryFilter,
+      options: categoryFilterOptions,
+      placeholder: 'Todas las categorías',
+      onChange: (value) => {
+        setCategoryFilter(value);
+        setPageIndex(0);
+      },
+    });
+  }
+
+  productTableFilters.push(
+    {
+      id: 'inventory-tracking',
+      label: 'Seguimiento de inventario',
+      value: inventoryTrackingFilter,
+      options: inventoryTrackingOptions,
+      placeholder: 'Todos los seguimientos',
+      onChange: (value) => {
+        setInventoryTrackingFilter(value);
+        setPageIndex(0);
+      },
+    },
+    {
+      id: 'lot-tracking',
+      label: 'Seguimiento por lote',
+      value: lotTrackingFilter,
+      options: lotTrackingOptions,
+      placeholder: 'Todos los lotes',
+      onChange: (value) => {
+        setLotTrackingFilter(value);
+        setPageIndex(0);
+      },
+    },
+  );
+
   useEffect(() => {
     let mounted = true;
 
@@ -394,14 +669,9 @@ export default function ProductsPage() {
               </Button>
             </div>
           </Section>
-        ) : products.length === 0 ? (
-          <EmptyState
-            title="No hay productos registrados"
-            description="Comienza agregando tu primer producto."
-          />
         ) : (
           <Section>
-            {categoryError ? (
+            {categoryError && rawProducts.length > 0 ? (
               <div
                 role="alert"
                 className="mb-4 flex flex-col gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-900 sm:flex-row sm:items-center sm:justify-between"
@@ -419,74 +689,73 @@ export default function ProductsPage() {
               </div>
             ) : null}
 
-            <Table
-              headers={[
-                'SKU',
-                'Nombre',
-                'Marca',
-                'Categoría',
-                'Seguimiento',
-                'Precio',
-                'Stock',
-                'Estado',
-                'Acciones',
-              ]}
-              data={products.map((product) => ({
-                sku: product.sku,
-                name: product.name,
-                brand: product.brand || '-',
-                category:
-                  product.category?.name ||
-                  (product.categoryId
-                    ? categoryNameById.get(product.categoryId)
-                    : null) ||
-                  '-',
-                tracking: (
-                  <StatusBadge
-                    label={inventoryTrackingShortLabels[product.inventoryTracking]}
-                    tone={
-                      product.inventoryTracking === 'ASSET'
-                        ? 'info'
-                        : 'neutral'
+            <DataTable
+              caption="Catálogo de productos"
+              rows={paginatedProducts}
+              columns={productColumns}
+              getRowId={(product) => product.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                rawProducts.length > 0 ? (
+                  <DataTableToolbar
+                    search={{
+                      value: search,
+                      label: 'Buscar productos',
+                      placeholder: 'Buscar por SKU, nombre, marca o código',
+                      onChange: (value) => {
+                        setSearch(value);
+                        setPageIndex(0);
+                      },
+                    }}
+                    filters={productTableFilters}
+                    onReset={resetTableControls}
+                    resetDisabled={!isFiltered}
+                  />
+                ) : undefined
+              }
+              pagination={
+                rawProducts.length > 0
+                  ? {
+                      pageIndex,
+                      pageSize,
+                      totalRows: sortedProducts.length,
+                      pageSizeOptions: PAGE_SIZE_OPTIONS,
+                      onPageChange: setPageIndex,
+                      onPageSizeChange: (nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setPageIndex(0);
+                      },
                     }
-                    ariaLabel={`Seguimiento de inventario: ${
-                      inventoryTrackingLabels[product.inventoryTracking]
-                    }`}
-                  />
-                ),
-                price: formatMoney(product.price),
-                stock: product.stock,
-                status: (
-                  <StatusBadge
-                    label={product.isActive ? 'Activo' : 'Inactivo'}
-                    tone={product.isActive ? 'success' : 'neutral'}
-                    ariaLabel={`Estado del producto: ${
-                      product.isActive ? 'Activo' : 'Inactivo'
-                    }`}
-                  />
-                ),
-                actions: (
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditModal(product)}
-                    >
-                      Editar
-                    </Button>
-
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      aria-label={`Desactivar producto ${product.sku}`}
-                      title={`Desactivar producto ${product.sku}`}
-                      onClick={() => openDeleteModal(product)}
-                    >
-                      Desactivar
-                    </Button>
-                  </div>
-                ),
-              }))}
+                  : undefined
+              }
+              rowActions={{
+                label: (product) => `Acciones del producto ${product.sku}`,
+                actions: [
+                  {
+                    id: 'edit',
+                    label: 'Editar',
+                    onSelect: openEditModal,
+                  },
+                  {
+                    id: 'deactivate',
+                    label: 'Desactivar',
+                    variant: 'destructive',
+                    onSelect: openDeleteModal,
+                  },
+                ],
+              }}
+              emptyState={{
+                title: 'No hay productos registrados',
+                description: 'Comienza agregando tu primer producto.',
+              }}
+              filteredEmptyState={{
+                title: 'No hay productos que coincidan',
+                description: 'Ajusta la búsqueda o limpia los filtros.',
+              }}
+              isFiltered={isFiltered}
             />
           </Section>
         )}
