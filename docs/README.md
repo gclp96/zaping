@@ -300,7 +300,10 @@ docs/
 │
 ├── ux/
 │   ├── DESIGN_SYSTEM.md
-│   └── BUSINESS_COMPONENTS.md
+│   ├── BUSINESS_COMPONENTS.md
+│   ├── UX_PRINCIPLES.md
+│   ├── UX_DECISIONS.md
+│   └── UX_IMPROVEMENT_BACKLOG.md
 │
 ├── modules/
 │   ├── erp/
@@ -406,20 +409,24 @@ No toda la carpeta architecture/ debe considerarse “pendiente” solamente por
 
 5.5 UX y Design System
 
-La documentación UX dedicada continúa parcialmente pendiente de consolidación.
+La documentación UX dedicada está consolidada para la baseline UX-01.
 
 Fuentes relevantes:
 
 modules/erp/ERP_UI_UX.md
 → CURRENT ERP UI/UX state
 
-y, cuando se consoliden formalmente:
-
 product/ZAPING_WAY.md
 
 ux/DESIGN_SYSTEM.md
 
 ux/BUSINESS_COMPONENTS.md
+
+ux/UX_PRINCIPLES.md
+
+ux/UX_DECISIONS.md
+
+ux/UX_IMPROVEMENT_BACKLOG.md
 
 No deben crearse documentos vacíos únicamente para completar una estructura teórica.
 

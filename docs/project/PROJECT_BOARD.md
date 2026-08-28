@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
-Última actualización: 2026-08-27
+Última actualización: 2026-08-28
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -39,6 +39,12 @@ ERP Core
 ├── Authentication / JWT foundation
 ├── Authenticated App Shell
 ├── Navigation
+├── UX-01 App Shell v2 / frontend foundations
+│   ├── semantic tokens
+│   ├── layout primitives
+│   ├── responsive Sidebar / AppHeader
+│   ├── authenticated Home V1
+│   └── Categories normalization
 ├── Dashboard 2.0
 ├── Customers V1
 ├── Suppliers V1
@@ -66,6 +72,14 @@ H8 — ERP Core release preparation
 │
 └── H8B Full technical regression
     └── next technical block
+
+Frontend UX workstream
+
+├── UX-01 Foundations / App Shell v2
+│   └── COMPLETED / VALIDATED
+│
+└── UX-02 DataTable / operational lists
+    └── DEFERRED / NOT STARTED
 
 NEXT
 
@@ -1754,7 +1768,21 @@ Frontend / Architecture
 
 Table Object.values(row) fragility
 
+DataTable / sorting / filters / row action menu
+
+responsive tables / pagination
+
+Inventory tabs primitive decision
+
 Modal accessibility / focus management
+
+drawer complete focus trap
+
+authenticated Home post-login redirect
+
+branch/context selector / notifications / global search
+
+role-aware navigation / collaboration
 
 auth protected-route / session architecture
 
@@ -2062,11 +2090,17 @@ Mobile Technician
 
 27. Snapshot de calidad vigente
 
-Último snapshot frontend confirmado después de H7B:
+Último snapshot frontend confirmado al cierre de UX-01.6:
 
-29 test files
+38 test files
 
-402 / 402 tests PASS
+469 / 469 tests PASS
+
+frontend tests with 4 workers
+PASS
+
+frontend tests serially
+PASS
 
 frontend build
 PASS
@@ -2077,7 +2111,8 @@ PASS
 git diff --check
 PASS
 
-Este snapshot es informativo y debe actualizarse durante H8B.
+Este snapshot cierra exclusivamente UX-01. H8B continúa siendo un bloque técnico
+más amplio y no se declara completado por esta validación frontend.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
 
@@ -2087,7 +2122,8 @@ parallel infrastructure/resource failure
 ≠
 application test failure
 
-La suite completa puede ejecutarse de forma serial para obtener un resultado confiable.
+La suite completa puede ejecutarse con workers limitados o de forma serial para
+obtener un resultado confiable.
 
 El snapshot backend definitivo de release deberá obtenerse durante H8B y no debe inferirse desde resultados antiguos.
 
