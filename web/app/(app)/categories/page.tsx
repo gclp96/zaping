@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
+import { stableSort } from '@/app/client-table.utils';
+import DataTable, {
+  type DataTableColumn,
+  type DataTableRowActions,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import Modal from '@/app/components/ui/Modal';
 import Input from '@/app/components/ui/Input';
-import Table from '@/app/components/ui/Table';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Button from '@/app/components/ui/Button';
-import EmptyState from '@/app/components/ui/EmptyState';
-import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -26,6 +29,7 @@ export default function CategoriesPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [sorting, setSorting] = useState<SortState>(null);
 
   const [openModal, setOpenModal] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -142,6 +146,62 @@ export default function CategoriesPage() {
     };
   }, []);
 
+  const sortedCategories = useMemo(() => {
+    if (!sorting) {
+      return categories;
+    }
+
+    return stableSort(
+      categories,
+      (first, second) => {
+        if (sorting.columnId === 'name') {
+          return first.name.localeCompare(second.name, 'es-MX');
+        }
+
+        if (sorting.columnId === 'status') {
+          return Number(first.isActive) - Number(second.isActive);
+        }
+
+        return 0;
+      },
+      sorting.direction,
+    );
+  }, [categories, sorting]);
+
+  const categoryColumns: DataTableColumn<Category>[] = [
+    {
+      id: 'name',
+      header: 'Nombre',
+      cell: (category) => category.name,
+      sortable: true,
+      priority: 'primary',
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: (category) => (category.isActive ? 'Activa' : 'Inactiva'),
+      sortable: true,
+      priority: 'secondary',
+    },
+  ];
+
+  const categoryRowActions: DataTableRowActions<Category> = {
+    label: (category) => `Acciones de ${category.name}`,
+    actions: [
+      {
+        id: 'edit',
+        label: 'Editar',
+        onSelect: openEditModal,
+      },
+      {
+        id: 'delete',
+        label: 'Eliminar',
+        variant: 'destructive',
+        onSelect: openDeleteModal,
+      },
+    ],
+  };
+
   return (
     <>
       <PageContainer>
@@ -162,43 +222,23 @@ export default function CategoriesPage() {
           }
         />
 
-        {pageLoading ? (
-          <Loading message="Cargando categorías..." />
-        ) : categories.length === 0 ? (
-          <EmptyState
-            title="No hay categorías registradas"
-            description="Crea la primera categoría para organizar tus productos."
+        <Section>
+          <DataTable
+            caption="Categorías"
+            rows={sortedCategories}
+            columns={categoryColumns}
+            getRowId={(category) => category.id}
+            sorting={{ state: sorting, onChange: setSorting }}
+            rowActions={categoryRowActions}
+            loading={pageLoading}
+            loadingMessage="Cargando categorías..."
+            emptyState={{
+              title: 'No hay categorías registradas',
+              description:
+                'Crea la primera categoría para organizar tus productos.',
+            }}
           />
-        ) : (
-          <Section>
-            <Table
-              headers={['Nombre', 'Estado', 'Acciones']}
-              data={categories.map((category) => ({
-                name: category.name,
-                status: category.isActive ? 'Activa' : 'Inactiva',
-                actions: (
-                  <div className="flex gap-3">
-                    <Button
-                      variant="outline"
-                      size="md"
-                      onClick={() => openEditModal(category)}
-                    >
-                      Editar
-                    </Button>
-
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => openDeleteModal(category)}
-                    >
-                      Eliminar
-                    </Button>
-                  </div>
-                ),
-              }))}
-            />
-          </Section>
-        )}
+        </Section>
       </PageContainer>
 
       <Modal

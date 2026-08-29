@@ -122,6 +122,29 @@ describe('CategoriesPage', () => {
     ).toBeTruthy();
   });
 
+  it('preserves the existing fallback when loading categories fails', async () => {
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('Error de red'));
+
+    render(<CategoriesPage />);
+
+    expect(
+      await screen.findByText('No hay categorías registradas'),
+    ).toBeTruthy();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('sorts categories by name with the shared stable sort utility', async () => {
+    const user = userEvent.setup();
+
+    await renderCategoriesPage();
+    await user.click(screen.getByRole('button', { name: 'Nombre' }));
+    await user.click(screen.getByRole('button', { name: 'Nombre' }));
+
+    const rows = screen.getAllByRole('row');
+    expect(within(rows[1]).getByText(inactiveCategory.name)).toBeTruthy();
+    expect(within(rows[2]).getByText(activeCategory.name)).toBeTruthy();
+  });
+
   it('creates a category with the existing payload and refreshes the list', async () => {
     const user = userEvent.setup();
     const newCategory = {
@@ -177,9 +200,10 @@ describe('CategoriesPage', () => {
     expect(categoryRow).toBeTruthy();
     await user.click(
       within(categoryRow as HTMLTableRowElement).getByRole('button', {
-        name: 'Editar',
+        name: `Acciones de ${activeCategory.name}`,
       }),
     );
+    await user.click(screen.getByRole('menuitem', { name: 'Editar' }));
 
     const nameInput = screen.getByRole('textbox', { name: 'Nombre' });
     fireEvent.change(nameInput, {
@@ -208,7 +232,12 @@ describe('CategoriesPage', () => {
     expect(categoryRow).toBeTruthy();
     await user.click(
       within(categoryRow as HTMLTableRowElement).getByRole('button', {
-        name: 'Eliminar',
+        name: `Acciones de ${activeCategory.name}`,
+      }),
+    );
+    await user.click(
+      screen.getByRole('menuitem', {
+        name: 'Acción destructiva: Eliminar',
       }),
     );
 
