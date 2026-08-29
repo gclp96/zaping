@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
+import DataTable, {
+  type DataTableColumn,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
 import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
@@ -13,6 +17,7 @@ import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -35,6 +40,93 @@ const movementTypeOptions = [
   { value: 'IN', label: 'Entrada' },
   { value: 'OUT', label: 'Salida' },
   { value: 'ADJUSTMENT', label: 'Ajuste' },
+];
+
+const DEFAULT_STOCK_PAGE_SIZE = 25;
+const STOCK_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const inventoryCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function compareInventoryItems(
+  first: InventoryItem,
+  second: InventoryItem,
+  columnId: string,
+) {
+  if (columnId === 'stock' || columnId === 'minStock') {
+    const firstValue = columnId === 'stock' ? first.stock : first.minStock;
+    const secondValue = columnId === 'stock' ? second.stock : second.minStock;
+
+    return firstValue - secondValue;
+  }
+
+  const firstValue = columnId === 'sku' ? first.sku : first.name;
+  const secondValue = columnId === 'sku' ? second.sku : second.name;
+
+  return inventoryCollator.compare(firstValue, secondValue);
+}
+
+const stockColumns: DataTableColumn<InventoryItem>[] = [
+  {
+    id: 'sku',
+    header: 'SKU',
+    cell: (item) => (
+      <span className="font-semibold text-gray-900">{item.sku}</span>
+    ),
+    sortable: true,
+    priority: 'secondary',
+    minWidth: 130,
+  },
+  {
+    id: 'name',
+    header: 'Producto',
+    cell: (item) => item.name,
+    sortable: true,
+    priority: 'primary',
+    minWidth: 220,
+  },
+  {
+    id: 'stock',
+    header: 'Stock actual',
+    cell: (item) => (
+      <span className="font-semibold text-gray-900">{item.stock}</span>
+    ),
+    sortable: true,
+    align: 'end',
+    priority: 'primary',
+    minWidth: 120,
+  },
+  {
+    id: 'minStock',
+    header: 'Stock mínimo',
+    cell: (item) => item.minStock,
+    sortable: true,
+    align: 'end',
+    priority: 'tertiary',
+    minWidth: 125,
+  },
+  {
+    id: 'status',
+    header: 'Estado',
+    cell: (item) => {
+      const descriptor = getInventoryStatusDescriptor(
+        item.stock,
+        item.minStock,
+      );
+
+      return (
+        <StatusBadge
+          label={descriptor.label}
+          tone={descriptor.tone}
+          ariaLabel={`Estado del inventario de ${item.name}: ${descriptor.label}`}
+        />
+      );
+    },
+    priority: 'primary',
+    minWidth: 145,
+  },
 ];
 
 export default function InventoryPage() {
@@ -77,6 +169,11 @@ function InventoryPageContent() {
   const [movementSearch, setMovementSearch] = useState('');
   const [movementTypeFilter, setMovementTypeFilter] =
     useState<MovementTypeFilter>('');
+  const [stockSorting, setStockSorting] = useState<SortState>(null);
+  const [stockPageIndex, setStockPageIndex] = useState(0);
+  const [stockPageSize, setStockPageSize] = useState(
+    DEFAULT_STOCK_PAGE_SIZE,
+  );
 
   const filteredMovements = useMemo(() => {
     return movements.filter((movement) => {
@@ -101,6 +198,23 @@ function InventoryPageContent() {
     requestedReferenceType,
     traceabilityFilterActive,
   ]);
+
+  const sortedInventory = useMemo(() => {
+    if (!stockSorting) {
+      return inventory;
+    }
+
+    return stableSort(
+      inventory,
+      (first, second) =>
+        compareInventoryItems(first, second, stockSorting.columnId),
+      stockSorting.direction,
+    );
+  }, [inventory, stockSorting]);
+
+  const paginatedInventory = useMemo(() => {
+    return paginateRows(sortedInventory, stockPageIndex, stockPageSize);
+  }, [sortedInventory, stockPageIndex, stockPageSize]);
 
   const traceabilityContext =
     requestedReferenceType === 'PURCHASE_RECEIPT'
@@ -151,6 +265,7 @@ function InventoryPageContent() {
       const response = await api.get<InventoryItem[]>('/inventory');
 
       setInventory(response.data);
+      setStockPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
       setInventoryError(
@@ -216,44 +331,35 @@ function InventoryPageContent() {
       );
     }
 
-    if (inventory.length === 0) {
-      return (
-        <EmptyState
-          title="Inventario vacío"
-          description="Todavía no existen productos registrados."
-        />
-      );
-    }
-
     return (
-      <Table
-        headers={[
-          'SKU',
-          'Producto',
-          'Stock actual',
-          'Stock mínimo',
-          'Estado',
-        ]}
-        data={inventory.map((item) => {
-          const descriptor = getInventoryStatusDescriptor(
-            item.stock,
-            item.minStock,
-          );
-
-          return {
-            sku: item.sku,
-            name: item.name,
-            stock: item.stock,
-            minStock: item.minStock,
-            status: (
-              <StatusBadge
-                label={descriptor.label}
-                tone={descriptor.tone}
-                ariaLabel={`Estado del inventario de ${item.name}: ${descriptor.label}`}
-              />
-            ),
-          };
-        })}
+      <DataTable
+        caption="Existencias actuales"
+        rows={paginatedInventory}
+        columns={stockColumns}
+        getRowId={(item) => item.id}
+        sorting={{
+          state: stockSorting,
+          onChange: setStockSorting,
+        }}
+        pagination={
+          inventory.length > 0
+            ? {
+                pageIndex: stockPageIndex,
+                pageSize: stockPageSize,
+                totalRows: sortedInventory.length,
+                pageSizeOptions: STOCK_PAGE_SIZE_OPTIONS,
+                onPageChange: setStockPageIndex,
+                onPageSizeChange: (nextPageSize) => {
+                  setStockPageSize(nextPageSize);
+                  setStockPageIndex(0);
+                },
+              }
+            : undefined
+        }
+        emptyState={{
+          title: 'Inventario vacío',
+          description: 'Todavía no existen productos registrados.',
+        }}
       />
     );
   }

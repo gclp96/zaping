@@ -67,6 +67,21 @@ const inventory: InventoryItem[] = [
   },
 ];
 
+function buildInventoryList(count: number): InventoryItem[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+
+    return {
+      id: `product-page-${sequence}`,
+      sku: `SKU-${String(sequence).padStart(3, '0')}`,
+      name: `Producto ${String(sequence).padStart(3, '0')}`,
+      stock: sequence,
+      minStock: Math.floor(sequence / 2),
+      price: sequence * 10,
+    };
+  });
+}
+
 function buildProduct(
   overrides: Partial<InventoryMovementProduct> = {},
 ): InventoryMovementProduct {
@@ -210,6 +225,12 @@ async function openMovementsView() {
   return user;
 }
 
+function renderedStockSkus() {
+  return screen.getAllByRole('row').slice(1).map((row) =>
+    within(row).getAllByRole('cell')[0].textContent?.trim(),
+  );
+}
+
 let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('InventoryPage', () => {
@@ -238,6 +259,29 @@ describe('InventoryPage', () => {
     ).toBe('true');
 
     const skuCell = await screen.findByText('MED-001');
+    expect(
+      screen.getByRole('table', { name: 'Existencias actuales' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((header) =>
+        header.textContent?.trim(),
+      ),
+    ).toEqual(['SKU', 'Producto', 'Stock actual', 'Stock mínimo', 'Estado']);
+    expect(
+      screen.getByRole('columnheader', { name: 'Producto' }).classList.contains(
+        'hidden',
+      ),
+    ).toBe(false);
+    expect(
+      screen.getByRole('columnheader', { name: 'SKU' }).classList.contains(
+        'sm:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole('columnheader', { name: 'Stock mínimo' }).classList.contains(
+        'md:table-cell',
+      ),
+    ).toBe(true);
     const row = skuCell.closest('tr');
     expect(row).toBeTruthy();
     expect(within(row as HTMLTableRowElement).getByText('Sutura quirúrgica'))
@@ -249,8 +293,87 @@ describe('InventoryPage', () => {
     expect(api.get).toHaveBeenCalledWith('/inventory');
     expect(api.get).toHaveBeenCalledWith('/inventory/movements');
     expect(screen.queryByRole('spinbutton')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /ajustar stock/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /nuevo movimiento/i })).toBeNull();
+  });
+
+  it('ordena Stock por SKU y valores numéricos sin agregar acciones de fila', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({
+      inventoryData: [
+        {
+          id: 'product-sort-10',
+          sku: 'SKU-010',
+          name: 'Producto Zeta',
+          stock: 10,
+          minStock: 8,
+          price: 100,
+        },
+        {
+          id: 'product-sort-2',
+          sku: 'SKU-002',
+          name: 'Producto Alfa',
+          stock: 2,
+          minStock: 1,
+          price: 20,
+        },
+        {
+          id: 'product-sort-1',
+          sku: 'SKU-001',
+          name: 'Producto Medio',
+          stock: 1,
+          minStock: 2,
+          price: 10,
+        },
+      ],
+    });
+
+    render(<InventoryPage />);
+    await screen.findByText('SKU-010');
+
+    await user.click(screen.getByRole('button', { name: 'SKU' }));
+    expect(renderedStockSkus()).toEqual(['SKU-001', 'SKU-002', 'SKU-010']);
+
+    await user.click(screen.getByRole('button', { name: 'Stock actual' }));
+    expect(renderedStockSkus()).toEqual(['SKU-001', 'SKU-002', 'SKU-010']);
+    expect(
+      screen.getByRole('columnheader', { name: 'Estado' }).querySelector('button'),
+    ).toBeNull();
+  });
+
+  it('pagina Stock con 25 filas por defecto y reinicia al cambiar tamaño', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({ inventoryData: buildInventoryList(30) });
+
+    render(<InventoryPage />);
+    await screen.findByText('SKU-001');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('SKU-026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+    expect(screen.getByText('SKU-030')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+    expect(screen.getByText('SKU-001')).toBeTruthy();
+    expect(screen.queryByText('SKU-030')).toBeNull();
+  });
+
+  it('representa el inventario Stock vacío mediante el estado empty de DataTable', async () => {
+    configureApiMocks({ inventoryData: [] });
+
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('Inventario vacío')).toBeTruthy();
+    expect(
+      screen.queryByRole('navigation', { name: 'Paginación de tabla' }),
+    ).toBeNull();
   });
 
   it('muestra el ledger completo con tipos, cantidades, balances y referencias', async () => {
