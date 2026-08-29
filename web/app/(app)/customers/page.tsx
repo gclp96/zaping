@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import CustomerFormModal from '@/app/components/business/CustomerForm';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
-import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import Loading from '@/app/components/ui/Loading';
-import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -27,6 +29,14 @@ type Customer = {
   notes?: string | null;
 };
 
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const customerCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
 function customerMatchesSearch(customer: Customer, search: string): boolean {
   const normalizedSearch = search.trim().toLocaleLowerCase('es-MX');
 
@@ -37,6 +47,39 @@ function customerMatchesSearch(customer: Customer, search: string): boolean {
   return [customer.name, customer.email, customer.phone, customer.address].some(
     (value) => value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
   );
+}
+
+function compareCustomers(
+  first: Customer,
+  second: Customer,
+  columnId: string,
+) {
+  const firstValue =
+    columnId === 'name'
+      ? first.name
+      : columnId === 'type'
+        ? first.type
+        : columnId === 'email'
+          ? first.email
+          : columnId === 'phone'
+            ? first.phone
+            : columnId === 'address'
+              ? first.address || ''
+              : '';
+  const secondValue =
+    columnId === 'name'
+      ? second.name
+      : columnId === 'type'
+        ? second.type
+        : columnId === 'email'
+          ? second.email
+          : columnId === 'phone'
+            ? second.phone
+            : columnId === 'address'
+              ? second.address || ''
+              : '';
+
+  return customerCollator.compare(firstValue, secondValue);
 }
 
 export default function CustomersPage() {
@@ -50,6 +93,9 @@ export default function CustomersPage() {
     useState<Customer | null>(null);
   const [deactivating, setDeactivating] = useState(false);
   const [deactivationError, setDeactivationError] = useState('');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const filteredCustomers = useMemo(
     () => customers.filter((customer) => customerMatchesSearch(customer, search)),
@@ -63,6 +109,7 @@ export default function CustomersPage() {
 
       const response = await api.get<Customer[]>('/customers');
       setCustomers(response.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
       setPageError(
@@ -130,34 +177,79 @@ export default function CustomersPage() {
     }
   }
 
-  const tableData = filteredCustomers.map((customer) => ({
-    name: customer.name,
-    email: customer.email,
-    phone: customer.phone,
-    address: customer.address || 'Sin dirección',
-    actions: (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Editar cliente ${customer.name}`}
-          onClick={() => openEditModal(customer)}
-        >
-          Editar
-        </Button>
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          aria-label={`Desactivar cliente ${customer.name}`}
-          onClick={() => openDeactivateDialog(customer)}
-        >
-          Desactivar
-        </Button>
-      </div>
-    ),
-  }));
+  const isFiltered = Boolean(search.trim());
+
+  const sortedCustomers = useMemo(() => {
+    if (!sorting) {
+      return filteredCustomers;
+    }
+
+    const direction = sorting.direction === 'asc' ? 1 : -1;
+
+    return filteredCustomers
+      .map((customer, originalIndex) => ({ customer, originalIndex }))
+      .sort((first, second) => {
+        const comparison = compareCustomers(
+          first.customer,
+          second.customer,
+          sorting.columnId,
+        );
+
+        return comparison === 0
+          ? first.originalIndex - second.originalIndex
+          : comparison * direction;
+      })
+      .map(({ customer }) => customer);
+  }, [filteredCustomers, sorting]);
+
+  const paginatedCustomers = useMemo(() => {
+    const firstRowIndex = pageIndex * pageSize;
+
+    return sortedCustomers.slice(firstRowIndex, firstRowIndex + pageSize);
+  }, [pageIndex, pageSize, sortedCustomers]);
+
+  const customerColumns: DataTableColumn<Customer>[] = [
+    {
+      id: 'name',
+      header: 'Cliente',
+      cell: (customer) => customer.name,
+      sortable: true,
+      priority: 'primary',
+      minWidth: 180,
+    },
+    {
+      id: 'type',
+      header: 'Tipo',
+      cell: (customer) => customer.type,
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 130,
+    },
+    {
+      id: 'email',
+      header: 'Email',
+      cell: (customer) => customer.email,
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 220,
+    },
+    {
+      id: 'phone',
+      header: 'Teléfono',
+      cell: (customer) => customer.phone,
+      sortable: true,
+      priority: 'tertiary',
+      minWidth: 140,
+    },
+    {
+      id: 'address',
+      header: 'Dirección',
+      cell: (customer) => customer.address || 'Sin dirección',
+      sortable: true,
+      priority: 'tertiary',
+      minWidth: 220,
+    },
+  ];
 
   return (
     <>
@@ -192,53 +284,89 @@ export default function CustomersPage() {
               </Button>
             </div>
           </Section>
-        ) : customers.length === 0 ? (
-          <EmptyState
-            title="Sin clientes activos"
-            description="Registra un cliente para comenzar a usarlo en cotizaciones y ventas."
-            action={
-              <Button type="button" onClick={openCreateModal}>
-                Nuevo cliente
-              </Button>
-            }
-          />
         ) : (
           <Section>
-            <Input
-              label="Buscar clientes"
-              type="search"
-              value={search}
-              placeholder="Nombre, email, teléfono o dirección"
-              startAdornment={<Search size={18} />}
-              onChange={(event) => setSearch(event.target.value)}
+            <DataTable
+              caption="Catálogo de clientes"
+              rows={paginatedCustomers}
+              columns={customerColumns}
+              getRowId={(customer) => customer.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                customers.length > 0 ? (
+                  <DataTableToolbar
+                    search={{
+                      value: search,
+                      label: 'Buscar clientes',
+                      placeholder: 'Nombre, email, teléfono o dirección',
+                      onChange: (value) => {
+                        setSearch(value);
+                        setPageIndex(0);
+                      },
+                    }}
+                    actions={
+                      isFiltered ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearch('');
+                            setPageIndex(0);
+                          }}
+                        >
+                          Limpiar búsqueda
+                        </Button>
+                      ) : null
+                    }
+                  />
+                ) : undefined
+              }
+              pagination={
+                customers.length > 0
+                  ? {
+                      pageIndex,
+                      pageSize,
+                      totalRows: sortedCustomers.length,
+                      pageSizeOptions: PAGE_SIZE_OPTIONS,
+                      onPageChange: setPageIndex,
+                      onPageSizeChange: (nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setPageIndex(0);
+                      },
+                    }
+                  : undefined
+              }
+              rowActions={{
+                label: (customer) => `Acciones del cliente ${customer.name}`,
+                actions: [
+                  {
+                    id: 'edit',
+                    label: 'Editar',
+                    onSelect: openEditModal,
+                  },
+                  {
+                    id: 'deactivate',
+                    label: 'Desactivar',
+                    variant: 'destructive',
+                    onSelect: openDeactivateDialog,
+                  },
+                ],
+              }}
+              emptyState={{
+                title: 'Sin clientes activos',
+                description:
+                  'Registra un cliente para comenzar a usarlo en cotizaciones y ventas.',
+              }}
+              filteredEmptyState={{
+                title: 'Sin clientes coincidentes',
+                description: 'No encontramos clientes con esa búsqueda.',
+              }}
+              isFiltered={isFiltered}
             />
-
-            {filteredCustomers.length === 0 ? (
-              <EmptyState
-                title="Sin clientes coincidentes"
-                description="No encontramos clientes con esa búsqueda."
-                action={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setSearch('')}
-                  >
-                    Limpiar búsqueda
-                  </Button>
-                }
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Nombre',
-                  'Email',
-                  'Teléfono',
-                  'Dirección',
-                  'Acciones',
-                ]}
-                data={tableData}
-              />
-            )}
           </Section>
         )}
       </PageContainer>

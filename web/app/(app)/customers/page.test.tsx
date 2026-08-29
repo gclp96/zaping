@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -56,6 +57,17 @@ const hospitalCustomer = {
 
 const customers = [clinicCustomer, hospitalCustomer];
 
+function buildCustomer(index: number) {
+  return {
+    ...clinicCustomer,
+    id: `customer-${index}`,
+    name: `Cliente ${String(index).padStart(2, '0')}`,
+    email: `cliente${index}@test.test`,
+    phone: `662100${String(index).padStart(4, '0')}`,
+    address: `Dirección ${index}`,
+  };
+}
+
 function configureApiMocks(customerData = customers) {
   vi.mocked(api.get).mockResolvedValue({ data: customerData } as never);
   vi.mocked(api.post).mockResolvedValue({ data: clinicCustomer } as never);
@@ -66,6 +78,41 @@ function configureApiMocks(customerData = customers) {
 async function renderCustomersPage() {
   render(<CustomersPage />);
   await screen.findByText(clinicCustomer.name);
+}
+
+async function chooseCustomerAction(
+  user: ReturnType<typeof userEvent.setup>,
+  customerName: string,
+  actionName: 'Editar' | 'Desactivar',
+) {
+  const row = screen
+    .getByText(customerName)
+    .closest('tr');
+
+  if (!row) {
+    throw new Error(`No se encontró la fila de ${customerName}`);
+  }
+
+  await user.click(
+    within(row).getByRole('button', {
+      name: `Acciones del cliente ${customerName}`,
+    }),
+  );
+  await user.click(
+    screen.getByRole('menuitem', {
+      name:
+        actionName === 'Desactivar'
+          ? 'Acción destructiva: Desactivar'
+          : actionName,
+    }),
+  );
+}
+
+function renderedCustomerNames() {
+  return screen.getAllByRole('row').slice(1).map((row) => {
+    const firstCell = within(row).getAllByRole('cell')[0];
+    return firstCell.textContent?.trim();
+  });
 }
 
 async function completeCustomerForm(
@@ -106,6 +153,7 @@ describe('CustomersPage', () => {
 
     expect(screen.getByText('Cargando clientes...')).toBeTruthy();
     expect(await screen.findByText(clinicCustomer.name)).toBeTruthy();
+    expect(screen.getByText(clinicCustomer.type)).toBeTruthy();
     expect(screen.getByText(clinicCustomer.email)).toBeTruthy();
     expect(screen.getByText(clinicCustomer.phone)).toBeTruthy();
     expect(screen.getByText(clinicCustomer.address)).toBeTruthy();
@@ -131,6 +179,85 @@ describe('CustomersPage', () => {
     expect(
       screen.getByText('No encontramos clientes con esa búsqueda.'),
     ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    expect(screen.getByText(clinicCustomer.name)).toBeTruthy();
+  });
+
+  it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {
+    const user = userEvent.setup();
+    const sortingCustomers = [
+      { ...clinicCustomer, id: 'customer-z', name: 'Cliente Z' },
+      { ...hospitalCustomer, id: 'customer-a', name: 'Cliente A' },
+      { ...clinicCustomer, id: 'customer-m', name: 'Cliente M' },
+    ];
+    configureApiMocks(sortingCustomers);
+
+    render(<CustomersPage />);
+    await screen.findByText('Cliente Z');
+
+    const nameHeader = screen.getByRole('button', { name: 'Cliente' });
+
+    await user.click(nameHeader);
+    expect(renderedCustomerNames()).toEqual([
+      'Cliente A',
+      'Cliente M',
+      'Cliente Z',
+    ]);
+
+    await user.click(nameHeader);
+    expect(renderedCustomerNames()).toEqual([
+      'Cliente Z',
+      'Cliente M',
+      'Cliente A',
+    ]);
+
+    await user.click(nameHeader);
+    expect(renderedCustomerNames()).toEqual([
+      'Cliente Z',
+      'Cliente A',
+      'Cliente M',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Tipo' }));
+    expect(renderedCustomerNames()).toEqual([
+      'Cliente Z',
+      'Cliente M',
+      'Cliente A',
+    ]);
+  });
+
+  it('pagina con 25 filas por defecto, permite cambiar tamaño y reinicia la búsqueda', async () => {
+    const user = userEvent.setup();
+    const manyCustomers = Array.from({ length: 30 }, (_, index) =>
+      buildCustomer(index),
+    );
+    configureApiMocks(manyCustomers);
+
+    render(<CustomersPage />);
+    await screen.findByText('Cliente 00');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('Cliente 29')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Cliente 29')).toBeTruthy();
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+    expect(screen.getByText('Cliente 00')).toBeTruthy();
+    expect(screen.queryByText('Cliente 29')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Cliente 10')).toBeTruthy();
+
+    const search = screen.getByRole('searchbox', { name: 'Buscar clientes' });
+    await user.type(search, 'Cliente 29');
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('Cliente 29')).toBeTruthy();
   });
 
   it('muestra un error de carga y permite reintentar', async () => {
@@ -231,11 +358,7 @@ describe('CustomersPage', () => {
     vi.mocked(api.patch).mockResolvedValue({ data: updatedCustomer } as never);
 
     await renderCustomersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Editar cliente ${clinicCustomer.name}`,
-      }),
-    );
+    await chooseCustomerAction(user, clinicCustomer.name, 'Editar');
     const nameInput = screen.getByRole('textbox', { name: 'Nombre' });
     await user.clear(nameInput);
     await user.type(nameInput, updatedCustomer.name);
@@ -267,11 +390,7 @@ describe('CustomersPage', () => {
       .mockResolvedValueOnce({ data: [hospitalCustomer] } as never);
 
     await renderCustomersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Desactivar cliente ${clinicCustomer.name}`,
-      }),
-    );
+    await chooseCustomerAction(user, clinicCustomer.name, 'Desactivar');
 
     expect(
       screen.getByRole('heading', { name: 'Desactivar cliente' }),
@@ -301,11 +420,7 @@ describe('CustomersPage', () => {
     );
 
     await renderCustomersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Desactivar cliente ${clinicCustomer.name}`,
-      }),
-    );
+    await chooseCustomerAction(user, clinicCustomer.name, 'Desactivar');
     await user.click(screen.getByRole('button', { name: 'Desactivar' }));
 
     expect(
