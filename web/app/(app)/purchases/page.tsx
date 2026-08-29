@@ -598,6 +598,41 @@ async function loadPageData() {
       cell: (purchase) => purchase.items.length,
     },
     {
+      id: 'receiptProgress',
+      header: 'Recepción',
+      priority: 'secondary',
+      minWidth: 175,
+      cell: (purchase) => {
+        if (purchase.status === 'DRAFT') {
+          return (
+            <span className="text-sm text-text-muted">
+              Pendiente de aprobación
+            </span>
+          );
+        }
+
+        if (purchase.status === 'CANCELLED') {
+          return <span className="text-sm text-text-muted">No aplica</span>;
+        }
+
+        return (
+          <div
+            aria-label={`Progreso de recepción: ${purchase.receiptProgress.completedLines} de ${purchase.receiptProgress.orderedLines} partidas`}
+            className="flex flex-col"
+          >
+            <span className="font-medium">
+              {purchase.receiptProgress.completedLines} /{' '}
+              {purchase.receiptProgress.orderedLines} partidas
+            </span>
+            <span className="text-xs text-text-muted">
+              {purchase.receiptProgress.receivedUnits} /{' '}
+              {purchase.receiptProgress.orderedUnits} uds.
+            </span>
+          </div>
+        );
+      },
+    },
+    {
       id: 'total',
       header: 'Total',
       sortable: true,

@@ -115,7 +115,7 @@ export class PurchasesService {
   }
 
   async findAll(companyId: string) {
-    return this.prisma.purchase.findMany({
+    const purchases = await this.prisma.purchase.findMany({
       where: {
         companyId,
       },
@@ -130,6 +130,73 @@ export class PurchasesService {
       orderBy: {
         createdAt: 'desc',
       },
+    });
+
+    const purchaseItemIds = purchases.flatMap((purchase) =>
+      purchase.items.map((item) => item.id),
+    );
+
+    const receiptItems =
+      purchaseItemIds.length === 0
+        ? []
+        : await this.prisma.purchaseReceiptItem.findMany({
+            where: {
+              companyId,
+              purchaseItemId: {
+                in: purchaseItemIds,
+              },
+            },
+            select: {
+              purchaseItemId: true,
+              quantityReceived: true,
+            },
+          });
+
+    const receivedByPurchaseItem = new Map<string, number>();
+
+    for (const receiptItem of receiptItems) {
+      const previousQuantity =
+        receivedByPurchaseItem.get(receiptItem.purchaseItemId) ?? 0;
+
+      receivedByPurchaseItem.set(
+        receiptItem.purchaseItemId,
+        previousQuantity + Math.max(receiptItem.quantityReceived, 0),
+      );
+    }
+
+    return purchases.map((purchase) => {
+      let orderedUnits = 0;
+      let receivedUnits = 0;
+      let pendingUnits = 0;
+      let completedLines = 0;
+
+      for (const item of purchase.items) {
+        const orderedQuantity = Math.max(item.quantity, 0);
+        const receivedQuantity = Math.max(
+          receivedByPurchaseItem.get(item.id) ?? 0,
+          0,
+        );
+        const pendingQuantity = Math.max(orderedQuantity - receivedQuantity, 0);
+
+        orderedUnits += orderedQuantity;
+        receivedUnits += receivedQuantity;
+        pendingUnits += pendingQuantity;
+
+        if (receivedQuantity >= orderedQuantity) {
+          completedLines += 1;
+        }
+      }
+
+      return {
+        ...purchase,
+        receiptProgress: {
+          orderedUnits,
+          receivedUnits,
+          pendingUnits,
+          orderedLines: purchase.items.length,
+          completedLines,
+        },
+      };
     });
   }
 

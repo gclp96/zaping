@@ -68,6 +68,21 @@ export default function PurchaseDetailModal({
   const statusDescriptor = purchase
     ? getPurchaseStatusDescriptor(purchase.status)
     : null;
+  const receivedByPurchaseItem = new Map<string, number>();
+
+  for (const receipt of receipts) {
+    for (const receiptItem of receipt.items) {
+      const previousQuantity =
+        receivedByPurchaseItem.get(receiptItem.purchaseItemId) ?? 0;
+
+      receivedByPurchaseItem.set(
+        receiptItem.purchaseItemId,
+        previousQuantity + Math.max(receiptItem.quantityReceived, 0),
+      );
+    }
+  }
+
+  const receiptHistoryReady = receiptHistoryStatus === 'success';
 
   return (
     <Modal
@@ -124,7 +139,15 @@ export default function PurchaseDetailModal({
                   </th>
 
                   <th className="px-3 py-2 text-right">
-                    Cantidad
+                    Pedido
+                  </th>
+
+                  <th className="px-3 py-2 text-right">
+                    Recibido
+                  </th>
+
+                  <th className="px-3 py-2 text-right">
+                    Pendiente
                   </th>
 
                   <th className="px-3 py-2 text-right">
@@ -155,6 +178,22 @@ export default function PurchaseDetailModal({
 
                     <td className="px-3 py-3 text-right">
                       {item.quantity}
+                    </td>
+
+                    <td className="px-3 py-3 text-right">
+                      {receiptHistoryReady
+                        ? receivedByPurchaseItem.get(item.id) ?? 0
+                        : '—'}
+                    </td>
+
+                    <td className="px-3 py-3 text-right">
+                      {receiptHistoryReady
+                        ? Math.max(
+                            item.quantity -
+                              (receivedByPurchaseItem.get(item.id) ?? 0),
+                            0,
+                          )
+                        : '—'}
                     </td>
 
                     <td className="px-3 py-3 text-right">

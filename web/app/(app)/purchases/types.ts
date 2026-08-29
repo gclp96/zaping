@@ -108,6 +108,14 @@ export type PurchaseItem = {
   };
 };
 
+export type PurchaseReceiptProgress = {
+  orderedUnits: number;
+  receivedUnits: number;
+  pendingUnits: number;
+  orderedLines: number;
+  completedLines: number;
+};
+
 export type Purchase = {
   id: string;
   folio: string;
@@ -116,6 +124,7 @@ export type Purchase = {
   iva: number;
   total: number;
   createdAt: string;
+  receiptProgress: PurchaseReceiptProgress;
 
   supplier: {
     id: string;

@@ -57,6 +57,13 @@ const purchase: Purchase = {
   id: 'purchase-1',
   folio: 'OC-0001',
   status: 'CONFIRMED',
+  receiptProgress: {
+    orderedUnits: 10,
+    receivedUnits: 4,
+    pendingUnits: 6,
+    orderedLines: 1,
+    completedLines: 0,
+  },
   subtotal: 1000,
   iva: 160,
   total: 1160,
@@ -506,6 +513,7 @@ describe('PurchasesPage — normalización de lista', () => {
       'Proveedor',
       'Fecha',
       'Partidas',
+      'Recepción',
       'Total',
       'Estado',
       'Acciones',
@@ -530,8 +538,67 @@ describe('PurchasesPage — normalización de lista', () => {
         .getByRole('columnheader', { name: 'Partidas' })
         .classList.contains('md:table-cell'),
     ).toBe(true);
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Recepción' })
+        .classList.contains('sm:table-cell'),
+    ).toBe(true);
     expect(screen.getByText('$1,160.00')).toBeTruthy();
     expect(screen.getByText(/23 jul 2026/i)).toBeTruthy();
+  });
+
+  it('muestra el progreso agregado sin inferir cantidades desde el status', async () => {
+    const confirmedNoReceipts = {
+      ...purchase,
+      receiptProgress: {
+        orderedUnits: 10,
+        receivedUnits: 0,
+        pendingUnits: 10,
+        orderedLines: 1,
+        completedLines: 0,
+      },
+    };
+    const partial = {
+      ...partialPurchase,
+      receiptProgress: {
+        orderedUnits: 15,
+        receivedUnits: 7,
+        pendingUnits: 8,
+        orderedLines: 3,
+        completedLines: 1,
+      },
+    };
+    const complete = {
+      ...receivedPurchase,
+      receiptProgress: {
+        orderedUnits: 10,
+        receivedUnits: 10,
+        pendingUnits: 0,
+        orderedLines: 1,
+        completedLines: 1,
+      },
+    };
+
+    configureApiMocks([
+      confirmedNoReceipts,
+      partial,
+      complete,
+      draftPurchase,
+      cancelledPurchase,
+    ]);
+
+    render(<PurchasesPage />);
+
+    await screen.findAllByText('OC-0001');
+
+    expect(screen.getByText('0 / 1 partidas')).toBeTruthy();
+    expect(screen.getByText('0 / 10 uds.')).toBeTruthy();
+    expect(screen.getByText('1 / 3 partidas')).toBeTruthy();
+    expect(screen.getByText('7 / 15 uds.')).toBeTruthy();
+    expect(screen.getByText('1 / 1 partidas')).toBeTruthy();
+    expect(screen.getByText('10 / 10 uds.')).toBeTruthy();
+    expect(screen.getByText('Pendiente de aprobación')).toBeTruthy();
+    expect(screen.getByText('No aplica')).toBeTruthy();
   });
 
   it('ordena por folio y total usando los valores reales de cada compra', async () => {
@@ -1319,7 +1386,7 @@ describe('PurchasesPage — recepciones', () => {
     ).toBeTruthy();
   });
 
-  it('calcula la cantidad recibida y pendiente al abrir el formulario', async () => {
+it('calcula la cantidad recibida y pendiente al abrir el formulario', async () => {
   const user = userEvent.setup();
 
   render(<PurchasesPage />);
@@ -1382,6 +1449,110 @@ describe('PurchasesPage — recepciones', () => {
 
   expect(quantityInput.getAttribute('min')).toBe('1');
   expect(quantityInput.getAttribute('max')).toBe('6');
+});
+
+it('muestra progreso por partida en cero cuando no hay recepciones', async () => {
+  const user = userEvent.setup();
+  const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (
+      String(url) ===
+      '/purchase-receipts/purchase/purchase-1'
+    ) {
+      return { data: [] } as never;
+    }
+
+    return defaultGet!(url);
+  });
+
+  render(<PurchasesPage />);
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+  const detailTitle = await screen.findByRole('heading', {
+    name: 'Detalle de compra',
+  });
+  const detailModal = detailTitle.parentElement?.parentElement;
+  const itemTable = screen.getByText('Pedido').closest('table');
+
+  expect(detailModal).not.toBeNull();
+  expect(itemTable).not.toBeNull();
+
+  const itemRow = within(itemTable as HTMLTableElement).getAllByRole('row')[1];
+  const itemCells = within(itemRow).getAllByRole('cell');
+
+  expect(itemCells[1].textContent).toBe('10');
+  expect(itemCells[2].textContent).toBe('0');
+  expect(itemCells[3].textContent).toBe('10');
+});
+
+it('mantiene el progreso por purchaseItemId con múltiples recepciones y productos repetidos', async () => {
+  const user = userEvent.setup();
+  const multiLinePurchase = {
+    ...purchase,
+    items: [
+      purchase.items[0],
+      {
+        ...purchase.items[0],
+        id: 'purchase-item-2',
+        quantity: 5,
+        subtotal: 500,
+      },
+    ],
+  };
+  const secondReceipt = {
+    ...previousReceipt,
+    id: 'receipt-2',
+    items: [
+      {
+        ...previousReceipt.items[0],
+        id: 'receipt-item-2',
+        quantityReceived: 1,
+      },
+      {
+        ...previousReceipt.items[0],
+        id: 'receipt-item-3',
+        purchaseItemId: 'purchase-item-2',
+        quantityReceived: 5,
+      },
+    ],
+  };
+  configureApiMocks([multiLinePurchase]);
+  const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    if (
+      String(url) ===
+      '/purchase-receipts/purchase/purchase-1'
+    ) {
+      return { data: [previousReceipt, secondReceipt] } as never;
+    }
+
+    return defaultGet!(url);
+  });
+
+  render(<PurchasesPage />);
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+  await screen.findByRole('heading', { name: 'Detalle de compra' });
+
+  const itemTable = screen.getByText('Pedido').closest('table');
+  expect(itemTable).not.toBeNull();
+
+  const itemRows = within(itemTable as HTMLTableElement)
+    .getAllByRole('row')
+    .slice(1);
+  const firstItemCells = within(itemRows[0]).getAllByRole('cell');
+  const secondItemCells = within(itemRows[1]).getAllByRole('cell');
+
+  expect(firstItemCells[1].textContent).toBe('10');
+  expect(firstItemCells[2].textContent).toBe('5');
+  expect(firstItemCells[3].textContent).toBe('5');
+  expect(secondItemCells[1].textContent).toBe('5');
+  expect(secondItemCells[2].textContent).toBe('5');
+  expect(secondItemCells[3].textContent).toBe('0');
 });
 
 it('muestra un error cuando no se captura ninguna cantidad', async () => {
