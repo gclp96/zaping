@@ -148,6 +148,43 @@ const cancelledQuote: Quote = {
   status: 'CANCELLED',
 };
 
+function buildQuoteList(count: number): Quote[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+    const total = sequence * 100;
+
+    return {
+      ...draftQuote,
+      id: `quote-page-${sequence}`,
+      folio: `COT-${String(sequence).padStart(4, '0')}`,
+      subtotal: total,
+      iva: 0,
+      total,
+      status: sequence % 2 === 0 ? 'CONFIRMED' : 'DRAFT',
+      createdAt: new Date(
+        Date.UTC(2026, 7, sequence, 18, 0, 0),
+      ).toISOString(),
+      updatedAt: new Date(
+        Date.UTC(2026, 7, sequence, 18, 0, 0),
+      ).toISOString(),
+      customer: {
+        ...customer,
+        id: `customer-page-${sequence}`,
+        name: `Cliente ${String(sequence).padStart(3, '0')}`,
+        email: `cliente${sequence}@example.com`,
+      },
+      items: [
+        {
+          ...draftQuote.items[0],
+          id: `quote-item-page-${sequence}`,
+          price: total,
+          subtotal: total,
+        },
+      ],
+    };
+  });
+}
+
 function configureApiMocks(
   quotes: Quote[] = [draftQuote],
 ) {
@@ -255,6 +292,38 @@ describe('QuotesPage', () => {
     ).toBeTruthy();
 
     expect(
+      screen.getByRole('table', { name: 'Listado de cotizaciones' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((header) =>
+        header.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Folio',
+      'Cliente',
+      'Fecha',
+      'Partidas',
+      'Total',
+      'Estado',
+      'Acciones',
+    ]);
+    expect(
+      screen.getByRole('columnheader', { name: 'Folio' }).classList.contains(
+        'hidden',
+      ),
+    ).toBe(false);
+    expect(
+      screen.getByRole('columnheader', { name: 'Fecha' }).classList.contains(
+        'sm:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole('columnheader', { name: 'Partidas' }).classList.contains(
+        'md:table-cell',
+      ),
+    ).toBe(true);
+
+    expect(
       screen.getByText('Hospital de prueba'),
     ).toBeTruthy();
 
@@ -266,6 +335,15 @@ describe('QuotesPage', () => {
 
     expect(
       screen.getByText('$1,160.00'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        new Intl.DateTimeFormat('es-MX', {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        }).format(new Date(draftQuote.createdAt)),
+      ),
     ).toBeTruthy();
 
     expect(api.get).toHaveBeenCalledWith(
@@ -279,6 +357,96 @@ describe('QuotesPage', () => {
     expect(api.get).toHaveBeenCalledWith(
       '/products',
     );
+  });
+
+  it('ordena por folio y total usando el valor real de cada cotización', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([
+      {
+        ...draftQuote,
+        id: 'quote-sort-10',
+        folio: 'COT-0010',
+        total: 10,
+        customer: { ...customer, name: 'Cliente Zeta' },
+      },
+      {
+        ...confirmedQuote,
+        id: 'quote-sort-2',
+        folio: 'COT-0002',
+        total: 200,
+        customer: { ...customer, name: 'Cliente Alfa' },
+      },
+      {
+        ...cancelledQuote,
+        id: 'quote-sort-1',
+        folio: 'COT-0001',
+        total: 100,
+        customer: { ...customer, name: 'Cliente Medio' },
+      },
+    ]);
+
+    render(<QuotesPage />);
+    await screen.findByText('COT-0010');
+
+    const folioHeader = screen.getByRole('columnheader', {
+      name: 'Folio',
+    });
+    await user.click(
+      within(folioHeader).getByRole('button', { name: 'Folio' }),
+    );
+
+    expect(folioHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['COT-0001', 'COT-0002', 'COT-0010']);
+
+    await user.click(screen.getByRole('button', { name: 'Total' }));
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['COT-0010', 'COT-0001', 'COT-0002']);
+  });
+
+  it('pagina 30 cotizaciones y reinicia al cambiar filtro, tamaño y búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks(buildQuoteList(30));
+
+    render(<QuotesPage />);
+    await screen.findByText('COT-0001');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('COT-0026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'CONFIRMED',
+    );
+    expect(screen.getByText('Mostrando 1-15 de 15')).toBeTruthy();
+    expect(screen.getByText('COT-0002')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar cotizaciones' }),
+      'COT-0030',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('COT-0030')).toBeTruthy();
   });
 
   it('busca por folio, cliente, email y producto, y muestra vacío contextual', async () => {

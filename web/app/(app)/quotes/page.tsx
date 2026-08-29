@@ -7,11 +7,15 @@ import StatusBadge from '@/app/components/business/StatusBadge';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type DataTableSelectFilter,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
 import Modal from '@/app/components/ui/Modal';
-import Table from '@/app/components/ui/Table';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
@@ -20,6 +24,7 @@ import CustomerFormModal from '@/app/components/business/CustomerForm';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 
 import QuoteDetailModal from './components/QuoteDetailModal';
 import QuoteFormModal from './components/QuoteFormModal';
@@ -71,6 +76,14 @@ const dateFormatter = new Intl.DateTimeFormat(
   },
 );
 
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const quoteCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
 function formatMoney(value: number): string {
   return moneyFormatter.format(value);
 }
@@ -96,6 +109,43 @@ function quoteMatchesSearch(quote: Quote, search: string): boolean {
   return values.some((value) =>
     value?.toLocaleLowerCase('es-MX').includes(normalizedSearch),
   );
+}
+
+function compareQuotes(
+  first: Quote,
+  second: Quote,
+  columnId: string,
+) {
+  if (columnId === 'date') {
+    return (
+      new Date(first.createdAt).getTime() -
+      new Date(second.createdAt).getTime()
+    );
+  }
+
+  if (columnId === 'total') {
+    return first.total - second.total;
+  }
+
+  if (columnId === 'folio') {
+    return quoteCollator.compare(first.folio, second.folio);
+  }
+
+  if (columnId === 'customer') {
+    return quoteCollator.compare(
+      first.customer.name,
+      second.customer.name,
+    );
+  }
+
+  if (columnId === 'status') {
+    return quoteCollator.compare(
+      getQuoteStatusDescriptor(first.status).label,
+      getQuoteStatusDescriptor(second.status).label,
+    );
+  }
+
+  return 0;
 }
 
 export default function QuotesPage() {
@@ -125,12 +175,16 @@ export default function QuotesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('ALL');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   async function loadQuotes() {
     const response =
       await api.get<Quote[]>('/quotes');
 
     setQuotes(response.data);
+    setPageIndex(0);
   }
 
   const {
@@ -174,6 +228,22 @@ export default function QuotesPage() {
       ),
     [quotes, search, statusFilter],
   );
+
+  const sortedQuotes = useMemo(() => {
+    if (!sorting) {
+      return filteredQuotes;
+    }
+
+    return stableSort(
+      filteredQuotes,
+      (first, second) => compareQuotes(first, second, sorting.columnId),
+      sorting.direction,
+    );
+  }, [filteredQuotes, sorting]);
+
+  const paginatedQuotes = useMemo(() => {
+    return paginateRows(sortedQuotes, pageIndex, pageSize);
+  }, [pageIndex, pageSize, sortedQuotes]);
 
   const {
     openModal,
@@ -230,6 +300,7 @@ export default function QuotesPage() {
       setQuotes(quotesResponse.data);
       setCustomers(customersResponse.data);
       setProducts(productsResponse.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
 
@@ -257,6 +328,7 @@ export default function QuotesPage() {
   function clearFilters() {
     setSearch('');
     setStatusFilter('ALL');
+    setPageIndex(0);
   }
 
   const actionErrorHasModal = Boolean(
@@ -267,85 +339,68 @@ export default function QuotesPage() {
       createdSale,
   );
 
-  const tableData = filteredQuotes.map((quote) => {
-    const statusDescriptor =
-      getQuoteStatusDescriptor(quote.status);
+  function renderQuoteActions(quote: Quote) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          className="min-w-24"
+          onClick={() => {
+            clearActionError();
+            setQuoteToView(quote);
+          }}
+        >
+          Ver detalle
+        </Button>
 
-    return {
-      folio: quote.folio,
+        {quote.status === 'DRAFT' ? (
+          <>
+            <Button
+              variant="success"
+              size="sm"
+              onClick={() => openApproveDialog(quote)}
+            >
+              Aprobar
+            </Button>
 
-      customer: quote.customer.name,
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => openCancelDialog(quote)}
+            >
+              Cancelar
+            </Button>
+          </>
+        ) : null}
 
-      date: formatDate(quote.createdAt),
+        <Button
+          variant="primary"
+          size="sm"
+          className="min-w-24"
+          loading={downloadingQuoteId === quote.id}
+          loadingText="Descargando..."
+          onClick={() => void handleDownloadPdf(quote)}
+        >
+          Descargar PDF
+        </Button>
+      </div>
+    );
+  }
 
-      items: quote.items.length,
-
-      total: formatMoney(quote.total),
-
-      status: (
-        <StatusBadge
-          label={statusDescriptor.label}
-          tone={statusDescriptor.tone}
-          ariaLabel={`Estado de la cotización: ${statusDescriptor.label}`}
-        />
-      ),
-
-      actions: (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="min-w-24"
-            onClick={() => {
-              clearActionError();
-              setQuoteToView(quote);
-            }}
-          >
-            Ver detalle
-          </Button>
-
-          {quote.status === 'DRAFT' ? (
-            <>
-              <Button
-                variant="success"
-                size="sm"
-                onClick={() =>
-                  openApproveDialog(quote)
-                }
-              >
-                Aprobar
-              </Button>
-
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() =>
-                  openCancelDialog(quote)
-                }
-              >
-                Cancelar
-              </Button>
-            </>
-          ) : null}
-
-          <Button
-            variant="primary"
-            size="sm"
-            className="min-w-24"
-            loading={
-              downloadingQuoteId === quote.id
-            }
-            loadingText="Descargando..."
-            onClick={() =>
-              void handleDownloadPdf(quote)
-            }
-          >
-            Descargar PDF
-          </Button>
-        </div>
-      ),
-    };
-  });
+  const quoteTableFilters: DataTableSelectFilter[] = [
+    {
+      id: 'status',
+      label: 'Estado',
+      value: statusFilter === 'ALL' ? '' : statusFilter,
+      options: statusFilterOptions.filter((option) => option.value !== 'ALL'),
+      placeholder: 'Todos',
+      onChange: (value) => {
+        setStatusFilter(value ? (value as QuoteStatus) : 'ALL');
+        setPageIndex(0);
+      },
+    },
+  ];
 
   return (
     <>
@@ -407,63 +462,127 @@ export default function QuotesPage() {
           />
         ) : (
           <Section>
-            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-              <Input
-                label="Buscar cotizaciones"
-                type="search"
-                value={search}
-                placeholder="Folio, cliente, email, SKU o producto"
-                onChange={(event) => setSearch(event.target.value)}
-              />
+            <DataTable
+              caption="Listado de cotizaciones"
+              rows={paginatedQuotes}
+              columns={[
+                {
+                  id: 'folio',
+                  header: 'Folio',
+                  cell: (quote) => (
+                    <span className="font-semibold text-gray-900">
+                      {quote.folio}
+                    </span>
+                  ),
+                  sortable: true,
+                  priority: 'primary',
+                  minWidth: 125,
+                },
+                {
+                  id: 'customer',
+                  header: 'Cliente',
+                  cell: (quote) => quote.customer.name,
+                  sortable: true,
+                  priority: 'primary',
+                  minWidth: 200,
+                },
+                {
+                  id: 'date',
+                  header: 'Fecha',
+                  cell: (quote) => formatDate(quote.createdAt),
+                  sortable: true,
+                  priority: 'secondary',
+                  minWidth: 130,
+                },
+                {
+                  id: 'items',
+                  header: 'Partidas',
+                  cell: (quote) => quote.items.length,
+                  priority: 'tertiary',
+                  minWidth: 100,
+                },
+                {
+                  id: 'total',
+                  header: 'Total',
+                  cell: (quote) => formatMoney(quote.total),
+                  sortable: true,
+                  priority: 'secondary',
+                  minWidth: 130,
+                },
+                {
+                  id: 'status',
+                  header: 'Estado',
+                  cell: (quote) => {
+                    const statusDescriptor =
+                      getQuoteStatusDescriptor(quote.status);
 
-              <div className="flex w-full flex-col gap-2">
-                <label
-                  htmlFor="quotes-status-filter"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Estado
-                </label>
-                <select
-                  id="quotes-status-filter"
-                  value={statusFilter}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as StatusFilter)
+                    return (
+                      <StatusBadge
+                        label={statusDescriptor.label}
+                        tone={statusDescriptor.tone}
+                        ariaLabel={`Estado de la cotización: ${statusDescriptor.label}`}
+                      />
+                    );
+                  },
+                  sortable: true,
+                  priority: 'primary',
+                  minWidth: 125,
+                },
+                {
+                  id: 'actions',
+                  header: 'Acciones',
+                  cell: renderQuoteActions,
+                  priority: 'primary',
+                  minWidth: 330,
+                },
+              ] satisfies DataTableColumn<Quote>[]}
+              getRowId={(quote) => quote.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                <DataTableToolbar
+                  search={{
+                    value: search,
+                    label: 'Buscar cotizaciones',
+                    placeholder: 'Folio, cliente, email, SKU o producto',
+                    onChange: (value) => {
+                      setSearch(value);
+                      setPageIndex(0);
+                    },
+                  }}
+                  filters={quoteTableFilters}
+                  onReset={clearFilters}
+                  resetDisabled={
+                    !Boolean(search.trim() || statusFilter !== 'ALL')
                   }
-                >
-                  {statusFilterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {filteredQuotes.length === 0 ? (
-              <EmptyState
-                title="No se encontraron cotizaciones"
-                description="No hay cotizaciones que coincidan con la búsqueda y el estado seleccionados."
-                action={
-                  <Button type="button" variant="outline" onClick={clearFilters}>
-                    Limpiar filtros
-                  </Button>
-                }
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Folio',
-                  'Cliente',
-                  'Fecha',
-                  'Partidas',
-                  'Total',
-                  'Estado',
-                  'Acciones',
-                ]}
-                data={tableData}
-              />
-            )}
+                />
+              }
+              pagination={{
+                pageIndex,
+                pageSize,
+                totalRows: sortedQuotes.length,
+                pageSizeOptions: PAGE_SIZE_OPTIONS,
+                onPageChange: setPageIndex,
+                onPageSizeChange: (nextPageSize) => {
+                  setPageSize(nextPageSize);
+                  setPageIndex(0);
+                },
+              }}
+              emptyState={{
+                title: 'No hay cotizaciones registradas',
+                description: 'Comienza creando tu primera cotización.',
+              }}
+              filteredEmptyState={{
+                title: 'No se encontraron cotizaciones',
+                description:
+                  'No hay cotizaciones que coincidan con la búsqueda y el estado seleccionados.',
+              }}
+              isFiltered={Boolean(
+                search.trim() || statusFilter !== 'ALL',
+              )}
+            />
           </Section>
         )}
       </PageContainer>
