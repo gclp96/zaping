@@ -196,6 +196,9 @@ describe('usePurchaseDetail', () => {
 
     expect(result.current.movementsError).toBe('');
     expect(result.current.receiptsError).toBe('');
+    expect(result.current.receiptHistoryStatus).toBe(
+      'idle',
+    );
   });
 
   it('carga los movimientos y recepciones de una compra', async () => {
@@ -241,6 +244,9 @@ describe('usePurchaseDetail', () => {
 
     expect(result.current.movementsError).toBe('');
     expect(result.current.receiptsError).toBe('');
+    expect(result.current.receiptHistoryStatus).toBe(
+      'success',
+    );
   });
 
   it('activa los estados de carga mientras obtiene el detalle', async () => {
@@ -309,6 +315,9 @@ describe('usePurchaseDetail', () => {
 
     expect(result.current.receiptsLoading).toBe(
       true,
+    );
+    expect(result.current.receiptHistoryStatus).toBe(
+      'loading',
     );
 
     await act(async () => {
@@ -442,10 +451,72 @@ describe('usePurchaseDetail', () => {
     expect(result.current.receiptsError).toBe(
       'No fue posible cargar las recepciones de la compra.',
     );
+    expect(result.current.receiptHistoryStatus).toBe(
+      'error',
+    );
 
     expect(consoleErrorSpy).toHaveBeenCalledTimes(
       1,
     );
+  });
+
+  it('reintenta sólo el historial y vuelve a marcarlo como disponible', async () => {
+    let receiptRequests = 0;
+
+    vi.mocked(api.get).mockImplementation(
+      async (url) => {
+        const endpoint = String(url);
+
+        if (
+          endpoint ===
+          '/purchases/purchase-1/inventory-movements'
+        ) {
+          return { data: [] } as never;
+        }
+
+        if (
+          endpoint ===
+          '/purchase-receipts/purchase/purchase-1'
+        ) {
+          receiptRequests += 1;
+
+          if (receiptRequests === 1) {
+            throw new Error('Error temporal');
+          }
+
+          return { data: [purchaseReceipt] } as never;
+        }
+
+        throw new Error(
+          `Solicitud GET no configurada: ${endpoint}`,
+        );
+      },
+    );
+
+    const { result } = renderHook(() =>
+      usePurchaseDetail(),
+    );
+
+    await act(async () => {
+      await result.current.openPurchaseDetail(purchase);
+    });
+
+    expect(result.current.receiptHistoryStatus).toBe(
+      'error',
+    );
+    expect(result.current.purchaseReceipts).toEqual([]);
+
+    await act(async () => {
+      await result.current.retryPurchaseReceipts();
+    });
+
+    expect(receiptRequests).toBe(2);
+    expect(result.current.receiptHistoryStatus).toBe(
+      'success',
+    );
+    expect(result.current.purchaseReceipts).toEqual([
+      purchaseReceipt,
+    ]);
   });
 
   it('cierra el detalle y limpia los datos cargados', async () => {
@@ -479,5 +550,8 @@ describe('usePurchaseDetail', () => {
 
     expect(result.current.movementsError).toBe('');
     expect(result.current.receiptsError).toBe('');
+    expect(result.current.receiptHistoryStatus).toBe(
+      'idle',
+    );
   });
 });

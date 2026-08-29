@@ -1,11 +1,14 @@
 import Link from 'next/link';
 
+import Button from '@/app/components/ui/Button';
+
 import type { PurchaseReceipt } from '../types';
 
 type PurchaseReceiptsHistoryProps = {
   receipts: PurchaseReceipt[];
   loading: boolean;
   error: string;
+  onRetry: () => void;
   formatDate: (value: string) => string;
   formatMoney: (value: number) => string;
 };
@@ -14,6 +17,7 @@ export default function PurchaseReceiptsHistory({
   receipts,
   loading,
   error,
+  onRetry,
   formatDate,
   formatMoney,
 }: PurchaseReceiptsHistoryProps) {
@@ -28,9 +32,27 @@ export default function PurchaseReceiptsHistory({
           Cargando recepciones...
         </p>
       ) : error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
+        <div
+          role="alert"
+          className="space-y-3 text-sm text-red-600"
+        >
+          <p>
+            No pudimos verificar las recepciones anteriores.
+            Vuelve a intentarlo antes de registrar una nueva
+            recepción.
+          </p>
+
+          <p>{error}</p>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+          >
+            Reintentar recepciones
+          </Button>
+        </div>
       ) : receipts.length === 0 ? (
         <p className="text-sm text-gray-500">
           Esta compra todavía no tiene recepciones registradas.

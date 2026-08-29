@@ -9,6 +9,12 @@ import type {
   PurchaseReceipt,
 } from '../types';
 
+export type PurchaseReceiptHistoryStatus =
+  | 'idle'
+  | 'loading'
+  | 'success'
+  | 'error';
+
 export function usePurchaseDetail() {
   const [purchaseToView, setPurchaseToView] =
     useState<Purchase | null>(null);
@@ -25,6 +31,9 @@ export function usePurchaseDetail() {
   const [receiptsError, setReceiptsError] =
     useState('');
 
+  const [receiptHistoryStatus, setReceiptHistoryStatus] =
+    useState<PurchaseReceiptHistoryStatus>('idle');
+
   const [movementsLoading, setMovementsLoading] =
     useState(false);
 
@@ -37,6 +46,7 @@ export function usePurchaseDetail() {
 
     setPurchaseReceipts([]);
     setReceiptsError('');
+    setReceiptHistoryStatus('idle');
   }
 
   function closePurchaseDetail() {
@@ -52,6 +62,7 @@ export function usePurchaseDetail() {
 
     setMovementsLoading(true);
     setReceiptsLoading(true);
+    setReceiptHistoryStatus('loading');
 
     const [movementsResult, receiptsResult] =
       await Promise.allSettled([
@@ -85,6 +96,7 @@ export function usePurchaseDetail() {
       setPurchaseReceipts(
         receiptsResult.value.data,
       );
+      setReceiptHistoryStatus('success');
     } else {
       const error: unknown =
         receiptsResult.reason;
@@ -97,10 +109,42 @@ export function usePurchaseDetail() {
           'No fue posible cargar las recepciones de la compra.',
         ),
       );
+      setReceiptHistoryStatus('error');
     }
 
     setMovementsLoading(false);
     setReceiptsLoading(false);
+  }
+
+  async function retryPurchaseReceipts() {
+    if (!purchaseToView) {
+      return;
+    }
+
+    setReceiptsLoading(true);
+    setReceiptsError('');
+    setReceiptHistoryStatus('loading');
+
+    try {
+      const response = await api.get<PurchaseReceipt[]>(
+        `/purchase-receipts/purchase/${purchaseToView.id}`,
+      );
+
+      setPurchaseReceipts(response.data);
+      setReceiptHistoryStatus('success');
+    } catch (error: unknown) {
+      console.error(error);
+
+      setReceiptsError(
+        getApiErrorMessage(
+          error,
+          'No fue posible cargar las recepciones de la compra.',
+        ),
+      );
+      setReceiptHistoryStatus('error');
+    } finally {
+      setReceiptsLoading(false);
+    }
   }
 
   return {
@@ -110,11 +154,13 @@ export function usePurchaseDetail() {
 
     receiptsLoading,
     receiptsError,
+    receiptHistoryStatus,
 
     movementsLoading,
     movementsError,
 
     openPurchaseDetail,
     closePurchaseDetail,
+    retryPurchaseReceipts,
   };
 }

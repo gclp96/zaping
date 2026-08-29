@@ -114,6 +114,7 @@ function setupHook(
   purchaseReceipts: PurchaseReceipt[] = [
     previousReceipt,
   ],
+  receiptHistoryReady = true,
 ) {
   const onReceiptCreated = vi
     .fn()
@@ -122,6 +123,7 @@ function setupHook(
   const hook = renderHook(() =>
     usePurchaseReceipts({
       purchaseReceipts,
+      receiptHistoryReady,
       onReceiptCreated,
     }),
   );
@@ -152,6 +154,23 @@ describe('usePurchaseReceipts', () => {
     consoleErrorSpy.mockRestore();
     vi.restoreAllMocks();
     cleanup();
+  });
+
+  it('no abre la recepción si el historial no está disponible', () => {
+    const { result } = setupHook([], false);
+
+    let opened = true;
+
+    act(() => {
+      opened = result.current.openReceiptModal(purchase);
+    });
+
+    expect(opened).toBe(false);
+    expect(result.current.purchaseToReceive).toBeNull();
+    expect(result.current.receiptFormItems).toEqual([]);
+    expect(
+      globalThis.crypto.randomUUID,
+    ).not.toHaveBeenCalled();
   });
 
   it('inicia con el formulario cerrado y vacío', () => {

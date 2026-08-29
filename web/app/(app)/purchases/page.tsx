@@ -259,11 +259,13 @@ const {
   purchaseReceipts,
   receiptsLoading,
   receiptsError,
+  receiptHistoryStatus,
   movementsLoading,
   movementsError,
 
   openPurchaseDetail,
   closePurchaseDetail,
+  retryPurchaseReceipts,
 } = usePurchaseDetail();
 
   //propiedades del formulario
@@ -317,6 +319,7 @@ const {
   handleCreateReceipt,
   } = usePurchaseReceipts({
     purchaseReceipts,
+    receiptHistoryReady: receiptHistoryStatus === 'success',
     onReceiptCreated: loadPurchases,
   });
 
@@ -760,6 +763,7 @@ async function loadPageData() {
           receipts={purchaseReceipts}
           receiptsLoading={receiptsLoading}
           receiptsError={receiptsError}
+          receiptHistoryStatus={receiptHistoryStatus}
           movements={inventoryMovements}
           movementsLoading={movementsLoading}
           movementsError={movementsError}
@@ -784,9 +788,11 @@ async function loadPageData() {
             closePurchaseDetailWithUrlCleanup();
           }}
           onReceive={(purchase) => {
-            openReceiptModal(purchase);
-            closePurchaseDetailWithUrlCleanup();
+            if (openReceiptModal(purchase)) {
+              closePurchaseDetailWithUrlCleanup();
+            }
           }}
+          onRetryReceipts={() => void retryPurchaseReceipts()}
           onDownload={(purchase) => {
             void handleDownloadPdf(purchase);
           }}

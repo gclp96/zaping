@@ -355,6 +355,51 @@ describe('PurchasesPage — navegación trazable', () => {
     expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
   });
 
+  it.each([
+    ['DRAFT', false],
+    ['CONFIRMED', true],
+    ['PARTIALLY_RECEIVED', true],
+    ['RECEIVED', false],
+    ['CANCELLED', false],
+  ] as const)(
+    'conserva la regla de recepción para el estado %s',
+    async (status, canReceive) => {
+      const user = userEvent.setup();
+      const statusPurchase = {
+        ...purchase,
+        status,
+      };
+
+      configureApiMocks([statusPurchase]);
+      render(<PurchasesPage />);
+
+      await screen.findByText(statusPurchase.folio);
+      await user.click(
+        screen.getByRole('button', { name: 'Ver detalle' }),
+      );
+
+      const detailTitle = await screen.findByRole('heading', {
+        name: 'Detalle de compra',
+      });
+      const detailModal = detailTitle.parentElement?.parentElement;
+
+      expect(detailModal).not.toBeNull();
+
+      const receiveButton = within(
+        detailModal as HTMLElement,
+      ).queryByRole('button', { name: 'Registrar recepción' });
+
+      if (canReceive) {
+        expect(receiveButton).not.toBeNull();
+        expect(
+          (receiveButton as HTMLButtonElement).disabled,
+        ).toBe(false);
+      } else {
+        expect(receiveButton).toBeNull();
+      }
+    },
+  );
+
   it('mantiene la lista usable cuando purchaseId no pertenece a una compra cargada', async () => {
     const user = userEvent.setup();
     routerMock.search = 'purchaseId=purchase-missing';
@@ -801,6 +846,113 @@ describe('PurchasesPage — recepciones', () => {
     consoleErrorSpy.mockRestore();
     vi.restoreAllMocks();
     cleanup();
+  });
+
+  it('deshabilita Registrar recepción mientras carga el historial', async () => {
+    const user = userEvent.setup();
+    let resolveReceipts: ((value: unknown) => void) | undefined;
+    const receiptsPromise = new Promise((resolve) => {
+      resolveReceipts = resolve;
+    });
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation((url) => {
+      if (
+        String(url) ===
+        '/purchase-receipts/purchase/purchase-1'
+      ) {
+        return receiptsPromise as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+    const detailTitle = await screen.findByRole('heading', {
+      name: 'Detalle de compra',
+    });
+    const detailModal = detailTitle.parentElement?.parentElement;
+    const receiveButton = within(
+      detailModal as HTMLElement,
+    ).getByRole('button', { name: 'Registrar recepción' });
+
+    expect((receiveButton as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      within(detailModal as HTMLElement).getByText(
+        'Cargando recepciones...',
+      ),
+    ).toBeTruthy();
+
+    resolveReceipts?.({ data: [previousReceipt] });
+
+    await waitFor(() => {
+      expect((receiveButton as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
+
+  it('bloquea la recepción si falla el historial y permite reintentar', async () => {
+    const user = userEvent.setup();
+    let receiptRequests = 0;
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (
+        String(url) ===
+        '/purchase-receipts/purchase/purchase-1'
+      ) {
+        receiptRequests += 1;
+
+        if (receiptRequests === 1) {
+          throw new Error('Error temporal');
+        }
+
+        return { data: [previousReceipt] } as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+    const detailTitle = await screen.findByRole('heading', {
+      name: 'Detalle de compra',
+    });
+    const detailModal = detailTitle.parentElement?.parentElement;
+    const detailScope = within(detailModal as HTMLElement);
+    const receiveButton = detailScope.getByRole('button', {
+      name: 'Registrar recepción',
+    });
+
+    expect(
+      await detailScope.findByText(
+        'No pudimos verificar las recepciones anteriores. Vuelve a intentarlo antes de registrar una nueva recepción.',
+      ),
+    ).toBeTruthy();
+    expect((receiveButton as HTMLButtonElement).disabled).toBe(true);
+
+    await user.click(
+      detailScope.getByRole('button', {
+        name: 'Reintentar recepciones',
+      }),
+    );
+
+    await waitFor(() => {
+      expect(receiptRequests).toBe(2);
+      expect((receiveButton as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    await user.click(receiveButton);
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
   });
 
   it('calcula la cantidad recibida y pendiente al abrir el formulario', async () => {

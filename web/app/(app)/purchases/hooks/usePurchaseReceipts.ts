@@ -13,11 +13,13 @@ import type {
 
 type UsePurchaseReceiptsParams = {
   purchaseReceipts: PurchaseReceipt[];
+  receiptHistoryReady: boolean;
   onReceiptCreated: () => Promise<void>;
 };
 
 export function usePurchaseReceipts({
   purchaseReceipts,
+  receiptHistoryReady,
   onReceiptCreated,
 }: UsePurchaseReceiptsParams) {
   const [purchaseToReceive, setPurchaseToReceive] =
@@ -51,7 +53,11 @@ export function usePurchaseReceipts({
     setCreatedReceipt(null);
   }
 
-  function openReceiptModal(purchase: Purchase) {
+  function openReceiptModal(purchase: Purchase): boolean {
+    if (!receiptHistoryReady) {
+      return false;
+    }
+
     const formItems: PurchaseReceiptFormItem[] =
       purchase.items
         .map((purchaseItem) => {
@@ -111,6 +117,8 @@ export function usePurchaseReceipts({
     setReceiptNotes('');
     setReceiptFormError('');
     setReceiptIdempotencyKey(crypto.randomUUID());
+
+    return true;
   }
 
   function closeReceiptModal() {

@@ -6,6 +6,7 @@ import {
   canRegisterPurchaseReceipt,
   getPurchaseStatusDescriptor,
 } from '../purchase-status';
+import type { PurchaseReceiptHistoryStatus } from '../hooks/usePurchaseDetail';
 
 import type {
   InventoryMovement,
@@ -22,6 +23,7 @@ type PurchaseDetailModalProps = {
   receipts: PurchaseReceipt[];
   receiptsLoading: boolean;
   receiptsError: string;
+  receiptHistoryStatus: PurchaseReceiptHistoryStatus;
 
   movements: InventoryMovement[];
   movementsLoading: boolean;
@@ -38,6 +40,7 @@ type PurchaseDetailModalProps = {
   onApprove: (purchase: Purchase) => void;
   onCancel: (purchase: Purchase) => void;
   onReceive: (purchase: Purchase) => void;
+  onRetryReceipts: () => void;
   onDownload: (purchase: Purchase) => void;
 };
 
@@ -46,6 +49,7 @@ export default function PurchaseDetailModal({
   receipts,
   receiptsLoading,
   receiptsError,
+  receiptHistoryStatus,
   movements,
   movementsLoading,
   movementsError,
@@ -58,6 +62,7 @@ export default function PurchaseDetailModal({
   onApprove,
   onCancel,
   onReceive,
+  onRetryReceipts,
   onDownload,
 }: PurchaseDetailModalProps) {
   const statusDescriptor = purchase
@@ -169,6 +174,7 @@ export default function PurchaseDetailModal({
             receipts={receipts}
             loading={receiptsLoading}
             error={receiptsError}
+            onRetry={onRetryReceipts}
             formatDate={formatDate}
             formatMoney={formatMoney}
           />
@@ -237,6 +243,7 @@ export default function PurchaseDetailModal({
               <Button
                 variant="success"
                 className="min-w-44"
+                disabled={receiptHistoryStatus !== 'success'}
                 onClick={() => onReceive(purchase)}
               >
                 Registrar recepción
