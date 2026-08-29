@@ -134,6 +134,45 @@ const cancelledPurchase: Purchase = {
   status: 'CANCELLED',
 };
 
+function buildPurchaseList(count: number): Purchase[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+    const timestamp = new Date(
+      Date.UTC(2026, 6, sequence, 18, 0, 0),
+    ).toISOString();
+    const isConfirmed = sequence % 2 === 0;
+
+    return {
+      ...purchase,
+      id: `purchase-page-${sequence}`,
+      folio: `OC-${String(sequence).padStart(4, '0')}`,
+      subtotal: sequence * 100,
+      iva: 0,
+      total: sequence * 100,
+      status: isConfirmed ? 'CONFIRMED' : 'DRAFT',
+      createdAt: timestamp,
+      supplier: isConfirmed
+        ? {
+            ...supplier,
+            id: 'supplier-2',
+            name: 'Proveedor alterno',
+          }
+        : {
+            ...supplier,
+            id: 'supplier-1',
+          },
+      items: [
+        {
+          ...purchase.items[0],
+          id: `purchase-item-page-${sequence}`,
+          price: sequence * 100,
+          subtotal: sequence * 100,
+        },
+      ],
+    };
+  });
+}
+
 
 const supplier = {
   id: 'supplier-1',
@@ -385,6 +424,144 @@ describe('PurchasesPage — normalización de lista', () => {
     await user.clear(search);
     await user.type(search, 'sin coincidencias');
     expect(screen.getByText('No se encontraron compras')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText(purchase.folio)).toBeTruthy();
+  });
+
+  it('renderiza las columnas reales y sus prioridades responsive', async () => {
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+
+    expect(
+      screen.getByRole('table', { name: 'Listado de compras' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((header) =>
+        header.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Folio',
+      'Proveedor',
+      'Fecha',
+      'Partidas',
+      'Total',
+      'Estado',
+      'Acciones',
+    ]);
+    expect(
+      screen.getByRole('columnheader', { name: 'Folio' }).classList.contains(
+        'hidden',
+      ),
+    ).toBe(false);
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Proveedor' })
+        .classList.contains('hidden'),
+    ).toBe(false);
+    expect(
+      screen.getByRole('columnheader', { name: 'Fecha' }).classList.contains(
+        'sm:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Partidas' })
+        .classList.contains('md:table-cell'),
+    ).toBe(true);
+    expect(screen.getByText('$1,160.00')).toBeTruthy();
+    expect(screen.getByText(/23 jul 2026/i)).toBeTruthy();
+  });
+
+  it('ordena por folio y total usando los valores reales de cada compra', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([
+      {
+        ...purchase,
+        id: 'purchase-sort-10',
+        folio: 'OC-0010',
+        total: 10,
+        supplier: { ...supplier, name: 'Proveedor Zeta' },
+      },
+      {
+        ...confirmedFilterPurchase,
+        id: 'purchase-sort-2',
+        folio: 'OC-0002',
+        total: 200,
+        supplier: { ...supplier, name: 'Proveedor Alfa' },
+      },
+      {
+        ...partialPurchase,
+        id: 'purchase-sort-1',
+        folio: 'OC-0001',
+        total: 100,
+        supplier: { ...partialPurchase.supplier, name: 'Proveedor Medio' },
+      },
+    ]);
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0010');
+
+    const folioHeader = screen.getByRole('columnheader', {
+      name: 'Folio',
+    });
+    await user.click(
+      within(folioHeader).getByRole('button', { name: 'Folio' }),
+    );
+
+    expect(folioHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['OC-0001', 'OC-0002', 'OC-0010']);
+
+    await user.click(screen.getByRole('button', { name: 'Total' }));
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['OC-0010', 'OC-0001', 'OC-0002']);
+  });
+
+  it('pagina 30 compras y reinicia página al cambiar filtro, tamaño y búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks(buildPurchaseList(30));
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('OC-0026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'CONFIRMED',
+    );
+    expect(screen.getByText('Mostrando 1-15 de 15')).toBeTruthy();
+    expect(screen.getByText('OC-0002')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar compras' }),
+      'OC-0030',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('OC-0030')).toBeTruthy();
   });
 
   it('combina los cinco estados reales con el proveedor derivado y limpia filtros', async () => {

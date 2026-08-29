@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 import { getPurchaseStatusDescriptor } from './purchase-status';
@@ -31,10 +32,14 @@ import type {
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type DataTableSelectFilter,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
-import Table from '@/app/components/ui/Table';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
@@ -69,6 +74,13 @@ const statusFilterOptions: Array<{
 const moneyFormatter = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'MXN',
+});
+
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const purchaseCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
 });
 
 function formatMoney(value: number): string {
@@ -124,6 +136,47 @@ function purchaseMatchesSearch(
   );
 }
 
+function comparePurchases(
+  first: Purchase,
+  second: Purchase,
+  columnId: string,
+): number {
+  if (columnId === 'date') {
+    return (
+      new Date(first.createdAt).getTime() -
+      new Date(second.createdAt).getTime()
+    );
+  }
+
+  if (columnId === 'items') {
+    return first.items.length - second.items.length;
+  }
+
+  if (columnId === 'total') {
+    return first.total - second.total;
+  }
+
+  if (columnId === 'folio') {
+    return purchaseCollator.compare(first.folio, second.folio);
+  }
+
+  if (columnId === 'supplier') {
+    return purchaseCollator.compare(
+      first.supplier.name,
+      second.supplier.name,
+    );
+  }
+
+  if (columnId === 'status') {
+    return purchaseCollator.compare(
+      getPurchaseStatusDescriptor(first.status).label,
+      getPurchaseStatusDescriptor(second.status).label,
+    );
+  }
+
+  return 0;
+}
+
 function PurchasesPageContent() {
 
 const router = useRouter();
@@ -141,10 +194,14 @@ const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] =
   useState<StatusFilter>('ALL');
 const [supplierFilter, setSupplierFilter] = useState('ALL');
+const [sorting, setSorting] = useState<SortState>(null);
+const [pageIndex, setPageIndex] = useState(0);
+const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
 async function loadPurchases() {
     const response = await api.get<Purchase[]>('/purchases');
     setPurchases(response.data);
+    setPageIndex(0);
   }
 
 const {
@@ -286,6 +343,7 @@ async function loadPageData() {
       setPurchases(purchasesResponse.data);
       setSuppliers(suppliersResponse.data);
       setProducts(productsResponse.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
 
@@ -347,31 +405,127 @@ async function loadPageData() {
     setSearch('');
     setStatusFilter('ALL');
     setSupplierFilter('ALL');
+    setPageIndex(0);
   }
 
   const actionErrorHasModal = Boolean(
     purchaseToView || purchaseToApprove || purchaseToCancel,
   );
 
-const tableData = filteredPurchases.map((purchase) => {
-    const statusDescriptor =
-      getPurchaseStatusDescriptor(purchase.status);
+  const sortedPurchases = useMemo(() => {
+    if (!sorting) {
+      return filteredPurchases;
+    }
 
-    return {
-      folio: purchase.folio,
-      supplier: purchase.supplier.name,
-      date: formatDate(purchase.createdAt),
-      items: purchase.items.length,
-      total: formatMoney(purchase.total),
-      status: (
-        <StatusBadge
-          label={statusDescriptor.label}
-          tone={statusDescriptor.tone}
-          ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
-        />
+    return stableSort(
+      filteredPurchases,
+      (first, second) =>
+        comparePurchases(first, second, sorting.columnId),
+      sorting.direction,
+    );
+  }, [filteredPurchases, sorting]);
+
+  const paginatedPurchases = useMemo(
+    () => paginateRows(sortedPurchases, pageIndex, pageSize),
+    [pageIndex, pageSize, sortedPurchases],
+  );
+
+  const purchasesTableFilters: DataTableSelectFilter[] = [
+    {
+      id: 'status',
+      label: 'Estado',
+      value: statusFilter === 'ALL' ? '' : statusFilter,
+      options: statusFilterOptions.filter(
+        (option) => option.value !== 'ALL',
       ),
+      placeholder: 'Todos',
+      onChange: (value) => {
+        setStatusFilter(value ? (value as PurchaseStatus) : 'ALL');
+        setPageIndex(0);
+      },
+    },
+    {
+      id: 'supplier',
+      label: 'Proveedor',
+      value: supplierFilter === 'ALL' ? '' : supplierFilter,
+      options: supplierFilterOptions.map((supplierOption) => ({
+        value: supplierOption.id,
+        label: supplierOption.name,
+      })),
+      placeholder: 'Todos los proveedores',
+      onChange: (value) => {
+        setSupplierFilter(value || 'ALL');
+        setPageIndex(0);
+      },
+    },
+  ];
 
-      actions: (
+  const purchaseColumns: DataTableColumn<Purchase>[] = [
+    {
+      id: 'folio',
+      header: 'Folio',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 120,
+      cell: (purchase) => purchase.folio,
+    },
+    {
+      id: 'supplier',
+      header: 'Proveedor',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 200,
+      cell: (purchase) => purchase.supplier.name,
+    },
+    {
+      id: 'date',
+      header: 'Fecha',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 130,
+      cell: (purchase) => formatDate(purchase.createdAt),
+    },
+    {
+      id: 'items',
+      header: 'Partidas',
+      sortable: true,
+      priority: 'tertiary',
+      minWidth: 100,
+      cell: (purchase) => purchase.items.length,
+    },
+    {
+      id: 'total',
+      header: 'Total',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 130,
+      cell: (purchase) => formatMoney(purchase.total),
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 190,
+      cell: (purchase) => {
+        const statusDescriptor =
+          getPurchaseStatusDescriptor(purchase.status);
+
+        return (
+          <StatusBadge
+            label={statusDescriptor.label}
+            tone={statusDescriptor.tone}
+            ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
+          />
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      priority: 'primary',
+      minWidth: 360,
+      cell: (purchase) => (
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
@@ -381,9 +535,9 @@ const tableData = filteredPurchases.map((purchase) => {
               clearActionError();
               void openPurchaseDetail(purchase);
             }}
-            >
-              Ver detalle
-            </Button>
+          >
+            Ver detalle
+          </Button>
 
           {purchase.status === 'DRAFT' ? (
             <>
@@ -398,9 +552,7 @@ const tableData = filteredPurchases.map((purchase) => {
               <Button
                 variant="success"
                 size="sm"
-                onClick={() =>
-                  openApproveDialog(purchase)
-                }
+                onClick={() => openApproveDialog(purchase)}
               >
                 Aprobar
               </Button>
@@ -408,9 +560,7 @@ const tableData = filteredPurchases.map((purchase) => {
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() =>
-                  openCancelDialog(purchase)
-                }
+                onClick={() => openCancelDialog(purchase)}
               >
                 Cancelar
               </Button>
@@ -429,8 +579,8 @@ const tableData = filteredPurchases.map((purchase) => {
           </Button>
         </div>
       ),
-    };
-  });
+    },
+  ];
 
   return (
     <>
@@ -510,85 +660,64 @@ const tableData = filteredPurchases.map((purchase) => {
           />
         ) : (
           <Section>
-            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_220px_260px]">
-              <Input
-                label="Buscar compras"
-                type="search"
-                value={search}
-                placeholder="Folio, proveedor, email, SKU o producto"
-                onChange={(event) => setSearch(event.target.value)}
-              />
-
-              <div className="flex w-full flex-col gap-2">
-                <label
-                  htmlFor="purchases-status-filter"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Estado
-                </label>
-                <select
-                  id="purchases-status-filter"
-                  value={statusFilter}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as StatusFilter)
+            <DataTable
+              caption="Listado de compras"
+              rows={paginatedPurchases}
+              columns={purchaseColumns}
+              getRowId={(purchase) => purchase.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                <DataTableToolbar
+                  search={{
+                    value: search,
+                    label: 'Buscar compras',
+                    placeholder:
+                      'Folio, proveedor, email, SKU o producto',
+                    onChange: (value) => {
+                      setSearch(value);
+                      setPageIndex(0);
+                    },
+                  }}
+                  filters={purchasesTableFilters}
+                  onReset={clearFilters}
+                  resetDisabled={
+                    !Boolean(
+                      search.trim() ||
+                        statusFilter !== 'ALL' ||
+                        supplierFilter !== 'ALL',
+                    )
                   }
-                >
-                  {statusFilterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex w-full flex-col gap-2">
-                <label
-                  htmlFor="purchases-supplier-filter"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Proveedor
-                </label>
-                <select
-                  id="purchases-supplier-filter"
-                  value={supplierFilter}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onChange={(event) => setSupplierFilter(event.target.value)}
-                >
-                  <option value="ALL">Todos los proveedores</option>
-                  {supplierFilterOptions.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {filteredPurchases.length === 0 ? (
-              <EmptyState
-                title="No se encontraron compras"
-                description="No hay compras que coincidan con la búsqueda y los filtros seleccionados."
-                action={
-                  <Button type="button" variant="outline" onClick={clearFilters}>
-                    Limpiar filtros
-                  </Button>
-                }
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Folio',
-                  'Proveedor',
-                  'Fecha',
-                  'Partidas',
-                  'Total',
-                  'Estado',
-                  'Acciones',
-                ]}
-                data={tableData}
-              />
-            )}
+                />
+              }
+              pagination={{
+                pageIndex,
+                pageSize,
+                totalRows: sortedPurchases.length,
+                pageSizeOptions: PAGE_SIZE_OPTIONS,
+                onPageChange: setPageIndex,
+                onPageSizeChange: (nextPageSize) => {
+                  setPageSize(nextPageSize);
+                  setPageIndex(0);
+                },
+              }}
+              emptyState={{
+                title: 'No hay compras registradas',
+                description: 'Comienza creando tu primera orden de compra.',
+              }}
+              filteredEmptyState={{
+                title: 'No se encontraron compras',
+                description:
+                  'No hay compras que coincidan con la búsqueda y los filtros seleccionados.',
+              }}
+              isFiltered={Boolean(
+                search.trim() ||
+                  statusFilter !== 'ALL' ||
+                  supplierFilter !== 'ALL',
+              )}
+            />
           </Section>
         )}
       </PageContainer>
