@@ -4,12 +4,17 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type DataTableSelectFilter,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
-import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -66,6 +71,13 @@ const statusFilterOptions: Array<{
   },
 ];
 
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+const saleCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
 function formatMoney(value: number): string {
   return moneyFormatter.format(value);
 }
@@ -91,6 +103,43 @@ function matchesSearch(sale: Sale, normalizedSearch: string): boolean {
     sale.folio.toLowerCase().includes(normalizedSearch) ||
     getCustomerName(sale).toLowerCase().includes(normalizedSearch)
   );
+}
+
+function compareSales(
+  first: Sale,
+  second: Sale,
+  columnId: string,
+): number {
+  if (columnId === 'date') {
+    return (
+      new Date(first.createdAt).getTime() -
+      new Date(second.createdAt).getTime()
+    );
+  }
+
+  if (columnId === 'total') {
+    return first.total - second.total;
+  }
+
+  if (columnId === 'folio') {
+    return saleCollator.compare(first.folio, second.folio);
+  }
+
+  if (columnId === 'customer') {
+    return saleCollator.compare(
+      getCustomerName(first),
+      getCustomerName(second),
+    );
+  }
+
+  if (columnId === 'status') {
+    return saleCollator.compare(
+      getSaleStatusDescriptor(first.status).label,
+      getSaleStatusDescriptor(second.status).label,
+    );
+  }
+
+  return 0;
 }
 
 export default function SalesPage() {
@@ -121,6 +170,9 @@ function SalesPageContent() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('ALL');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const compatibleProducts = useMemo(
     () => getCompatibleSalesProducts(products),
@@ -131,6 +183,7 @@ function SalesPageContent() {
     const response = await api.get<Sale[]>('/sales');
 
     setSales(response.data);
+    setPageIndex(0);
   }
 
   async function loadPageData() {
@@ -151,6 +204,7 @@ function SalesPageContent() {
       setSales(salesResponse.data);
       setCustomers(customersResponse.data);
       setProducts(productsResponse.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
 
@@ -269,23 +323,110 @@ function SalesPageContent() {
     });
   }, [sales, search, statusFilter]);
 
-  const tableData = filteredSales.map((sale) => {
-    const statusDescriptor = getSaleStatusDescriptor(sale.status);
+  const sortedSales = useMemo(() => {
+    if (!sorting) {
+      return filteredSales;
+    }
 
-    return {
-      folio: sale.folio,
-      customer: getCustomerName(sale),
-      date: formatDate(sale.createdAt),
-      items: getItemCountLabel(sale.items.length),
-      total: formatMoney(sale.total),
-      status: (
-        <StatusBadge
-          label={statusDescriptor.label}
-          tone={statusDescriptor.tone}
-          ariaLabel={`Estado de la venta: ${statusDescriptor.label}`}
-        />
+    return stableSort(
+      filteredSales,
+      (first, second) =>
+        compareSales(first, second, sorting.columnId),
+      sorting.direction,
+    );
+  }, [filteredSales, sorting]);
+
+  const paginatedSales = useMemo(
+    () => paginateRows(sortedSales, pageIndex, pageSize),
+    [pageIndex, pageSize, sortedSales],
+  );
+
+  function clearFilters() {
+    setSearch('');
+    setStatusFilter('ALL');
+    setPageIndex(0);
+  }
+
+  const salesTableFilters: DataTableSelectFilter[] = [
+    {
+      id: 'status',
+      label: 'Estado',
+      value: statusFilter === 'ALL' ? '' : statusFilter,
+      options: statusFilterOptions.filter(
+        (option) => option.value !== 'ALL',
       ),
-      actions: (
+      placeholder: 'Todas',
+      onChange: (value) => {
+        setStatusFilter(value ? (value as SaleStatus) : 'ALL');
+        setPageIndex(0);
+      },
+    },
+  ];
+
+  const salesColumns: DataTableColumn<Sale>[] = [
+    {
+      id: 'folio',
+      header: 'Folio',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 125,
+      cell: (sale) => sale.folio,
+    },
+    {
+      id: 'customer',
+      header: 'Cliente',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 200,
+      cell: (sale) => getCustomerName(sale),
+    },
+    {
+      id: 'date',
+      header: 'Fecha',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 130,
+      cell: (sale) => formatDate(sale.createdAt),
+    },
+    {
+      id: 'items',
+      header: 'Partidas',
+      priority: 'tertiary',
+      minWidth: 100,
+      cell: (sale) => getItemCountLabel(sale.items.length),
+    },
+    {
+      id: 'total',
+      header: 'Total',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 130,
+      cell: (sale) => formatMoney(sale.total),
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      sortable: true,
+      priority: 'primary',
+      minWidth: 130,
+      cell: (sale) => {
+        const statusDescriptor = getSaleStatusDescriptor(sale.status);
+
+        return (
+          <StatusBadge
+            label={statusDescriptor.label}
+            tone={statusDescriptor.tone}
+            ariaLabel={`Estado de la venta: ${statusDescriptor.label}`}
+          />
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Acciones',
+      priority: 'primary',
+      minWidth: 100,
+      cell: (sale) => (
         <Button
           variant="secondary"
           size="sm"
@@ -299,8 +440,8 @@ function SalesPageContent() {
           Ver
         </Button>
       ),
-    };
-  });
+    },
+  ];
 
   return (
     <>
@@ -339,59 +480,58 @@ function SalesPageContent() {
           />
         ) : (
           <Section>
-            <div className="mb-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-              <Input
-                label="Buscar"
-                type="search"
-                value={search}
-                placeholder="Buscar por folio o cliente"
-                onChange={(event) => setSearch(event.target.value)}
-              />
-
-              <div className="flex w-full flex-col gap-2">
-                <label
-                  htmlFor="sales-status-filter"
-                  className="text-sm font-medium text-gray-700"
-                >
-                  Estado
-                </label>
-
-                <select
-                  id="sales-status-filter"
-                  value={statusFilter}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as StatusFilter)
+            <DataTable
+              caption="Listado de ventas"
+              rows={paginatedSales}
+              columns={salesColumns}
+              getRowId={(sale) => sale.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                <DataTableToolbar
+                  search={{
+                    value: search,
+                    label: 'Buscar',
+                    placeholder: 'Buscar por folio o cliente',
+                    onChange: (value) => {
+                      setSearch(value);
+                      setPageIndex(0);
+                    },
+                  }}
+                  filters={salesTableFilters}
+                  onReset={clearFilters}
+                  resetDisabled={
+                    !Boolean(search.trim() || statusFilter !== 'ALL')
                   }
-                >
-                  {statusFilterOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {filteredSales.length === 0 ? (
-              <EmptyState
-                title="No se encontraron ventas"
-                description="No se encontraron ventas con los filtros seleccionados."
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Folio',
-                  'Cliente',
-                  'Fecha',
-                  'Partidas',
-                  'Total',
-                  'Estado',
-                  'Acciones',
-                ]}
-                data={tableData}
-              />
-            )}
+                />
+              }
+              pagination={{
+                pageIndex,
+                pageSize,
+                totalRows: sortedSales.length,
+                pageSizeOptions: PAGE_SIZE_OPTIONS,
+                onPageChange: setPageIndex,
+                onPageSizeChange: (nextPageSize) => {
+                  setPageSize(nextPageSize);
+                  setPageIndex(0);
+                },
+              }}
+              emptyState={{
+                title: 'No hay ventas registradas',
+                description:
+                  'Las ventas aparecerán aquí cuando existan registros.',
+              }}
+              filteredEmptyState={{
+                title: 'No se encontraron ventas',
+                description:
+                  'No se encontraron ventas con los filtros seleccionados.',
+              }}
+              isFiltered={Boolean(
+                search.trim() || statusFilter !== 'ALL',
+              )}
+            />
           </Section>
         )}
       </PageContainer>

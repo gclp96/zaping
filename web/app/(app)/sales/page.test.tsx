@@ -183,6 +183,41 @@ const cancelledSale: Sale = {
   },
 };
 
+function buildSaleList(count: number): Sale[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+    const timestamp = new Date(
+      Date.UTC(2026, 7, sequence, 18, 0, 0),
+    ).toISOString();
+
+    return {
+      ...baseSale,
+      id: `sale-page-${sequence}`,
+      folio: `V-${String(sequence).padStart(6, '0')}`,
+      subtotal: sequence * 100,
+      iva: 0,
+      total: sequence * 100,
+      status: sequence % 2 === 0 ? 'CONFIRMED' : 'DRAFT',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      customerId: `customer-page-${sequence}`,
+      customer: {
+        ...customer,
+        id: `customer-page-${sequence}`,
+        name: `Cliente ${String(sequence).padStart(3, '0')}`,
+      },
+      items: [
+        {
+          ...baseSale.items[0],
+          id: `sale-item-page-${sequence}`,
+          price: sequence * 100,
+          subtotal: sequence * 100,
+        },
+      ],
+    };
+  });
+}
+
 function configureApiMocks({
   sales = [baseSale],
   customers = [customer],
@@ -481,10 +516,134 @@ describe('SalesPage', () => {
     render(<SalesPage />);
 
     expect(await screen.findByText('V-000001')).toBeTruthy();
+    expect(
+      screen.getByRole('table', { name: 'Listado de ventas' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((header) =>
+        header.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Folio',
+      'Cliente',
+      'Fecha',
+      'Partidas',
+      'Total',
+      'Estado',
+      'Acciones',
+    ]);
+    expect(
+      screen.getByRole('columnheader', { name: 'Folio' }).classList.contains(
+        'hidden',
+      ),
+    ).toBe(false);
+    expect(
+      screen.getByRole('columnheader', { name: 'Fecha' }).classList.contains(
+        'sm:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen
+        .getByRole('columnheader', { name: 'Partidas' })
+        .classList.contains('md:table-cell'),
+    ).toBe(true);
     expect(screen.getByText('Hospital de prueba')).toBeTruthy();
     expect(screen.getByText(/20 ago 2026/i)).toBeTruthy();
     expect(screen.getByText('2 partidas')).toBeTruthy();
     expect(screen.getByText('$1,160.00')).toBeTruthy();
+  });
+
+  it('ordena por folio y total usando el valor real de cada venta', async () => {
+    const user = userEvent.setup();
+
+    configureApiMocks({
+      sales: [
+        {
+          ...baseSale,
+          id: 'sale-sort-10',
+          folio: 'V-0010',
+          total: 10,
+          customer: { ...customer, name: 'Cliente Zeta' },
+        },
+        {
+          ...confirmedSale,
+          id: 'sale-sort-2',
+          folio: 'V-0002',
+          total: 200,
+          customer: { ...customer, name: 'Cliente Alfa' },
+        },
+        {
+          ...cancelledSale,
+          id: 'sale-sort-1',
+          folio: 'V-0001',
+          total: 100,
+          customer: { ...customer, name: 'Cliente Medio' },
+        },
+      ],
+    });
+
+    render(<SalesPage />);
+    await screen.findByText('V-0010');
+
+    const folioHeader = screen.getByRole('columnheader', {
+      name: 'Folio',
+    });
+    await user.click(
+      within(folioHeader).getByRole('button', { name: 'Folio' }),
+    );
+
+    expect(folioHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['V-0001', 'V-0002', 'V-0010']);
+
+    await user.click(screen.getByRole('button', { name: 'Total' }));
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[0].textContent?.trim(),
+      ),
+    ).toEqual(['V-0010', 'V-0001', 'V-0002']);
+  });
+
+  it('pagina 30 ventas y reinicia página al cambiar filtro, tamaño y búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({ sales: buildSaleList(30) });
+
+    render(<SalesPage />);
+    await screen.findByText('V-000001');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('V-000026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'CONFIRMED',
+    );
+    expect(screen.getByText('Mostrando 1-15 de 15')).toBeTruthy();
+    expect(screen.getByText('V-000002')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar' }),
+      'V-000030',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('V-000030')).toBeTruthy();
   });
 
   it('mapea DRAFT, CONFIRMED y CANCELLED a etiquetas en español', async () => {
@@ -571,6 +730,9 @@ describe('SalesPage', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText('No hay ventas registradas')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('V-000001')).toBeTruthy();
   });
 
   it('no muestra ventas falsas ni acciones de ciclo de vida', async () => {
