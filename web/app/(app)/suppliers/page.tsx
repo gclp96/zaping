@@ -16,6 +16,7 @@ import Modal from '@/app/components/ui/Modal';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -288,28 +289,16 @@ export default function SuppliersPage() {
       return filteredSuppliers;
     }
 
-    const direction = sorting.direction === 'asc' ? 1 : -1;
-
-    return filteredSuppliers
-      .map((supplier, originalIndex) => ({ supplier, originalIndex }))
-      .sort((first, second) => {
-        const comparison = compareSuppliers(
-          first.supplier,
-          second.supplier,
-          sorting.columnId,
-        );
-
-        return comparison === 0
-          ? first.originalIndex - second.originalIndex
-          : comparison * direction;
-      })
-      .map(({ supplier }) => supplier);
+    return stableSort(
+      filteredSuppliers,
+      (first, second) =>
+        compareSuppliers(first, second, sorting.columnId),
+      sorting.direction,
+    );
   }, [filteredSuppliers, sorting]);
 
   const paginatedSuppliers = useMemo(() => {
-    const firstRowIndex = pageIndex * pageSize;
-
-    return sortedSuppliers.slice(firstRowIndex, firstRowIndex + pageSize);
+    return paginateRows(sortedSuppliers, pageIndex, pageSize);
   }, [pageIndex, pageSize, sortedSuppliers]);
 
   const supplierColumns: DataTableColumn<Supplier>[] = [

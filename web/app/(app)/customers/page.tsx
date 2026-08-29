@@ -15,6 +15,7 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -184,28 +185,16 @@ export default function CustomersPage() {
       return filteredCustomers;
     }
 
-    const direction = sorting.direction === 'asc' ? 1 : -1;
-
-    return filteredCustomers
-      .map((customer, originalIndex) => ({ customer, originalIndex }))
-      .sort((first, second) => {
-        const comparison = compareCustomers(
-          first.customer,
-          second.customer,
-          sorting.columnId,
-        );
-
-        return comparison === 0
-          ? first.originalIndex - second.originalIndex
-          : comparison * direction;
-      })
-      .map(({ customer }) => customer);
+    return stableSort(
+      filteredCustomers,
+      (first, second) =>
+        compareCustomers(first, second, sorting.columnId),
+      sorting.direction,
+    );
   }, [filteredCustomers, sorting]);
 
   const paginatedCustomers = useMemo(() => {
-    const firstRowIndex = pageIndex * pageSize;
-
-    return sortedCustomers.slice(firstRowIndex, firstRowIndex + pageSize);
+    return paginateRows(sortedCustomers, pageIndex, pageSize);
   }, [pageIndex, pageSize, sortedCustomers]);
 
   const customerColumns: DataTableColumn<Customer>[] = [

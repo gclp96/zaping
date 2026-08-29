@@ -19,6 +19,7 @@ import Select, { type SelectOption } from '@/app/components/ui/Select';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -279,29 +280,16 @@ export default function ProductsPage() {
       return filteredProducts;
     }
 
-    const direction = sorting.direction === 'asc' ? 1 : -1;
-
-    return filteredProducts
-      .map((product, originalIndex) => ({ product, originalIndex }))
-      .sort((first, second) => {
-        const comparison = compareProducts(
-          first.product,
-          second.product,
-          sorting.columnId,
-          categoryNameById,
-        );
-
-        return comparison === 0
-          ? first.originalIndex - second.originalIndex
-          : comparison * direction;
-      })
-      .map(({ product }) => product);
+    return stableSort(
+      filteredProducts,
+      (first, second) =>
+        compareProducts(first, second, sorting.columnId, categoryNameById),
+      sorting.direction,
+    );
   }, [categoryNameById, filteredProducts, sorting]);
 
   const paginatedProducts = useMemo(() => {
-    const firstRowIndex = pageIndex * pageSize;
-
-    return sortedProducts.slice(firstRowIndex, firstRowIndex + pageSize);
+    return paginateRows(sortedProducts, pageIndex, pageSize);
   }, [pageIndex, pageSize, sortedProducts]);
 
   const productColumns = useMemo<DataTableColumn<Product>[]>(
