@@ -146,6 +146,24 @@ const manualEquipment = buildEquipment({
 
 const equipmentList = [purchaseReceiptEquipment, manualEquipment];
 
+function buildEquipmentPageList(count: number): EquipmentAsset[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+
+    return buildEquipment({
+      id: `equipment-page-${sequence}`,
+      assetCode: `EQ-${String(sequence).padStart(6, '0')}`,
+      serialNumber: `SN-EQ-${String(sequence).padStart(3, '0')}`,
+      lifecycle: sequence === count ? 'RETIRED' : 'ACTIVE',
+      product: buildProduct({
+        id: `product-page-${sequence}`,
+        sku: `EQP-${String(sequence).padStart(3, '0')}`,
+        name: `EQUIPO ${String(sequence).padStart(3, '0')}`,
+      }),
+    });
+  });
+}
+
 const equipmentDetails: Record<string, EquipmentAssetDetail> = {
   'equipment-1': {
     ...purchaseReceiptEquipment,
@@ -305,6 +323,12 @@ function configureApiMocks({
 async function renderEquipmentPage() {
   render(<EquipmentPage />);
   await screen.findByText('EQ-000001');
+}
+
+function renderedEquipmentCodes() {
+  return screen.getAllByRole('row').slice(1).map((row) =>
+    within(row).getAllByRole('cell')[0].textContent?.trim(),
+  );
 }
 
 async function openCreateEquipmentModal() {
@@ -841,6 +865,31 @@ describe('EquipmentPage', () => {
     },
   );
 
+  it('combina búsqueda y filtros existentes sin cambiar su semántica', async () => {
+    const user = userEvent.setup();
+    await renderEquipmentPage();
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar equipos' }),
+      'monitor',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'RETIRED',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Condición' }),
+      'DAMAGED',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Origen' }),
+      'MANUAL',
+    );
+
+    expect(screen.getByText('EQ-000002')).toBeTruthy();
+    expect(screen.queryByText('EQ-000001')).toBeNull();
+  });
+
   it('filtra por lifecycle, condición y origen, y permite limpiar filtros', async () => {
     const user = userEvent.setup();
     await renderEquipmentPage();
@@ -890,6 +939,136 @@ describe('EquipmentPage', () => {
 
     expect(screen.getByText('Sin equipos coincidentes')).toBeTruthy();
     expect(screen.queryByText('Sin equipos registrados')).toBeNull();
+  });
+
+  it('ordena columnas explícitas con estado controlado y conserva Ver visible', async () => {
+    configureApiMocks({
+      list: [
+        buildEquipment({
+          id: 'equipment-sort-10',
+          assetCode: 'EQ-000010',
+          product: buildProduct({
+            id: 'product-sort-z',
+            sku: 'SORT-Z',
+            name: 'ZETA',
+          }),
+        }),
+        buildEquipment({
+          id: 'equipment-sort-2',
+          assetCode: 'EQ-000002',
+          product: buildProduct({
+            id: 'product-sort-a',
+            sku: 'SORT-A',
+            name: 'ALFA',
+          }),
+        }),
+        buildEquipment({
+          id: 'equipment-sort-1',
+          assetCode: 'EQ-000001',
+          product: buildProduct({
+            id: 'product-sort-m',
+            sku: 'SORT-M',
+            name: 'MIEDO',
+          }),
+        }),
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<EquipmentPage />);
+    await screen.findByText('EQ-000010');
+
+    expect(
+      screen.getByRole('table', { name: 'Catálogo de equipos' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Ver equipo EQ-000010' }),
+    ).toBeTruthy();
+
+    const assetCodeHeader = screen.getByRole('columnheader', {
+      name: 'Código',
+    });
+    await user.click(
+      within(assetCodeHeader).getByRole('button', { name: 'Código' }),
+    );
+
+    expect(assetCodeHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(renderedEquipmentCodes()).toEqual([
+      'EQ-000001',
+      'EQ-000002',
+      'EQ-000010',
+    ]);
+
+    await user.click(
+      within(assetCodeHeader).getByRole('button', { name: 'Código' }),
+    );
+    expect(assetCodeHeader.getAttribute('aria-sort')).toBe('descending');
+    expect(renderedEquipmentCodes()).toEqual([
+      'EQ-000010',
+      'EQ-000002',
+      'EQ-000001',
+    ]);
+
+    await user.click(
+      within(assetCodeHeader).getByRole('button', { name: 'Código' }),
+    );
+    expect(assetCodeHeader.hasAttribute('aria-sort')).toBe(false);
+    expect(renderedEquipmentCodes()).toEqual([
+      'EQ-000010',
+      'EQ-000002',
+      'EQ-000001',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Producto' }));
+    expect(renderedEquipmentCodes()).toEqual([
+      'EQ-000002',
+      'EQ-000001',
+      'EQ-000010',
+    ]);
+  });
+
+  it('pagina 30 equipos y reinicia la página al cambiar tamaño, filtro o búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({ list: buildEquipmentPageList(30) });
+
+    render(<EquipmentPage />);
+    await screen.findByText('Mostrando 1-25 de 30');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('EQ-000026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+    expect(screen.getByText('EQ-000030')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+    expect(screen.getByText('EQ-000001')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 11-20 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'RETIRED',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('EQ-000030')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+    expect(screen.getByText('EQ-000001')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    const search = screen.getByRole('searchbox', { name: 'Buscar equipos' });
+    await user.clear(search);
+    await user.type(search, 'EQ-000030');
+
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('EQ-000030')).toBeTruthy();
   });
 
   it('consulta y presenta el contrato de detalle con trazabilidad compacta', async () => {

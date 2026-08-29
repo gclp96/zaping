@@ -6,14 +6,17 @@ import { Plus } from 'lucide-react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
-import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type DataTableSelectFilter,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import Loading from '@/app/components/ui/Loading';
-import Select from '@/app/components/ui/Select';
-import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -68,6 +71,47 @@ const originOptions = [
   { value: 'INITIAL_MIGRATION', label: 'Migración inicial' },
 ];
 
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const equipmentCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function compareEquipment(
+  first: EquipmentAsset,
+  second: EquipmentAsset,
+  columnId: string,
+) {
+  const firstValue =
+    columnId === 'assetCode'
+      ? first.assetCode
+      : columnId === 'product'
+        ? `${first.product.name} ${first.product.sku}`
+        : columnId === 'serialNumber'
+          ? first.serialNumber || ''
+          : columnId === 'lifecycle'
+            ? getEquipmentLifecycleDescriptor(first.lifecycle).label
+            : columnId === 'condition'
+              ? getEquipmentConditionDescriptor(first.condition).label
+              : '';
+  const secondValue =
+    columnId === 'assetCode'
+      ? second.assetCode
+      : columnId === 'product'
+        ? `${second.product.name} ${second.product.sku}`
+        : columnId === 'serialNumber'
+          ? second.serialNumber || ''
+          : columnId === 'lifecycle'
+            ? getEquipmentLifecycleDescriptor(second.lifecycle).label
+            : columnId === 'condition'
+              ? getEquipmentConditionDescriptor(second.condition).label
+              : '';
+
+  return equipmentCollator.compare(firstValue, secondValue);
+}
+
 export default function EquipmentPage() {
   return (
     <Suspense
@@ -97,6 +141,9 @@ function EquipmentPageContent() {
   const [conditionFilter, setConditionFilter] =
     useState<ConditionFilter>('');
   const [originFilter, setOriginFilter] = useState<OriginFilter>('');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [selectedEquipment, setSelectedEquipment] =
     useState<EquipmentAsset | null>(null);
   const [equipmentDetail, setEquipmentDetail] =
@@ -157,6 +204,23 @@ function EquipmentPageContent() {
     search.trim() || lifecycleFilter || conditionFilter || originFilter,
   );
 
+  const sortedEquipment = useMemo(() => {
+    if (!sorting) {
+      return filteredEquipment;
+    }
+
+    return stableSort(
+      filteredEquipment,
+      (first, second) =>
+        compareEquipment(first, second, sorting.columnId),
+      sorting.direction,
+    );
+  }, [filteredEquipment, sorting]);
+
+  const paginatedEquipment = useMemo(() => {
+    return paginateRows(sortedEquipment, pageIndex, pageSize);
+  }, [pageIndex, pageSize, sortedEquipment]);
+
   async function loadEquipment(showLoading = true) {
     try {
       if (showLoading) {
@@ -167,6 +231,7 @@ function EquipmentPageContent() {
       const response = await api.get<EquipmentAsset[]>('/equipment');
 
       setEquipment(response.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
       setPageError(
@@ -544,7 +609,44 @@ function EquipmentPageContent() {
     setLifecycleFilter('');
     setConditionFilter('');
     setOriginFilter('');
+    setPageIndex(0);
   }
+
+  const equipmentTableFilters: DataTableSelectFilter[] = [
+    {
+      id: 'lifecycle',
+      label: 'Estado',
+      value: lifecycleFilter,
+      options: lifecycleOptions,
+      placeholder: 'Todos los estados',
+      onChange: (value) => {
+        setLifecycleFilter(value as LifecycleFilter);
+        setPageIndex(0);
+      },
+    },
+    {
+      id: 'condition',
+      label: 'Condición',
+      value: conditionFilter,
+      options: conditionOptions,
+      placeholder: 'Todas las condiciones',
+      onChange: (value) => {
+        setConditionFilter(value as ConditionFilter);
+        setPageIndex(0);
+      },
+    },
+    {
+      id: 'origin',
+      label: 'Origen',
+      value: originFilter,
+      options: originOptions,
+      placeholder: 'Todos los orígenes',
+      onChange: (value) => {
+        setOriginFilter(value as OriginFilter);
+        setPageIndex(0);
+      },
+    },
+  ];
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -633,134 +735,169 @@ function EquipmentPageContent() {
               </Button>
             </div>
           </Section>
-        ) : equipment.length === 0 ? (
-          <EmptyState
-            title="Sin equipos registrados"
-            description="Todavía no existen unidades físicas identificables."
-          />
         ) : (
           <Section>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <Input
-                label="Buscar equipos"
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Código, serie, producto o SKU"
-              />
-              <Select
-                label="Estado"
-                value={lifecycleFilter}
-                onChange={(event) =>
-                  setLifecycleFilter(event.target.value as LifecycleFilter)
-                }
-                options={lifecycleOptions}
-                placeholder="Todos los estados"
-              />
-              <Select
-                label="Condición"
-                value={conditionFilter}
-                onChange={(event) =>
-                  setConditionFilter(event.target.value as ConditionFilter)
-                }
-                options={conditionOptions}
-                placeholder="Todas las condiciones"
-              />
-              <Select
-                label="Origen"
-                value={originFilter}
-                onChange={(event) =>
-                  setOriginFilter(event.target.value as OriginFilter)
-                }
-                options={originOptions}
-                placeholder="Todos los orígenes"
-              />
-            </div>
+            <DataTable
+              caption="Catálogo de equipos"
+              rows={paginatedEquipment}
+              columns={[
+                {
+                  id: 'assetCode',
+                  header: 'Código',
+                  cell: (item) => (
+                    <span className="font-semibold text-gray-900">
+                      {item.assetCode}
+                    </span>
+                  ),
+                  sortable: true,
+                  priority: 'primary',
+                  minWidth: 150,
+                },
+                {
+                  id: 'product',
+                  header: 'Producto',
+                  cell: (item) => (
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {item.product.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {item.product.sku}
+                      </p>
+                    </div>
+                  ),
+                  sortable: true,
+                  priority: 'secondary',
+                  minWidth: 210,
+                },
+                {
+                  id: 'serialNumber',
+                  header: 'Serie',
+                  cell: (item) => item.serialNumber || 'Sin serie',
+                  sortable: true,
+                  priority: 'secondary',
+                  minWidth: 150,
+                },
+                {
+                  id: 'lifecycle',
+                  header: 'Estado',
+                  cell: (item) => {
+                    const descriptor = getEquipmentLifecycleDescriptor(
+                      item.lifecycle,
+                    );
 
-            {filtersActive ? (
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearFilters}
-                >
-                  Limpiar filtros
-                </Button>
-              </div>
-            ) : null}
-
-            {filteredEquipment.length === 0 ? (
-              <EmptyState
-                title="Sin equipos coincidentes"
-                description="Ningún equipo coincide con los filtros actuales."
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Código',
-                  'Producto',
-                  'Serie',
-                  'Estado',
-                  'Condición',
-                  'Origen',
-                  'Lote',
-                  'Acciones',
-                ]}
-                data={filteredEquipment.map((item) => {
-                  const lifecycleDescriptor =
-                    getEquipmentLifecycleDescriptor(item.lifecycle);
-                  const conditionDescriptor =
-                    getEquipmentConditionDescriptor(item.condition);
-
-                  return {
-                    assetCode: (
-                      <span className="font-semibold text-gray-900">
-                        {item.assetCode}
-                      </span>
-                    ),
-                    product: (
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {item.product.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {item.product.sku}
-                        </p>
-                      </div>
-                    ),
-                    serialNumber: item.serialNumber || 'Sin serie',
-                    lifecycle: (
+                    return (
                       <StatusBadge
-                        label={lifecycleDescriptor.label}
-                        tone={lifecycleDescriptor.tone}
-                        ariaLabel={`Estado del equipo ${item.assetCode}: ${lifecycleDescriptor.label}`}
+                        label={descriptor.label}
+                        tone={descriptor.tone}
+                        ariaLabel={`Estado del equipo ${item.assetCode}: ${descriptor.label}`}
                       />
-                    ),
-                    condition: (
+                    );
+                  },
+                  sortable: true,
+                  priority: 'secondary',
+                  minWidth: 125,
+                },
+                {
+                  id: 'condition',
+                  header: 'Condición',
+                  cell: (item) => {
+                    const descriptor = getEquipmentConditionDescriptor(
+                      item.condition,
+                    );
+
+                    return (
                       <StatusBadge
-                        label={conditionDescriptor.label}
-                        tone={conditionDescriptor.tone}
-                        ariaLabel={`Condición del equipo ${item.assetCode}: ${conditionDescriptor.label}`}
+                        label={descriptor.label}
+                        tone={descriptor.tone}
+                        ariaLabel={`Condición del equipo ${item.assetCode}: ${descriptor.label}`}
                       />
-                    ),
-                    origin: getEquipmentOriginLabel(item.origin),
-                    batch: item.batch?.lotNumber || 'Sin lote',
-                    actions: (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Ver equipo ${item.assetCode}`}
-                        onClick={() => openEquipmentDetail(item)}
-                      >
-                        Ver
-                      </Button>
-                    ),
-                  };
-                })}
-              />
-            )}
+                    );
+                  },
+                  sortable: true,
+                  priority: 'primary',
+                  minWidth: 145,
+                },
+                {
+                  id: 'origin',
+                  header: 'Origen',
+                  cell: (item) => getEquipmentOriginLabel(item.origin),
+                  priority: 'tertiary',
+                  minWidth: 170,
+                },
+                {
+                  id: 'batch',
+                  header: 'Lote',
+                  cell: (item) => item.batch?.lotNumber || 'Sin lote',
+                  priority: 'tertiary',
+                  minWidth: 140,
+                },
+                {
+                  id: 'actions',
+                  header: 'Acciones',
+                  cell: (item) => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Ver equipo ${item.assetCode}`}
+                      onClick={() => openEquipmentDetail(item)}
+                    >
+                      Ver
+                    </Button>
+                  ),
+                  priority: 'primary',
+                  minWidth: 90,
+                },
+              ] satisfies DataTableColumn<EquipmentAsset>[]}
+              getRowId={(item) => item.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                equipment.length > 0 ? (
+                  <DataTableToolbar
+                    search={{
+                      value: search,
+                      label: 'Buscar equipos',
+                      placeholder: 'Código, serie, producto o SKU',
+                      onChange: (value) => {
+                        setSearch(value);
+                        setPageIndex(0);
+                      },
+                    }}
+                    filters={equipmentTableFilters}
+                    onReset={clearFilters}
+                    resetDisabled={!filtersActive}
+                  />
+                ) : undefined
+              }
+              pagination={
+                equipment.length > 0
+                  ? {
+                      pageIndex,
+                      pageSize,
+                      totalRows: sortedEquipment.length,
+                      pageSizeOptions: PAGE_SIZE_OPTIONS,
+                      onPageChange: setPageIndex,
+                      onPageSizeChange: (nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setPageIndex(0);
+                      },
+                    }
+                  : undefined
+              }
+              emptyState={{
+                title: 'Sin equipos registrados',
+                description: 'Todavía no existen unidades físicas identificables.',
+              }}
+              filteredEmptyState={{
+                title: 'Sin equipos coincidentes',
+                description: 'Ningún equipo coincide con los filtros actuales.',
+              }}
+              isFiltered={filtersActive}
+            />
           </Section>
         )}
       </PageContainer>
