@@ -354,8 +354,35 @@ describe('PurchasesPage — navegación trazable', () => {
     render(<PurchasesPage />);
 
     expect(
-      await screen.findByRole('heading', { name: 'Detalle de compra' }),
+      await screen.findByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeTruthy();
+
+    const summary = screen.getByRole('region', {
+      name: 'Resumen de compra',
+    });
+
+    expect(within(summary).getByText('Proveedor médico')).toBeTruthy();
+    expect(
+      within(summary).getByLabelText('Estado de la compra: Confirmada'),
+    ).toBeTruthy();
+    expect(summary.textContent).toContain('0 / 1 partidas');
+    expect(summary.textContent).toContain('4 / 10 uds. · 6 pendientes');
+
+    const financialSummary = screen.getByRole('region', {
+      name: 'Resumen financiero',
+    });
+    const traceability = screen.getByRole('region', {
+      name: 'Trazabilidad',
+    });
+
+    expect(
+      financialSummary.compareDocumentPosition(traceability) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(financialSummary).getByText('$1,000.00')).toBeTruthy();
+    expect(within(financialSummary).getByText('$160.00')).toBeTruthy();
+    expect(within(financialSummary).getByText('$1,160.00')).toBeTruthy();
+
     expect(api.get).toHaveBeenCalledWith(
       '/purchases/purchase-1/inventory-movements',
     );
@@ -372,7 +399,7 @@ describe('PurchasesPage — navegación trazable', () => {
 
     expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
     expect(
-      screen.queryByRole('heading', { name: 'Detalle de compra' }),
+      screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
     expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
   });
@@ -401,11 +428,23 @@ describe('PurchasesPage — navegación trazable', () => {
       );
 
       const detailTitle = await screen.findByRole('heading', {
-        name: 'Detalle de compra',
+        name: 'Compra OC-0001',
       });
       const detailModal = detailTitle.parentElement?.parentElement;
 
       expect(detailModal).not.toBeNull();
+
+      const summary = within(detailModal as HTMLElement).getByRole('region', {
+        name: 'Resumen de compra',
+      });
+
+      if (status === 'DRAFT') {
+        expect(summary.textContent).toContain('Pendiente de aprobación');
+      } else if (status === 'CANCELLED') {
+        expect(summary.textContent).toContain('No aplica');
+      } else {
+        expect(summary.textContent).toContain('0 / 1 partidas');
+      }
 
       const receiveButton = within(
         detailModal as HTMLElement,
@@ -433,7 +472,7 @@ describe('PurchasesPage — navegación trazable', () => {
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
     expect(
-      screen.queryByRole('heading', { name: 'Detalle de compra' }),
+      screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Volver a compras' }));
@@ -993,7 +1032,7 @@ describe('PurchasesPage — recepciones', () => {
     ).toBeTruthy();
     expect(
       screen.queryByRole('heading', {
-        name: 'Detalle de compra',
+        name: 'Compra OC-0001',
       }),
     ).toBeNull();
     expect(api.get).toHaveBeenCalledWith(
@@ -1303,7 +1342,7 @@ describe('PurchasesPage — recepciones', () => {
     await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
     const detailTitle = await screen.findByRole('heading', {
-      name: 'Detalle de compra',
+      name: 'Compra OC-0001',
     });
     const detailModal = detailTitle.parentElement?.parentElement;
     const receiveButton = within(
@@ -1351,7 +1390,7 @@ describe('PurchasesPage — recepciones', () => {
     await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
     const detailTitle = await screen.findByRole('heading', {
-      name: 'Detalle de compra',
+      name: 'Compra OC-0001',
     });
     const detailModal = detailTitle.parentElement?.parentElement;
     const detailScope = within(detailModal as HTMLElement);
@@ -1404,7 +1443,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -1451,9 +1490,21 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
   expect(quantityInput.getAttribute('max')).toBe('6');
 });
 
-it('muestra progreso por partida en cero cuando no hay recepciones', async () => {
-  const user = userEvent.setup();
-  const defaultGet = vi.mocked(api.get).getMockImplementation();
+  it('muestra progreso por partida en cero cuando no hay recepciones', async () => {
+    const user = userEvent.setup();
+    const noReceiptPurchase = {
+      ...purchase,
+      receiptProgress: {
+        orderedUnits: 10,
+        receivedUnits: 0,
+        pendingUnits: 10,
+        orderedLines: 1,
+        completedLines: 0,
+      },
+    };
+
+    configureApiMocks([noReceiptPurchase]);
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
 
   vi.mocked(api.get).mockImplementation(async (url) => {
     if (
@@ -1471,13 +1522,18 @@ it('muestra progreso por partida en cero cuando no hay recepciones', async () =>
   await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
   const detailTitle = await screen.findByRole('heading', {
-    name: 'Detalle de compra',
+    name: 'Compra OC-0001',
   });
   const detailModal = detailTitle.parentElement?.parentElement;
   const itemTable = screen.getByText('Pedido').closest('table');
+  const summary = screen.getByRole('region', {
+    name: 'Resumen de compra',
+  });
 
   expect(detailModal).not.toBeNull();
   expect(itemTable).not.toBeNull();
+  expect(summary.textContent).toContain('0 / 1 partidas');
+  expect(summary.textContent).toContain('0 / 10 uds. · 10 pendientes');
 
   const itemRow = within(itemTable as HTMLTableElement).getAllByRole('row')[1];
   const itemCells = within(itemRow).getAllByRole('cell');
@@ -1485,6 +1541,43 @@ it('muestra progreso por partida en cero cuando no hay recepciones', async () =>
   expect(itemCells[1].textContent).toBe('10');
   expect(itemCells[2].textContent).toBe('0');
   expect(itemCells[3].textContent).toBe('10');
+});
+
+it('muestra el progreso completo sin cambiar los valores financieros', async () => {
+  const user = userEvent.setup();
+  const completePurchase = {
+    ...purchase,
+    status: 'RECEIVED' as const,
+    receiptProgress: {
+      orderedUnits: 10,
+      receivedUnits: 10,
+      pendingUnits: 0,
+      orderedLines: 1,
+      completedLines: 1,
+    },
+  };
+
+  configureApiMocks([completePurchase]);
+  render(<PurchasesPage />);
+
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+  const summary = await screen.findByRole('region', {
+    name: 'Resumen de compra',
+  });
+  const financialSummary = screen.getByRole('region', {
+    name: 'Resumen financiero',
+  });
+
+  expect(summary.textContent).toContain('1 / 1 partidas');
+  expect(summary.textContent).toContain('10 / 10 uds. · 0 pendientes');
+  expect(within(financialSummary).getByText('$1,000.00')).toBeTruthy();
+  expect(within(financialSummary).getByText('$160.00')).toBeTruthy();
+  expect(within(financialSummary).getByText('$1,160.00')).toBeTruthy();
+  expect(
+    within(summary).getByLabelText('Estado de la compra: Recibida'),
+  ).toBeTruthy();
 });
 
 it('mantiene el progreso por purchaseItemId con múltiples recepciones y productos repetidos', async () => {
@@ -1536,7 +1629,7 @@ it('mantiene el progreso por purchaseItemId con múltiples recepciones y product
   await screen.findByText('OC-0001');
   await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
-  await screen.findByRole('heading', { name: 'Detalle de compra' });
+  await screen.findByRole('heading', { name: 'Compra OC-0001' });
 
   const itemTable = screen.getByText('Pedido').closest('table');
   expect(itemTable).not.toBeNull();
@@ -1571,7 +1664,7 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -1622,7 +1715,7 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -1682,7 +1775,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -1754,7 +1847,7 @@ it('envía correctamente la recepción al backend', async () => {
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -1942,7 +2035,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
@@ -2010,7 +2103,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   );
 
   const detailTitleAfterSuccess = await screen.findByRole('heading', {
-    name: 'Detalle de compra',
+    name: 'Compra OC-0001',
   });
   const detailAfterSuccess =
     detailTitleAfterSuccess.parentElement?.parentElement;
@@ -2070,7 +2163,7 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
   await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
   const detailTitle = await screen.findByRole('heading', {
-    name: 'Detalle de compra',
+    name: 'Compra OC-0001',
   });
   const detailModal = detailTitle.parentElement?.parentElement;
 
@@ -2123,7 +2216,7 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
   const detailTitle = await screen.findByRole(
     'heading',
     {
-      name: /detalle de compra/i,
+      name: /Compra OC-0001/i,
     },
   );
 
