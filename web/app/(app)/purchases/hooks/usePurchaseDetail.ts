@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -14,6 +14,14 @@ export type PurchaseReceiptHistoryStatus =
   | 'loading'
   | 'success'
   | 'error';
+
+export type PurchaseDetailLoadResult = {
+  stale: boolean;
+  inventoryMovements: InventoryMovement[];
+  purchaseReceipts: PurchaseReceipt[];
+  movementsError: string;
+  receiptsError: string;
+};
 
 export function usePurchaseDetail() {
   const [purchaseToView, setPurchaseToView] =
@@ -39,6 +47,7 @@ export function usePurchaseDetail() {
 
   const [movementsError, setMovementsError] =
     useState('');
+  const detailRequestVersion = useRef(0);
 
   function resetDetailData() {
     setInventoryMovements([]);
@@ -50,14 +59,18 @@ export function usePurchaseDetail() {
   }
 
   function closePurchaseDetail() {
+    detailRequestVersion.current += 1;
     setPurchaseToView(null);
     resetDetailData();
   }
 
-  async function openPurchaseDetail(
+  async function loadPurchaseDetailData(
     purchase: Purchase,
-  ) {
-    setPurchaseToView(purchase);
+  ): Promise<PurchaseDetailLoadResult> {
+    const requestVersion =
+      detailRequestVersion.current + 1;
+    detailRequestVersion.current = requestVersion;
+
     resetDetailData();
 
     setMovementsLoading(true);
@@ -74,6 +87,19 @@ export function usePurchaseDetail() {
         ),
       ]);
 
+    if (requestVersion !== detailRequestVersion.current) {
+      return {
+        stale: true,
+        inventoryMovements: [],
+        purchaseReceipts: [],
+        movementsError: '',
+        receiptsError: '',
+      };
+    }
+
+    let movementsError = '';
+    let receiptsError = '';
+
     if (movementsResult.status === 'fulfilled') {
       setInventoryMovements(
         movementsResult.value.data,
@@ -84,12 +110,11 @@ export function usePurchaseDetail() {
 
       console.error(error);
 
-      setMovementsError(
-        getApiErrorMessage(
-          error,
-          'No fue posible cargar los movimientos de inventario.',
-        ),
+      movementsError = getApiErrorMessage(
+        error,
+        'No fue posible cargar los movimientos de inventario.',
       );
+      setMovementsError(movementsError);
     }
 
     if (receiptsResult.status === 'fulfilled') {
@@ -103,17 +128,43 @@ export function usePurchaseDetail() {
 
       console.error(error);
 
-      setReceiptsError(
-        getApiErrorMessage(
-          error,
-          'No fue posible cargar las recepciones de la compra.',
-        ),
+      receiptsError = getApiErrorMessage(
+        error,
+        'No fue posible cargar las recepciones de la compra.',
       );
+      setReceiptsError(receiptsError);
       setReceiptHistoryStatus('error');
     }
 
     setMovementsLoading(false);
     setReceiptsLoading(false);
+
+    return {
+      stale: false,
+      inventoryMovements:
+        movementsResult.status === 'fulfilled'
+          ? movementsResult.value.data
+          : [],
+      purchaseReceipts:
+        receiptsResult.status === 'fulfilled'
+          ? receiptsResult.value.data
+          : [],
+      movementsError,
+      receiptsError,
+    };
+  }
+
+  async function openPurchaseDetail(
+    purchase: Purchase,
+  ) {
+    setPurchaseToView(purchase);
+    await loadPurchaseDetailData(purchase);
+  }
+
+  async function preparePurchaseForReceipt(
+    purchase: Purchase,
+  ) {
+    return loadPurchaseDetailData(purchase);
   }
 
   async function retryPurchaseReceipts() {
@@ -162,5 +213,6 @@ export function usePurchaseDetail() {
     openPurchaseDetail,
     closePurchaseDetail,
     retryPurchaseReceipts,
+    preparePurchaseForReceipt,
   };
 }

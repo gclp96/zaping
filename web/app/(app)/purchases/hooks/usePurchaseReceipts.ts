@@ -53,16 +53,24 @@ export function usePurchaseReceipts({
     setCreatedReceipt(null);
   }
 
-  function openReceiptModal(purchase: Purchase): boolean {
-    if (!receiptHistoryReady) {
+  function openReceiptModal(
+    purchase: Purchase,
+    options?: {
+      verifiedPurchaseReceipts?: PurchaseReceipt[];
+    },
+  ): boolean {
+    if (!receiptHistoryReady && !options?.verifiedPurchaseReceipts) {
       return false;
     }
+
+    const receiptsForForm =
+      options?.verifiedPurchaseReceipts ?? purchaseReceipts;
 
     const formItems: PurchaseReceiptFormItem[] =
       purchase.items
         .map((purchaseItem) => {
           const receivedQuantity =
-            purchaseReceipts.reduce(
+            receiptsForForm.reduce(
               (total, receipt) => {
                 const receivedFromReceipt =
                   receipt.items

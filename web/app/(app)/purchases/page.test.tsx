@@ -307,6 +307,21 @@ async function selectProduct(
   );
 }
 
+function getReceiptSubmitButton() {
+  const receiptHeading = screen.getByRole('heading', {
+    name: /registrar recepci[oó]n.*OC-0001/i,
+  });
+  const receiptModal = receiptHeading.parentElement?.parentElement;
+
+  if (!receiptModal) {
+    throw new Error('No se encontró el modal de recepción.');
+  }
+
+  return within(receiptModal).getByRole('button', {
+    name: /^registrar recepci[oó]n$/i,
+  });
+}
+
 beforeEach(() => {
   routerMock.search = '';
 });
@@ -848,6 +863,355 @@ describe('PurchasesPage — recepciones', () => {
     cleanup();
   });
 
+  it.each([
+    ['DRAFT', false],
+    ['CONFIRMED', true],
+    ['PARTIALLY_RECEIVED', true],
+    ['RECEIVED', false],
+    ['CANCELLED', false],
+  ] as const)(
+    'muestra la acción directa sólo para el estado %s',
+    async (status, canReceive) => {
+      const user = userEvent.setup();
+      configureApiMocks([
+        {
+          ...purchase,
+          status,
+        },
+      ]);
+
+      render(<PurchasesPage />);
+      await screen.findByText('OC-0001');
+
+      const receiveButton = screen.queryByRole('button', {
+        name: 'Registrar recepción',
+      });
+
+      if (canReceive) {
+        expect(receiveButton).not.toBeNull();
+        expect(
+          (receiveButton as HTMLButtonElement).disabled,
+        ).toBe(false);
+      } else {
+        expect(receiveButton).toBeNull();
+      }
+
+      if (canReceive) {
+        await user.click(receiveButton as HTMLButtonElement);
+        expect(
+          await screen.findByRole('heading', {
+            name: /registrar recepción.*OC-0001/i,
+          }),
+        ).toBeTruthy();
+      }
+    },
+  );
+
+  it('prepara la recepción directa sin abrir el detalle de compra', async () => {
+    const user = userEvent.setup();
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar recepción',
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: 'Detalle de compra',
+      }),
+    ).toBeNull();
+    expect(api.get).toHaveBeenCalledWith(
+      '/purchases/purchase-1/inventory-movements',
+    );
+    expect(api.get).toHaveBeenCalledWith(
+      '/purchase-receipts/purchase/purchase-1',
+    );
+  });
+
+  it('prepara la recepción directa para una compra parcialmente recibida', async () => {
+    const user = userEvent.setup();
+    const partial = {
+      ...purchase,
+      id: 'purchase-2',
+      folio: 'OC-0002',
+      status: 'PARTIALLY_RECEIVED' as const,
+    };
+    configureApiMocks([partial]);
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (
+        endpoint ===
+        '/purchases/purchase-2/inventory-movements'
+      ) {
+        return { data: [] } as never;
+      }
+
+      if (
+        endpoint ===
+        '/purchase-receipts/purchase/purchase-2'
+      ) {
+        return { data: [] } as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0002');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar recepción',
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0002/i,
+      }),
+    ).toBeTruthy();
+  });
+
+  it('no abre la recepción directa mientras carga detalle e historial', async () => {
+    const user = userEvent.setup();
+    let resolveMovements: ((value: unknown) => void) | undefined;
+    let resolveReceipts: ((value: unknown) => void) | undefined;
+    const movementsPromise = new Promise((resolve) => {
+      resolveMovements = resolve;
+    });
+    const receiptsPromise = new Promise((resolve) => {
+      resolveReceipts = resolve;
+    });
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation((url) => {
+      const endpoint = String(url);
+
+      if (
+        endpoint ===
+        '/purchases/purchase-1/inventory-movements'
+      ) {
+        return movementsPromise as never;
+      }
+
+      if (
+        endpoint ===
+        '/purchase-receipts/purchase/purchase-1'
+      ) {
+        return receiptsPromise as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar recepción',
+      }),
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Preparando...' }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeNull();
+
+    resolveMovements?.({ data: [] });
+    resolveReceipts?.({ data: [previousReceipt] });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
+  });
+
+  it('bloquea intentos repetidos y acciones de otra fila durante la preparación', async () => {
+    const user = userEvent.setup();
+    let resolveMovements: ((value: unknown) => void) | undefined;
+    let resolveReceipts: ((value: unknown) => void) | undefined;
+    const movementsPromise = new Promise((resolve) => {
+      resolveMovements = resolve;
+    });
+    const receiptsPromise = new Promise((resolve) => {
+      resolveReceipts = resolve;
+    });
+    configureApiMocks([purchase, partialPurchase]);
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation((url) => {
+      const endpoint = String(url);
+
+      if (
+        endpoint ===
+        '/purchases/purchase-1/inventory-movements'
+      ) {
+        return movementsPromise as never;
+      }
+
+      if (
+        endpoint ===
+        '/purchase-receipts/purchase/purchase-1'
+      ) {
+        return receiptsPromise as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await screen.findByText('OC-0002');
+
+    const receiveButtons = screen.getAllByRole('button', {
+      name: 'Registrar recepción',
+    });
+
+    await user.click(receiveButtons[0]);
+
+    await waitFor(() => {
+      expect(
+        (receiveButtons[0] as HTMLButtonElement).disabled,
+      ).toBe(true);
+      expect(
+        (receiveButtons[1] as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
+
+    await user.click(receiveButtons[1]);
+
+    expect(api.get).not.toHaveBeenCalledWith(
+      '/purchases/purchase-2/inventory-movements',
+    );
+    expect(api.get).not.toHaveBeenCalledWith(
+      '/purchase-receipts/purchase/purchase-2',
+    );
+
+    resolveMovements?.({ data: [] });
+    resolveReceipts?.({ data: [previousReceipt] });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: /registrar recepción.*OC-0002/i,
+      }),
+    ).toBeNull();
+  });
+
+  it('bloquea la recepción directa si falla el historial y permite reintentar', async () => {
+    const user = userEvent.setup();
+    let receiptRequests = 0;
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      const endpoint = String(url);
+
+      if (
+        endpoint ===
+        '/purchase-receipts/purchase/purchase-1'
+      ) {
+        receiptRequests += 1;
+
+        if (receiptRequests === 1) {
+          throw new Error('Error temporal');
+        }
+
+        return { data: [previousReceipt] } as never;
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar recepción',
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        'No pudimos verificar las recepciones anteriores. Vuelve a intentarlo antes de registrar una nueva recepción.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeNull();
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Reintentar recepción',
+      }),
+    );
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
+    expect(receiptRequests).toBe(2);
+  });
+
+  it('no abre la recepción directa si falla la carga del detalle', async () => {
+    const user = userEvent.setup();
+    const defaultGet = vi.mocked(api.get).getMockImplementation();
+
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (
+        String(url) ===
+        '/purchases/purchase-1/inventory-movements'
+      ) {
+        throw new Error('Error temporal');
+      }
+
+      return defaultGet!(url);
+    });
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Registrar recepción',
+      }),
+    );
+
+    expect(
+      await screen.findByText(
+        'No pudimos preparar el detalle de la compra. Vuelve a intentarlo antes de registrar una nueva recepción.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeNull();
+  });
+
   it('deshabilita Registrar recepción mientras carga el historial', async () => {
     const user = userEvent.setup();
     let resolveReceipts: ((value: unknown) => void) | undefined;
@@ -1059,9 +1423,7 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
   });
 
   await user.click(
-    screen.getByRole('button', {
-      name: /^registrar recepci[oó]n$/i,
-    }),
+    getReceiptSubmitButton(),
   );
 
   const alert = await screen.findByRole('alert');
@@ -1121,9 +1483,7 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
   await user.type(quantityInput, '7');
 
   await user.click(
-    screen.getByRole('button', {
-      name: /^registrar recepci[oó]n$/i,
-    }),
+    getReceiptSubmitButton(),
   );
 
   const alert = await screen.findByRole('alert');
@@ -1188,9 +1548,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
   await user.type(expirationInput, '2028-12-31');
 
   await user.click(
-    screen.getByRole('button', {
-      name: /^registrar recepci[oó]n$/i,
-    }),
+    getReceiptSubmitButton(),
   );
 
   const alert = await screen.findByRole('alert');
@@ -1273,9 +1631,7 @@ it('envía correctamente la recepción al backend', async () => {
   );
 
   await user.click(
-    screen.getByRole('button', {
-      name: /^registrar recepci[oó]n$/i,
-    }),
+    getReceiptSubmitButton(),
   );
 
   await waitFor(() => {
@@ -1310,8 +1666,14 @@ it('envía correctamente la recepción al backend', async () => {
     }),
   ).toBeTruthy();
   expect(screen.getByText('REC-000123')).toBeTruthy();
+  const successHeading = screen.getByRole('heading', {
+    name: 'Recepción registrada correctamente',
+  });
+  const successModal = successHeading.parentElement?.parentElement;
+
+  expect(successModal).not.toBeNull();
   expect(
-    screen.queryByRole('button', {
+    within(successModal as HTMLElement).queryByRole('button', {
       name: /^registrar recepción$/i,
     }),
   ).toBeNull();
@@ -1441,9 +1803,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   await user.type(quantityInput, '2');
 
   await user.click(
-    screen.getByRole('button', {
-      name: /^registrar recepci[oó]n$/i,
-    }),
+    getReceiptSubmitButton(),
   );
 
   expect(
@@ -1555,7 +1915,7 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
     '6',
   );
   await user.click(
-    screen.getByRole('button', { name: 'Registrar recepción' }),
+    getReceiptSubmitButton(),
   );
 
   expect(

@@ -12,7 +12,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
-import { getPurchaseStatusDescriptor } from './purchase-status';
+import {
+  canRegisterPurchaseReceipt,
+  getPurchaseStatusDescriptor,
+} from './purchase-status';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
@@ -46,6 +49,23 @@ import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 
 type StatusFilter = 'ALL' | PurchaseStatus;
+
+type DirectReceiveState =
+  | {
+      purchase: Purchase;
+      status: 'loading';
+    }
+  | {
+      purchase: Purchase;
+      status: 'error';
+      message: string;
+    }
+  | null;
+
+const receiptHistoryUnavailableMessage =
+  'No pudimos verificar las recepciones anteriores. Vuelve a intentarlo antes de registrar una nueva recepción.';
+const purchaseDetailUnavailableMessage =
+  'No pudimos preparar el detalle de la compra. Vuelve a intentarlo antes de registrar una nueva recepción.';
 
 const statusFilterOptions: Array<{
   value: StatusFilter;
@@ -197,6 +217,10 @@ const [supplierFilter, setSupplierFilter] = useState('ALL');
 const [sorting, setSorting] = useState<SortState>(null);
 const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+const [directReceiveState, setDirectReceiveState] =
+  useState<DirectReceiveState>(null);
+const directReceiveRequestId = useRef(0);
+const directReceiveInFlight = useRef(false);
 
 async function loadPurchases() {
     const response = await api.get<Purchase[]>('/purchases');
@@ -266,6 +290,7 @@ const {
   openPurchaseDetail,
   closePurchaseDetail,
   retryPurchaseReceipts,
+  preparePurchaseForReceipt,
 } = usePurchaseDetail();
 
   //propiedades del formulario
@@ -322,6 +347,82 @@ const {
     receiptHistoryReady: receiptHistoryStatus === 'success',
     onReceiptCreated: loadPurchases,
   });
+
+  async function handleDirectReceive(purchase: Purchase) {
+    if (directReceiveInFlight.current) {
+      return;
+    }
+
+    directReceiveInFlight.current = true;
+    const requestId = directReceiveRequestId.current + 1;
+    directReceiveRequestId.current = requestId;
+    setDirectReceiveState({
+      purchase,
+      status: 'loading',
+    });
+
+    try {
+      const result = await preparePurchaseForReceipt(purchase);
+
+      if (requestId !== directReceiveRequestId.current) {
+        return;
+      }
+
+      if (result.stale) {
+        setDirectReceiveState({
+          purchase,
+          status: 'error',
+          message: purchaseDetailUnavailableMessage,
+        });
+        return;
+      }
+
+      if (result.receiptsError) {
+        setDirectReceiveState({
+          purchase,
+          status: 'error',
+          message: receiptHistoryUnavailableMessage,
+        });
+        return;
+      }
+
+      if (result.movementsError) {
+        setDirectReceiveState({
+          purchase,
+          status: 'error',
+          message: purchaseDetailUnavailableMessage,
+        });
+        return;
+      }
+
+      if (
+        openReceiptModal(purchase, {
+          verifiedPurchaseReceipts: result.purchaseReceipts,
+        })
+      ) {
+        setDirectReceiveState(null);
+        return;
+      }
+
+      setDirectReceiveState({
+        purchase,
+        status: 'error',
+        message: receiptHistoryUnavailableMessage,
+      });
+    } catch (error: unknown) {
+      console.error(error);
+
+      if (requestId === directReceiveRequestId.current) {
+        setDirectReceiveState({
+          purchase,
+          status: 'error',
+          message: purchaseDetailUnavailableMessage,
+        });
+      }
+    } finally {
+      directReceiveInFlight.current = false;
+    }
+  }
 
 function handleViewCreatedReceipt(receiptId: string) {
   closeReceiptModal();
@@ -542,6 +643,25 @@ async function loadPageData() {
             Ver detalle
           </Button>
 
+          {canRegisterPurchaseReceipt(purchase.status) ? (
+            <Button
+              variant="success"
+              size="sm"
+              className="min-w-36"
+              loading={
+                directReceiveState?.status === 'loading' &&
+                directReceiveState.purchase.id === purchase.id
+              }
+              loadingText="Preparando..."
+              disabled={
+                directReceiveState?.status === 'loading'
+              }
+              onClick={() => void handleDirectReceive(purchase)}
+            >
+              Registrar recepción
+            </Button>
+          ) : null}
+
           {purchase.status === 'DRAFT' ? (
             <>
               <Button
@@ -629,6 +749,25 @@ async function loadPageData() {
               onClick={clearActionError}
             >
               Cerrar mensaje
+            </Button>
+          </div>
+        ) : null}
+
+        {directReceiveState?.status === 'error' ? (
+          <div
+            role="alert"
+            className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <span>{directReceiveState.message}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                void handleDirectReceive(directReceiveState.purchase)
+              }
+            >
+              Reintentar recepción
             </Button>
           </div>
         ) : null}
