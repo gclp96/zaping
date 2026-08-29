@@ -38,6 +38,7 @@ type PurchaseReceiptModalProps = {
   onNotesChange: (value: string) => void;
   onSubmit: () => void;
   onViewReceipt: (receiptId: string) => void;
+  onViewInventory: (receiptId: string, receiptFolio: string) => void;
 };
 
 export default function PurchaseReceiptModal({
@@ -53,6 +54,7 @@ export default function PurchaseReceiptModal({
   onNotesChange,
   onSubmit,
   onViewReceipt,
+  onViewInventory,
 }: PurchaseReceiptModalProps) {
   return (
     <Modal
@@ -103,6 +105,15 @@ export default function PurchaseReceiptModal({
               onClick={() => onViewReceipt(createdReceipt.id)}
             >
               Ver recepción
+            </Button>
+
+            <Button
+              className="w-full sm:w-auto"
+              onClick={() =>
+                onViewInventory(createdReceipt.id, createdReceipt.folio)
+              }
+            >
+              Ver en inventario
             </Button>
           </div>
         </div>

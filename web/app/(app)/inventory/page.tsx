@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -18,6 +19,7 @@ import Section from '@/app/components/ui/layout/Section';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
+import { getPurchaseReceiptHref } from '../purchase-receipts/receipt-navigation';
 
 import {
   compactReferenceId,
@@ -301,6 +303,10 @@ function InventoryPageContent() {
   const traceabilityFilterActive = Boolean(
     requestedReferenceType && requestedReferenceId,
   );
+  const purchaseReceiptReferenceId =
+    requestedReferenceType === 'PURCHASE_RECEIPT'
+      ? requestedReferenceId
+      : null;
   const [selectedView, setSelectedView] = useState<InventoryView>('stock');
   const activeView: InventoryView = queryRequestsMovements
     ? 'movements'
@@ -723,14 +729,24 @@ function InventoryPageContent() {
                 className="flex flex-col gap-3 border-l-4 border-blue-500 bg-blue-50 px-4 py-3 text-blue-950 sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="font-medium">{traceabilityContext}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={clearTraceabilityFilter}
-                >
-                  Limpiar filtro
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {purchaseReceiptReferenceId ? (
+                    <Link
+                      href={getPurchaseReceiptHref(purchaseReceiptReferenceId)}
+                      className="inline-flex items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100"
+                    >
+                      Volver a recepción
+                    </Link>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={clearTraceabilityFilter}
+                  >
+                    Limpiar filtro
+                  </Button>
+                </div>
               </div>
             ) : null}
             {renderMovementsView()}

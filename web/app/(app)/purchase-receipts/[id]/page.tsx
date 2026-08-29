@@ -38,6 +38,7 @@ import {
   formatReceiptMoney,
   getReceiptResponsibleLabel,
 } from '../receipt-display';
+import { getPurchaseReceiptInventoryHref } from '../receipt-navigation';
 import type {
   PurchaseReceiptDetail,
   ReceiptEquipmentAsset,
@@ -162,12 +163,10 @@ export default function PurchaseReceiptDetailPage() {
 
   const purchaseStatus = getPurchaseStatusDescriptor(receipt.purchase.status);
   const responsible = getReceiptResponsibleLabel(receipt.receivedByUser);
-  const inventorySearchParams = new URLSearchParams({
-    tab: 'movements',
-    referenceType: 'PURCHASE_RECEIPT',
-    referenceId: receipt.id,
-    receiptFolio: receipt.folio,
-  });
+  const inventoryHref = getPurchaseReceiptInventoryHref(
+    receipt.id,
+    receipt.folio,
+  );
 
   const receivedItemColumns: StaticTableColumn<ReceivedItemRow>[] = [
     {
@@ -425,7 +424,7 @@ export default function PurchaseReceiptDetailPage() {
           description="Entradas asociadas directamente con esta recepción."
           action={
             <Link
-              href={`/inventory?${inventorySearchParams.toString()}`}
+              href={inventoryHref}
               className={traceabilityActionClassName}
             >
               Ver en inventario

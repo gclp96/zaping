@@ -22,6 +22,7 @@ import PurchaseReceiptModal from './components/PurchaseReceiptModal';
 import PurchaseDetailModal from './components/PurchaseDetailModal';
 import PurchaseFormModal from './components/PurchaseFormModal';
 import { usePurchaseReceipts } from './hooks/usePurchaseReceipts';
+import { getPurchaseReceiptInventoryHref } from '../purchase-receipts/receipt-navigation';
 import { usePurchaseForm } from './hooks/usePurchaseForm';
 import { usePurchaseDetail } from './hooks/usePurchaseDetail';
 import { usePurchaseActions } from './hooks/usePurchaseActions';
@@ -426,7 +427,15 @@ const {
 
 function handleViewCreatedReceipt(receiptId: string) {
   closeReceiptModal();
-  router.push(`/purchase-receipts/${receiptId}`);
+  router.push(`/purchase-receipts/${encodeURIComponent(receiptId)}`);
+}
+
+function handleViewCreatedReceiptInventory(
+  receiptId: string,
+  receiptFolio: string,
+) {
+  closeReceiptModal();
+  router.push(getPurchaseReceiptInventoryHref(receiptId, receiptFolio));
 }
 
 async function loadPageData() {
@@ -985,6 +994,7 @@ async function loadPageData() {
         onNotesChange={handleReceiptNotesChange}
         onSubmit={() => void handleCreateReceipt()}
         onViewReceipt={handleViewCreatedReceipt}
+        onViewInventory={handleViewCreatedReceiptInventory}
       />
 
       <ConfirmDialog

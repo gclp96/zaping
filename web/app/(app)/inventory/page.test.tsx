@@ -732,6 +732,11 @@ describe('InventoryPage', () => {
     ).toBeTruthy();
     expect(screen.getByText('Recepción REC-000001 de compra OC-000001'))
       .toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Volver a recepción' })
+        .getAttribute('href'),
+    ).toBe('/purchase-receipts/658dc34b-1111-2222-3333-444444444444');
     expect(screen.queryByText('Otra recepción con referencia parecida'))
       .toBeNull();
     expect(screen.queryByText('Venta V-000001')).toBeNull();
@@ -764,6 +769,9 @@ describe('InventoryPage', () => {
         'aria-selected',
       ),
     ).toBe('true');
+    expect(
+      screen.queryByRole('link', { name: 'Volver a recepción' }),
+    ).toBeNull();
     expect(screen.queryByRole('button', { name: 'Limpiar filtro' })).toBeNull();
   });
 
@@ -783,5 +791,24 @@ describe('InventoryPage', () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('ignora una referencia de recepción sin ID y conserva el inventario usable', async () => {
+    navigationMock.search = new URLSearchParams({
+      tab: 'movements',
+      referenceType: 'PURCHASE_RECEIPT',
+      referenceId: '   ',
+    }).toString();
+
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('Venta V-000001')).toBeTruthy();
+    expect(screen.queryByText(/Movimientos de la recepción/)).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: 'Volver a recepción' }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Limpiar filtro' }),
+    ).toBeNull();
   });
 });
