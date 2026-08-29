@@ -7,6 +7,16 @@ export type PurchaseStatus =
   | 'RECEIVED'
   | 'CANCELLED';
 
+export type ProductInventoryTracking =
+  | 'QUANTITY'
+  | 'SERIALIZED'
+  | 'ASSET';
+
+export type ProductLotTracking =
+  | 'NONE'
+  | 'OPTIONAL'
+  | 'REQUIRED';
+
 export type PurchaseReceiptFormField =
   | 'quantityReceived'
   | 'lotNumber'
@@ -17,6 +27,8 @@ export type PurchaseReceiptFormItem = {
   productId: string;
   sku: string;
   name: string;
+  inventoryTracking: ProductInventoryTracking;
+  lotTracking: ProductLotTracking;
 
   orderedQuantity: number;
   receivedQuantity: number;
@@ -26,6 +38,15 @@ export type PurchaseReceiptFormItem = {
   lotNumber: string;
   expirationDate: string;
 };
+
+export type PurchaseReceiptItemFieldErrors = Partial<
+  Record<PurchaseReceiptFormField, string>
+>;
+
+export type PurchaseReceiptFieldErrors = Record<
+  string,
+  PurchaseReceiptItemFieldErrors
+>;
 
 export type PurchaseReceiptItem = {
   id: string;
@@ -105,6 +126,8 @@ export type PurchaseItem = {
     id: string;
     sku: string;
     name: string;
+    inventoryTracking: ProductInventoryTracking;
+    lotTracking: ProductLotTracking;
   };
 };
 
@@ -158,6 +181,8 @@ export type Product = {
   stock: number;
   minStock: number;
   price: number;
+  inventoryTracking: ProductInventoryTracking;
+  lotTracking: ProductLotTracking;
 };
 
 export type PurchaseFormItem = {

@@ -337,6 +337,7 @@ const {
   receiptNotes,
   receiptSaving,
   receiptFormError,
+  receiptFieldErrors,
   createdReceipt,
   openReceiptModal,
   closeReceiptModal,
@@ -988,6 +989,7 @@ async function loadPageData() {
         notes={receiptNotes}
         saving={receiptSaving}
         error={receiptFormError}
+        fieldErrors={receiptFieldErrors}
         createdReceipt={createdReceipt}
         onClose={closeReceiptModal}
         onItemChange={handleReceiptItemChange}

@@ -7,6 +7,7 @@ import type {
   CreatedPurchaseReceipt,
   Purchase,
   PurchaseReceipt,
+  PurchaseReceiptFieldErrors,
   PurchaseReceiptFormField,
   PurchaseReceiptFormItem,
 } from '../types';
@@ -37,6 +38,8 @@ export function usePurchaseReceipts({
     useState<string | null>(null);
   const [receiptFormError, setReceiptFormError] =
     useState('');
+  const [receiptFieldErrors, setReceiptFieldErrors] =
+    useState<PurchaseReceiptFieldErrors>({});
   const receiptSubmissionInFlight = useRef(false);
 
   function clearReceiptAttempt() {
@@ -44,6 +47,7 @@ export function usePurchaseReceipts({
     setReceiptFormItems([]);
     setReceiptNotes('');
     setReceiptFormError('');
+    setReceiptFieldErrors({});
     setReceiptIdempotencyKey(null);
     receiptSubmissionInFlight.current = false;
   }
@@ -105,6 +109,9 @@ export function usePurchaseReceipts({
             productId: purchaseItem.productId,
             sku: purchaseItem.product.sku,
             name: purchaseItem.product.name,
+            inventoryTracking:
+              purchaseItem.product.inventoryTracking,
+            lotTracking: purchaseItem.product.lotTracking,
 
             orderedQuantity: purchaseItem.quantity,
             receivedQuantity,
@@ -124,6 +131,7 @@ export function usePurchaseReceipts({
     setReceiptFormItems(formItems);
     setReceiptNotes('');
     setReceiptFormError('');
+    setReceiptFieldErrors({});
     setReceiptIdempotencyKey(crypto.randomUUID());
 
     return true;
@@ -145,20 +153,68 @@ export function usePurchaseReceipts({
     setReceiptFormItems((currentItems) =>
       currentItems.map((item) =>
         item.purchaseItemId === purchaseItemId
-          ? {
-              ...item,
-              [field]: value,
-            }
+          ? item.lotTracking === 'NONE' &&
+            (field === 'lotNumber' ||
+              field === 'expirationDate')
+            ? {
+                ...item,
+                lotNumber: '',
+                expirationDate: '',
+              }
+            : {
+                ...item,
+                [field]: value,
+              }
           : item,
       ),
     );
 
     setReceiptFormError('');
+    setReceiptFieldErrors((currentErrors) => {
+      const itemErrors = currentErrors[purchaseItemId];
+
+      if (!itemErrors) {
+        return currentErrors;
+      }
+
+      const nextItemErrors = { ...itemErrors };
+      delete nextItemErrors[field];
+
+      if (field === 'lotNumber') {
+        delete nextItemErrors.expirationDate;
+      }
+
+      if (Object.keys(nextItemErrors).length === 0) {
+        const remainingErrors = { ...currentErrors };
+        delete remainingErrors[purchaseItemId];
+
+        return remainingErrors;
+      }
+
+      return {
+        ...currentErrors,
+        [purchaseItemId]: nextItemErrors,
+      };
+    });
   }
 
   function handleReceiptNotesChange(value: string) {
     setReceiptNotes(value);
     setReceiptFormError('');
+  }
+
+  function setReceiptFieldError(
+    purchaseItemId: string,
+    field: PurchaseReceiptFormField,
+    message: string,
+  ) {
+    setReceiptFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      [purchaseItemId]: {
+        ...currentErrors[purchaseItemId],
+        [field]: message,
+      },
+    }));
   }
 
   async function handleCreateReceipt() {
@@ -171,6 +227,7 @@ export function usePurchaseReceipts({
     }
 
     setReceiptFormError('');
+    setReceiptFieldErrors({});
 
     const selectedItems = receiptFormItems.filter(
       (item) =>
@@ -199,8 +256,31 @@ export function usePurchaseReceipts({
     );
 
     if (invalidQuantityItem) {
-      setReceiptFormError(
-        `La cantidad de ${invalidQuantityItem.name} debe ser un entero entre 1 y ${invalidQuantityItem.pendingQuantity}.`,
+      const message = `La cantidad de ${invalidQuantityItem.name} debe ser un entero entre 1 y ${invalidQuantityItem.pendingQuantity}.`;
+
+      setReceiptFormError(message);
+      setReceiptFieldError(
+        invalidQuantityItem.purchaseItemId,
+        'quantityReceived',
+        message,
+      );
+      return;
+    }
+
+    const missingRequiredLot = selectedItems.find(
+      (item) =>
+        item.lotTracking === 'REQUIRED' &&
+        item.lotNumber.trim() === '',
+    );
+
+    if (missingRequiredLot) {
+      const message = `El producto ${missingRequiredLot.sku} requiere número de lote.`;
+
+      setReceiptFormError(message);
+      setReceiptFieldError(
+        missingRequiredLot.purchaseItemId,
+        'lotNumber',
+        message,
       );
       return;
     }
@@ -208,13 +288,19 @@ export function usePurchaseReceipts({
     const expirationWithoutLot =
       selectedItems.find(
         (item) =>
+          item.lotTracking !== 'NONE' &&
           item.expirationDate.trim() !== '' &&
           item.lotNumber.trim() === '',
       );
 
     if (expirationWithoutLot) {
-      setReceiptFormError(
-        `Captura el número de lote de ${expirationWithoutLot.name} para registrar su caducidad.`,
+      const message = `Captura el número de lote de ${expirationWithoutLot.name} para registrar su caducidad.`;
+
+      setReceiptFormError(message);
+      setReceiptFieldError(
+        expirationWithoutLot.purchaseItemId,
+        'expirationDate',
+        message,
       );
       return;
     }
@@ -236,10 +322,14 @@ export function usePurchaseReceipts({
               item.quantityReceived,
             ),
             lotNumber:
-              item.lotNumber.trim() || undefined,
+              item.lotTracking === 'NONE'
+                ? undefined
+                : item.lotNumber.trim() || undefined,
             expirationDate:
-              item.expirationDate.trim() ||
-              undefined,
+              item.lotTracking === 'NONE'
+                ? undefined
+                : item.expirationDate.trim() ||
+                  undefined,
           })),
         },
         {
@@ -277,6 +367,7 @@ export function usePurchaseReceipts({
     receiptNotes,
     receiptSaving,
     receiptFormError,
+    receiptFieldErrors,
     createdReceipt,
 
     openReceiptModal,

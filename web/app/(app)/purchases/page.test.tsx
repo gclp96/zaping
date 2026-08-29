@@ -85,6 +85,8 @@ const purchase: Purchase = {
         id: 'product-1',
         sku: 'MED-001',
         name: 'Producto médico',
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
       },
     },
   ],
@@ -122,6 +124,8 @@ const partialPurchase: Purchase = {
         id: 'product-2',
         sku: 'RX-200',
         name: 'Reactivo especializado',
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
       },
     },
   ],
@@ -195,6 +199,9 @@ const product = {
   cost: 100,
   stock: 4,
   minStock: 2,
+  price: 120,
+  inventoryTracking: 'QUANTITY',
+  lotTracking: 'OPTIONAL',
 };
 
 const previousReceipt = {
@@ -1466,7 +1473,8 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
     }),
   ).toBeTruthy();
 
-  const productSku = screen.getByText('MED-001');
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const productSku = within(receiptDesktop).getByText('MED-001');
   const productRow = productSku.closest('tr');
 
   expect(productRow).not.toBeNull();
@@ -1479,7 +1487,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
   expect(row.getByText('4')).toBeTruthy();
   expect(row.getByText('6')).toBeTruthy();
 
-  const quantityInput = screen.getByRole(
+  const quantityInput = within(receiptDesktop).getByRole(
     'spinbutton',
     {
       name: /cantidad recibida de producto médico/i,
@@ -1690,7 +1698,7 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
     getReceiptSubmitButton(),
   );
 
-  const alert = await screen.findByRole('alert');
+  const alert = (await screen.findAllByRole('alert')).at(-1)!;
 
   expect(alert.textContent).toContain(
     'Captura la cantidad recibida de al menos un producto.',
@@ -1737,7 +1745,8 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
     name: /registrar recepci[oó]n.*OC-0001/i,
   });
 
-  const quantityInput = screen.getByRole(
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const quantityInput = within(receiptDesktop).getByRole(
     'spinbutton',
     {
       name: /cantidad recibida de producto médico/i,
@@ -1750,7 +1759,7 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
     getReceiptSubmitButton(),
   );
 
-  const alert = await screen.findByRole('alert');
+  const alert = (await screen.findAllByRole('alert')).at(-1)!;
 
   expect(alert.textContent).toContain(
     'La cantidad de Producto médico debe ser un entero entre 1 y 6.',
@@ -1797,14 +1806,15 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
     name: /registrar recepci[oó]n.*OC-0001/i,
   });
 
-  const quantityInput = screen.getByRole(
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const quantityInput = within(receiptDesktop).getByRole(
     'spinbutton',
     {
       name: /cantidad recibida de producto médico/i,
     },
   );
 
-  const expirationInput = screen.getByLabelText(
+  const expirationInput = within(receiptDesktop).getByLabelText(
     /caducidad de producto médico/i,
   );
 
@@ -1815,7 +1825,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
     getReceiptSubmitButton(),
   );
 
-  const alert = await screen.findByRole('alert');
+  const alert = (await screen.findAllByRole('alert')).at(-1)!;
 
   expect(alert.textContent).toContain(
     'Captura el número de lote de Producto médico para registrar su caducidad.',
@@ -1869,18 +1879,19 @@ it('envía correctamente la recepción al backend', async () => {
     name: /registrar recepci[oó]n.*OC-0001/i,
   });
 
-  const quantityInput = screen.getByRole(
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const quantityInput = within(receiptDesktop).getByRole(
     'spinbutton',
     {
       name: /cantidad recibida de producto médico/i,
     },
   );
 
-  const lotInput = screen.getByLabelText(
+  const lotInput = within(receiptDesktop).getByLabelText(
     /lote de producto médico/i,
   );
 
-  const expirationInput = screen.getByLabelText(
+  const expirationInput = within(receiptDesktop).getByLabelText(
     /caducidad de producto médico/i,
   );
 
@@ -2057,7 +2068,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
     name: /registrar recepci[oó]n.*OC-0001/i,
   });
 
-  const quantityInput = screen.getByRole(
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const quantityInput = within(receiptDesktop).getByRole(
     'spinbutton',
     {
       name: /cantidad recibida de producto médico/i,
@@ -2119,7 +2131,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
     }),
   );
 
-  const freshQuantity = await screen.findByRole('spinbutton', {
+  const freshReceiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const freshQuantity = within(freshReceiptDesktop).getByRole('spinbutton', {
     name: 'Cantidad recibida de Producto médico',
   });
 
@@ -2172,8 +2185,9 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
       name: 'Registrar recepción',
     }),
   );
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
   await user.type(
-    screen.getByRole('spinbutton', {
+    within(receiptDesktop).getByRole('spinbutton', {
       name: 'Cantidad recibida de Producto médico',
     }),
     '6',
@@ -2250,8 +2264,12 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
     receiptModal as HTMLElement,
   );
 
+  const receiptDesktop = receiptScope.getByTestId(
+    'receipt-desktop-items',
+  );
+
   await user.type(
-    receiptScope.getByRole('spinbutton', {
+    within(receiptDesktop).getByRole('spinbutton', {
       name: /cantidad recibida de producto médico/i,
     }),
     '2',
@@ -2336,7 +2354,7 @@ describe('PurchasesPage — formulario de compra', () => {
         name: /^proveedor$/i,
       });
 
-    const quantityInput = screen.getByRole(
+    const quantityInput = within(formModal as HTMLElement).getByRole(
       'spinbutton',
       {
         name: /^cantidad$/i,

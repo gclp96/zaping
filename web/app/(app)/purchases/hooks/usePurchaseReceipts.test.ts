@@ -24,6 +24,7 @@ import { usePurchaseReceipts } from './usePurchaseReceipts';
 
 vi.mock('@/services/api', () => ({
   api: {
+    get: vi.fn(),
     post: vi.fn(),
   },
 }));
@@ -65,6 +66,8 @@ const purchase: Purchase = {
         id: 'product-1',
         sku: 'MED-001',
         name: 'Producto médico',
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
       },
     },
   ],
@@ -116,6 +119,36 @@ const firstIdempotencyKey =
   '11111111-1111-4111-8111-111111111111';
 const secondIdempotencyKey =
   '22222222-2222-4222-8222-222222222222';
+
+const noneLotPurchase: Purchase = {
+  ...purchase,
+  items: [
+    {
+      ...purchase.items[0],
+      product: {
+        ...purchase.items[0].product,
+        sku: 'NOLOT-001',
+        name: 'Producto sin lote',
+        lotTracking: 'NONE',
+      },
+    },
+  ],
+};
+
+const requiredLotPurchase: Purchase = {
+  ...purchase,
+  items: [
+    {
+      ...purchase.items[0],
+      product: {
+        ...purchase.items[0].product,
+        sku: 'LOT-REQUIRED',
+        name: 'Producto con lote requerido',
+        lotTracking: 'REQUIRED',
+      },
+    },
+  ],
+};
 
 function setupHook(
   purchaseReceipts: PurchaseReceipt[] = [
@@ -217,11 +250,105 @@ describe('usePurchaseReceipts', () => {
         orderedQuantity: 10,
         receivedQuantity: 4,
         pendingQuantity: 6,
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
         quantityReceived: '',
         lotNumber: '',
         expirationDate: '',
       },
     ]);
+  });
+
+  it('propaga tracking desde el producto sin solicitar productos aparte', () => {
+    const { result } = setupHook([]);
+
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+
+    expect(result.current.receiptFormItems[0]).toMatchObject({
+      inventoryTracking: 'QUANTITY',
+      lotTracking: 'OPTIONAL',
+    });
+    expect(api.get).not.toHaveBeenCalled();
+  });
+
+  it('no envía datos de lote stale para una línea NONE', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: {
+        id: 'receipt-none',
+        folio: 'RC-NONE',
+      },
+    } as never);
+
+    const { result } = setupHook([]);
+
+    act(() => {
+      result.current.openReceiptModal(noneLotPurchase);
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '1',
+      );
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'lotNumber',
+        'STALE-LOT',
+      );
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'expirationDate',
+        '2029-06-30',
+      );
+    });
+
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/purchase-receipts',
+      {
+        purchaseId: 'purchase-1',
+        notes: undefined,
+        items: [
+          {
+            purchaseItemId: 'purchase-item-1',
+            quantityReceived: 1,
+            lotNumber: undefined,
+            expirationDate: undefined,
+          },
+        ],
+      },
+      expect.anything(),
+    );
+  });
+
+  it('mantiene la regla REQUIRED cerca de la línea antes de enviar', async () => {
+    const { result } = setupHook([]);
+
+    act(() => {
+      result.current.openReceiptModal(requiredLotPurchase);
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '1',
+      );
+    });
+
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+
+    expect(result.current.receiptFormError).toBe(
+      'El producto LOT-REQUIRED requiere número de lote.',
+    );
+    expect(result.current.receiptFieldErrors).toEqual({
+      'purchase-item-1': {
+        lotNumber: 'El producto LOT-REQUIRED requiere número de lote.',
+      },
+    });
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it('excluye los productos recibidos completamente', () => {

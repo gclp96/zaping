@@ -38,6 +38,9 @@ const product = {
   cost: 100,
   stock: 20,
   minStock: 5,
+  price: 120,
+  inventoryTracking: 'QUANTITY' as const,
+  lotTracking: 'OPTIONAL' as const,
 };
 
 const draftPurchase = {
@@ -63,6 +66,8 @@ const draftPurchase = {
         id: 'product-1',
         sku: 'MED-001',
         name: 'Producto médico',
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
       },
     },
   ],

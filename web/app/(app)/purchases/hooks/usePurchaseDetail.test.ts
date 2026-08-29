@@ -66,6 +66,8 @@ const purchase: Purchase = {
         id: 'product-1',
         sku: 'MED-001',
         name: 'Producto médico',
+        inventoryTracking: 'QUANTITY',
+        lotTracking: 'OPTIONAL',
       },
     },
   ],
