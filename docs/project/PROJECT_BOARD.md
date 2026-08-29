@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
-Última actualización: 2026-08-28
+Última actualización: 2026-08-29
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -79,7 +79,9 @@ Frontend UX workstream
 │   └── COMPLETED / VALIDATED
 │
 └── UX-02 DataTable / operational lists
-    └── DEFERRED / NOT STARTED
+    ├── COMPLETE / VALIDATED
+    ├── DataTable para listas operativas
+    └── StaticTable para detalle/documentación
 
 NEXT
 
@@ -1792,12 +1794,6 @@ real concurrent idempotency PostgreSQL QA
 
 Frontend / Architecture
 
-Table Object.values(row) fragility
-
-DataTable / sorting / filters / row action menu
-
-responsive tables / pagination
-
 Inventory tabs primitive decision
 
 Modal accessibility / focus management
@@ -2116,16 +2112,16 @@ Mobile Technician
 
 27. Snapshot de calidad vigente
 
-Último snapshot frontend confirmado al cierre de UX-01.6:
+Último snapshot frontend confirmado al cierre de UX-02:
 
-38 test files
+41 test files
 
-469 / 469 tests PASS
+534 / 534 tests PASS
 
-frontend tests with 4 workers
+frontend tests with limited workers
 PASS
 
-frontend tests serially
+frontend tests serially with one worker
 PASS
 
 frontend build
@@ -2137,7 +2133,7 @@ PASS
 git diff --check
 PASS
 
-Este snapshot cierra exclusivamente UX-01. H8B continúa siendo un bloque técnico
+Este snapshot cierra UX-02 exclusivamente. H8B continúa siendo un bloque técnico
 más amplio y no se declara completado por esta validación frontend.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.

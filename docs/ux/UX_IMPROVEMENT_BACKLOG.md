@@ -1,8 +1,8 @@
 # UX Improvement Backlog — Zaping
 
 **Estado:** Activo
-**Última actualización:** 2026-08-28
-**Baseline:** UX-01 completado
+**Última actualización:** 2026-08-29
+**Baseline:** UX-01 y UX-02 completados
 
 ---
 
@@ -15,28 +15,70 @@ alcance, prioridad y criterios de aceptación propios.
 
 ## 2. UX-02 — DataTable y listas operativas
 
-Estado: `DEFERRED / NOT STARTED`
+Estado: `COMPLETE / VALIDATED`
 
-Alcance candidato:
+UX-02 cerró la migración de las listas operativas y la clasificación de las
+tablas documentales/de detalle.
 
-- DataTable;
-- sorting;
-- filtros consistentes;
-- row action menu;
-- tablas responsive;
-- pagination;
-- estados de tabla escalables;
-- contratos de columnas que no dependan de `Object.values(row)`.
+Arquitectura vigente:
 
-Debe resolverse antes de migrar módulos:
+```text
+DataTable
+→ listas operativas e interactivas
 
-- modelo de columnas tipado;
-- ownership entre UI y feature components;
-- estrategia mobile;
-- paginación client-side vs server-side;
-- accesibilidad de headers, acciones y navegación de páginas.
+StaticTable
+→ tablas documentales y de detalle
+```
 
-No se debe migrar Table de forma masiva sin este contrato.
+`DataTable` es un componente controlado. No procesa dominio ni realiza fetch.
+Cada consumidor conserva la responsabilidad de:
+
+- búsqueda y filtros, cuando aplican;
+- interpretación del sorting;
+- estado de paginación;
+- transformación de datos.
+
+Capacidades validadas de `DataTable`:
+
+- columnas explícitas y tipadas;
+- prioridades responsive;
+- sorting controlado;
+- composición de toolbar;
+- controles de paginación;
+- `RowActionsMenu`;
+- loading, error, empty y filtered-empty;
+- semántica accesible.
+
+`StaticTable` ofrece columnas tipadas, keys explícitas, tabla semántica,
+caption, empty state, renderers de celda y overflow horizontal. No incluye
+sorting, filtros, búsqueda, paginación, toolbar, selección ni manejo de estado.
+
+Utilidades compartidas aprobadas:
+
+- `stableSort()`;
+- `paginateRows()`.
+
+La normalización de búsqueda, el reset de página, las constantes globales de
+page-size y los hooks/controllers genéricos permanecen fuera de esta capa.
+
+Evidencia de cierre UX-02:
+
+- 41 archivos de test;
+- 534 tests PASS;
+- build PASS;
+- lint PASS.
+
+Capacidades diferidas:
+
+- paginación, filtros y sorting server-side;
+- exportación;
+- selección y acciones bulk;
+- saved views;
+- visibilidad configurable de columnas;
+- tipos avanzados de filtros;
+- hooks/controllers genéricos;
+- accesibilidad de Modal;
+- typeahead de `RowActionsMenu` y casos extremos de viewport.
 
 ## 3. Inventory tabs
 
@@ -44,7 +86,8 @@ Estado: `DEFERRED`
 
 Inventory mantiene tabs manuales funcionales y accesibles.
 
-UX-02 deberá decidir si:
+La decisión de primitive para Inventory tabs queda fuera de UX-02 y permanece
+deferred:
 
 - se mantienen locales por semántica específica;
 - se crea una primitive Tabs reutilizable;
@@ -142,7 +185,7 @@ Este backlog UX no redefine:
 - prioridades P0 de release;
 - módulos Healthcare futuros.
 
-## 10. Criterio de entrada para UX-02
+## 10. Criterio de entrada para UX-02 (histórico)
 
 Antes de implementar UX-02 debe aprobarse:
 
@@ -152,3 +195,5 @@ Antes de implementar UX-02 debe aprobarse:
 - contrato de paginación;
 - cobertura de accesibilidad;
 - plan de migración sin ruptura de workflows.
+
+Este criterio fue satisfecho antes del inicio de UX-02.

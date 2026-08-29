@@ -1,7 +1,7 @@
 # UX Principles — Zaping
 
 **Estado:** Aprobado
-**Última actualización:** 2026-08-28
+**Última actualización:** 2026-08-29
 **Alcance:** Principios transversales de experiencia para Zaping ERP
 
 ---
@@ -87,7 +87,8 @@ La estrategia responsive de UX-01 es:
 - acciones que pueden envolver sin desbordar;
 - layouts que usan grids y restricciones explícitas.
 
-La adaptación completa de tablas pertenece a UX-02.
+La adaptación completa de tablas se resolvió en UX-02 mediante `DataTable`
+para listas operativas y `StaticTable` para tablas documentales/de detalle.
 
 ## 8. Datos reales y estados honestos
 
