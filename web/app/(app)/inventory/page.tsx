@@ -6,14 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
+  DataTableToolbar,
   type DataTableColumn,
+  type DataTableSelectFilter,
   type SortState,
 } from '@/app/components/ui/DataTable';
-import EmptyState from '@/app/components/ui/EmptyState';
-import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
-import Select from '@/app/components/ui/Select';
-import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -129,6 +127,153 @@ const stockColumns: DataTableColumn<InventoryItem>[] = [
   },
 ];
 
+const DEFAULT_MOVEMENT_PAGE_SIZE = 25;
+const MOVEMENT_PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const movementCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function compareInventoryMovements(
+  first: InventoryMovement,
+  second: InventoryMovement,
+  columnId: string,
+) {
+  if (columnId === 'date') {
+    return (
+      new Date(first.createdAt).getTime() -
+      new Date(second.createdAt).getTime()
+    );
+  }
+
+  if (columnId === 'quantity') {
+    return first.quantity - second.quantity;
+  }
+
+  if (columnId === 'type') {
+    return movementCollator.compare(
+      getMovementTypeDescriptor(first.movementType).label,
+      getMovementTypeDescriptor(second.movementType).label,
+    );
+  }
+
+  return movementCollator.compare(
+    first.product.name,
+    second.product.name,
+  );
+}
+
+const movementColumns: DataTableColumn<InventoryMovement>[] = [
+  {
+    id: 'date',
+    header: 'Fecha',
+    cell: (movement) => formatMovementDate(movement.createdAt),
+    sortable: true,
+    priority: 'secondary',
+    minWidth: 180,
+  },
+  {
+    id: 'product',
+    header: 'Producto',
+    cell: (movement) => (
+      <div>
+        <p className="font-medium text-gray-900">
+          {movement.product.name}
+        </p>
+        <p className="text-sm text-gray-500">{movement.product.sku}</p>
+      </div>
+    ),
+    sortable: true,
+    priority: 'primary',
+    minWidth: 210,
+  },
+  {
+    id: 'type',
+    header: 'Tipo',
+    cell: (movement) => {
+      const typeDescriptor = getMovementTypeDescriptor(
+        movement.movementType,
+      );
+
+      return (
+        <StatusBadge
+          label={typeDescriptor.label}
+          tone={typeDescriptor.tone}
+          ariaLabel={`Tipo de movimiento: ${typeDescriptor.label}`}
+        />
+      );
+    },
+    sortable: true,
+    priority: 'primary',
+    minWidth: 120,
+  },
+  {
+    id: 'quantity',
+    header: 'Cantidad',
+    cell: (movement) => {
+      const typeDescriptor = getMovementTypeDescriptor(
+        movement.movementType,
+      );
+      const quantityUnit =
+        movement.quantity === 1 ? 'unidad' : 'unidades';
+
+      return (
+        <span
+          className={`font-semibold ${typeDescriptor.quantityClassName}`}
+          aria-label={`${typeDescriptor.label}: ${movement.quantity} ${quantityUnit}`}
+        >
+          {movement.quantity}
+        </span>
+      );
+    },
+    sortable: true,
+    align: 'end',
+    priority: 'primary',
+    minWidth: 110,
+  },
+  {
+    id: 'balance',
+    header: 'Balance posterior',
+    cell: (movement) => movement.balance ?? 'No disponible',
+    align: 'end',
+    priority: 'tertiary',
+    minWidth: 150,
+  },
+  {
+    id: 'reference',
+    header: 'Referencia',
+    cell: (movement) => {
+      const referenceLabel = getReferenceTypeLabel(
+        movement.referenceType,
+      );
+
+      return (
+        <div>
+          <p className="font-medium text-gray-900">{referenceLabel}</p>
+          {movement.referenceId ? (
+            <p
+              className="text-sm text-gray-500"
+              aria-label={`Identificador de referencia: ${movement.referenceId}`}
+            >
+              ID {compactReferenceId(movement.referenceId)}
+            </p>
+          ) : null}
+        </div>
+      );
+    },
+    priority: 'secondary',
+    minWidth: 190,
+  },
+  {
+    id: 'notes',
+    header: 'Notas',
+    cell: (movement) => movement.notes || '-',
+    priority: 'tertiary',
+    minWidth: 220,
+  },
+];
+
 export default function InventoryPage() {
   return (
     <Suspense
@@ -174,6 +319,11 @@ function InventoryPageContent() {
   const [stockPageSize, setStockPageSize] = useState(
     DEFAULT_STOCK_PAGE_SIZE,
   );
+  const [movementSorting, setMovementSorting] = useState<SortState>(null);
+  const [movementPageIndex, setMovementPageIndex] = useState(0);
+  const [movementPageSize, setMovementPageSize] = useState(
+    DEFAULT_MOVEMENT_PAGE_SIZE,
+  );
 
   const filteredMovements = useMemo(() => {
     return movements.filter((movement) => {
@@ -198,6 +348,44 @@ function InventoryPageContent() {
     requestedReferenceType,
     traceabilityFilterActive,
   ]);
+
+  const sortedMovements = useMemo(() => {
+    if (!movementSorting) {
+      return filteredMovements;
+    }
+
+    return stableSort(
+      filteredMovements,
+      (first, second) =>
+        compareInventoryMovements(first, second, movementSorting.columnId),
+      movementSorting.direction,
+    );
+  }, [filteredMovements, movementSorting]);
+
+  const paginatedMovements = useMemo(() => {
+    return paginateRows(
+      sortedMovements,
+      movementPageIndex,
+      movementPageSize,
+    );
+  }, [movementPageIndex, movementPageSize, sortedMovements]);
+
+  const movementFiltersActive = Boolean(
+    movementSearch.trim() || movementTypeFilter,
+  );
+  const movementTableFilters: DataTableSelectFilter[] = [
+    {
+      id: 'movementType',
+      label: 'Tipo de movimiento',
+      value: movementTypeFilter,
+      options: movementTypeOptions,
+      placeholder: 'Todos los tipos',
+      onChange: (value) => {
+        setMovementTypeFilter(value as MovementTypeFilter);
+        setMovementPageIndex(0);
+      },
+    },
+  ];
 
   const sortedInventory = useMemo(() => {
     if (!stockSorting) {
@@ -248,6 +436,7 @@ function InventoryPageContent() {
 
   function clearTraceabilityFilter() {
     setSelectedView('movements');
+    setMovementPageIndex(0);
 
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', 'movements');
@@ -289,6 +478,7 @@ function InventoryPageContent() {
       );
 
       setMovements(response.data);
+      setMovementPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
       setMovementsError(
@@ -388,127 +578,73 @@ function InventoryPageContent() {
       );
     }
 
-    if (movements.length === 0) {
-      return (
-        <EmptyState
-          title={
-            traceabilityFilterActive
-              ? 'Sin movimientos asociados'
-              : 'Sin movimientos de inventario'
-          }
-          description={
-            traceabilityFilterActive
-              ? 'No hay movimientos de inventario asociados a esta recepción.'
-              : 'Todavía no existe historial de entradas, salidas o ajustes.'
-          }
-        />
-      );
+    function clearMovementFilters() {
+      setMovementSearch('');
+      setMovementTypeFilter('');
+      setMovementPageIndex(0);
     }
 
     return (
-      <>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Input
-            label="Buscar movimientos"
-            type="search"
-            value={movementSearch}
-            onChange={(event) => setMovementSearch(event.target.value)}
-            placeholder="SKU, producto o referencia"
-          />
-          <Select
-            label="Tipo de movimiento"
-            value={movementTypeFilter}
-            onChange={(event) =>
-              setMovementTypeFilter(event.target.value as MovementTypeFilter)
-            }
-            options={movementTypeOptions}
-            placeholder="Todos los tipos"
-          />
-        </div>
-
-        {filteredMovements.length === 0 ? (
-          <EmptyState
-            title={
-              traceabilityFilterActive
-                ? 'Sin movimientos asociados'
-                : 'Sin movimientos coincidentes'
-            }
-            description={
-              traceabilityFilterActive
-                ? 'No hay movimientos de inventario asociados a esta recepción.'
-                : 'Ningún movimiento coincide con los filtros actuales.'
-            }
-          />
-        ) : (
-          <Table
-            headers={[
-              'Fecha',
-              'Producto',
-              'Tipo',
-              'Cantidad',
-              'Balance posterior',
-              'Referencia',
-              'Notas',
-            ]}
-            data={filteredMovements.map((movement) => {
-              const typeDescriptor = getMovementTypeDescriptor(
-                movement.movementType,
-              );
-              const quantityUnit =
-                movement.quantity === 1 ? 'unidad' : 'unidades';
-              const referenceLabel = getReferenceTypeLabel(
-                movement.referenceType,
-              );
-
-              return {
-                date: formatMovementDate(movement.createdAt),
-                product: (
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {movement.product.name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      {movement.product.sku}
-                    </p>
-                  </div>
-                ),
-                type: (
-                  <StatusBadge
-                    label={typeDescriptor.label}
-                    tone={typeDescriptor.tone}
-                    ariaLabel={`Tipo de movimiento: ${typeDescriptor.label}`}
-                  />
-                ),
-                quantity: (
-                  <span
-                    className={`font-semibold ${typeDescriptor.quantityClassName}`}
-                    aria-label={`${typeDescriptor.label}: ${movement.quantity} ${quantityUnit}`}
-                  >
-                    {movement.quantity}
-                  </span>
-                ),
-                balance: movement.balance ?? 'No disponible',
-                reference: (
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {referenceLabel}
-                    </p>
-                    {movement.referenceId ? (
-                      <p
-                        className="text-sm text-gray-500"
-                        aria-label={`Identificador de referencia: ${movement.referenceId}`}
-                      >
-                        ID {compactReferenceId(movement.referenceId)}
-                      </p>
-                    ) : null}
-                  </div>
-                ),
-                notes: movement.notes || '-',
-              };
-            })}
-          />
-        )}
-      </>
+      <DataTable
+        caption="Historial de movimientos"
+        rows={paginatedMovements}
+        columns={movementColumns}
+        getRowId={(movement) => movement.id}
+        sorting={{
+          state: movementSorting,
+          onChange: setMovementSorting,
+        }}
+        toolbar={
+          movements.length > 0 ? (
+            <DataTableToolbar
+              search={{
+                value: movementSearch,
+                label: 'Buscar movimientos',
+                placeholder: 'SKU, producto o referencia',
+                onChange: (value) => {
+                  setMovementSearch(value);
+                  setMovementPageIndex(0);
+                },
+              }}
+              filters={movementTableFilters}
+              onReset={clearMovementFilters}
+              resetDisabled={!movementFiltersActive}
+            />
+          ) : undefined
+        }
+        pagination={
+          movements.length > 0
+            ? {
+                pageIndex: movementPageIndex,
+                pageSize: movementPageSize,
+                totalRows: sortedMovements.length,
+                pageSizeOptions: MOVEMENT_PAGE_SIZE_OPTIONS,
+                onPageChange: setMovementPageIndex,
+                onPageSizeChange: (nextPageSize) => {
+                  setMovementPageSize(nextPageSize);
+                  setMovementPageIndex(0);
+                },
+              }
+            : undefined
+        }
+        emptyState={{
+          title: traceabilityFilterActive
+            ? 'Sin movimientos asociados'
+            : 'Sin movimientos de inventario',
+          description: traceabilityFilterActive
+            ? 'No hay movimientos de inventario asociados a esta recepción.'
+            : 'Todavía no existe historial de entradas, salidas o ajustes.',
+        }}
+        filteredEmptyState={{
+          title: traceabilityFilterActive
+            ? 'Sin movimientos asociados'
+            : 'Sin movimientos coincidentes',
+          description: traceabilityFilterActive
+            ? 'No hay movimientos de inventario asociados a esta recepción.'
+            : 'Ningún movimiento coincide con los filtros actuales.',
+        }}
+        isFiltered={Boolean(movementFiltersActive || traceabilityFilterActive)}
+      />
     );
   }
 

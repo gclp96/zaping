@@ -177,6 +177,28 @@ const movements = [
   adjustmentMovement,
 ];
 
+function buildMovementList(count: number): InventoryMovement[] {
+  return Array.from({ length: count }, (_, index) => {
+    const sequence = index + 1;
+
+    return {
+      ...purchaseReceiptMovement,
+      id: `movement-page-${sequence}`,
+      movementType: sequence === count ? 'OUT' : 'IN',
+      quantity: sequence,
+      referenceId: `movement-reference-${sequence}`,
+      createdAt: new Date(
+        Date.UTC(2026, 7, sequence, 18, 0, 0),
+      ).toISOString(),
+      product: buildProduct({
+        id: `product-page-${sequence}`,
+        sku: `MOV-${String(sequence).padStart(3, '0')}`,
+        name: `Movimiento ${String(sequence).padStart(3, '0')}`,
+      }),
+    };
+  });
+}
+
 function configureApiMocks({
   inventoryData = inventory,
   movementData = movements,
@@ -380,6 +402,40 @@ describe('InventoryPage', () => {
     await openMovementsView();
 
     expect(
+      screen.getByRole('table', { name: 'Historial de movimientos' }),
+    ).toBeTruthy();
+    expect(
+      screen.getAllByRole('columnheader').map((header) =>
+        header.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Fecha',
+      'Producto',
+      'Tipo',
+      'Cantidad',
+      'Balance posterior',
+      'Referencia',
+      'Notas',
+    ]);
+    expect(
+      screen.getByRole('columnheader', { name: 'Producto' }).classList.contains(
+        'hidden',
+      ),
+    ).toBe(false);
+    expect(
+      screen.getByRole('columnheader', { name: 'Fecha' }).classList.contains(
+        'sm:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen.getByRole('columnheader', { name: 'Notas' }).classList.contains(
+        'md:table-cell',
+      ),
+    ).toBe(true);
+    expect(
+      screen.queryByRole('columnheader', { name: 'Acciones' }),
+    ).toBeNull();
+    expect(
       screen.getByRole('tab', {
         name: 'Movimientos',
       }).getAttribute('aria-selected'),
@@ -408,6 +464,108 @@ describe('InventoryPage', () => {
     ).toBeTruthy();
     expect(screen.getByText('Venta V-000001')).toBeTruthy();
     expect(screen.queryByRole('link')).toBeNull();
+  });
+
+  it('combina búsqueda y filtro de tipo sin ampliar la semántica actual', async () => {
+    const user = await openMovementsView();
+
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar movimientos' }),
+      'blunt',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo de movimiento' }),
+      'OUT',
+    );
+
+    expect(screen.getByText('LF1837')).toBeTruthy();
+    expect(screen.queryByText('MED-001')).toBeNull();
+    expect(screen.queryByText('ZERO-001')).toBeNull();
+  });
+
+  it('ordena movimientos por fecha y cantidad con SortState controlado', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({
+      movementData: [
+        purchaseReceiptMovement,
+        saleMovement,
+        adjustmentMovement,
+      ],
+    });
+
+    render(<InventoryPage />);
+    await screen.findByText('MED-001');
+    await user.click(screen.getByRole('tab', { name: 'Movimientos' }));
+
+    const productHeader = screen.getByRole('columnheader', {
+      name: 'Producto',
+    });
+    await user.click(
+      within(productHeader).getByRole('button', { name: 'Producto' }),
+    );
+
+    expect(productHeader.getAttribute('aria-sort')).toBe('ascending');
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[1].textContent?.trim(),
+      ),
+    ).toEqual([
+      'BLUNT TIPLF1837',
+      'Producto agotadoZERO-001',
+      'Sutura quirúrgicaMED-001',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Cantidad' }));
+    expect(
+      screen.getAllByRole('row').slice(1).map((row) =>
+        within(row).getAllByRole('cell')[1].textContent?.trim(),
+      ),
+    ).toEqual([
+      'BLUNT TIPLF1837',
+      'Producto agotadoZERO-001',
+      'Sutura quirúrgicaMED-001',
+    ]);
+  });
+
+  it('pagina Movements con 25 filas y reinicia tras tipo, tamaño y búsqueda', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({ movementData: buildMovementList(30) });
+
+    render(<InventoryPage />);
+    await screen.findByText('MED-001');
+    await user.click(screen.getByRole('tab', { name: 'Movimientos' }));
+    await screen.findByText('MOV-001');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('MOV-026')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Tipo de movimiento' }),
+      'OUT',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('MOV-030')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar movimientos' }),
+      'MOV-030',
+    );
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('MOV-030')).toBeTruthy();
   });
 
   it('filtra por búsqueda normalizada y por tipo de movimiento', async () => {
@@ -445,6 +603,9 @@ describe('InventoryPage', () => {
     );
 
     expect(screen.getByText('Sin movimientos coincidentes')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('Venta V-000001')).toBeTruthy();
 
     unmount();
     cleanup();
