@@ -14,7 +14,9 @@ import {
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import Loading from '@/app/components/ui/Loading';
-import Table from '@/app/components/ui/Table';
+import StaticTable, {
+  type StaticTableColumn,
+} from '@/app/components/ui/StaticTable';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -36,12 +38,24 @@ import {
   formatReceiptMoney,
   getReceiptResponsibleLabel,
 } from '../receipt-display';
-import type { PurchaseReceiptDetail } from '../types';
+import type {
+  PurchaseReceiptDetail,
+  ReceiptEquipmentAsset,
+} from '../types';
 
 type DetailFieldProps = {
   label: string;
   children: ReactNode;
 };
+
+type EquipmentRow = {
+  asset: ReceiptEquipmentAsset;
+  lotNumber: string;
+};
+
+type ReceivedItemRow = PurchaseReceiptDetail['items'][number];
+type InventoryMovementRow =
+  PurchaseReceiptDetail['inventoryMovements'][number];
 
 function DetailField({ label, children }: DetailFieldProps) {
   return (
@@ -100,7 +114,7 @@ export default function PurchaseReceiptDetailPage() {
     void loadReceipt();
   }, [loadReceipt]);
 
-  const equipmentRows = useMemo(
+  const equipmentRows = useMemo<EquipmentRow[]>(
     () =>
       receipt?.items.flatMap((item) =>
         item.equipmentAssets.map((asset) => ({
@@ -154,6 +168,188 @@ export default function PurchaseReceiptDetailPage() {
     referenceId: receipt.id,
     receiptFolio: receipt.folio,
   });
+
+  const receivedItemColumns: StaticTableColumn<ReceivedItemRow>[] = [
+    {
+      id: 'sku',
+      header: 'SKU',
+      cell: (item) => item.product.sku,
+    },
+    {
+      id: 'product',
+      header: 'Producto',
+      cell: (item) => item.product.name,
+    },
+    {
+      id: 'quantity',
+      header: 'Cantidad recibida',
+      cell: (item) => item.quantityReceived,
+    },
+    {
+      id: 'unitCost',
+      header: 'Costo unitario',
+      cell: (item) => formatReceiptMoney(item.unitCost),
+    },
+    {
+      id: 'batch',
+      header: 'Lote',
+      cell: (item) => item.batch?.lotNumber ?? item.lotNumber ?? '—',
+    },
+    {
+      id: 'expiration',
+      header: 'Caducidad',
+      cell: (item) =>
+        item.expirationDate
+          ? formatReceiptDate(item.expirationDate)
+          : '—',
+    },
+    {
+      id: 'equipment',
+      header: 'Equipo generado',
+      cell: (item) => item.equipmentAssets.length,
+    },
+  ];
+
+  const inventoryMovementColumns: StaticTableColumn<InventoryMovementRow>[] = [
+    {
+      id: 'date',
+      header: 'Fecha',
+      cell: (movement) => formatMovementDate(movement.createdAt),
+    },
+    {
+      id: 'product',
+      header: 'Producto',
+      cell: (movement) => (
+        <div>
+          <p className="font-medium text-gray-900">
+            {movement.product.name}
+          </p>
+          <p className="text-sm text-gray-500">
+            {movement.product.sku}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'type',
+      header: 'Tipo',
+      cell: (movement) => {
+        const descriptor = getMovementTypeDescriptor(
+          movement.movementType,
+        );
+
+        return (
+          <StatusBadge
+            label={descriptor.label}
+            tone={descriptor.tone}
+            ariaLabel={`Tipo de movimiento: ${descriptor.label}`}
+          />
+        );
+      },
+    },
+    {
+      id: 'quantity',
+      header: 'Cantidad',
+      cell: (movement) => movement.quantity,
+    },
+    {
+      id: 'balance',
+      header: 'Saldo',
+      cell: (movement) => movement.balance ?? 'No disponible',
+    },
+    {
+      id: 'unitCost',
+      header: 'Costo unitario',
+      cell: (movement) =>
+        movement.unitCost == null
+          ? '—'
+          : formatReceiptMoney(movement.unitCost),
+    },
+    {
+      id: 'reference',
+      header: 'Referencia',
+      cell: () => `Recepción ${receipt.folio}`,
+    },
+  ];
+
+  const equipmentColumns: StaticTableColumn<EquipmentRow>[] = [
+    {
+      id: 'code',
+      header: 'Código',
+      cell: ({ asset }) => (
+        <Link
+          href={`/equipment?assetId=${encodeURIComponent(asset.id)}`}
+          aria-label={`Ver equipo ${asset.assetCode}`}
+          className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
+        >
+          {asset.assetCode}
+        </Link>
+      ),
+    },
+    {
+      id: 'product',
+      header: 'Producto',
+      cell: ({ asset }) => (
+        <div>
+          <p className="font-medium text-gray-900">
+            {asset.product.name}
+          </p>
+          <p className="text-sm text-gray-500">
+            {asset.product.sku}
+          </p>
+        </div>
+      ),
+    },
+    {
+      id: 'serial',
+      header: 'Serie',
+      cell: ({ asset }) => asset.serialNumber || '—',
+    },
+    {
+      id: 'lifecycle',
+      header: 'Estado',
+      cell: ({ asset }) => {
+        const lifecycle = getEquipmentLifecycleDescriptor(
+          asset.lifecycle,
+        );
+
+        return (
+          <StatusBadge
+            label={lifecycle.label}
+            tone={lifecycle.tone}
+            ariaLabel={`Estado del equipo ${asset.assetCode}: ${lifecycle.label}`}
+          />
+        );
+      },
+    },
+    {
+      id: 'condition',
+      header: 'Condición',
+      cell: ({ asset }) => {
+        const condition = getEquipmentConditionDescriptor(
+          asset.condition,
+        );
+
+        return (
+          <StatusBadge
+            label={condition.label}
+            tone={condition.tone}
+            ariaLabel={`Condición del equipo ${asset.assetCode}: ${condition.label}`}
+          />
+        );
+      },
+    },
+    {
+      id: 'origin',
+      header: 'Origen',
+      cell: ({ asset }) => getEquipmentOriginLabel(asset.origin),
+    },
+    {
+      id: 'batch',
+      header: 'Lote',
+      cell: ({ lotNumber }) => lotNumber,
+    },
+  ];
 
   return (
     <PageContainer>
@@ -213,27 +409,12 @@ export default function PurchaseReceiptDetailPage() {
           title="Partidas recibidas"
           description="Productos y costos registrados en esta recepción."
         >
-          <Table
-            headers={[
-              'SKU',
-              'Producto',
-              'Cantidad recibida',
-              'Costo unitario',
-              'Lote',
-              'Caducidad',
-              'Equipo generado',
-            ]}
-            data={receipt.items.map((item) => ({
-              sku: item.product.sku,
-              product: item.product.name,
-              quantity: item.quantityReceived,
-              unitCost: formatReceiptMoney(item.unitCost),
-              batch: item.batch?.lotNumber ?? item.lotNumber ?? '—',
-              expiration: item.expirationDate
-                ? formatReceiptDate(item.expirationDate)
-                : '—',
-              equipment: item.equipmentAssets.length,
-            }))}
+          <StaticTable
+            caption="Partidas recibidas"
+            columns={receivedItemColumns}
+            rows={receipt.items}
+            getRowKey={(item) => item.id}
+            emptyState="Sin registros"
           />
         </Section>
       </div>
@@ -257,49 +438,12 @@ export default function PurchaseReceiptDetailPage() {
               No hay movimientos de inventario asociados a esta recepción.
             </p>
           ) : (
-            <Table
-              headers={[
-                'Fecha',
-                'Producto',
-                'Tipo',
-                'Cantidad',
-                'Saldo',
-                'Costo unitario',
-                'Referencia',
-              ]}
-              data={receipt.inventoryMovements.map((movement) => {
-                const descriptor = getMovementTypeDescriptor(
-                  movement.movementType,
-                );
-
-                return {
-                  date: formatMovementDate(movement.createdAt),
-                  product: (
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {movement.product.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {movement.product.sku}
-                      </p>
-                    </div>
-                  ),
-                  type: (
-                    <StatusBadge
-                      label={descriptor.label}
-                      tone={descriptor.tone}
-                      ariaLabel={`Tipo de movimiento: ${descriptor.label}`}
-                    />
-                  ),
-                  quantity: movement.quantity,
-                  balance: movement.balance ?? 'No disponible',
-                  unitCost:
-                    movement.unitCost == null
-                      ? '—'
-                      : formatReceiptMoney(movement.unitCost),
-                  reference: `Recepción ${receipt.folio}`,
-                };
-              })}
+            <StaticTable
+              caption="Movimientos de inventario"
+              columns={inventoryMovementColumns}
+              rows={receipt.inventoryMovements}
+              getRowKey={(movement) => movement.id}
+              emptyState="Sin registros"
             />
           )}
         </Section>
@@ -315,63 +459,12 @@ export default function PurchaseReceiptDetailPage() {
               Esta recepción no generó equipos.
             </p>
           ) : (
-            <Table
-              headers={[
-                'Código',
-                'Producto',
-                'Serie',
-                'Estado',
-                'Condición',
-                'Origen',
-                'Lote',
-              ]}
-              data={equipmentRows.map(({ asset, lotNumber }) => {
-                const lifecycle = getEquipmentLifecycleDescriptor(
-                  asset.lifecycle,
-                );
-                const condition = getEquipmentConditionDescriptor(
-                  asset.condition,
-                );
-
-                return {
-                  code: (
-                    <Link
-                      href={`/equipment?assetId=${encodeURIComponent(asset.id)}`}
-                      aria-label={`Ver equipo ${asset.assetCode}`}
-                      className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
-                    >
-                      {asset.assetCode}
-                    </Link>
-                  ),
-                  product: (
-                    <div>
-                      <p className="font-medium text-gray-900">
-                        {asset.product.name}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {asset.product.sku}
-                      </p>
-                    </div>
-                  ),
-                  serial: asset.serialNumber || '—',
-                  lifecycle: (
-                    <StatusBadge
-                      label={lifecycle.label}
-                      tone={lifecycle.tone}
-                      ariaLabel={`Estado del equipo ${asset.assetCode}: ${lifecycle.label}`}
-                    />
-                  ),
-                  condition: (
-                    <StatusBadge
-                      label={condition.label}
-                      tone={condition.tone}
-                      ariaLabel={`Condición del equipo ${asset.assetCode}: ${condition.label}`}
-                    />
-                  ),
-                  origin: getEquipmentOriginLabel(asset.origin),
-                  batch: lotNumber,
-                };
-              })}
+            <StaticTable
+              caption="Equipos generados"
+              columns={equipmentColumns}
+              rows={equipmentRows}
+              getRowKey={({ asset }) => asset.id}
+              emptyState="Sin registros"
             />
           )}
         </Section>
