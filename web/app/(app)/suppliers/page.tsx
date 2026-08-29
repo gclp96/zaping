@@ -1,15 +1,18 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
-import EmptyState from '@/app/components/ui/EmptyState';
+import DataTable, {
+  DataTableToolbar,
+  type DataTableColumn,
+  type SortState,
+} from '@/app/components/ui/DataTable';
 import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
 import Modal from '@/app/components/ui/Modal';
-import Table from '@/app/components/ui/Table';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -30,6 +33,14 @@ type SupplierFormErrors = {
   name?: string;
   email?: string;
 };
+
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
+
+const supplierCollator = new Intl.Collator('es-MX', {
+  numeric: true,
+  sensitivity: 'base',
+});
 
 function normalizeOptionalValue(value: string): string | undefined {
   const trimmedValue = value.trim();
@@ -54,6 +65,35 @@ function supplierMatchesSearch(supplier: Supplier, search: string): boolean {
   );
 }
 
+function compareSuppliers(
+  first: Supplier,
+  second: Supplier,
+  columnId: string,
+) {
+  const firstValue =
+    columnId === 'name'
+      ? first.name
+      : columnId === 'contactName'
+        ? first.contactName || ''
+        : columnId === 'email'
+          ? first.email || ''
+          : columnId === 'phone'
+            ? first.phone || ''
+            : '';
+  const secondValue =
+    columnId === 'name'
+      ? second.name
+      : columnId === 'contactName'
+        ? second.contactName || ''
+        : columnId === 'email'
+          ? second.email || ''
+          : columnId === 'phone'
+            ? second.phone || ''
+            : '';
+
+  return supplierCollator.compare(firstValue, secondValue);
+}
+
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -74,6 +114,9 @@ export default function SuppliersPage() {
     useState<Supplier | null>(null);
   const [deactivating, setDeactivating] = useState(false);
   const [deactivationError, setDeactivationError] = useState('');
+  const [sorting, setSorting] = useState<SortState>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const filteredSuppliers = useMemo(
     () => suppliers.filter((supplier) => supplierMatchesSearch(supplier, search)),
@@ -87,6 +130,7 @@ export default function SuppliersPage() {
 
       const response = await api.get<Supplier[]>('/suppliers');
       setSuppliers(response.data);
+      setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
       setPageError(
@@ -237,35 +281,78 @@ export default function SuppliersPage() {
     }
   }
 
-  const tableData = filteredSuppliers.map((supplier) => ({
-    name: supplier.name,
-    contactName: supplier.contactName || 'Sin contacto',
-    email: supplier.email || 'Sin email',
-    phone: supplier.phone || 'Sin teléfono',
-    address: supplier.address || 'Sin dirección',
-    actions: (
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Editar proveedor ${supplier.name}`}
-          onClick={() => openEditModal(supplier)}
-        >
-          Editar
-        </Button>
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          aria-label={`Desactivar proveedor ${supplier.name}`}
-          onClick={() => openDeactivateDialog(supplier)}
-        >
-          Desactivar
-        </Button>
-      </div>
-    ),
-  }));
+  const isFiltered = Boolean(search.trim());
+
+  const sortedSuppliers = useMemo(() => {
+    if (!sorting) {
+      return filteredSuppliers;
+    }
+
+    const direction = sorting.direction === 'asc' ? 1 : -1;
+
+    return filteredSuppliers
+      .map((supplier, originalIndex) => ({ supplier, originalIndex }))
+      .sort((first, second) => {
+        const comparison = compareSuppliers(
+          first.supplier,
+          second.supplier,
+          sorting.columnId,
+        );
+
+        return comparison === 0
+          ? first.originalIndex - second.originalIndex
+          : comparison * direction;
+      })
+      .map(({ supplier }) => supplier);
+  }, [filteredSuppliers, sorting]);
+
+  const paginatedSuppliers = useMemo(() => {
+    const firstRowIndex = pageIndex * pageSize;
+
+    return sortedSuppliers.slice(firstRowIndex, firstRowIndex + pageSize);
+  }, [pageIndex, pageSize, sortedSuppliers]);
+
+  const supplierColumns: DataTableColumn<Supplier>[] = [
+    {
+      id: 'name',
+      header: 'Proveedor',
+      cell: (supplier) => supplier.name,
+      sortable: true,
+      priority: 'primary',
+      minWidth: 190,
+    },
+    {
+      id: 'contactName',
+      header: 'Contacto',
+      cell: (supplier) => supplier.contactName || 'Sin contacto',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 170,
+    },
+    {
+      id: 'email',
+      header: 'Email',
+      cell: (supplier) => supplier.email || 'Sin email',
+      sortable: true,
+      priority: 'secondary',
+      minWidth: 220,
+    },
+    {
+      id: 'phone',
+      header: 'Teléfono',
+      cell: (supplier) => supplier.phone || 'Sin teléfono',
+      sortable: true,
+      priority: 'tertiary',
+      minWidth: 150,
+    },
+    {
+      id: 'address',
+      header: 'Dirección',
+      cell: (supplier) => supplier.address || 'Sin dirección',
+      priority: 'tertiary',
+      minWidth: 220,
+    },
+  ];
 
   return (
     <>
@@ -300,54 +387,88 @@ export default function SuppliersPage() {
               </Button>
             </div>
           </Section>
-        ) : suppliers.length === 0 ? (
-          <EmptyState
-            title="Sin proveedores activos"
-            description="Registra un proveedor para comenzar a usarlo en compras."
-            action={
-              <Button type="button" onClick={openCreateModal}>
-                Nuevo proveedor
-              </Button>
-            }
-          />
         ) : (
           <Section>
-            <Input
-              label="Buscar proveedores"
-              type="search"
-              value={search}
-              placeholder="Nombre, contacto, email, teléfono o dirección"
-              startAdornment={<Search size={18} />}
-              onChange={(event) => setSearch(event.target.value)}
+            <DataTable
+              caption="Catálogo de proveedores"
+              rows={paginatedSuppliers}
+              columns={supplierColumns}
+              getRowId={(supplier) => supplier.id}
+              sorting={{
+                state: sorting,
+                onChange: setSorting,
+              }}
+              toolbar={
+                suppliers.length > 0 ? (
+                  <DataTableToolbar
+                    search={{
+                      value: search,
+                      label: 'Buscar proveedores',
+                      placeholder: 'Nombre, contacto, email, teléfono o dirección',
+                      onChange: (value) => {
+                        setSearch(value);
+                        setPageIndex(0);
+                      },
+                    }}
+                    actions={
+                      isFiltered ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSearch('');
+                            setPageIndex(0);
+                          }}
+                        >
+                          Limpiar búsqueda
+                        </Button>
+                      ) : null
+                    }
+                  />
+                ) : undefined
+              }
+              pagination={
+                suppliers.length > 0
+                  ? {
+                      pageIndex,
+                      pageSize,
+                      totalRows: sortedSuppliers.length,
+                      pageSizeOptions: PAGE_SIZE_OPTIONS,
+                      onPageChange: setPageIndex,
+                      onPageSizeChange: (nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setPageIndex(0);
+                      },
+                    }
+                  : undefined
+              }
+              rowActions={{
+                label: (supplier) => `Acciones del proveedor ${supplier.name}`,
+                actions: [
+                  {
+                    id: 'edit',
+                    label: 'Editar',
+                    onSelect: openEditModal,
+                  },
+                  {
+                    id: 'deactivate',
+                    label: 'Desactivar',
+                    variant: 'destructive',
+                    onSelect: openDeactivateDialog,
+                  },
+                ],
+              }}
+              emptyState={{
+                title: 'Sin proveedores activos',
+                description: 'Registra un proveedor para comenzar a usarlo en compras.',
+              }}
+              filteredEmptyState={{
+                title: 'Sin proveedores coincidentes',
+                description: 'No encontramos proveedores con esa búsqueda.',
+              }}
+              isFiltered={isFiltered}
             />
-
-            {filteredSuppliers.length === 0 ? (
-              <EmptyState
-                title="Sin proveedores coincidentes"
-                description="No encontramos proveedores con esa búsqueda."
-                action={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setSearch('')}
-                  >
-                    Limpiar búsqueda
-                  </Button>
-                }
-              />
-            ) : (
-              <Table
-                headers={[
-                  'Nombre',
-                  'Contacto',
-                  'Email',
-                  'Teléfono',
-                  'Dirección',
-                  'Acciones',
-                ]}
-                data={tableData}
-              />
-            )}
           </Section>
         )}
       </PageContainer>

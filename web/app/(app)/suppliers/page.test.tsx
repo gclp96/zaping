@@ -3,6 +3,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -54,6 +55,18 @@ const laboratorySupplier = {
 
 const suppliers = [medicalSupplier, laboratorySupplier];
 
+function buildSupplier(index: number) {
+  return {
+    ...medicalSupplier,
+    id: `supplier-${index}`,
+    name: `Proveedor ${String(index).padStart(2, '0')}`,
+    contactName: `Contacto ${index}`,
+    email: `proveedor${index}@test.test`,
+    phone: `662555${String(index).padStart(4, '0')}`,
+    address: `Dirección ${index}`,
+  };
+}
+
 function configureApiMocks(list = suppliers) {
   vi.mocked(api.get).mockResolvedValue({ data: list } as never);
   vi.mocked(api.post).mockResolvedValue({ data: medicalSupplier } as never);
@@ -64,6 +77,39 @@ function configureApiMocks(list = suppliers) {
 async function renderSuppliersPage() {
   render(<SuppliersPage />);
   await screen.findByText(medicalSupplier.name);
+}
+
+async function chooseSupplierAction(
+  user: ReturnType<typeof userEvent.setup>,
+  supplierName: string,
+  actionName: 'Editar' | 'Desactivar',
+) {
+  const row = screen.getByText(supplierName).closest('tr');
+
+  if (!row) {
+    throw new Error(`No se encontró la fila de ${supplierName}`);
+  }
+
+  await user.click(
+    within(row).getByRole('button', {
+      name: `Acciones del proveedor ${supplierName}`,
+    }),
+  );
+  await user.click(
+    screen.getByRole('menuitem', {
+      name:
+        actionName === 'Desactivar'
+          ? 'Acción destructiva: Desactivar'
+          : actionName,
+    }),
+  );
+}
+
+function renderedSupplierNames() {
+  return screen.getAllByRole('row').slice(1).map((row) => {
+    const firstCell = within(row).getAllByRole('cell')[0];
+    return firstCell.textContent?.trim();
+  });
 }
 
 async function completeSupplierForm(
@@ -139,6 +185,92 @@ describe('SuppliersPage', () => {
     expect(
       screen.getByText('No encontramos proveedores con esa búsqueda.'),
     ).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    expect(screen.getByText(medicalSupplier.name)).toBeTruthy();
+  });
+
+  it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {
+    const user = userEvent.setup();
+    const sortingSuppliers = [
+      { ...medicalSupplier, id: 'supplier-z', name: 'Proveedor Z', contactName: 'Contacto Z' },
+      { ...laboratorySupplier, id: 'supplier-a', name: 'Proveedor A', contactName: 'Contacto A' },
+      { ...medicalSupplier, id: 'supplier-m', name: 'Proveedor M', contactName: 'Contacto M' },
+    ];
+    configureApiMocks(sortingSuppliers);
+
+    render(<SuppliersPage />);
+    await screen.findByText('Proveedor Z');
+    expect(screen.queryByRole('button', { name: 'Dirección' })).toBeNull();
+
+    const supplierHeader = screen.getByRole('button', { name: 'Proveedor' });
+
+    await user.click(supplierHeader);
+    expect(renderedSupplierNames()).toEqual([
+      'Proveedor A',
+      'Proveedor M',
+      'Proveedor Z',
+    ]);
+
+    await user.click(supplierHeader);
+    expect(renderedSupplierNames()).toEqual([
+      'Proveedor Z',
+      'Proveedor M',
+      'Proveedor A',
+    ]);
+
+    await user.click(supplierHeader);
+    expect(renderedSupplierNames()).toEqual([
+      'Proveedor Z',
+      'Proveedor A',
+      'Proveedor M',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Contacto' }));
+    expect(renderedSupplierNames()).toEqual([
+      'Proveedor A',
+      'Proveedor M',
+      'Proveedor Z',
+    ]);
+  });
+
+  it('pagina con 25 filas por defecto, permite cambiar tamaño y reinicia la búsqueda', async () => {
+    const user = userEvent.setup();
+    const manySuppliers = Array.from({ length: 30 }, (_, index) =>
+      buildSupplier(index),
+    );
+    configureApiMocks(manySuppliers);
+
+    render(<SuppliersPage />);
+    await screen.findByText('Proveedor 00');
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.queryByText('Proveedor 29')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Proveedor 29')).toBeTruthy();
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: 'Página anterior' }));
+    expect(screen.getByText('Proveedor 00')).toBeTruthy();
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Filas por página' }),
+      '10',
+    );
+    expect(screen.getByText('Mostrando 1-10 de 30')).toBeTruthy();
+    expect(screen.getByText('Proveedor 00')).toBeTruthy();
+    expect(screen.queryByText('Proveedor 29')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Proveedor 10')).toBeTruthy();
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar proveedores',
+    });
+    await user.type(search, 'Proveedor 29');
+    expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByText('Proveedor 29')).toBeTruthy();
   });
 
   it('muestra un error de carga y permite reintentar', async () => {
@@ -245,11 +377,7 @@ describe('SuppliersPage', () => {
     vi.mocked(api.patch).mockResolvedValue({ data: updatedSupplier } as never);
 
     await renderSuppliersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Editar proveedor ${medicalSupplier.name}`,
-      }),
-    );
+    await chooseSupplierAction(user, medicalSupplier.name, 'Editar');
     const nameInput = screen.getByRole('textbox', { name: 'Nombre' });
     await user.clear(nameInput);
     await user.type(nameInput, updatedSupplier.name);
@@ -280,11 +408,7 @@ describe('SuppliersPage', () => {
       .mockResolvedValueOnce({ data: [laboratorySupplier] } as never);
 
     await renderSuppliersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Desactivar proveedor ${medicalSupplier.name}`,
-      }),
-    );
+    await chooseSupplierAction(user, medicalSupplier.name, 'Desactivar');
 
     expect(
       screen.getByRole('heading', { name: 'Desactivar proveedor' }),
@@ -314,11 +438,7 @@ describe('SuppliersPage', () => {
     );
 
     await renderSuppliersPage();
-    await user.click(
-      screen.getByRole('button', {
-        name: `Desactivar proveedor ${medicalSupplier.name}`,
-      }),
-    );
+    await chooseSupplierAction(user, medicalSupplier.name, 'Desactivar');
     await user.click(screen.getByRole('button', { name: 'Desactivar' }));
 
     expect(
