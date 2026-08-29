@@ -32,6 +32,7 @@ export default function ConfirmDialog({
     <Modal
       isOpen={isOpen}
       title={title}
+      dismissible={!loading}
       onClose={() => {
         if (!loading) {
           onClose();
@@ -45,6 +46,7 @@ export default function ConfirmDialog({
 
         <div className="flex justify-end gap-3">
           <Button
+            autoFocus={!loading}
             variant="outline"
             disabled={loading}
             onClick={onClose}

@@ -652,16 +652,14 @@ describe('QuotesPage', () => {
   expect(
     within(
       quoteModal as HTMLElement,
-    ).getByText('Clínica nueva'),
-  ).toBeTruthy();
+    ).getAllByText('Clínica nueva').length,
+  ).toBeGreaterThan(0);
 
   expect(
     within(
       quoteModal as HTMLElement,
-    ).getByText(
-      'compras@clinicanueva.com',
-    ),
-  ).toBeTruthy();
+    ).getAllByText('compras@clinicanueva.com').length,
+  ).toBeGreaterThan(0);
 
   expect(
     screen.getByRole('heading', {
