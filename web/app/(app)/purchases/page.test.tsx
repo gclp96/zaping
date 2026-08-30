@@ -2378,8 +2378,8 @@ describe('PurchasesPage — formulario de compra', () => {
     );
 
     expect(
-      screen.getByText('Producto médico'),
-    ).toBeTruthy();
+      screen.getAllByText('Producto médico').length,
+    ).toBeGreaterThan(0);
 
     await user.click(
       screen.getByRole('button', {
@@ -2463,7 +2463,10 @@ describe('PurchasesPage — formulario de compra', () => {
       }),
     ).toBeTruthy();
 
-    const quantityInput = screen.getByRole(
+    const itemsTable = screen.getByTestId(
+      'purchase-form-items-table',
+    );
+    const quantityInput = within(itemsTable).getByRole(
       'spinbutton',
       {
         name: /cantidad de producto médico/i,

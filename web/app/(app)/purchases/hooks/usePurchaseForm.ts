@@ -37,6 +37,10 @@ export function usePurchaseForm({
     useState('');
   const [productError, setProductError] =
     useState('');
+  const [quantityError, setQuantityError] =
+    useState('');
+  const [itemQuantityErrors, setItemQuantityErrors] =
+    useState<Record<string, string>>({});
   const [itemsError, setItemsError] = useState('');
 
   const subtotal = useMemo(() => {
@@ -65,6 +69,8 @@ export function usePurchaseForm({
 
     setSupplierError('');
     setProductError('');
+    setQuantityError('');
+    setItemQuantityErrors({});
     setItemsError('');
   }
 
@@ -97,6 +103,8 @@ export function usePurchaseForm({
 
     setSupplierError('');
     setProductError('');
+    setQuantityError('');
+    setItemQuantityErrors({});
     setItemsError('');
 
     setOpenModal(true);
@@ -128,10 +136,12 @@ export function usePurchaseForm({
     value: string,
   ) {
     setQuantity(value);
+    setQuantityError('');
   }
 
   function handleAddProduct() {
     setProductError('');
+    setQuantityError('');
     setItemsError('');
 
     if (!selectedProductId) {
@@ -145,7 +155,7 @@ export function usePurchaseForm({
       !Number.isInteger(parsedQuantity) ||
       parsedQuantity < 1
     ) {
-      setProductError(
+      setQuantityError(
         'La cantidad debe ser un número entero mayor o igual a uno.',
       );
       return;
@@ -186,6 +196,16 @@ export function usePurchaseForm({
       },
     ]);
 
+    setItemQuantityErrors((currentErrors) => {
+      if (!currentErrors[product.id]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[product.id];
+      return nextErrors;
+    });
+
     setSelectedProductId('');
     setQuantity('1');
   }
@@ -206,6 +226,15 @@ export function usePurchaseForm({
     );
 
     setItemsError('');
+    setItemQuantityErrors((currentErrors) => {
+      if (!currentErrors[productId]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[productId];
+      return nextErrors;
+    });
   }
 
   function handleRemoveItem(productId: string) {
@@ -216,10 +245,21 @@ export function usePurchaseForm({
     );
 
     setItemsError('');
+    setItemQuantityErrors((currentErrors) => {
+      if (!currentErrors[productId]) {
+        return currentErrors;
+      }
+
+      const nextErrors = { ...currentErrors };
+      delete nextErrors[productId];
+      return nextErrors;
+    });
   }
 
   async function handleCreatePurchase() {
     setSupplierError('');
+    setQuantityError('');
+    setItemQuantityErrors({});
     setItemsError('');
 
     let valid = true;
@@ -238,20 +278,25 @@ export function usePurchaseForm({
       valid = false;
     }
 
-    const invalidQuantity = items.some(
-      (item) => {
-        const parsedQuantity = Number(
-          item.quantity,
-        );
+    const quantityErrors = items.reduce<Record<string, string>>(
+      (errors, item) => {
+        const parsedQuantity = Number(item.quantity);
 
-        return (
+        if (
           !Number.isInteger(parsedQuantity) ||
           parsedQuantity < 1
-        );
+        ) {
+          errors[item.productId] =
+            'La cantidad debe ser un número entero mayor o igual a uno.';
+        }
+
+        return errors;
       },
+      {},
     );
 
-    if (invalidQuantity) {
+    if (Object.keys(quantityErrors).length > 0) {
+      setItemQuantityErrors(quantityErrors);
       setItemsError(
         'Todas las cantidades deben ser enteros mayores o iguales a uno.',
       );
@@ -313,6 +358,8 @@ export function usePurchaseForm({
 
     supplierError,
     productError,
+    quantityError,
+    itemQuantityErrors,
     itemsError,
 
     subtotal,

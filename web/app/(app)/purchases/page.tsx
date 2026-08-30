@@ -307,6 +307,8 @@ const {
 
   supplierError,
   productError,
+  quantityError,
+  itemQuantityErrors,
   itemsError,
 
   subtotal,
@@ -922,6 +924,8 @@ async function loadPageData() {
         items={items}
         supplierError={supplierError}
         productError={productError}
+        quantityError={quantityError}
+        itemQuantityErrors={itemQuantityErrors}
         itemsError={itemsError}
         subtotal={subtotal}
         iva={iva}
