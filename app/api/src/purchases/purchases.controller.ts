@@ -73,4 +73,10 @@ export class PurchasesController {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     return this.purchasesService.generatePDF(req.user.companyId, id, res);
   }
+
+  @Get(':id')
+  findOne(@Request() req: any, @Param('id') id: string) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+    return this.purchasesService.findOne(req.user.companyId, id);
+  }
 }

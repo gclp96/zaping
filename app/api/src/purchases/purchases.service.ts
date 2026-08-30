@@ -12,6 +12,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 
+type PurchaseWithReceiptItems = {
+  items: Array<{
+    id: string;
+    quantity: number;
+  }>;
+};
+
 @Injectable()
 export class PurchasesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -132,25 +139,64 @@ export class PurchasesService {
       },
     });
 
+    const receivedByPurchaseItem =
+      await this.getReceivedQuantitiesByPurchaseItem(companyId, purchases);
+
+    return purchases.map((purchase) =>
+      this.withReceiptProgress(purchase, receivedByPurchaseItem),
+    );
+  }
+
+  async findOne(companyId: string, purchaseId: string) {
+    const purchase = await this.prisma.purchase.findFirst({
+      where: {
+        id: purchaseId,
+        companyId,
+      },
+      include: {
+        supplier: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    if (!purchase) {
+      throw new NotFoundException('Compra no encontrada');
+    }
+
+    const receivedByPurchaseItem =
+      await this.getReceivedQuantitiesByPurchaseItem(companyId, [purchase]);
+
+    return this.withReceiptProgress(purchase, receivedByPurchaseItem);
+  }
+
+  private async getReceivedQuantitiesByPurchaseItem(
+    companyId: string,
+    purchases: PurchaseWithReceiptItems[],
+  ) {
     const purchaseItemIds = purchases.flatMap((purchase) =>
       purchase.items.map((item) => item.id),
     );
 
-    const receiptItems =
-      purchaseItemIds.length === 0
-        ? []
-        : await this.prisma.purchaseReceiptItem.findMany({
-            where: {
-              companyId,
-              purchaseItemId: {
-                in: purchaseItemIds,
-              },
-            },
-            select: {
-              purchaseItemId: true,
-              quantityReceived: true,
-            },
-          });
+    if (purchaseItemIds.length === 0) {
+      return new Map<string, number>();
+    }
+
+    const receiptItems = await this.prisma.purchaseReceiptItem.findMany({
+      where: {
+        companyId,
+        purchaseItemId: {
+          in: purchaseItemIds,
+        },
+      },
+      select: {
+        purchaseItemId: true,
+        quantityReceived: true,
+      },
+    });
 
     const receivedByPurchaseItem = new Map<string, number>();
 
@@ -164,40 +210,45 @@ export class PurchasesService {
       );
     }
 
-    return purchases.map((purchase) => {
-      let orderedUnits = 0;
-      let receivedUnits = 0;
-      let pendingUnits = 0;
-      let completedLines = 0;
+    return receivedByPurchaseItem;
+  }
 
-      for (const item of purchase.items) {
-        const orderedQuantity = Math.max(item.quantity, 0);
-        const receivedQuantity = Math.max(
-          receivedByPurchaseItem.get(item.id) ?? 0,
-          0,
-        );
-        const pendingQuantity = Math.max(orderedQuantity - receivedQuantity, 0);
+  private withReceiptProgress<TPurchase extends PurchaseWithReceiptItems>(
+    purchase: TPurchase,
+    receivedByPurchaseItem: Map<string, number>,
+  ) {
+    let orderedUnits = 0;
+    let receivedUnits = 0;
+    let pendingUnits = 0;
+    let completedLines = 0;
 
-        orderedUnits += orderedQuantity;
-        receivedUnits += receivedQuantity;
-        pendingUnits += pendingQuantity;
+    for (const item of purchase.items) {
+      const orderedQuantity = Math.max(item.quantity, 0);
+      const receivedQuantity = Math.max(
+        receivedByPurchaseItem.get(item.id) ?? 0,
+        0,
+      );
+      const pendingQuantity = Math.max(orderedQuantity - receivedQuantity, 0);
 
-        if (receivedQuantity >= orderedQuantity) {
-          completedLines += 1;
-        }
+      orderedUnits += orderedQuantity;
+      receivedUnits += receivedQuantity;
+      pendingUnits += pendingQuantity;
+
+      if (receivedQuantity >= orderedQuantity) {
+        completedLines += 1;
       }
+    }
 
-      return {
-        ...purchase,
-        receiptProgress: {
-          orderedUnits,
-          receivedUnits,
-          pendingUnits,
-          orderedLines: purchase.items.length,
-          completedLines,
-        },
-      };
-    });
+    return {
+      ...purchase,
+      receiptProgress: {
+        orderedUnits,
+        receivedUnits,
+        pendingUnits,
+        orderedLines: purchase.items.length,
+        completedLines,
+      },
+    };
   }
 
   async update(companyId: string, purchaseId: string, dto: UpdatePurchaseDto) {
