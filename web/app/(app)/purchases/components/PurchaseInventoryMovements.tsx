@@ -1,9 +1,11 @@
 import type { InventoryMovement } from '../types';
+import Button from '@/app/components/ui/Button';
 
 type PurchaseInventoryMovementsProps = {
   movements: InventoryMovement[];
   loading: boolean;
   error: string;
+  onRetry?: () => void;
   formatDate: (value: string) => string;
   formatMoney: (value: number) => string;
 };
@@ -12,6 +14,7 @@ export default function PurchaseInventoryMovements({
   movements,
   loading,
   error,
+  onRetry,
   formatDate,
   formatMoney,
 }: PurchaseInventoryMovementsProps) {
@@ -26,9 +29,23 @@ export default function PurchaseInventoryMovements({
           Cargando movimientos...
         </p>
       ) : error ? (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
+        <div
+          role="alert"
+          className="space-y-3 text-sm text-red-600"
+        >
+          <p>{error}</p>
+
+          {onRetry ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onRetry}
+            >
+              Reintentar movimientos
+            </Button>
+          ) : null}
+        </div>
       ) : movements.length === 0 ? (
         <p className="text-sm text-gray-500">
           Esta compra no tiene movimientos de inventario asociados.
