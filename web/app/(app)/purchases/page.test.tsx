@@ -336,6 +336,46 @@ function getReceiptSubmitButton() {
   });
 }
 
+function getPurchaseRowByFolio(folio: string) {
+  const folioLink = screen.getByRole('link', { name: folio });
+  const row = folioLink.closest('tr');
+
+  if (!row) {
+    throw new Error(`No se encontró la fila de la compra ${folio}.`);
+  }
+
+  return row;
+}
+
+async function openActionsMenu(
+  user: ReturnType<typeof userEvent.setup>,
+  folio = purchase.folio,
+) {
+  await user.click(
+    within(getPurchaseRowByFolio(folio)).getByRole('button', {
+      name: `Acciones de compra ${folio}`,
+    }),
+  );
+
+  return await screen.findByRole('menu', {
+    name: `Acciones de compra ${folio}`,
+  });
+}
+
+async function clickRowAction(
+  user: ReturnType<typeof userEvent.setup>,
+  actionName: RegExp | string,
+  folio = purchase.folio,
+) {
+  const menu = await openActionsMenu(user, folio);
+
+  await user.click(
+    within(menu).getByRole('menuitem', {
+      name: actionName,
+    }),
+  );
+}
+
 beforeEach(() => {
   routerMock.search = '';
 });
@@ -408,7 +448,12 @@ describe('PurchasesPage — navegación trazable', () => {
     expect(
       screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
-    expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href'),
+    ).toBe('/purchases/purchase-1');
+    expect(
+      screen.queryByRole('button', { name: 'Ver detalle' }),
+    ).toBeNull();
   });
 
   it.each([
@@ -420,19 +465,16 @@ describe('PurchasesPage — navegación trazable', () => {
   ] as const)(
     'conserva la regla de recepción para el estado %s',
     async (status, canReceive) => {
-      const user = userEvent.setup();
       const statusPurchase = {
         ...purchase,
         status,
       };
 
+      routerMock.search = 'purchaseId=purchase-1';
       configureApiMocks([statusPurchase]);
       render(<PurchasesPage />);
 
       await screen.findByText(statusPurchase.folio);
-      await user.click(
-        screen.getByRole('button', { name: 'Ver detalle' }),
-      );
 
       const detailTitle = await screen.findByRole('heading', {
         name: 'Compra OC-0001',
@@ -477,7 +519,12 @@ describe('PurchasesPage — navegación trazable', () => {
     expect(
       await screen.findByText('No se encontró la compra solicitada.'),
     ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Ver detalle' })).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href'),
+    ).toBe('/purchases/purchase-1');
+    expect(
+      screen.queryByRole('button', { name: 'Ver detalle' }),
+    ).toBeNull();
     expect(
       screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
@@ -756,23 +803,36 @@ describe('PurchasesPage — normalización de lista', () => {
       name: 'Proveedor',
     });
 
-    for (const [value, label, folio] of [
-      ['DRAFT', 'Borrador', draftPurchase.folio],
-      ['CONFIRMED', 'Confirmada', confirmedFilterPurchase.folio],
+    for (const [value, label, folio, purchaseId] of [
+      ['DRAFT', 'Borrador', draftPurchase.folio, draftPurchase.id],
+      [
+        'CONFIRMED',
+        'Confirmada',
+        confirmedFilterPurchase.folio,
+        confirmedFilterPurchase.id,
+      ],
       [
         'PARTIALLY_RECEIVED',
         'Parcialmente recibida',
         partialPurchase.folio,
+        partialPurchase.id,
       ],
-      ['RECEIVED', 'Recibida', receivedPurchase.folio],
-      ['CANCELLED', 'Cancelada', cancelledPurchase.folio],
+      ['RECEIVED', 'Recibida', receivedPurchase.folio, receivedPurchase.id],
+      [
+        'CANCELLED',
+        'Cancelada',
+        cancelledPurchase.folio,
+        cancelledPurchase.id,
+      ],
     ]) {
       expect(within(status).getByRole('option', { name: label })).toBeTruthy();
       await user.selectOptions(status, value);
-      expect(screen.getByText(folio)).toBeTruthy();
       expect(
-        screen.getAllByRole('button', { name: 'Ver detalle' }),
-      ).toHaveLength(1);
+        screen.getByRole('link', { name: folio }).getAttribute('href'),
+      ).toBe(`/purchases/${purchaseId}`);
+      expect(
+        screen.queryByRole('button', { name: 'Ver detalle' }),
+      ).toBeNull();
     }
 
     expect(within(supplierFilter).getAllByRole('option')).toHaveLength(3);
@@ -790,9 +850,14 @@ describe('PurchasesPage — normalización de lista', () => {
     );
 
     expect(screen.getByText(partialPurchase.folio)).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: 'Ver detalle' })).toHaveLength(
-      1,
-    );
+    expect(
+      screen.getByRole('link', { name: partialPurchase.folio }).getAttribute(
+        'href',
+      ),
+    ).toBe('/purchases/purchase-2');
+    expect(
+      screen.queryByRole('button', { name: 'Ver detalle' }),
+    ).toBeNull();
 
     const search = screen.getByRole('searchbox', {
       name: 'Buscar compras',
@@ -909,7 +974,11 @@ describe('PurchasesPage — normalización de lista', () => {
       render(<PurchasesPage />);
 
       await screen.findByText(draftPurchase.folio);
-      await user.click(screen.getByRole('button', { name: action }));
+      if (action === 'Cancelar') {
+        await clickRowAction(user, /cancelar/i);
+      } else {
+        await user.click(screen.getByRole('button', { name: action }));
+      }
 
       const dialogHeading = await screen.findByRole('heading', {
         name: dialog,
@@ -947,7 +1016,7 @@ describe('PurchasesPage — normalización de lista', () => {
     render(<PurchasesPage />);
 
     await screen.findByText(purchase.folio);
-    await user.click(screen.getByRole('button', { name: 'Descargar PDF' }));
+    await clickRowAction(user, /descargar pdf/i);
 
     expect(
       await screen.findByText('No fue posible descargar el PDF.'),
@@ -1326,7 +1395,6 @@ describe('PurchasesPage — recepciones', () => {
   });
 
   it('deshabilita Registrar recepción mientras carga el historial', async () => {
-    const user = userEvent.setup();
     let resolveReceipts: ((value: unknown) => void) | undefined;
     const receiptsPromise = new Promise((resolve) => {
       resolveReceipts = resolve;
@@ -1344,9 +1412,9 @@ describe('PurchasesPage — recepciones', () => {
       return defaultGet!(url);
     });
 
+    routerMock.search = 'purchaseId=purchase-1';
     render(<PurchasesPage />);
     await screen.findByText('OC-0001');
-    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
     const detailTitle = await screen.findByRole('heading', {
       name: 'Compra OC-0001',
@@ -1392,9 +1460,9 @@ describe('PurchasesPage — recepciones', () => {
       return defaultGet!(url);
     });
 
+    routerMock.search = 'purchaseId=purchase-1';
     render(<PurchasesPage />);
     await screen.findByText('OC-0001');
-    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
     const detailTitle = await screen.findByRole('heading', {
       name: 'Compra OC-0001',
@@ -1443,29 +1511,9 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
   );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  const registerReceiptButton = within(
-    detailModal as HTMLElement,
-  ).getByRole('button', {
-    name: /registrar recepci[oó]n/i,
-  });
-
-  await user.click(registerReceiptButton);
 
   expect(
     await screen.findByRole('heading', {
@@ -1499,7 +1547,6 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 });
 
   it('muestra progreso por partida en cero cuando no hay recepciones', async () => {
-    const user = userEvent.setup();
     const noReceiptPurchase = {
       ...purchase,
       receiptProgress: {
@@ -1525,9 +1572,9 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
     return defaultGet!(url);
   });
 
+  routerMock.search = 'purchaseId=purchase-1';
   render(<PurchasesPage />);
   await screen.findByText('OC-0001');
-  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
   const detailTitle = await screen.findByRole('heading', {
     name: 'Compra OC-0001',
@@ -1552,7 +1599,6 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 });
 
 it('muestra el progreso completo sin cambiar los valores financieros', async () => {
-  const user = userEvent.setup();
   const completePurchase = {
     ...purchase,
     status: 'RECEIVED' as const,
@@ -1566,10 +1612,10 @@ it('muestra el progreso completo sin cambiar los valores financieros', async () 
   };
 
   configureApiMocks([completePurchase]);
+  routerMock.search = 'purchaseId=purchase-1';
   render(<PurchasesPage />);
 
   await screen.findByText('OC-0001');
-  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
   const summary = await screen.findByRole('region', {
     name: 'Resumen de compra',
@@ -1589,7 +1635,6 @@ it('muestra el progreso completo sin cambiar los valores financieros', async () 
 });
 
 it('mantiene el progreso por purchaseItemId con múltiples recepciones y productos repetidos', async () => {
-  const user = userEvent.setup();
   const multiLinePurchase = {
     ...purchase,
     items: [
@@ -1633,9 +1678,9 @@ it('mantiene el progreso por purchaseItemId con múltiples recepciones y product
     return defaultGet!(url);
   });
 
+  routerMock.search = 'purchaseId=purchase-1';
   render(<PurchasesPage />);
   await screen.findByText('OC-0001');
-  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
 
   await screen.findByRole('heading', { name: 'Compra OC-0001' });
 
@@ -1665,29 +1710,8 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   await screen.findByRole('heading', {
@@ -1716,29 +1740,8 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   await screen.findByRole('heading', {
@@ -1777,29 +1780,8 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   await screen.findByRole('heading', {
@@ -1850,29 +1832,8 @@ it('envía correctamente la recepción al backend', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   await screen.findByRole('heading', {
@@ -2039,29 +2000,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   await screen.findByRole('heading', {
@@ -2111,23 +2051,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   expect(screen.getByRole('heading', { name: 'Compras' })).toBeTruthy();
 
   await user.click(
-    screen.getByRole('button', { name: 'Ver detalle' }),
-  );
-
-  const detailTitleAfterSuccess = await screen.findByRole('heading', {
-    name: 'Compra OC-0001',
-  });
-  const detailAfterSuccess =
-    detailTitleAfterSuccess.parentElement?.parentElement;
-
-  expect(detailAfterSuccess).toBeTruthy();
-  expect(
-    within(detailAfterSuccess as HTMLElement).getByText('REC-000002'),
-  ).toBeTruthy();
-
-  await user.click(
-    within(detailAfterSuccess as HTMLElement).getByRole('button', {
-      name: 'Registrar recepción',
+    screen.getByRole('button', {
+      name: /registrar recepci[oó]n/i,
     }),
   );
 
@@ -2173,16 +2098,10 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
   render(<PurchasesPage />);
 
   await screen.findByText('OC-0001');
-  await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
-
-  const detailTitle = await screen.findByRole('heading', {
-    name: 'Compra OC-0001',
-  });
-  const detailModal = detailTitle.parentElement?.parentElement;
 
   await user.click(
-    within(detailModal as HTMLElement).getByRole('button', {
-      name: 'Registrar recepción',
+    screen.getByRole('button', {
+      name: /registrar recepci[oó]n/i,
     }),
   );
   const receiptDesktop = screen.getByTestId('receipt-desktop-items');
@@ -2223,29 +2142,8 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
 
   await user.click(
     screen.getByRole('button', {
-      name: /ver detalle/i,
+      name: /registrar recepci[oó]n/i,
     }),
-  );
-
-  const detailTitle = await screen.findByRole(
-    'heading',
-    {
-      name: /Compra OC-0001/i,
-    },
-  );
-
-  const detailModal =
-    detailTitle.parentElement?.parentElement;
-
-  expect(detailModal).not.toBeNull();
-
-  await user.click(
-    within(detailModal as HTMLElement).getByRole(
-      'button',
-      {
-        name: /registrar recepci[oó]n/i,
-      },
-    ),
   );
 
   const receiptHeading = await screen.findByRole(
@@ -2451,11 +2349,7 @@ describe('PurchasesPage — formulario de compra', () => {
 
     await screen.findByText('OC-0001');
 
-    await user.click(
-      screen.getByRole('button', {
-        name: /^editar$/i,
-      }),
-    );
+    await clickRowAction(user, /^editar$/i);
 
     expect(
       await screen.findByRole('heading', {
@@ -2593,6 +2487,112 @@ describe('PurchasesPage — formulario de compra', () => {
     cleanup();
   });
 
+  it.each([
+    {
+      purchaseForStatus: draftPurchase,
+      primaryAction: /^aprobar$/i,
+      hiddenPrimaryAction: /registrar recepci[oó]n/i,
+      menuActions: [/^editar$/i, /descargar pdf/i, /cancelar/i],
+      omittedMenuActions: [/ver detalle/i],
+    },
+    {
+      purchaseForStatus: purchase,
+      primaryAction: /registrar recepci[oó]n/i,
+      hiddenPrimaryAction: /^aprobar$/i,
+      menuActions: [/descargar pdf/i],
+      omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
+    },
+    {
+      purchaseForStatus: partialPurchase,
+      primaryAction: /registrar recepci[oó]n/i,
+      hiddenPrimaryAction: /^aprobar$/i,
+      menuActions: [/descargar pdf/i],
+      omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
+    },
+    {
+      purchaseForStatus: receivedPurchase,
+      primaryAction: null,
+      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      menuActions: [/descargar pdf/i],
+      omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
+    },
+    {
+      purchaseForStatus: cancelledPurchase,
+      primaryAction: null,
+      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      menuActions: [/descargar pdf/i],
+      omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
+    },
+  ])(
+    'renderiza la matriz de acciones para $purchaseForStatus.status',
+    async ({
+      purchaseForStatus,
+      primaryAction,
+      hiddenPrimaryAction,
+      menuActions,
+      omittedMenuActions,
+    }) => {
+      const user = userEvent.setup();
+      configureApiMocks([purchaseForStatus]);
+
+      render(<PurchasesPage />);
+
+      await screen.findByText(purchaseForStatus.folio);
+      const row = getPurchaseRowByFolio(purchaseForStatus.folio);
+
+      expect(
+        within(row)
+          .getByRole('link', { name: purchaseForStatus.folio })
+          .getAttribute('href'),
+      ).toBe(`/purchases/${purchaseForStatus.id}`);
+
+      if (primaryAction) {
+        expect(
+          within(row).getByRole('button', {
+            name: primaryAction,
+          }),
+        ).toBeTruthy();
+      }
+
+      expect(
+        within(row).queryByRole('button', {
+          name: hiddenPrimaryAction,
+        }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole('button', { name: /ver detalle/i }),
+      ).toBeNull();
+
+      const menu = await openActionsMenu(user, purchaseForStatus.folio);
+
+      for (const action of menuActions) {
+        expect(
+          within(menu).getByRole('menuitem', {
+            name: action,
+          }),
+        ).toBeTruthy();
+      }
+
+      for (const action of omittedMenuActions) {
+        expect(
+          within(menu).queryByRole('menuitem', {
+            name: action,
+          }),
+        ).toBeNull();
+      }
+
+      await user.keyboard('{Escape}');
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('menu', {
+            name: `Acciones de compra ${purchaseForStatus.folio}`,
+          }),
+        ).toBeNull();
+      });
+    },
+  );
+
   it('aprueba una compra en borrador y recarga las compras', async () => {
     const user = userEvent.setup();
 
@@ -2727,11 +2727,7 @@ describe('PurchasesPage — formulario de compra', () => {
 
   await screen.findByText('OC-0001');
 
-  await user.click(
-    screen.getByRole('button', {
-      name: /^cancelar$/i,
-    }),
-  );
+  await clickRowAction(user, /cancelar/i);
 
   const dialogTitle = await screen.findByRole(
     'heading',
@@ -2843,11 +2839,7 @@ describe('PurchasesPage — formulario de compra', () => {
 
   await screen.findByText('OC-0001');
 
-  await user.click(
-    screen.getByRole('button', {
-      name: /descargar pdf/i,
-    }),
-  );
+  await clickRowAction(user, /descargar pdf/i);
 
   await waitFor(() => {
     expect(api.get).toHaveBeenCalledWith(

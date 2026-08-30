@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { paginateRows, stableSort } from '@/app/client-table.utils';
@@ -38,7 +39,9 @@ import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import DataTable, {
   DataTableToolbar,
+  RowActionsMenu,
   type DataTableColumn,
+  type DataTableRowAction,
   type DataTableSelectFilter,
   type SortState,
 } from '@/app/components/ui/DataTable';
@@ -583,7 +586,14 @@ async function loadPageData() {
       sortable: true,
       priority: 'primary',
       minWidth: 120,
-      cell: (purchase) => purchase.folio,
+      cell: (purchase) => (
+        <Link
+          href={`/purchases/${encodeURIComponent(purchase.id)}`}
+          className="font-medium text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
+        >
+          {purchase.folio}
+        </Link>
+      ),
     },
     {
       id: 'supplier',
@@ -675,22 +685,56 @@ async function loadPageData() {
       id: 'actions',
       header: 'Acciones',
       priority: 'primary',
-      minWidth: 360,
-      cell: (purchase) => (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="min-w-24"
-            onClick={() => {
-              clearActionError();
-              void openPurchaseDetail(purchase);
-            }}
-          >
-            Ver detalle
-          </Button>
+      minWidth: 210,
+      cell: (purchase) => {
+        const rowActions: DataTableRowAction<Purchase>[] = [
+          ...(purchase.status === 'DRAFT'
+            ? [
+                {
+                  id: 'edit',
+                  label: 'Editar',
+                  onSelect: (selectedPurchase: Purchase) =>
+                    openEditModal(selectedPurchase),
+                },
+              ]
+            : []),
+          {
+            id: 'download-pdf',
+            label:
+              downloadingPurchaseId === purchase.id
+                ? 'Descargando PDF...'
+                : 'Descargar PDF',
+            disabled: downloadingPurchaseId === purchase.id,
+            onSelect: (selectedPurchase) =>
+              void handleDownloadPdf(selectedPurchase),
+          },
+          ...(purchase.status === 'DRAFT'
+            ? [
+                {
+                  id: 'cancel',
+                  label: 'Cancelar',
+                  variant: 'destructive' as const,
+                  onSelect: (selectedPurchase: Purchase) =>
+                    openCancelDialog(selectedPurchase),
+                },
+              ]
+            : []),
+        ];
 
-          {canRegisterPurchaseReceipt(purchase.status) ? (
+        return (
+          <div className="flex items-center justify-end gap-2">
+            {purchase.status === 'DRAFT' ? (
+              <Button
+                variant="success"
+                size="sm"
+                className="min-w-24"
+                onClick={() => openApproveDialog(purchase)}
+              >
+                Aprobar
+              </Button>
+            ) : null}
+
+            {canRegisterPurchaseReceipt(purchase.status) ? (
             <Button
               variant="success"
               size="sm"
@@ -707,48 +751,16 @@ async function loadPageData() {
             >
               Registrar recepción
             </Button>
-          ) : null}
+            ) : null}
 
-          {purchase.status === 'DRAFT' ? (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openEditModal(purchase)}
-              >
-                Editar
-              </Button>
-
-              <Button
-                variant="success"
-                size="sm"
-                onClick={() => openApproveDialog(purchase)}
-              >
-                Aprobar
-              </Button>
-
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => openCancelDialog(purchase)}
-              >
-                Cancelar
-              </Button>
-            </>
-          ) : null}
-
-          <Button
-            variant="primary"
-            size="sm"
-            className="min-w-24"
-            loading={downloadingPurchaseId === purchase.id}
-            loadingText="Descargando..."
-            onClick={() => void handleDownloadPdf(purchase)}
-          >
-            Descargar PDF
-          </Button>
-        </div>
-      ),
+            <RowActionsMenu
+              row={purchase}
+              label={`Acciones de compra ${purchase.folio}`}
+              actions={rowActions}
+            />
+          </div>
+        );
+      },
     },
   ];
 
