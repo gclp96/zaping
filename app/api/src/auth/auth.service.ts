@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  AuthenticatedSession,
+  AuthenticatedUser,
+} from './interfaces/authenticated-request.interface';
 
 import * as bcrypt from 'bcrypt';
 
@@ -15,6 +19,28 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  async getAuthenticatedUserContext(
+    user: AuthenticatedUser,
+  ): Promise<AuthenticatedSession> {
+    const company = await this.prisma.company.findUnique({
+      where: {
+        id: user.companyId,
+      },
+      select: {
+        timezone: true,
+      },
+    });
+
+    if (!company) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    return {
+      ...user,
+      companyTimezone: company.timezone,
+    };
+  }
 
   async register(data: {
     companyName: string;

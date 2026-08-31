@@ -10,6 +10,10 @@ export interface AuthenticatedUser {
   role: UserRole;
 }
 
+export interface AuthenticatedSession extends AuthenticatedUser {
+  companyTimezone: string;
+}
+
 export interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
 }

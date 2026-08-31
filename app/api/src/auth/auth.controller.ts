@@ -7,7 +7,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import {
   AuthenticatedRequest,
-  AuthenticatedUser,
+  AuthenticatedSession,
 } from './interfaces/authenticated-request.interface';
 
 @Controller('auth')
@@ -31,7 +31,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@Req() request: AuthenticatedRequest): AuthenticatedUser {
-    return request.user;
+  me(@Req() request: AuthenticatedRequest): Promise<AuthenticatedSession> {
+    return this.authService.getAuthenticatedUserContext(request.user);
   }
 }
