@@ -244,12 +244,31 @@ const previousReceipt = {
   ],
 };
 
+type ConfigureApiMocksOptions = {
+  companyTimezone?: string;
+  authMeError?: Error;
+};
+
 function configureApiMocks(
   purchases: Purchase[] = [purchase],
+  options: ConfigureApiMocksOptions = {},
 ) {
   vi.mocked(api.get).mockImplementation(
     async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        if (options.authMeError) {
+          throw options.authMeError;
+        }
+
+        return {
+          data: {
+            companyTimezone:
+              options.companyTimezone ?? 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/purchases') {
         return {
@@ -345,6 +364,13 @@ function getPurchaseRowByFolio(folio: string) {
   }
 
   return row;
+}
+
+function getVisiblePurchaseFolios() {
+  return screen
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell')[0].textContent?.trim());
 }
 
 async function openActionsMenu(
@@ -880,12 +906,177 @@ describe('PurchasesPage — normalización de lista', () => {
     ).toHaveLength(1);
   });
 
+  it('filtra fechas por día operativo de la empresa sin usar la zona horaria del navegador', async () => {
+    const user = userEvent.setup();
+    const hermosilloNightPurchase: Purchase = {
+      ...purchase,
+      id: 'purchase-tz-night',
+      folio: 'OC-TZ-31',
+      createdAt: '2026-09-01T02:00:00.000Z',
+    };
+    const hermosilloDayPurchase: Purchase = {
+      ...partialPurchase,
+      id: 'purchase-tz-day',
+      folio: 'OC-TZ-01',
+      createdAt: '2026-09-01T20:00:00.000Z',
+    };
+
+    configureApiMocks([
+      hermosilloNightPurchase,
+      hermosilloDayPurchase,
+      receivedPurchase,
+    ]);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText('OC-TZ-31');
+    expect(screen.getByText(/31 ago 2026/i)).toBeTruthy();
+    expect(screen.getByText(/01 sep 2026/i)).toBeTruthy();
+
+    await user.type(screen.getByLabelText('Desde'), '2026-08-31');
+    await user.type(screen.getByLabelText('Hasta'), '2026-08-31');
+
+    expect(screen.getByRole('link', { name: 'OC-TZ-31' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'OC-TZ-01' })).toBeNull();
+    expect(screen.queryByRole('link', { name: receivedPurchase.folio })).toBeNull();
+
+    await user.clear(screen.getByLabelText('Hasta'));
+    await user.type(screen.getByLabelText('Hasta'), '2026-09-01');
+
+    expect(screen.getByRole('link', { name: 'OC-TZ-31' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'OC-TZ-01' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: receivedPurchase.folio })).toBeNull();
+
+    await user.clear(screen.getByLabelText('Desde'));
+
+    expect(screen.getByRole('link', { name: receivedPurchase.folio })).toBeTruthy();
+  });
+
+  it('combina rango de fechas con búsqueda, estado, proveedor y reinicia paginación', async () => {
+    const user = userEvent.setup();
+    const paginatedPurchases = buildPurchaseList(30);
+
+    configureApiMocks(paginatedPurchases);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText('OC-0001');
+    await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    expect(screen.getByText('Mostrando 26-30 de 30')).toBeTruthy();
+
+    await user.type(screen.getByLabelText('Desde'), '2026-07-10');
+    await user.type(screen.getByLabelText('Hasta'), '2026-07-12');
+
+    expect(screen.getByText('Mostrando 1-3 de 3')).toBeTruthy();
+    expect(getVisiblePurchaseFolios()).toEqual([
+      'OC-0010',
+      'OC-0011',
+      'OC-0012',
+    ]);
+
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'CONFIRMED',
+    );
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Proveedor' }),
+      'supplier-2',
+    );
+    await user.type(
+      screen.getByRole('searchbox', { name: 'Buscar compras' }),
+      'OC-0012',
+    );
+
+    expect(getVisiblePurchaseFolios()).toEqual(['OC-0012']);
+
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+
+    expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect((screen.getByLabelText('Desde') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Hasta') as HTMLInputElement).value).toBe('');
+  });
+
+  it('mantiene otros filtros y no aplica el rango cuando Desde es posterior a Hasta', async () => {
+    const user = userEvent.setup();
+
+    configureApiMocks([purchase, partialPurchase, receivedPurchase]);
+
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Estado' }),
+      'CONFIRMED',
+    );
+    await user.type(screen.getByLabelText('Desde'), '2026-09-02');
+    await user.type(screen.getByLabelText('Hasta'), '2026-09-01');
+
+    expect(
+      screen.getAllByText('La fecha Desde no puede ser posterior a Hasta.'),
+    ).toHaveLength(1);
+    expect((screen.getByLabelText('Desde') as HTMLInputElement).value).toBe(
+      '2026-09-02',
+    );
+    expect((screen.getByLabelText('Hasta') as HTMLInputElement).value).toBe(
+      '2026-09-01',
+    );
+    expect(screen.getByRole('link', { name: purchase.folio })).toBeTruthy();
+    expect(
+      screen.queryByRole('link', { name: partialPurchase.folio }),
+    ).toBeNull();
+  });
+
+  it('mantiene la lista usable y deshabilita fechas si auth/me falla o trae timezone inválido', async () => {
+    configureApiMocks([purchase], {
+      authMeError: new Error('Sesión no disponible'),
+    });
+
+    const { unmount } = render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    expect((screen.getByLabelText('Desde') as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByLabelText('Hasta') as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect(
+      screen.getByText('No fue posible habilitar el filtro por fecha.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Fecha no disponible')).toBeTruthy();
+
+    unmount();
+    vi.clearAllMocks();
+    configureApiMocks([purchase], {
+      companyTimezone: 'Zona/Invalida',
+    });
+
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    expect((screen.getByLabelText('Desde') as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByLabelText('Hasta') as HTMLInputElement).disabled).toBe(
+      true,
+    );
+    expect(
+      screen.getByText('No fue posible habilitar el filtro por fecha.'),
+    ).toBeTruthy();
+  });
+
   it('muestra el error de carga y permite reintentar con recuperación', async () => {
     const user = userEvent.setup();
     let purchaseRequests = 0;
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: { companyTimezone: 'America/Hermosillo' },
+        } as never;
+      }
 
       if (endpoint === '/purchases') {
         purchaseRequests += 1;

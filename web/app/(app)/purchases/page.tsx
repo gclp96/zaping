@@ -3,12 +3,14 @@
 import {
   Suspense,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { RotateCcw, Search } from 'lucide-react';
 
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
@@ -17,6 +19,11 @@ import {
   canRegisterPurchaseReceipt,
   getPurchaseStatusDescriptor,
 } from './purchase-status';
+import {
+  formatPurchaseDate,
+  getOperationalDateKey,
+  isValidTimeZone,
+} from './purchase-date';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
@@ -38,7 +45,6 @@ import type {
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import DataTable, {
-  DataTableToolbar,
   RowActionsMenu,
   type DataTableColumn,
   type DataTableRowAction,
@@ -46,13 +52,24 @@ import DataTable, {
   type SortState,
 } from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
+import Input from '@/app/components/ui/Input';
 import Loading from '@/app/components/ui/Loading';
+import Select from '@/app/components/ui/Select';
 
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 
 type StatusFilter = 'ALL' | PurchaseStatus;
+
+type AuthenticatedSession = {
+  companyTimezone: string;
+};
+
+type CompanyTimezoneState =
+  | { status: 'loading' }
+  | { status: 'success'; value: string }
+  | { status: 'error'; message: string };
 
 type DirectReceiveState =
   | {
@@ -70,6 +87,8 @@ const receiptHistoryUnavailableMessage =
   'No pudimos verificar las recepciones anteriores. Vuelve a intentarlo antes de registrar una nueva recepción.';
 const purchaseDetailUnavailableMessage =
   'No pudimos preparar el detalle de la compra. Vuelve a intentarlo antes de registrar una nueva recepción.';
+const timezoneUnavailableMessage =
+  'No fue posible habilitar el filtro por fecha.';
 
 const statusFilterOptions: Array<{
   value: StatusFilter;
@@ -109,14 +128,6 @@ const purchaseCollator = new Intl.Collator('es-MX', {
 
 function formatMoney(value: number): string {
   return moneyFormatter.format(value);
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat('es-MX', {
-    year: 'numeric',
-    month: 'short',
-    day: '2-digit',
-  }).format(new Date(value));
 }
 
 export default function PurchasesPage() {
@@ -206,6 +217,7 @@ function PurchasesPageContent() {
 const router = useRouter();
 const searchParams = useSearchParams();
 const purchaseId = searchParams.get('purchaseId')?.trim() || null;
+const dateRangeMessageId = useId();
 const openedPurchaseId = useRef<string | null>(null);
 
 const [ purchases, setPurchases ] = useState<Purchase[]>([]);
@@ -218,6 +230,10 @@ const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] =
   useState<StatusFilter>('ALL');
 const [supplierFilter, setSupplierFilter] = useState('ALL');
+const [dateFrom, setDateFrom] = useState('');
+const [dateTo, setDateTo] = useState('');
+const [companyTimezoneState, setCompanyTimezoneState] =
+  useState<CompanyTimezoneState>({ status: 'loading' });
 const [sorting, setSorting] = useState<SortState>(null);
 const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -226,11 +242,54 @@ const [directReceiveState, setDirectReceiveState] =
 const directReceiveRequestId = useRef(0);
 const directReceiveInFlight = useRef(false);
 
+const companyTimezone =
+  companyTimezoneState.status === 'success'
+    ? companyTimezoneState.value
+    : null;
+const hasDateRange = Boolean(dateFrom || dateTo);
+const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+const dateRangeUnavailable =
+  hasDateRange && companyTimezoneState.status !== 'success';
+const dateInputsDisabled = companyTimezoneState.status !== 'success';
+const dateRangeMessage = dateRangeInvalid
+  ? 'La fecha Desde no puede ser posterior a Hasta.'
+  : companyTimezoneState.status === 'loading'
+    ? 'Cargando zona horaria de la empresa...'
+    : companyTimezoneState.status === 'error'
+      ? companyTimezoneState.message
+      : '';
+
 async function loadPurchases() {
     const response = await api.get<Purchase[]>('/purchases');
     setPurchases(response.data);
     setPageIndex(0);
   }
+
+async function loadCompanyTimezone() {
+  try {
+    setCompanyTimezoneState({ status: 'loading' });
+
+    const response = await api.get<AuthenticatedSession>('/auth/me');
+    const timezone = response.data.companyTimezone?.trim() ?? '';
+
+    if (!isValidTimeZone(timezone)) {
+      setCompanyTimezoneState({
+        status: 'error',
+        message: timezoneUnavailableMessage,
+      });
+      return;
+    }
+
+    setCompanyTimezoneState({ status: 'success', value: timezone });
+  } catch (error: unknown) {
+    console.error(error);
+
+    setCompanyTimezoneState({
+      status: 'error',
+      message: timezoneUnavailableMessage,
+    });
+  }
+}
 
 const {
   purchaseToApprove,
@@ -271,14 +330,60 @@ const supplierFilterOptions = useMemo(() => {
 
 const filteredPurchases = useMemo(
   () =>
-    purchases.filter(
-      (purchase) =>
-        (statusFilter === 'ALL' || purchase.status === statusFilter) &&
-        (supplierFilter === 'ALL' ||
-          purchase.supplier.id === supplierFilter) &&
-        purchaseMatchesSearch(purchase, search),
-    ),
-  [purchases, search, statusFilter, supplierFilter],
+    purchases.filter((purchase) => {
+      if (statusFilter !== 'ALL' && purchase.status !== statusFilter) {
+        return false;
+      }
+
+      if (
+        supplierFilter !== 'ALL' &&
+        purchase.supplier.id !== supplierFilter
+      ) {
+        return false;
+      }
+
+      if (!purchaseMatchesSearch(purchase, search)) {
+        return false;
+      }
+
+      if (
+        !hasDateRange ||
+        dateRangeInvalid ||
+        !companyTimezone
+      ) {
+        return true;
+      }
+
+      const purchaseDateKey = getOperationalDateKey(
+        purchase.createdAt,
+        companyTimezone,
+      );
+
+      if (!purchaseDateKey) {
+        return false;
+      }
+
+      if (dateFrom && purchaseDateKey < dateFrom) {
+        return false;
+      }
+
+      if (dateTo && purchaseDateKey > dateTo) {
+        return false;
+      }
+
+      return true;
+    }),
+  [
+    companyTimezone,
+    dateFrom,
+    dateRangeInvalid,
+    dateTo,
+    hasDateRange,
+    purchases,
+    search,
+    statusFilter,
+    supplierFilter,
+  ],
 );
 
 const {
@@ -480,6 +585,7 @@ async function loadPageData() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPageData();
+    void loadCompanyTimezone();
   }, []);
 
   useEffect(() => {
@@ -524,7 +630,144 @@ async function loadPageData() {
     setSearch('');
     setStatusFilter('ALL');
     setSupplierFilter('ALL');
+    setDateFrom('');
+    setDateTo('');
     setPageIndex(0);
+  }
+
+  function formatDate(value: string): string {
+    if (companyTimezoneState.status === 'loading') {
+      return 'Cargando fecha...';
+    }
+
+    if (!companyTimezone) {
+      return 'Fecha no disponible';
+    }
+
+    return formatPurchaseDate(value, companyTimezone) ?? 'Fecha no disponible';
+  }
+
+  function handleDateFromChange(value: string) {
+    setDateFrom(value);
+    setPageIndex(0);
+  }
+
+  function handleDateToChange(value: string) {
+    setDateTo(value);
+    setPageIndex(0);
+  }
+
+  function renderPurchasesToolbar() {
+    const resetDisabled = !Boolean(
+      search.trim() ||
+        statusFilter !== 'ALL' ||
+        supplierFilter !== 'ALL' ||
+        hasDateRange,
+    );
+
+    return (
+      <div
+        role="group"
+        aria-label="Controles de tabla"
+        className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"
+      >
+        <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <Input
+            label="Buscar compras"
+            type="search"
+            value={search}
+            placeholder="Folio, proveedor, email, SKU o producto"
+            startAdornment={<Search size={17} />}
+            containerClassName="sm:col-span-2 lg:col-span-1"
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPageIndex(0);
+            }}
+          />
+
+          {purchasesTableFilters.map((filter) => (
+            <Select
+              key={filter.id}
+              label={filter.label}
+              value={filter.value}
+              options={[...filter.options]}
+              placeholder={filter.placeholder ?? 'Todas las opciones'}
+              onChange={(event) => filter.onChange(event.target.value)}
+            />
+          ))}
+
+          <Input
+            label="Desde"
+            type="date"
+            value={dateFrom}
+            disabled={dateInputsDisabled}
+            className={
+              dateRangeInvalid ? 'border-red-500 focus:ring-red-500' : ''
+            }
+            aria-describedby={
+              dateRangeMessage ? dateRangeMessageId : undefined
+            }
+            aria-invalid={dateRangeInvalid}
+            onChange={(event) => handleDateFromChange(event.target.value)}
+          />
+
+          <Input
+            label="Hasta"
+            type="date"
+            value={dateTo}
+            disabled={dateInputsDisabled}
+            aria-describedby={
+              dateRangeMessage ? dateRangeMessageId : undefined
+            }
+            aria-invalid={dateRangeInvalid}
+            onChange={(event) => handleDateToChange(event.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+          {companyTimezoneState.status === 'error' ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void loadCompanyTimezone()}
+            >
+              Reintentar zona horaria
+            </Button>
+          ) : null}
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={resetDisabled}
+            onClick={clearFilters}
+          >
+            <RotateCcw aria-hidden="true" size={16} />
+            Limpiar filtros
+          </Button>
+        </div>
+
+        {dateRangeMessage ? (
+          <p
+            id={dateRangeMessageId}
+            role={
+              dateRangeInvalid || dateRangeUnavailable ? 'alert' : undefined
+            }
+            className={[
+              'text-sm xl:basis-full',
+              dateRangeInvalid || dateRangeUnavailable
+                ? 'text-red-600'
+                : 'text-gray-500',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {dateRangeMessage}
+          </p>
+        ) : null}
+      </div>
+    );
   }
 
   const actionErrorHasModal = Boolean(
@@ -870,29 +1113,7 @@ async function loadPageData() {
                 state: sorting,
                 onChange: setSorting,
               }}
-              toolbar={
-                <DataTableToolbar
-                  search={{
-                    value: search,
-                    label: 'Buscar compras',
-                    placeholder:
-                      'Folio, proveedor, email, SKU o producto',
-                    onChange: (value) => {
-                      setSearch(value);
-                      setPageIndex(0);
-                    },
-                  }}
-                  filters={purchasesTableFilters}
-                  onReset={clearFilters}
-                  resetDisabled={
-                    !Boolean(
-                      search.trim() ||
-                        statusFilter !== 'ALL' ||
-                        supplierFilter !== 'ALL',
-                    )
-                  }
-                />
-              }
+              toolbar={renderPurchasesToolbar()}
               pagination={{
                 pageIndex,
                 pageSize,
@@ -916,7 +1137,8 @@ async function loadPageData() {
               isFiltered={Boolean(
                 search.trim() ||
                   statusFilter !== 'ALL' ||
-                  supplierFilter !== 'ALL',
+                  supplierFilter !== 'ALL' ||
+                  hasDateRange,
               )}
             />
           </Section>
