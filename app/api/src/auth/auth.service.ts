@@ -138,6 +138,10 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+
     const passwordValid = await bcrypt.compare(
       data.password,
       user.passwordHash,
@@ -169,36 +173,6 @@ export class AuthService {
     return {
       token,
       user: safeUser,
-    };
-  }
-
-  async resetPassword(data: { email: string; password: string }) {
-    if (!data.email || !data.password) {
-      throw new BadRequestException('Correo y contraseña son obligatorios');
-    }
-
-    const user = await this.prisma.user.findUnique({
-      where: {
-        email: data.email,
-      },
-    });
-
-    if (user) {
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-
-      await this.prisma.user.update({
-        where: {
-          id: user.id,
-        },
-        data: {
-          passwordHash: hashedPassword,
-        },
-      });
-    }
-
-    return {
-      message:
-        'Si el correo existe, la contraseña fue actualizada correctamente.',
     };
   }
 }

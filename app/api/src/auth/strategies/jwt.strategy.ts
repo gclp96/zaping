@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { UserRole } from '@prisma/client';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
+import { PrismaService } from '../../prisma/prisma.service';
 import { AuthenticatedUser } from '../interfaces/authenticated-request.interface';
 
 interface JwtPayload {
@@ -16,7 +17,7 @@ interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private readonly prisma: PrismaService) {
     const jwtSecret = process.env.JWT_SECRET;
 
     if (!jwtSecret) {
@@ -30,18 +31,38 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload): AuthenticatedUser {
+  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
     if (!payload.sub || !payload.companyId || !payload.email || !payload.role) {
       throw new UnauthorizedException('Token inválido');
     }
 
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: payload.sub,
+        companyId: payload.companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
     return {
-      id: payload.sub,
-      companyId: payload.companyId,
-      email: payload.email,
-      firstName: payload.firstName ?? '',
-      lastName: payload.lastName ?? '',
-      role: payload.role,
+      id: user.id,
+      companyId: user.companyId,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
     };
   }
 }
