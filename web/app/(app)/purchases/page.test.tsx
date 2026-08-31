@@ -406,7 +406,7 @@ beforeEach(() => {
   routerMock.search = '';
 });
 
-describe('PurchasesPage — navegación trazable', () => {
+describe('PurchasesPage — compatibilidad de navegación legacy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     configureApiMocks();
@@ -420,144 +420,38 @@ describe('PurchasesPage — navegación trazable', () => {
     cleanup();
   });
 
-  it('abre el detalle existente desde purchaseId, enlaza su recepción y limpia la URL al cerrar', async () => {
-    const user = userEvent.setup();
+  it('redirige purchaseId legacy hacia la ruta canónica sin abrir modal ni cargar detalle', async () => {
     routerMock.search = 'purchaseId=purchase-1';
 
     render(<PurchasesPage />);
 
-    expect(
-      await screen.findByRole('heading', { name: 'Compra OC-0001' }),
-    ).toBeTruthy();
-
-    const summary = screen.getByRole('region', {
-      name: 'Resumen de compra',
-    });
-
-    expect(within(summary).getByText('Proveedor médico')).toBeTruthy();
-    expect(
-      within(summary).getByLabelText('Estado de la compra: Confirmada'),
-    ).toBeTruthy();
-    expect(summary.textContent).toContain('0 / 1 partidas');
-    expect(summary.textContent).toContain('4 / 10 uds. · 6 pendientes');
-
-    const financialSummary = screen.getByRole('region', {
-      name: 'Resumen financiero',
-    });
-    const traceability = screen.getByRole('region', {
-      name: 'Trazabilidad',
-    });
-
-    expect(
-      financialSummary.compareDocumentPosition(traceability) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(within(financialSummary).getByText('$1,000.00')).toBeTruthy();
-    expect(within(financialSummary).getByText('$160.00')).toBeTruthy();
-    expect(within(financialSummary).getByText('$1,160.00')).toBeTruthy();
-
-    expect(api.get).toHaveBeenCalledWith(
-      '/purchases/purchase-1/inventory-movements',
-    );
-    expect(api.get).toHaveBeenCalledWith(
-      '/purchase-receipts/purchase/purchase-1',
-    );
-    expect(
-      (await screen.findByRole('link', { name: 'Ver recepción' })).getAttribute(
-        'href',
-      ),
-    ).toBe('/purchase-receipts/receipt-1');
-
-    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
-
-    expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
-    expect(
-      screen.queryByRole('heading', { name: 'Compra OC-0001' }),
-    ).toBeNull();
+    expect(await screen.findByText(purchase.folio)).toBeTruthy();
+    expect(routerMock.replace).toHaveBeenCalledWith('/purchases/purchase-1');
     expect(
       screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href'),
     ).toBe('/purchases/purchase-1');
     expect(
-      screen.queryByRole('button', { name: 'Ver detalle' }),
+      screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
+    expect(
+      vi.mocked(api.get).mock.calls.some(
+        ([url]) =>
+          String(url) === '/purchases/purchase-1/inventory-movements' ||
+          String(url) === '/purchase-receipts/purchase/purchase-1',
+      ),
+    ).toBe(false);
   });
 
-  it.each([
-    ['DRAFT', false],
-    ['CONFIRMED', true],
-    ['PARTIALLY_RECEIVED', true],
-    ['RECEIVED', false],
-    ['CANCELLED', false],
-  ] as const)(
-    'conserva la regla de recepción para el estado %s',
-    async (status, canReceive) => {
-      const statusPurchase = {
-        ...purchase,
-        status,
-      };
-
-      routerMock.search = 'purchaseId=purchase-1';
-      configureApiMocks([statusPurchase]);
-      render(<PurchasesPage />);
-
-      await screen.findByText(statusPurchase.folio);
-
-      const detailTitle = await screen.findByRole('heading', {
-        name: 'Compra OC-0001',
-      });
-      const detailModal = detailTitle.parentElement?.parentElement;
-
-      expect(detailModal).not.toBeNull();
-
-      const summary = within(detailModal as HTMLElement).getByRole('region', {
-        name: 'Resumen de compra',
-      });
-
-      if (status === 'DRAFT') {
-        expect(summary.textContent).toContain('Pendiente de aprobación');
-      } else if (status === 'CANCELLED') {
-        expect(summary.textContent).toContain('No aplica');
-      } else {
-        expect(summary.textContent).toContain('0 / 1 partidas');
-      }
-
-      const receiveButton = within(
-        detailModal as HTMLElement,
-      ).queryByRole('button', { name: 'Registrar recepción' });
-
-      if (canReceive) {
-        expect(receiveButton).not.toBeNull();
-        expect(
-          (receiveButton as HTMLButtonElement).disabled,
-        ).toBe(false);
-      } else {
-        expect(receiveButton).toBeNull();
-      }
-    },
-  );
-
-  it('mantiene la lista usable cuando purchaseId no pertenece a una compra cargada', async () => {
-    const user = userEvent.setup();
-    routerMock.search = 'purchaseId=purchase-missing';
+  it('ignora purchaseId vacío y mantiene la lista usable', async () => {
+    routerMock.search = 'purchaseId=';
 
     render(<PurchasesPage />);
 
-    expect(
-      await screen.findByText('No se encontró la compra solicitada.'),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href'),
-    ).toBe('/purchases/purchase-1');
-    expect(
-      screen.queryByRole('button', { name: 'Ver detalle' }),
-    ).toBeNull();
+    expect(await screen.findByText(purchase.folio)).toBeTruthy();
+    expect(routerMock.replace).not.toHaveBeenCalled();
     expect(
       screen.queryByRole('heading', { name: 'Compra OC-0001' }),
     ).toBeNull();
-
-    await user.click(screen.getByRole('button', { name: 'Volver a compras' }));
-
-    expect(routerMock.replace).toHaveBeenCalledWith('/purchases');
   });
 });
 
@@ -1586,6 +1480,7 @@ describe('PurchasesPage — recepciones', () => {
   });
 
   it('deshabilita Registrar recepción mientras carga el historial', async () => {
+    const user = userEvent.setup();
     let resolveReceipts: ((value: unknown) => void) | undefined;
     const receiptsPromise = new Promise((resolve) => {
       resolveReceipts = resolve;
@@ -1603,30 +1498,27 @@ describe('PurchasesPage — recepciones', () => {
       return defaultGet!(url);
     });
 
-    routerMock.search = 'purchaseId=purchase-1';
     render(<PurchasesPage />);
     await screen.findByText('OC-0001');
 
-    const detailTitle = await screen.findByRole('heading', {
-      name: 'Compra OC-0001',
+    const receiveButton = screen.getByRole('button', {
+      name: 'Registrar recepción',
     });
-    const detailModal = detailTitle.parentElement?.parentElement;
-    const receiveButton = within(
-      detailModal as HTMLElement,
-    ).getByRole('button', { name: 'Registrar recepción' });
+
+    await user.click(receiveButton);
 
     expect((receiveButton as HTMLButtonElement).disabled).toBe(true);
     expect(
-      within(detailModal as HTMLElement).getByText(
-        'Cargando recepciones...',
-      ),
+      await screen.findByRole('button', { name: 'Preparando...' }),
     ).toBeTruthy();
 
     resolveReceipts?.({ data: [previousReceipt] });
 
-    await waitFor(() => {
-      expect((receiveButton as HTMLButtonElement).disabled).toBe(false);
-    });
+    expect(
+      await screen.findByRole('heading', {
+        name: /registrar recepción.*OC-0001/i,
+      }),
+    ).toBeTruthy();
   });
 
   it('bloquea la recepción si falla el historial y permite reintentar', async () => {
@@ -1651,38 +1543,29 @@ describe('PurchasesPage — recepciones', () => {
       return defaultGet!(url);
     });
 
-    routerMock.search = 'purchaseId=purchase-1';
     render(<PurchasesPage />);
     await screen.findByText('OC-0001');
 
-    const detailTitle = await screen.findByRole('heading', {
-      name: 'Compra OC-0001',
-    });
-    const detailModal = detailTitle.parentElement?.parentElement;
-    const detailScope = within(detailModal as HTMLElement);
-    const receiveButton = detailScope.getByRole('button', {
+    const receiveButton = screen.getByRole('button', {
       name: 'Registrar recepción',
     });
+    await user.click(receiveButton);
 
     expect(
-      await detailScope.findByText(
+      await screen.findByText(
         'No pudimos verificar las recepciones anteriores. Vuelve a intentarlo antes de registrar una nueva recepción.',
       ),
     ).toBeTruthy();
-    expect((receiveButton as HTMLButtonElement).disabled).toBe(true);
 
     await user.click(
-      detailScope.getByRole('button', {
-        name: 'Reintentar recepciones',
+      screen.getByRole('button', {
+        name: 'Reintentar recepción',
       }),
     );
 
     await waitFor(() => {
       expect(receiptRequests).toBe(2);
-      expect((receiveButton as HTMLButtonElement).disabled).toBe(false);
     });
-
-    await user.click(receiveButton);
 
     expect(
       await screen.findByRole('heading', {
@@ -1738,6 +1621,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 });
 
   it('muestra progreso por partida en cero cuando no hay recepciones', async () => {
+    const user = userEvent.setup();
     const noReceiptPurchase = {
       ...purchase,
       receiptProgress: {
@@ -1763,23 +1647,23 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
     return defaultGet!(url);
   });
 
-  routerMock.search = 'purchaseId=purchase-1';
   render(<PurchasesPage />);
   await screen.findByText('OC-0001');
 
-  const detailTitle = await screen.findByRole('heading', {
-    name: 'Compra OC-0001',
-  });
-  const detailModal = detailTitle.parentElement?.parentElement;
-  const itemTable = screen.getByText('Pedido').closest('table');
-  const summary = screen.getByRole('region', {
-    name: 'Resumen de compra',
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Registrar recepción',
+    }),
+  );
+
+  await screen.findByRole('heading', {
+    name: /registrar recepci[oó]n.*OC-0001/i,
   });
 
-  expect(detailModal).not.toBeNull();
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const itemTable = within(receiptDesktop).getByText('Producto').closest('table');
+
   expect(itemTable).not.toBeNull();
-  expect(summary.textContent).toContain('0 / 1 partidas');
-  expect(summary.textContent).toContain('0 / 10 uds. · 10 pendientes');
 
   const itemRow = within(itemTable as HTMLTableElement).getAllByRole('row')[1];
   const itemCells = within(itemRow).getAllByRole('cell');
@@ -1789,43 +1673,8 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
   expect(itemCells[3].textContent).toBe('10');
 });
 
-it('muestra el progreso completo sin cambiar los valores financieros', async () => {
-  const completePurchase = {
-    ...purchase,
-    status: 'RECEIVED' as const,
-    receiptProgress: {
-      orderedUnits: 10,
-      receivedUnits: 10,
-      pendingUnits: 0,
-      orderedLines: 1,
-      completedLines: 1,
-    },
-  };
-
-  configureApiMocks([completePurchase]);
-  routerMock.search = 'purchaseId=purchase-1';
-  render(<PurchasesPage />);
-
-  await screen.findByText('OC-0001');
-
-  const summary = await screen.findByRole('region', {
-    name: 'Resumen de compra',
-  });
-  const financialSummary = screen.getByRole('region', {
-    name: 'Resumen financiero',
-  });
-
-  expect(summary.textContent).toContain('1 / 1 partidas');
-  expect(summary.textContent).toContain('10 / 10 uds. · 0 pendientes');
-  expect(within(financialSummary).getByText('$1,000.00')).toBeTruthy();
-  expect(within(financialSummary).getByText('$160.00')).toBeTruthy();
-  expect(within(financialSummary).getByText('$1,160.00')).toBeTruthy();
-  expect(
-    within(summary).getByLabelText('Estado de la compra: Recibida'),
-  ).toBeTruthy();
-});
-
 it('mantiene el progreso por purchaseItemId con múltiples recepciones y productos repetidos', async () => {
+  const user = userEvent.setup();
   const multiLinePurchase = {
     ...purchase,
     items: [
@@ -1869,27 +1718,33 @@ it('mantiene el progreso por purchaseItemId con múltiples recepciones y product
     return defaultGet!(url);
   });
 
-  routerMock.search = 'purchaseId=purchase-1';
   render(<PurchasesPage />);
   await screen.findByText('OC-0001');
 
-  await screen.findByRole('heading', { name: 'Compra OC-0001' });
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Registrar recepción',
+    }),
+  );
 
-  const itemTable = screen.getByText('Pedido').closest('table');
+  await screen.findByRole('heading', {
+    name: /registrar recepci[oó]n.*OC-0001/i,
+  });
+
+  const receiptDesktop = screen.getByTestId('receipt-desktop-items');
+  const itemTable = within(receiptDesktop).getByText('Producto').closest('table');
   expect(itemTable).not.toBeNull();
 
   const itemRows = within(itemTable as HTMLTableElement)
     .getAllByRole('row')
     .slice(1);
+  expect(itemRows).toHaveLength(1);
+
   const firstItemCells = within(itemRows[0]).getAllByRole('cell');
-  const secondItemCells = within(itemRows[1]).getAllByRole('cell');
 
   expect(firstItemCells[1].textContent).toBe('10');
   expect(firstItemCells[2].textContent).toBe('5');
   expect(firstItemCells[3].textContent).toBe('5');
-  expect(secondItemCells[1].textContent).toBe('5');
-  expect(secondItemCells[2].textContent).toBe('5');
-  expect(secondItemCells[3].textContent).toBe('0');
 });
 
 it('muestra un error cuando no se captura ninguna cantidad', async () => {

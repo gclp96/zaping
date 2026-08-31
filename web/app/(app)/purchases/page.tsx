@@ -27,12 +27,11 @@ import {
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
-import PurchaseDetailModal from './components/PurchaseDetailModal';
 import PurchaseFormModal from './components/PurchaseFormModal';
 import { usePurchaseReceipts } from './hooks/usePurchaseReceipts';
 import { getPurchaseReceiptInventoryHref } from '../purchase-receipts/receipt-navigation';
 import { usePurchaseForm } from './hooks/usePurchaseForm';
-import { usePurchaseDetail } from './hooks/usePurchaseDetail';
+import { usePurchaseReceiptPreparation } from './hooks/usePurchaseReceiptPreparation';
 import { usePurchaseActions } from './hooks/usePurchaseActions';
 
 import type {
@@ -216,9 +215,8 @@ function PurchasesPageContent() {
 
 const router = useRouter();
 const searchParams = useSearchParams();
-const purchaseId = searchParams.get('purchaseId')?.trim() || null;
+const legacyPurchaseId = searchParams.get('purchaseId')?.trim() || '';
 const dateRangeMessageId = useId();
-const openedPurchaseId = useRef<string | null>(null);
 
 const [ purchases, setPurchases ] = useState<Purchase[]>([]);
 const [ suppliers, setSuppliers ] = useState<Supplier[]>([]);
@@ -387,20 +385,8 @@ const filteredPurchases = useMemo(
 );
 
 const {
-  purchaseToView,
-  inventoryMovements,
-  purchaseReceipts,
-  receiptsLoading,
-  receiptsError,
-  receiptHistoryStatus,
-  movementsLoading,
-  movementsError,
-
-  openPurchaseDetail,
-  closePurchaseDetail,
-  retryPurchaseReceipts,
   preparePurchaseForReceipt,
-} = usePurchaseDetail();
+} = usePurchaseReceiptPreparation();
 
   //propiedades del formulario
 const {
@@ -454,9 +440,9 @@ const {
   handleReceiptItemChange,
   handleReceiptNotesChange,
   handleCreateReceipt,
-  } = usePurchaseReceipts({
-    purchaseReceipts,
-    receiptHistoryReady: receiptHistoryStatus === 'success',
+} = usePurchaseReceipts({
+    purchaseReceipts: [],
+    receiptHistoryReady: false,
     onReceiptCreated: loadPurchases,
   });
 
@@ -589,42 +575,10 @@ async function loadPageData() {
   }, []);
 
   useEffect(() => {
-    if (!purchaseId) {
-      openedPurchaseId.current = null;
-      return;
+    if (legacyPurchaseId) {
+      router.replace(`/purchases/${encodeURIComponent(legacyPurchaseId)}`);
     }
-
-    if (
-      pageLoading ||
-      pageError ||
-      openedPurchaseId.current === purchaseId
-    ) {
-      return;
-    }
-
-    const purchase = purchases.find((item) => item.id === purchaseId);
-    openedPurchaseId.current = purchaseId;
-
-    if (purchase) {
-      void openPurchaseDetail(purchase);
-    }
-  }, [openPurchaseDetail, pageError, pageLoading, purchaseId, purchases]);
-
-  const purchaseDeepLinkMissing = Boolean(
-    purchaseId &&
-    !pageLoading &&
-    !pageError &&
-    !purchases.some((purchase) => purchase.id === purchaseId),
-  );
-
-  function closePurchaseDetailWithUrlCleanup() {
-    closePurchaseDetail();
-    clearActionError();
-
-    if (purchaseId) {
-      router.replace('/purchases');
-    }
-  }
+  }, [legacyPurchaseId, router]);
 
   function clearFilters() {
     setSearch('');
@@ -770,9 +724,7 @@ async function loadPageData() {
     );
   }
 
-  const actionErrorHasModal = Boolean(
-    purchaseToView || purchaseToApprove || purchaseToCancel,
-  );
+  const actionErrorHasDialog = Boolean(purchaseToApprove || purchaseToCancel);
 
   const sortedPurchases = useMemo(() => {
     if (!sorting) {
@@ -1021,24 +973,7 @@ async function loadPageData() {
           }
         />
 
-        {purchaseDeepLinkMissing ? (
-          <div
-            role="alert"
-            className="flex flex-col gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-900 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <span>No se encontró la compra solicitada.</span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={closePurchaseDetailWithUrlCleanup}
-            >
-              Volver a compras
-            </Button>
-          </div>
-        ) : null}
-
-        {actionError && !actionErrorHasModal ? (
+        {actionError && !actionErrorHasDialog ? (
           <div
             role="alert"
             className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
@@ -1178,48 +1113,6 @@ async function loadPageData() {
           handleItemQuantityChange
         }
         />
-      
-      {/* Ver detalles de compra */}
-      <PurchaseDetailModal
-          purchase={purchaseToView}
-          receipts={purchaseReceipts}
-          receiptsLoading={receiptsLoading}
-          receiptsError={receiptsError}
-          receiptHistoryStatus={receiptHistoryStatus}
-          movements={inventoryMovements}
-          movementsLoading={movementsLoading}
-          movementsError={movementsError}
-          downloading={
-            purchaseToView !== null &&
-            downloadingPurchaseId === purchaseToView.id
-          }
-          actionError={actionError}
-          formatDate={formatDate}
-          formatMoney={formatMoney}
-          onClose={closePurchaseDetailWithUrlCleanup}
-          onEdit={(purchase) => {
-            openEditModal(purchase);
-            closePurchaseDetailWithUrlCleanup();
-          }}
-          onApprove={(purchase) => {
-            openApproveDialog(purchase);
-            closePurchaseDetailWithUrlCleanup();
-          }}
-          onCancel={(purchase) => {
-            openCancelDialog(purchase);
-            closePurchaseDetailWithUrlCleanup();
-          }}
-          onReceive={(purchase) => {
-            if (openReceiptModal(purchase)) {
-              closePurchaseDetailWithUrlCleanup();
-            }
-          }}
-          onRetryReceipts={() => void retryPurchaseReceipts()}
-          onDownload={(purchase) => {
-            void handleDownloadPdf(purchase);
-          }}
-        />
-
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}

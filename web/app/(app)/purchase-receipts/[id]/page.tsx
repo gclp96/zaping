@@ -376,7 +376,7 @@ export default function PurchaseReceiptDetailPage() {
           title="Compra y proveedor"
           action={
             <Link
-              href={`/purchases?purchaseId=${encodeURIComponent(receipt.purchase.id)}`}
+              href={`/purchases/${encodeURIComponent(receipt.purchase.id)}`}
               className={traceabilityActionClassName}
             >
               Ver compra

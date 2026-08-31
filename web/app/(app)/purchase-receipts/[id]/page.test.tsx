@@ -216,7 +216,7 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.getByLabelText('Estado de compra: Recibida')).toBeTruthy();
     expect(
       screen.getByRole('link', { name: 'Ver compra' }).getAttribute('href'),
-    ).toBe('/purchases?purchaseId=purchase-quantity');
+    ).toBe('/purchases/purchase-quantity');
     expect(
       screen
         .getByRole('link', { name: 'Ver en inventario' })
