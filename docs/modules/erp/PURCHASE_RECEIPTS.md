@@ -661,8 +661,17 @@ Purchase
 Receipt
 → Purchase detail
 
-/purchases?purchaseId=<id>
+/purchases/<id>
 ```
+
+`Ver compra` en Receipt Detail navega a la superficie canónica de Purchase 360:
+
+```text
+/purchases/:id
+```
+
+La URL legacy `/purchases?purchaseId=<id>` ya no representa un flujo de detalle;
+existe únicamente como redirect temporal de compatibilidad.
 
 ```text
 Receipt

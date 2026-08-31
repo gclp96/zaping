@@ -1274,29 +1274,37 @@ historical visibility
 
 ---
 
-# 50. Purchase deep-link CURRENT
+# 50. Purchase detail / 360 CURRENT
 
-Existe:
+La superficie real de detalle de Purchases es:
+
+```text
+/purchases/:id
+→ Purchase 360
+→ GET /purchases/:id
+```
+
+El listado usa el folio como navegación canónica hacia `/purchases/:id`.
+
+`PurchaseDetailModal` fue retirado. Los modales de Purchases quedan reservados
+para operaciones enfocadas:
+
+```text
+create/edit Purchase
+
+register Receipt
+
+approve/cancel confirmation
+```
+
+La URL legacy:
 
 ```text
 /purchases?purchaseId=<id>
 ```
 
-pero actualmente el detalle depende del Purchase presente en el listado cargado.
-
-Por tanto:
-
-```text
-Purchase deep-link
-→ CURRENT
-```
-
-pero:
-
-```text
-pagination-safe dedicated detail resolution
-→ TECHNICAL DEBT
-```
+funciona únicamente como compatibility redirect temporal hacia `/purchases/<id>`.
+No es una segunda superficie de detalle.
 
 ---
 
@@ -2083,8 +2091,13 @@ Convenciones actuales:
 ```
 
 ```text
+/purchases/:id
+→ Purchase 360 dedicated detail page
+```
+
+```text
 /purchases?purchaseId=<id>
-→ resolved from current Purchase list
+→ compatibility redirect to /purchases/<id>
 ```
 
 ```text

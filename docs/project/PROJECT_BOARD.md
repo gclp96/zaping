@@ -54,6 +54,10 @@ ERP Core
 ├── Quotes V1
 ├── Sales V1
 ├── Purchases V1
+│   ├── Purchase 360 canonical detail
+│   ├── folio navigation to /purchases/:id
+│   ├── timezone-aware date filters
+│   └── legacy purchaseId compatibility redirect
 ├── Purchase Receipts V1
 │   ├── partial / full receiving
 │   ├── lot tracking
@@ -816,7 +820,9 @@ approve
 
 cancel DRAFT
 
-detail from current loaded data
+Purchase 360 canonical detail
+
+folio navigation to /purchases/:id
 
 PDF
 
@@ -825,6 +831,8 @@ search
 status filter
 
 Supplier filter
+
+Desde / Hasta date filter with Company.timezone
 
 Receipt creation
 
@@ -838,13 +846,14 @@ deep-link
 
 Deep-link:
 
+/purchases/:id
+
+Legacy compatibility:
+
 /purchases?purchaseId=<id>
+→ /purchases/<id>
 
-Limitación:
-
-Purchase deep-link currently resolves through loaded Purchase list
-
-Con paginación futura deberá evolucionar hacia resolución directa por ID o estrategia equivalente.
+Este redirect es temporal y no representa una segunda UI de detalle.
 
 Deuda:
 
@@ -856,7 +865,7 @@ pagination
 
 server-side filtering
 
-future deep-link pagination compatibility
+future cleanup of legacy purchaseId compatibility redirect
 
 11. Purchase Receipts
 
@@ -1582,7 +1591,7 @@ XLSX
 
 UX-360 — 360 Views
 
-Estado: ⏳ PENDING
+Estado: ⏳ PARTIAL / ACTIVE
 
 Product 360
 
@@ -1591,6 +1600,7 @@ Customer 360
 Supplier 360
 
 Purchase 360
+✅ COMPLETED / CLOSED
 
 SalesOrder 360 TARGET
 

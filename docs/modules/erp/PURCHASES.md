@@ -1996,29 +1996,43 @@ GET   /purchases/:id/pdf
 
 ---
 
-# 76. No GET Purchase detail endpoint
+# 76. Purchase detail endpoint — CURRENT
 
-Actualmente no existe:
+Actualmente existe:
 
 ```text
 GET /purchases/:id
 ```
 
-La experiencia de detalle utiliza los datos obtenidos mediante:
+La experiencia canónica de detalle es:
 
 ```text
-GET /purchases
+/purchases/:id
+→ Purchase 360
+→ GET /purchases/:id
 ```
 
-Esto funciona mientras el listado completo contiene la Purchase solicitada.
-
-Permanece como deuda:
+El listado de Purchases no es fuente de detalle completo. El folio de cada fila
+navega a la ruta canónica:
 
 ```text
-dedicated Purchase detail endpoint
+/purchases/<id>
 ```
 
-especialmente antes de introducir paginación server-side.
+La URL legacy:
+
+```text
+/purchases?purchaseId=<id>
+```
+
+permanece únicamente como compatibility redirect temporal hacia:
+
+```text
+/purchases/<id>
+```
+
+No es una segunda UI/API de detalle y no debe mantenerse indefinidamente sin
+decisión explícita.
 
 ---
 
@@ -2065,6 +2079,8 @@ La experiencia `/purchases` soporta actualmente:
 ```text
 Purchase list
 
+folio navigation to /purchases/:id
+
 create Purchase
 
 edit DRAFT
@@ -2073,7 +2089,7 @@ approve DRAFT
 
 cancel DRAFT
 
-Purchase detail
+Purchase 360 canonical detail
 
 Purchase PDF
 
@@ -2085,7 +2101,7 @@ Inventory traceability
 
 search
 
-filters
+status / Supplier / Desde / Hasta filters
 
 loading
 
@@ -2129,10 +2145,20 @@ status filter
 
 Supplier filter
 
+date range filter:
+Desde / Hasta
+
 combined filters
 ```
 
-Los filtros se aplican sobre datos ya cargados.
+Los filtros se aplican sobre datos ya cargados. Las fechas de Purchases se
+interpretan con:
+
+```text
+Company.timezone
+```
+
+para evitar depender de la zona horaria del navegador.
 
 Actualmente:
 
@@ -2143,7 +2169,7 @@ server-side Purchase filtering
 
 ---
 
-# 82. Deep-link CURRENT
+# 82. Purchase legacy URL compatibility
 
 Existe:
 
@@ -2151,24 +2177,24 @@ Existe:
 /purchases?purchaseId=<id>
 ```
 
-que abre el contexto de la Purchase indicada.
-
-Actualmente depende del resultado de:
+pero actualmente funciona sólo como redirect temporal de compatibilidad:
 
 ```text
-GET /purchases
+/purchases?purchaseId=<id>
+→ /purchases/<id>
 ```
 
-Por tanto:
+El detalle real se resuelve siempre por:
 
 ```text
-deep-link + future server pagination
-→ compatibility debt
+GET /purchases/:id
 ```
+
+No existe `PurchaseDetailModal` como superficie vigente de detalle.
 
 ---
 
-# 83. Purchase detail
+# 83. Purchase 360 canonical detail
 
 La experiencia de detalle permite comprender:
 
@@ -2190,13 +2216,7 @@ pending quantities
 Inventory-related traceability
 ```
 
-Puede evolucionar hacia una experiencia más amplia tipo:
-
-```text
-Purchase 360
-```
-
-pero eso no es necesario para cerrar Purchase V1.
+Esta superficie ya existe como ruta dedicada `/purchases/:id`.
 
 ---
 
@@ -2736,10 +2756,6 @@ Purchase creation idempotency
 ```
 
 ```text
-GET /purchases/:id
-```
-
-```text
 backend pagination
 ```
 
@@ -2748,7 +2764,7 @@ server-side search/filtering
 ```
 
 ```text
-deep-link compatibility after pagination
+future cleanup of legacy purchaseId compatibility redirect
 ```
 
 ---
@@ -2782,8 +2798,6 @@ No deben confundirse con deuda del lifecycle de Purchase.
 Evoluciones posteriores pueden incluir:
 
 ```text
-Purchase 360
-
 improved Audit integration
 
 granular permissions
@@ -3505,9 +3519,6 @@ Product active backend enforcement
 Purchase creation idempotency
 ⏳
 
-GET /purchases/:id
-⏳
-
 backend pagination
 ⏳
 
@@ -3550,8 +3561,6 @@ Por tanto, capacidades como:
 
 ```text
 Supplier Returns
-
-Purchase 360
 
 advanced approvals
 

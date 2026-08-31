@@ -87,6 +87,46 @@ sin convertir esos hechos históricos en reglas vigentes.
 
 # 3. 2026-08 — ERP Core, Equipment, Healthcare Foundation y consolidación documental
 
+## 3.0 Purchase 360 canonical detail closure — UX-03.5C4F
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Fecha:** 2026-08-31
+
+Se cerró la migración de Purchases hacia una superficie dedicada de detalle:
+
+```text
+Purchase List
+↓
+/purchases/:id
+↓
+Purchase 360
+```
+
+El cierre consolidó:
+
+```text
+dedicated Purchase 360
+canonical folio navigation
+simplified row actions
+timezone-aware Desde / Hasta filters
+Receipt Detail → Ver compra → /purchases/:id
+retired PurchaseDetailModal
+safe receipt-preparation hook
+```
+
+La URL histórica:
+
+```text
+/purchases?purchaseId=<id>
+```
+
+quedó limitada a compatibility redirect temporal hacia `/purchases/<id>`.
+No representa una segunda UI/API de detalle.
+
+No hubo cambios backend, Prisma ni contrato API.
+
+---
+
 ## 3.1 ERP Core Functional Normalization — H7
 
 **Estado:** IMPLEMENTED / VALIDATED
@@ -142,7 +182,7 @@ Purchase
 
 Receipt
 → Purchase
-→ /purchases?purchaseId=<id>
+→ /purchases/<id>
 
 Receipt
 → Inventory movements
