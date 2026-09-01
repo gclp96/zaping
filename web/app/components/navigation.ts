@@ -12,12 +12,15 @@ import {
   UsersRound,
   Wrench,
   type LucideIcon,
-} from 'lucide-react';
+} from "lucide-react";
+
+import type { UserRole } from "@/app/auth-session";
 
 export type NavigationItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  visibleForRoles?: readonly UserRole[];
 };
 
 export type NavigationGroup = {
@@ -27,86 +30,92 @@ export type NavigationGroup = {
 
 export const navigationGroups: NavigationGroup[] = [
   {
-    label: 'INICIO',
+    label: "INICIO",
     items: [
       {
-        label: 'Inicio',
-        href: '/home',
+        label: "Inicio",
+        href: "/home",
         icon: House,
       },
       {
-        label: 'Dashboard',
-        href: '/dashboard',
+        label: "Dashboard",
+        href: "/dashboard",
         icon: LayoutDashboard,
       },
     ],
   },
   {
-    label: 'COMERCIAL',
+    label: "COMERCIAL",
     items: [
       {
-        label: 'Clientes',
-        href: '/customers',
+        label: "Clientes",
+        href: "/customers",
         icon: UsersRound,
       },
       {
-        label: 'Cotizaciones',
-        href: '/quotes',
+        label: "Cotizaciones",
+        href: "/quotes",
         icon: FileText,
       },
       {
-        label: 'Ventas',
-        href: '/sales',
+        label: "Ventas",
+        href: "/sales",
         icon: ShoppingCart,
       },
     ],
   },
   {
-    label: 'COMPRAS',
+    label: "COMPRAS",
     items: [
       {
-        label: 'Proveedores',
-        href: '/suppliers',
+        label: "Proveedores",
+        href: "/suppliers",
         icon: Truck,
       },
       {
-        label: 'Compras',
-        href: '/purchases',
+        label: "Compras",
+        href: "/purchases",
         icon: ClipboardList,
       },
       {
-        label: 'Recepciones',
-        href: '/purchase-receipts',
+        label: "Recepciones",
+        href: "/purchase-receipts",
         icon: PackageCheck,
       },
     ],
   },
   {
-    label: 'INVENTARIO',
+    label: "INVENTARIO",
     items: [
       {
-        label: 'Productos',
-        href: '/products',
+        label: "Productos",
+        href: "/products",
         icon: Package,
       },
       {
-        label: 'Inventario',
-        href: '/inventory',
+        label: "Inventario",
+        href: "/inventory",
         icon: Boxes,
       },
       {
-        label: 'Equipos',
-        href: '/equipment',
+        label: "Equipos",
+        href: "/equipment",
         icon: Wrench,
       },
     ],
   },
   {
-    label: 'ADMINISTRACIÓN',
+    label: "ADMINISTRACIÓN",
     items: [
       {
-        label: 'Categorías',
-        href: '/categories',
+        label: "Usuarios",
+        href: "/users",
+        icon: UsersRound,
+        visibleForRoles: ["ADMIN"],
+      },
+      {
+        label: "Categorías",
+        href: "/categories",
         icon: Tags,
       },
     ],
@@ -117,11 +126,28 @@ export function isNavigationItemActive(
   pathname: string,
   href: string,
 ): boolean {
-  if (href === '/') {
-    return pathname === '/';
+  if (href === "/") {
+    return pathname === "/";
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function getVisibleNavigationGroups(
+  currentUserRole?: UserRole | null,
+): NavigationGroup[] {
+  return navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(
+        (item) =>
+          !item.visibleForRoles ||
+          Boolean(
+            currentUserRole && item.visibleForRoles.includes(currentUserRole),
+          ),
+      ),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 export function getRouteTitle(pathname: string): string {
@@ -135,5 +161,5 @@ export function getRouteTitle(pathname: string): string {
     }
   }
 
-  return 'Zaping ERP';
+  return "Zaping ERP";
 }
