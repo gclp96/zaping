@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import Button from "@/app/components/ui/Button";
@@ -27,6 +28,7 @@ const initialValues: ChangePasswordFormValues = {
 };
 
 export default function ChangePasswordPage() {
+  const router = useRouter();
   const [values, setValues] =
     useState<ChangePasswordFormValues>(initialValues);
   const [errors, setErrors] = useState<ChangePasswordFormErrors>({});
@@ -91,7 +93,11 @@ export default function ChangePasswordPage() {
 
       setValues(initialValues);
       setErrors({});
-      setSuccessMessage("Tu contraseña se actualizó correctamente.");
+      setSuccessMessage(
+        "Tu contraseña se actualizó correctamente. Inicia sesión nuevamente.",
+      );
+      localStorage.removeItem("token");
+      router.replace("/login");
     } catch (error) {
       setApiError(
         getApiErrorMessage(error, "No fue posible cambiar la contraseña."),

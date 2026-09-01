@@ -109,6 +109,7 @@ export class AuthService {
       companyId: company.id,
       email: user.email,
       role: user.role,
+      authVersion: user.authVersion,
     });
 
     const safeUser = {
@@ -159,6 +160,7 @@ export class AuthService {
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
+      authVersion: user.authVersion,
     });
 
     const safeUser = {
@@ -226,6 +228,9 @@ export class AuthService {
       },
       data: {
         passwordHash,
+        authVersion: {
+          increment: 1,
+        },
       },
     });
 

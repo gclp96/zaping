@@ -21,6 +21,7 @@ describe('JwtStrategy', () => {
     role: UserRole.ADMIN,
     firstName: 'Stale',
     lastName: 'Token',
+    authVersion: 0,
   };
 
   const dbUser = {
@@ -30,6 +31,16 @@ describe('JwtStrategy', () => {
     firstName: 'Current',
     lastName: 'User',
     role: UserRole.MANAGER,
+    authVersion: 0,
+  };
+
+  const safeDbUser = {
+    id: dbUser.id,
+    companyId: dbUser.companyId,
+    email: dbUser.email,
+    firstName: dbUser.firstName,
+    lastName: dbUser.lastName,
+    role: dbUser.role,
   };
 
   beforeEach(() => {
@@ -54,7 +65,7 @@ describe('JwtStrategy', () => {
   it('returns the current safe DB user for an active user in the token company', async () => {
     prismaMock.user.findFirst.mockResolvedValue(dbUser);
 
-    await expect(strategy.validate(payload)).resolves.toEqual(dbUser);
+    await expect(strategy.validate(payload)).resolves.toEqual(safeDbUser);
 
     expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
       where: {
@@ -69,8 +80,91 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        authVersion: true,
       },
     });
+  });
+
+  it('accepts a current authVersion token', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      ...dbUser,
+      authVersion: 1,
+    });
+
+    await expect(
+      strategy.validate({
+        ...payload,
+        authVersion: 1,
+      }),
+    ).resolves.toEqual(safeDbUser);
+  });
+
+  it('rejects a stale authVersion token', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      ...dbUser,
+      authVersion: 1,
+    });
+
+    await expect(
+      strategy.validate({
+        ...payload,
+        authVersion: 0,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('accepts a legacy token without authVersion while the DB version is zero', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(dbUser);
+    const legacyPayload = {
+      sub: payload.sub,
+      companyId: payload.companyId,
+      email: payload.email,
+      role: payload.role,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+    };
+
+    await expect(strategy.validate(legacyPayload)).resolves.toEqual(safeDbUser);
+  });
+
+  it('rejects a legacy token without authVersion after authVersion increments', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      ...dbUser,
+      authVersion: 1,
+    });
+    const legacyPayload = {
+      sub: payload.sub,
+      companyId: payload.companyId,
+      email: payload.email,
+      role: payload.role,
+      firstName: payload.firstName,
+      lastName: payload.lastName,
+    };
+
+    await expect(strategy.validate(legacyPayload)).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('rejects an old token after a password change and accepts the next version', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      ...dbUser,
+      authVersion: 2,
+    });
+
+    await expect(
+      strategy.validate({
+        ...payload,
+        authVersion: 1,
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    await expect(
+      strategy.validate({
+        ...payload,
+        authVersion: 2,
+      }),
+    ).resolves.toEqual(safeDbUser);
   });
 
   it('rejects a missing user', async () => {
@@ -101,6 +195,7 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        authVersion: true,
       },
     });
   });
@@ -128,6 +223,7 @@ describe('JwtStrategy', () => {
         firstName: true,
         lastName: true,
         role: true,
+        authVersion: true,
       },
     });
   });
@@ -149,5 +245,6 @@ describe('JwtStrategy', () => {
     const user = await strategy.validate(payload);
 
     expect(user).not.toHaveProperty('passwordHash');
+    expect(user).not.toHaveProperty('authVersion');
   });
 });

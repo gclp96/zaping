@@ -16,15 +16,20 @@ describe('AuthService', () => {
     };
     data: {
       passwordHash: string;
+      authVersion?: {
+        increment: number;
+      };
     };
   };
 
   let service: AuthService;
   let prismaMock: {
     company: {
+      create: jest.Mock;
       findUnique: jest.Mock;
     };
     user: {
+      create: jest.Mock;
       findFirst: jest.Mock;
       findUnique: jest.Mock;
       updateMany: jest.Mock;
@@ -48,6 +53,7 @@ describe('AuthService', () => {
     ...authenticatedUser,
     role: UserRole.ADMIN,
     passwordHash: 'hashed-password',
+    authVersion: 0,
     locale: 'es',
     isActive: true,
   };
@@ -55,9 +61,11 @@ describe('AuthService', () => {
   beforeEach(async () => {
     prismaMock = {
       company: {
+        create: jest.fn(),
         findUnique: jest.fn(),
       },
       user: {
+        create: jest.fn(),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         updateMany: jest.fn(),
@@ -154,10 +162,44 @@ describe('AuthService', () => {
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
   });
 
+  it('signs register tokens with the initial user authVersion without exposing it', async () => {
+    const company = {
+      id: 'company-1',
+      name: 'Zaping Medical',
+      tradeName: undefined,
+      rfc: 'ZAP010101ABC',
+    };
+    prismaMock.user.findUnique.mockResolvedValue(null);
+    prismaMock.company.findUnique.mockResolvedValue(null);
+    prismaMock.company.create.mockResolvedValue(company);
+    prismaMock.user.create.mockResolvedValue(userRecord);
+    jwtServiceMock.signAsync.mockResolvedValue('registered-token');
+
+    const response = await service.register({
+      companyName: company.name,
+      rfc: company.rfc,
+      firstName: userRecord.firstName,
+      lastName: userRecord.lastName,
+      email: userRecord.email,
+      password: 'secure-password',
+    });
+
+    expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
+      sub: userRecord.id,
+      companyId: company.id,
+      email: userRecord.email,
+      role: userRecord.role,
+      authVersion: 0,
+    });
+    expect(response.user).not.toHaveProperty('passwordHash');
+    expect(response.user).not.toHaveProperty('authVersion');
+  });
+
   it('allows active users with a valid password to login without exposing passwordHash', async () => {
     prismaMock.user.findUnique.mockResolvedValue({
       ...userRecord,
       passwordHash: await bcrypt.hash('correct-password', 10),
+      authVersion: 2,
     });
     jwtServiceMock.signAsync.mockResolvedValue('signed-token');
 
@@ -179,6 +221,16 @@ describe('AuthService', () => {
       },
     });
     expect(response.user).not.toHaveProperty('passwordHash');
+    expect(response.user).not.toHaveProperty('authVersion');
+    expect(jwtServiceMock.signAsync).toHaveBeenCalledWith({
+      sub: userRecord.id,
+      companyId: userRecord.companyId,
+      email: userRecord.email,
+      role: userRecord.role,
+      firstName: userRecord.firstName,
+      lastName: userRecord.lastName,
+      authVersion: 2,
+    });
   });
 
   it('rejects inactive users with the generic credentials error before issuing a token', async () => {
@@ -258,6 +310,9 @@ describe('AuthService', () => {
       },
       data: {
         passwordHash: updateCall.data.passwordHash,
+        authVersion: {
+          increment: 1,
+        },
       },
     });
     expect(typeof updateCall.data.passwordHash).toBe('string');
@@ -335,7 +390,11 @@ describe('AuthService', () => {
     await expect(bcrypt.compare('new-secure-password', nextHash)).resolves.toBe(
       true,
     );
-    expect(Object.keys(updateCall.data)).toEqual(['passwordHash']);
+    expect(updateCall.data.authVersion).toEqual({ increment: 1 });
+    expect(Object.keys(updateCall.data)).toEqual([
+      'passwordHash',
+      'authVersion',
+    ]);
   });
 
   it('rejects missing or inactive users before password comparison', async () => {

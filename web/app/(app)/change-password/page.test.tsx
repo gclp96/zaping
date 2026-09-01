@@ -11,6 +11,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ChangePasswordPage from "./page";
 import { api } from "@/services/api";
 
+const replaceMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: replaceMock,
+  }),
+}));
+
 vi.mock("@/services/api", () => ({
   api: {
     post: vi.fn(),
@@ -48,6 +56,8 @@ async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
+  window.history.pushState(null, "", "/change-password");
   vi.mocked(api.post).mockResolvedValue({
     data: {
       success: true,
@@ -58,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });
 
 describe("ChangePasswordPage", () => {
@@ -132,23 +143,29 @@ describe("ChangePasswordPage", () => {
     ]);
   });
 
-  it("clears password fields and shows success after update", async () => {
+  it("clears the local session and redirects to login after update", async () => {
     const user = userEvent.setup();
+    localStorage.setItem("token", "current-token");
 
     render(<ChangePasswordPage />);
     await fillValidForm(user);
     await user.click(screen.getByRole("button", { name: "Cambiar contraseña" }));
 
     expect(
-      await screen.findByText("Tu contraseña se actualizó correctamente."),
+      await screen.findByText(
+        "Tu contraseña se actualizó correctamente. Inicia sesión nuevamente.",
+      ),
     ).toBeTruthy();
     expect(getCurrentPasswordInput().value).toBe("");
     expect(getNewPasswordInput().value).toBe("");
     expect(getConfirmPasswordInput().value).toBe("");
+    expect(localStorage.getItem("token")).toBeNull();
+    expect(replaceMock).toHaveBeenCalledWith("/login");
   });
 
   it("displays safe API errors", async () => {
     const user = userEvent.setup();
+    localStorage.setItem("token", "current-token");
     vi.mocked(api.post).mockRejectedValueOnce(
       apiError("La contraseña actual no es correcta."),
     );
@@ -160,6 +177,9 @@ describe("ChangePasswordPage", () => {
     expect(
       await screen.findByText("La contraseña actual no es correcta."),
     ).toBeTruthy();
+    expect(localStorage.getItem("token")).toBe("current-token");
+    expect(window.location.pathname).toBe("/change-password");
+    expect(replaceMock).not.toHaveBeenCalled();
   });
 
   it("prevents double submission while the request is pending", async () => {
@@ -185,6 +205,8 @@ describe("ChangePasswordPage", () => {
     expect(api.post).toHaveBeenCalledTimes(1);
 
     resolveRequest({ data: { success: true } });
-    await screen.findByText("Tu contraseña se actualizó correctamente.");
+    await screen.findByText(
+      "Tu contraseña se actualizó correctamente. Inicia sesión nuevamente.",
+    );
   });
 });

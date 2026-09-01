@@ -410,6 +410,7 @@ model User {
   lastName     String
   email        String   @unique
   passwordHash String
+  authVersion  Int      @default(0)
   locale       String   @default("es")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())

@@ -13,6 +13,9 @@ interface JwtPayload {
   role: UserRole;
   firstName?: string;
   lastName?: string;
+  authVersion?: number;
+  iat?: number;
+  exp?: number;
 }
 
 @Injectable()
@@ -49,10 +52,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         firstName: true,
         lastName: true,
         role: true,
+        authVersion: true,
       },
     });
 
     if (!user) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    const tokenAuthVersion = payload.authVersion ?? 0;
+
+    if (tokenAuthVersion !== user.authVersion) {
       throw new UnauthorizedException('Token inválido');
     }
 
