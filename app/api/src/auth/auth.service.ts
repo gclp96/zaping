@@ -10,6 +10,7 @@ import {
   AuthenticatedSession,
   AuthenticatedUser,
 } from './interfaces/authenticated-request.interface';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 import * as bcrypt from 'bcrypt';
 
@@ -173,6 +174,68 @@ export class AuthService {
     return {
       token,
       user: safeUser,
+    };
+  }
+
+  async changePassword(user: AuthenticatedUser, dto: ChangePasswordDto) {
+    const currentUser = await this.prisma.user.findFirst({
+      where: {
+        id: user.id,
+        companyId: user.companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        passwordHash: true,
+        isActive: true,
+      },
+    });
+
+    if (!currentUser) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    const currentPasswordValid = await bcrypt.compare(
+      dto.currentPassword,
+      currentUser.passwordHash,
+    );
+
+    if (!currentPasswordValid) {
+      throw new BadRequestException('La contraseña actual no es correcta.');
+    }
+
+    const samePassword = await bcrypt.compare(
+      dto.newPassword,
+      currentUser.passwordHash,
+    );
+
+    if (samePassword) {
+      throw new BadRequestException(
+        'La nueva contraseña debe ser diferente de la actual.',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(dto.newPassword, 10);
+
+    const updateResult = await this.prisma.user.updateMany({
+      where: {
+        id: currentUser.id,
+        companyId: currentUser.companyId,
+        isActive: true,
+      },
+      data: {
+        passwordHash,
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      throw new UnauthorizedException('Token inválido');
+    }
+
+    return {
+      success: true,
+      message: 'Contraseña actualizada',
     };
   }
 }

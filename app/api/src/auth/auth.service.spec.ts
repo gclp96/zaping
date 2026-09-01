@@ -1,5 +1,5 @@
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -8,13 +8,26 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 
 describe('AuthService', () => {
+  type UserUpdateManyCall = {
+    where: {
+      id: string;
+      companyId: string;
+      isActive: boolean;
+    };
+    data: {
+      passwordHash: string;
+    };
+  };
+
   let service: AuthService;
   let prismaMock: {
     company: {
       findUnique: jest.Mock;
     };
     user: {
+      findFirst: jest.Mock;
       findUnique: jest.Mock;
+      updateMany: jest.Mock;
     };
   };
   let jwtServiceMock: {
@@ -45,7 +58,9 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
       },
       user: {
+        findFirst: jest.fn(),
         findUnique: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
     jwtServiceMock = {
@@ -198,5 +213,141 @@ describe('AuthService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('changes password for the authenticated active user scoped by id and companyId', async () => {
+    const currentHash = await bcrypt.hash('current-password', 10);
+
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: userRecord.id,
+      companyId: userRecord.companyId,
+      passwordHash: currentHash,
+      isActive: true,
+    });
+    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    const response = await service.changePassword(authenticatedUser as never, {
+      currentPassword: 'current-password',
+      newPassword: 'new-secure-password',
+    });
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: authenticatedUser.id,
+        companyId: authenticatedUser.companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        companyId: true,
+        passwordHash: true,
+        isActive: true,
+      },
+    });
+    expect(prismaMock.user.updateMany).toHaveBeenCalledTimes(1);
+    const updateCalls = prismaMock.user.updateMany.mock.calls as [
+      UserUpdateManyCall,
+    ][];
+    const updateCall = updateCalls[0][0];
+
+    expect(updateCall).toEqual({
+      where: {
+        id: authenticatedUser.id,
+        companyId: authenticatedUser.companyId,
+        isActive: true,
+      },
+      data: {
+        passwordHash: updateCall.data.passwordHash,
+      },
+    });
+    expect(typeof updateCall.data.passwordHash).toBe('string');
+    expect(response).toEqual({
+      success: true,
+      message: 'Contraseña actualizada',
+    });
+    expect(response).not.toHaveProperty('passwordHash');
+    expect(response).not.toHaveProperty('password');
+  });
+
+  it('rejects an incorrect current password as a form error without updating', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: userRecord.id,
+      companyId: userRecord.companyId,
+      passwordHash: await bcrypt.hash('current-password', 10),
+      isActive: true,
+    });
+
+    await expect(
+      service.changePassword(authenticatedUser as never, {
+        currentPassword: 'wrong-password',
+        newPassword: 'new-secure-password',
+      }),
+    ).rejects.toMatchObject({
+      constructor: BadRequestException,
+      message: 'La contraseña actual no es correcta.',
+    });
+
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects same-password changes without updating', async () => {
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: userRecord.id,
+      companyId: userRecord.companyId,
+      passwordHash: await bcrypt.hash('current-password', 10),
+      isActive: true,
+    });
+
+    await expect(
+      service.changePassword(authenticatedUser as never, {
+        currentPassword: 'current-password',
+        newPassword: 'current-password',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('persists only a fresh hash and never the plain new password', async () => {
+    const currentHash = await bcrypt.hash('current-password', 10);
+
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: userRecord.id,
+      companyId: userRecord.companyId,
+      passwordHash: currentHash,
+      isActive: true,
+    });
+    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+
+    await service.changePassword(authenticatedUser as never, {
+      currentPassword: 'current-password',
+      newPassword: 'new-secure-password',
+    });
+
+    const updateCalls = prismaMock.user.updateMany.mock.calls as [
+      UserUpdateManyCall,
+    ][];
+    const updateCall = updateCalls[0][0];
+    const nextHash = updateCall.data.passwordHash;
+
+    expect(nextHash).not.toBe('new-secure-password');
+    expect(nextHash).not.toBe(currentHash);
+    await expect(bcrypt.compare('new-secure-password', nextHash)).resolves.toBe(
+      true,
+    );
+    expect(Object.keys(updateCall.data)).toEqual(['passwordHash']);
+  });
+
+  it('rejects missing or inactive users before password comparison', async () => {
+    prismaMock.user.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.changePassword(authenticatedUser as never, {
+        currentPassword: 'current-password',
+        newPassword: 'new-secure-password',
+      }),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
   });
 });

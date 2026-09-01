@@ -7,6 +7,7 @@ import Sidebar from "./sidebar";
 const expectedNavigation = [
   ["Inicio", "/home"],
   ["Dashboard", "/dashboard"],
+  ["Cambiar contraseña", "/change-password"],
   ["Clientes", "/customers"],
   ["Cotizaciones", "/quotes"],
   ["Ventas", "/sales"],

@@ -341,7 +341,7 @@ describe('AuthenticatedAppLayout', () => {
       within(startGroup as HTMLElement)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Inicio', 'Dashboard']);
+    ).toEqual(['Inicio', 'Dashboard', 'Cambiar contraseña']);
   });
 
   it('renders Recepciones after Compras in the COMPRAS group', () => {
