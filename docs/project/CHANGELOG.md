@@ -1,9 +1,9 @@
 # Changelog — Zaping
 
 **Documento:** Historial consolidado del proyecto
-**Versión:** 1.2.0
+**Versión:** 1.3.0
 **Estado:** Activo
-**Última actualización:** 2026-08-27
+**Última actualización:** 2026-09-01
 **Responsable:** Zaping Team
 
 ---
@@ -86,6 +86,35 @@ sin convertir esos hechos históricos en reglas vigentes.
 ---
 
 # 3. 2026-08 — ERP Core, Equipment, Healthcare Foundation y consolidación documental
+
+## 3.16 Auth + Users V1 closure — ERP-V1-CLOSE-B1C
+
+**Estado:** IMPLEMENTED / VALIDATED
+**Fecha:** 2026-09-01
+
+Se consolidó Identity & Access para Users V1:
+
+```text
+secure Users V1 backend
+ADMIN-only user administration
+tenant-safe Users API
+GET /users
+GET /users/:id
+POST /users
+PATCH /users/:id
+activate/deactivate through PATCH isActive
+last active ADMIN protection
+DB-backed active/current-role revalidation
+Users frontend at /users
+responsive Users management
+```
+
+También se retiró el reset-password inseguro anterior.
+
+Secure password recovery no fue anunciado como implementado. Queda pendiente
+para `ERP-V1-CLOSE-B1D`.
+
+---
 
 ## 3.0 Purchase 360 canonical detail closure — UX-03.5C4F
 

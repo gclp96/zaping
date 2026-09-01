@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
-Última actualización: 2026-08-29
+Última actualización: 2026-09-01
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -37,6 +37,7 @@ IMPLEMENTED / VALIDATED
 ERP Core
 
 ├── Authentication / JWT foundation
+├── Users V1 administration
 ├── Authenticated App Shell
 ├── Navigation
 ├── UX-01 App Shell v2 / frontend foundations
@@ -72,7 +73,7 @@ CURRENT
 H8 — ERP Core release preparation
 
 ├── H8A Documentation synchronization
-│   └── final cross-document synchronization in progress
+│   └── AUTH-USERS-V1 completed
 │
 └── H8B Full technical regression
     └── next technical block
@@ -89,9 +90,19 @@ Frontend UX workstream
 
 NEXT
 
+ERP-V1-CLOSE-B1D — secure password recovery / change password
+        ↓
+ERP-V1-CLOSE-B2 — critical RBAC review
+        ↓
+ERP-V1-CLOSE-B3 — broader tenant regression
+        ↓
+ERP-V1-CLOSE-C — production config / CORS / rate limiting
+        ↓
+ERP-V1-CLOSE-D — protected frontend / session hardening
+        ↓
 UX-B.6 — Full ERP end-to-end QA
         ↓
-ERP Core V1 closure
+ERP-V1-RC — ERP Core V1 release candidate
         ↓
 Healthcare specialization
 
@@ -100,10 +111,6 @@ RELEASE BLOCKERS — P0
 Antes de pilot/commercial production deben resolverse o verificarse formalmente:
 
 secure password recovery
-
-inactive-user enforcement
-
-default ADMIN / safe role provisioning review
 
 systematic tenant-isolation regression
 
@@ -185,7 +192,7 @@ Companies
 
 Identity & Access
 
-🟡 IMPLEMENTED / P0 security evolution pending
+🟡 AUTH + USERS V1 IMPLEMENTED / P0 security evolution pending
 
 Dashboard
 
@@ -940,7 +947,7 @@ Product.stock ↔ EquipmentAsset reconciliation
 
 12. Identity & Access
 
-Estado: 🟡 IMPLEMENTED / P0 SECURITY EVOLUTION PENDING
+Estado: 🟡 AUTH + USERS V1 IMPLEMENTED / P0 SECURITY EVOLUTION PENDING
 
 Implementado:
 
@@ -970,9 +977,11 @@ Endpoints principales:
 
 /auth/login
 
-/auth/reset-password
-
 /auth/me
+
+/users
+
+/users/:id
 
 SEC-001 — Authentication Response Sanitization
 
@@ -989,45 +998,63 @@ No debe mantenerse como riesgo activo.
 
 SEC-002 — Default ADMIN / Safe Role Provisioning Review
 
-Estado: ⏳ PENDING
-Prioridad: P0
+Estado: ✅ COMPLETED / VERIFIED
 
-Riesgo actual a revisar:
+Resuelto para el código vigente:
 
 User.role
-@default(ADMIN)
+→ no @default(ADMIN)
 
-Debe validarse:
+Company sign-up
 
-all user creation flows
+→ first ADMIN explicit
 
-explicit role assignment
+Users V1 create
 
-privilege escalation protection
+→ ADMIN-only
 
-safe provisioning defaults
-
-regression tests
-
-No debe asumirse que el default es seguro para producción sin revisión formal.
+→ explicit role required
 
 SEC-003 — Inactive User Enforcement
 
-Estado: 🔎 VERIFY / FIX IF NEEDED
-Prioridad: P0
+Estado: ✅ COMPLETED / VERIFIED
 
-Debe garantizarse:
+Implementado:
 
 User.isActive = false
-→ no normal application access
+→ login rejected
 
-Debe verificarse tanto en:
+JWT vigente
+→ revalidated against DB on subsequent requests
 
-authentication
+role current
+→ loaded from DB for protected requests
 
-authenticated request lifecycle
+AUTH-USERS-V1 — Users V1 Administration
 
-según la estrategia final.
+Estado: ✅ COMPLETE
+
+Closed checkpoints:
+
+ERP-V1-CLOSE-B1C-A
+
+ERP-V1-CLOSE-B1C-B
+
+ERP-V1-CLOSE-B1C-C
+
+Implementado:
+
+GET /users
+
+GET /users/:id
+
+POST /users
+
+PATCH /users/:id
+
+No DELETE /users.
+
+ADMIN-only, tenant-safe, no passwordHash in responses.
 
 SEC-004 — Tenant Isolation Regression
 
@@ -1048,11 +1075,19 @@ SEC-005 — Secure Password Recovery
 Estado: ⛔ P0 BLOCKER
 Prioridad: P0
 
-El endpoint CURRENT:
+El reset inseguro anterior fue retirado.
 
-/auth/reset-password
+Estado actual:
 
-no puede considerarse apto para pilot/commercial production si permite restablecer una contraseña sin demostrar control de la cuenta mediante un mecanismo seguro.
+secure recovery
+→ PENDING
+
+/forgot-password
+→ informa indisponibilidad temporal
+
+No puede considerarse apto para pilot/commercial production un recovery que
+restablezca contraseña sin demostrar control de la cuenta mediante un mecanismo
+seguro.
 
 Debe existir una estrategia equivalente a:
 
@@ -1074,11 +1109,29 @@ audit / abuse controls where applicable
 
 Regla:
 
-public password reset
+password recovery
 without secure recovery proof
 → P0 security blocker
 
 No debe cerrarse ERP Core para producción comercial sin resolver este punto.
+
+Siguiente checkpoint:
+
+ERP-V1-CLOSE-B1D
+
+Debe cubrir:
+
+change-password
+
+forgot-password
+
+secure reset token
+
+expiry
+
+one-time use
+
+email delivery
 
 SEC-006 — Authentication Abuse Protection / Rate Limiting
 
@@ -1642,7 +1695,7 @@ context
 
 AUTH-PERM — Permission-Based RBAC
 
-Estado: ⏳ TARGET
+Estado: ⏳ DEFERRED P1
 
 Evolución:
 
@@ -1723,10 +1776,6 @@ Security / Release
 secure password recovery
 
 authentication abuse protection / rate limiting
-
-inactive-user enforcement
-
-default ADMIN / safe role provisioning
 
 systematic tenant-isolation regression
 
@@ -1829,10 +1878,6 @@ RISK-001 — Security Hardening
 Riesgos vigentes:
 
 secure password recovery
-
-ADMIN default / safe role provisioning
-
-inactive-user enforcement
 
 systematic tenant-isolation coverage
 

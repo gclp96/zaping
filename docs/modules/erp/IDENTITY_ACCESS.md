@@ -2,10 +2,10 @@
 
 **Módulo:** Identity & Access
 **Producto:** Zaping Platform / ERP Core
-**Versión:** 2.2.0
+**Versión:** 2.3.0
 **Estado:** Aprobado
-**Estado de implementación:** AUTH IMPLEMENTED / RBAC PARTIAL / PERMISSIONS TARGET
-**Última actualización:** 2026-08-27
+**Estado de implementación:** AUTH IMPLEMENTED / USERS V1 IMPLEMENTED / CURRENT ROLE-BASED RBAC PARTIAL / PERMISSION-BASED RBAC DEFERRED P1
+**Última actualización:** 2026-09-01
 **Responsable:** Zaping Platform & Security Team
 
 ---
@@ -71,7 +71,7 @@ RolesGuard
 
 future permissions
 
-future secure user administration
+Users V1 administration
 
 future session/revocation capabilities
 ```
@@ -202,11 +202,17 @@ Static role model
 RolesGuard
 → implemented
 
+Users V1 administration
+→ implemented
+
+Current role-based RBAC
+→ partial
+
 ERP-wide granular authorization
 → NOT implemented
 
-Permission model
-→ TARGET
+Permission-based RBAC
+→ DEFERRED P1
 ```
 
 ---
@@ -523,50 +529,48 @@ Identity debe preservarse aunque el usuario ya no pueda acceder al sistema.
 
 ---
 
-# 17. Inactive User — CURRENT GAP
+# 17. Inactive User — CURRENT
 
-Actualmente existe una deuda de seguridad importante:
+Actualmente:
 
 ```text
 login
-→ does not fully enforce User.isActive
+→ rejects User.isActive = false
 
 JwtStrategy
-→ does not revalidate User.isActive against database
+→ revalidates active User state against database
 ```
 
 Por tanto:
 
 ```text
 User.isActive = false
+↓
+new login rejected
+↓
+existing JWT stops authorizing on subsequent protected requests
 ```
 
-todavía no representa una garantía completa de bloqueo de acceso.
+`JwtStrategy` consulta el estado vigente de DB para cada request protegida.
+También reconstruye el `role` desde DB, por lo que un cambio de rol aplica en
+requests posteriores sin esperar a que expire el token.
+
+Esto no representa revocación global de tokens; representa enforcement
+DB-backed en el ciclo normal de requests autenticados.
 
 ---
 
-# 18. Inactive User — requisito P0
+# 18. Inactive User — invariant
 
-Debe garantizarse:
+Debe mantenerse:
 
 ```text
 User.isActive = false
 ↓
-no new authentication
+no normal protected application access
 ```
 
-y debe definirse el comportamiento sobre tokens previamente emitidos.
-
-Como mínimo antes de exposición real:
-
-```text
-inactive User
-→ no normal protected application access
-```
-
-Este punto es:
-
-> **P0 — Release Blocker**
+Reactivar un User requiere una operación administrativa explícita.
 
 ---
 
@@ -774,10 +778,11 @@ issue token
 return safe response
 ```
 
-Actualmente existe deuda en:
+Actualmente:
 
 ```text
-User.isActive enforcement
+User.isActive = false
+→ login rejected
 ```
 
 ---
@@ -838,11 +843,12 @@ role
 
 según el payload implementado.
 
-Actualmente existe una limitación:
+Actualmente:
 
 ```text
 JwtStrategy
-→ does not fully revalidate active User state against database
+→ revalidates active User state against database
+→ uses current DB role for request.user
 ```
 
 ---
@@ -1046,12 +1052,13 @@ POST /auth/register
 
 POST /auth/login
 
-POST /auth/reset-password
-
 GET /auth/me
 ```
 
 Los DTOs y contratos exactos pertenecen al código vigente.
+
+El reset inseguro anterior fue retirado. La recuperación segura de contraseña
+permanece pendiente.
 
 ---
 
@@ -1077,20 +1084,32 @@ como sustituto de la identidad autenticada.
 
 ---
 
-# 39. Registration
+# 39. Company Sign-up
 
-`/auth/register` existe actualmente.
+`POST /auth/register` existe actualmente como Company sign-up.
 
-Su semántica debe tratarse con cuidado.
-
-No debe asumirse:
+Su semántica vigente:
 
 ```text
-public registration
-→ permission to create privileged Users
+New Company
+↓
+first User
+↓
+explicit ADMIN
 ```
 
-El provisioning inicial de una Company es diferente de la creación posterior de usuarios internos.
+No es un endpoint para crear usuarios internos posteriores.
+
+Usuarios posteriores:
+
+```text
+Users administration
+↓
+ADMIN-only
+```
+
+El provisioning inicial de una Company es diferente de la creación posterior de
+usuarios internos.
 
 ---
 
@@ -1116,26 +1135,20 @@ Esto no justifica que usuarios posteriores hereden `ADMIN` por default.
 
 ---
 
-# 41. Riesgo P0 — `role @default(ADMIN)`
+# 41. Implicit ADMIN default — RESOLVED
 
-Actualmente Prisma define:
+El modelo vigente ya no define:
 
 ```text
 User.role
-→ default ADMIN
+→ @default(ADMIN)
 ```
 
-Esto crea un riesgo:
+La creación de usuarios administrativos exige `role` explícito en el contrato
+de Users V1.
 
-```text
-generic User creation
-+
-role omitted
-↓
-ADMIN
-```
-
-Una operación de creación de usuarios no debe depender de este default.
+Este riesgo histórico deja de ser P0 activo para el código actual, pero sigue
+siendo un anti-patrón prohibido.
 
 ---
 
@@ -1165,34 +1178,58 @@ role omitted
 implicit ADMIN
 ```
 
-Este punto es:
+Esta regla está implementada para el flujo actual:
 
-> **P0 — Release Blocker**
+```text
+Company sign-up
+→ first ADMIN explicit
 
-Debe evaluarse posteriormente si el default Prisma debe eliminarse o sustituirse por una estrategia más segura.
+Users V1 create
+→ ADMIN-only
+→ explicit role required
+```
 
 ---
 
-# 43. Password Reset — CURRENT
+# 43. Password Recovery — CURRENT
 
-Actualmente existe:
+El reset inseguro anterior fue retirado.
+
+Actualmente:
 
 ```text
-POST /auth/reset-password
+secure recovery
+→ PENDING
+
+/forgot-password
+→ informs temporary unavailability
 ```
 
-y el flujo actual no utiliza todavía una infraestructura segura de recovery token que demuestre control de la cuenta.
+No existe todavía una infraestructura segura de recovery token que demuestre
+control de la cuenta.
 
 Por tanto:
 
 ```text
-current reset-password
-→ NOT production-safe as full forgot-password recovery
+forgot / reset password
+→ NOT IMPLEMENTED as secure production recovery
 ```
 
 Este punto es:
 
 > **P0 — Release Blocker**
+
+Siguiente checkpoint:
+
+```text
+ERP-V1-CLOSE-B1D
+→ change-password
+→ forgot-password
+→ secure reset token
+→ expiry
+→ one-time use
+→ email delivery
+```
 
 ---
 
@@ -1658,49 +1695,85 @@ No debe existir un período donde rutas críticas queden sin protección.
 
 ---
 
-# 63. User Administration — TARGET
+# 63. Users V1 Administration — CURRENT
 
-La administración completa de Users debe considerarse una capacidad controlada.
+Users V1 está implementado como administración interna controlada.
 
-Requisito:
+Endpoints:
 
 ```text
-authorized administrator
-↓
-manage Users
-↓
-only inside own Company
+GET /users
+
+GET /users/:id
+
+POST /users
+
+PATCH /users/:id
 ```
 
-El contrato completo de Users API debe verificarse contra backend antes de declararlo implementado.
+No existe:
+
+```text
+DELETE /users
+```
+
+Protección:
+
+```text
+JwtAuthGuard
++
+RolesGuard
++
+ADMIN
+```
+
+Tenant isolation:
+
+```text
+authenticated companyId
+↓
+UsersService tenant scope
+```
+
+No se acepta `companyId` como input administrativo.
+
+Las respuestas utilizan un select seguro y no incluyen `passwordHash`.
 
 ---
 
-# 64. Create User — requisito
+# 64. Users V1 business rules
 
-Una operación futura/normalizada de creación de User debe validar:
-
-```text
-authenticated authorized actor
-
-tenant scope
-
-global email uniqueness
-
-explicit role
-
-password policy
-
-input validation
-```
-
-No debe aceptar arbitrariamente:
+Reglas implementadas:
 
 ```text
-companyId
+role required on create
+
+User.role has no default ADMIN
+
+minimum password length: 8
+
+passwordHash never returned
+
+self-deactivation blocked
+
+last active ADMIN cannot be deactivated
+
+last active ADMIN cannot be demoted
+
+self-demotion allowed only if another active ADMIN remains
+
+ADMIN can create another ADMIN
 ```
 
-desde frontend como autoridad.
+Administración de estado:
+
+```text
+activate/deactivate
+↓
+PATCH isActive
+```
+
+No hay borrado físico de Users.
 
 ---
 
@@ -1735,7 +1808,7 @@ Change Role
 
 Deactivate User
 
-Reactivate User future
+Reactivate User
 ```
 
 sobre un:
@@ -2422,13 +2495,25 @@ locale
 
 safe register/login responses
 
+inactive user enforcement
+
+DB-backed current role revalidation
+
+Company sign-up with explicit first ADMIN
+
+Users V1 ADMIN-only administration
+
+tenant-safe Users API
+
+safe Users responses without passwordHash
+
 /auth/register
 
 /auth/login
 
-/auth/reset-password
-
 /auth/me
+
+/users
 ```
 
 ---
@@ -2440,19 +2525,15 @@ Antes de un piloto externo o producción deben resolverse:
 ```text
 1. Secure password recovery
 
-2. User.isActive enforcement
+2. Systematic tenant-isolation regression
 
-3. Safe explicit role provisioning
+3. Authorization review for critical ERP endpoints
 
-4. Remove implicit ADMIN privilege risk
+4. Basic abuse/rate-limit protection for Auth public endpoints
 
-5. Systematic tenant-isolation regression
+5. Protected frontend/session hardening
 
-6. Authorization review for critical ERP endpoints
-
-7. Basic abuse/rate-limit protection for Auth public endpoints
-
-8. Security regression coverage for resolved blockers
+6. Security regression coverage for remaining blockers
 ```
 
 `passwordHash` response sanitization:
@@ -2461,7 +2542,9 @@ Antes de un piloto externo o producción deben resolverse:
 RESOLVED
 ```
 
-No pertenece al backlog P0 actual.
+`User.isActive` enforcement, explicit safe role provisioning, implicit ADMIN
+default removal, and Users V1 administration are also resolved for the current
+code boundary. Broader tenant and authorization regression remain pending.
 
 ---
 
@@ -2475,8 +2558,6 @@ session/token strategy review
 refresh / revocation
 
 frontend protected-route hardening
-
-User administration
 
 business Audit integration
 
@@ -2657,6 +2738,9 @@ generic User create
 ↓
 privilege escalation
 ```
+
+Este anti-patrón no describe el modelo vigente de `User.role`; permanece aquí
+como regla de seguridad a no reintroducir.
 
 ---
 

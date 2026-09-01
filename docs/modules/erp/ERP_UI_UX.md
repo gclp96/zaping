@@ -2,10 +2,10 @@
 
 **Módulo:** ERP Core UI / UX
 **Producto:** Zaping ERP Core
-**Versión:** 1.3.0
+**Versión:** 1.4.0
 **Estado:** Approved milestone scope
 **Estado de implementación:** ERP CORE FUNCTIONAL NORMALIZATION H7 COMPLETED / VALIDATED
-**Última actualización:** 2026-08-27
+**Última actualización:** 2026-09-01
 **Responsable:** Zaping ERP Team
 
 ---
@@ -321,7 +321,14 @@ review of localStorage token strategy
 
 # 12. Secure password recovery — P0
 
-Existe actualmente una experiencia pública de recuperación/reset de contraseña.
+Existe actualmente la ruta pública:
+
+```text
+/forgot-password
+```
+
+Su estado vigente informa indisponibilidad temporal. No representa todavía un
+flujo seguro de recuperación.
 
 Antes de pilot o producción debe existir un mecanismo seguro que verifique control
 de la cuenta mediante un flujo como:
@@ -348,6 +355,12 @@ No debe considerarse resuelto únicamente porque exista:
 ```
 
 en frontend.
+
+Siguiente checkpoint:
+
+```text
+ERP-V1-CLOSE-B1D
+```
 
 ---
 
@@ -443,8 +456,9 @@ INVENTARIO
 - Inventario
 - Equipos
 
-ADMINISTRACION
-- Categorias
+ADMINISTRACIÓN
+- Usuarios
+- Categorías
 ```
 
 ---
@@ -469,13 +483,16 @@ No deben mostrarse rutas inexistentes únicamente porque aparezcan en roadmap.
 
 ---
 
-# 17. Permission-aware navigation
+# 17. Role-aware navigation
 
 Actualmente:
 
 ```text
-permission-aware navigation
-→ TARGET
+role-aware navigation
+→ PARTIAL CURRENT
+
+Usuarios
+→ visible only for ADMIN
 ```
 
 La Sidebar no debe considerarse todavía una frontera completa de autorización.
@@ -486,6 +503,73 @@ Debe mantenerse:
 navigation visibility
 ≠
 backend authorization
+```
+
+Permission-based navigation granular permanece:
+
+```text
+permission-aware navigation
+→ DEFERRED P1
+```
+
+---
+
+# 17.1 Users V1 CURRENT
+
+Ruta:
+
+```text
+/users
+```
+
+Navegación:
+
+```text
+ADMINISTRACIÓN
+↓
+Usuarios
+```
+
+Visible solo para `ADMIN` en UI. El backend sigue siendo la autoridad real.
+
+Patrón UX:
+
+```text
+LIST
+→ DataTable
+
+MODAL
+→ create/edit focused operation
+
+ROW ACTIONS
+→ Editar / Desactivar / Reactivar
+
+ConfirmDialog
+→ Desactivar
+```
+
+Features V1:
+
+```text
+listado
+búsqueda
+filtro rol
+filtro estado
+crear
+editar
+activar/desactivar
+badge Tú
+responsive desktop/tablet/mobile
+403
+```
+
+Users V1 no incluye:
+
+```text
+password reset
+invite email
+permissions
+user detail / 360
 ```
 
 ---
@@ -2563,12 +2647,6 @@ Antes de pilot/production deben cerrarse o decidirse formalmente al menos:
 ```text
 secure password recovery
 
-inactive-user enforcement
-
-safe role provisioning
-
-default ADMIN review
-
 critical authorization review
 
 systematic tenant-isolation regression
@@ -2591,17 +2669,11 @@ Estas tareas no son meramente visuales.
 ```text
 secure password recovery
 
-inactive-user enforcement
-
 protected-route/session architecture review
 
 critical authorization review
 
 tenant-isolation regression
-
-safe role provisioning
-
-default ADMIN review
 
 authentication endpoint abuse protection
 
@@ -2670,11 +2742,6 @@ P0
 ```text
 protected-route/session architecture
 P0 review
-```
-
-```text
-inactive-user enforcement
-P0
 ```
 
 ```text
@@ -3524,6 +3591,9 @@ Generic Sales backend safety
 
 Purchase Receipt idempotency UX
 ✅
+
+Users V1 administration
+✅
 ```
 
 ---
@@ -3536,9 +3606,6 @@ P0
 
 protected-route/session architecture
 P0 review
-
-inactive-user enforcement
-P0
 
 authorization / tenant regression
 P0
