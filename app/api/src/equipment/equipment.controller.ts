@@ -7,8 +7,11 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guards';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-request.interface';
 
 import { CreateEquipmentInspectionDto } from './dto/create-equipment-inspection.dto';
@@ -21,7 +24,8 @@ type EquipmentRequest = {
   user: AuthenticatedUser;
 };
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
 @Controller('equipment')
 export class EquipmentController {
   constructor(

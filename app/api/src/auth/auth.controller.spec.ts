@@ -10,6 +10,10 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+jest.mock('../email/email.service', () => ({
+  EmailService: class EmailService {},
+}));
+
 describe('AuthController', () => {
   let controller: AuthController;
   let authServiceMock: {

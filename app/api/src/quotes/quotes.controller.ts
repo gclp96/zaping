@@ -10,10 +10,13 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 
 import type { Request as ExpressRequest, Response } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guards';
 
 import { CreateQuoteDto } from './dto/create-quote.dto';
 import { QuotesService } from './quotes.service';
@@ -27,7 +30,8 @@ type AuthenticatedRequest = ExpressRequest & {
   };
 };
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES)
 @Controller('quotes')
 export class QuotesController {
   constructor(private readonly quotesService: QuotesService) {}

@@ -9,13 +9,17 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guards';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
 @Controller('purchase-receipts')
 export class PurchaseReceiptsController {
   constructor(
