@@ -5,7 +5,7 @@
 **Versión:** 2.3.0
 **Estado:** Aprobado
 **Estado de implementación:** AUTH IMPLEMENTED / USERS V1 IMPLEMENTED / CURRENT ROLE-BASED RBAC PARTIAL / PERMISSION-BASED RBAC DEFERRED P1
-**Última actualización:** 2026-09-01
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping Platform & Security Team
 
 ---
@@ -617,6 +617,20 @@ para generar y validar:
 passwordHash
 ```
 
+El contrato vigente de contraseña es:
+
+```text
+minimum length: 8
+
+no artificial uppercase requirement
+
+no artificial symbol requirement
+
+plaintext never persisted
+
+passwordHash never returned or logged
+```
+
 ---
 
 # 21. passwordHash
@@ -849,6 +863,7 @@ Actualmente:
 JwtStrategy
 → revalidates active User state against database
 → uses current DB role for request.user
+→ compares JWT authVersion with current DB authVersion
 ```
 
 ---
@@ -899,6 +914,8 @@ companyId
 email
 
 role
+
+authVersion
 ```
 
 según contrato.
@@ -924,6 +941,23 @@ Encrypted data
 ```
 
 Quien posee el token normalmente puede leer su payload.
+
+La revocación de credenciales usa `authVersion`:
+
+```text
+User.authVersion
+→ Int @default(0)
+
+JWT authVersion
+→ compared with DB value on every protected request
+
+legacy JWT without claim
+→ treated as authVersion 0
+```
+
+Si el valor persistido aumenta, los JWT anteriores dejan de autorizar. La
+estrategia también vuelve a validar en base de datos el usuario activo y el rol
+actual en cada request autenticada.
 
 ---
 
@@ -1045,20 +1079,42 @@ Actualmente existen capacidades bajo:
 /auth
 ```
 
-incluyendo:
+Contrato público exacto:
 
 ```text
 POST /auth/register
 
 POST /auth/login
 
+POST /auth/forgot-password
+
+POST /auth/reset-password
+```
+
+Contrato autenticado exacto:
+
+```text
 GET /auth/me
+
+POST /auth/change-password
+```
+
+Administración de Users V1, protegida para `ADMIN` y tenant-scoped:
+
+```text
+GET /users
+
+GET /users/:id
+
+POST /users
+
+PATCH /users/:id
+
+DELETE /users
+→ no existe
 ```
 
 Los DTOs y contratos exactos pertenecen al código vigente.
-
-El reset inseguro anterior fue retirado. La recuperación segura de contraseña
-permanece pendiente.
 
 ---
 
@@ -1191,7 +1247,7 @@ Users V1 create
 
 ---
 
-# 43. Password Recovery — CURRENT
+# 43. Password Recovery — IMPLEMENTED / VERIFIED
 
 El reset inseguro anterior fue retirado.
 
@@ -1199,43 +1255,92 @@ Actualmente:
 
 ```text
 secure recovery
-→ PENDING
+→ IMPLEMENTED / VERIFIED
 
 /forgot-password
-→ informs temporary unavailability
+→ recovery request with generic response
+
+/reset-password?token=...
+→ one-time password reset
 ```
 
-No existe todavía una infraestructura segura de recovery token que demuestre
-control de la cuenta.
+`POST /auth/forgot-password` recibe únicamente `email`. Para una cuenta activa
+existente invalida el token pendiente anterior, genera un token aleatorio de
+256 bits y persiste únicamente su hash SHA-256. El token expira en 30 minutos,
+es de un solo uso y se entrega por `EmailService`.
+
+La respuesta pública es genérica para cuentas activas, inactivas, desconocidas
+y fallos del proveedor; no permite account enumeration. Si falla la entrega,
+la configuración o la construcción de la URL después de emitir el token, el
+token recién creado se invalida. No se registran el token, la reset URL, la
+contraseña ni `passwordHash`.
+
+El modelo `PasswordResetToken` conserva:
+
+```text
+user relation
+
+userId
+
+unique tokenHash
+
+expiresAt
+
+usedAt
+
+createdAt
+
+usedAt = null while pending
+
+one valid pending reset per user
+```
+
+`POST /auth/reset-password` recibe sólo `{ token, newPassword }`: no acepta
+email, `userId`, `companyId` ni JWT. Requiere un token vigente, no usado y de un
+usuario activo. Los casos inválido, expirado, usado o inactivo responden con el
+mensaje genérico `El enlace no es válido o ha expirado.`. El mismo password
+produce un error seguro específico y conserva el token para retry; errores de
+red o 5xx también conservan el token para retry.
+
+El éxito actualiza el hash bcrypt, incrementa `authVersion`, invalida los demás
+tokens pendientes y no emite un JWT nuevo: el usuario debe iniciar sesión. El
+consumo es condicional y transaccional, por lo que un token concurrentemente
+reutilizado puede producir como máximo un reset exitoso.
+
+La arquitectura de entrega es:
+
+```text
+Auth/application orchestration
+→ PasswordRecoveryService
+→ EmailService
+→ Resend
+```
+
+El dominio Auth no depende directamente del SDK del proveedor. El contrato de
+configuración usa únicamente los nombres `RESEND_API_KEY`, `EMAIL_FROM` y
+`FRONTEND_BASE_URL`; sus valores válidos y la verificación de sender/domain
+pertenecen al gate de producción.
 
 Por tanto:
 
 ```text
 forgot / reset password
-→ NOT IMPLEMENTED as secure production recovery
+→ IMPLEMENTED as secure account-control recovery
 ```
 
-Este punto es:
-
-> **P0 — Release Blocker**
-
-Siguiente checkpoint:
+Validación del cierre:
 
 ```text
-ERP-V1-CLOSE-B1D
-→ change-password
-→ forgot-password
-→ secure reset token
-→ expiry
-→ one-time use
-→ email delivery
+API: 58 suites / 594 tests PASS
+frontend D3: 640 tests PASS bounded + serial
+frontend lint and production build: PASS
 ```
 
 ---
 
-# 44. Forgot Password — TARGET
+# 44. Forgot Password — CURRENT CONTRACT
 
-Un flujo seguro deberá ser equivalente a:
+El flujo seguro vigente es equivalente a:
 
 ```text
 Request password recovery
@@ -1250,6 +1355,9 @@ Reset password
 ↓
 Invalidate token
 ```
+
+`POST /auth/forgot-password` pide sólo el email y mantiene respuesta genérica.
+La pantalla nunca pide una contraseña y no distingue si la cuenta existe.
 
 El token debe ser:
 
@@ -1290,6 +1398,14 @@ Forgot Password Recovery
 ```
 
 Estos workflows no deben mezclarse en un endpoint genérico sin reglas claras.
+
+El contrato vigente de `POST /auth/change-password` es autenticado y recibe
+`currentPassword` y `newPassword`. Requiere JWT y usuario activo. Current
+password incorrecta y new password igual a la actual responden `400`.
+
+En éxito actualiza `passwordHash`, incrementa `authVersion`, invalida tokens de
+recovery pendientes y revoca los JWT existentes. No emite un JWT nuevo. El
+frontend elimina el token local y retorna a login.
 
 ---
 
@@ -1416,14 +1532,16 @@ Solo rutas deliberadamente públicas deben omitir Authentication.
 
 # 53. Public endpoints
 
-Ejemplos actuales o potenciales:
+Contrato público actual:
 
 ```text
-login
+POST /auth/register
 
-register depending on provisioning strategy
+POST /auth/login
 
-password recovery request
+POST /auth/forgot-password
+
+POST /auth/reset-password
 ```
 
 Toda ruta pública aumenta superficie de ataque y debe revisarse proporcionalmente.
@@ -2388,7 +2506,17 @@ invalid token
 
 expired token
 
-inactive User enforcement once implemented
+inactive User enforcement
+
+password change invalidates authVersion
+
+forgot-password generic response
+
+reset token single-use / expiry / reuse rejection
+
+same-password retry behavior
+
+delivery-failure token invalidation
 ```
 
 Una vulnerabilidad corregida debe recibir una prueba de regresión cuando sea razonable.
@@ -2507,13 +2635,30 @@ tenant-safe Users API
 
 safe Users responses without passwordHash
 
+authVersion-based JWT invalidation on password change/reset
+
+secure PasswordResetToken recovery with SHA-256 hash, 30-minute TTL and
+single-use atomic consumption
+
+generic anti-enumeration recovery response
+
+EmailService → Resend delivery integration
+
 /auth/register
 
 /auth/login
 
 /auth/me
 
+/auth/change-password
+
+/auth/forgot-password
+
+/auth/reset-password
+
 /users
+
+/users/:id
 ```
 
 ---
@@ -2523,17 +2668,17 @@ safe Users responses without passwordHash
 Antes de un piloto externo o producción deben resolverse:
 
 ```text
-1. Secure password recovery
+1. Systematic tenant-isolation regression
 
-2. Systematic tenant-isolation regression
+2. Authorization review for critical ERP endpoints
 
-3. Authorization review for critical ERP endpoints
+3. Basic abuse/rate-limit protection for Auth public endpoints
 
-4. Basic abuse/rate-limit protection for Auth public endpoints
+4. Protected frontend/session hardening
 
-5. Protected frontend/session hardening
+5. Security regression coverage for remaining blockers
 
-6. Security regression coverage for remaining blockers
+6. Real email delivery/configuration verification for recovery
 ```
 
 `passwordHash` response sanitization:
@@ -2545,6 +2690,17 @@ RESOLVED
 `User.isActive` enforcement, explicit safe role provisioning, implicit ADMIN
 default removal, and Users V1 administration are also resolved for the current
 code boundary. Broader tenant and authorization regression remain pending.
+
+Estado de workstream:
+
+```text
+AUTH-PASSWORD-SECURITY-V1
+→ IMPLEMENTED
+```
+
+Esto significa implementation complete, no production-ready ni RC-ready. Los
+gates de abuso, correo real, configuración, dependencias, tenant, autorización,
+sesión y QA transversal permanecen separados.
 
 ---
 

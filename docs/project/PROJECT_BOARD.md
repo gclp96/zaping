@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
-Última actualización: 2026-09-01
+Última actualización: 2026-09-02
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -66,6 +66,7 @@ ERP Core
 │   ├── Inventory IN
 │   ├── Equipment provisioning
 │   └── cross-module traceability
+├── Secure password recovery
 └── Healthcare Case Foundation
 
 CURRENT
@@ -76,7 +77,7 @@ H8 — ERP Core release preparation
 │   └── AUTH-USERS-V1 completed
 │
 └── H8B Full technical regression
-    └── next technical block
+    └── B1D Password Security implementation completed; B1D-E documentation closure current
 
 Frontend UX workstream
 
@@ -90,17 +91,13 @@ Frontend UX workstream
 
 NEXT
 
-ERP-V1-CLOSE-B1D — secure password recovery / change password
+ERP-V1-CLOSE-B2 — critical authorization / tenant regression
         ↓
-ERP-V1-CLOSE-B2 — critical RBAC review
+ERP-V1-CLOSE-B3 — production / security hardening
         ↓
-ERP-V1-CLOSE-B3 — broader tenant regression
+ERP-V1-CLOSE-C — technical regression
         ↓
-ERP-V1-CLOSE-C — production config / CORS / rate limiting
-        ↓
-ERP-V1-CLOSE-D — protected frontend / session hardening
-        ↓
-UX-B.6 — Full ERP end-to-end QA
+ERP-V1-CLOSE-D — full ERP end-to-end QA
         ↓
 ERP-V1-RC — ERP Core V1 release candidate
         ↓
@@ -109,8 +106,6 @@ Healthcare specialization
 RELEASE BLOCKERS — P0
 
 Antes de pilot/commercial production deben resolverse o verificarse formalmente:
-
-secure password recovery
 
 systematic tenant-isolation regression
 
@@ -121,6 +116,16 @@ protected-route / session architecture
 authentication abuse protection / rate limiting
 
 production secrets / configuration review
+
+CORS / environment-specific origins
+
+real password-recovery email delivery/configuration
+
+dependency/security maintenance
+
+technical regression
+
+full ERP end-to-end QA
 
 ERP Core funcional validado:
 
@@ -1072,71 +1077,96 @@ La existencia de filtros tenant en múltiples services no sustituye una regresi�
 
 SEC-005 — Secure Password Recovery
 
-Estado: ⛔ P0 BLOCKER
+Estado: ✅ IMPLEMENTED / VERIFIED
 Prioridad: P0
+
+Workstream:
+
+AUTH-PASSWORD-SECURITY-V1
+→ IMPLEMENTED
 
 El reset inseguro anterior fue retirado.
 
 Estado actual:
 
 secure recovery
-→ PENDING
+→ IMPLEMENTED / VERIFIED
 
 /forgot-password
-→ informa indisponibilidad temporal
+→ recovery request with generic response
 
-No puede considerarse apto para pilot/commercial production un recovery que
-restablezca contraseña sin demostrar control de la cuenta mediante un mecanismo
-seguro.
+/reset-password
+→ one-time token password reset
 
-Debe existir una estrategia equivalente a:
+El flujo vigente cubre:
 
 recovery request
 
-secure random single-use token
+secure random token
 
-short expiration
+hashed token persistence
 
-account-control proof
+30-minute expiration
 
-token invalidation after use
+single-use atomic consumption
+
+pending-token invalidation after password reset
+
+password change authVersion invalidation
+
+JWT revocation after password change/reset
 
 safe response semantics
 
+
 no account enumeration
 
-audit / abuse controls where applicable
+auth session invalidation through authVersion
 
-Regla:
+email delivery through Resend
 
-password recovery
-without secure recovery proof
-→ P0 security blocker
+token/plaintext/reset URL/password/passwordHash excluded from logs
 
-No debe cerrarse ERP Core para producción comercial sin resolver este punto.
+Frontend coverage:
 
-Siguiente checkpoint:
+/forgot-password
 
-ERP-V1-CLOSE-B1D
+/reset-password?token=...
 
-Debe cubrir:
+La validación realizada incluye:
 
-change-password
+API D2: 58 suites / 594 tests PASS
 
-forgot-password
+Frontend D3: 640 tests PASS bounded + serial
 
-secure reset token
+frontend lint PASS
 
-expiry
+frontend production build PASS
 
-one-time use
+Permanecen fuera de este cierre:
 
-email delivery
+authentication abuse protection / rate limiting
+
+real email delivery/configuration verification:
+verified sender/domain, valid RESEND_API_KEY, EMAIL_FROM and
+FRONTEND_BASE_URL, plus real forgot → email → reset → login E2E
+
+dependency/security maintenance before RC
+
+tenant isolation regression
+
+critical authorization review
+
+protected frontend/session architecture
+
+technical regression
+
+full ERP end-to-end QA
 
 SEC-006 — Authentication Abuse Protection / Rate Limiting
 
 Estado: ⏳ PENDING
-Prioridad: P0 preproduction
+Prioridad: P0 preproduction / B3
 
 Endpoints sensibles como:
 
@@ -1144,7 +1174,9 @@ Endpoints sensibles como:
 
 /auth/register
 
-password recovery endpoints
+POST /auth/forgot-password
+
+POST /auth/reset-password
 
 deben contar con protección básica contra abuso antes de producción.
 
@@ -1159,6 +1191,9 @@ monitoring
 safe error responses
 
 No aplicar una estrategia de lockout que permita denegación de servicio trivial sin análisis.
+
+Debe cubrir también cualquier otro endpoint auth-sensitive aprobado por la
+política final.
 
 SEC-007 — Protected Route / Session Architecture
 
@@ -1230,6 +1265,20 @@ safe environment separation
 production database configuration
 
 debug/dev settings disabled where appropriate
+
+CORS / environment-specific origins reviewed
+
+El cierre de Password Security no valida todavía el correo real. El gate exige
+sender/domain verificado, `RESEND_API_KEY`, `EMAIL_FROM` y
+`FRONTEND_BASE_URL` válidos, y una prueba real forgot → email → reset → login.
+
+DEPENDENCY AUDIT NOTE
+
+`npm audit --audit-level=high` reporta 5 vulnerabilidades (4 high, 1
+moderate), incluyendo `deepmerge-ts < 8.0.0` vía `@prisma/config` / Prisma
+tooling. La corrección `--force` propone un cambio rompedor de Prisma y no se
+ejecuta. Queda como dependency/security maintenance before RC; no se afirma
+exploitability ni impacto runtime sin análisis separado.
 
 13. Release Readiness
 
@@ -1773,8 +1822,6 @@ La siguiente deuda permanece vigente y debe revisarse periódicamente.
 
 Security / Release
 
-secure password recovery
-
 authentication abuse protection / rate limiting
 
 systematic tenant-isolation regression
@@ -1876,8 +1923,6 @@ frontend test worker resource exhaustion under parallel pool
 RISK-001 — Security Hardening
 
 Riesgos vigentes:
-
-secure password recovery
 
 systematic tenant-isolation coverage
 
@@ -2167,13 +2212,11 @@ Mobile Technician
 
 27. Snapshot de calidad vigente
 
-Último snapshot frontend confirmado al cierre de UX-02:
+Último snapshot frontend confirmado al cierre de ERP-V1-CLOSE-B1D-D3:
 
-41 test files
+640 / 640 tests PASS
 
-534 / 534 tests PASS
-
-frontend tests with limited workers
+frontend tests bounded
 PASS
 
 frontend tests serially with one worker
@@ -2188,8 +2231,13 @@ PASS
 git diff --check
 PASS
 
-Este snapshot cierra UX-02 exclusivamente. H8B continúa siendo un bloque técnico
-más amplio y no se declara completado por esta validación frontend.
+API D2:
+
+58 suites / 594 tests PASS
+
+Este snapshot valida D3 frontend y Password Security D2/D3 exclusivamente. H8B
+continúa siendo un bloque técnico más amplio y no se declara completado por esta
+validación.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
 
@@ -2259,7 +2307,7 @@ primary documentation reviewed
 
 cross-document CURRENT / TARGET / FUTURE sync
 
-secure password recovery P0 reflected
+secure password recovery implementation reflected
 
 auth abuse protection P0 reflected
 

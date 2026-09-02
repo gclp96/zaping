@@ -3,7 +3,7 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.3.0
 **Estado:** Activo
-**Última actualización:** 2026-09-01
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping Team
 
 ---
@@ -82,6 +82,48 @@ deuda existente al cierre de una entrega
 ```
 
 sin convertir esos hechos históricos en reglas vigentes.
+
+---
+
+# 2026-09-02 — Password Security V1 closure — ERP-V1-CLOSE-B1D-E
+
+**Estado:** IMPLEMENTED / VERIFIED
+
+Se cerró la implementación de Password Security V1 y su documentación
+contractual:
+
+```text
+authenticated change-password
+→ bcrypt update + authVersion JWT revocation
+
+secure reset tokens
+→ random, SHA-256 persisted, 30-minute, single-use
+
+Resend email recovery
+→ generic anti-enumeration response
+
+public forgot/reset
+→ /forgot-password + /reset-password?token=...
+```
+
+La UI de reset usa token sólo en memoria, limpia la URL con
+`router.replace('/reset-password')`, no usa storage/cookies y envía únicamente
+`token` y `newPassword`. El flujo mantiene el token para retry seguro en misma
+contraseña o red/5xx y lo elimina en éxito o enlace inválido.
+
+Validación:
+
+```text
+frontend D3: 640 / 640 tests PASS bounded + serial
+frontend lint: PASS
+frontend production build: PASS
+API D2: 58 suites / 594 tests PASS
+```
+
+La implementación completa no equivale a production-ready ni RC-ready.
+Rate limiting, entrega real de email, dependency/security maintenance,
+tenant/authorization review, session hardening, C technical regression y D E2E
+QA permanecen pendientes en `PROJECT_BOARD.md`.
 
 ---
 

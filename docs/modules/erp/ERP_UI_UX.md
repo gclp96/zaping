@@ -5,7 +5,7 @@
 **Versión:** 1.4.0
 **Estado:** Approved milestone scope
 **Estado de implementación:** ERP CORE FUNCTIONAL NORMALIZATION H7 COMPLETED / VALIDATED
-**Última actualización:** 2026-09-01
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping ERP Team
 
 ---
@@ -252,6 +252,8 @@ Rutas públicas como:
 /register
 
 /forgot-password
+
+/reset-password?token=...
 ```
 
 permanecen fuera del authenticated App Shell.
@@ -319,7 +321,7 @@ review of localStorage token strategy
 
 ---
 
-# 12. Secure password recovery — P0
+# 12. Secure password recovery — IMPLEMENTED / VERIFIED
 
 Existe actualmente la ruta pública:
 
@@ -327,8 +329,8 @@ Existe actualmente la ruta pública:
 /forgot-password
 ```
 
-Su estado vigente informa indisponibilidad temporal. No representa todavía un
-flujo seguro de recuperación.
+Su estado vigente permite solicitar un enlace de recuperación y completar el
+restablecimiento mediante un token seguro de un solo uso y expiración corta.
 
 Antes de pilot o producción debe existir un mecanismo seguro que verifique control
 de la cuenta mediante un flujo como:
@@ -341,25 +343,48 @@ secure one-time / expiring recovery proof
 password reset
 ```
 
-Un reset público que permita cambiar una contraseña sin una prueba segura de
-control de cuenta constituye:
+El flujo implementado es:
 
 ```text
-P0 PREPRODUCTION SECURITY BLOCKER
+recovery request
+↓
+secure one-time / expiring recovery proof
+↓
+password reset
 ```
 
-No debe considerarse resuelto únicamente porque exista:
+Las rutas públicas son:
 
 ```text
 /forgot-password
+/reset-password?token=...
 ```
 
-en frontend.
+La UI de `/forgot-password` pide únicamente el email, hace `POST
+/auth/forgot-password` y muestra una respuesta genérica tanto si la cuenta
+existe como si no. Nunca pide ni envía una contraseña en ese paso.
 
-Siguiente checkpoint:
+La UI de `/reset-password?token=...` captura el token desde la query, lo
+conserva sólo en memoria y ejecuta `router.replace('/reset-password')` después
+de capturarlo para retirar el token de la URL visible. No usa
+`localStorage`, `sessionStorage` ni cookies para el token. La política de
+referrer es `no-referrer` cuando Next metadata la soporta limpiamente.
+
+La pantalla exige nueva contraseña y confirmación, con mínimo de 8 caracteres,
+y envía únicamente `{ token, newPassword }` a `POST /auth/reset-password`.
+Después de un refresh, o si falta el token, muestra estado de enlace inválido;
+esto es intencional en V1 porque el token no se persiste.
+
+En éxito limpia token y campos, muestra confirmación y ofrece CTA a login sin
+auto-login. En enlace inválido/expirado elimina el token; un error de misma
+contraseña o de red/5xx conserva el token en memoria para permitir retry.
+
+La seguridad pendiente relacionada pertenece a otros checkpoints:
 
 ```text
-ERP-V1-CLOSE-B1D
+authentication abuse protection
+production configuration
+protected session architecture
 ```
 
 ---
@@ -2645,8 +2670,6 @@ para evitar confundir datos preexistentes con el efecto de la prueba actual.
 Antes de pilot/production deben cerrarse o decidirse formalmente al menos:
 
 ```text
-secure password recovery
-
 critical authorization review
 
 systematic tenant-isolation regression
@@ -2667,8 +2690,6 @@ Estas tareas no son meramente visuales.
 ## P0 — PREPRODUCTION SECURITY
 
 ```text
-secure password recovery
-
 protected-route/session architecture review
 
 critical authorization review
@@ -2733,11 +2754,6 @@ optional micro-interactions
 ---
 
 # 98. Technical debt — Identity / Session
-
-```text
-secure password recovery
-P0
-```
 
 ```text
 protected-route/session architecture
@@ -3601,9 +3617,6 @@ Users V1 administration
 # 124. Estado consolidado DEBT
 
 ```text
-secure password recovery
-P0
-
 protected-route/session architecture
 P0 review
 

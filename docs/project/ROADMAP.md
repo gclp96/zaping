@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-08-27
+Última actualización: 2026-09-02
 Responsable: Zaping Team
 
 1. Propósito
@@ -310,17 +310,17 @@ UX-B.6
 ↓
 ERP Core V1 Closure
 8.1 Security Hardening
-Capacidades P0 pendientes:
+Estado de los checkpoints de seguridad:
 
-Secure password recovery
-
-↓
-
-Explicit user role safety
+Secure password recovery — ✅ CLOSED / VERIFIED
 
 ↓
 
-Inactive-user enforcement
+Explicit user role safety — ✅ CLOSED / VERIFIED
+
+↓
+
+Inactive-user enforcement — ✅ CLOSED / VERIFIED
 
 ↓
 
@@ -341,12 +341,22 @@ Authentication abuse protection / rate limiting
 ↓
 
 Production secrets / configuration review
+
+↓
+
+Real password-recovery email delivery/configuration
+
+↓
+
+Dependency/security maintenance before RC
 La sanitización histórica de passwordHash ya fue resuelta y no forma parte del trabajo futuro.
 
-8.2 Secure Password Recovery
-El endpoint CURRENT de password reset no debe considerarse apto para pilot/commercial production si permite restablecer una contraseña sin demostrar control de la cuenta.
+8.2 Secure Password Recovery — CLOSED / CURRENT
+El flujo CURRENT de password recovery demuestra control de la cuenta mediante
+un token seguro, de un solo uso y con expiración corta antes de permitir el
+restablecimiento.
 
-Debe existir una estrategia equivalente a:
+La implementación vigente cubre:
 
 recovery request
 
@@ -373,24 +383,39 @@ password reset
 ↓
 
 token invalidation
-Además debe contemplar:
 
-safe response semantics
+authVersion increment and JWT invalidation
 
-no account enumeration
+generic anti-enumeration response
 
-abuse protection
+delivery-failure token invalidation
 
-audit where appropriate
-Regla:
+La implementación está completa. Fuera de este workstream permanecen:
+
+real email delivery/configuration verification
+
+rate limiting / abuse protection
+
+dependency/security maintenance
+
+tenant, authorization and session hardening
+Regla de seguridad:
 
 public password reset
 without secure recovery proof
 → P0 blocker
 8.3 Safe User Provisioning
-Debe revisarse:
+Estado: CLOSED / CURRENT
+
+El riesgo histórico:
 
 User.role @default(ADMIN)
+
+fue retirado. El primer administrador de Company y los usuarios internos
+requieren rol explícito según su flujo autorizado.
+
+La revisión transversal de autorización permanece en B2.
+
 Objetivo:
 
 normal user creation
@@ -407,7 +432,9 @@ authorization
 
 privilege escalation regression
 8.4 Inactive User Enforcement
-Debe garantizarse:
+Estado: CLOSED / CURRENT
+
+Debe mantenerse:
 
 User.isActive = false
 ↓
@@ -502,7 +529,9 @@ Antes de producción deben protegerse especialmente:
 
 /auth/register
 
-password recovery endpoints
+POST /auth/forgot-password
+
+POST /auth/reset-password
 mediante controles apropiados como:
 
 rate limiting
@@ -524,6 +553,14 @@ environment separation
 no committed credentials
 
 production database configuration
+
+CORS / environment-specific origins
+
+verified sender/domain for password recovery
+
+valid RESEND_API_KEY, EMAIL_FROM and FRONTEND_BASE_URL
+
+real forgot → email → reset → login E2E
 
 debug/dev settings
 
@@ -2378,7 +2415,9 @@ Scalable SaaS
 27.1 Pilotos
 Antes de pilotos externos debe existir al menos:
 
-secure password recovery
+Password Security V1 implementation
+
+real password-recovery email delivery/configuration verification
 
 authentication abuse protection
 
@@ -2494,29 +2533,34 @@ Algunas iniciativas pueden ejecutarse en paralelo cuando no violen dependencias 
 
 31. Prioridades actuales resumidas
 P0 — Release / Integrity / Security
-Documentation closure
 
-Secure password recovery
+Completed / verified:
 
-Authentication abuse protection
+Password Security V1 implementation
 
 Safe role provisioning
 
 Inactive-user enforcement
 
-Tenant isolation regression
+Remaining:
 
-Critical authorization review
+cross-workstream documentation closure
 
-Protected-route / session review
+B2 critical authorization / tenant regression
 
-Production secrets / configuration
+B3 production / security hardening
 
-Core regression
+Dependency/security maintenance
 
-ERP end-to-end QA
+Real email delivery
 
-Release readiness
+Rate limiting / authentication abuse protection
+
+C technical regression
+
+D full ERP end-to-end QA
+
+Release candidate gate
 Commercial Returns Backend no es P0.
 
 P1 estratégica inmediata

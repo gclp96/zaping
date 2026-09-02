@@ -210,21 +210,22 @@ project/PROJECT_BOARD.md
 
 Entre los temas críticos deben permanecer visibles:
 
-secure password recovery
-
-inactive-user enforcement
-
 protected-route / session architecture
 
 authorization review
 
 tenant isolation regression
 
-safe role provisioning / default ADMIN review
-
 authentication abuse protection / rate limiting
 
 production secrets / configuration
+
+real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
+
+Password Security V1 está implementado; estos temas son gates independientes y
+no deben presentarse como parte de un recovery inseguro pendiente.
 
 3. Idioma oficial
 

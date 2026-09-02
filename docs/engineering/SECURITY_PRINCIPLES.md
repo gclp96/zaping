@@ -3,7 +3,7 @@
 **Producto:** Zaping Platform
 **Versión:** 2.2.0
 **Estado:** Aprobado
-**Última actualización:** 2026-08-27
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping Team
 
 ---
@@ -212,6 +212,10 @@ DTOs por operación
 
 register/login sanitizados sin passwordHash
 
+secure password recovery with one-time hashed tokens
+
+authVersion-based invalidation after password change/reset
+
 RolesGuard
 
 @Roles en Healthcare Cases
@@ -261,17 +265,10 @@ y no debe duplicarse permanentemente en este documento.
 
 ## 5.3 P0 — Security Release Blockers
 
-Antes de un piloto externo o una exposición productiva deben resolverse como mínimo:
+Password Security V1 está implementado. Antes de un piloto externo o una
+exposición productiva deben resolverse o verificarse como mínimo:
 
 ```text
-secure password recovery
-
-inactive-user enforcement
-
-safe user role provisioning
-
-remove implicit ADMIN privilege risk
-
 systematic tenant-isolation regression
 
 authorization review of critical ERP endpoints
@@ -279,6 +276,8 @@ authorization review of critical ERP endpoints
 basic authentication endpoint abuse protection
 
 production secrets/configuration review
+
+real password-recovery email delivery/configuration
 ```
 
 Estos puntos son blockers de seguridad para una exposición real.
@@ -456,6 +455,9 @@ bcrypt
 
 es utilizado para `passwordHash`.
 
+Los contratos de registro, creación interna y reset exigen una longitud mínima
+de 8 caracteres, sin imponer requisitos artificiales de mayúsculas o símbolos.
+
 La aplicación no debe exponer:
 
 ```text
@@ -496,18 +498,34 @@ La sanitización de `register` y `login` para evitar exposición de `passwordHas
 
 ## Estado actual
 
-Existe un flujo público de reset de contraseña cuya seguridad todavía requiere hardening.
-
-Actualmente el problema relevante es:
+Existe un flujo seguro implementado para recuperar el control de la cuenta:
 
 ```text
-password reset
-without secure account-control recovery token
+POST /auth/forgot-password
+→ generic response, no account enumeration
+
+POST /auth/reset-password
+→ token + newPassword only
 ```
 
-Esto debe considerarse:
+El token es aleatorio de 256 bits, se persiste únicamente como hash SHA-256,
+expira en 30 minutos y es de un solo uso. Los tokens pendientes anteriores se
+invalidan al emitir uno nuevo y los demás se invalidan al completar el reset.
+Las cuentas desconocidas o inactivas no reciben token y mantienen la misma
+respuesta genérica.
 
-> **P0 antes de piloto o producción.**
+La entrega se orquesta mediante `PasswordRecoveryService` y `EmailService` con
+Resend. Si falla la entrega, la configuración o la construcción de la URL tras
+emitir el token, se invalida el token recién creado. No se registran tokens,
+reset URLs, contraseñas ni `passwordHash`.
+
+Los casos inválido, expirado, usado o inactivo usan el mensaje genérico. Un
+reset concurrente consume como máximo una vez mediante actualización
+condicional y transacción.
+
+La implementación está completa; la verificación de sender/domain, variables
+válidas y flujo real forgot → email → reset → login sigue siendo un gate de
+producción.
 
 ---
 
@@ -610,6 +628,12 @@ token revocation
 
 device sessions
 ```
+
+Sin embargo, password change y password reset incrementan `authVersion`; el
+JWT lleva ese claim y `JwtStrategy` lo compara con la base de datos en cada
+request protegida. Un JWT legado sin claim se interpreta como `0`. Al aumentar
+el valor persistido, los JWT anteriores dejan de autorizar. Esto no equivale a
+un session registry, refresh tokens o remote logout generales.
 
 ---
 
@@ -1943,6 +1967,27 @@ forced audit fixes
 
 sin revisar impacto.
 
+Snapshot actual de `npm audit --audit-level=high`:
+
+```text
+5 vulnerabilities: 4 high, 1 moderate
+
+deepmerge-ts < 8.0.0
+→ high severity
+→ transitive through @prisma/config / Prisma tooling
+
+fast-uri
+→ high severity
+
+qs
+→ moderate severity
+```
+
+El arreglo forzado propone instalar `prisma@6.12.0` con cambio rompedor. No se
+ejecuta `npm audit fix --force`; el hallazgo queda clasificado como
+dependency/security maintenance before RC. No se afirma exploitability ni
+impacto runtime sin análisis separado.
+
 ---
 
 # 56. Archivos y documentos
@@ -2484,21 +2529,15 @@ PROJECT_BOARD.md
 ## P0 — Release Blockers
 
 ```text
-1. Secure password recovery
+1. Systematic tenant-isolation regression
 
-2. User.isActive enforcement
+2. Authorization review for critical ERP operations
 
-3. Safe User role provisioning
+3. Basic rate limiting / abuse protection for authentication endpoints
 
-4. Remove implicit ADMIN privilege risk
+4. Production secret and configuration review
 
-5. Systematic tenant-isolation regression
-
-6. Authorization review for critical ERP operations
-
-7. Basic rate limiting / abuse protection for authentication endpoints
-
-8. Production secret and configuration review
+5. Real password-recovery email delivery/configuration verification
 ```
 
 ---
@@ -2548,12 +2587,6 @@ advanced security analytics
 Antes del primer entorno productivo deben revisarse como mínimo:
 
 ```text
-secure password recovery
-
-User.isActive enforcement
-
-safe role provisioning
-
 JWT configuration
 
 session/token strategy
@@ -2591,6 +2624,8 @@ data sensitivity
 Healthcare boundary
 
 production configuration
+
+verified recovery sender/domain and real email E2E
 
 monitoring
 

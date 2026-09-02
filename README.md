@@ -783,13 +783,16 @@ non-destructive lifecycle where applicable
 
 La sanitización histórica de respuestas de autenticación para evitar exposición de passwordHash ya fue corregida.
 
-Antes de pilot/commercial production deben completarse los P0 relacionados con:
+Password Security V1:
 
-secure password recovery
+IMPLEMENTED
 
-default ADMIN / safe role provisioning
+La implementación cubre cambio autenticado de contraseña, invalidación por
+`authVersion` y recovery seguro con token de un solo uso. No equivale a
+production-ready ni RC-ready.
 
-inactive-user enforcement
+Antes de pilot/commercial production deben completarse o verificarse los P0
+relacionados con:
 
 systematic tenant-isolation regression
 
@@ -801,13 +804,20 @@ authentication abuse protection / rate limiting
 
 production secrets / configuration review
 
+real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
+
 Regla:
 
 public password reset
 without secure recovery proof
 → P0 blocker
 
-El flujo de password recovery debe demostrar control de la cuenta mediante un mecanismo seguro antes de permitir el cambio de contraseña.
+El flujo de password recovery implementado demuestra control de la cuenta
+mediante un mecanismo seguro antes de permitir el cambio de contraseña. La
+verificación de sender/domain, configuración válida y E2E real
+forgot → email → reset → login sigue pendiente.
 
 La arquitectura exacta se mantiene en:
 
@@ -825,13 +835,7 @@ docs/project/PROJECT_BOARD.md
 
 Entre los temas principales permanecen:
 
-secure password recovery
-
 authentication abuse protection / rate limiting
-
-default ADMIN / safe role provisioning
-
-inactive-user enforcement
 
 systematic tenant-isolation regression
 
@@ -840,6 +844,10 @@ critical authorization review
 protected-route / session architecture
 
 production secrets / configuration
+
+real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
 
 Sales create idempotency
 
