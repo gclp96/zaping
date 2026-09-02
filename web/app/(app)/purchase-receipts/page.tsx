@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { Eye } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { hasRole, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
@@ -16,8 +18,9 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 import {
   formatReceiptDate,
@@ -67,9 +70,20 @@ function compareReceipts(
 }
 
 export default function PurchaseReceiptsPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES),
+  );
   const [receipts, setReceipts] = useState<PurchaseReceiptListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortState>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -111,6 +125,11 @@ export default function PurchaseReceiptsPage() {
       setPageIndex(0);
     } catch (requestError: unknown) {
       console.error(requestError);
+      if (isForbiddenError(requestError)) {
+        setForbidden(true);
+        setReceipts([]);
+        return;
+      }
       setError(
         getApiErrorMessage(
           requestError,
@@ -123,9 +142,21 @@ export default function PurchaseReceiptsPage() {
   }, []);
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadReceipts();
-  }, [loadReceipts]);
+  }, [currentUserRole, loadReceipts, sessionState.status]);
 
   function clearFilters() {
     setSearch('');
@@ -220,7 +251,9 @@ export default function PurchaseReceiptsPage() {
         description="Consulta las entradas de mercancía y su trazabilidad operativa."
       />
 
-      {loading ? (
+      {forbidden || sessionForbidsAccess ? (
+        <ForbiddenState />
+      ) : loading ? (
         <Loading message="Cargando recepciones..." />
       ) : error ? (
         <Section>

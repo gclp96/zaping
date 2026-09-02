@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import SuppliersPage from './page';
 
@@ -31,6 +32,13 @@ vi.mock('@/services/api', () => ({
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 const medicalSupplier = {
@@ -55,6 +63,22 @@ const laboratorySupplier = {
 
 const suppliers = [medicalSupplier, laboratorySupplier];
 
+function authSessionResponse(
+  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' = 'ADMIN',
+) {
+  return {
+    data: {
+      id: 'user-1',
+      companyId: 'company-1',
+      email: 'admin@test.test',
+      firstName: 'Admin',
+      lastName: 'Test',
+      role,
+      companyTimezone: 'America/Hermosillo',
+    },
+  } as never;
+}
+
 function buildSupplier(index: number) {
   return {
     ...medicalSupplier,
@@ -67,8 +91,15 @@ function buildSupplier(index: number) {
   };
 }
 
-function configureApiMocks(list = suppliers) {
-  vi.mocked(api.get).mockResolvedValue({ data: list } as never);
+function configureApiMocks(
+  list = suppliers,
+  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' = 'ADMIN',
+) {
+  vi.mocked(api.get).mockImplementation(async (url) =>
+    String(url) === '/auth/me'
+      ? authSessionResponse(role)
+      : ({ data: list } as never),
+  );
   vi.mocked(api.post).mockResolvedValue({ data: medicalSupplier } as never);
   vi.mocked(api.patch).mockResolvedValue({ data: medicalSupplier } as never);
   vi.mocked(api.delete).mockResolvedValue({ data: {} } as never);
@@ -135,6 +166,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('SuppliersPage', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     configureApiMocks();
     consoleErrorSpy = vi
@@ -187,6 +219,24 @@ describe('SuppliersPage', () => {
     ).toBeTruthy();
     await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
     expect(screen.getByText(medicalSupplier.name)).toBeTruthy();
+  });
+
+  it('mantiene proveedores en solo lectura para WAREHOUSE', async () => {
+    clearAuthenticatedSessionCache();
+    configureApiMocks(suppliers, 'WAREHOUSE');
+
+    render(<SuppliersPage />);
+
+    await screen.findByText(medicalSupplier.name);
+    expect(screen.queryByRole('button', { name: 'Nuevo proveedor' })).toBeNull();
+
+    const row = screen.getByText(medicalSupplier.name).closest('tr');
+    expect(row).toBeTruthy();
+    expect(
+      within(row as HTMLTableRowElement).queryByRole('button', {
+        name: `Acciones del proveedor ${medicalSupplier.name}`,
+      }),
+    ).toBeNull();
   });
 
   it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {
@@ -275,9 +325,19 @@ describe('SuppliersPage', () => {
 
   it('muestra un error de carga y permite reintentar', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.get)
-      .mockRejectedValueOnce(new Error('Proveedores no disponibles'))
-      .mockResolvedValueOnce({ data: suppliers } as never);
+    let supplierRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      supplierRequestCount += 1;
+      if (supplierRequestCount === 1) {
+        throw new Error('Proveedores no disponibles');
+      }
+
+      return { data: suppliers } as never;
+    });
 
     render(<SuppliersPage />);
 
@@ -285,7 +345,7 @@ describe('SuppliersPage', () => {
     await user.click(screen.getByRole('button', { name: 'Reintentar' }));
 
     expect(await screen.findByText(medicalSupplier.name)).toBeTruthy();
-    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(api.get).toHaveBeenCalledTimes(3);
   });
 
   it('presenta un estado vacío útil', async () => {
@@ -313,9 +373,20 @@ describe('SuppliersPage', () => {
       address: null,
       notes: null,
     };
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: suppliers } as never)
-      .mockResolvedValueOnce({ data: [...suppliers, newSupplier] } as never);
+    let supplierRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      supplierRequestCount += 1;
+      return {
+        data:
+          supplierRequestCount === 1
+            ? suppliers
+            : [...suppliers, newSupplier],
+      } as never;
+    });
     vi.mocked(api.post).mockResolvedValue({ data: newSupplier } as never);
 
     await renderSuppliersPage();
@@ -369,11 +440,20 @@ describe('SuppliersPage', () => {
       ...medicalSupplier,
       name: 'Distribuidora Médica Actualizada',
     };
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: suppliers } as never)
-      .mockResolvedValue({
-        data: [updatedSupplier, laboratorySupplier],
-      } as never);
+    let supplierRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      supplierRequestCount += 1;
+      return {
+        data:
+          supplierRequestCount === 1
+            ? suppliers
+            : [updatedSupplier, laboratorySupplier],
+      } as never;
+    });
     vi.mocked(api.patch).mockResolvedValue({ data: updatedSupplier } as never);
 
     await renderSuppliersPage();
@@ -403,9 +483,17 @@ describe('SuppliersPage', () => {
 
   it('desactiva con lenguaje no destructivo y refresca la lista activa', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: suppliers } as never)
-      .mockResolvedValueOnce({ data: [laboratorySupplier] } as never);
+    let supplierRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      supplierRequestCount += 1;
+      return {
+        data: supplierRequestCount === 1 ? suppliers : [laboratorySupplier],
+      } as never;
+    });
 
     await renderSuppliersPage();
     await chooseSupplierAction(user, medicalSupplier.name, 'Desactivar');
@@ -445,6 +533,6 @@ describe('SuppliersPage', () => {
       await screen.findByText('No fue posible desactivar este proveedor'),
     ).toBeTruthy();
     expect(screen.getAllByText(medicalSupplier.name).length).toBeGreaterThan(0);
-    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledTimes(2);
   });
 });

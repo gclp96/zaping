@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import HomePage from './page';
 
@@ -85,6 +86,8 @@ const purchasesData = [
   { id: 'purchase-received', status: 'RECEIVED' },
 ] as const;
 
+let homeRole: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' = 'ADMIN';
+
 function mockHomeSuccess({
   dashboard = dashboardData,
   equipment = equipmentData,
@@ -96,6 +99,20 @@ function mockHomeSuccess({
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: homeRole,
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
     if (endpoint === '/dashboard') {
       return { data: dashboard } as never;
@@ -115,6 +132,9 @@ function mockHomeSuccess({
 
 describe('HomePage', () => {
   beforeEach(() => {
+    homeRole = 'ADMIN';
+    clearAuthenticatedSessionCache();
+    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockHomeSuccess();
   });
@@ -140,16 +160,59 @@ describe('HomePage', () => {
     expect(api.get).toHaveBeenCalledWith('/dashboard');
     expect(api.get).toHaveBeenCalledWith('/equipment');
     expect(api.get).toHaveBeenCalledWith('/purchases');
-    expect(api.get).toHaveBeenCalledTimes(3);
+    expect(api.get).toHaveBeenCalledTimes(4);
     expect(screen.queryByText('Valor de inventario')).toBeNull();
     expect(screen.queryByText('Ventas recientes')).toBeNull();
     expect(screen.queryByText('Productos')).toBeNull();
+  });
+
+  it('keeps SALES on dashboard and commercial actions without loading warehouse resources', async () => {
+    homeRole = 'SALES';
+    clearAuthenticatedSessionCache();
+    mockHomeSuccess();
+
+    render(<HomePage />);
+
+    await screen.findByText('Productos sin stock');
+
+    expect(api.get).toHaveBeenCalledWith('/dashboard');
+    expect(api.get).not.toHaveBeenCalledWith('/equipment');
+    expect(api.get).not.toHaveBeenCalledWith('/purchases');
+    expect(screen.getByRole('button', { name: 'Nueva cotización' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Nueva venta' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Nueva compra' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Registrar recepción' }),
+    ).toBeNull();
+    expect(screen.queryByText('Inspecciones pendientes')).toBeNull();
+    expect(screen.queryByText('Compras por recibir')).toBeNull();
+  });
+
+  it('keeps WAREHOUSE operational attention and warehouse actions available', async () => {
+    homeRole = 'WAREHOUSE';
+    clearAuthenticatedSessionCache();
+    mockHomeSuccess();
+
+    render(<HomePage />);
+
+    await screen.findByText('2 equipos requieren inspección');
+
+    expect(api.get).toHaveBeenCalledWith('/dashboard');
+    expect(api.get).toHaveBeenCalledWith('/equipment');
+    expect(api.get).toHaveBeenCalledWith('/purchases');
+    expect(screen.getByRole('button', { name: 'Nueva compra' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Registrar recepción' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Nueva cotización' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Nueva venta' })).toBeNull();
   });
 
   it('navigates every quick action to an existing workflow route', async () => {
     const user = userEvent.setup();
 
     render(<HomePage />);
+    await screen.findByRole('button', { name: 'Nueva cotización' });
 
     for (const [label, href] of [
       ['Nueva cotización', '/quotes'],
@@ -165,11 +228,11 @@ describe('HomePage', () => {
   it('renders only actionable alerts supported by current APIs', async () => {
     render(<HomePage />);
 
+    expect(await screen.findByText('2 equipos requieren inspección')).toBeTruthy();
     expect(await screen.findByText('1 producto requiere reposición')).toBeTruthy();
     expect(
       screen.getByText('1 producto está en o debajo de su mínimo'),
     ).toBeTruthy();
-    expect(screen.getByText('2 equipos requieren inspección')).toBeTruthy();
     expect(
       screen.getByText('2 compras permiten registrar recepción'),
     ).toBeTruthy();
@@ -224,15 +287,31 @@ describe('HomePage', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Inicio' }),
     ).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Nueva cotización' })).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Nueva cotización' }),
+    ).toBeNull();
   });
 
   it('keeps supported alerts usable when one source fails and retries locally', async () => {
     const user = userEvent.setup();
     let dashboardAttempts = 0;
 
-    vi.mocked(api.get).mockImplementation(async (url) => {
-      const endpoint = String(url);
+  vi.mocked(api.get).mockImplementation(async (url) => {
+    const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: homeRole,
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
       if (endpoint === '/dashboard') {
         dashboardAttempts += 1;
@@ -258,8 +337,12 @@ describe('HomePage', () => {
     render(<HomePage />);
 
     expect(await screen.findByText('Inventario no disponible')).toBeTruthy();
-    expect(screen.getByText('2 equipos requieren inspección')).toBeTruthy();
-    expect(screen.getByText('2 compras permiten registrar recepción')).toBeTruthy();
+    expect(
+      await screen.findByText('2 equipos requieren inspección'),
+    ).toBeTruthy();
+    expect(
+      await screen.findByText('2 compras permiten registrar recepción'),
+    ).toBeTruthy();
 
     await user.click(
       screen.getByRole('button', { name: 'Reintentar inventario' }),

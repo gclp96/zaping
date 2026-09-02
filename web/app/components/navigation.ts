@@ -16,6 +16,10 @@ import {
 } from "lucide-react";
 
 import type { UserRole } from "@/app/auth-session";
+import {
+  COMMERCIAL_ROLES,
+  WAREHOUSE_ROLES,
+} from "@/app/erp-role-access";
 
 export type NavigationItem = {
   label: string;
@@ -57,16 +61,19 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Clientes",
         href: "/customers",
         icon: UsersRound,
+        visibleForRoles: COMMERCIAL_ROLES,
       },
       {
         label: "Cotizaciones",
         href: "/quotes",
         icon: FileText,
+        visibleForRoles: COMMERCIAL_ROLES,
       },
       {
         label: "Ventas",
         href: "/sales",
         icon: ShoppingCart,
+        visibleForRoles: COMMERCIAL_ROLES,
       },
     ],
   },
@@ -77,16 +84,19 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Proveedores",
         href: "/suppliers",
         icon: Truck,
+        visibleForRoles: WAREHOUSE_ROLES,
       },
       {
         label: "Compras",
         href: "/purchases",
         icon: ClipboardList,
+        visibleForRoles: WAREHOUSE_ROLES,
       },
       {
         label: "Recepciones",
         href: "/purchase-receipts",
         icon: PackageCheck,
+        visibleForRoles: WAREHOUSE_ROLES,
       },
     ],
   },
@@ -107,6 +117,7 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Equipos",
         href: "/equipment",
         icon: Wrench,
+        visibleForRoles: WAREHOUSE_ROLES,
       },
     ],
   },
@@ -148,6 +159,8 @@ export function getVisibleNavigationGroups(
       items: group.items.filter(
         (item) =>
           !item.visibleForRoles ||
+          (currentUserRole === undefined &&
+            item.visibleForRoles.length > 1) ||
           Boolean(
             currentUserRole && item.visibleForRoles.includes(currentUserRole),
           ),

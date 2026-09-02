@@ -734,8 +734,7 @@ describe('RowActionsMenu', () => {
     expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('disables the trigger when every row action is disabled', async () => {
-    const user = userEvent.setup();
+  it('does not render an empty trigger when every row action is disabled', async () => {
 
     render(
       <RowActionsMenu
@@ -748,12 +747,9 @@ describe('RowActionsMenu', () => {
       />,
     );
 
-    const trigger = screen.getByRole('button', {
-      name: 'Acciones de Zoe',
-    }) as HTMLButtonElement;
-    expect(trigger.disabled).toBe(true);
-
-    await user.click(trigger);
+    expect(
+      screen.queryByRole('button', { name: 'Acciones de Zoe' }),
+    ).toBeNull();
     expect(screen.queryByRole('menu')).toBeNull();
   });
 

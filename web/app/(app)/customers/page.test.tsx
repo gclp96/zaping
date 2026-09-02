@@ -31,6 +31,13 @@ vi.mock('@/services/api', () => ({
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 const clinicCustomer = {
@@ -69,7 +76,21 @@ function buildCustomer(index: number) {
 }
 
 function configureApiMocks(customerData = customers) {
-  vi.mocked(api.get).mockResolvedValue({ data: customerData } as never);
+  vi.mocked(api.get).mockImplementation(async (url) =>
+    String(url) === '/auth/me'
+      ? ({
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never)
+      : ({ data: customerData } as never),
+  );
   vi.mocked(api.post).mockResolvedValue({ data: clinicCustomer } as never);
   vi.mocked(api.patch).mockResolvedValue({ data: clinicCustomer } as never);
   vi.mocked(api.delete).mockResolvedValue({ data: {} } as never);

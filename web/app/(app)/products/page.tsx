@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { canManageCatalog } from '@/app/erp-role-access';
 import MoneyInput from '@/app/components/business/MoneyInput';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -181,6 +183,12 @@ function compareProducts(
 }
 
 export default function ProductsPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = canManageCatalog(currentUserRole);
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
@@ -630,11 +638,11 @@ export default function ProductsPage() {
         <PageHeader
           title="Productos"
           description="Administra el catálogo de productos."
-          action={
+          action={canWrite ? (
             <Button onClick={openCreateModal}>
               Agregar Producto
             </Button>
-          }
+          ) : undefined}
         />
 
         {pageLoading ? (
@@ -719,7 +727,7 @@ export default function ProductsPage() {
                     }
                   : undefined
               }
-              rowActions={{
+              rowActions={canWrite ? {
                 label: (product) => `Acciones del producto ${product.sku}`,
                 actions: [
                   {
@@ -734,7 +742,7 @@ export default function ProductsPage() {
                     onSelect: openDeleteModal,
                   },
                 ],
-              }}
+              } : undefined}
               emptyState={{
                 title: 'No hay productos registrados',
                 description: 'Comienza agregando tu primer producto.',

@@ -12,6 +12,13 @@ import {
   useState,
 } from 'react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import {
+  canApprovePurchases,
+  canEditPurchases,
+  hasRole,
+  WAREHOUSE_ROLES,
+} from '@/app/erp-role-access';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
@@ -19,8 +26,9 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 import PurchaseFormModal from '../components/PurchaseFormModal';
 import PurchaseInventoryMovements from '../components/PurchaseInventoryMovements';
@@ -94,10 +102,16 @@ function buildReceivedByPurchaseItem(receipts: PurchaseReceipt[]) {
 }
 
 function usePurchase360(purchaseId: string) {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [baseLoading, setBaseLoading] = useState(true);
   const [baseError, setBaseError] = useState('');
   const [notFound, setNotFound] = useState(false);
+  const [forbidden, setForbidden] = useState(false);
 
   const [receipts, setReceipts] = useState<PurchaseReceipt[]>([]);
   const [receiptsLoading, setReceiptsLoading] = useState(false);
@@ -171,6 +185,7 @@ function usePurchase360(purchaseId: string) {
     setBaseLoading(true);
     setBaseError('');
     setNotFound(false);
+    setForbidden(false);
     setPurchase(null);
     setReceipts([]);
     setMovements([]);
@@ -196,8 +211,9 @@ function usePurchase360(purchaseId: string) {
       }
 
       setNotFound(isNotFoundError(error));
+      setForbidden(isForbiddenError(error));
       setBaseError(
-        isNotFoundError(error)
+        isNotFoundError(error) || isForbiddenError(error)
           ? 'Compra no encontrada'
           : getApiErrorMessage(error, 'No pudimos cargar la compra.'),
       );
@@ -206,15 +222,29 @@ function usePurchase360(purchaseId: string) {
   }, [loadRelatedResources, purchaseId]);
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPurchase();
-  }, [loadPurchase]);
+  }, [currentUserRole, loadPurchase, sessionState.status]);
 
   return {
     purchase,
     baseLoading,
     baseError,
     notFound,
+    forbidden,
+    currentUserRole,
     receipts,
     receiptsLoading,
     receiptsError,
@@ -237,6 +267,7 @@ export default function Purchase360Page() {
     baseLoading,
     baseError,
     notFound,
+    forbidden,
     receipts,
     receiptsLoading,
     receiptsError,
@@ -247,7 +278,13 @@ export default function Purchase360Page() {
     loadPurchase,
     loadReceipts,
     loadMovements,
+    currentUserRole,
   } = usePurchase360(id);
+  const canEdit = canEditPurchases(currentUserRole);
+  const canApprove = canApprovePurchases(currentUserRole);
+  const sessionForbidsAccess = Boolean(
+    currentUserRole && !hasRole(currentUserRole, WAREHOUSE_ROLES),
+  );
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -404,6 +441,15 @@ export default function Purchase360Page() {
   }
 
   if (baseError || !purchase) {
+    if (forbidden || sessionForbidsAccess) {
+      return (
+        <PageContainer size="wide">
+          <PageHeader title="Compra" action={backLink} />
+          <ForbiddenState />
+        </PageContainer>
+      );
+    }
+
     return (
       <PageContainer size="wide">
         <PageHeader title="Compra" action={backLink} />
@@ -436,9 +482,11 @@ export default function Purchase360Page() {
 
   const statusDescriptor = getPurchaseStatusDescriptor(purchase.status);
   const canReceive =
+    canEdit &&
     canRegisterPurchaseReceipt(purchase.status) &&
     receiptHistoryStatus === 'success';
   const receiveBlocked =
+    canEdit &&
     canRegisterPurchaseReceipt(purchase.status) &&
     receiptHistoryStatus !== 'success';
 
@@ -450,34 +498,40 @@ export default function Purchase360Page() {
           description={`Proveedor: ${purchase.supplier.name}`}
           action={
             <>
-              {purchase.status === 'DRAFT' ? (
+              {purchase.status === 'DRAFT' && (canApprove || canEdit) ? (
                 <>
-                  <Button
-                    variant="success"
-                    onClick={() => openApproveDialog(purchase)}
-                  >
-                    Aprobar
-                  </Button>
+                  {canApprove ? (
+                    <Button
+                      variant="success"
+                      onClick={() => openApproveDialog(purchase)}
+                    >
+                      Aprobar
+                    </Button>
+                  ) : null}
 
-                  <Button
-                    variant="outline"
-                    loading={catalogLoading}
-                    loadingText="Preparando..."
-                    onClick={() => void handleEditPurchase(purchase)}
-                  >
-                    Editar
-                  </Button>
+                  {canEdit ? (
+                    <Button
+                      variant="outline"
+                      loading={catalogLoading}
+                      loadingText="Preparando..."
+                      onClick={() => void handleEditPurchase(purchase)}
+                    >
+                      Editar
+                    </Button>
+                  ) : null}
 
-                  <Button
-                    variant="danger"
-                    onClick={() => openCancelDialog(purchase)}
-                  >
-                    Cancelar
-                  </Button>
+                  {canApprove ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => openCancelDialog(purchase)}
+                    >
+                      Cancelar
+                    </Button>
+                  ) : null}
                 </>
               ) : null}
 
-              {canRegisterPurchaseReceipt(purchase.status) ? (
+              {canReceive || receiveBlocked ? (
                 <Button
                   variant="success"
                   disabled={!canReceive}

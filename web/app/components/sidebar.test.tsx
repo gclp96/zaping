@@ -17,6 +17,7 @@ const expectedNavigation = [
   ["Productos", "/products"],
   ["Inventario", "/inventory"],
   ["Equipos", "/equipment"],
+  ["Usuarios", "/users"],
   ["Categorías", "/categories"],
 ] as const;
 
@@ -26,7 +27,7 @@ afterEach(() => {
 
 describe("Sidebar", () => {
   it("preserves every navigation group and href", () => {
-    render(<Sidebar pathname="/dashboard" />);
+    render(<Sidebar pathname="/dashboard" currentUserRole="ADMIN" />);
 
     for (const group of [
       "INICIO",
@@ -43,6 +44,74 @@ describe("Sidebar", () => {
         .getAllByRole("link")
         .map((link) => [link.textContent, link.getAttribute("href")]),
     ).toEqual(expectedNavigation);
+  });
+
+  it('filters the ERP Core navigation for every role', () => {
+    const scenarios = [
+      {
+        role: 'ADMIN' as const,
+        visible: expectedNavigation.map(([label]) => label),
+        hidden: [],
+      },
+      {
+        role: 'MANAGER' as const,
+        visible: expectedNavigation
+          .map(([label]) => label)
+          .filter((label) => label !== 'Usuarios'),
+        hidden: ['Usuarios'],
+      },
+      {
+        role: 'SALES' as const,
+        visible: [
+          'Inicio',
+          'Dashboard',
+          'Cambiar contraseña',
+          'Clientes',
+          'Cotizaciones',
+          'Ventas',
+          'Productos',
+          'Inventario',
+          'Categorías',
+        ],
+        hidden: [
+          'Proveedores',
+          'Compras',
+          'Recepciones',
+          'Equipos',
+          'Usuarios',
+        ],
+      },
+      {
+        role: 'WAREHOUSE' as const,
+        visible: [
+          'Inicio',
+          'Dashboard',
+          'Cambiar contraseña',
+          'Proveedores',
+          'Compras',
+          'Recepciones',
+          'Productos',
+          'Inventario',
+          'Equipos',
+          'Categorías',
+        ],
+        hidden: ['Clientes', 'Cotizaciones', 'Ventas', 'Usuarios'],
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      cleanup();
+      render(
+        <Sidebar pathname="/dashboard" currentUserRole={scenario.role} />,
+      );
+
+      for (const label of scenario.visible) {
+        expect(screen.getByRole('link', { name: label })).toBeTruthy();
+      }
+      for (const label of scenario.hidden) {
+        expect(screen.queryByRole('link', { name: label })).toBeNull();
+      }
+    }
   });
 
   it("marks the active route without relying only on color", () => {

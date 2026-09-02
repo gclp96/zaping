@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import {
+  canManageSuppliers,
+  hasRole,
+  WAREHOUSE_ROLES,
+} from '@/app/erp-role-access';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import DataTable, {
@@ -16,9 +22,10 @@ import Modal from '@/app/components/ui/Modal';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 type Supplier = {
   id: string;
@@ -96,9 +103,21 @@ function compareSuppliers(
 }
 
 export default function SuppliersPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = canManageSuppliers(currentUserRole);
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES),
+  );
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -134,6 +153,11 @@ export default function SuppliersPage() {
       setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setSuppliers([]);
+        return;
+      }
       setPageError(
         getApiErrorMessage(error, 'No fue posible cargar los proveedores.'),
       );
@@ -143,9 +167,21 @@ export default function SuppliersPage() {
   }
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSuppliers();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   function resetSupplierForm() {
     setName('');
@@ -349,15 +385,17 @@ export default function SuppliersPage() {
         <PageHeader
           title="Proveedores"
           description="Administra los proveedores disponibles para nuevas compras."
-          action={
+          action={canWrite ? (
             <Button type="button" onClick={openCreateModal}>
               <Plus aria-hidden="true" size={18} />
               Nuevo proveedor
             </Button>
-          }
+          ) : undefined}
         />
 
-        {pageLoading ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : pageLoading ? (
           <Loading message="Cargando proveedores..." />
         ) : pageError ? (
           <Section>
@@ -432,7 +470,7 @@ export default function SuppliersPage() {
                     }
                   : undefined
               }
-              rowActions={{
+              rowActions={canWrite ? {
                 label: (supplier) => `Acciones del proveedor ${supplier.name}`,
                 actions: [
                   {
@@ -447,7 +485,7 @@ export default function SuppliersPage() {
                     onSelect: openDeactivateDialog,
                   },
                 ],
-              }}
+              } : undefined}
               emptyState={{
                 title: 'Sin proveedores activos',
                 description: 'Registra un proveedor para comenzar a usarlo en compras.',

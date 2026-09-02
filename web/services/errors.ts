@@ -5,6 +5,10 @@ type ApiErrorBody = {
   error?: string;
 };
 
+export function isForbiddenError(error: unknown): boolean {
+  return axios.isAxiosError(error) && error.response?.status === 403;
+}
+
 export function getApiErrorMessage(
   error: unknown,
   fallback = 'Ocurrió un error',

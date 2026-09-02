@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { canManageCatalog } from '@/app/erp-role-access';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 import { stableSort } from '@/app/client-table.utils';
@@ -25,6 +27,12 @@ type Category = {
 };
 
 export default function CategoriesPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = canManageCatalog(currentUserRole);
   const [categories, setCategories] = useState<Category[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -207,7 +215,7 @@ export default function CategoriesPage() {
       <PageContainer>
         <PageHeader
           title="Categorías"
-          action={
+          action={canWrite ? (
             <Button
               onClick={() => {
                 setEditingCategory(null);
@@ -219,7 +227,7 @@ export default function CategoriesPage() {
             >
               Nueva Categoría
             </Button>
-          }
+          ) : undefined}
         />
 
         <Section>
@@ -229,7 +237,7 @@ export default function CategoriesPage() {
             columns={categoryColumns}
             getRowId={(category) => category.id}
             sorting={{ state: sorting, onChange: setSorting }}
-            rowActions={categoryRowActions}
+            rowActions={canWrite ? categoryRowActions : undefined}
             loading={pageLoading}
             loadingMessage="Cargando categorías..."
             emptyState={{

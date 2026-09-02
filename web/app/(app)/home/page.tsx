@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import Button from '@/app/components/ui/Button';
+import { hasRole, COMMERCIAL_ROLES, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import Card from '@/app/components/ui/Card';
 import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
@@ -24,6 +25,7 @@ type QuickAction = {
   label: string;
   href: string;
   icon: LucideIcon;
+  visibleForRoles: typeof COMMERCIAL_ROLES | typeof WAREHOUSE_ROLES;
 };
 
 const quickActions: QuickAction[] = [
@@ -31,21 +33,25 @@ const quickActions: QuickAction[] = [
     label: 'Nueva cotización',
     href: '/quotes',
     icon: FilePlus2,
+    visibleForRoles: COMMERCIAL_ROLES,
   },
   {
     label: 'Nueva venta',
     href: '/sales',
     icon: ShoppingCart,
+    visibleForRoles: COMMERCIAL_ROLES,
   },
   {
     label: 'Nueva compra',
     href: '/purchases',
     icon: ClipboardPlus,
+    visibleForRoles: WAREHOUSE_ROLES,
   },
   {
     label: 'Registrar recepción',
     href: '/purchases',
     icon: PackageCheck,
+    visibleForRoles: WAREHOUSE_ROLES,
   },
 ];
 
@@ -97,7 +103,15 @@ export default function HomePage() {
     initialLoading,
     attentionUpdating,
     attentionHasErrors,
+    currentUserRole,
+    sessionLoading,
   } = useHomeData();
+
+  const visibleQuickActions = sessionLoading
+    ? []
+    : quickActions.filter((action) =>
+        hasRole(currentUserRole, action.visibleForRoles),
+      );
 
   return (
     <PageContainer size="wide">
@@ -106,9 +120,10 @@ export default function HomePage() {
         description="Resumen de tu operación diaria."
       />
 
-      <Section title="Acciones rápidas">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {quickActions.map((action) => {
+      {visibleQuickActions.length > 0 ? (
+        <Section title="Acciones rápidas">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {visibleQuickActions.map((action) => {
             const Icon = action.icon;
 
             return (
@@ -124,9 +139,10 @@ export default function HomePage() {
                 {action.label}
               </Button>
             );
-          })}
-        </div>
-      </Section>
+            })}
+          </div>
+        </Section>
+      ) : null}
 
       {initialLoading ? (
         <Loading message="Cargando prioridades..." />

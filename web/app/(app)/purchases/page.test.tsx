@@ -19,6 +19,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import PurchasesPage from './page';
 
@@ -43,6 +44,13 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -247,6 +255,7 @@ const previousReceipt = {
 type ConfigureApiMocksOptions = {
   companyTimezone?: string;
   authMeError?: Error;
+  role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 };
 
 function configureApiMocks(
@@ -264,6 +273,12 @@ function configureApiMocks(
 
         return {
           data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: options.role ?? 'ADMIN',
             companyTimezone:
               options.companyTimezone ?? 'America/Hermosillo',
           },
@@ -2354,6 +2369,20 @@ describe('PurchasesPage — formulario de compra', () => {
       async (url) => {
         const endpoint = String(url);
 
+        if (endpoint === '/auth/me') {
+          return {
+            data: {
+              id: 'user-1',
+              companyId: 'company-1',
+              email: 'admin@test.test',
+              firstName: 'Admin',
+              lastName: 'Test',
+              role: 'ADMIN',
+              companyTimezone: 'America/Hermosillo',
+            },
+          } as never;
+        }
+
         if (endpoint === '/purchases') {
           return {
             data: [draftPurchase],
@@ -2519,6 +2548,7 @@ describe('PurchasesPage — formulario de compra', () => {
 
  describe('PurchasesPage — acciones de compra', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
 
     consoleErrorSpy = vi
@@ -2639,12 +2669,59 @@ describe('PurchasesPage — formulario de compra', () => {
     },
   );
 
+  it('muestra Editar como acción primaria para WAREHOUSE y deja solo PDF en el menú del borrador', async () => {
+    const user = userEvent.setup();
+    clearAuthenticatedSessionCache();
+    configureApiMocks([draftPurchase], { role: 'WAREHOUSE' });
+
+    render(<PurchasesPage />);
+
+    await screen.findByText(draftPurchase.folio);
+    const row = getPurchaseRowByFolio(draftPurchase.folio);
+
+    expect(
+      within(row).getByRole('button', { name: /^editar$/i }),
+    ).toBeTruthy();
+    expect(
+      within(row).queryByRole('button', { name: /^aprobar$/i }),
+    ).toBeNull();
+    expect(
+      within(row).queryByRole('button', { name: /registrar recepción/i }),
+    ).toBeNull();
+
+    const menu = await openActionsMenu(user, draftPurchase.folio);
+
+    expect(
+      within(menu).getByRole('menuitem', { name: /descargar pdf/i }),
+    ).toBeTruthy();
+    expect(
+      within(menu).queryByRole('menuitem', { name: /^editar$/i }),
+    ).toBeNull();
+    expect(
+      within(menu).queryByRole('menuitem', { name: /^cancelar$/i }),
+    ).toBeNull();
+  });
+
   it('aprueba una compra en borrador y recarga las compras', async () => {
     const user = userEvent.setup();
 
     vi.mocked(api.get).mockImplementation(
       async (url) => {
         const endpoint = String(url);
+
+        if (endpoint === '/auth/me') {
+          return {
+            data: {
+              id: 'user-1',
+              companyId: 'company-1',
+              email: 'admin@test.test',
+              firstName: 'Admin',
+              lastName: 'Test',
+              role: 'ADMIN',
+              companyTimezone: 'America/Hermosillo',
+            },
+          } as never;
+        }
 
         if (endpoint === '/purchases') {
           return {
@@ -2737,6 +2814,20 @@ describe('PurchasesPage — formulario de compra', () => {
   vi.mocked(api.get).mockImplementation(
     async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/purchases') {
         return {

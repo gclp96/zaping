@@ -1,10 +1,10 @@
 "use client";
 
-import axios from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 
 import { useAuthenticatedSession } from "@/app/auth-session";
+import ForbiddenState from "@/app/components/ui/ForbiddenState";
 import { paginateRows, stableSort } from "@/app/client-table.utils";
 import Badge from "@/app/components/ui/Badge";
 import Button from "@/app/components/ui/Button";
@@ -25,7 +25,7 @@ import PageContainer from "@/app/components/ui/layout/PageContainer";
 import PageHeader from "@/app/components/ui/layout/PageHeader";
 import Section from "@/app/components/ui/layout/Section";
 import { api } from "@/services/api";
-import { getApiErrorMessage } from "@/services/errors";
+import { getApiErrorMessage, isForbiddenError } from "@/services/errors";
 
 import type {
   CreateUserPayload,
@@ -70,10 +70,6 @@ const initialFormValues: UserFormValues = {
   password: "",
   confirmPassword: "",
 };
-
-function isForbiddenError(error: unknown) {
-  return axios.isAxiosError(error) && error.response?.status === 403;
-}
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -166,9 +162,19 @@ export default function UsersPage() {
   }
 
   useEffect(() => {
+    if (sessionState.status === "loading") {
+      return;
+    }
+
+    if (sessionState.status === "success" && currentUser?.role) {
+      if (!currentUserIsAdmin) {
+        return;
+      }
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadUsers();
-  }, []);
+  }, [currentUser?.role, currentUserIsAdmin, sessionState.status]);
 
   function resetFilters() {
     setSearch("");
@@ -539,17 +545,7 @@ export default function UsersPage() {
     return (
       <PageContainer>
         <PageHeader title="Usuarios" />
-        <Section>
-          <div
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800"
-          >
-            <h2 className="text-base font-semibold">Sin permisos</h2>
-            <p className="mt-1 text-sm">
-              No tienes autorización para administrar usuarios.
-            </p>
-          </div>
-        </Section>
+        <ForbiddenState />
       </PageContainer>
     );
   }

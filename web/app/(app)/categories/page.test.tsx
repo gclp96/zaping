@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import CategoriesPage from './page';
 
@@ -50,8 +51,31 @@ const inactiveCategory = {
 
 const categories = [activeCategory, inactiveCategory];
 
-function configureApiMocks(categoryData = categories) {
-  vi.mocked(api.get).mockResolvedValue({ data: categoryData } as never);
+function authSessionResponse(
+  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' = 'ADMIN',
+) {
+  return {
+    data: {
+      id: 'user-1',
+      companyId: 'company-1',
+      email: 'admin@test.test',
+      firstName: 'Admin',
+      lastName: 'Test',
+      role,
+      companyTimezone: 'America/Hermosillo',
+    },
+  } as never;
+}
+
+function configureApiMocks(
+  categoryData = categories,
+  role: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE' = 'ADMIN',
+) {
+  vi.mocked(api.get).mockImplementation(async (url) =>
+    String(url) === '/auth/me'
+      ? authSessionResponse(role)
+      : ({ data: categoryData } as never),
+  );
   vi.mocked(api.post).mockResolvedValue({ data: activeCategory } as never);
   vi.mocked(api.patch).mockResolvedValue({ data: activeCategory } as never);
   vi.mocked(api.delete).mockResolvedValue({ data: {} } as never);
@@ -67,6 +91,7 @@ let alertSpy: ReturnType<typeof vi.spyOn>;
 
 describe('CategoriesPage', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     configureApiMocks();
     consoleErrorSpy = vi
@@ -107,6 +132,25 @@ describe('CategoriesPage', () => {
     expect(screen.getByRole('columnheader', { name: 'Acciones' })).toBeTruthy();
   });
 
+  it.each(['SALES', 'WAREHOUSE'] as const)(
+    'mantiene la lectura de categorías y oculta las mutaciones para %s',
+    async (role) => {
+      clearAuthenticatedSessionCache();
+      configureApiMocks(categories, role);
+
+      render(<CategoriesPage />);
+
+      await screen.findByText(activeCategory.name);
+      expect(screen.queryByRole('button', { name: 'Nueva Categoría' })).toBeNull();
+      expect(
+        screen
+          .getByText(activeCategory.name)
+          .closest('tr')
+          ?.querySelector('button'),
+      ).toBeNull();
+    },
+  );
+
   it('renders the existing empty state when no categories are registered', async () => {
     configureApiMocks([]);
 
@@ -123,7 +167,13 @@ describe('CategoriesPage', () => {
   });
 
   it('preserves the existing fallback when loading categories fails', async () => {
-    vi.mocked(api.get).mockRejectedValueOnce(new Error('Error de red'));
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      throw new Error('Error de red');
+    });
 
     render(<CategoriesPage />);
 
@@ -153,9 +203,19 @@ describe('CategoriesPage', () => {
       description: 'Material implantable',
       isActive: false,
     };
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: categories } as never)
-      .mockResolvedValue({ data: [...categories, newCategory] } as never);
+    let categoryRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      categoryRequestCount += 1;
+      return {
+        data: categoryRequestCount === 1
+          ? categories
+          : [...categories, newCategory],
+      } as never;
+    });
     vi.mocked(api.post).mockResolvedValue({ data: newCategory } as never);
 
     await renderCategoriesPage();
@@ -190,9 +250,19 @@ describe('CategoriesPage', () => {
       ...activeCategory,
       name: 'Consumibles clínicos',
     };
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: categories } as never)
-      .mockResolvedValue({ data: [updatedCategory, inactiveCategory] } as never);
+    let categoryRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      categoryRequestCount += 1;
+      return {
+        data: categoryRequestCount === 1
+          ? categories
+          : [updatedCategory, inactiveCategory],
+      } as never;
+    });
     vi.mocked(api.patch).mockResolvedValue({ data: updatedCategory } as never);
 
     await renderCategoriesPage();
@@ -223,9 +293,17 @@ describe('CategoriesPage', () => {
 
   it('deletes a category through the existing confirmation flow', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.get)
-      .mockResolvedValueOnce({ data: categories } as never)
-      .mockResolvedValue({ data: [inactiveCategory] } as never);
+    let categoryRequestCount = 0;
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/auth/me') {
+        return authSessionResponse();
+      }
+
+      categoryRequestCount += 1;
+      return {
+        data: categoryRequestCount === 1 ? categories : [inactiveCategory],
+      } as never;
+    });
 
     await renderCategoriesPage();
     const categoryRow = screen.getByText(activeCategory.name).closest('tr');

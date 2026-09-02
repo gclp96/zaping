@@ -18,6 +18,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import QuotesPage from './page';
 
@@ -44,6 +45,13 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -198,6 +206,20 @@ function configureApiMocks(
         } as never;
       }
 
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
+
       if (endpoint === '/customers') {
         return {
           data: [customer],
@@ -270,6 +292,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 describe('QuotesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
 
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -555,7 +578,7 @@ describe('QuotesPage', () => {
   await screen.findByText('COT-0001');
 
   await user.click(
-    screen.getByRole('button', {
+    await screen.findByRole('button', {
       name: /nueva cotización/i,
     }),
   );
@@ -908,6 +931,20 @@ describe('QuotesPage', () => {
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/quotes') {
         quoteRequestCount += 1;

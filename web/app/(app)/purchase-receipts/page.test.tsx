@@ -28,6 +28,13 @@ vi.mock('@/services/api', () => ({
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 const primaryReceipt: PurchaseReceiptListItem = {

@@ -4,6 +4,12 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import {
+  canManageEquipment,
+  hasRole,
+  WAREHOUSE_ROLES,
+} from '@/app/erp-role-access';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
@@ -16,9 +22,10 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 import EquipmentCreateModal from './components/EquipmentCreateModal';
 import EquipmentDetailModal from './components/EquipmentDetailModal';
@@ -130,11 +137,23 @@ export default function EquipmentPage() {
 function EquipmentPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = canManageEquipment(currentUserRole);
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES),
+  );
   const assetId = searchParams.get('assetId')?.trim() || null;
   const openedAssetId = useRef<string | null>(null);
   const [equipment, setEquipment] = useState<EquipmentAsset[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [lifecycleFilter, setLifecycleFilter] =
     useState<LifecycleFilter>('');
@@ -234,6 +253,11 @@ function EquipmentPageContent() {
       setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setEquipment([]);
+        return;
+      }
       setPageError(
         getApiErrorMessage(
           error,
@@ -649,9 +673,21 @@ function EquipmentPageContent() {
   ];
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadEquipment();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   useEffect(() => {
     if (!assetId) {
@@ -691,15 +727,17 @@ function EquipmentPageContent() {
         <PageHeader
           title="Equipos"
           description="Consulta las unidades físicas identificables del catálogo."
-          action={
+          action={canWrite ? (
             <Button type="button" onClick={openCreateModal}>
               <Plus aria-hidden="true" size={18} />
               Nuevo equipo
             </Button>
-          }
+          ) : undefined}
         />
 
-        {equipmentDeepLinkMissing ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : equipmentDeepLinkMissing ? (
           <div
             role="alert"
             className="flex flex-col gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-yellow-900 sm:flex-row sm:items-center sm:justify-between"
@@ -716,7 +754,7 @@ function EquipmentPageContent() {
           </div>
         ) : null}
 
-        {pageLoading ? (
+        {!forbidden && !sessionForbidsAccess ? (pageLoading ? (
           <Loading message="Cargando equipos..." />
         ) : pageError ? (
           <Section>
@@ -899,7 +937,7 @@ function EquipmentPageContent() {
               isFiltered={filtersActive}
             />
           </Section>
-        )}
+        )) : null}
       </PageContainer>
 
       <EquipmentCreateModal

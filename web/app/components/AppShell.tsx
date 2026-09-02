@@ -73,7 +73,7 @@ export default function AppShell({ children }: AppShellProps) {
 
   const title = getRouteTitle(pathname);
   const currentUserRole =
-    sessionState.status === "success" ? sessionState.user.role : null;
+    sessionState.status === "success" ? sessionState.user.role : undefined;
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((currentValue) => {

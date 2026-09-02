@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { hasRole, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import type { PurchaseStatus } from '@/app/(app)/purchases/types';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
@@ -45,6 +47,9 @@ function createResourceState<T>(): ResourceState<T> {
 }
 
 export function useHomeData() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success' ? sessionState.user?.role ?? null : null;
   const [dashboardState, setDashboardState] = useState<
     ResourceState<DashboardData>
   >(() => createResourceState<DashboardData>());
@@ -125,33 +130,67 @@ export function useHomeData() {
   }, []);
 
   useEffect(() => {
+    void Promise.resolve().then(() => loadDashboard());
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     void Promise.resolve().then(() =>
-      Promise.all([loadDashboard(), loadEquipment(), loadPurchases()]),
+      Promise.all([loadEquipment(), loadPurchases()]),
     );
-  }, [loadDashboard, loadEquipment, loadPurchases]);
+  }, [
+    currentUserRole,
+    loadEquipment,
+    loadPurchases,
+    sessionState.status,
+  ]);
+
+  const operationalResourcesSuppressed = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES),
+  );
+  const visibleEquipmentState = operationalResourcesSuppressed
+    ? { data: [], loading: false, error: '' }
+    : equipmentState;
+  const visiblePurchasesState = operationalResourcesSuppressed
+    ? { data: [], loading: false, error: '' }
+    : purchasesState;
 
   const initialLoading =
-    dashboardState.loading &&
-    equipmentState.loading &&
-    purchasesState.loading &&
-    !dashboardState.data &&
-    !equipmentState.data &&
-    !purchasesState.data;
+    dashboardState.loading && !dashboardState.data;
   const attentionUpdating =
-    dashboardState.loading || equipmentState.loading || purchasesState.loading;
+    dashboardState.loading ||
+    (sessionState.status !== 'loading' &&
+      (visibleEquipmentState.loading || visiblePurchasesState.loading));
   const attentionHasErrors = Boolean(
-    dashboardState.error || equipmentState.error || purchasesState.error,
+    dashboardState.error ||
+      visibleEquipmentState.error ||
+      visiblePurchasesState.error,
   );
 
   return {
     dashboardState,
-    equipmentState,
-    purchasesState,
+    equipmentState: visibleEquipmentState,
+    purchasesState: visiblePurchasesState,
     loadDashboard,
     loadEquipment,
     loadPurchases,
     initialLoading,
     attentionUpdating,
     attentionHasErrors,
+    currentUserRole,
+    sessionLoading: sessionState.status === 'loading',
   };
 }

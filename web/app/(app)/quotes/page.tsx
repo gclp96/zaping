@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { hasRole, COMMERCIAL_ROLES } from '@/app/erp-role-access';
 import StatusBadge from '@/app/components/business/StatusBadge';
 
 import Button from '@/app/components/ui/Button';
@@ -20,10 +22,11 @@ import Modal from '@/app/components/ui/Modal';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import CustomerFormModal from '@/app/components/business/CustomerForm';
 
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 
 import QuoteDetailModal from './components/QuoteDetailModal';
@@ -150,6 +153,17 @@ function compareQuotes(
 
 export default function QuotesPage() {
   const router = useRouter();
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = hasRole(currentUserRole, COMMERCIAL_ROLES);
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES),
+  );
   const [quotes, setQuotes] = useState<Quote[]>(
     [],
   );
@@ -172,6 +186,7 @@ export default function QuotesPage() {
     useState(false);
 
   const [pageError, setPageError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('ALL');
@@ -304,6 +319,12 @@ export default function QuotesPage() {
     } catch (error: unknown) {
       console.error(error);
 
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setQuotes([]);
+        return;
+      }
+
       setPageError(
         getApiErrorMessage(
           error,
@@ -316,9 +337,21 @@ export default function QuotesPage() {
   }
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPageData();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   function closeQuoteDetail() {
     setQuoteToView(null);
@@ -408,11 +441,11 @@ export default function QuotesPage() {
         <PageHeader
           title="Cotizaciones"
           description="Administra las cotizaciones comerciales registradas."
-          action={
+          action={canWrite ? (
             <Button onClick={openCreateModal}>
               Nueva cotización
             </Button>
-          }
+          ) : undefined}
         />
 
         {actionError && !actionErrorHasModal ? (
@@ -432,7 +465,9 @@ export default function QuotesPage() {
           </div>
         ) : null}
 
-        {pageLoading ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : pageLoading ? (
           <Loading message="Cargando cotizaciones..." />
         ) : pageError ? (
           <div
@@ -455,9 +490,11 @@ export default function QuotesPage() {
             title="No hay cotizaciones registradas"
             description="Comienza creando tu primera cotización."
             action={
-              <Button type="button" onClick={openCreateModal}>
-                Nueva cotización
-              </Button>
+              canWrite ? (
+                <Button type="button" onClick={openCreateModal}>
+                  Nueva cotización
+                </Button>
+              ) : undefined
             }
           />
         ) : (

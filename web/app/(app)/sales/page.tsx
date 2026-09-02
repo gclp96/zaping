@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { hasRole, COMMERCIAL_ROLES } from '@/app/erp-role-access';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import Button from '@/app/components/ui/Button';
@@ -18,8 +20,9 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 import SaleDetailModal from './components/SaleDetailModal';
 import SaleFormModal from './components/SaleFormModal';
@@ -160,6 +163,17 @@ export default function SalesPage() {
 function SalesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = hasRole(currentUserRole, COMMERCIAL_ROLES);
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES),
+  );
   const saleId = searchParams.get('saleId')?.trim() || null;
   const openedSaleId = useRef<string | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -167,6 +181,7 @@ function SalesPageContent() {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] =
     useState<StatusFilter>('ALL');
@@ -208,6 +223,12 @@ function SalesPageContent() {
     } catch (error: unknown) {
       console.error(error);
 
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setSales([]);
+        return;
+      }
+
       setPageError(
         getApiErrorMessage(
           error,
@@ -220,9 +241,21 @@ function SalesPageContent() {
   }
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPageData();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   const {
     saleIdToView,
@@ -449,14 +482,16 @@ function SalesPageContent() {
         <PageHeader
           title="Ventas"
           description="Consulta y da seguimiento a las ventas registradas."
-          action={
+          action={canWrite ? (
             <Button onClick={openCreateModal}>
               Nueva venta
             </Button>
-          }
+          ) : undefined}
         />
 
-        {pageLoading ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : pageLoading ? (
           <Loading message="Cargando ventas..." />
         ) : pageError ? (
           <div

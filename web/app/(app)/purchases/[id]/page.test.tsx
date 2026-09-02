@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import type {
   InventoryMovement,
@@ -42,6 +43,13 @@ vi.mock('@/services/api', () => ({
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -194,12 +202,28 @@ function setupApi({
   purchaseResponse = purchase,
   receiptsResponse = [receipt],
   movementsResponse = [movement],
+  role = 'ADMIN',
 }: {
   purchaseResponse?: Purchase;
   receiptsResponse?: PurchaseReceipt[];
   movementsResponse?: InventoryMovement[];
+  role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation((endpoint: string) => {
+    if (endpoint === '/auth/me') {
+      return Promise.resolve({
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role,
+          companyTimezone: 'America/Hermosillo',
+        },
+      }) as never;
+    }
+
     if (endpoint === '/purchases/purchase-1') {
       return Promise.resolve({ data: purchaseResponse }) as never;
     }
@@ -235,6 +259,7 @@ const revokeObjectURLMock = vi.fn();
 
 describe('Purchase360Page', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     routerMock.id = 'purchase-1';
     setupApi();
@@ -320,6 +345,20 @@ describe('Purchase360Page', () => {
 
   it('shows neutral item progress while receipt history is unavailable', async () => {
     vi.mocked(api.get).mockImplementation((endpoint: string) => {
+      if (endpoint === '/auth/me') {
+        return Promise.resolve({
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        }) as never;
+      }
+
       if (endpoint === '/purchases/purchase-1') {
         return Promise.resolve({ data: purchase }) as never;
       }
@@ -349,6 +388,20 @@ describe('Purchase360Page', () => {
 
   it('isolates related resource errors and supports local retries', async () => {
     vi.mocked(api.get).mockImplementation((endpoint: string) => {
+      if (endpoint === '/auth/me') {
+        return Promise.resolve({
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        }) as never;
+      }
+
       if (endpoint === '/purchases/purchase-1') {
         return Promise.resolve({ data: purchase }) as never;
       }
@@ -394,11 +447,27 @@ describe('Purchase360Page', () => {
   });
 
   it('shows not found and base error states without hiding navigation', async () => {
-    vi.mocked(api.get).mockRejectedValueOnce({
-      isAxiosError: true,
-      response: {
-        status: 404,
-      },
+    vi.mocked(api.get).mockImplementation((endpoint: string) => {
+      if (endpoint === '/auth/me') {
+        return Promise.resolve({
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        }) as never;
+      }
+
+      return Promise.reject({
+        isAxiosError: true,
+        response: {
+          status: 404,
+        },
+      }) as never;
     });
 
     render(<Purchase360Page />);
@@ -455,6 +524,25 @@ describe('Purchase360Page', () => {
         ).toBeNull();
       }
     }
+  });
+
+  it('hides approval and cancellation for WAREHOUSE while retaining edit and read actions', async () => {
+    clearAuthenticatedSessionCache();
+    setupApi({
+      purchaseResponse: {
+        ...purchase,
+        status: 'DRAFT',
+      },
+      role: 'WAREHOUSE',
+    });
+
+    render(<Purchase360Page />);
+    await screen.findByRole('heading', { name: 'Compra OC-0001' });
+
+    expect(screen.getByRole('button', { name: 'Editar' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Aprobar' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).toBeNull();
   });
 
   it('refreshes the purchase after approving or cancelling', async () => {

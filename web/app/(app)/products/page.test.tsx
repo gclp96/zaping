@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import ProductsPage from './page';
 
@@ -139,14 +140,30 @@ function configureApiMocks({
   categories = [surgicalCategory, inactiveCategory],
   categoryError,
   productError,
+  role = 'ADMIN',
 }: {
   products?: Product[];
   categories?: Category[];
   categoryError?: Error;
   productError?: Error;
+  role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role,
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
     if (endpoint === '/products') {
       if (productError) {
@@ -285,6 +302,7 @@ let alertSpy: ReturnType<typeof vi.spyOn>;
 
 describe('ProductsPage', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     configureApiMocks();
 
@@ -329,6 +347,27 @@ describe('ProductsPage', () => {
       await screen.findByText('No hay productos registrados'),
     ).toBeTruthy();
   });
+
+  it.each(['SALES', 'WAREHOUSE'] as const)(
+    'mantiene la lectura del catálogo y oculta las mutaciones para %s',
+    async (role) => {
+      clearAuthenticatedSessionCache();
+      configureApiMocks({ role });
+
+      render(<ProductsPage />);
+
+      await screen.findByText('LF1837');
+      expect(screen.queryByRole('button', { name: /agregar producto/i })).toBeNull();
+
+      const row = screen.getByText('BLUNT TIP').closest('tr');
+      expect(row).toBeTruthy();
+      expect(
+        within(row as HTMLTableRowElement).queryByRole('button', {
+          name: /acciones del producto/i,
+        }),
+      ).toBeNull();
+    },
+  );
 
   it('muestra error de productos y permite reintentar', async () => {
     const user = userEvent.setup();
@@ -892,6 +931,20 @@ describe('ProductsPage', () => {
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/products') {
         productRequestCount += 1;

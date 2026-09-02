@@ -17,6 +17,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import SalesPage from './page';
 
@@ -44,6 +45,13 @@ vi.mock('@/services/errors', () => ({
     _error: unknown,
     fallbackMessage: string,
   ) => fallbackMessage,
+  isForbiddenError: (error: unknown) =>
+    Boolean(
+      error &&
+        typeof error === 'object' &&
+        'response' in error &&
+        (error as { response?: { status?: number } }).response?.status === 403,
+    ),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -229,14 +237,30 @@ function configureApiMocks({
     requiredLotProduct,
   ],
   saleDetails,
+  role,
 }: {
   sales?: Sale[];
   customers?: SaleCustomer[];
   products?: SaleProduct[];
   saleDetails?: Record<string, Sale>;
+  role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: role ?? 'ADMIN',
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
     if (endpoint === '/sales') {
       return {
@@ -328,6 +352,7 @@ let anchorClickSpy: ReturnType<typeof vi.spyOn>;
 
 describe('SalesPage', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     navigationMock.search = '';
 
@@ -499,6 +524,22 @@ describe('SalesPage', () => {
 
     expect(await screen.findByText('V-000001')).toBeTruthy();
     expect(api.get).toHaveBeenCalledWith('/sales');
+  });
+
+  it('muestra estado 403 amigable y no carga ventas para WAREHOUSE', async () => {
+    clearAuthenticatedSessionCache();
+    configureApiMocks({ role: 'WAREHOUSE' });
+
+    render(<SalesPage />);
+
+    expect(
+      await screen.findByRole('heading', { name: 'Sin permisos' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText('No tienes permisos para acceder a esta sección.'),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Volver al inicio' })).toBeTruthy();
+    expect(api.get).not.toHaveBeenCalledWith('/sales');
   });
 
   it('muestra el estado vacío cuando no hay ventas', async () => {
@@ -794,6 +835,20 @@ describe('SalesPage', () => {
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/sales') {
         return { data: [baseSale] } as never;
@@ -1326,6 +1381,20 @@ describe('SalesPage', () => {
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/sales') {
         salesRequest += 1;

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
+import { canManageCustomers, hasRole, COMMERCIAL_ROLES } from '@/app/erp-role-access';
 import CustomerFormModal from '@/app/components/business/CustomerForm';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
@@ -15,9 +17,10 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 type Customer = {
   id: string;
@@ -84,9 +87,21 @@ function compareCustomers(
 }
 
 export default function CustomersPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canWrite = canManageCustomers(currentUserRole);
+  const sessionForbidsAccess = Boolean(
+    sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES),
+  );
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState('');
+  const [forbidden, setForbidden] = useState(false);
   const [search, setSearch] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
@@ -113,6 +128,11 @@ export default function CustomersPage() {
       setPageIndex(0);
     } catch (error: unknown) {
       console.error(error);
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setCustomers([]);
+        return;
+      }
       setPageError(
         getApiErrorMessage(error, 'No fue posible cargar los clientes.'),
       );
@@ -122,9 +142,21 @@ export default function CustomersPage() {
   }
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, COMMERCIAL_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadCustomers();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   function openCreateModal() {
     setEditingCustomer(null);
@@ -246,15 +278,17 @@ export default function CustomersPage() {
         <PageHeader
           title="Clientes"
           description="Administra los clientes disponibles para nuevas operaciones."
-          action={
+          action={canWrite ? (
             <Button type="button" onClick={openCreateModal}>
               <Plus aria-hidden="true" size={18} />
               Nuevo cliente
             </Button>
-          }
+          ) : undefined}
         />
 
-        {pageLoading ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : pageLoading ? (
           <Loading message="Cargando clientes..." />
         ) : pageError ? (
           <Section>
@@ -329,7 +363,7 @@ export default function CustomersPage() {
                     }
                   : undefined
               }
-              rowActions={{
+              rowActions={canWrite ? {
                 label: (customer) => `Acciones del cliente ${customer.name}`,
                 actions: [
                   {
@@ -344,7 +378,7 @@ export default function CustomersPage() {
                     onSelect: openDeactivateDialog,
                   },
                 ],
-              }}
+              } : undefined}
               emptyState={{
                 title: 'Sin clientes activos',
                 description:

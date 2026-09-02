@@ -171,6 +171,10 @@ export default function RowActionsMenu<T>({
     }
   }
 
+  if (!hasEnabledActions) {
+    return null;
+  }
+
   return (
     <div ref={containerRef} className="relative inline-flex">
       <button
@@ -182,7 +186,6 @@ export default function RowActionsMenu<T>({
         aria-controls={menuOpen ? menuId : undefined}
         title={label}
         className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={!hasEnabledActions}
         onClick={() => {
           if (open) {
             setOpen(false);

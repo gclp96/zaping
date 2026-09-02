@@ -69,4 +69,21 @@ describe('api response interceptor', () => {
     expect(removeItemSpy).toHaveBeenCalledWith('token');
     expect(localStorage.getItem('token')).toBeNull();
   });
+
+  it('preserves the current session and route for 403 authorization errors', async () => {
+    const rejected = getResponseRejectedHandler();
+    const removeItemSpy = vi.spyOn(Storage.prototype, 'removeItem');
+    localStorage.setItem('token', 'valid-token');
+    window.history.pushState(null, '', '/sales');
+
+    await expect(rejected(axiosError(403))).rejects.toMatchObject({
+      response: {
+        status: 403,
+      },
+    });
+
+    expect(removeItemSpy).not.toHaveBeenCalledWith('token');
+    expect(localStorage.getItem('token')).toBe('valid-token');
+    expect(window.location.pathname).toBe('/sales');
+  });
 });

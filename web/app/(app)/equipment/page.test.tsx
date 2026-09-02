@@ -16,6 +16,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 
 import { formatEquipmentDate } from './equipment-display';
 import EquipmentPage from './page';
@@ -272,6 +273,20 @@ function configureApiMocks({
       return { data: list } as never;
     }
 
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: 'ADMIN',
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
+
     if (endpoint === '/products') {
       if (productsError) {
         throw productsError;
@@ -365,6 +380,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 describe('EquipmentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
     navigationMock.search = '';
     configureApiMocks();
     consoleErrorSpy = vi
@@ -770,6 +786,20 @@ describe('EquipmentPage', () => {
 
       if (endpoint === '/products') {
         return { data: [buildProduct()] } as never;
+      }
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@test.test',
+            firstName: 'Admin',
+            lastName: 'Test',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
       }
 
       throw new Error(`Solicitud GET no configurada: ${endpoint}`);

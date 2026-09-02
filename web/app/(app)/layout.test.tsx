@@ -18,6 +18,7 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
+import { clearAuthenticatedSessionCache } from '@/app/auth-session';
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/app/components/AppShell';
 
 import AuthenticatedAppLayout from './layout';
@@ -80,6 +81,20 @@ function configureApiMocks() {
       } as never;
     }
 
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: 'ADMIN',
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
+
     return {
       data: [],
     } as never;
@@ -96,6 +111,7 @@ function renderInShell(children: ReactNode) {
 
 describe('AuthenticatedAppLayout', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     window.localStorage.clear();
     navigationMock.pathname = '/dashboard';
     configureApiMocks();

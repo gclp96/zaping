@@ -13,8 +13,15 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { RotateCcw, Search } from 'lucide-react';
 
 import { paginateRows, stableSort } from '@/app/client-table.utils';
+import { useAuthenticatedSession } from '@/app/auth-session';
+import {
+  canApprovePurchases,
+  canEditPurchases,
+  hasRole,
+  WAREHOUSE_ROLES,
+} from '@/app/erp-role-access';
 import { api } from '@/services/api';
-import { getApiErrorMessage } from '@/services/errors';
+import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import {
   canRegisterPurchaseReceipt,
   getPurchaseStatusDescriptor,
@@ -58,6 +65,7 @@ import Select from '@/app/components/ui/Select';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import ForbiddenState from '@/app/components/ui/ForbiddenState';
 
 type StatusFilter = 'ALL' | PurchaseStatus;
 
@@ -215,6 +223,18 @@ function PurchasesPageContent() {
 
 const router = useRouter();
 const searchParams = useSearchParams();
+const sessionState = useAuthenticatedSession();
+const currentUserRole =
+  sessionState.status === 'success'
+    ? sessionState.user?.role ?? null
+    : null;
+const canEdit = canEditPurchases(currentUserRole);
+const canApprove = canApprovePurchases(currentUserRole);
+const sessionForbidsAccess = Boolean(
+  sessionState.status === 'success' &&
+    currentUserRole &&
+    !hasRole(currentUserRole, WAREHOUSE_ROLES),
+);
 const legacyPurchaseId = searchParams.get('purchaseId')?.trim() || '';
 const dateRangeMessageId = useId();
 
@@ -224,6 +244,7 @@ const [ products, setProducts ] = useState<Product[]>([]);
 
 const [ pageLoading, setPageLoading ] = useState(true);
 const [ pageError, setPageError ] = useState('');
+const [forbidden, setForbidden] = useState(false);
 const [search, setSearch] = useState('');
 const [statusFilter, setStatusFilter] =
   useState<StatusFilter>('ALL');
@@ -557,6 +578,12 @@ async function loadPageData() {
     } catch (error: unknown) {
       console.error(error);
 
+      if (isForbiddenError(error)) {
+        setForbidden(true);
+        setPurchases([]);
+        return;
+      }
+
       setPageError(
         getApiErrorMessage(
           error,
@@ -569,10 +596,22 @@ async function loadPageData() {
   }
 
   useEffect(() => {
+    if (sessionState.status === 'loading') {
+      return;
+    }
+
+    if (
+      sessionState.status === 'success' &&
+      currentUserRole &&
+      !hasRole(currentUserRole, WAREHOUSE_ROLES)
+    ) {
+      return;
+    }
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPageData();
     void loadCompanyTimezone();
-  }, []);
+  }, [currentUserRole, sessionState.status]);
 
   useEffect(() => {
     if (legacyPurchaseId) {
@@ -883,7 +922,7 @@ async function loadPageData() {
       minWidth: 210,
       cell: (purchase) => {
         const rowActions: DataTableRowAction<Purchase>[] = [
-          ...(purchase.status === 'DRAFT'
+          ...(canEdit && canApprove && purchase.status === 'DRAFT'
             ? [
                 {
                   id: 'edit',
@@ -903,7 +942,7 @@ async function loadPageData() {
             onSelect: (selectedPurchase) =>
               void handleDownloadPdf(selectedPurchase),
           },
-          ...(purchase.status === 'DRAFT'
+          ...(canApprove && purchase.status === 'DRAFT'
             ? [
                 {
                   id: 'cancel',
@@ -918,7 +957,7 @@ async function loadPageData() {
 
         return (
           <div className="flex items-center justify-end gap-2">
-            {purchase.status === 'DRAFT' ? (
+            {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
                 size="sm"
@@ -929,7 +968,18 @@ async function loadPageData() {
               </Button>
             ) : null}
 
-            {canRegisterPurchaseReceipt(purchase.status) ? (
+            {purchase.status === 'DRAFT' && canEdit && !canApprove ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="min-w-24"
+                onClick={() => openEditModal(purchase)}
+              >
+                Editar
+              </Button>
+            ) : null}
+
+            {canEdit && canRegisterPurchaseReceipt(purchase.status) ? (
             <Button
               variant="success"
               size="sm"
@@ -966,11 +1016,11 @@ async function loadPageData() {
         <PageHeader
           title="Compras"
           description="Administra las órdenes de compra registradas."
-          action={
+          action={canEdit ? (
             <Button onClick={openCreateModal}>
               Nueva compra
             </Button>
-          }
+          ) : undefined}
         />
 
         {actionError && !actionErrorHasDialog ? (
@@ -1009,7 +1059,9 @@ async function loadPageData() {
           </div>
         ) : null}
 
-        {pageLoading ? (
+        {forbidden || sessionForbidsAccess ? (
+          <ForbiddenState />
+        ) : pageLoading ? (
           <Loading message="Cargando compras..." />
         ) : pageError ? (
           <div
@@ -1032,9 +1084,11 @@ async function loadPageData() {
             title="No hay compras registradas"
             description="Comienza creando tu primera orden de compra."
             action={
-              <Button type="button" onClick={openCreateModal}>
-                Nueva compra
-              </Button>
+              canEdit ? (
+                <Button type="button" onClick={openCreateModal}>
+                  Nueva compra
+                </Button>
+              ) : undefined
             }
           />
         ) : (
