@@ -460,7 +460,7 @@ describe('SalesPage', () => {
     expect(
       await screen.findByText('No fue posible cargar el detalle de la venta.'),
     ).toBeTruthy();
-    expect(screen.getByText(baseSale.folio)).toBeTruthy();
+    expect(await screen.findByText(baseSale.folio)).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Cerrar' }));
 
