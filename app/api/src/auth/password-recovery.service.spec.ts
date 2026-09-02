@@ -117,12 +117,16 @@ describe('PasswordRecoveryService', () => {
   it('issues a URL-safe high-entropy token and persists only its hash', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2026-09-01T16:30:00.000Z'));
     prismaMock.user.findUnique.mockResolvedValue(activeUser);
+    transactionMock.passwordResetToken.create.mockResolvedValue({
+      id: 'reset-token-1',
+    });
 
     const result = await service.preparePasswordReset(activeUser.email);
 
     expect(result).not.toBeNull();
     expect(result?.token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(result?.expiresAt).toEqual(new Date('2026-09-01T17:00:00.000Z'));
+    expect(result?.tokenId).toBe('reset-token-1');
     expect(result?.user).toEqual({
       id: activeUser.id,
       email: activeUser.email,
@@ -149,6 +153,11 @@ describe('PasswordRecoveryService', () => {
     expect(createCall.data.expiresAt).toEqual(
       new Date('2026-09-01T17:00:00.000Z'),
     );
+    expect(createCall).toMatchObject({
+      select: {
+        id: true,
+      },
+    });
     expect(JSON.stringify(createCall)).not.toContain(result?.token ?? '');
   });
 

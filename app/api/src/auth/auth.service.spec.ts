@@ -5,7 +5,9 @@ import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import { AuthService } from './auth.service';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 describe('AuthService', () => {
   type UserUpdateManyCall = {
@@ -47,6 +49,14 @@ describe('AuthService', () => {
   let jwtServiceMock: {
     sign: jest.Mock;
     signAsync: jest.Mock;
+  };
+  let passwordRecoveryServiceMock: {
+    invalidateToken: jest.Mock;
+    preparePasswordReset: jest.Mock;
+    resetPasswordWithToken: jest.Mock;
+  };
+  let emailServiceMock: {
+    sendPasswordResetEmail: jest.Mock;
   };
 
   const authenticatedUser = {
@@ -96,6 +106,15 @@ describe('AuthService', () => {
       sign: jest.fn(),
       signAsync: jest.fn(),
     };
+    passwordRecoveryServiceMock = {
+      invalidateToken: jest.fn(),
+      preparePasswordReset: jest.fn(),
+      resetPasswordWithToken: jest.fn(),
+    };
+    emailServiceMock = {
+      sendPasswordResetEmail: jest.fn(),
+    };
+    process.env.FRONTEND_BASE_URL = 'https://app.zaping.example';
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
@@ -107,6 +126,14 @@ describe('AuthService', () => {
         {
           provide: JwtService,
           useValue: jwtServiceMock,
+        },
+        {
+          provide: PasswordRecoveryService,
+          useValue: passwordRecoveryServiceMock,
+        },
+        {
+          provide: EmailService,
+          useValue: emailServiceMock,
         },
       ],
     }).compile();
@@ -285,6 +312,129 @@ describe('AuthService', () => {
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
+    expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
+  });
+
+  it('orchestrates forgot-password for active users without exposing the token', async () => {
+    const preparedReset = {
+      tokenId: 'reset-token-1',
+      token: 'plain-reset-token',
+      expiresAt: new Date('2026-09-01T17:00:00.000Z'),
+      user: {
+        id: userRecord.id,
+        email: userRecord.email,
+        firstName: userRecord.firstName,
+        lastName: userRecord.lastName,
+      },
+    };
+    passwordRecoveryServiceMock.preparePasswordReset.mockResolvedValue(
+      preparedReset,
+    );
+    emailServiceMock.sendPasswordResetEmail.mockResolvedValue(undefined);
+
+    const response = await service.forgotPassword({
+      email: `  ${userRecord.email.toUpperCase()}  `,
+    });
+
+    expect(
+      passwordRecoveryServiceMock.preparePasswordReset,
+    ).toHaveBeenCalledWith(userRecord.email);
+    expect(emailServiceMock.sendPasswordResetEmail).toHaveBeenCalledWith({
+      to: userRecord.email,
+      resetUrl:
+        'https://app.zaping.example/reset-password?token=plain-reset-token',
+      expiresAt: preparedReset.expiresAt,
+      recipientName: userRecord.firstName,
+    });
+    expect(response).toEqual({
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    });
+    expect(response).not.toHaveProperty('token');
+    expect(response).not.toHaveProperty('resetUrl');
+  });
+
+  it('returns the same forgot-password response for unknown or inactive users without sending email', async () => {
+    passwordRecoveryServiceMock.preparePasswordReset.mockResolvedValue(null);
+
+    await expect(
+      service.forgotPassword({
+        email: 'missing@example.com',
+      }),
+    ).resolves.toEqual({
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    });
+    await expect(
+      service.forgotPassword({
+        email: 'inactive@example.com',
+      }),
+    ).resolves.toEqual({
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    });
+
+    expect(emailServiceMock.sendPasswordResetEmail).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the issued token and returns the generic response when delivery fails', async () => {
+    const loggerSpy = jest
+      .spyOn(service['logger'], 'error')
+      .mockImplementation(() => undefined);
+    passwordRecoveryServiceMock.preparePasswordReset.mockResolvedValue({
+      tokenId: 'reset-token-1',
+      token: 'plain-reset-token',
+      expiresAt: new Date('2026-09-01T17:00:00.000Z'),
+      user: {
+        id: userRecord.id,
+        email: userRecord.email,
+        firstName: userRecord.firstName,
+        lastName: userRecord.lastName,
+      },
+    });
+    emailServiceMock.sendPasswordResetEmail.mockRejectedValue(
+      new Error('provider unavailable'),
+    );
+
+    await expect(
+      service.forgotPassword({
+        email: userRecord.email,
+      }),
+    ).resolves.toEqual({
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    });
+
+    expect(passwordRecoveryServiceMock.invalidateToken).toHaveBeenCalledWith(
+      'reset-token-1',
+    );
+    expect(loggerSpy).toHaveBeenCalledWith(
+      'Password reset email delivery failed',
+    );
+    expect(JSON.stringify(loggerSpy.mock.calls)).not.toContain(
+      'plain-reset-token',
+    );
+  });
+
+  it('resets password through PasswordRecoveryService without returning a JWT', async () => {
+    passwordRecoveryServiceMock.resetPasswordWithToken.mockResolvedValue({
+      success: true,
+      message: 'Contraseña actualizada',
+    });
+
+    await expect(
+      service.resetPassword({
+        token: 'plain-reset-token',
+        newPassword: 'new-secure-password',
+      }),
+    ).resolves.toEqual({
+      success: true,
+      message: 'Contraseña restablecida',
+    });
+
+    expect(
+      passwordRecoveryServiceMock.resetPasswordWithToken,
+    ).toHaveBeenCalledWith('plain-reset-token', 'new-secure-password');
     expect(jwtServiceMock.signAsync).not.toHaveBeenCalled();
   });
 

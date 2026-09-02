@@ -14,7 +14,9 @@ describe('AuthController', () => {
   let controller: AuthController;
   let authServiceMock: {
     changePassword: jest.Mock;
+    forgotPassword: jest.Mock;
     getAuthenticatedUserContext: jest.Mock;
+    resetPassword: jest.Mock;
   };
 
   const authenticatedUser = {
@@ -29,7 +31,9 @@ describe('AuthController', () => {
   beforeEach(async () => {
     authServiceMock = {
       changePassword: jest.fn(),
+      forgotPassword: jest.fn(),
       getAuthenticatedUserContext: jest.fn(),
+      resetPassword: jest.fn(),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
@@ -50,7 +54,10 @@ describe('AuthController', () => {
   });
 
   const getMethodMetadata = (
-    methodName: keyof Pick<AuthController, 'me' | 'changePassword'>,
+    methodName: keyof Pick<
+      AuthController,
+      'me' | 'changePassword' | 'forgotPassword' | 'resetPassword'
+    >,
   ): object => {
     const descriptor = Object.getOwnPropertyDescriptor(
       AuthController.prototype,
@@ -84,6 +91,26 @@ describe('AuthController', () => {
       RequestMethod.POST,
     );
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('change-password');
+  });
+
+  it('exposes public POST /auth/forgot-password', () => {
+    const handler = getMethodMetadata('forgotPassword');
+
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('forgot-password');
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toBeUndefined();
+  });
+
+  it('exposes public POST /auth/reset-password', () => {
+    const handler = getMethodMetadata('resetPassword');
+
+    expect(Reflect.getMetadata(METHOD_METADATA, handler)).toBe(
+      RequestMethod.POST,
+    );
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('reset-password');
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toBeUndefined();
   });
 
   it('returns the authenticated context from /auth/me with companyTimezone', async () => {
@@ -167,5 +194,40 @@ describe('AuthController', () => {
       }),
       expect.anything(),
     );
+  });
+
+  it('delegates forgot-password and returns only the generic public response', async () => {
+    const response = {
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    };
+    const dto = {
+      email: 'ada@example.com',
+    };
+    authServiceMock.forgotPassword.mockResolvedValue(response);
+
+    await expect(controller.forgotPassword(dto)).resolves.toEqual(response);
+
+    expect(authServiceMock.forgotPassword).toHaveBeenCalledWith(dto);
+    expect(response).not.toHaveProperty('token');
+    expect(response).not.toHaveProperty('resetUrl');
+  });
+
+  it('delegates reset-password without requiring an authenticated user', async () => {
+    const response = {
+      success: true,
+      message: 'Contraseña restablecida',
+    };
+    const dto = {
+      token: 'reset-token',
+      newPassword: 'new-secure-password',
+    };
+    authServiceMock.resetPassword.mockResolvedValue(response);
+
+    await expect(controller.resetPassword(dto)).resolves.toEqual(response);
+
+    expect(authServiceMock.resetPassword).toHaveBeenCalledWith(dto);
+    expect(response).not.toHaveProperty('token');
+    expect(response).not.toHaveProperty('user');
   });
 });

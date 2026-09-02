@@ -8,6 +8,7 @@ const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 const INVALID_RESET_TOKEN_MESSAGE = 'El enlace no es válido o ha expirado.';
 
 type IssuedPasswordReset = {
+  tokenId: string;
   token: string;
   expiresAt: Date;
   user: {
@@ -47,7 +48,7 @@ export class PasswordRecoveryService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MS);
 
-    await this.prisma.$transaction(async (tx) => {
+    const resetToken = await this.prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.updateMany({
         where: {
           userId: user.id,
@@ -58,16 +59,20 @@ export class PasswordRecoveryService {
         },
       });
 
-      await tx.passwordResetToken.create({
+      return tx.passwordResetToken.create({
         data: {
           userId: user.id,
           tokenHash,
           expiresAt,
         },
+        select: {
+          id: true,
+        },
       });
     });
 
     return {
+      tokenId: resetToken.id,
       token,
       expiresAt,
       user: {
@@ -184,6 +189,18 @@ export class PasswordRecoveryService {
     await this.prisma.passwordResetToken.updateMany({
       where: {
         userId,
+        usedAt: null,
+      },
+      data: {
+        usedAt,
+      },
+    });
+  }
+
+  async invalidateToken(tokenId: string, usedAt = new Date()) {
+    await this.prisma.passwordResetToken.updateMany({
+      where: {
+        id: tokenId,
         usedAt: null,
       },
       data: {

@@ -2,23 +2,32 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import {
   AuthenticatedSession,
   AuthenticatedUser,
 } from './interfaces/authenticated-request.interface';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private passwordRecoveryService: PasswordRecoveryService,
+    private emailService: EmailService,
   ) {}
 
   async getAuthenticatedUserContext(
@@ -254,5 +263,62 @@ export class AuthService {
       success: true,
       message: 'Contraseña actualizada',
     };
+  }
+
+  async forgotPassword(_dto: ForgotPasswordDto) {
+    const dto = {
+      email: _dto.email.trim().toLowerCase(),
+    };
+    const publicResponse = {
+      message:
+        'Si la cuenta existe, enviaremos instrucciones para restablecer la contraseña.',
+    };
+    const preparedReset =
+      await this.passwordRecoveryService.preparePasswordReset(dto.email);
+
+    if (!preparedReset) {
+      return publicResponse;
+    }
+
+    try {
+      const resetUrl = this.buildPasswordResetUrl(preparedReset.token);
+
+      await this.emailService.sendPasswordResetEmail({
+        to: preparedReset.user.email,
+        resetUrl,
+        expiresAt: preparedReset.expiresAt,
+        recipientName: preparedReset.user.firstName,
+      });
+    } catch {
+      await this.passwordRecoveryService.invalidateToken(preparedReset.tokenId);
+      this.logger.error('Password reset email delivery failed');
+    }
+
+    return publicResponse;
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    await this.passwordRecoveryService.resetPasswordWithToken(
+      dto.token,
+      dto.newPassword,
+    );
+
+    return {
+      success: true,
+      message: 'Contraseña restablecida',
+    };
+  }
+
+  private buildPasswordResetUrl(token: string) {
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL;
+
+    if (!frontendBaseUrl) {
+      throw new Error('FRONTEND_BASE_URL must be defined');
+    }
+
+    const resetUrl = new URL('/reset-password', frontendBaseUrl);
+    resetUrl.searchParams.set('token', token);
+
+    return resetUrl.toString();
   }
 }
