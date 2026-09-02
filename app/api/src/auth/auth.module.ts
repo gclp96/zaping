@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 import { JwtStrategy } from './strategies/jwt.strategy';
 
@@ -24,7 +25,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
 
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, PasswordRecoveryService],
 
   controllers: [AuthController],
 

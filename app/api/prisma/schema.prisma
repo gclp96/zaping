@@ -431,6 +431,22 @@ model User {
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
   cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
+
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model HealthcareCase {

@@ -24,6 +24,7 @@ describe('AuthService', () => {
 
   let service: AuthService;
   let prismaMock: {
+    $transaction: jest.Mock;
     company: {
       create: jest.Mock;
       findUnique: jest.Mock;
@@ -32,6 +33,14 @@ describe('AuthService', () => {
       create: jest.Mock;
       findFirst: jest.Mock;
       findUnique: jest.Mock;
+      updateMany: jest.Mock;
+    };
+  };
+  let transactionMock: {
+    passwordResetToken: {
+      updateMany: jest.Mock;
+    };
+    user: {
       updateMany: jest.Mock;
     };
   };
@@ -59,7 +68,19 @@ describe('AuthService', () => {
   };
 
   beforeEach(async () => {
+    transactionMock = {
+      passwordResetToken: {
+        updateMany: jest.fn(),
+      },
+      user: {
+        updateMany: jest.fn(),
+      },
+    };
     prismaMock = {
+      $transaction: jest.fn(
+        (callback: (tx: typeof transactionMock) => unknown) =>
+          callback(transactionMock),
+      ),
       company: {
         create: jest.fn(),
         findUnique: jest.fn(),
@@ -276,7 +297,10 @@ describe('AuthService', () => {
       passwordHash: currentHash,
       isActive: true,
     });
-    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+    transactionMock.user.updateMany.mockResolvedValue({ count: 1 });
+    transactionMock.passwordResetToken.updateMany.mockResolvedValue({
+      count: 2,
+    });
 
     const response = await service.changePassword(authenticatedUser as never, {
       currentPassword: 'current-password',
@@ -296,8 +320,9 @@ describe('AuthService', () => {
         isActive: true,
       },
     });
-    expect(prismaMock.user.updateMany).toHaveBeenCalledTimes(1);
-    const updateCalls = prismaMock.user.updateMany.mock.calls as [
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(transactionMock.user.updateMany).toHaveBeenCalledTimes(1);
+    const updateCalls = transactionMock.user.updateMany.mock.calls as [
       UserUpdateManyCall,
     ][];
     const updateCall = updateCalls[0][0];
@@ -316,6 +341,15 @@ describe('AuthService', () => {
       },
     });
     expect(typeof updateCall.data.passwordHash).toBe('string');
+    expect(transactionMock.passwordResetToken.updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: authenticatedUser.id,
+        usedAt: null,
+      },
+      data: {
+        usedAt: expect.any(Date) as Date,
+      },
+    });
     expect(response).toEqual({
       success: true,
       message: 'Contraseña actualizada',
@@ -342,7 +376,11 @@ describe('AuthService', () => {
       message: 'La contraseña actual no es correcta.',
     });
 
-    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(transactionMock.user.updateMany).not.toHaveBeenCalled();
+    expect(
+      transactionMock.passwordResetToken.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it('rejects same-password changes without updating', async () => {
@@ -360,7 +398,11 @@ describe('AuthService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(transactionMock.user.updateMany).not.toHaveBeenCalled();
+    expect(
+      transactionMock.passwordResetToken.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it('persists only a fresh hash and never the plain new password', async () => {
@@ -372,14 +414,17 @@ describe('AuthService', () => {
       passwordHash: currentHash,
       isActive: true,
     });
-    prismaMock.user.updateMany.mockResolvedValue({ count: 1 });
+    transactionMock.user.updateMany.mockResolvedValue({ count: 1 });
+    transactionMock.passwordResetToken.updateMany.mockResolvedValue({
+      count: 0,
+    });
 
     await service.changePassword(authenticatedUser as never, {
       currentPassword: 'current-password',
       newPassword: 'new-secure-password',
     });
 
-    const updateCalls = prismaMock.user.updateMany.mock.calls as [
+    const updateCalls = transactionMock.user.updateMany.mock.calls as [
       UserUpdateManyCall,
     ][];
     const updateCall = updateCalls[0][0];
@@ -407,6 +452,10 @@ describe('AuthService', () => {
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(prismaMock.user.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(transactionMock.user.updateMany).not.toHaveBeenCalled();
+    expect(
+      transactionMock.passwordResetToken.updateMany,
+    ).not.toHaveBeenCalled();
   });
 });

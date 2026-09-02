@@ -220,23 +220,35 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
 
-    const updateResult = await this.prisma.user.updateMany({
-      where: {
-        id: currentUser.id,
-        companyId: currentUser.companyId,
-        isActive: true,
-      },
-      data: {
-        passwordHash,
-        authVersion: {
-          increment: 1,
+    await this.prisma.$transaction(async (tx) => {
+      const updateResult = await tx.user.updateMany({
+        where: {
+          id: currentUser.id,
+          companyId: currentUser.companyId,
+          isActive: true,
         },
-      },
-    });
+        data: {
+          passwordHash,
+          authVersion: {
+            increment: 1,
+          },
+        },
+      });
 
-    if (updateResult.count !== 1) {
-      throw new UnauthorizedException('Token inválido');
-    }
+      if (updateResult.count !== 1) {
+        throw new UnauthorizedException('Token inválido');
+      }
+
+      await tx.passwordResetToken.updateMany({
+        where: {
+          userId: currentUser.id,
+          usedAt: null,
+        },
+        data: {
+          usedAt: new Date(),
+        },
+      });
+    });
 
     return {
       success: true,
