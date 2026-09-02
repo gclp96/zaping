@@ -192,7 +192,24 @@ Analytics
 
 AI
 
-2.4 Production readiness boundary
+2.4 Authorization + Tenant Isolation V1
+
+ERP Core V1 security closure:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
+```
+
+B2D validó la regresión automatizada de autorización, aislamiento tenant,
+relaciones cross-company y manejo frontend de `403`. La fuente técnica principal
+es `modules/erp/IDENTITY_ACCESS.md` y las reglas transversales están en
+`engineering/SECURITY_PRINCIPLES.md`.
+
+2.5 Production readiness boundary
 
 Debe mantenerse:
 
@@ -208,13 +225,9 @@ engineering/SECURITY_PRINCIPLES.md
 
 project/PROJECT_BOARD.md
 
-Entre los temas críticos deben permanecer visibles:
+Entre los temas críticos que permanecen abiertos deben permanecer visibles:
 
 protected-route / session architecture
-
-authorization review
-
-tenant isolation regression
 
 authentication abuse protection / rate limiting
 
@@ -224,8 +237,12 @@ real password-recovery email delivery/configuration
 
 dependency/security maintenance before RC
 
-Password Security V1 está implementado; estos temas son gates independientes y
-no deben presentarse como parte de un recovery inseguro pendiente.
+RC-DATA: posible lost update / stock concurrency issue en
+`InventoryService.createMovement`
+
+Password Security V1 y Authorization + Tenant Isolation V1 están implementados;
+estos gates son independientes y no deben presentarse como una autorización o
+recovery inseguro pendiente.
 
 3. Idioma oficial
 

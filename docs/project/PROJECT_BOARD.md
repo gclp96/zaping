@@ -67,6 +67,11 @@ ERP Core
 │   ├── Equipment provisioning
 │   └── cross-module traceability
 ├── Secure password recovery
+├── Authorization + Tenant Isolation V1
+│   ├── fixed-role ERP Core authorization
+│   ├── tenant-safe reads and mutations
+│   ├── cross-company relation hardening
+│   └── frontend role-aware UX / 403 handling
 └── Healthcare Case Foundation
 
 CURRENT
@@ -77,7 +82,7 @@ H8 — ERP Core release preparation
 │   └── AUTH-USERS-V1 completed
 │
 └── H8B Full technical regression
-    └── B1D Password Security implementation completed; B1D-E documentation closure current
+    └── B2 Authorization + Tenant Isolation V1 completed; B2E documentation closure completed
 
 Frontend UX workstream
 
@@ -91,8 +96,6 @@ Frontend UX workstream
 
 NEXT
 
-ERP-V1-CLOSE-B2 — critical authorization / tenant regression
-        ↓
 ERP-V1-CLOSE-B3 — production / security hardening
         ↓
 ERP-V1-CLOSE-C — technical regression
@@ -107,10 +110,6 @@ RELEASE BLOCKERS — P0
 
 Antes de pilot/commercial production deben resolverse o verificarse formalmente:
 
-systematic tenant-isolation regression
-
-critical authorization review
-
 protected-route / session architecture
 
 authentication abuse protection / rate limiting
@@ -123,11 +122,18 @@ real password-recovery email delivery/configuration
 
 dependency/security maintenance
 
+RC-DATA — InventoryService.createMovement possible lost update / stock
+concurrency issue
+
 technical regression
 
 full ERP end-to-end QA
 
-ERP Core funcional validado:
+Authorization + Tenant Isolation V1:
+
+IMPLEMENTED / VALIDATED
+
+ERP Core funcional y su cierre B2:
 
 ≠
 production-ready
@@ -197,7 +203,7 @@ Companies
 
 Identity & Access
 
-🟡 AUTH + USERS V1 IMPLEMENTED / P0 security evolution pending
+✅ AUTH + USERS + PASSWORD SECURITY + ROLE AUTHORIZATION + TENANT ISOLATION V1 IMPLEMENTED / VALIDATED
 
 Dashboard
 
@@ -952,7 +958,7 @@ Product.stock ↔ EquipmentAsset reconciliation
 
 12. Identity & Access
 
-Estado: 🟡 AUTH + USERS V1 IMPLEMENTED / P0 SECURITY EVOLUTION PENDING
+Estado: ✅ AUTH + USERS + PASSWORD SECURITY + ROLE AUTHORIZATION + TENANT ISOLATION V1 IMPLEMENTED / VALIDATED
 
 Implementado:
 
@@ -1063,17 +1069,27 @@ ADMIN-only, tenant-safe, no passwordHash in responses.
 
 SEC-004 — Tenant Isolation Regression
 
-Estado: ⏳ PENDING / PARTIAL
+Estado: ✅ CLOSED / VERIFIED
 Prioridad: P0
 
-Objetivo:
+Validado en B2D:
 
+```text
 Company A
 → cannot read/write Company B resources
 
-Debe cubrir sistemáticamente las operaciones críticas.
+tenant-safe list/detail/mutation behavior
+→ validated across critical ERP modules
 
-La existencia de filtros tenant en múltiples services no sustituye una regresión transversal.
+mixed-tenant relations
+→ rejected without business side effects
+
+final tenant predicates
+→ validated for sensitive writes
+```
+
+La cobertura automatizada es la evidencia de este cierre; no se presenta como
+penetration testing.
 
 SEC-005 — Secure Password Recovery
 
@@ -1133,15 +1149,8 @@ Frontend coverage:
 
 /reset-password?token=...
 
-La validación realizada incluye:
-
-API D2: 58 suites / 594 tests PASS
-
-Frontend D3: 640 tests PASS bounded + serial
-
-frontend lint PASS
-
-frontend production build PASS
+La implementación fue validada en B1D-D2/D3. El snapshot cuantitativo vigente
+de regresión pertenece a B2D.
 
 Permanecen fuera de este cierre:
 
@@ -1152,10 +1161,6 @@ verified sender/domain, valid RESEND_API_KEY, EMAIL_FROM and
 FRONTEND_BASE_URL, plus real forgot → email → reset → login E2E
 
 dependency/security maintenance before RC
-
-tenant isolation regression
-
-critical authorization review
 
 protected frontend/session architecture
 
@@ -1232,20 +1237,24 @@ JWT en localStorage es estrategia CURRENT, no una decisión que deba asumirse ir
 
 SEC-008 — Critical Authorization Review
 
-Estado: ⏳ PENDING
+Estado: ✅ CLOSED / VERIFIED
 Prioridad: P0
 
-Debe verificarse sistemáticamente:
+Validado en B2D:
 
-sensitive endpoints
+```text
+JwtAuthGuard + RolesGuard + @Roles(...)
 
-RolesGuard / authorization coverage
+fixed-role matrix for ADMIN / MANAGER / SALES / WAREHOUSE
 
 server-side business authorization
 
 no frontend-only authorization assumptions
 
-antes de production release.
+401 / 403 / 404 / 400 semantics
+```
+
+El frontend role-aware es UX; el backend mantiene la autoridad.
 
 SEC-009 — Production Secrets / Configuration Review
 
@@ -1279,6 +1288,26 @@ moderate), incluyendo `deepmerge-ts < 8.0.0` vía `@prisma/config` / Prisma
 tooling. La corrección `--force` propone un cambio rompedor de Prisma y no se
 ejecuta. Queda como dependency/security maintenance before RC; no se afirma
 exploitability ni impacto runtime sin análisis separado.
+
+B2D VALIDATION SNAPSHOT
+
+```text
+Backend: 60 suites / 628 tests PASS
+Frontend: 54 files / 653 tests PASS bounded
+Frontend: 54 files / 653 tests PASS serial
+Backend build/lint: PASS
+Frontend build/lint: PASS
+Prisma validate/status: PASS
+25 migrations found; database schema up to date
+```
+
+Authorization + Tenant Isolation V1 quedó `CLOSED / IMPLEMENTED`. La cobertura
+validó autenticación, role denial, aislamiento de listados/detalles/mutaciones,
+relaciones mixtas, ausencia de side effects en rechazos cross-tenant, predicados
+finales, semántica de errores y preservación de sesión ante `403`.
+
+Permanece abierto y separado el blocker `RC-DATA`: posible lost update de stock
+en `InventoryService.createMovement`.
 
 13. Release Readiness
 
@@ -1824,15 +1853,14 @@ Security / Release
 
 authentication abuse protection / rate limiting
 
-systematic tenant-isolation regression
-
-critical authorization review
-
 protected-route / session architecture
 
 production secrets / configuration review
 
 Reliability / Integrity
+
+RC-DATA — InventoryService.createMovement possible lost update / stock
+concurrency issue
 
 Sales create idempotency
 
@@ -1924,9 +1952,8 @@ RISK-001 — Security Hardening
 
 Riesgos vigentes:
 
-systematic tenant-isolation coverage
-
-critical authorization review
+B2 Authorization + Tenant Isolation V1
+→ CLOSED / VERIFIED
 
 protected-route / session architecture
 
@@ -1938,7 +1965,7 @@ passwordHash exposure ya no forma parte de este riesgo.
 
 Mitigación:
 
-complete P0 security work
+complete remaining B3 security work
 before pilot / commercial production release
 
 RISK-002 — Legacy Sales Architecture
@@ -2212,32 +2239,21 @@ Mobile Technician
 
 27. Snapshot de calidad vigente
 
-Último snapshot frontend confirmado al cierre de ERP-V1-CLOSE-B1D-D3:
+Último snapshot validado al cierre de ERP-V1-CLOSE-B2D:
 
-640 / 640 tests PASS
+```text
+Backend: 60 suites / 628 tests PASS
+Frontend: 54 files / 653 tests PASS bounded
+Frontend: 54 files / 653 tests PASS serial
+Backend build/lint: PASS
+Frontend build/lint: PASS
+Prisma validate/status: PASS
+25 migrations found; database schema up to date
+```
 
-frontend tests bounded
-PASS
-
-frontend tests serially with one worker
-PASS
-
-frontend build
-PASS
-
-frontend ESLint
-PASS
-
-git diff --check
-PASS
-
-API D2:
-
-58 suites / 594 tests PASS
-
-Este snapshot valida D3 frontend y Password Security D2/D3 exclusivamente. H8B
-continúa siendo un bloque técnico más amplio y no se declara completado por esta
-validación.
+Este snapshot valida la regresión completa de autorización y tenant isolation,
+además de los controles técnicos indicados. No equivale a penetration testing ni
+cierra los gates B3, C, D o RC-DATA.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
 
@@ -2299,17 +2315,19 @@ Future direction
 Historical delivery record
 → docs/project/CHANGELOG.md
 
-29. H8A close conditions
+29. B2E close conditions
 
-H8A puede cerrarse únicamente después de:
+Estado: ✅ CLOSED / VERIFIED
+
+B2E puede cerrarse únicamente después de:
 
 primary documentation reviewed
 
 cross-document CURRENT / TARGET / FUTURE sync
 
-secure password recovery implementation reflected
+Authorization + Tenant Isolation V1 reflected
 
-auth abuse protection P0 reflected
+B3 gates and RC-DATA blocker reflected
 
 PROJECT_BOARD final sync
 
@@ -2325,7 +2343,7 @@ no secrets / credentials / .env backup committed
 
 only intended documentation changes present
 
-No realizar el commit final de H8A antes de estos checks.
+No realizar el commit final de B2E antes de estos checks.
 
 30. Principio final
 
@@ -2335,24 +2353,21 @@ Este documento debe poder responder siempre:
 
 Respuesta vigente:
 
-H8A
-→ finish final cross-document / security synchronization
-→ run final doc/repository health checks
+B1 ✅
 
-Then:
+B2 ✅
 
-H8B
-→ full automated technical regression
+B3
+← NEXT — production / security hardening
 
-Then:
+C
+→ technical regression
 
-UX-B.6
+D
 → full ERP end-to-end QA
 
-Then:
-
-ERP Core V1
-→ formal closure after quality + security gates
+RC
+→ ERP Core V1 release candidate after all gates
 
 Then:
 

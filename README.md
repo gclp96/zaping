@@ -16,17 +16,29 @@ Estado actual: desarrollo activo.
 
 La normalización funcional del ERP Core correspondiente a H7 está implementada y validada.
 
-La secuencia inmediata del proyecto es:
+La posición actual del proyecto es:
 
-H8A — Documentation Synchronization
+B1 ✅
 ↓
-H8B — Full Automated Regression / Technical Health
+B2 ✅ — Authorization + Tenant Isolation V1
 ↓
-UX-B.6 — Full ERP End-to-End QA
+B3 ← NEXT — Production / Security Hardening
 ↓
-ERP Core V1 Closure
+C — Full Technical Regression
+↓
+D — Full ERP End-to-End QA
+↓
+RC — ERP Core V1 Release Candidate
 ↓
 Zaping Healthcare
+
+Estado de seguridad ERP Core V1:
+
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
 
 ERP Core funcionalmente validado:
 
@@ -67,7 +79,9 @@ Modelo multi-tenant: Company.
 
 El companyId obtenido del usuario autenticado constituye la frontera principal de tenant para los recursos empresariales.
 
-Los módulos actuales implementan tenant scoping sobre sus operaciones principales. La cobertura sistemática de aislamiento entre Companies y el hardening de operaciones legacy permanecen como trabajo P0 previo a producción.
+Los módulos actuales implementan tenant scoping sobre sus operaciones principales.
+La cobertura sistemática de Authorization + Tenant Isolation V1 fue validada en
+B2D. Los gates B3, C, D y RC permanecen separados.
 
 La validación global de NestJS utiliza:
 
@@ -794,10 +808,6 @@ production-ready ni RC-ready.
 Antes de pilot/commercial production deben completarse o verificarse los P0
 relacionados con:
 
-systematic tenant-isolation regression
-
-critical authorization review
-
 protected-route / session architecture
 
 authentication abuse protection / rate limiting
@@ -807,6 +817,9 @@ production secrets / configuration review
 real password-recovery email delivery/configuration
 
 dependency/security maintenance before RC
+
+RC-DATA: posible lost update / stock concurrency issue en
+`InventoryService.createMovement`
 
 Regla:
 
@@ -836,10 +849,6 @@ docs/project/PROJECT_BOARD.md
 Entre los temas principales permanecen:
 
 authentication abuse protection / rate limiting
-
-systematic tenant-isolation regression
-
-critical authorization review
 
 protected-route / session architecture
 

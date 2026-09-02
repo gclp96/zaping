@@ -218,7 +218,7 @@ authVersion-based invalidation after password change/reset
 
 RolesGuard
 
-@Roles en Healthcare Cases
+@Roles(...) en ERP Core y Healthcare Cases
 
 tenant-scoped operations en módulos normalizados
 
@@ -261,23 +261,52 @@ PROJECT_BOARD.md
 
 y no debe duplicarse permanentemente en este documento.
 
+### 5.2.1 Authorization + Tenant Isolation V1
+
+El cierre B2D validó el siguiente estado de seguridad del ERP Core:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
+```
+
+El backend aplica `JwtAuthGuard`, `RolesGuard` y `@Roles(...)`. La autoridad
+final es `request.user.role`, reconstruido desde el estado actual de User por
+`JwtStrategy`; un cambio de rol aplica en requests protegidas posteriores.
+El frontend sólo ofrece visibilidad role-aware y nunca es la frontera de
+seguridad.
+
+La autoridad de tenant es siempre `req.user.companyId`. Los DTOs ERP normales
+no aceptan `companyId` controlado por el cliente y se conservan
+`whitelist`, `forbidNonWhitelisted` y `transform` en `ValidationPipe`.
+
+Las mutaciones tenant-owned incluyen ownership en el predicado final, y las
+relaciones entre entidades se validan dentro de la Company autenticada. La
+regresión validó además la semántica `401` para no autenticado, `403` para rol
+no permitido, `404` para recurso foreign-tenant y `400` para transición de
+negocio inválida sobre un recurso propio.
+
 ---
 
 ## 5.3 P0 — Security Release Blockers
 
-Password Security V1 está implementado. Antes de un piloto externo o una
-exposición productiva deben resolverse o verificarse como mínimo:
+Password Security V1 y Authorization + Tenant Isolation V1 están implementados
+y validados. Antes de un piloto externo o una exposición productiva deben
+resolverse o verificarse como mínimo los gates B3 restantes:
 
 ```text
-systematic tenant-isolation regression
-
-authorization review of critical ERP endpoints
-
 basic authentication endpoint abuse protection
 
 production secrets/configuration review
 
 real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
+
+protected frontend/session architecture review
 ```
 
 Estos puntos son blockers de seguridad para una exposición real.
@@ -301,7 +330,6 @@ dependency security review
 
 security observability
 
-legacy tenant-safe write hardening
 ```
 
 ---
@@ -777,9 +805,13 @@ Zaping utiliza RBAC como base.
 
 Actualmente existen roles base utilizados por el sistema.
 
-`RolesGuard` y `@Roles` se encuentran implementados, con uso explícito en Healthcare Cases.
+`RolesGuard` y `@Roles` se encuentran implementados en el ERP Core y en
+Healthcare Cases. ERP Core V1 utiliza una matriz cerrada de roles fijos
+(`ADMIN`, `MANAGER`, `SALES`, `WAREHOUSE`), documentada en
+`docs/modules/erp/IDENTITY_ACCESS.md`.
 
-Esto no significa que exista autorización granular homogénea en todo ERP Core.
+Esto no significa que exista autorización granular basada en un catálogo de
+permisos: Permission-Based RBAC continúa diferido P1.
 
 ---
 
@@ -1027,7 +1059,8 @@ cross-tenant exports
 cross-tenant lifecycle command
 ```
 
-La regresión sistemática completa permanece como trabajo P0 del cierre de seguridad.
+La regresión sistemática de Authorization + Tenant Isolation V1 quedó validada
+en B2D. No equivale a penetration testing ni cierra los gates B3 restantes.
 
 ---
 
@@ -2529,15 +2562,13 @@ PROJECT_BOARD.md
 ## P0 — Release Blockers
 
 ```text
-1. Systematic tenant-isolation regression
+1. Basic rate limiting / abuse protection for authentication endpoints
 
-2. Authorization review for critical ERP operations
+2. Production secret and configuration review
 
-3. Basic rate limiting / abuse protection for authentication endpoints
+3. Real password-recovery email delivery/configuration verification
 
-4. Production secret and configuration review
-
-5. Real password-recovery email delivery/configuration verification
+4. Dependency/security maintenance before RC
 ```
 
 ---
@@ -2554,8 +2585,6 @@ frontend protected-route hardening
 business audit foundation
 
 dependency security review
-
-legacy tenant-safe writes
 
 security observability
 

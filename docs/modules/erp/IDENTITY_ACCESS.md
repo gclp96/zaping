@@ -4,7 +4,7 @@
 **Producto:** Zaping Platform / ERP Core
 **Versión:** 2.3.0
 **Estado:** Aprobado
-**Estado de implementación:** AUTH IMPLEMENTED / USERS V1 IMPLEMENTED / CURRENT ROLE-BASED RBAC PARTIAL / PERMISSION-BASED RBAC DEFERRED P1
+**Estado de implementación:** AUTH IMPLEMENTED / USERS V1 IMPLEMENTED / PASSWORD SECURITY V1 IMPLEMENTED / ROLE-BASED AUTHORIZATION V1 IMPLEMENTED / TENANT ISOLATION V1 IMPLEMENTED / PERMISSION-BASED RBAC DEFERRED P1
 **Última actualización:** 2026-09-02
 **Responsable:** Zaping Platform & Security Team
 
@@ -206,14 +206,157 @@ Users V1 administration
 → implemented
 
 Current role-based RBAC
-→ partial
+→ implemented for ERP Core V1 fixed roles
 
-ERP-wide granular authorization
+Permission-based / granular authorization
 → NOT implemented
 
 Permission-based RBAC
 → DEFERRED P1
 ```
+
+## 5.1 Authorization + Tenant Isolation V1 — IMPLEMENTED
+
+Estado de cierre:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
+```
+
+La matriz CURRENT utiliza únicamente los roles fijos `ADMIN`, `MANAGER`,
+`SALES` y `WAREHOUSE`:
+
+| Módulo | Lectura | Escritura / acciones sensibles |
+| --- | --- | --- |
+| Dashboard | ALL | — |
+| Products / Categories | ALL | ADMIN, MANAGER |
+| Customers | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Suppliers | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER |
+| Purchases | ADMIN, MANAGER, WAREHOUSE | create/edit: ADMIN, MANAGER, WAREHOUSE; approve/cancel: ADMIN, MANAGER |
+| Purchase Receipts | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER, WAREHOUSE |
+| Inventory | ALL | movimientos normales: ADMIN, MANAGER, WAREHOUSE; `ADJUSTMENT`: ADMIN, MANAGER |
+| Quotes | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Sales | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Equipment | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER, WAREHOUSE |
+| Users | ADMIN | ADMIN |
+| Companies | sin superficie ERP HTTP normal | — |
+
+No se agregan permisos implícitos fuera de esta matriz.
+
+### Modelo de autorización CURRENT
+
+El backend es la autoridad:
+
+```text
+JwtAuthGuard
+↓
+RolesGuard
+↓
+@Roles(...)
+↓
+request.user.role
+```
+
+`request.user.role` proviene del estado actual de User en DB porque
+`JwtStrategy` revalida el usuario y reconstruye el rol en cada request protegida.
+Un cambio de rol aplica en solicitudes autenticadas posteriores; no se utiliza
+un rol antiguo del JWT para autorizar.
+
+La visibilidad role-aware del frontend sólo mejora UX. Ocultar una ruta o acción
+no constituye una frontera de seguridad.
+
+### Tenant authority y DTOs
+
+El tenant siempre se deriva del contexto autenticado:
+
+```text
+req.user.companyId
+↓
+tenant-scoped read / relation / mutation
+```
+
+Los DTOs ERP normales no aceptan `companyId` controlado por el cliente. Se
+conservan `whitelist`, `forbidNonWhitelisted` y `transform` en el
+`ValidationPipe` global.
+
+Las escrituras tenant-owned incluyen ownership en la mutación final, usando
+`id_companyId` cuando existe o predicados equivalentes con `id`, `companyId` y
+verificación de `count` cuando corresponde. No basta con un pre-read.
+
+Los IDs relacionales se validan dentro de la Company actual. Esto aplica a
+`supplierId`, `customerId`, `productId`, `categoryId`, `purchaseId`,
+`purchaseItemId`, `batchId`, `equipmentAssetId` y `quoteId`. Las relaciones
+mixtas entre tenants se rechazan antes de efectos de negocio.
+
+### Semántica de errores
+
+```text
+no autenticado
+→ 401
+
+autenticado con rol no permitido
+→ 403
+
+rol permitido + recurso de otro tenant o inexistente
+→ 404 / NotFound
+
+rol permitido + recurso propio + transición de negocio inválida
+→ 400 / BadRequest
+```
+
+Esta distinción fue validada en la regresión B2D.
+
+### Garantías de dominios críticos
+
+```text
+Purchases
+→ supplier/product same-tenant validation
+→ tenant-safe updates and status mutations
+
+Purchase Receipts
+→ purchase/item/product/batch ownership validation
+→ tenant-scoped stock, batch and purchase effects
+→ mixed-tenant rejection before business side effects
+→ Serializable transaction preserved
+
+Quotes / Sales
+→ customer/product ownership validation
+→ foreign quote/sale relation rejection
+→ tenant-safe status mutations
+
+Equipment
+→ Product, Batch, EquipmentAsset, Inspection and retirement are company-scoped
+→ foreign IDs return NotFound
+
+Users
+→ ADMIN-only and company-scoped
+→ foreign user ID returns NotFound
+→ self-deactivation and last active ADMIN protections preserved
+→ no DELETE /users
+```
+
+No existe una superficie ERP normal `GET /companies` o `POST /companies` ni un
+superadmin/platform admin. `POST /auth/register` crea una Company y su primer
+ADMIN.
+
+### Límites V1 y gates separados
+
+El modelo actual es `User → one Company`; no implementa multi-company
+memberships, branch-scoped access, composite tenant foreign-key rollout ni una
+abstracción central de repositorios. Son evolución posterior, no blockers de
+Authorization + Tenant Isolation V1.
+
+El hallazgo de integridad de datos permanece separado y abierto: posible lost
+update/concurrencia en `InventoryService.createMovement`. Es un blocker
+`RC-DATA` antes de Release Candidate y no forma parte del cierre B2.
+
+Permission-based RBAC, custom roles, múltiples roles por usuario, permisos
+granulares, `PermissionsGuard`, delegated admin y ABAC/policy engine permanecen
+deferred P1/P2.
 
 ---
 
@@ -1586,9 +1729,10 @@ request.user.role
 allow / deny
 ```
 
-Su uso está verificado explícitamente en Healthcare Cases.
+Su uso está verificado en los controladores del ERP Core y en Healthcare Cases.
 
-No existe todavía una política RBAC granular aplicada homogéneamente a todo ERP Core.
+La autorización CURRENT de ERP Core usa roles fijos y está implementada. La
+autorización granular basada en catálogo de permisos continúa diferida.
 
 ---
 
@@ -2665,20 +2809,23 @@ EmailService → Resend delivery integration
 
 # 98. P0 — Release Blockers
 
-Antes de un piloto externo o producción deben resolverse:
+Antes de un piloto externo o producción deben resolverse los gates que siguen
+abiertos:
 
 ```text
-1. Systematic tenant-isolation regression
+1. Basic abuse/rate-limit protection for Auth public endpoints
 
-2. Authorization review for critical ERP endpoints
+2. Protected frontend/session hardening
 
-3. Basic abuse/rate-limit protection for Auth public endpoints
+3. Real email delivery/configuration verification for recovery
 
-4. Protected frontend/session hardening
+4. Production secrets/configuration and dependency review
+```
 
-5. Security regression coverage for remaining blockers
+Authorization + Tenant Isolation V1:
 
-6. Real email delivery/configuration verification for recovery
+```text
+IMPLEMENTED / VALIDATED — B2 CLOSED
 ```
 
 `passwordHash` response sanitization:
@@ -2689,7 +2836,8 @@ RESOLVED
 
 `User.isActive` enforcement, explicit safe role provisioning, implicit ADMIN
 default removal, and Users V1 administration are also resolved for the current
-code boundary. Broader tenant and authorization regression remain pending.
+code boundary. La regresión transversal de autorización y tenant isolation fue
+validada en B2D.
 
 Estado de workstream:
 
@@ -2699,8 +2847,8 @@ AUTH-PASSWORD-SECURITY-V1
 ```
 
 Esto significa implementation complete, no production-ready ni RC-ready. Los
-gates de abuso, correo real, configuración, dependencias, tenant, autorización,
-sesión y QA transversal permanecen separados.
+gates de abuso, correo real, configuración, dependencias, sesión y QA transversal
+permanecen separados.
 
 ---
 
@@ -2717,14 +2865,13 @@ frontend protected-route hardening
 
 business Audit integration
 
-legacy tenant-safe write hardening
-
 dependency security review
 
 security observability
 ```
 
-Permission-based RBAC puede avanzar dentro de esta evolución según prioridad de producto.
+Permission-based RBAC puede avanzar dentro de esta evolución según prioridad de
+producto; permanece DEFERRED P1/P2 y no forma parte de Authorization V1.
 
 ---
 

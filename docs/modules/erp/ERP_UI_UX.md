@@ -447,11 +447,7 @@ H8 regression
 
 UX-B.6 E2E QA
 
-security P0 blockers
-
-authorization review
-
-tenant isolation regression
+B3 production / security hardening
 
 session architecture
 ```
@@ -514,13 +510,14 @@ Actualmente:
 
 ```text
 role-aware navigation
-→ PARTIAL CURRENT
+→ IMPLEMENTED / VALIDATED for fixed-role V1 boundaries
 
 Usuarios
 → visible only for ADMIN
 ```
 
-La Sidebar no debe considerarse todavía una frontera completa de autorización.
+La Sidebar expresa el contrato UX de roles fijos, pero no es una frontera de
+autorización. El backend continúa siendo la autoridad real.
 
 Debe mantenerse:
 
@@ -536,6 +533,45 @@ Permission-based navigation granular permanece:
 permission-aware navigation
 → DEFERRED P1
 ```
+
+### Role-aware ERP UX V1
+
+La UX role-aware vigente mantiene estas reglas:
+
+```text
+inaccessible modules
+→ hidden from navigation
+
+read-only roles
+→ write actions hidden
+
+direct forbidden URL
+→ ForbiddenState
+→ CTA /home
+
+no valid row action
+→ RowActionsMenu not rendered
+```
+
+Esto mejora descubribilidad y reduce acciones previsiblemente rechazadas, pero
+no sustituye el control server-side.
+
+Home evita llamadas previsiblemente no autorizadas: por ejemplo, `SALES` no
+solicita endpoints de Purchases ni Equipment y no crea bloques de atención
+vacíos por esa omisión.
+
+En Purchases, `WAREHOUSE` puede leer, crear y editar, y registrar recepciones;
+no puede aprobar ni cancelar. Products y Categories son read-only para
+`SALES`/`WAREHOUSE`; `ADMIN`/`MANAGER` conservan los controles de escritura.
+Suppliers es read-only para `WAREHOUSE`. Inventory es read-only para `SALES`,
+permite movimientos normales a `WAREHOUSE` y reserva `ADJUSTMENT` a
+`ADMIN`/`MANAGER`.
+
+### 403 y sesión
+
+Ante un `403`, la sesión se conserva, no se redirige a `/login`, se muestra
+`ForbiddenState` y se ofrece CTA a `/home`. El comportamiento existente de
+invalidación y redirección ante `401` se mantiene.
 
 ---
 
@@ -2039,7 +2075,7 @@ Header
 
 ```text
 Sidebar
-→ permission awareness pending
+→ fixed-role visibility implemented; permission-aware navigation deferred P1
 ```
 
 ---
@@ -2670,10 +2706,6 @@ para evitar confundir datos preexistentes con el efecto de la prueba actual.
 Antes de pilot/production deben cerrarse o decidirse formalmente al menos:
 
 ```text
-critical authorization review
-
-systematic tenant-isolation regression
-
 protected-route/session architecture
 
 authentication abuse protection / rate limiting
@@ -2691,10 +2723,6 @@ Estas tareas no son meramente visuales.
 
 ```text
 protected-route/session architecture review
-
-critical authorization review
-
-tenant-isolation regression
 
 authentication endpoint abuse protection
 
@@ -2789,7 +2817,7 @@ mixed form architecture
 
 limited Header user/session context
 
-permission-aware Sidebar
+permission-aware Sidebar (P1 deferred)
 ```
 
 ---
@@ -3619,9 +3647,6 @@ Users V1 administration
 ```text
 protected-route/session architecture
 P0 review
-
-authorization / tenant regression
-P0
 
 auth abuse protection
 P0

@@ -85,6 +85,43 @@ sin convertir esos hechos históricos en reglas vigentes.
 
 ---
 
+# 2026-09-02 — Authorization + Tenant Isolation V1 closure — ERP-V1-CLOSE-B2E
+
+**Estado:** IMPLEMENTED / VALIDATED
+
+Se cerró documentalmente Authorization + Tenant Isolation V1 del ERP Core:
+
+```text
+fixed-role authorization for ADMIN / MANAGER / SALES / WAREHOUSE
+Companies boundary without normal global ERP HTTP surface
+tenant-safe reads, details and mutations
+cross-company relation hardening
+frontend role-aware UX and 403 session preservation
+```
+
+La fuente técnica principal es `docs/modules/erp/IDENTITY_ACCESS.md`; las
+reglas transversales están en `docs/engineering/SECURITY_PRINCIPLES.md`.
+B2D validó autenticación, denegación por rol, aislamiento de tenant,
+relaciones mixtas, ausencia de side effects en rechazos cross-tenant,
+predicados finales y semántica `401` / `403` / `404` / `400`.
+
+Snapshot B2D:
+
+```text
+Backend: 60 suites / 628 tests PASS
+Frontend: 54 files / 653 tests PASS bounded + serial
+Backend/frontend build and lint: PASS
+Prisma validate/status: PASS
+```
+
+El cierre no equivale a `SECURITY COMPLETE`, `PRODUCTION READY` ni `RC READY`.
+Permission-based RBAC continúa diferido P1/P2. El posible lost update de stock
+en `InventoryService.createMovement` permanece como blocker `RC-DATA`; B3,
+dependencias, configuración, entrega real de Resend, C, D y el gate RC siguen
+abiertos.
+
+---
+
 # 2026-09-02 — Password Security V1 closure — ERP-V1-CLOSE-B1D-E
 
 **Estado:** IMPLEMENTED / VERIFIED

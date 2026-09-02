@@ -79,15 +79,19 @@ CHANGELOG
 3. Secuencia estratégica vigente
 La normalización funcional H7 del ERP Core está completada.
 
-La secuencia inmediata actual es:
+La posición actual del cierre ERP Core V1 es:
 
-H8A — Documentation Synchronization
+B1 ✅
 ↓
-H8B — Full Automated Regression / Technical Health
+B2 ✅ — Authorization + Tenant Isolation V1
 ↓
-UX-B.6 — Full ERP End-to-End QA
+B3 ← NEXT — Production / Security Hardening
 ↓
-ERP Core V1 Closure
+C — Full Technical Regression
+↓
+D — Full ERP End-to-End QA
+↓
+RC — ERP Core V1 Release Candidate
 ↓
 Zaping Healthcare
 Healthcare Case Foundation ya existe en backend.
@@ -324,11 +328,11 @@ Inactive-user enforcement — ✅ CLOSED / VERIFIED
 
 ↓
 
-Tenant isolation regression
+Tenant isolation regression — ✅ CLOSED / VALIDATED in B2D
 
 ↓
 
-Critical authorization review
+Critical authorization review — ✅ CLOSED / VALIDATED in B2D
 
 ↓
 
@@ -398,7 +402,7 @@ rate limiting / abuse protection
 
 dependency/security maintenance
 
-tenant, authorization and session hardening
+session hardening
 Regla de seguridad:
 
 public password reset
@@ -414,7 +418,7 @@ User.role @default(ADMIN)
 fue retirado. El primer administrador de Company y los usuarios internos
 requieren rol explícito según su flujo autorizado.
 
-La revisión transversal de autorización permanece en B2.
+La revisión transversal de autorización quedó cerrada y validada en B2D.
 
 Objetivo:
 
@@ -422,7 +426,7 @@ normal user creation
 → explicit authorized role
 Debe evitarse cualquier elevación accidental de privilegios.
 
-Cobertura necesaria:
+Cobertura validada:
 
 user creation flows
 
@@ -441,8 +445,8 @@ User.isActive = false
 no normal application access
 La desactivación debe afectar autenticación y sesión de manera consistente.
 
-8.5 Tenant Isolation
-Debe existir cobertura sistemática:
+8.5 Tenant Isolation — CLOSED / VALIDATED
+B2D validó cobertura sistemática:
 
 Company A
 ↛
@@ -470,7 +474,7 @@ Sales
 Healthcare Cases
 
 future resources
-Debe cubrir:
+La cobertura incluyó:
 
 read
 
@@ -483,8 +487,8 @@ lifecycle actions
 exports where applicable
 
 cross-module navigation
-8.6 Critical Authorization Review
-Debe verificarse:
+8.6 Critical Authorization Review — CLOSED / VALIDATED
+B2D verificó:
 
 sensitive endpoints
 
@@ -492,10 +496,12 @@ RolesGuard / authorization coverage
 
 server-side authorization
 
-business-action permissions
+business-action authorization
 
 no frontend-only access assumptions
-antes de release productivo.
+
+La matriz CURRENT utiliza sólo `ADMIN`, `MANAGER`, `SALES` y `WAREHOUSE`.
+Permission-based RBAC permanece diferido P1.
 
 8.7 Protected Route / Session Architecture
 CURRENT frontend utiliza:
@@ -566,7 +572,11 @@ debug/dev settings
 
 production-safe defaults
 8.10 Core Regression
-H8B debe ejecutar:
+B2D completó la regresión automatizada de autorización y tenant isolation.
+
+La regresión técnica C y el QA funcional D permanecen como gates posteriores.
+
+La validación B2D incluyó:
 
 Backend tests
 
@@ -2427,9 +2437,9 @@ inactive-user enforcement
 
 critical flows stable
 
-tenant isolation validated
+tenant isolation validated — ✅ B2D
 
-critical authorization reviewed
+critical authorization reviewed — ✅ B2D
 
 protected-route/session behavior reviewed
 
@@ -2542,11 +2552,11 @@ Safe role provisioning
 
 Inactive-user enforcement
 
+Authorization + Tenant Isolation V1
+
+Role-based authorization V1
+
 Remaining:
-
-cross-workstream documentation closure
-
-B2 critical authorization / tenant regression
 
 B3 production / security hardening
 
