@@ -249,7 +249,10 @@ export class PurchaseReceiptsService {
 
             const updatedProduct = await tx.product.update({
               where: {
-                id: item.productId,
+                id_companyId: {
+                  id: item.productId,
+                  companyId,
+                },
               },
               data: {
                 stock: {
@@ -301,9 +304,10 @@ export class PurchaseReceiptsService {
             },
           );
 
-          await tx.purchase.update({
+          const purchaseUpdateResult = await tx.purchase.updateMany({
             where: {
               id: purchase.id,
+              companyId,
             },
             data: {
               status: purchaseWasFullyReceived
@@ -311,6 +315,10 @@ export class PurchaseReceiptsService {
                 : PurchaseStatus.PARTIALLY_RECEIVED,
             },
           });
+
+          if (purchaseUpdateResult.count === 0) {
+            throw new NotFoundException('Compra no encontrada');
+          }
 
           await tx.idempotencyRecord.update({
             where: {
@@ -766,7 +774,10 @@ export class PurchaseReceiptsService {
 
     return tx.inventoryBatch.update({
       where: {
-        id: existingBatch.id,
+        id_companyId: {
+          id: existingBatch.id,
+          companyId: data.companyId,
+        },
       },
       data: {
         initialQuantity: {

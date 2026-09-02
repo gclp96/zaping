@@ -222,12 +222,41 @@ export class QuotesService {
       );
     }
 
-    return this.prisma.quote.update({
+    const updateResult = await this.prisma.quote.updateMany({
       where: {
         id: quote.id,
+        companyId,
+        status: DocumentStatus.DRAFT,
       },
       data: {
         status: DocumentStatus.CONFIRMED,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      const currentQuote = await this.prisma.quote.findFirst({
+        where: {
+          id: quoteId,
+          companyId,
+        },
+        select: {
+          status: true,
+        },
+      });
+
+      if (!currentQuote) {
+        throw new NotFoundException('Cotización no encontrada');
+      }
+
+      throw new BadRequestException(
+        'Solo se pueden aprobar cotizaciones en borrador',
+      );
+    }
+
+    const confirmedQuote = await this.prisma.quote.findFirst({
+      where: {
+        id: quoteId,
+        companyId,
       },
       include: {
         customer: true,
@@ -238,6 +267,12 @@ export class QuotesService {
         },
       },
     });
+
+    if (!confirmedQuote) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
+
+    return confirmedQuote;
   }
 
   async cancel(companyId: string, quoteId: string) {
@@ -262,12 +297,41 @@ export class QuotesService {
       );
     }
 
-    return this.prisma.quote.update({
+    const updateResult = await this.prisma.quote.updateMany({
       where: {
         id: quote.id,
+        companyId,
+        status: DocumentStatus.DRAFT,
       },
       data: {
         status: DocumentStatus.CANCELLED,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      const currentQuote = await this.prisma.quote.findFirst({
+        where: {
+          id: quoteId,
+          companyId,
+        },
+        select: {
+          status: true,
+        },
+      });
+
+      if (!currentQuote) {
+        throw new NotFoundException('Cotización no encontrada');
+      }
+
+      throw new BadRequestException(
+        'Solo se pueden cancelar cotizaciones en borrador',
+      );
+    }
+
+    const cancelledQuote = await this.prisma.quote.findFirst({
+      where: {
+        id: quoteId,
+        companyId,
       },
       include: {
         customer: true,
@@ -278,6 +342,12 @@ export class QuotesService {
         },
       },
     });
+
+    if (!cancelledQuote) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
+
+    return cancelledQuote;
   }
 
   private async validateCustomer(companyId: string, customerId: string) {

@@ -355,19 +355,60 @@ export class PurchasesService {
       const iva = this.roundMoney(subtotal * 0.16);
       const total = this.roundMoney(subtotal + iva);
 
-      return tx.purchase.update({
+      const updateResult = await tx.purchase.updateMany({
         where: {
           id: purchaseId,
+          companyId,
+          status: 'DRAFT',
         },
         data: {
           supplierId: dto.supplierId,
           subtotal,
           iva,
           total,
-          items: {
-            deleteMany: {},
-            create: purchaseItems,
+        },
+      });
+
+      if (updateResult.count === 0) {
+        const currentPurchase = await tx.purchase.findFirst({
+          where: {
+            id: purchaseId,
+            companyId,
           },
+          select: {
+            status: true,
+          },
+        });
+
+        if (!currentPurchase) {
+          throw new NotFoundException('Compra no encontrada');
+        }
+
+        throw new BadRequestException(
+          `No se puede editar una compra con estado ${currentPurchase.status}`,
+        );
+      }
+
+      await tx.purchaseItem.deleteMany({
+        where: {
+          purchaseId,
+          purchase: {
+            companyId,
+          },
+        },
+      });
+
+      await tx.purchaseItem.createMany({
+        data: purchaseItems.map((item) => ({
+          ...item,
+          purchaseId,
+        })),
+      });
+
+      return tx.purchase.findFirst({
+        where: {
+          id: purchaseId,
+          companyId,
         },
         include: {
           supplier: true,

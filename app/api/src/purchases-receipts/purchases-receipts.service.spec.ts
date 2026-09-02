@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { EquipmentProvisioningService } from '../equipment/equipment-provisioning.service';
@@ -32,6 +32,7 @@ type TransactionClientMock = {
   purchase: {
     findFirst: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
   product: {
     findMany: jest.Mock;
@@ -131,7 +132,10 @@ type InventoryMovementCreateArgs = {
 
 type InventoryBatchUpdateArgs = {
   where: {
-    id: string;
+    id_companyId: {
+      id: string;
+      companyId: string;
+    };
   };
   data: {
     initialQuantity: {
@@ -220,6 +224,7 @@ describe('PurchaseReceiptsService', () => {
       purchase: {
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       product: {
         findMany: jest.fn(),
@@ -388,6 +393,7 @@ describe('PurchaseReceiptsService', () => {
       equipmentProvisioningService.provisionFromPurchaseReceiptItem,
     ).not.toHaveBeenCalled();
     expect(transactionClient.purchase.update).not.toHaveBeenCalled();
+    expect(transactionClient.purchase.updateMany).not.toHaveBeenCalled();
   }
 
   function expectBatchCreatedWith(
@@ -1349,6 +1355,63 @@ describe('PurchaseReceiptsService', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('debe rechazar una compra con una partida cuyo producto pertenece a otro tenant sin efectos de negocio', async () => {
+    const companyId = '33333333-3333-4333-8333-333333333333';
+    const otherCompanyProductId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const purchaseId = '22222222-2222-4222-8222-222222222222';
+    const purchaseItemId = '11111111-1111-4111-8111-111111111111';
+
+    transactionClient.purchase.findFirst.mockResolvedValue({
+      id: purchaseId,
+      companyId,
+      folio: 'OC-MIXTA-001',
+      status: PurchaseStatus.CONFIRMED,
+      items: [
+        {
+          id: purchaseItemId,
+          productId: otherCompanyProductId,
+          quantity: 10,
+          price: 1347,
+          receiptItems: [],
+        },
+      ],
+    });
+    transactionClient.product.findMany.mockResolvedValue([]);
+
+    const dto: CreatePurchaseReceiptDto = {
+      purchaseId,
+      items: [
+        {
+          purchaseItemId,
+          quantityReceived: 2,
+          lotNumber: 'LOTE-MIXTO-001',
+          expirationDate: '2028-12-31',
+        },
+      ],
+    };
+
+    await expect(
+      createReceipt(companyId, lotTrackingUserId, dto),
+    ).rejects.toThrow(
+      new NotFoundException(`Producto ${otherCompanyProductId} no encontrado`),
+    );
+
+    expect(transactionClient.product.findMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        id: {
+          in: [otherCompanyProductId],
+        },
+      },
+      select: {
+        id: true,
+        sku: true,
+        lotTracking: true,
+      },
+    });
+    expectNoReceiptMutations();
+  });
+
   it('debe registrar correctamente una recepción parcial', async () => {
     const companyId = '33333333-3333-4333-8333-333333333333';
 
@@ -1529,7 +1592,10 @@ describe('PurchaseReceiptsService', () => {
 
     expect(transactionClient.product.update).toHaveBeenCalledWith({
       where: {
-        id: productId,
+        id_companyId: {
+          id: productId,
+          companyId,
+        },
       },
       data: {
         stock: {
@@ -1561,9 +1627,10 @@ describe('PurchaseReceiptsService', () => {
     expect(inventoryMovementCreateArgs.data.createdBy).toBe(userId);
     expect(inventoryMovementCreateArgs.data.unitCost).toBe(1347);
 
-    expect(transactionClient.purchase.update).toHaveBeenCalledWith({
+    expect(transactionClient.purchase.updateMany).toHaveBeenCalledWith({
       where: {
         id: purchaseId,
+        companyId,
       },
       data: {
         status: PurchaseStatus.PARTIALLY_RECEIVED,
@@ -1809,7 +1876,10 @@ describe('PurchaseReceiptsService', () => {
       expect(transactionClient.product.update).toHaveBeenCalledTimes(1);
       expect(transactionClient.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         data: {
           stock: {
@@ -2030,7 +2100,10 @@ describe('PurchaseReceiptsService', () => {
     const [inventoryBatchUpdateArgs] = transactionClient.inventoryBatch.update
       .mock.calls[0] as [InventoryBatchUpdateArgs];
 
-    expect(inventoryBatchUpdateArgs.where.id).toBe(batchId);
+    expect(inventoryBatchUpdateArgs.where.id_companyId).toEqual({
+      id: batchId,
+      companyId,
+    });
 
     expect(inventoryBatchUpdateArgs.data.initialQuantity.increment).toBe(6);
 
@@ -2053,7 +2126,10 @@ describe('PurchaseReceiptsService', () => {
 
     expect(transactionClient.product.update).toHaveBeenCalledWith({
       where: {
-        id: productId,
+        id_companyId: {
+          id: productId,
+          companyId,
+        },
       },
       data: {
         stock: {
@@ -2065,9 +2141,10 @@ describe('PurchaseReceiptsService', () => {
       },
     });
 
-    expect(transactionClient.purchase.update).toHaveBeenCalledWith({
+    expect(transactionClient.purchase.updateMany).toHaveBeenCalledWith({
       where: {
         id: purchaseId,
+        companyId,
       },
       data: {
         status: PurchaseStatus.RECEIVED,

@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { CategoriesService } from './categories.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,8 +9,8 @@ describe('CategoriesService', () => {
     category: {
       create: jest.Mock;
       findFirst: jest.Mock;
-      update: jest.Mock;
-      delete: jest.Mock;
+      updateMany: jest.Mock;
+      deleteMany: jest.Mock;
     };
     product: {
       count: jest.Mock;
@@ -21,8 +22,8 @@ describe('CategoriesService', () => {
       category: {
         create: jest.fn(),
         findFirst: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
+        updateMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       product: {
         count: jest.fn(),
@@ -83,14 +84,15 @@ describe('CategoriesService', () => {
   it('updates a category scoped by id and company', async () => {
     prisma.category.findFirst
       .mockResolvedValueOnce({ id: 'category-1', companyId: 'company-1' })
-      .mockResolvedValueOnce(null);
-    prisma.category.update.mockResolvedValue({
-      id: 'category-1',
-      companyId: 'company-1',
-      name: 'Implantes',
-      description: null,
-      isActive: true,
-    });
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 'category-1',
+        companyId: 'company-1',
+        name: 'Implantes',
+        description: null,
+        isActive: true,
+      });
+    prisma.category.updateMany.mockResolvedValue({ count: 1 });
 
     await expect(
       service.update('company-1', 'category-1', { name: ' Implantes ' }),
@@ -108,13 +110,30 @@ describe('CategoriesService', () => {
         companyId: 'company-1',
       },
     });
-    expect(prisma.category.update).toHaveBeenCalledWith({
+    expect(prisma.category.updateMany).toHaveBeenCalledWith({
       where: {
         id: 'category-1',
+        companyId: 'company-1',
       },
       data: {
         name: 'Implantes',
       },
+    });
+  });
+
+  it('rechaza la mutación final si la categoría dejó de pertenecer a la empresa', async () => {
+    prisma.category.findFirst
+      .mockResolvedValueOnce({ id: 'category-1', companyId: 'company-1' })
+      .mockResolvedValueOnce(null);
+    prisma.category.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.update('company-1', 'category-1', { name: 'Implantes' }),
+    ).rejects.toThrow(new NotFoundException('Categoría no encontrada'));
+
+    expect(prisma.category.updateMany).toHaveBeenCalledWith({
+      where: { id: 'category-1', companyId: 'company-1' },
+      data: { name: 'Implantes' },
     });
   });
 
@@ -124,10 +143,7 @@ describe('CategoriesService', () => {
       companyId: 'company-1',
     });
     prisma.product.count.mockResolvedValue(0);
-    prisma.category.delete.mockResolvedValue({
-      id: 'category-1',
-      companyId: 'company-1',
-    });
+    prisma.category.deleteMany.mockResolvedValue({ count: 1 });
 
     await expect(service.remove('company-1', 'category-1')).resolves.toEqual({
       id: 'category-1',
@@ -146,10 +162,22 @@ describe('CategoriesService', () => {
         companyId: 'company-1',
       },
     });
-    expect(prisma.category.delete).toHaveBeenCalledWith({
+    expect(prisma.category.deleteMany).toHaveBeenCalledWith({
       where: {
         id: 'category-1',
+        companyId: 'company-1',
       },
     });
+  });
+
+  it('rechaza eliminar una categoría de otra empresa sin mutar datos', async () => {
+    prisma.category.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.remove('company-1', 'category-from-company-2'),
+    ).rejects.toThrow(new NotFoundException('Categoría no encontrada'));
+
+    expect(prisma.category.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.product.count).not.toHaveBeenCalled();
   });
 });

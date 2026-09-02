@@ -126,7 +126,10 @@ export class ProductsService {
 
     return this.prisma.product.update({
       where: {
-        id: productId,
+        id_companyId: {
+          id: productId,
+          companyId,
+        },
       },
       data: {
         sku: dto.sku,
@@ -157,7 +160,7 @@ export class ProductsService {
   async remove(companyId: string, productId: string) {
     await this.findOne(companyId, productId);
 
-    await this.prisma.product.updateMany({
+    const updateResult = await this.prisma.product.updateMany({
       where: {
         id: productId,
         companyId,
@@ -167,6 +170,10 @@ export class ProductsService {
         isActive: false,
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new NotFoundException('Producto no encontrado');
+    }
 
     return this.findOne(companyId, productId);
   }

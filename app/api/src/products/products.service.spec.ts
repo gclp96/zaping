@@ -367,7 +367,10 @@ describe('ProductsService', () => {
       });
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
@@ -423,7 +426,10 @@ describe('ProductsService', () => {
       expect(prismaMock.category.findFirst).not.toHaveBeenCalled();
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
@@ -438,7 +444,10 @@ describe('ProductsService', () => {
       expect(prismaMock.category.findFirst).not.toHaveBeenCalled();
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.objectContaining({
@@ -456,7 +465,10 @@ describe('ProductsService', () => {
 
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.not.objectContaining({
@@ -473,7 +485,10 @@ describe('ProductsService', () => {
 
       expect(prismaMock.product.update).toHaveBeenCalledWith({
         where: {
-          id: productId,
+          id_companyId: {
+            id: productId,
+            companyId,
+          },
         },
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         data: expect.not.objectContaining({
@@ -529,19 +544,19 @@ describe('ProductsService', () => {
       expect(prismaMock.product.delete).not.toHaveBeenCalled();
     });
 
-    it('permite repetir DELETE sobre un producto ya inactivo sin borrarlo', async () => {
+    it('rechaza la mutación final si el producto ya no está activo', async () => {
       const inactiveProduct = productMock({
         isActive: false,
       });
 
-      prismaMock.product.findFirst
-        .mockResolvedValueOnce(inactiveProduct)
-        .mockResolvedValueOnce(inactiveProduct);
+      prismaMock.product.findFirst.mockResolvedValueOnce(inactiveProduct);
       prismaMock.product.updateMany.mockResolvedValueOnce({
         count: 0,
       });
 
-      const result = await service.remove(companyId, productId);
+      await expect(service.remove(companyId, productId)).rejects.toThrow(
+        new NotFoundException('Producto no encontrado'),
+      );
 
       expect(prismaMock.product.updateMany).toHaveBeenCalledWith({
         where: {
@@ -554,7 +569,6 @@ describe('ProductsService', () => {
         },
       });
       expect(prismaMock.product.delete).not.toHaveBeenCalled();
-      expect(result).toEqual(inactiveProduct);
     });
 
     it('no elimina relaciones historicas al desactivar', async () => {
