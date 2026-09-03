@@ -24,7 +24,7 @@ export  default function LoginPage() {
 
             localStorage.setItem('token', response.data.token);
 
-            router.push('/dashboard');
+            router.push('/home');
         }   catch (error) {
             console.error(error);
             alert('Credenciales inválidas');

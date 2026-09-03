@@ -2,12 +2,13 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import AppHeader from "@/app/components/AppHeader";
 import { useAuthenticatedSession } from "@/app/auth-session";
 import { getRouteTitle } from "@/app/components/navigation";
 import Sidebar from "@/app/components/sidebar";
+import Loading from "@/app/components/ui/Loading";
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "zaping.sidebar.collapsed";
 
@@ -19,13 +20,24 @@ type AppShellProps = {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceReady, setSidebarPreferenceReady] = useState(false);
-  const sessionState = useAuthenticatedSession();
+  const sessionState = useAuthenticatedSession({ requireToken: true });
   const drawerRef = useRef<HTMLDivElement>(null);
   const drawerWasOpenRef = useRef(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (sessionState.status !== "unauthenticated") {
+      return;
+    }
+
+    router.replace("/login");
+    // The router is stable in the App Router; status prevents repeated redirects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionState.status]);
 
   useEffect(() => {
     try {
@@ -71,9 +83,52 @@ export default function AppShell({ children }: AppShellProps) {
     };
   }, [mobileNavigationOpen]);
 
+  if (
+    sessionState.status === "loading" ||
+    sessionState.status === "unauthenticated"
+  ) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-6">
+        <div className="w-full max-w-md" role="status" aria-live="polite">
+          <Loading
+            message={
+              sessionState.status === "unauthenticated"
+                ? "Redirigiendo al inicio de sesión..."
+                : "Cargando sesión..."
+            }
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (sessionState.status === "error") {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-subtle p-6">
+        <div
+          className="w-full max-w-md rounded-ui-lg border border-border bg-surface p-6 shadow-subtle"
+          role="alert"
+        >
+          <h1 className="text-lg font-semibold text-text">
+            No se pudo verificar tu sesión
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {sessionState.message}
+          </p>
+          <button
+            type="button"
+            className="mt-5 inline-flex min-h-10 items-center justify-center rounded-ui-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            onClick={sessionState.retry}
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const title = getRouteTitle(pathname);
-  const currentUserRole =
-    sessionState.status === "success" ? sessionState.user.role : undefined;
+  const currentUserRole = sessionState.user.role;
 
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((currentValue) => {

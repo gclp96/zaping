@@ -2,6 +2,7 @@
 
 import {
   Suspense,
+  useCallback,
   useEffect,
   useId,
   useMemo,
@@ -68,10 +69,6 @@ import Section from '@/app/components/ui/layout/Section';
 import ForbiddenState from '@/app/components/ui/ForbiddenState';
 
 type StatusFilter = 'ALL' | PurchaseStatus;
-
-type AuthenticatedSession = {
-  companyTimezone: string;
-};
 
 type CompanyTimezoneState =
   | { status: 'loading' }
@@ -260,6 +257,10 @@ const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
 const directReceiveRequestId = useRef(0);
 const directReceiveInFlight = useRef(false);
+const authenticatedCompanyTimezone =
+  sessionState.status === 'success'
+    ? sessionState.user.companyTimezone
+    : null;
 
 const companyTimezone =
   companyTimezoneState.status === 'success'
@@ -284,12 +285,19 @@ async function loadPurchases() {
     setPageIndex(0);
   }
 
-async function loadCompanyTimezone() {
+const loadCompanyTimezone = useCallback(async () => {
   try {
     setCompanyTimezoneState({ status: 'loading' });
 
-    const response = await api.get<AuthenticatedSession>('/auth/me');
-    const timezone = response.data.companyTimezone?.trim() ?? '';
+    if (sessionState.status !== 'success') {
+      setCompanyTimezoneState({
+        status: 'error',
+        message: timezoneUnavailableMessage,
+      });
+      return;
+    }
+
+    const timezone = authenticatedCompanyTimezone?.trim() ?? '';
 
     if (!isValidTimeZone(timezone)) {
       setCompanyTimezoneState({
@@ -308,7 +316,7 @@ async function loadCompanyTimezone() {
       message: timezoneUnavailableMessage,
     });
   }
-}
+}, [authenticatedCompanyTimezone, sessionState.status]);
 
 const {
   purchaseToApprove,
@@ -611,7 +619,7 @@ async function loadPageData() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadPageData();
     void loadCompanyTimezone();
-  }, [currentUserRole, sessionState.status]);
+  }, [currentUserRole, loadCompanyTimezone, sessionState.status]);
 
   useEffect(() => {
     if (legacyPurchaseId) {

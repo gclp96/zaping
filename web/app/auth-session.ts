@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { api } from "@/services/api";
+import { getApiErrorStatus } from "@/services/errors";
+
+export const AUTH_TOKEN_STORAGE_KEY = "token";
 
 export type UserRole = "ADMIN" | "MANAGER" | "SALES" | "WAREHOUSE";
 
@@ -19,13 +22,41 @@ export type AuthenticatedSession = {
 export type AuthenticatedSessionState =
   | { status: "loading" }
   | { status: "success"; user: AuthenticatedSession }
+  | { status: "unauthenticated" }
   | { status: "error"; message: string };
+
+type AuthenticatedSessionHookState = AuthenticatedSessionState & {
+  retry: () => void;
+};
+
+type SessionLoadOptions = {
+  requireToken?: boolean;
+};
+
+export function hasStoredAuthToken(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return Boolean(window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
 
 let cachedSession: AuthenticatedSession | null = null;
 let sessionRequest: Promise<AuthenticatedSession> | null = null;
 
-export async function loadAuthenticatedSession() {
-  if (cachedSession) {
+export async function loadAuthenticatedSession({
+  requireToken = false,
+}: SessionLoadOptions = {}): Promise<AuthenticatedSession | null> {
+  if (requireToken && !hasStoredAuthToken()) {
+    cachedSession = null;
+    return null;
+  }
+
+  if (cachedSession && (!requireToken || hasStoredAuthToken())) {
     return cachedSession;
   }
 
@@ -47,29 +78,56 @@ export function clearAuthenticatedSessionCache() {
   sessionRequest = null;
 }
 
-export function useAuthenticatedSession(): AuthenticatedSessionState {
+export function useAuthenticatedSession({
+  requireToken = false,
+}: SessionLoadOptions = {}): AuthenticatedSessionHookState {
   const [state, setState] = useState<AuthenticatedSessionState>(() =>
-    cachedSession
+    cachedSession && (!requireToken || hasStoredAuthToken())
       ? { status: "success", user: cachedSession }
       : { status: "loading" },
   );
+  const [retryVersion, setRetryVersion] = useState(0);
+  const retry = useCallback(() => {
+    setState({ status: "loading" });
+    setRetryVersion((currentVersion) => currentVersion + 1);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    loadAuthenticatedSession()
+    if (requireToken && !hasStoredAuthToken()) {
+      cachedSession = null;
+      // The client-only token check transitions the bootstrap state explicitly.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setState({ status: "unauthenticated" });
+      return () => {
+        mounted = false;
+      };
+    }
+
+    loadAuthenticatedSession({ requireToken })
       .then((user) => {
-        if (mounted) {
-          setState({ status: "success", user });
+        if (!mounted) return;
+
+        if (!user) {
+          setState({ status: "unauthenticated" });
+          return;
         }
+
+        setState({ status: "success", user });
       })
       .catch((error: unknown) => {
         console.error(error);
 
         if (mounted) {
+          if (getApiErrorStatus(error) === 401) {
+            setState({ status: "unauthenticated" });
+            return;
+          }
+
           setState({
             status: "error",
-            message: "No fue posible cargar la sesión.",
+            message: "No fue posible verificar tu sesión.",
           });
         }
       });
@@ -77,7 +135,7 @@ export function useAuthenticatedSession(): AuthenticatedSessionState {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [requireToken, retryVersion]);
 
-  return state;
+  return { ...state, retry };
 }

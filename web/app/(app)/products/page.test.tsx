@@ -31,6 +31,10 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('@/services/errors', () => ({
+  getApiErrorStatus: (error: unknown) =>
+    error && typeof error === 'object' && 'response' in error
+      ? (error as { response?: { status?: number } }).response?.status
+      : undefined,
   getApiErrorMessage: (
     error: unknown,
     fallbackMessage: string,

@@ -20,9 +20,10 @@ function getResponseRejectedHandler() {
   return rejected;
 }
 
-function axiosError(status: number) {
+function axiosError(status: number, config?: { url: string }) {
   return {
     isAxiosError: true,
+    ...(config ? { config } : {}),
     response: {
       status,
       data: {
@@ -68,6 +69,23 @@ describe("api response interceptor", () => {
 
     expect(removeItemSpy).toHaveBeenCalledWith("token");
     expect(localStorage.getItem("token")).toBeNull();
+  });
+
+  it("leaves navigation to the session gate for an auth/me 401", async () => {
+    const rejected = getResponseRejectedHandler();
+    localStorage.setItem("token", "expired-token");
+    window.history.pushState(null, "", "/products");
+
+    await expect(
+      rejected(axiosError(401, { url: "/auth/me" })),
+    ).rejects.toMatchObject({
+      response: {
+        status: 401,
+      },
+    });
+
+    expect(localStorage.getItem("token")).toBeNull();
+    expect(window.location.pathname).toBe("/products");
   });
 
   it("preserves the current session and route for 403 authorization errors", async () => {

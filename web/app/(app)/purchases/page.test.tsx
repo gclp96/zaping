@@ -40,6 +40,10 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('@/services/errors', () => ({
+  getApiErrorStatus: (error: unknown) =>
+    error && typeof error === 'object' && 'response' in error
+      ? (error as { response?: { status?: number } }).response?.status
+      : undefined,
   getApiErrorMessage: (
     _error: unknown,
     fallbackMessage: string,
@@ -418,6 +422,7 @@ async function clickRowAction(
 }
 
 beforeEach(() => {
+  clearAuthenticatedSessionCache();
   routerMock.search = '';
 });
 
@@ -2010,6 +2015,20 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'admin@test.test',
+          firstName: 'Admin',
+          lastName: 'Test',
+          role: 'ADMIN',
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
     if (endpoint === '/purchases') {
       return {

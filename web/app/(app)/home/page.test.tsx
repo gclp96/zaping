@@ -156,6 +156,10 @@ describe('HomePage', () => {
     );
 
     await screen.findByText('Productos sin stock');
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/equipment');
+      expect(api.get).toHaveBeenCalledWith('/purchases');
+    });
 
     expect(api.get).toHaveBeenCalledWith('/dashboard');
     expect(api.get).toHaveBeenCalledWith('/equipment');

@@ -18,7 +18,10 @@ import {
 } from 'vitest';
 
 import { api } from '@/services/api';
-import { clearAuthenticatedSessionCache } from '@/app/auth-session';
+import {
+  clearAuthenticatedSessionCache,
+  loadAuthenticatedSession,
+} from '@/app/auth-session';
 import { SIDEBAR_COLLAPSED_STORAGE_KEY } from '@/app/components/AppShell';
 
 import AuthenticatedAppLayout from './layout';
@@ -110,11 +113,14 @@ function renderInShell(children: ReactNode) {
 }
 
 describe('AuthenticatedAppLayout', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
+    window.localStorage.setItem('token', 'test-token');
     navigationMock.pathname = '/dashboard';
     configureApiMocks();
+    await loadAuthenticatedSession({ requireToken: true });
+    vi.clearAllMocks();
   });
 
   afterEach(() => {

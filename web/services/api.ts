@@ -68,7 +68,14 @@ api.interceptors.response.use(
     ) {
       localStorage.removeItem("token");
 
-      if (window.location.pathname !== "/login") {
+      const requestUrl = error.config?.url;
+      const isSessionBootstrapRequest =
+        requestUrl === "/auth/me" || requestUrl?.endsWith("/auth/me");
+
+      if (
+        !isSessionBootstrapRequest &&
+        window.location.pathname !== "/login"
+      ) {
         window.location.href = "/login";
       }
     }
