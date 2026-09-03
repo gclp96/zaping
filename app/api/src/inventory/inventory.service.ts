@@ -58,38 +58,40 @@ export class InventoryService {
   }
 
   async createMovement(companyId: string, data: CreateMovementDto) {
-    const product = await this.prisma.product.findFirst({
-      where: {
-        id: data.productId,
-        companyId,
-      },
-    });
+    return this.executeSerializableWithRetry(async (tx) => {
+      // Re-read the product inside every Serializable attempt so retries never
+      // reuse a stock value from an aborted transaction.
+      const product = await tx.product.findFirst({
+        where: {
+          id: data.productId,
+          companyId,
+        },
+      });
 
-    if (!product) {
-      throw new NotFoundException('Producto no encontrado');
-    }
+      if (!product) {
+        throw new NotFoundException('Producto no encontrado');
+      }
 
-    let newStock = product.stock;
+      let newStock = product.stock;
 
-    switch (data.movementType) {
-      case 'IN':
-        newStock += data.quantity;
-        break;
+      switch (data.movementType) {
+        case 'IN':
+          newStock += data.quantity;
+          break;
 
-      case 'OUT':
-        if (product.stock < data.quantity) {
-          throw new BadRequestException('Stock insuficiente');
-        }
+        case 'OUT':
+          if (product.stock < data.quantity) {
+            throw new BadRequestException('Stock insuficiente');
+          }
 
-        newStock -= data.quantity;
-        break;
+          newStock -= data.quantity;
+          break;
 
-      case 'ADJUSTMENT':
-        newStock = data.quantity;
-        break;
-    }
+        case 'ADJUSTMENT':
+          newStock = data.quantity;
+          break;
+      }
 
-    return this.prisma.$transaction(async (tx) => {
       const movement = await tx.inventoryMovement.create({
         data: {
           companyId,
@@ -115,6 +117,33 @@ export class InventoryService {
 
       return movement;
     });
+  }
+
+  private async executeSerializableWithRetry<T>(
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error: unknown) {
+        if (!this.isSerializableConflict(error) || attempt === maxAttempts) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Serializable transaction retry loop exhausted');
+  }
+
+  private isSerializableConflict(error: unknown): boolean {
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2034'
+    );
   }
 
   async registerPurchaseEntry(
