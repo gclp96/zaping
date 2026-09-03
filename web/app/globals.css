@@ -72,6 +72,14 @@
   --motion-duration-fast: 120ms;
   --motion-duration-normal: 180ms;
   --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Local, network-independent system font stacks. */
+  --font-sans-stack:
+    ui-sans-serif, system-ui, sans-serif, "Segoe UI", Roboto, Helvetica, Arial,
+    "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono-stack:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
 }
 
 @theme inline {
@@ -118,8 +126,8 @@
   --shadow-subtle: var(--elevation-subtle);
   --shadow-popover: var(--elevation-popover);
   --shadow-modal: var(--elevation-modal);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 }
 
 body {

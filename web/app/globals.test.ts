@@ -83,11 +83,12 @@ describe('global semantic foundation', () => {
     expect(globalsCss).not.toContain('prefers-color-scheme: dark');
   });
 
-  it('uses the existing Geist configuration as the global sans font', () => {
-    expect(globalsCss).toContain('--font-sans: var(--font-geist-sans);');
-    expect(globalsCss).not.toContain('font-family: Arial');
-    expect(rootLayout).toContain('geistSans.variable');
-    expect(rootLayout).toContain('geistMono.variable');
+  it('uses local system font stacks without a Google font dependency', () => {
+    expect(globalsCss).toContain('--font-sans: var(--font-sans-stack);');
+    expect(globalsCss).toContain('--font-mono: var(--font-mono-stack);');
+    expect(rootLayout).not.toContain('next/font/google');
+    expect(rootLayout).not.toContain('geistSans.variable');
+    expect(rootLayout).not.toContain('geistMono.variable');
     expect(rootLayout).toMatch(/<body className="[^"]*font-sans[^"]*"/);
   });
 });
