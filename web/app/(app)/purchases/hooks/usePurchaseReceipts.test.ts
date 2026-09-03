@@ -520,7 +520,7 @@ describe('usePurchaseReceipts', () => {
       globalThis.crypto.randomUUID,
     ).toHaveBeenCalledTimes(1);
     expect(
-      api.post.mock.calls[0]?.[1],
+      vi.mocked(api.post).mock.calls[0]?.[1],
     ).not.toHaveProperty('idempotencyKey');
 
     expect(
@@ -584,12 +584,12 @@ describe('usePurchaseReceipts', () => {
     });
 
     expect(api.post).toHaveBeenCalledTimes(2);
-    expect(api.post.mock.calls[0]?.[2]).toEqual({
+    expect(vi.mocked(api.post).mock.calls[0]?.[2]).toEqual({
       headers: {
         'Idempotency-Key': firstIdempotencyKey,
       },
     });
-    expect(api.post.mock.calls[1]?.[2]).toEqual({
+    expect(vi.mocked(api.post).mock.calls[1]?.[2]).toEqual({
       headers: {
         'Idempotency-Key': firstIdempotencyKey,
       },
@@ -656,12 +656,12 @@ describe('usePurchaseReceipts', () => {
       await result.current.handleCreateReceipt();
     });
 
-    expect(api.post.mock.calls[0]?.[2]).toEqual({
+    expect(vi.mocked(api.post).mock.calls[0]?.[2]).toEqual({
       headers: {
         'Idempotency-Key': firstIdempotencyKey,
       },
     });
-    expect(api.post.mock.calls[1]?.[2]).toEqual({
+    expect(vi.mocked(api.post).mock.calls[1]?.[2]).toEqual({
       headers: {
         'Idempotency-Key': secondIdempotencyKey,
       },
@@ -813,7 +813,7 @@ describe('usePurchaseReceipts', () => {
     });
 
     expect(api.post).toHaveBeenCalledTimes(1);
-    expect(api.post.mock.calls[0]?.[2]).toEqual({
+    expect(vi.mocked(api.post).mock.calls[0]?.[2]).toEqual({
       headers: {
         'Idempotency-Key': secondIdempotencyKey,
       },

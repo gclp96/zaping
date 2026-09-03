@@ -1786,10 +1786,14 @@ describe('EquipmentPage', () => {
         },
       );
     });
-    expect(Object.keys(vi.mocked(api.post).mock.calls[0][1])).toEqual([
-      'conditionAfter',
-      'notes',
-    ]);
+    expect(
+      Object.keys(
+        vi.mocked(api.post).mock.calls[0][1] as Record<
+          string,
+          unknown
+        >,
+      ),
+    ).toEqual(['conditionAfter', 'notes']);
   });
 
   it('bloquea el doble envío y conserva el formulario cuando el POST falla', async () => {

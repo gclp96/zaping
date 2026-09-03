@@ -15,6 +15,8 @@ import {
 
 import { api } from '@/services/api';
 
+import type { Purchase } from '../types';
+
 import { usePurchaseForm } from './usePurchaseForm';
 
 vi.mock('@/services/api', () => ({
@@ -43,10 +45,17 @@ const product = {
   lotTracking: 'OPTIONAL' as const,
 };
 
-const draftPurchase = {
+const draftPurchase: Purchase = {
   id: 'purchase-1',
   folio: 'OC-0001',
   status: 'DRAFT',
+  receiptProgress: {
+    orderedUnits: 10,
+    receivedUnits: 0,
+    pendingUnits: 10,
+    orderedLines: 1,
+    completedLines: 0,
+  },
   subtotal: 1000,
   iva: 160,
   total: 1160,

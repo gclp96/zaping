@@ -105,7 +105,7 @@ function mockMenuGeometry({
   vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(viewport.width);
   vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(viewport.height);
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function getBoundingClientRect() {
+    function getBoundingClientRect(this: HTMLElement) {
       if (this.getAttribute('aria-haspopup') === 'menu') {
         return createRect(trigger);
       }
