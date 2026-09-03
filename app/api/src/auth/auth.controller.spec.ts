@@ -5,6 +5,7 @@ import {
   PATH_METADATA,
 } from '@nestjs/common/constants';
 import { Test, TestingModule } from '@nestjs/testing';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -41,6 +42,11 @@ describe('AuthController', () => {
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
+      imports: [
+        ThrottlerModule.forRoot({
+          throttlers: [{ name: 'default', limit: 10, ttl: 60_000 }],
+        }),
+      ],
       controllers: [AuthController],
       providers: [
         {
@@ -60,7 +66,12 @@ describe('AuthController', () => {
   const getMethodMetadata = (
     methodName: keyof Pick<
       AuthController,
-      'me' | 'changePassword' | 'forgotPassword' | 'resetPassword'
+      | 'me'
+      | 'changePassword'
+      | 'forgotPassword'
+      | 'resetPassword'
+      | 'register'
+      | 'login'
     >,
   ): object => {
     const descriptor = Object.getOwnPropertyDescriptor(
@@ -79,10 +90,11 @@ describe('AuthController', () => {
     expect(Reflect.getMetadata(PATH_METADATA, AuthController)).toBe('auth');
   });
 
-  it('protects change-password with JwtAuthGuard only', () => {
+  it('protects change-password with throttling before JwtAuthGuard', () => {
     const handler = getMethodMetadata('changePassword');
 
     expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([
+      ThrottlerGuard,
       JwtAuthGuard,
     ]);
     expect(Reflect.getMetadata('roles', handler)).toBeUndefined();
@@ -104,7 +116,9 @@ describe('AuthController', () => {
       RequestMethod.POST,
     );
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('forgot-password');
-    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toBeUndefined();
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([
+      ThrottlerGuard,
+    ]);
   });
 
   it('exposes public POST /auth/reset-password', () => {
@@ -114,7 +128,9 @@ describe('AuthController', () => {
       RequestMethod.POST,
     );
     expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('reset-password');
-    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toBeUndefined();
+    expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([
+      ThrottlerGuard,
+    ]);
   });
 
   it('returns the authenticated context from /auth/me with companyTimezone', async () => {

@@ -5,6 +5,7 @@ import {
   PATH_METADATA,
 } from '@nestjs/common/constants';
 import { Reflector } from '@nestjs/core';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { InventoryMovementType, UserRole } from '@prisma/client';
 
 import { AuthController } from '../auth.controller';
@@ -335,7 +336,9 @@ describe('public route regressions', () => {
     ]) {
       const handler = getHandler(AuthController, methodName);
 
-      expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toBeUndefined();
+      expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([
+        ThrottlerGuard,
+      ]);
     }
   });
 
@@ -344,6 +347,7 @@ describe('public route regressions', () => {
       const handler = getHandler(AuthController, methodName);
 
       expect(Reflect.getMetadata(GUARDS_METADATA, handler)).toEqual([
+        ...(methodName === 'changePassword' ? [ThrottlerGuard] : []),
         JwtAuthGuard,
       ]);
       expect(Reflect.getMetadata('roles', handler)).toBeUndefined();

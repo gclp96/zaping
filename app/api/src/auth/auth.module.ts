@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
@@ -17,6 +18,16 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     EmailModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
+    }),
+
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          limit: 10,
+          ttl: 60_000,
+        },
+      ],
     }),
 
     JwtModule.register({
