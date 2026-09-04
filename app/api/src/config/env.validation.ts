@@ -1,4 +1,6 @@
 const LOCAL_FRONTEND_URL = 'http://localhost:3000';
+const DEFAULT_PORT = 3001;
+const DEFAULT_TRUST_PROXY_HOPS = 0;
 
 export type NodeEnvironment = 'development' | 'test' | 'production';
 export type EnvironmentVariables = Record<string, string | undefined>;
@@ -18,6 +20,54 @@ function requiredValue(
   }
 
   return value;
+}
+
+function parseOptionalInteger(
+  value: string | undefined,
+  name: string,
+  minimum: number,
+  maximum: number,
+  defaultValue: number,
+): number {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    return defaultValue;
+  }
+
+  if (!/^\d+$/.test(normalizedValue)) {
+    throw new Error(
+      `${name} must be an integer between ${minimum} and ${maximum}`,
+    );
+  }
+
+  const parsedValue = Number(normalizedValue);
+
+  if (
+    !Number.isSafeInteger(parsedValue) ||
+    parsedValue < minimum ||
+    parsedValue > maximum
+  ) {
+    throw new Error(
+      `${name} must be an integer between ${minimum} and ${maximum}`,
+    );
+  }
+
+  return parsedValue;
+}
+
+export function parsePort(value: string | undefined): number {
+  return parseOptionalInteger(value, 'PORT', 1, 65535, DEFAULT_PORT);
+}
+
+export function parseTrustProxyHops(value: string | undefined): number {
+  return parseOptionalInteger(
+    value,
+    'TRUST_PROXY_HOPS',
+    0,
+    10,
+    DEFAULT_TRUST_PROXY_HOPS,
+  );
 }
 
 function parseHttpUrl(value: string): URL | null {
@@ -88,6 +138,8 @@ export function validateEnvironment(
 
   const databaseUrl = requiredValue(environment, 'DATABASE_URL');
   const jwtSecret = requiredValue(environment, 'JWT_SECRET');
+  const port = parsePort(environment.PORT);
+  const trustProxyHops = parseTrustProxyHops(environment.TRUST_PROXY_HOPS);
 
   if (jwtSecret.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters');
@@ -118,6 +170,8 @@ export function validateEnvironment(
     JWT_SECRET: jwtSecret,
     FRONTEND_ORIGIN: frontendOrigin,
     FRONTEND_BASE_URL: frontendBaseUrl,
+    PORT: String(port),
+    TRUST_PROXY_HOPS: String(trustProxyHops),
   };
 
   if (nodeEnv === 'production') {

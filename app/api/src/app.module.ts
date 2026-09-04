@@ -16,6 +16,7 @@ import { UsersModule } from './users/users.module';
 import { PurchaseReceiptsModule } from './purchases-receipts/purchases-receipts.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { HealthcareCasesModule } from './healthcare/cases/healthcare-cases.module';
+import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { validateEnvironment } from './config/env.validation';
 
@@ -26,6 +27,7 @@ import { validateEnvironment } from './config/env.validation';
       validate: validateEnvironment,
     }),
     PrismaModule,
+    HealthModule,
     AuthModule,
     CustomersModule,
     ProductsModule,

@@ -50,6 +50,8 @@ describe('environment configuration validation', () => {
     expect(result.NODE_ENV).toBe('development');
     expect(result.FRONTEND_ORIGIN).toBe('http://localhost:3000');
     expect(result.FRONTEND_BASE_URL).toBe('http://localhost:3000');
+    expect(result.PORT).toBe('3001');
+    expect(result.TRUST_PROXY_HOPS).toBe('0');
   });
 
   it('accepts a valid test configuration with safe defaults', () => {
@@ -118,8 +120,55 @@ describe('environment configuration validation', () => {
       NODE_ENV: 'production',
       FRONTEND_ORIGIN: 'https://app.example.test',
       FRONTEND_BASE_URL: 'https://app.example.test',
+      PORT: '3001',
+      TRUST_PROXY_HOPS: '0',
     });
   });
+
+  it.each(['1', '8080', '65535'])('accepts valid PORT=%s', (port) => {
+    const result = validateEnvironment({
+      ...productionConfig,
+      PORT: port,
+    });
+
+    expect(result.PORT).toBe(port);
+  });
+
+  it.each(['0', '-1', '65536', 'abc', '8080.5'])(
+    'rejects invalid PORT=%s',
+    (port) => {
+      const error = validationError({
+        ...productionConfig,
+        PORT: port,
+      });
+
+      expect(error?.message).toContain('PORT');
+    },
+  );
+
+  it.each(['0', '1', '2', '10'])(
+    'accepts valid TRUST_PROXY_HOPS=%s',
+    (hops) => {
+      const result = validateEnvironment({
+        ...productionConfig,
+        TRUST_PROXY_HOPS: hops,
+      });
+
+      expect(result.TRUST_PROXY_HOPS).toBe(hops);
+    },
+  );
+
+  it.each(['-1', '11', 'abc', '1.5'])(
+    'rejects invalid TRUST_PROXY_HOPS=%s',
+    (hops) => {
+      const error = validationError({
+        ...productionConfig,
+        TRUST_PROXY_HOPS: hops,
+      });
+
+      expect(error?.message).toContain('TRUST_PROXY_HOPS');
+    },
+  );
 
   it('requires email settings in production', () => {
     const missingApiKey = { ...productionConfig };
