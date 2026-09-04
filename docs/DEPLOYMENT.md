@@ -554,7 +554,9 @@ zero downtime. Comunicar previamente cualquier ventana que afecte usuarios.
 
 Antes de cada migration o release de producción debe existir backup/snapshot
 disponible y verificarse su recuperabilidad según las capacidades del
-proveedor. La implementación y prueba de restore real quedan en OPS-RC-B4.
+proveedor. El procedimiento y la evidencia local de OPS-RC-B4 están en
+[BACKUP_RESTORE.md](BACKUP_RESTORE.md); el restore respaldado por el proveedor
+en STAGING sigue siendo requisito antes del piloto.
 
 Objetivos provisionales, no SLA contractual:
 

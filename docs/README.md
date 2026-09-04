@@ -212,7 +212,10 @@ es `modules/erp/IDENTITY_ACCESS.md` y las reglas transversales están en
 2.5 Production readiness boundary
 
 Deployment, staging y operaciones
-→ DEPLOYMENT.md
+→ [DEPLOYMENT.md](DEPLOYMENT.md)
+
+Backup y restore operacional
+→ [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
 
 Debe mantenerse:
 
