@@ -38,15 +38,19 @@ se usa PRODUCTION como ambiente de pruebas.
 - Web en `http://localhost:3000`.
 - API en `http://localhost:3001`.
 - Sólo datos y secretos locales; nunca secretos de staging o producción.
-- Los archivos `.env*` son locales y están ignorados por Git.
+- Los archivos `.env*` locales están ignorados por Git; la única excepción
+  versionable es la plantilla segura `.env.docker.example`.
 
 El `docker-compose.yml` existente es exclusivamente una ayuda de desarrollo.
 Sus credenciales no deben reutilizarse fuera de LOCAL.
+La contraseña local se proporciona mediante `ZAPING_POSTGRES_PASSWORD` y no se
+versiona. Copia `.env.docker.example` a `.env.docker`, completa el valor local
+y arranca PostgreSQL con:
 
 Secuencia local reproducible:
 
 ```bash
-docker compose up -d postgres
+docker compose --env-file .env.docker up -d postgres
 
 cd app/api
 npm ci
@@ -270,18 +274,39 @@ réplicas.
 
 ### API deployment step
 
-Desde `app/api`, después de que la DB esté en el estado esperado:
+La API se despliega en DigitalOcean App Platform mediante
+`app/api/Dockerfile`. El Dockerfile fija Node 24.20.0, instala dependencias con
+`npm ci`, ejecuta `prisma generate`, compila NestJS y arranca con el `CMD`
+`npm run start:prod`. No ejecuta migrations dentro de la imagen ni durante el
+arranque.
+
+El source directory es `app/api`. Después de que la DB esté en el estado
+esperado:
 
 ```bash
-npm ci
-npx prisma generate
-npm run build
-npm run start:prod
+docker build -t zaping-api:staging ./app/api
 ```
 
-En la práctica, `npm ci` y `prisma generate` pueden formar parte del artefacto
-de release; la regla importante es separar y observar el paso de migración del
-arranque de la API.
+En DigitalOcean, el build usa el Dockerfile del source directory y el run usa
+su `CMD` por defecto. La migración permanece como PRE_DEPLOY separado:
+
+```bash
+npx prisma migrate deploy
+```
+
+La configuración objetivo de DigitalOcean es:
+
+```text
+source_dir: app/api
+Dockerfile: app/api/Dockerfile
+PRE_DEPLOY: npx prisma migrate deploy
+Liveness: GET /health/live
+Readiness: GET /health/ready
+NODE_ENV: production
+```
+
+El puerto continúa siendo el valor inyectado en `PORT`; no se fija un puerto
+productivo en la imagen.
 
 ### Web deployment step
 
@@ -614,7 +639,10 @@ OPS-RC-B3.
 ### API provider
 
 ```text
-[ ] Node 24.20.0 soportado
+[ ] DigitalOcean App Platform con deployment Dockerfile-based
+[ ] Source directory app/api
+[ ] app/api/Dockerfile
+[ ] Node 24.20.0 dentro de la imagen
 [ ] Proceso Node persistente
 [ ] Health checks configurables
 [ ] Inyección segura de env/secrets

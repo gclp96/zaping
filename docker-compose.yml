@@ -7,7 +7,7 @@ services:
 
     environment:
       POSTGRES_USER: zaping
-      POSTGRES_PASSWORD: zaping123
+      POSTGRES_PASSWORD: ${ZAPING_POSTGRES_PASSWORD:?Set ZAPING_POSTGRES_PASSWORD}
       POSTGRES_DB: zaping_dev
 
     ports:
