@@ -2,7 +2,7 @@ Documentación de Zaping
 
 Producto: Zaping
 Versión del índice: 2.2.0
-Última actualización: 2026-08-27
+Última actualización: 2026-09-04
 Estado: H8A DOCUMENTATION SYNCHRONIZATION — IN PROGRESS
 
 1. Propósito
@@ -210,6 +210,9 @@ es `modules/erp/IDENTITY_ACCESS.md` y las reglas transversales están en
 `engineering/SECURITY_PRINCIPLES.md`.
 
 2.5 Production readiness boundary
+
+Deployment, staging y operaciones
+→ DEPLOYMENT.md
 
 Debe mantenerse:
 
