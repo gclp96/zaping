@@ -252,7 +252,6 @@ function EquipmentPageContent() {
       setEquipment(response.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
       if (isForbiddenError(error)) {
         setForbidden(true);
         setEquipment([]);
@@ -283,7 +282,6 @@ function EquipmentPageContent() {
 
       setEquipmentDetail(response.data);
     } catch (error: unknown) {
-      console.error(error);
       setDetailError(
         getApiErrorMessage(
           error,
@@ -307,7 +305,6 @@ function EquipmentPageContent() {
 
       setAvailability(response.data);
     } catch (error: unknown) {
-      console.error(error);
       setAvailabilityError(
         getApiErrorMessage(
           error,
@@ -331,7 +328,6 @@ function EquipmentPageContent() {
 
       setInspections(response.data);
     } catch (error: unknown) {
-      console.error(error);
       setInspectionsError(
         getApiErrorMessage(
           error,
@@ -355,7 +351,6 @@ function EquipmentPageContent() {
         response.data.filter(isEquipmentProductEligible),
       );
     } catch (error: unknown) {
-      console.error(error);
       setCreateProductsError(
         getApiErrorMessage(
           error,
@@ -477,7 +472,6 @@ function EquipmentPageContent() {
         loadEquipment(false),
       ]);
     } catch (error: unknown) {
-      console.error(error);
       setInspectionError(
         getApiErrorMessage(
           error,
@@ -546,7 +540,6 @@ function EquipmentPageContent() {
 
       await loadEquipment(false);
     } catch (error: unknown) {
-      console.error(error);
       setCreateError(
         getApiErrorMessage(
           error,
@@ -615,7 +608,6 @@ function EquipmentPageContent() {
         loadEquipment(false),
       ]);
     } catch (error: unknown) {
-      console.error(error);
       setRetirementError(
         getApiErrorMessage(
           error,

@@ -237,7 +237,7 @@ describe('usePurchaseReceiptPreparation', () => {
         'No fue posible cargar los movimientos de inventario.',
       receiptsError: '',
     });
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('reporta como insegura la preparación cuando falla el historial de recepciones', async () => {
@@ -276,7 +276,7 @@ describe('usePurchaseReceiptPreparation', () => {
       movementsError: '',
       receiptsError: 'No fue posible cargar las recepciones de la compra.',
     });
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('marca una preparación como obsoleta cuando una solicitud posterior gana la carrera', async () => {

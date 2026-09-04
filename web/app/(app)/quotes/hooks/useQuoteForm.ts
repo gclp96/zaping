@@ -376,7 +376,6 @@ export function useQuoteForm({
       setOpenModal(false);
       resetForm();
     } catch (error: unknown) {
-      console.error(error);
 
       setFormError(
         getApiErrorMessage(

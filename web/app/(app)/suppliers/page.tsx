@@ -152,7 +152,6 @@ export default function SuppliersPage() {
       setSuppliers(response.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
       if (isForbiddenError(error)) {
         setForbidden(true);
         setSuppliers([]);
@@ -267,7 +266,6 @@ export default function SuppliersPage() {
       setEditingSupplier(null);
       resetSupplierForm();
     } catch (error: unknown) {
-      console.error(error);
       setFormError(
         getApiErrorMessage(
           error,
@@ -309,7 +307,6 @@ export default function SuppliersPage() {
 
       setSupplierToDeactivate(null);
     } catch (error: unknown) {
-      console.error(error);
       setDeactivationError(
         getApiErrorMessage(error, 'No fue posible desactivar el proveedor.'),
       );

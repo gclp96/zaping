@@ -347,7 +347,6 @@ export function usePurchaseReceipts({
         folio: response.data.folio,
       });
     } catch (error: unknown) {
-      console.error(error);
 
       setReceiptFormError(
         getApiErrorMessage(

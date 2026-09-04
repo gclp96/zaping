@@ -71,7 +71,6 @@ export function useHomeData() {
       const response = await api.get<DashboardData>('/dashboard');
       setDashboardState({ data: response.data, loading: false, error: '' });
     } catch (error: unknown) {
-      console.error(error);
       setDashboardState({
         data: null,
         loading: false,
@@ -94,7 +93,6 @@ export function useHomeData() {
       const response = await api.get<HomeEquipment[]>('/equipment');
       setEquipmentState({ data: response.data, loading: false, error: '' });
     } catch (error: unknown) {
-      console.error(error);
       setEquipmentState({
         data: null,
         loading: false,
@@ -117,7 +115,6 @@ export function useHomeData() {
       const response = await api.get<HomePurchase[]>('/purchases');
       setPurchasesState({ data: response.data, loading: false, error: '' });
     } catch (error: unknown) {
-      console.error(error);
       setPurchasesState({
         data: null,
         loading: false,

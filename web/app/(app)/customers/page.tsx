@@ -127,7 +127,6 @@ export default function CustomersPage() {
       setCustomers(response.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
       if (isForbiddenError(error)) {
         setForbidden(true);
         setCustomers([]);
@@ -201,7 +200,6 @@ export default function CustomersPage() {
 
       setCustomerToDeactivate(null);
     } catch (error: unknown) {
-      console.error(error);
       setDeactivationError(
         getApiErrorMessage(error, 'No fue posible desactivar el cliente.'),
       );

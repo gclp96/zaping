@@ -110,7 +110,6 @@ export function useQuoteActions({
 
       setQuoteToApprove(null);
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(
@@ -140,7 +139,6 @@ export function useQuoteActions({
 
       setQuoteToCancel(null);
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(
@@ -177,7 +175,6 @@ export function useQuoteActions({
       try {
         await onQuoteChanged();
       } catch (error: unknown) {
-        console.error(error);
 
         setActionError(
           getApiErrorMessage(
@@ -187,7 +184,6 @@ export function useQuoteActions({
         );
       }
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(
@@ -230,7 +226,6 @@ export function useQuoteActions({
       link.click();
       link.remove();
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(

@@ -333,7 +333,6 @@ export function usePurchaseForm({
       setPurchaseToEdit(null);
       resetForm();
     } catch (error: unknown) {
-      console.error(error);
 
       setItemsError(
         getApiErrorMessage(

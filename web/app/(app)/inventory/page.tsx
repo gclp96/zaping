@@ -462,7 +462,6 @@ function InventoryPageContent() {
       setInventory(response.data);
       setStockPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
       setInventoryError(
         getApiErrorMessage(
           error,
@@ -486,7 +485,6 @@ function InventoryPageContent() {
       setMovements(response.data);
       setMovementPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
       setMovementsError(
         getApiErrorMessage(
           error,

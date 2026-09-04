@@ -10,6 +10,29 @@ const navigationMock = vi.hoisted(() => ({
   push: vi.fn(),
 }));
 
+function sensitiveAxiosLikeError() {
+  return {
+    isAxiosError: true,
+    config: {
+      headers: {
+        Authorization: 'Bearer SUPER_SECRET_JWT',
+      },
+      data: {
+        email: 'qa@example.test',
+        password: 'SUPER_SECRET_PASSWORD',
+        currentPassword: 'SUPER_SECRET_CURRENT_PASSWORD',
+        newPassword: 'SUPER_SECRET_NEW_PASSWORD',
+      },
+      url: '/reset-password?token=SUPER_SECRET_RESET_TOKEN',
+    },
+    request: { body: 'SUPER_SECRET_REQUEST_SECRET' },
+    response: {
+      status: 401,
+      data: { secret: 'SUPER_SECRET_RESPONSE_SECRET' },
+    },
+  };
+}
+
 vi.mock('next/navigation', () => ({
   useRouter: () => navigationMock,
 }));
@@ -21,14 +44,20 @@ vi.mock('@/services/api', () => ({
 }));
 
 describe('LoginPage', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     vi.stubGlobal('alert', vi.fn());
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     cleanup();
+    consoleErrorSpy.mockRestore();
     vi.unstubAllGlobals();
   });
 
@@ -84,5 +113,28 @@ describe('LoginPage', () => {
     });
     expect(navigationMock.push).not.toHaveBeenCalled();
     expect(localStorage.getItem('token')).toBeNull();
+  });
+
+  it('does not send sensitive login errors to the console', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.post).mockRejectedValueOnce(sensitiveAxiosLikeError());
+
+    render(<LoginPage />);
+    await user.type(screen.getByLabelText('Correo'), 'qa@example.test');
+    await user.type(screen.getByLabelText('Contraseña'), 'SUPER_SECRET_PASSWORD');
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+
+    await waitFor(() => {
+      expect(window.alert).toHaveBeenCalledWith('Credenciales inválidas');
+    });
+
+    const serializedConsoleArgs = JSON.stringify(consoleErrorSpy.mock.calls);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_JWT');
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_PASSWORD');
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_CURRENT_PASSWORD');
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_NEW_PASSWORD');
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_RESET_TOKEN');
+    expect(serializedConsoleArgs).not.toContain('SUPER_SECRET_RESPONSE_SECRET');
   });
 });

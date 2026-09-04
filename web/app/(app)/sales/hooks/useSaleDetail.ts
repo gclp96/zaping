@@ -21,8 +21,6 @@ export function useSaleDetail() {
 
       setSaleToView(response.data);
     } catch (error: unknown) {
-      console.error(error);
-
       setDetailError(
         getApiErrorMessage(
           error,

@@ -98,7 +98,6 @@ export default function PurchaseReceiptDetailPage() {
 
       setReceipt(response.data);
     } catch (requestError: unknown) {
-      console.error(requestError);
       setError(
         getApiErrorMessage(
           requestError,

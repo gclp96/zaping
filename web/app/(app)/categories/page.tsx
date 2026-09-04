@@ -53,8 +53,7 @@ export default function CategoriesPage() {
     try {
       const response = await api.get('/categories');
       setCategories(response.data);
-    } catch (error) {
-      console.error(error);
+    } catch {
     }
   }
 
@@ -86,8 +85,6 @@ export default function CategoriesPage() {
 
       await loadCategories();
     } catch (error: unknown) {
-      console.error(error);
-
       alert(getApiErrorMessage(error, 'Error al guardar categoría'));
     } finally {
       setLoading(false);
@@ -120,8 +117,6 @@ export default function CategoriesPage() {
 
       await loadCategories();
     } catch (error: unknown) {
-      console.error(error);
-
       alert(getApiErrorMessage(error, 'Error al eliminar categoría'));
     } finally {
       setDeleteLoading(false);
@@ -138,8 +133,7 @@ export default function CategoriesPage() {
         if (mounted) {
           setCategories(response.data);
         }
-      } catch (error) {
-        console.error(error);
+      } catch {
       } finally {
         if (mounted) {
           setPageLoading(false);

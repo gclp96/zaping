@@ -117,8 +117,6 @@ export function useAuthenticatedSession({
         setState({ status: "success", user });
       })
       .catch((error: unknown) => {
-        console.error(error);
-
         if (mounted) {
           if (getApiErrorStatus(error) === 401) {
             setState({ status: "unauthenticated" });

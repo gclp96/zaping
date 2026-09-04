@@ -76,7 +76,6 @@ export function usePurchaseActions({
 
       setPurchaseToApprove(null);
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(
@@ -106,7 +105,6 @@ export function usePurchaseActions({
 
       setPurchaseToCancel(null);
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(
@@ -148,7 +146,6 @@ export function usePurchaseActions({
       link.click();
       link.remove();
     } catch (error: unknown) {
-      console.error(error);
 
       setActionError(
         getApiErrorMessage(

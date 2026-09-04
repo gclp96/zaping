@@ -407,8 +407,6 @@ describe('useQuoteForm', () => {
 
     expect(result.current.saving).toBe(false);
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });

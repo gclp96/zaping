@@ -308,8 +308,7 @@ const loadCompanyTimezone = useCallback(async () => {
     }
 
     setCompanyTimezoneState({ status: 'success', value: timezone });
-  } catch (error: unknown) {
-    console.error(error);
+  } catch {
 
     setCompanyTimezoneState({
       status: 'error',
@@ -536,8 +535,7 @@ const {
         status: 'error',
         message: receiptHistoryUnavailableMessage,
       });
-    } catch (error: unknown) {
-      console.error(error);
+    } catch {
 
       if (requestId === directReceiveRequestId.current) {
         setDirectReceiveState({
@@ -584,7 +582,6 @@ async function loadPageData() {
       setProducts(productsResponse.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
 
       if (isForbiddenError(error)) {
         setForbidden(true);

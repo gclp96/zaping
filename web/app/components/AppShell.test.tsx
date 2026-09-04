@@ -68,6 +68,29 @@ function axiosError(status: number) {
   };
 }
 
+function sensitiveAxiosLikeError(status: number) {
+  return {
+    isAxiosError: true,
+    config: {
+      headers: {
+        Authorization: "Bearer SUPER_SECRET_JWT",
+      },
+      data: {
+        email: "qa@example.test",
+        password: "SUPER_SECRET_PASSWORD",
+        currentPassword: "SUPER_SECRET_CURRENT_PASSWORD",
+        newPassword: "SUPER_SECRET_NEW_PASSWORD",
+      },
+      url: "/reset-password?token=SUPER_SECRET_RESET_TOKEN",
+    },
+    request: { body: "SUPER_SECRET_REQUEST_SECRET" },
+    response: {
+      status,
+      data: { secret: "SUPER_SECRET_RESPONSE_SECRET" },
+    },
+  };
+}
+
 function mockAuthSuccess(session: AuthenticatedSession = adminSession) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     if (String(url) === "/auth/me") {
@@ -94,12 +117,16 @@ function deferred<T>() {
 }
 
 describe("AppShell session gate", () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
     navigationMock.pathname = "/products";
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -229,7 +256,7 @@ describe("AppShell session gate", () => {
 
   it("preserves the token and blocks the shell on a structured 5xx", async () => {
     window.localStorage.setItem("token", "valid-token");
-    vi.mocked(api.get).mockRejectedValueOnce(axiosError(503));
+    vi.mocked(api.get).mockRejectedValueOnce(sensitiveAxiosLikeError(503));
 
     renderShell();
 
@@ -237,6 +264,19 @@ describe("AppShell session gate", () => {
     expect(window.localStorage.getItem("token")).toBe("valid-token");
     expect(navigationMock.replace).not.toHaveBeenCalled();
     expect(screen.queryByTestId("protected-child")).toBeNull();
+
+    const serializedConsoleArgs = JSON.stringify(consoleErrorSpy.mock.calls);
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_JWT");
+    expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_PASSWORD");
+    expect(serializedConsoleArgs).not.toContain(
+      "SUPER_SECRET_CURRENT_PASSWORD",
+    );
+    expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_NEW_PASSWORD");
+    expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_RESET_TOKEN");
+    expect(serializedConsoleArgs).not.toContain(
+      "SUPER_SECRET_RESPONSE_SECRET",
+    );
   });
 
   it("does not fetch protected child data before auth bootstrap completes", async () => {

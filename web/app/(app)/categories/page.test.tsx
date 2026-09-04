@@ -180,7 +180,7 @@ describe('CategoriesPage', () => {
     expect(
       await screen.findByText('No hay categorías registradas'),
     ).toBeTruthy();
-    expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('sorts categories by name with the shared stable sort utility', async () => {

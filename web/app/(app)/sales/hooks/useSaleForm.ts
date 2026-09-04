@@ -242,8 +242,6 @@ export function useSaleForm({
       setOpenModal(false);
       resetForm();
     } catch (error: unknown) {
-      console.error(error);
-
       setFormError(
         getApiErrorMessage(
           error,

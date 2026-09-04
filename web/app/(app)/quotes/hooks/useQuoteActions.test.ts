@@ -441,9 +441,7 @@ describe('useQuoteActions', () => {
     );
     expect(result.current.createdSale).toBeNull();
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('bloquea una segunda conversión mientras la primera sigue pendiente', async () => {

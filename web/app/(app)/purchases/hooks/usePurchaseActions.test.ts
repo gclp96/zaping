@@ -263,9 +263,7 @@ describe('usePurchaseActions', () => {
       'No fue posible aprobar la compra.',
     );
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('cancela una compra y actualiza la lista', async () => {
@@ -333,9 +331,7 @@ describe('usePurchaseActions', () => {
       'No fue posible cancelar la compra.',
     );
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 
   it('descarga el PDF y libera la URL temporal', async () => {
@@ -419,8 +415,6 @@ describe('usePurchaseActions', () => {
       result.current.downloadingPurchaseId,
     ).toBeNull();
 
-    expect(consoleErrorSpy).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
 });

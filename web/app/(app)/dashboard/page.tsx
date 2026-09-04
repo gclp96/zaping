@@ -167,8 +167,6 @@ export default function DashboardPage() {
         items: response.data,
       });
     } catch (loadError: unknown) {
-      console.error(loadError);
-
       setSalesState({
         loading: false,
         error: getApiErrorMessage(
@@ -198,7 +196,6 @@ export default function DashboardPage() {
       setData(dashboardResult.value.data);
       setError('');
     } else {
-      console.error(dashboardResult.reason);
       setData(null);
       setError(
         getApiErrorMessage(
@@ -215,7 +212,6 @@ export default function DashboardPage() {
         items: salesResult.value.data,
       });
     } else {
-      console.error(salesResult.reason);
       setSalesState({
         loading: false,
         error: getApiErrorMessage(

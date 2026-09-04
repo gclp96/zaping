@@ -52,7 +52,6 @@ export function usePurchaseReceiptPreparation() {
     if (movementsResult.status === 'rejected') {
       const error: unknown = movementsResult.reason;
 
-      console.error(error);
 
       movementsError = getApiErrorMessage(
         error,
@@ -63,7 +62,6 @@ export function usePurchaseReceiptPreparation() {
     if (receiptsResult.status === 'rejected') {
       const error: unknown = receiptsResult.reason;
 
-      console.error(error);
 
       receiptsError = getApiErrorMessage(
         error,

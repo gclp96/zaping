@@ -137,7 +137,6 @@ function usePurchase360(purchaseId: string) {
       setReceipts(response.data);
       setReceiptHistoryStatus('success');
     } catch (error: unknown) {
-      console.error(error);
       setReceipts([]);
       setReceiptsError(
         getApiErrorMessage(
@@ -161,7 +160,6 @@ function usePurchase360(purchaseId: string) {
       );
       setMovements(response.data);
     } catch (error: unknown) {
-      console.error(error);
       setMovements([]);
       setMovementsError(
         getApiErrorMessage(
@@ -204,8 +202,6 @@ function usePurchase360(purchaseId: string) {
       setBaseLoading(false);
       await loadRelatedResources();
     } catch (error: unknown) {
-      console.error(error);
-
       if (version !== requestVersion.current) {
         return;
       }
@@ -389,7 +385,6 @@ export default function Purchase360Page() {
       setProducts(productsResponse.data);
       return true;
     } catch (error: unknown) {
-      console.error(error);
       setCatalogError(
         getApiErrorMessage(
           error,

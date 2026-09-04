@@ -124,7 +124,6 @@ export default function PurchaseReceiptsPage() {
       setReceipts(response.data);
       setPageIndex(0);
     } catch (requestError: unknown) {
-      console.error(requestError);
       if (isForbiddenError(requestError)) {
         setForbidden(true);
         setReceipts([]);

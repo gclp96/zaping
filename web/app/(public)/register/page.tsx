@@ -42,8 +42,7 @@ export default function RegisterPage() {
 
       localStorage.setItem('token', response.data.token);
       router.push('/dashboard');
-    } catch (error) {
-      console.error(error);
+    } catch {
       alert('No se pudo crear la cuenta');
     } finally {
       setLoading(false);

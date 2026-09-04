@@ -145,8 +145,6 @@ export default function UsersPage() {
       setUsers(response.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
-
       if (isForbiddenError(error)) {
         setForbidden(true);
         setUsers([]);
@@ -300,7 +298,6 @@ export default function UsersPage() {
       resetForm();
       await loadUsers();
     } catch (error: unknown) {
-      console.error(error);
       setFormApiError(
         getApiErrorMessage(error, "No fue posible guardar el usuario."),
       );
@@ -338,7 +335,6 @@ export default function UsersPage() {
       await loadUsers();
       setUserToDeactivate(null);
     } catch (error: unknown) {
-      console.error(error);
       setDeactivationError(
         getApiErrorMessage(error, "No fue posible desactivar el usuario."),
       );
@@ -361,7 +357,6 @@ export default function UsersPage() {
       });
       await loadUsers();
     } catch (error: unknown) {
-      console.error(error);
       setActionError(
         getApiErrorMessage(error, "No fue posible reactivar el usuario."),
       );

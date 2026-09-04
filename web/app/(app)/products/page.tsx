@@ -399,7 +399,6 @@ export default function ProductsPage() {
       setCategories(response.data);
       setCategoryError(null);
     } catch (error: unknown) {
-      console.error(error);
       setCategoryError(
         getApiErrorMessage(
           error,
@@ -416,7 +415,6 @@ export default function ProductsPage() {
     try {
       await Promise.all([loadProducts(), loadCategories()]);
     } catch (error: unknown) {
-      console.error(error);
       setPageError(
         getApiErrorMessage(
           error,
@@ -528,7 +526,6 @@ export default function ProductsPage() {
       closeProductModal();
       await loadProducts();
     } catch (error: unknown) {
-      console.error(error);
       alert(getApiErrorMessage(error, 'Error al guardar producto'));
     } finally {
       setLoading(false);
@@ -545,7 +542,6 @@ export default function ProductsPage() {
       setSelectedProduct(null);
       await loadProducts();
     } catch (error: unknown) {
-      console.error(error);
       alert(getApiErrorMessage(error, 'Error al desactivar producto'));
     } finally {
       setDeleteLoading(false);
@@ -608,8 +604,6 @@ export default function ProductsPage() {
       try {
         await Promise.all([loadProducts(), loadCategories()]);
       } catch (error: unknown) {
-        console.error(error);
-
         if (mounted) {
           setPageError(
             getApiErrorMessage(

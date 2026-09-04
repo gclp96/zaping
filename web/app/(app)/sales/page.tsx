@@ -221,8 +221,6 @@ function SalesPageContent() {
       setProducts(productsResponse.data);
       setPageIndex(0);
     } catch (error: unknown) {
-      console.error(error);
-
       if (isForbiddenError(error)) {
         setForbidden(true);
         setSales([]);
