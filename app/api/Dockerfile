@@ -39,4 +39,4 @@ COPY --from=build /app/dist ./dist
 
 USER node
 
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/src/main"]

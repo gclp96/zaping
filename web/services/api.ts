@@ -76,7 +76,9 @@ api.interceptors.response.use(
         !isSessionBootstrapRequest &&
         window.location.pathname !== "/login"
       ) {
-        window.location.href = "/login";
+        window.location.assign(
+          new URL("/login", window.location.origin).toString(),
+        );
       }
     }
 

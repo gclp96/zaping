@@ -1,11 +1,11 @@
 # Case Kits — Zaping Healthcare
 
-**Módulo:** Healthcare Case Kits  
-**Producto:** Zaping Healthcare  
-**Versión:** 2.0.0  
-**Estado:** Aprobado  
-**Estado de implementación:** DOMAIN DESIGN / APPROVED TARGET / NOT IMPLEMENTED  
-**Última actualización:** 2026-08-20  
+**Módulo:** Healthcare Case Kits
+**Producto:** Zaping Healthcare
+**Versión:** 2.0.0
+**Estado:** Aprobado
+**Estado de implementación:** DOMAIN DESIGN / APPROVED TARGET / NOT IMPLEMENTED
+**Última actualización:** 2026-08-20
 **Responsable:** Zaping Healthcare Team
 
 ---
