@@ -1,251 +1,238 @@
-# Módulo de Ventas — Zaping ERP
+# Sales — Zaping ERP
 
 **Módulo:** Sales
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** LEGACY IMPLEMENTED / TARGET REFACTOR APPROVED
-**Última actualización:** 2026-08-19
+**Estado de implementación:** SALES V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Sales administra el proceso mediante el cual una intención comercial se convierte en un compromiso de venta y posteriormente en cumplimiento físico.
+Sales administra el workflow comercial CURRENT mediante el cual una Company
+registra una venta para un Customer y, al confirmarla, produce la salida física
+correspondiente de Inventory.
 
-La arquitectura objetivo debe permitir responder:
+Su responsabilidad actual es responder:
 
 ```text
-¿Qué pidió el cliente?
-¿Qué cantidades se comprometieron?
-¿Qué precios se acordaron?
-¿Qué se ha entregado?
-¿Qué falta entregar?
-¿Qué inventario salió?
-¿De qué operación provino?
-¿Qué devoluciones existen?
+¿Quién compra?
+
+¿Qué Products se venden?
+
+¿Qué cantidades?
+
+¿A qué precios?
+
+¿Cuál es el total?
+
+¿En qué estado está la Sale?
+
+¿Ya produjo Inventory OUT?
+
+¿Provino de una Quote?
 ```
+
+La arquitectura futura separará explícitamente:
+
+```text
+commercial commitment
+```
+
+de:
+
+```text
+physical fulfillment
+```
+
+mediante SalesOrder y Delivery.
 
 ---
 
-# 2. Principio fundamental
+# 2. Ownership CURRENT
 
-Zaping distingue tres hechos:
-
-```text
-SalesOrder
-=
-compromiso comercial
-```
-
-```text
-Delivery
-=
-cumplimiento físico
-```
-
-```text
-InventoryMovement OUT
-=
-consecuencia física definitiva
-```
-
-Por tanto:
-
-> **Confirmar una intención comercial no debe equivaler automáticamente a mover inventario.**
-
----
-
-# 3. Arquitectura objetivo
-
-La arquitectura aprobada mediante ADR-011 es:
-
-```text
-Quote
-   ↓ opcional
-SalesOrder
-   ↓
-Delivery
-   ↓
-Inventory OUT
-```
-
----
-
-# 4. Venta directa
-
-Quote no es obligatoria.
-
-Debe ser válido:
-
-```text
-Customer
-↓
-SalesOrder
-↓
-Delivery
-```
-
-cuando la operación comercial comienza directamente como pedido o venta.
-
----
-
-# 5. Arquitectura actual legacy
-
-La implementación histórica de Zaping utiliza:
+Sales es propietario actualmente de:
 
 ```text
 Sale
+
+SaleItem
+
+Sale folio
+
+Customer relationship
+
+commercial quantities
+
+commercial prices
+
+subtotal
+
+iva
+
+total
+
+Sale lifecycle
+
+Quote-origin relationship when applicable
 ```
 
-como entidad central.
-
-El flujo manual documentado es:
-
-```text
-Create Sale
-↓
-DRAFT
-├── approve
-│      ↓
-│   CONFIRMED
-│      ↓
-│   Inventory OUT
-│
-└── cancel
-       ↓
-    CANCELLED
-```
+Sales coordina con Inventory la consecuencia física de una Sale confirmada.
 
 ---
 
-# 6. Por qué el modelo actual es legacy
-
-`Sale` combina actualmente responsabilidades que en la arquitectura objetivo pertenecen a conceptos diferentes.
-
-Principalmente:
-
-```text
-Commercial Commitment
-+
-Physical Fulfillment
-```
-
-Esto limita escenarios como:
-
-* entregas parciales;
-* múltiples entregas;
-* entrega posterior;
-* envío;
-* selección de lote en Delivery;
-* facturación independiente;
-* devoluciones físicas;
-* Healthcare custody.
-
----
-
-# 7. Estrategia de transición
-
-El sistema no debe romper el modelo actual de inmediato.
-
-La evolución será:
-
-```text
-Sale legacy
-↓
-documentar comportamiento actual
-↓
-diseñar SalesOrder
-↓
-diseñar Delivery
-↓
-definir migración
-↓
-implementar
-↓
-migrar frontend/API
-↓
-retirar comportamiento legacy
-```
-
----
-
-# 8. Responsabilidades objetivo de Sales
-
-Sales será propietario de:
-
-* SalesOrder;
-* SalesOrderItem;
-* Customer del pedido;
-* cantidades comprometidas;
-* precios;
-* subtotal;
-* impuestos;
-* total;
-* lifecycle comercial;
-* relación con Quote;
-* cantidades entregadas/pending como información derivada.
-
----
-
-# 9. Responsabilidades de Delivery
-
-Delivery será responsable de:
-
-* cumplimiento físico;
-* cantidades realmente entregadas;
-* lotes;
-* series;
-* destino;
-* responsable;
-* fecha;
-* confirmación;
-* integración con Inventory.
-
-Inicialmente Delivery puede permanecer dentro del dominio Sales sin perder esta separación conceptual.
-
----
-
-# 10. Fuera del alcance
+# 3. Fuera del alcance
 
 Sales no es propietario de:
 
-* Product stock;
-* InventoryMovement;
-* InventoryBatch;
-* Purchase;
-* PurchaseReceipt;
-* Customer master data;
-* Invoice;
-* Payment;
-* Healthcare custody;
-* Equipment lifecycle.
-
----
-
-# 11. Modelo `Sale` actual
-
-El schema vigente contiene:
-
 ```text
-Sale
-├── id
-├── companyId
-├── folio
-├── customerId
-├── subtotal
-├── iva
-├── total
-├── status
-├── createdAt
-├── updatedAt
-└── items
+Product master data
+
+Inventory stock model
+
+InventoryBatch semantics
+
+Purchase
+
+PurchaseReceipt
+
+Customer master lifecycle
+
+Equipment lifecycle
+
+Billing
+
+Invoice
+
+Payment
+
+Accounts Receivable
+
+Healthcare custody
 ```
 
 ---
 
-# 12. Modelo `SaleItem` actual
+# 4. CURRENT vs TARGET vs FUTURE
+
+Este documento distingue:
+
+## CURRENT
+
+Comportamiento implementado y validado mediante `Sale`.
+
+## TARGET
+
+Arquitectura futura basada en:
+
+```text
+SalesOrder
+↓
+Delivery
+```
+
+## FUTURE
+
+Capacidades posteriores como:
+
+```text
+Returns
+
+Reservations
+
+Shipments
+
+Billing
+
+advanced fulfillment
+```
+
+---
+
+# 5. Estado CURRENT
+
+Sales V1 soporta actualmente:
+
+```text
+Sale persistence
+
+SaleItem
+
+direct Sale creation
+
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+
+DRAFT approval
+
+DRAFT cancellation
+
+Customer active validation
+
+Product active validation
+
+Generic Sales eligibility
+
+Inventory OUT on confirmation
+
+Quote → Sale conversion
+
+server-generated sequential folio
+
+Sale detail
+
+Sale deep-link
+
+Sale PDF
+
+frontend list/create/detail/lifecycle
+```
+
+---
+
+# 6. Modelo Sale actual
+
+Conceptualmente:
+
+```text
+Sale
+
+id
+companyId
+
+folio
+
+customerId
+quoteId?
+
+subtotal
+iva
+total
+
+status
+
+createdAt
+updatedAt
+
+customer
+items
+```
+
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
+
+---
+
+# 7. SaleItem
 
 Conceptualmente:
 
@@ -260,573 +247,793 @@ Sale
     └── subtotal
 ```
 
-La definición técnica exacta permanece en `schema.prisma`.
+`SaleItem` conserva los valores comerciales de la transacción.
 
 ---
 
-# 13. Tenant
+# 8. Sale como modelo CURRENT
 
-`Sale` pertenece directamente a:
-
-```text
-Company
-```
-
-mediante:
+Debe mantenerse:
 
 ```text
-companyId
-```
-
-`SaleItem` hereda actualmente su pertenencia al tenant mediante:
-
-```text
-SaleItem
-↓
 Sale
-↓
-companyId
+→ CURRENT ERP Core V1
 ```
 
-No necesita necesariamente duplicar `companyId` mientras la relación sea segura.
+Aunque ADR-011 define una arquitectura futura diferente.
+
+La terminología recomendada es:
+
+```text
+CURRENT transitional commercial model
+```
+
+y no:
+
+```text
+historical-only model
+```
 
 ---
 
-# 14. Folio
+# 9. Lifecycle CURRENT
 
-Sale utiliza actualmente un folio único por Company.
-
-Conceptualmente:
+Sale utiliza:
 
 ```text
-id
-→ UUID técnico
+DRAFT
+
+CONFIRMED
+
+CANCELLED
 ```
+
+Flujo principal:
+
+```text
+DRAFT
+├── approve → CONFIRMED
+└── cancel  → CANCELLED
+```
+
+Actualmente no existe un flujo normal:
+
+```text
+CONFIRMED
+→ CANCELLED
+```
+
+---
+
+# 10. DRAFT
+
+Una Sale creada directamente comienza como:
+
+```text
+DRAFT
+```
+
+Representa una venta todavía no confirmada físicamente.
+
+Debe mantenerse:
+
+```text
+Create direct Sale
+→ DRAFT
+→ no Inventory mutation
+```
+
+---
+
+# 11. DRAFT no implica edición genérica
+
+Actualmente no existe un endpoint genérico documentado:
+
+```text
+PATCH /sales/:id
+```
+
+ni una UI general de edición de Sale.
+
+Por tanto:
+
+```text
+generic Sale editing
+→ NOT IMPLEMENTED
+```
+
+El estado DRAFT no debe interpretarse automáticamente como una capacidad CRUD
+completa.
+
+---
+
+# 12. CONFIRMED
+
+Una Sale pasa:
+
+```text
+DRAFT
+↓
+approve
+↓
+CONFIRMED
+```
+
+Actualmente `CONFIRMED` representa:
+
+```text
+commercial confirmation
++
+physical Inventory OUT
+```
+
+dentro de Sales V1.
+
+---
+
+# 13. CONFIRMED es terminal en el flujo normal
+
+Actualmente una Sale CONFIRMED:
+
+```text
+→ no normal cancellation
+```
+
+y:
+
+```text
+→ no generic reversal workflow
+```
+
+La restauración del Inventory después de una Sale confirmada no está implementada.
+
+---
+
+# 14. CANCELLED
+
+Una Sale DRAFT puede pasar a:
+
+```text
+CANCELLED
+```
+
+Debe mantenerse:
+
+```text
+DRAFT
+↓
+cancel
+↓
+CANCELLED
+```
+
+sin:
+
+```text
+InventoryMovement
+```
+
+y sin:
+
+```text
+Product.stock mutation
+```
+
+---
+
+# 15. CANCELLED no significa deleted
+
+Debe mantenerse:
+
+```text
+CANCELLED
+≠
+DELETED
+```
+
+La Sale permanece como documento histórico con:
 
 ```text
 folio
-→ referencia empresarial
+
+Customer
+
+items
+
+prices
+
+totals
+
+status
 ```
 
 ---
 
-# 15. Unicidad
+# 16. Direct Sale CURRENT
 
-El schema actual contiene:
+La creación directa utiliza:
 
 ```text
-@@unique([companyId, folio])
+POST /sales
 ```
 
-Esta regla debe preservarse conceptualmente para la futura SalesOrder.
-
----
-
-# 16. Lifecycle legacy
-
-La entidad Sale utiliza actualmente:
+Flujo:
 
 ```text
+validate request
+↓
+allocate Sale folio
+↓
+create Sale
+↓
 DRAFT
-CONFIRMED
-CANCELLED
+```
+
+No modifica Inventory.
+
+---
+
+# 17. Direct Sale create no mueve stock
+
+Debe mantenerse:
+
+```text
+POST /sales
+→ Sale DRAFT
+→ Product.stock unchanged
+```
+
+y:
+
+```text
+POST /sales
+→ no InventoryMovement OUT
 ```
 
 ---
 
-# 17. DRAFT legacy
+# 18. Approval CURRENT
 
-Representa una venta manual todavía no confirmada.
+La aprobación utiliza:
 
-Puede permitir:
+```text
+PATCH /sales/:id/approve
+```
 
-* edición;
-* cambio de Customer;
-* modificación de items;
-* modificación de cantidades;
-* aprobación;
-* cancelación.
+y conceptualmente ejecuta:
+
+```text
+Sale DRAFT validation
+
++
+
+Customer validation
+
++
+
+Product validation
+
++
+
+Generic Sales eligibility validation
+
++
+
+stock availability validation
+
++
+
+Sale → CONFIRMED
+
++
+
+Product.stock decrement
+
++
+
+InventoryMovement OUT
+```
 
 ---
 
-# 18. CONFIRMED legacy
+# 19. Approval atomicity
 
-Actualmente:
+La aprobación debe mantener consistencia transaccional.
+
+No debe ocurrir:
 
 ```text
 Sale CONFIRMED
+✓
+
+Inventory OUT
+✗
 ```
 
-representa tanto confirmación comercial como la operación que desencadena la salida de inventario.
-
-Este comportamiento debe considerarse:
-
-**LEGACY**
-
----
-
-# 19. CANCELLED legacy
-
-La documentación histórica permite cancelar principalmente Sales todavía en:
+ni:
 
 ```text
-DRAFT
-```
+Inventory OUT
+✓
 
-Una Sale confirmada no debe simplemente cancelarse si ya produjo movimientos físicos.
+Sale still DRAFT
+✗
+```
 
 ---
 
-# 20. Sale confirmada con efectos
+# 20. Inventory OUT CURRENT
 
-Cuando:
+En Sales V1:
+
+```text
+Sale CONFIRMED
+↓
+Inventory OUT
+```
+
+La semántica exacta del movimiento pertenece a:
+
+```text
+INVENTORY.md
+```
+
+Sales determina el evento empresarial que origina esa salida.
+
+---
+
+# 21. InventoryMovement reference
+
+Los movimientos generados por una Sale confirmada deben conservar referencia a la
+operación de origen.
+
+Conceptualmente:
+
+```text
+InventoryMovement
+
+type = OUT
+
+reference
+→ Sale
+```
+
+Esto permite trazabilidad:
 
 ```text
 Sale
 ↓
-CONFIRMED
-↓
-Inventory OUT
-```
-
-ya ocurrió, no debe permitirse:
-
-```text
-status = CANCELLED
-```
-
-sin resolver también los efectos físicos.
-
----
-
-# 21. Returns como compensación
-
-La estrategia histórica correcta para mercancía ya vendida es:
-
-```text
-Sale CONFIRMED
-↓
-Return
-```
-
-en lugar de eliminar o cancelar retrospectivamente la Sale.
-
-Este principio continúa siendo válido después del refactor.
-
----
-
-# 22. Lifecycle objetivo de SalesOrder
-
-SalesOrder representará el pedido o compromiso comercial.
-
-Un lifecycle conceptual puede incluir:
-
-```text
-DRAFT
-↓
-CONFIRMED
-↓
-PARTIALLY_DELIVERED
-↓
-DELIVERED
-```
-
-además de:
-
-```text
-CANCELLED
-```
-
-cuando corresponda.
-
----
-
-# 23. Estados no aprobados todavía como enum
-
-Los nombres:
-
-```text
-PARTIALLY_DELIVERED
-DELIVERED
-```
-
-representan semántica funcional objetivo.
-
-Este documento **no ordena agregarlos todavía a `DocumentStatus`**.
-
-El diseño técnico se realizará durante el refactor.
-
----
-
-# 24. Estado derivado
-
-Cuando sea posible, el estado de fulfillment debe derivarse de las cantidades realmente entregadas.
-
-Ejemplo:
-
-```text
-Ordered = 100
-Delivered = 40
-Pending = 60
-```
-
-representa una operación parcialmente cumplida.
-
----
-
-# 25. SalesOrder DRAFT
-
-Representa un pedido todavía editable.
-
-Puede permitir:
-
-* Customer;
-* items;
-* quantities;
-* prices;
-* terms;
-* confirmación;
-* cancelación.
-
----
-
-# 26. SalesOrder CONFIRMED
-
-Significa:
-
-> Existe un compromiso comercial válido.
-
-No significa:
-
-> La mercancía ya salió.
-
----
-
-# 27. Regla crítica
-
-Debe cumplirse:
-
-```text
-SalesOrder CONFIRMED
-→ no Inventory OUT
-```
-
----
-
-# 28. Delivery
-
-`Delivery` representa qué mercancía fue efectivamente entregada.
-
-Una SalesOrder puede producir:
-
-```text
-0..N Deliveries
-```
-
----
-
-# 29. Ejemplo de entrega parcial
-
-```text
-SalesOrder SO-001
-100 unidades
-│
-├── Delivery DEL-001
-│   40
-│
-├── Delivery DEL-002
-│   30
-│
-└── Pending
-    30
-```
-
----
-
-# 30. Ordered Quantity
-
-Para una SalesOrderItem:
-
-```text
-Ordered Quantity
-=
-SalesOrderItem.quantity
-```
-
----
-
-# 31. Delivered Quantity
-
-Conceptualmente:
-
-```text
-Delivered Quantity
-=
-Σ confirmed DeliveryItems
-```
-
-relacionados con la misma partida.
-
----
-
-# 32. Pending Quantity
-
-```text
-Pending Quantity
-=
-Ordered Quantity
--
-Delivered Quantity
-```
-
----
-
-# 33. No sobreentrega
-
-Dentro del flujo normal:
-
-```text
-newDeliveryQuantity
-<=
-pendingQuantity
-```
-
-No debe permitirse:
-
-```text
-Delivered
->
-Ordered
-```
-
-sin una operación excepcional explícita.
-
----
-
-# 34. Validación backend
-
-Aunque frontend muestre:
-
-```text
-Pendiente: 6
-```
-
-backend debe recalcular el valor antes de confirmar Delivery.
-
----
-
-# 35. Delivery DRAFT
-
-Puede ser útil permitir preparar una entrega antes de producir efectos físicos.
-
-Conceptualmente:
-
-```text
-DRAFT
-↓
-CONFIRMED
-```
-
----
-
-# 36. Delivery CONFIRMED
-
-Solo la confirmación definitiva debe producir:
-
-```text
-Inventory OUT
-```
-
----
-
-# 37. Regla de inventario
-
-Correcto:
-
-```text
-Delivery CONFIRMED
-↓
-Inventory OUT
-```
-
-Incorrecto:
-
-```text
-SalesOrder CONFIRMED
-↓
-Inventory OUT
-```
-
----
-
-# 38. Atomicidad de Delivery
-
-Confirmar una Delivery puede involucrar:
-
-```text
-Delivery
-+
-DeliveryItems
-+
-Batch allocations
-+
 InventoryMovement OUT
-+
-Stock update
-+
-SalesOrder fulfillment status
 ```
-
-La operación debe mantener consistencia transaccional.
 
 ---
 
-# 39. Idempotencia
+# 22. Customer relationship
 
-Debe impedirse:
-
-```text
-Confirm Delivery
-↓
-network retry
-↓
-Confirm Delivery again
-```
-
-generando dos movimientos OUT.
-
----
-
-# 40. Customer
-
-Toda SalesOrder pertenece a una contraparte comercial válida.
-
-Conceptualmente:
+Toda Sale pertenece a un Customer.
 
 ```text
 Customer
 ↓
-SalesOrder
+Sale
 ```
+
+Customer identifica la contraparte comercial.
 
 ---
 
-# 41. Customer validation
+# 23. Customer validation CURRENT
 
-Backend debe verificar:
+Para nuevas Sales backend valida:
 
 ```text
 Customer exists
-AND
-Customer belongs to Company
+
++
+
+Customer belongs to authenticated Company
+
++
+
+Customer.isActive = true
 ```
 
-y para nuevas operaciones normalmente:
+Estado:
 
 ```text
-Customer is active
+same-tenant validation
+✅
+```
+
+```text
+active Customer validation
+✅
 ```
 
 ---
 
-# 42. Customer histórico
+# 24. Inactive Customer
 
-Desactivar posteriormente al Customer no invalida:
+Debe mantenerse:
 
-* SalesOrder;
-* Delivery;
-* Return;
-* documentos históricos.
+```text
+Inactive Customer
+↓
+New Sale
+→ BLOCK
+```
+
+mientras:
+
+```text
+Customer becomes inactive later
+↓
+Historical Sale
+→ remains valid
+```
 
 ---
 
-# 43. Products
+# 25. Product relationship
 
-Cada partida comercial referencia un Product.
+Cada `SaleItem` referencia un Product.
 
-Backend debe validar:
+Debe mantenerse:
+
+```text
+Product
+↓
+SaleItem
+```
+
+Product proporciona la identidad de catálogo.
+
+SaleItem conserva:
+
+```text
+quantity
+
+price
+```
+
+de la transacción comercial.
+
+---
+
+# 26. Product validation CURRENT
+
+Para Sales nuevas backend debe validar:
 
 ```text
 Product exists
-AND
-Product belongs to Company
+
++
+
+Product belongs to authenticated Company
+
++
+
+Product.isActive = true
+
++
+
+Product is Generic-Sales compatible
+```
+
+Frontend puede filtrar Products incompatibles, pero backend continúa siendo la
+fuente de verdad.
+
+---
+
+# 27. Generic Sales eligibility
+
+El flujo Generic Sales CURRENT permite:
+
+```text
+QUANTITY + NONE
+```
+
+y:
+
+```text
+QUANTITY + OPTIONAL
 ```
 
 ---
 
-# 44. Product inactivo
+# 28. Generic Sales rejected Products
 
-Un Product inactivo normalmente no debe agregarse a una nueva SalesOrder.
+El flujo CURRENT rechaza:
 
-Pero continúa apareciendo en operaciones históricas.
+```text
+QUANTITY + REQUIRED
+```
+
+y cualquier Product con:
+
+```text
+inventoryTracking != QUANTITY
+```
+
+Por tanto actualmente Generic Sales rechaza:
+
+```text
+SERIALIZED
+
+ASSET
+```
 
 ---
 
-# 45. Quantity
+# 29. SERIALIZED ≠ ASSET
 
-Actualmente `SaleItem.quantity` utiliza:
+Debe mantenerse:
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+Son estrategias distintas de tracking.
+
+Sin embargo:
+
+```text
+Generic Sales
+→ supports neither currently
+```
+
+No debe utilizarse EquipmentAsset como sustituto automático de un futuro flujo
+SERIALIZED.
+
+---
+
+# 30. QUANTITY + NONE
+
+Este flujo es compatible con Generic Sales CURRENT.
+
+Conceptualmente:
+
+```text
+QUANTITY
++
+NONE
+↓
+Sale
+↓
+Inventory OUT
+```
+
+sin selección obligatoria de lote.
+
+---
+
+# 31. QUANTITY + OPTIONAL
+
+También es compatible:
+
+```text
+QUANTITY
++
+OPTIONAL
+```
+
+pero debe distinguirse:
+
+```text
+Sale allowed
+✅
+```
+
+de:
+
+```text
+batch allocation / batch picking
+❌ NOT IMPLEMENTED
+```
+
+Generic Sales actualmente no exige seleccionar un InventoryBatch para Products
+OPTIONAL.
+
+---
+
+# 32. REQUIRED lot restriction
+
+Debe mantenerse:
+
+```text
+QUANTITY
++
+REQUIRED
+→ BLOCK
+```
+
+porque el Generic Sales flow actual no posee todavía:
+
+```text
+required lot selection
+
+batch allocation
+
+lot-specific fulfillment
+```
+
+---
+
+# 33. ASSET restriction
+
+Debe mantenerse:
+
+```text
+inventoryTracking = ASSET
+→ Generic Sales BLOCK
+```
+
+Generic Sales no implementa actualmente:
+
+```text
+EquipmentAsset selection
+
+Equipment dispatch
+
+asset-specific commercial fulfillment
+```
+
+---
+
+# 34. SERIALIZED restriction
+
+Debe mantenerse:
+
+```text
+inventoryTracking = SERIALIZED
+→ Generic Sales BLOCK
+```
+
+porque todavía no existe:
+
+```text
+serialized picking
+
+serial allocation
+
+serialized fulfillment workflow
+```
+
+---
+
+# 35. Eligibility enforcement points
+
+Las reglas Generic Sales se aplican en:
+
+```text
+direct Sale create
+
+Sale approval
+
+Quote → Sale conversion
+```
+
+Esto evita que una incompatibilidad se salte mediante otro punto de entrada.
+
+---
+
+# 36. Frontend filtering ≠ backend authority
+
+Debe mantenerse:
+
+```text
+frontend
+→ filters incompatible Products
+```
+
+pero:
+
+```text
+backend
+→ authoritative eligibility validation
+```
+
+Nunca debe confiarse únicamente en la UI.
+
+---
+
+# 37. Quantity
+
+`SaleItem.quantity` utiliza actualmente:
 
 ```text
 Int
 ```
 
-Por tanto las cantidades actuales son enteras.
+Por tanto:
 
-Una futura estrategia de Units of Measure deberá revisarse en todo el ERP.
+```text
+quantity >= 1
+```
+
+dentro del flujo normal.
 
 ---
 
-# 46. Price
+# 38. Fractional quantities — FUTURE
 
-El precio de una partida comercial constituye un snapshot.
+Una futura implementación de Units of Measure deberá revisar de forma transversal:
 
-Conceptualmente:
+```text
+Products
+
+Sales
+
+Quotes
+
+Purchases
+
+Inventory
+```
+
+No debe cambiarse solamente Sale.
+
+---
+
+# 39. SaleItem.price
+
+`SaleItem.price` representa el precio comercial persistido dentro de la Sale.
+
+Debe mantenerse:
 
 ```text
 Product.price
-↓ initial reference
-SalesOrderItem.price
-↓ historical commercial value
+→ reference at transaction time
+```
+
+```text
+SaleItem.price
+→ historical transaction value
 ```
 
 ---
 
-# 47. Cambio posterior del precio
+# 40. Historical price
 
-Si:
-
-```text
-Product.price = 150
-```
-
-una venta histórica realizada a:
+Debe mantenerse:
 
 ```text
-100
+Product.price changes later
+≠
+historical SaleItem.price changes
 ```
 
-debe conservar:
-
-```text
-100
-```
+Una Sale histórica conserva su precio persistido.
 
 ---
 
-# 48. Price override
+# 41. Pricing — FUTURE
 
-Modificar el precio puede requerir posteriormente permisos granulares.
-
-Ejemplo futuro:
+Una futura arquitectura puede incorporar:
 
 ```text
-sales.create
-sales.price.override
+Price Lists
+
+Customer-specific prices
+
+Discounts
+
+Promotions
+
+Contracts
+
+Currencies
+
+Price approvals
 ```
+
+No forman parte del motor actual de Sales V1.
 
 ---
 
-# 49. Subtotal de partida
+# 42. Item subtotal
 
 Conceptualmente:
 
@@ -838,31 +1045,33 @@ quantity × price
 
 ---
 
-# 50. Subtotal
+# 43. Sale subtotal
+
+Conceptualmente:
 
 ```text
-SalesOrder Subtotal
+Sale Subtotal
 =
-Σ Item Subtotal
+Σ SaleItem subtotals
 ```
 
 ---
 
-# 51. IVA
+# 44. IVA
 
-El modelo legacy utiliza:
+El flujo actual utiliza:
 
 ```text
-iva
+IVA = 16%
 ```
 
-y actualmente se ha utilizado 16 % en varios workflows.
+según la implementación vigente.
 
-Esto no debe considerarse una política fiscal universal permanente.
+No debe considerarse política fiscal universal permanente.
 
 ---
 
-# 52. Total
+# 45. Total
 
 Conceptualmente:
 
@@ -874,272 +1083,718 @@ subtotal
 iva
 ```
 
-según las reglas fiscales actuales.
+según las reglas vigentes.
 
 ---
 
-# 53. Backend como autoridad
+# 46. Backend como autoridad
 
-Frontend puede mostrar una previsualización.
+Frontend puede mostrar una vista previa.
 
-Backend debe validar/calcular los valores definitivos.
+Backend debe continuar siendo autoridad sobre:
 
-No debe confiar en totales arbitrarios enviados desde frontend.
+```text
+eligible Product
+
+quantity
+
+price handling
+
+subtotal
+
+iva
+
+total
+```
+
+según el contrato actual.
 
 ---
 
-# 54. Dinero
+# 47. Monetary representation
 
-El modelo actual de Sale utiliza:
+El modelo Sale actual utiliza la representación monetaria histórica basada en:
 
 ```text
 Float
 ```
 
-para importes.
+Antes de ampliar:
 
-Antes de ampliar Billing/CFDI debe revisarse la estrategia monetaria.
+```text
+Billing
 
-Este documento no ordena modificar Prisma todavía.
+CFDI
+
+Accounting
+
+financial reporting
+```
+
+deberá revisarse transversalmente:
+
+```text
+precision
+
+rounding
+
+currency representation
+```
 
 ---
 
-# 55. Quote como origen
+# 48. Sale folio CURRENT
 
-Una SalesOrder puede originarse en una Quote.
+Las nuevas Sales utilizan folios como:
 
-Arquitectura objetivo:
+```text
+V-000001
+
+V-000002
+
+V-000003
+```
+
+La generación es:
+
+```text
+server-generated
+
+tenant-scoped
+
+sequential
+
+minimum six digits
+
+no six-digit maximum
+
+immutable
+```
+
+---
+
+# 49. Folio no se reutiliza
+
+Debe mantenerse:
+
+```text
+cancelled folio
+→ remains occupied
+```
+
+```text
+historical folio
+→ remains occupied
+```
+
+No debe reciclarse un folio empresarial.
+
+---
+
+# 50. Legacy folios históricos
+
+Folios históricos creados con estrategias anteriores:
+
+```text
+→ remain unchanged
+```
+
+La nueva estrategia no debe reescribir identidad histórica.
+
+---
+
+# 51. Folio implementation
+
+La implementación utiliza:
+
+```text
+SalesFolioService
+↓
+CompanySequenceAllocatorService
+```
+
+con:
+
+```text
+key = SALE_FOLIO
+```
+
+---
+
+# 52. Shared Sale sequence
+
+Utilizan la misma secuencia:
+
+```text
+Direct Sale
+```
+
+y:
+
+```text
+Quote-converted Sale
+```
+
+Esto evita espacios de numeración separados para el mismo documento empresarial.
+
+---
+
+# 53. Quote relationship CURRENT
+
+Una Sale puede originarse en una Quote.
+
+Conceptualmente:
+
+```text
+Quote
+↓
+Sale
+```
+
+cuando:
+
+```text
+quoteId
+```
+
+está presente.
+
+Quote continúa siendo el documento de propuesta.
+
+Sale representa la operación comercial resultante CURRENT.
+
+---
+
+# 54. Quote conversion CURRENT
+
+Actualmente:
 
 ```text
 Quote CONFIRMED
 ↓
-SalesOrder
-```
-
----
-
-# 56. Quote opcional
-
-También debe ser válido:
-
-```text
-SalesOrder
-```
-
-sin Quote previa.
-
----
-
-# 57. Limitación actual de relación
-
-El modelo actual no contiene una relación estructurada:
-
-```text
-Sale
-→ Quote
-```
-
-En cambio, Quote conserva:
-
-```text
-convertedToSale
-```
-
-como booleano legacy.
-
----
-
-# 58. Problema del booleano
-
-Un booleano responde:
-
-```text
-¿fue convertida?
-```
-
-pero no responde:
-
-```text
-¿en qué operación?
-```
-
-La arquitectura futura debe permitir una relación explícita.
-
----
-
-# 59. Relación objetivo
-
-Debe poder navegarse:
-
-```text
-Quote
-↓
-SalesOrder
-```
-
-y viceversa cuando el SalesOrder provenga de Quote.
-
----
-
-# 60. No diseñar FK todavía
-
-La implementación puede utilizar posteriormente:
-
-```text
-sourceQuoteId
-```
-
-o una relación equivalente.
-
-Este documento no define todavía el campo exacto.
-
----
-
-# 61. Conversión
-
-Convertir una Quote debe copiar de forma controlada:
-
-* Customer;
-* items;
-* quantities;
-* prices;
-* totals;
-* contexto comercial necesario.
-
----
-
-# 62. Conversión no produce OUT
-
-Debe cumplirse:
-
-```text
-Quote
-↓
-SalesOrder
-```
-
-sin:
-
-```text
-Inventory OUT
-```
-
----
-
-# 63. Conversión legacy
-
-La implementación actual puede continuar temporalmente con:
-
-```text
-Quote
+POST /sales/from-quote/:quoteId
 ↓
 Sale CONFIRMED
 ↓
 Inventory OUT
 ```
 
-mientras se realiza el refactor.
-
-Este comportamiento es compatibilidad histórica, no arquitectura objetivo.
+Este es comportamiento CURRENT del ERP Core V1.
 
 ---
 
-# 64. Venta manual legacy
+# 55. Direct Sale vs Quote conversion
 
-Las ventas creadas manualmente continuarán funcionando durante la transición.
-
-El refactor debe ofrecer un equivalente natural:
+Debe mantenerse explícita la diferencia:
 
 ```text
-Create Sale
+Direct Sale
+→ DRAFT
+→ no Inventory OUT at creation
 ```
 
-actualmente
-
-hacia:
+frente a:
 
 ```text
-Create SalesOrder
+Quote conversion
+→ Sale CONFIRMED
+→ Inventory OUT immediately
 ```
 
-en la arquitectura futura.
+Son dos entry points diferentes del modelo CURRENT.
 
 ---
 
-# 65. UX de venta inmediata
+# 56. Quote conversion eligibility
 
-La separación técnica no debe obligar al usuario a realizar pasos innecesarios.
-
-Para una venta inmediata, la interfaz puede permitir:
+La conversión debe respetar:
 
 ```text
-Nueva venta
-↓
-Guardar y entregar
+Quote exists
+
+Quote belongs to Company
+
+Quote is CONFIRMED
+
+Quote not already converted
+
+Customer valid
+
+Products valid
+
+Generic Sales eligibility
 ```
 
-mientras internamente se producen:
-
-```text
-SalesOrder
-+
-Delivery
-```
-
-de manera controlada.
+Las restricciones de Sales continúan siendo autoridad durante la conversión.
 
 ---
 
-# 66. Principio UX
+# 57. Duplicate conversion guard
+
+Una misma Quote no debe crear dos Sales mediante el flujo normal.
+
+Debe mantenerse:
 
 ```text
-Correct domain model
-≠
-More user friction
+Quote already converted
+→ second conversion rejected
 ```
 
-La interfaz puede simplificar el proceso sin falsear los hechos empresariales.
-
----
-
-# 67. Inventario disponible
-
-Sales puede consultar disponibilidad para ayudar al usuario.
-
-Ejemplo:
+Estado:
 
 ```text
-Product A
-Requested: 10
-Available: 6
+duplicate conversion protection
+✅
 ```
 
 ---
 
-# 68. SalesOrder no reserva automáticamente
+# 58. Conversion guard ≠ request idempotency
+
+Debe distinguirse:
+
+```text
+single-conversion protection
+✅
+```
+
+de:
+
+```text
+formal request-level idempotent replay
+```
+
+Un retry no necesariamente devuelve la misma respuesta previa de forma
+determinista.
+
+Por tanto:
+
+```text
+formal conversion replay idempotency
+→ not guaranteed as general contract
+```
+
+---
+
+# 59. Sale create request idempotency
 
 Actualmente:
 
 ```text
-SalesOrder
-→ no automatic reservation
+POST /sales
+→ no Idempotency-Key contract
 ```
 
-Reservation requerirá una decisión específica.
+Por tanto:
+
+```text
+Sale create request idempotency
+→ TECHNICAL DEBT
+```
+
+Debe considerarse antes de escenarios de producción donde retries o double-submit
+puedan producir operaciones duplicadas.
 
 ---
 
-# 69. Disponibilidad en Delivery
+# 60. Quote conversion handoff
 
-La validación física definitiva ocurre al confirmar Delivery.
+Después de convertir una Quote, el frontend recibe:
 
-El stock pudo cambiar desde que se creó la SalesOrder.
+```text
+Sale.id
+
+Sale.folio
+```
+
+y permite:
+
+```text
+Ver venta
+```
+
+con navegación:
+
+```text
+/sales?saleId=<id>
+```
+
+Estado:
+
+```text
+same-session handoff
+✅ IMPLEMENTED / VALIDATED
+```
 
 ---
 
-# 70. Stock negativo
+# 61. Historical Quote conversion identity
 
-Delivery debe respetar la regla de Inventory:
+La deuda histórica pertenece principalmente al response model de Quotes.
+
+Una Quote convertida en una sesión anterior conoce:
+
+```text
+convertedToSale = true
+```
+
+pero actualmente no puede reconstruir necesariamente:
+
+```text
+Sale.id
+
+Sale.folio
+```
+
+desde `GET /quotes`.
+
+Sales sí puede resolver una Sale cuando conoce su `id`.
+
+---
+
+# 62. Sale detail CURRENT
+
+Existe:
+
+```text
+GET /sales/:id
+```
+
+La operación es tenant-scoped.
+
+Conceptualmente:
+
+```text
+authenticated companyId
++
+Sale id
+↓
+Sale detail
+```
+
+La respuesta incluye las relaciones requeridas por la experiencia actual, como:
+
+```text
+customer
+
+items.product
+```
+
+---
+
+# 63. Sale detail y tenant isolation
+
+Debe mantenerse:
+
+```text
+Sale from another Company
+→ not accessible
+```
+
+El conocimiento del UUID no concede acceso.
+
+---
+
+# 64. Sale deep-link CURRENT
+
+Existe:
+
+```text
+/sales?saleId=<id>
+```
+
+Flujo:
+
+```text
+URL saleId
+↓
+GET /sales/:id
+↓
+Sale detail
+```
+
+Esto no depende de que la Sale esté contenida en:
+
+```text
+GET /sales
+```
+
+---
+
+# 65. Deep-link y future pagination
+
+Debido a que el detalle utiliza:
+
+```text
+GET /sales/:id
+```
+
+el deep-link es compatible conceptualmente con futura paginación del listado.
+
+Sales no posee la misma deuda de detalle list-based existente actualmente en
+Quotes y Purchases.
+
+---
+
+# 66. API CURRENT
+
+Endpoints actuales:
+
+```text
+POST  /sales
+
+GET   /sales
+
+GET   /sales/:id
+
+PATCH /sales/:id/approve
+
+PATCH /sales/:id/cancel
+
+GET   /sales/:id/pdf
+
+POST  /sales/from-quote/:quoteId
+```
+
+Este documento no introduce endpoints inexistentes únicamente por estética de API.
+
+---
+
+# 67. API no CURRENT
+
+No deben marcarse como implementados actualmente:
+
+```text
+PATCH /sales/:id
+```
+
+genérico,
+
+ni:
+
+```text
+DELETE /sales/:id
+```
+
+ni endpoints de SalesOrder / Delivery.
+
+---
+
+# 68. Sale PDF CURRENT
+
+Actualmente existe:
+
+```text
+GET /sales/:id/pdf
+```
+
+con:
+
+```text
+Content-Type: application/pdf
+```
+
+y descarga basada en:
+
+```text
+venta-{folio}.pdf
+```
+
+Estado:
+
+```text
+IMPLEMENTED / AUTOMATED
+```
+
+La validación manual final en navegador puede mantenerse como QA si todavía
+corresponde.
+
+---
+
+# 69. Sale PDF semantics
+
+El PDF representa la Sale actual.
+
+Puede incluir información como:
+
+```text
+Company
+
+Customer
+
+folio
+
+status
+
+items
+
+quantities
+
+prices
+
+subtotal
+
+iva
+
+total
+```
+
+No representa:
+
+```text
+Invoice
+
+Purchase Receipt
+
+Healthcare Dispatch
+```
+
+---
+
+# 70. Frontend Sales V1
+
+La experiencia `/sales` soporta actualmente:
+
+```text
+Sales list
+
+search
+
+status filter
+
+loading
+
+error
+
+retry
+
+empty state
+
+filtered-empty state
+
+New Sale modal
+
+Customer selection
+
+compatible Product selection
+
+stock visibility
+
+current price display
+
+quantity
+
+item add/remove
+
+duplicate prevention
+
+subtotal
+
+IVA
+
+total preview
+
+Sale detail modal
+
+approve
+
+cancel
+
+PDF
+
+deep-link
+
+terminal-state action visibility
+```
+
+---
+
+# 71. Search CURRENT
+
+El frontend permite buscar Sales mediante información reconocible como:
+
+```text
+folio
+
+Customer
+```
+
+según la implementación actual.
+
+---
+
+# 72. Status filter CURRENT
+
+El frontend permite filtrar por:
+
+```text
+DRAFT
+
+CONFIRMED
+
+CANCELLED
+```
+
+con etiquetas:
+
+```text
+DRAFT
+→ Borrador
+
+CONFIRMED
+→ Confirmada
+
+CANCELLED
+→ Cancelada
+```
+
+---
+
+# 73. Pagination / filtering debt
+
+Actualmente:
+
+```text
+GET /sales
+→ no server pagination
+```
+
+y:
+
+```text
+server-side search/filtering
+→ not implemented
+```
+
+Por tanto:
+
+```text
+Sales list scalability
+→ TECHNICAL DEBT
+```
+
+---
+
+# 74. Inventory availability
+
+Sales puede consultar o mostrar Inventory disponible para ayudar al usuario.
+
+Ejemplo:
+
+```text
+Requested: 10
+
+Current stock: 6
+```
+
+La validación definitiva debe seguir realizándose backend-side cuando se confirma
+la salida.
+
+---
+
+# 75. Stock negativo
+
+Debe mantenerse:
 
 ```text
 requested OUT
@@ -1147,268 +1802,323 @@ requested OUT
 available inventory
 ```
 
+dentro del flujo Generic Sales normal.
+
+Una Sale no debe producir stock negativo mediante el comportamiento estándar.
+
 ---
 
-# 71. Lotes
+# 76. Optional-lot limitation
 
-Para productos trazables, Delivery debe identificar qué Batch salió.
+Aunque:
 
-Conceptualmente:
+```text
+QUANTITY + OPTIONAL
+```
+
+pueda venderse actualmente, Generic Sales no implementa:
+
+```text
+specific InventoryBatch selection
+
+FEFO allocation
+
+lot-level Sale fulfillment
+```
+
+Esto constituye una limitación conocida.
+
+---
+
+# 77. Required-lot future flow
+
+Para soportar:
+
+```text
+lotTracking = REQUIRED
+```
+
+deberá existir un workflow físico explícito capaz de seleccionar y validar:
 
 ```text
 InventoryBatch
-↓
-DeliveryItem
-↓
-Customer
+
+available quantity
+
+lot identity
 ```
 
----
-
-# 72. FEFO
-
-Cuando aplique, Inventory puede sugerir lotes usando FEFO.
-
-Sales no debe implementar una segunda lógica independiente de selección de lotes.
+Generic Sales actual no lo hace.
 
 ---
 
-# 73. Batch allocation
+# 78. ASSET commercial fulfillment — FUTURE
 
-La arquitectura futura necesitará representar qué cantidad de cada lote fue utilizada en cada DeliveryItem.
-
-Conceptualmente:
+Para soportar Products ASSET en una venta comercial futura se necesitará una
+operación explícita sobre:
 
 ```text
-DeliveryItem
-└── Batch Allocations
-    ├── Batch A × 3
-    └── Batch B × 2
+EquipmentAsset
+```
+
+que preserve:
+
+```text
+asset identity
+
+lifecycle
+
+commercial disposition
+
+Inventory consistency
+```
+
+No debe resolverse simplemente decrementando una cantidad genérica.
+
+---
+
+# 79. SERIALIZED commercial fulfillment — FUTURE
+
+Un futuro flujo SERIALIZED deberá identificar las unidades concretas o seriales
+que salen.
+
+No debe asumirse que su implementación será idéntica a ASSET.
+
+---
+
+# 80. Confirmed Sale reversal
+
+Actualmente:
+
+```text
+Sale CONFIRMED
+→ Inventory OUT already occurred
+```
+
+y no existe:
+
+```text
+confirmed Sale reversal
+```
+
+como workflow normal.
+
+Estado:
+
+```text
+confirmed Sale reversal
+→ NOT IMPLEMENTED
 ```
 
 ---
 
-# 74. No crear `SaleItemBatchAllocation` legacy
+# 81. No silent confirmed cancellation
 
-La documentación histórica de Returns propone una entidad:
+Debe evitarse:
+
+```text
+Sale CONFIRMED
+↓
+status = CANCELLED
+```
+
+sin una operación explícita que resuelva también:
+
+```text
+Inventory history
+
+commercial history
+```
+
+---
+
+# 82. Commercial Returns — DEFERRED
+
+Una devolución comercial es conceptualmente diferente de cancelar una Sale.
+
+Debe mantenerse:
+
+```text
+Confirmed commercial fulfillment
+↓
+Commercial Return
+```
+
+sin reescribir la Sale original.
+
+Actualmente:
+
+```text
+Generic Commercial Returns
+→ P1 / DEFERRED
+```
+
+No es un bloqueo P0 del ERP Core V1 actual.
+
+---
+
+# 83. Commercial Return ≠ Healthcare Return
+
+Debe mantenerse:
+
+```text
+Commercial Return
+≠
+Healthcare custody Return
+```
+
+Commercial Return trata mercancía vendida/entregada.
+
+Healthcare Return trata material o Equipment que regresa de una operación de
+custodia temporal.
+
+Son dominios diferentes.
+
+---
+
+# 84. Returns y arquitectura futura
+
+Cuando se implemente la arquitectura TARGET:
+
+```text
+SalesOrder
+↓
+Delivery
+```
+
+la devolución comercial deberá referenciar preferentemente el fulfillment físico
+real:
+
+```text
+Delivery
+↓
+Return
+```
+
+y no una cantidad meramente ordenada.
+
+---
+
+# 85. No construir nueva trazabilidad permanente sobre SaleItem
+
+No debe introducirse apresuradamente un modelo como:
 
 ```text
 SaleItemBatchAllocation
 ```
 
-para resolver trazabilidad de devoluciones.
-
-Con ADR-011, la asignación correcta debe diseñarse sobre:
+como arquitectura definitiva si el fulfillment futuro será propiedad de:
 
 ```text
 DeliveryItem
 ```
 
-no sobre `SaleItem` legacy.
+Cualquier diseño deberá coordinarse con SalesOrder / Delivery.
 
 ---
 
-# 75. Importancia para Returns
+# 86. Billing boundary
 
-Una devolución debe poder responder:
-
-```text
-¿Qué se entregó?
-¿Qué lote salió?
-¿Cuánto puede regresar?
-```
-
-Por ello Delivery se convierte en la referencia física natural para Returns.
-
----
-
-# 76. Seriales
-
-Para productos serializados, Delivery deberá registrar la unidad física concreta.
-
-Ejemplo:
-
-```text
-DeliveryItem
-↓
-Serial SN-00021
-```
-
----
-
-# 77. Shipment
-
-Shipment y Delivery no son necesariamente lo mismo.
-
-Conceptualmente:
-
-```text
-SalesOrder
-↓
-Delivery
-↓
-Shipment
-```
-
-puede ser una evolución futura.
-
----
-
-# 78. Delivery Address
-
-El destino físico puede diferir de:
-
-```text
-Customer.address
-```
-
-Por tanto no debe dependerse permanentemente del Customer master para reconstruir una entrega histórica.
-
----
-
-# 79. Proof of Delivery
-
-Una evolución futura puede incluir:
-
-* receptor;
-* firma;
-* fotografía;
-* fecha;
-* evidencia;
-* ubicación.
-
-No forma parte todavía del MVP.
-
----
-
-# 80. Invoice
-
-Arquitectónicamente:
-
-```text
-SalesOrder
-≠
-Delivery
-≠
-Invoice
-```
-
----
-
-# 81. Facturación antes de Delivery
-
-Algunos procesos pueden requerir:
-
-```text
-SalesOrder
-↓
-Invoice
-↓
-Delivery
-```
-
----
-
-# 82. Facturación después de Delivery
-
-Otros pueden utilizar:
-
-```text
-SalesOrder
-↓
-Delivery
-↓
-Invoice
-```
-
-El dominio Billing definirá esas reglas.
-
----
-
-# 83. Invoice no mueve stock
-
-Debe cumplirse:
-
-```text
-Invoice
-→ no Inventory OUT
-```
-
-El efecto físico pertenece a Delivery.
-
----
-
-# 84. Returns
-
-Una devolución comercial debe originarse en lo efectivamente entregado.
-
-Arquitectura objetivo:
-
-```text
-Delivery
-↓
-Return
-```
-
----
-
-# 85. Modelo legacy de Returns
-
-Actualmente Returns ha sido diseñado alrededor de:
+Debe mantenerse:
 
 ```text
 Sale
-↓
-SaleItem
-↓
-Return
+≠
+Invoice
 ```
 
-Esto deberá evolucionar junto con Sales.
-
----
-
-# 86. Regla que permanece válida
-
-Aunque cambie el origen técnico:
-
-> una devolución no debe reescribir la operación original.
-
-La historia debe conservar:
+y, en el futuro:
 
 ```text
-Original Delivery
-+
-Return
+SalesOrder
+≠
+Delivery
+≠
+Invoice
 ```
+
+Invoice pertenece al dominio Billing.
 
 ---
 
-# 87. Cantidad retornable
+# 87. Invoice no mueve Inventory por sí misma
 
-Conceptualmente:
+La futura emisión de Invoice no debe convertirse automáticamente en:
 
 ```text
-Returnable Quantity
-=
-Delivered Quantity
--
-Confirmed Returned Quantity
+Inventory OUT
+```
+
+La consecuencia física debe permanecer ligada al evento de fulfillment
+correspondiente.
+
+---
+
+# 88. Payments — FUTURE
+
+Sales V1 no implementa:
+
+```text
+Payment
+
+Accounts Receivable
+
+payment reconciliation
+```
+
+Estos conceptos pertenecen a dominios financieros futuros.
+
+---
+
+# 89. Healthcare boundary
+
+Sales pertenece a ERP Core.
+
+Healthcare no debe utilizar automáticamente:
+
+```text
+CaseDispatch
+```
+
+como equivalente de:
+
+```text
+Sale
+```
+
+o:
+
+```text
+Delivery
 ```
 
 ---
 
-# 88. No devolver lo no entregado
+# 90. CaseDispatch ≠ Commercial Fulfillment
 
-Una SalesOrder de 10 unidades con solo 4 entregadas no puede permitir Return de 10.
+En la arquitectura Healthcare TARGET:
 
-La devolución máxima está ligada al fulfillment físico.
+```text
+CaseDispatch
+→ temporary custody / operational dispatch
+```
 
----
+mientras:
 
-# 89. Healthcare
+```text
+Commercial fulfillment
+→ definitive commercial disposition
+```
 
-Healthcare introduce un flujo diferente.
+Debe mantenerse:
+
+```text
+CaseDispatch
+≠
+Sale
+```
+
+y:
 
 ```text
 CaseDispatch
@@ -1418,621 +2128,360 @@ Delivery
 
 ---
 
-# 90. CaseDispatch
+# 91. Healthcare double-decrement invariant
 
-Representa:
-
-```text
-custodia temporal
-```
-
-No una venta ni una entrega definitiva.
-
----
-
-# 91. Reconciliation
-
-Después de un Case:
+Cuando se diseñe Healthcare Dispatch/Reconciliation, deberá evitarse:
 
 ```text
-Used
-Returned
-Unresolved
-```
-
-determinan el destino del material.
-
----
-
-# 92. Material utilizado
-
-El material usado puede originar un evento comercial o fulfillment definitivo.
-
-Conceptualmente:
-
-```text
-Case Reconciliation
-↓
-Used Material
-↓
-Sales / Delivery
-↓
-Inventory OUT definitivo
-```
-
-La integración exacta se diseñará con Healthcare.
-
----
-
-# 93. Importante sobre Inventory
-
-Si el material ya salió del almacén bajo custodia, el OUT definitivo de Healthcare representa:
-
-> cambio de disposición/propiedad empresarial
-
-y no necesariamente otro desplazamiento físico desde el almacén en ese instante.
-
-Inventory deberá evitar descontar dos veces la misma existencia.
-
----
-
-# 94. Integración Healthcare pendiente
-
-La implementación técnica deberá diseñar cuidadosamente:
-
-```text
-Custody
-→ Consumption
-```
-
-sin:
-
-```text
-Custody movement
+custody movement
 +
-second physical OUT
-=
-double decrement
+commercial fulfillment
+→ double decrement
 ```
 
-ADR-013 gobierna esta separación.
+La integración exacta pertenece a Healthcare e Inventory.
 
 ---
 
-# 95. Sale PDF legacy
+# 92. Healthcare status
 
-La documentación histórica indica generación de PDF para Sales.
+Actualmente el Healthcare Case Foundation existe, pero no deben documentarse como
+CURRENT dentro de Sales:
 
-Este documento conserva esa capacidad como parte del modelo actual.
+```text
+CaseDispatch
+
+Reconciliation
+
+Healthcare Return
+
+Equipment Assignment
+```
+
+mientras esos workflows no estén implementados.
 
 ---
 
-# 96. SalesOrder PDF futuro
+# 93. Authorization
 
-El documento comercial objetivo deberá decidir si representa:
+Sales utiliza la arquitectura transversal de:
 
-* pedido;
-* confirmación;
-* nota de venta;
+```text
+Authentication
 
-según los workflows reales.
+Authorization
+
+Tenant Isolation
+
+Validation
+
+Business Rules
+```
+
+Los endpoints críticos deberán seguir incluidos en la revisión de autorización
+antes de producción.
 
 ---
 
-# 97. Delivery document futuro
+# 94. Multi-tenancy
 
-Delivery puede requerir un documento físico diferente.
-
-Ejemplos:
-
-* remisión;
-* nota de entrega;
-* comprobante.
-
-No debe confundirse con SalesOrder PDF.
-
----
-
-# 98. CFDI futuro
-
-Invoice/CFDI será otro documento distinto.
+Debe mantenerse:
 
 ```text
-SalesOrder PDF
-≠
-Delivery Document
-≠
-Invoice CFDI
+Sale.companyId
 ```
 
----
-
-# 99. SalesOrder 360
-
-La experiencia objetivo incluye:
+alineado con:
 
 ```text
-SalesOrder 360
-```
+Customer.companyId
 
----
-
-# 100. Preguntas que debe responder
-
-```text
-¿Quién compra?
-¿Qué pidió?
-¿Cuánto?
-¿A qué precio?
-¿Qué se ha entregado?
-¿Qué falta?
-¿Qué devoluciones existen?
-¿Qué factura existe?
-¿Qué actividad ocurrió?
-```
-
----
-
-# 101. Vista conceptual
-
-```text
-SO-000421
-
-Customer
-ABC Medical
-
-Status
-Partially Delivered
-
-Ordered
-100
-
-Delivered
-70
-
-Pending
-30
-
-Deliveries
-DEL-001   40
-DEL-002   30
-
-[Registrar entrega]
-```
-
----
-
-# 102. Acción contextual
-
-Conceptualmente:
-
-```text
-DRAFT
-→ Editar / Confirmar
-```
-
-```text
-CONFIRMED
-→ Registrar Delivery
-```
-
-```text
-PARTIALLY DELIVERED
-→ Entregar pendiente
-```
-
-```text
-FULLY DELIVERED
-→ Ver historial / Facturación
-```
-
----
-
-# 103. Delivery UX
-
-Al crear una Delivery desde SalesOrder, Zaping ya conoce:
-
-* Customer;
-* Products;
-* ordered quantities;
-* delivered quantities;
-* pending quantities.
-
-No debe pedir nuevamente información que ya existe.
-
----
-
-# 104. Formulario de Delivery
-
-Puede mostrar:
-
-```text
-Producto
-Ordenado
-Entregado
-Pendiente
-Entregar ahora
-Lote
-Serie
-```
-
-cuando corresponda.
-
----
-
-# 105. Selección de lote
-
-El usuario debe trabajar únicamente con lotes elegibles.
-
-La UI puede sugerir FEFO.
-
-Backend debe volver a validar.
-
----
-
-# 106. Confirmación de Delivery
-
-Antes de confirmar debe quedar claro que la operación:
-
-```text
-modificará inventario
-```
-
-Ejemplo UX:
-
-```text
-Confirmar entrega
-
-Se entregarán 6 unidades
-y el inventario se actualizará.
-
-[Volver] [Confirmar]
-```
-
----
-
-# 107. Feedback
-
-Después:
-
-```text
-Entrega DEL-002 confirmada.
-
-Entregado: 70
-Pendiente: 30
-```
-
-y, cuando aporte valor:
-
-```text
-Stock actualizado.
-```
-
----
-
-# 108. Listado de SalesOrders
-
-Una tabla objetivo puede priorizar:
-
-```text
-Folio
-Customer
-Fecha
-Total
-Status
-Delivered
-Pending
-Actions
-```
-
----
-
-# 109. Filtros
-
-Puede incluir:
-
-```text
-Status
-Customer
-Date
-Pending Delivery
-Search
-```
-
----
-
-# 110. Search
-
-Debe permitir localizar operaciones mediante:
-
-```text
-folio
-customer
-```
-
-y posteriormente otros identificadores útiles.
-
----
-
-# 111. Dashboard
-
-Dashboard podrá mostrar tareas como:
-
-```text
-SalesOrders pending delivery
-Partially delivered orders
-Deliveries today
-```
-
-en lugar de limitarse al total de Sales.
-
----
-
-# 112. Action Dashboard
-
-Ejemplo:
-
-```text
-2 pedidos listos para entregar
-[Revisar]
-```
-
-Esto es más accionable que:
-
-```text
-Sales: 52
-```
-
-como único contexto.
-
----
-
-# 113. Multi-tenancy
-
-Toda operación comercial debe pertenecer a una Company.
-
-Debe verificarse:
-
-```text
-SalesOrder company
-Customer company
 Product company
-Delivery company
-Inventory company
 ```
+
+según las relaciones utilizadas.
 
 ---
 
-# 114. Cross-tenant Customer
+# 95. Cross-tenant Customer
 
 Debe rechazarse:
 
 ```text
-Company A SalesOrder
-→ Customer Company B
+Company A Sale
+↓
+Customer Company B
 ```
+
+aunque el UUID exista.
 
 ---
 
-# 115. Cross-tenant Product
+# 96. Cross-tenant Product
 
-También:
+Debe rechazarse:
 
 ```text
-Company A SalesOrder
-→ Product Company B
+Company A Sale
+↓
+Product Company B
 ```
 
 ---
 
-# 116. Cross-tenant Batch
+# 97. Permission granularity — TARGET
 
-Delivery nunca debe consumir:
-
-```text
-InventoryBatch
-```
-
-de otra Company.
-
----
-
-# 117. Authorization
-
-Toda operación debe aplicar:
-
-```text
-Authentication
-+
-Authorization
-+
-Tenant Isolation
-+
-Validation
-+
-Business Rules
-```
-
----
-
-# 118. RBAC
-
-Permisos conceptuales pueden incluir:
+Una futura arquitectura RBAC puede incluir permisos conceptuales como:
 
 ```text
 sales.read
-sales.create
-sales.update
-sales.confirm
-sales.cancel
 
-deliveries.read
-deliveries.create
-deliveries.confirm
+sales.create
+
+sales.approve
+
+sales.cancel
 
 sales.price.override
 ```
 
-La implementación granular continúa evolucionando.
-
----
-
-# 119. Cancel permission
-
-Cancelar una operación comercial puede requerir permiso distinto de editarla.
-
-Especialmente cuando ya existen relaciones posteriores.
-
----
-
-# 120. Delivery permission
-
-Confirmar una Delivery debe considerarse una operación sensible porque:
+y, con Delivery:
 
 ```text
-Delivery CONFIRMED
+deliveries.read
+
+deliveries.create
+
+deliveries.confirm
+```
+
+No deben considerarse completamente implementados solo por estar documentados.
+
+---
+
+# 98. Audit — TARGET
+
+Una futura plataforma transversal de Audit puede registrar:
+
+```text
+Sale created
+
+Sale approved
+
+Sale cancelled
+
+Quote converted to Sale
+```
+
+y posteriormente:
+
+```text
+SalesOrder created
+
+Delivery confirmed
+
+Commercial Return created
+```
+
+Actualmente no existe un Audit transversal completo.
+
+---
+
+# 99. TARGET commercial architecture
+
+ADR-011 define como dirección futura:
+
+```text
+Quote
+   ↓ optional
+SalesOrder
+   ↓
+Delivery
+   ↓
+Inventory OUT
+```
+
+Esta arquitectura separará:
+
+```text
+commercial commitment
+```
+
+de:
+
+```text
+physical fulfillment
+```
+
+---
+
+# 100. SalesOrder TARGET
+
+SalesOrder representará:
+
+```text
+commercial commitment
+```
+
+Debe mantenerse como principio:
+
+```text
+SalesOrder confirmation
+→ no Inventory OUT
+```
+
+SalesOrder no existe todavía como reemplazo operativo de Sale.
+
+---
+
+# 101. Delivery TARGET
+
+Delivery representará:
+
+```text
+physical fulfillment
+```
+
+Debe mantenerse como principio futuro:
+
+```text
+Delivery confirmed
 → Inventory OUT
 ```
 
 ---
 
-# 121. Segregación futura
+# 102. Partial Delivery TARGET
 
-Una empresa puede requerir:
-
-```text
-Salesperson
-→ creates SalesOrder
-
-Warehouse
-→ confirms Delivery
-```
-
-Esto permite separar:
+La arquitectura futura deberá poder soportar:
 
 ```text
-commercial authority
+Ordered
+>
+Delivered
 ```
 
-de:
+con:
 
 ```text
-physical fulfillment authority
+Pending Quantity
+=
+Ordered
+-
+Delivered
 ```
+
+sin obligar a entregar toda la SalesOrder en un solo evento.
 
 ---
 
-# 122. Auditoría
+# 103. Delivery quantity invariant TARGET
 
-Eventos importantes:
+Debe mantenerse:
 
 ```text
-SalesOrder created
-SalesOrder updated
-SalesOrder confirmed
-SalesOrder cancelled
-Delivery created
-Delivery confirmed
-Return created
+Delivered Quantity
+<=
+Ordered Quantity
 ```
 
-deberán ser auditables cuando la infraestructura correspondiente esté completa.
+dentro del flujo normal.
+
+Backend deberá recalcular la cantidad pendiente.
 
 ---
 
-# 123. Historial
+# 104. Delivery atomicity TARGET
 
-Una SalesOrder 360 debe poder evolucionar hacia un timeline:
-
-```text
-10:15  SalesOrder creada
-10:40  Confirmada
-14:20  Delivery DEL-001 confirmada
-día 2  Delivery DEL-002 confirmada
-día 5  Return RET-001
-```
-
----
-
-# 124. Inmutabilidad de Delivery
-
-Una Delivery confirmada no debe editarse para reescribir:
-
-* quantity;
-* product;
-* batch;
-* serial;
-* destination;
-
-cuando esos campos determinan el hecho histórico.
-
----
-
-# 125. Corrección de Delivery
-
-Los errores deben resolverse mediante:
-
-* Return;
-* reversal;
-* corrective operation;
-
-según el caso.
-
-No mediante edición histórica silenciosa.
-
----
-
-# 126. SalesOrder cancelada sin Delivery
-
-Si no existe fulfillment físico, cancelar una SalesOrder normalmente no necesita un movimiento de inventario inverso.
-
----
-
-# 127. SalesOrder con Delivery
-
-Si ya existen Deliveries, cancelar el pedido pendiente no debe borrar la historia de lo ya entregado.
-
-Ejemplo:
-
-```text
-Ordered 10
-Delivered 4
-Pending 6
-↓
-Cancel remaining
-```
-
-Los 4 entregados siguen existiendo históricamente.
-
----
-
-# 128. Modelo exacto de cancelación parcial
-
-La semántica concreta de:
-
-```text
-cancel remaining
-```
-
-deberá diseñarse durante la implementación de SalesOrder.
-
-No debe resolverse simplemente cambiando toda la operación a `CANCELLED`.
-
----
-
-# 129. Reservation futura
-
-SalesOrder puede eventualmente reservar inventario.
+La confirmación física futura deberá ser transaccional.
 
 Conceptualmente:
 
 ```text
-Physical
-Reserved
-Available
+Delivery
+
++
+
+DeliveryItems
+
++
+
+physical allocation
+
++
+
+Inventory OUT
+
++
+
+SalesOrder fulfillment update
 ```
 
-Pero:
+debe completarse o revertirse como una unidad.
+
+---
+
+# 105. Delivery duplicate protection TARGET
+
+Una futura confirmación Delivery deberá impedir que retries produzcan:
+
+```text
+Inventory OUT
++
+same Inventory OUT again
+```
+
+La estrategia técnica de idempotencia se diseñará durante esa implementación.
+
+---
+
+# 106. Batch allocation TARGET
+
+Cuando corresponda, Delivery podrá resolver:
+
+```text
+DeliveryItem
+↓
+InventoryBatch allocation
+```
+
+permitiendo:
+
+```text
+required-lot fulfillment
+
+partial batch allocation
+
+future FEFO support
+```
+
+---
+
+# 107. Serial / ASSET fulfillment TARGET
+
+La futura capa física deberá soportar mecanismos distintos según:
+
+```text
+QUANTITY
+
+SERIALIZED
+
+ASSET
+```
+
+sin asumir que todos se resuelven mediante cantidades agregadas.
+
+---
+
+# 108. Reservation — FUTURE
+
+SalesOrder podrá evaluar posteriormente:
+
+```text
+Reservation
+```
+
+pero debe mantenerse:
 
 ```text
 Reservation
@@ -2040,169 +2489,127 @@ Reservation
 Inventory OUT
 ```
 
----
-
-# 130. Allocation vs Reservation
-
-También debe distinguirse:
+y:
 
 ```text
 Reservation
-→ cantidad comprometida
-```
-
-de:
-
-```text
+≠
 Batch Allocation
-→ existencia física específica seleccionada
 ```
 
-La estrategia se diseñará cuando sea necesaria.
+como conceptos separados.
 
 ---
 
-# 131. Backorder futuro
+# 109. Shipment — FUTURE
 
-Si una parte del pedido no puede entregarse, puede necesitarse:
-
-```text
-Backorder
-```
-
-como concepto futuro.
-
-No se agrega todavía.
-
----
-
-# 132. Shipment futuro
-
-Logística de envío puede introducir:
+Una futura logística de envío puede incorporar:
 
 ```text
 Carrier
+
 Tracking Number
+
 Ship Date
+
 Delivery Date
 ```
 
-sin cambiar la frontera principal SalesOrder / Delivery.
-
----
-
-# 133. Importación histórica
-
-Una futura migración puede incluir Sales históricas.
-
-Debe distinguirse:
+sin alterar la frontera:
 
 ```text
-Historical Sale
+SalesOrder
+→ commitment
+
+Delivery
+→ fulfillment
 ```
 
-de:
+---
+
+# 110. Proof of Delivery — FUTURE
+
+Una futura Delivery puede requerir:
 
 ```text
-Operational SalesOrder
+recipient
+
+signature
+
+photo
+
+timestamp
+
+location
 ```
 
-para evitar generar Inventory OUT nuevamente al importar datos históricos.
+No forma parte del ERP Core V1 actual.
 
 ---
 
-# 134. Migración de Sale actual
+# 111. SalesOrder / Delivery migration
 
-Antes de modificar Prisma debe determinarse:
-
-1. cuántas Sales existen;
-2. qué estados tienen;
-3. qué movimientos Inventory generaron;
-4. cuáles provienen de Quotes;
-5. qué Returns existen;
-6. cómo mapearlas a SalesOrder/Delivery;
-7. cómo conservar folios;
-8. cómo evitar movimientos duplicados.
-
----
-
-# 135. Posible estrategia de migración
-
-Conceptualmente, una Sale confirmada legacy podría convertirse en:
+La futura migración desde `Sale` deberá preservar:
 
 ```text
-Sale legacy
-↓
+historical folios
+
+historical commercial values
+
+InventoryMovement history
+
+Quote relationships
+
+tenant ownership
+```
+
+No debe reconstruir movimientos físicos ya existentes.
+
+---
+
+# 112. Confirmed Sale migration principle
+
+Conceptualmente una Sale CONFIRMED histórica podría corresponder en el futuro a:
+
+```text
 SalesOrder
 +
-Delivery confirmed
+confirmed Delivery
 ```
 
-porque históricamente representaba ambos hechos.
+porque el modelo CURRENT concentra ambos hechos.
+
+Esto es una hipótesis de migración, no una instrucción inmediata.
 
 ---
 
-# 136. Sale DRAFT legacy
+# 113. DRAFT Sale migration principle
 
-Una Sale `DRAFT` podría mapear conceptualmente a:
+Conceptualmente:
 
 ```text
-SalesOrder DRAFT
+Sale DRAFT
+→ SalesOrder DRAFT
 ```
 
-sin Delivery.
+podría ser una equivalencia futura.
+
+Debe validarse contra datos y workflows reales antes de migrar.
 
 ---
 
-# 137. Sale CANCELLED legacy
+# 114. CANCELLED Sale migration principle
 
-Una Sale `CANCELLED` podría mapearse a una operación comercial cancelada sin fulfillment, dependiendo del historial real.
+Una Sale CANCELLED histórica podría mapearse a una SalesOrder cancelada sin
+fulfillment cuando corresponda.
 
----
-
-# 138. No ejecutar esta migración todavía
-
-Las equivalencias anteriores son hipótesis de diseño.
-
-Antes de una migración deben validarse contra:
-
-* datos reales;
-* código;
-* Returns;
-* InventoryMovement;
-* Quote conversion.
+No debe asumirse universalmente sin revisar su historia real.
 
 ---
 
-# 139. Integridad de movimientos existentes
+# 115. No Prisma refactor now
 
-Una migración no debe recrear:
-
-```text
-Inventory OUT
-```
-
-para Sales ya confirmadas si ese OUT ya existe históricamente.
-
----
-
-# 140. Relación con Returns durante migración
-
-Returns existentes pueden depender de:
-
-```text
-SaleItem
-```
-
-Por tanto Sales y Returns deben migrarse coordinadamente.
-
-No debe eliminarse `SaleItem` antes de resolver esas relaciones.
-
----
-
-# 141. No modificar Prisma ahora
-
-Este documento **no autoriza todavía**:
+Este documento no autoriza actualmente:
 
 ```text
 rename Sale → SalesOrder
@@ -2211,7 +2618,7 @@ rename Sale → SalesOrder
 ni:
 
 ```text
-create Delivery
+create Delivery as immediate implementation
 ```
 
 ni:
@@ -2226,196 +2633,452 @@ ni:
 change DocumentStatus
 ```
 
-La implementación llegará mediante un feature/refactor documentado.
+La evolución deberá ser un refactor deliberado posterior.
 
 ---
 
-# 142. API legacy
+# 116. IMPLEMENTED — Sales
 
-La documentación histórica confirma capacidades equivalentes a:
-
-```text
-create Sale
-approve Sale
-cancel Draft Sale
-convert Quote
-generate PDF
-```
-
-Los endpoints exactos deben verificarse contra el backend vigente antes de documentarlos como contrato actual.
-
----
-
-# 143. API objetivo
-
-Conceptualmente:
+Actualmente:
 
 ```text
-GET  /sales-orders
-GET  /sales-orders/:id
-POST /sales-orders
+Sale persistence
 
-POST /sales-orders/:id/confirm
-POST /sales-orders/:id/cancel
+SaleItem persistence
 
-POST /sales-orders/:id/deliveries
-GET  /sales-orders/:id/deliveries
+direct Sale create
 
-POST /deliveries/:id/confirm
-```
-
-Los paths finales se definirán durante implementación/OpenAPI.
-
----
-
-# 144. API no debe exponer persistencia
-
-Evitar endpoints como:
-
-```text
-POST /sales/decrement-stock
-```
-
-El consumidor debe solicitar una operación de negocio.
-
----
-
-# 145. Current vs Target
-
-## CURRENT — legacy
-
-```text
-Sale
-SaleItem
 DRAFT
+
 CONFIRMED
+
 CANCELLED
-Manual Sales
-Sale approval
-Draft cancellation
-Quote conversion
-Inventory OUT on confirmed Sale
-Inventory movements
+
+DRAFT approval
+
+DRAFT cancellation
+
+Customer active validation
+
+Product active validation
+
+Generic Sales eligibility
+
+Inventory OUT on approval
+
+InventoryMovement Sale reference
+
+server-generated Sale folio
+
+Quote → Sale conversion
+
+GET /sales/:id
+
+deep-link
+
 Sale PDF
+
+Sales frontend
 ```
 
 ---
 
-# 146. TARGET
+# 117. VALIDATED
+
+La validación registrada cubre según los hitos correspondientes:
+
+```text
+ASSET Product rejection
+
+compatible QUANTITY Product creation
+
+DRAFT creation without stock mutation
+
+sequential folio allocation
+
+folio non-reuse
+
+DRAFT → CONFIRMED
+
+stock decrement
+
+InventoryMovement OUT
+
+Sale reference traceability
+
+DRAFT cancellation without stock mutation
+
+DRAFT cancellation without InventoryMovement
+
+Quote conversion
+
+Sale detail
+
+Sales deep-link
+
+PDF automated flow
+
+frontend lifecycle
+```
+
+Los casos concretos y IDs de QA pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+
+QA evidence
+```
+
+y no a esta especificación permanente.
+
+---
+
+# 118. TECHNICAL DEBT — CURRENT
+
+Permanece pendiente:
+
+```text
+Sale create request idempotency
+```
+
+```text
+server-side Sales pagination
+```
+
+```text
+server-side Sales search/filtering
+```
+
+```text
+generic Sale editing if product requirements eventually need it
+```
+
+```text
+confirmed Sale reversal
+```
+
+```text
+OPTIONAL-lot batch allocation
+```
+
+```text
+REQUIRED-lot fulfillment
+```
+
+```text
+SERIALIZED fulfillment
+```
+
+```text
+ASSET commercial fulfillment
+```
+
+```text
+Audit integration
+```
+
+---
+
+# 119. Deferred commercial capabilities
+
+Actualmente se consideran diferidas:
+
+```text
+Commercial Returns
+```
+
+```text
+Billing / Invoice
+```
+
+```text
+Payments
+```
+
+```text
+Accounts Receivable
+```
+
+Commercial Returns es una capacidad estratégica posterior, no un P0 blocker del
+ERP Core V1 actual.
+
+---
+
+# 120. TARGET
+
+La evolución comercial aprobada incluye:
 
 ```text
 SalesOrder
+
 SalesOrderItem
+
 Delivery
+
 DeliveryItem
-Partial deliveries
-Pending quantities
+
+partial deliveries
+
+pending quantities
+
 Delivery-based Inventory OUT
-Batch allocation
-Explicit Quote relationship
+
+lot / batch allocation
+
+serial / ASSET fulfillment strategy
+
+explicit Quote relationship
+
 SalesOrder 360
-Delivery history
-Granular permissions
-Audit
-OpenAPI
+
+delivery history
 ```
+
+Estas capacidades no están implementadas todavía.
 
 ---
 
-# 147. FUTURE
+# 121. FUTURE
+
+Capacidades posteriores pueden incluir:
 
 ```text
 Reservations
+
 Shipments
+
 Backorders
-Multiple addresses
+
 Proof of Delivery
+
+Multiple Delivery Addresses
+
 Price Lists
+
 Discount approvals
-Payment terms
+
+Payment Terms
+
 Billing / CFDI
+
 Accounts Receivable
+
 Sales commissions
+
 Sales representative ownership
+
 Customer Portal
+
 Mobile fulfillment
+
 Advanced analytics
+
 AI recommendations
 ```
 
+No forman parte automáticamente del siguiente sprint.
+
 ---
 
-# 148. Invariantes CURRENT que deben preservarse durante transición
+# 122. Invariantes CURRENT
+
+## Tenant
 
 ```text
 Sale
 → belongs to one Company
 ```
 
-```text
-Sale Customer
-→ same Company
-```
+---
+
+## Customer
 
 ```text
-Sale Products
-→ same Company
-```
-
-```text
-Confirmed legacy Sale
-→ historical inventory effect preserved
-```
-
-```text
-Confirmed legacy Sale
-→ should not be silently rewritten
+New Sale
+→ active same-tenant Customer required
 ```
 
 ---
 
-# 149. Invariantes TARGET
+## Product
 
 ```text
-SalesOrder
+New Sale
+→ active same-tenant Product required
+```
+
+---
+
+## Generic eligibility
+
+```text
+QUANTITY + NONE
+→ allowed
+```
+
+```text
+QUANTITY + OPTIONAL
+→ allowed
+```
+
+```text
+QUANTITY + REQUIRED
+→ blocked
+```
+
+```text
+SERIALIZED
+→ blocked
+```
+
+```text
+ASSET
+→ blocked
+```
+
+---
+
+## Direct create
+
+```text
+POST /sales
+→ DRAFT
 → no Inventory OUT
 ```
+
+---
+
+## Approval
+
+```text
+DRAFT
+↓
+approve
+↓
+CONFIRMED
+↓
+Inventory OUT
+```
+
+---
+
+## Cancellation
+
+```text
+DRAFT
+↓
+cancel
+↓
+CANCELLED
+↓
+no Inventory mutation
+```
+
+---
+
+## Confirmed Sale
+
+```text
+CONFIRMED
+→ no normal cancellation
+```
+
+---
+
+## Quote conversion
+
+```text
+Quote CONFIRMED
+↓
+Sale CONFIRMED
+↓
+Inventory OUT
+```
+
+---
+
+## Duplicate conversion
+
+```text
+already-converted Quote
+→ cannot create another normal Sale
+```
+
+---
+
+## Folio
+
+```text
+Sale folio
+→ tenant-scoped
+→ sequential
+→ immutable
+→ never reused
+```
+
+---
+
+## Historical price
+
+```text
+Product.price changes
+≠
+historical SaleItem.price changes
+```
+
+---
+
+# 123. Invariantes TARGET
+
+## Commercial commitment
+
+```text
+SalesOrder CONFIRMED
+→ no Inventory OUT
+```
+
+---
+
+## Physical fulfillment
 
 ```text
 Delivery CONFIRMED
 → Inventory OUT
 ```
 
-```text
-Delivered Quantity
-<=
-Ordered Quantity
-```
+---
+
+## Fulfillment quantity
 
 ```text
-Delivery inventory effects
+Delivered
+<=
+Ordered
+```
+
+---
+
+## Atomicity
+
+```text
+Delivery physical effects
 → atomic
 ```
 
-```text
-Confirmed Delivery
-→ immutable historical event
-```
+---
+
+## Returns
 
 ```text
-Return
+Commercial Return
 → references physical fulfillment
 ```
 
-```text
-Quote conversion
-→ SalesOrder
-```
+---
 
-```text
-Quote conversion
-→ no Inventory OUT
-```
+## Healthcare
 
 ```text
 CaseDispatch
@@ -2423,337 +3086,762 @@ CaseDispatch
 Delivery
 ```
 
+---
+
+# 124. Anti-patrones
+
+## Inventory on direct Sale creation
+
+Incorrecto:
+
 ```text
-Cross-tenant commercial relation
-→ forbidden
+POST /sales
+→ stock decrement
 ```
+
+La Sale directa inicia DRAFT.
 
 ---
 
-# 150. Anti-patrones
+## Confirmed Sale without Inventory OUT
 
-## SalesOrder directly changes stock
+Incorrecto en el modelo CURRENT:
 
 ```text
-Confirm SalesOrder
+Sale CONFIRMED
++
+no Inventory consequence
+```
+
+si se trata de una confirmación válida del Generic Sales flow.
+
+---
+
+## Confirmed Sale cancellation without compensation
+
+Incorrecto:
+
+```text
+CONFIRMED
+→ CANCELLED
+```
+
+sin resolver el efecto físico previo.
+
+---
+
+## Frontend-only Product eligibility
+
+Incorrecto depender únicamente del ProductSelector.
+
+Backend debe validar.
+
+---
+
+## REQUIRED lot without allocation
+
+Incorrecto:
+
+```text
+REQUIRED lot Product
+→ Generic Sale OUT
+```
+
+sin seleccionar existencia física válida.
+
+---
+
+## ASSET as generic quantity
+
+Incorrecto:
+
+```text
+ASSET
 → stock -= quantity
 ```
 
+sin identificar el EquipmentAsset correspondiente.
+
 ---
 
-## Quote directly changes stock
+## SERIALIZED = ASSET
+
+Incorrecto asumir que ambos modelos son equivalentes.
+
+---
+
+## Duplicate Quote conversion
+
+Incorrecto:
 
 ```text
-Convert Quote
-→ OUT
+Quote
+→ Sale A
+
+same Quote
+→ Sale B
 ```
 
-en la arquitectura objetivo.
-
 ---
 
-## Delivery without original order context
+## Reusing folios
 
-Crear entregas sin validar cantidades comprometidas cuando pertenecen a una SalesOrder.
-
----
-
-## Over Delivery
-
-```text
-Ordered 10
-Delivered 14
-```
-
-sin flujo excepcional.
-
----
-
-## Rewrite Delivery
-
-Cambiar cantidades históricas después de confirmar.
-
----
-
-## Return against unordered quantity
-
-Devolver más de lo realmente entregado.
-
----
-
-## Lot tracking on SaleItem legacy
-
-Construir nueva trazabilidad permanente sobre `SaleItem` cuando el modelo objetivo es DeliveryItem.
+Incorrecto reutilizar folios de Sales canceladas o históricas.
 
 ---
 
 ## Invoice changes stock
+
+Incorrecto:
 
 ```text
 Invoice
 → Inventory OUT
 ```
 
----
-
-## Customer address as permanent delivery snapshot
-
-Depender del dato actual de Customer para reconstruir una entrega histórica.
+como regla general.
 
 ---
 
-## Healthcare Dispatch as Sale
+## Healthcare Dispatch = Sale
+
+Incorrecto:
 
 ```text
 CaseDispatch
-→ Delivery
+→ Sale
 ```
 
 automáticamente.
 
 ---
 
-# 151. Relación con Customers
+## Commercial Return = Healthcare Return
+
+Incorrecto mezclar ambos conceptos.
+
+---
+
+## Target documented as Current
+
+Incorrecto presentar:
+
+```text
+SalesOrder
+Delivery
+```
+
+como si ya hubieran sustituido a Sale.
+
+---
+
+# 125. Relación con Customers
+
+CURRENT:
 
 ```text
 Customer
 ↓
-SalesOrder
+Sale
 ```
 
-Customer identifica la contraparte comercial.
+Customer administra la identidad maestra.
+
+Sales administra la transacción comercial.
 
 ---
 
-# 152. Relación con Quotes
+# 126. Relación con Quotes
+
+CURRENT:
 
 ```text
-Quote
-↓ optional conversion
-SalesOrder
+Quote CONFIRMED
+↓
+Sale CONFIRMED
 ```
 
-Quote conserva la propuesta histórica.
+cuando se ejecuta la conversión.
+
+`QUOTES.md` administra:
+
+```text
+proposal lifecycle
+
+conversion entry point
+```
+
+Sales administra:
+
+```text
+resulting Sale
+
+physical Inventory OUT
+```
 
 ---
 
-# 153. Relación con Products
+# 127. Relación con Products
+
+CURRENT:
 
 ```text
 Product
 ↓
-SalesOrderItem
-↓
-DeliveryItem
+SaleItem
 ```
 
-Product identifica el artículo comercial.
+Products administra:
 
-Inventory identifica qué existencia física se entrega.
+```text
+catalog identity
+
+inventoryTracking
+
+lotTracking
+```
+
+Sales aplica las restricciones compatibles con Generic Sales.
 
 ---
 
-# 154. Relación con Inventory
+# 128. Relación con Inventory
 
-La frontera oficial es:
+CURRENT:
 
 ```text
-Delivery
+Sale CONFIRMED
 ↓
+Inventory OUT
+```
+
+Inventory administra:
+
+```text
+Product.stock consequence
+
+InventoryMovement
+
+movement traceability
+```
+
+Sales no redefine esas reglas internamente.
+
+---
+
+# 129. Relación con Equipment
+
+Actualmente Generic Sales no soporta Products ASSET.
+
+Una futura integración comercial deberá operar sobre:
+
+```text
+EquipmentAsset
+```
+
+sin contaminar el Core Equipment con lógica de Case o Sales innecesaria.
+
+---
+
+# 130. Relación con Returns
+
+Commercial Returns permanece:
+
+```text
+P1 / DEFERRED
+```
+
+La arquitectura futura deberá coordinarse con:
+
+```text
+SalesOrder
+
+Delivery
+
 Inventory
 ```
 
-Sales no debe actualizar directamente:
+y no reescribir la Sale o Delivery original.
+
+---
+
+# 131. Relación con Healthcare
+
+Healthcare podrá originar o relacionarse con operaciones comerciales en el futuro.
+
+Debe mantenerse:
 
 ```text
-Product.stock
+Sales
+→ ERP Core commercial behavior
 ```
-
-evitando las reglas de Inventory.
-
----
-
-# 155. Relación con Returns
-
-Arquitectura objetivo:
 
 ```text
-Delivery
-↓
-Return
-↓
-Inventory disposition
+Healthcare
+→ operational Case / custody behavior
 ```
 
-El documento `RETURNS.md` deberá reconstruirse sobre esta frontera.
+sin fusionarlos.
 
 ---
 
-# 156. Relación con Billing
+# 132. Relación con Billing
 
-```text
-SalesOrder
-Delivery
-↓
-Billing context
-↓
-Invoice
-```
-
-La factura conserva responsabilidades propias.
-
----
-
-# 157. Relación con Healthcare
-
-Healthcare puede producir o relacionarse con operaciones comerciales sin obligar a Sales a conocer lógica clínica o de custodia.
-
----
-
-# 158. Relación con Zaping Way
-
-Sales debe sentirse como un workflow continuo:
-
-```text
-Pedido
-↓
-Entrega
-↓
-Pendiente
-↓
-Devolución / Facturación
-```
-
-y no como tablas desconectadas.
-
----
-
-# 159. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-010 — Quote → Sale — SUPERSEDED.
-* ADR-011 — SalesOrder y Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
-
----
-
-# 160. Documentos relacionados
-
-```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-
-modules/erp/CUSTOMERS.md
-modules/erp/PRODUCTS.md
-modules/erp/QUOTES.md
-modules/erp/INVENTORY.md
-```
-
-Documento inmediato relacionado:
-
-```text
-modules/erp/RETURNS.md
-```
-
----
-
-# 161. Fuente de verdad
-
-```text
-SALES.md
-→ reglas funcionales de ventas y fulfillment
-
-QUOTES.md
-→ propuesta comercial
-
-INVENTORY.md
-→ existencia física y movimientos
-
-RETURNS.md
-→ devolución de fulfillment
-
-ADR-011
-→ separación SalesOrder / Delivery
-
-schema.prisma
-→ modelo técnico CURRENT
-
-backend
-→ comportamiento implementado
-
-tests
-→ comportamiento validado
-
-PROJECT_BOARD.md
-→ trabajo pendiente
-```
-
----
-
-# 162. Regla de transición
-
-Mientras exista:
+Billing podrá utilizar contexto de:
 
 ```text
 Sale
+
+future SalesOrder
+
+future Delivery
 ```
 
-en el código, la documentación debe identificarlo claramente como:
+pero administra:
 
 ```text
-CURRENT / LEGACY
+Invoice
+
+Payment
+
+financial responsibility
 ```
 
-y cuando se hable de:
+como dominios separados.
+
+---
+
+# 133. ADR relacionados
+
+```text
+ADR-001 — Multi-Tenant
+
+ADR-002 — Inventory Movements
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-010 — Quote → Sale — superseded as long-term architecture
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
+
+ADR-013 — Inventory Custody & Case Logistics
+```
+
+ADR-010 puede estar superado como arquitectura futura, pero:
+
+```text
+Quote → Sale
+```
+
+continúa siendo CURRENT hasta que exista una migración real.
+
+---
+
+# 134. Documentación relacionada
+
+```text
+docs/modules/erp/CUSTOMERS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+`RETURNS.md` puede permanecer como documentación estratégica/deferred, pero no debe
+interpretarse como el siguiente módulo obligatorio del ERP Core V1.
+
+---
+
+# 135. Fuente de verdad
+
+```text
+SALES.md
+→ CURRENT Sale behavior
+→ Sale lifecycle
+→ Generic Sales eligibility
+→ CURRENT Inventory OUT trigger
+→ TARGET SalesOrder / Delivery direction
+```
+
+```text
+QUOTES.md
+→ Quote lifecycle
+→ Quote → Sale conversion entry point
+```
+
+```text
+CUSTOMERS.md
+→ Customer master-data lifecycle
+→ active Customer rules
+```
+
+```text
+PRODUCTS.md
+→ Product tracking configuration
+→ Product master lifecycle
+```
+
+```text
+INVENTORY.md
+→ stock
+→ InventoryMovement
+→ physical Inventory semantics
+```
+
+```text
+EQUIPMENT.md
+→ EquipmentAsset identity
+```
+
+```text
+ADR-011
+→ TARGET SalesOrder / Delivery architecture
+```
+
+```text
+ADR-013
+→ Healthcare custody vs physical/commercial disposition
+```
+
+```text
+schema.prisma
+→ CURRENT persistence
+```
+
+```text
+Sales backend
+→ CURRENT API/business implementation
+```
+
+```text
+Sales frontend
+→ CURRENT user experience
+```
+
+```text
+tests
+→ validated behavior
+```
+
+```text
+PROJECT_BOARD.md
+→ current project status and technical debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
+```
+
+---
+
+# 136. Estado consolidado
+
+CURRENT:
+
+```text
+Sale persistence
+✅
+
+SaleItem
+✅
+
+direct Sale creation
+✅
+
+DRAFT
+✅
+
+CONFIRMED
+✅
+
+CANCELLED
+✅
+
+DRAFT → CONFIRMED
+✅
+
+DRAFT → CANCELLED
+✅
+
+DRAFT create without stock mutation
+✅
+
+CONFIRMED → Inventory OUT
+✅
+
+Customer active validation
+✅
+
+Product active validation
+✅
+
+QUANTITY + NONE
+✅
+
+QUANTITY + OPTIONAL
+✅
+
+QUANTITY + REQUIRED
+❌ blocked
+
+SERIALIZED
+❌ blocked
+
+ASSET
+❌ blocked
+
+CompanySequence SALE_FOLIO
+✅
+
+Quote → Sale conversion
+✅
+
+GET /sales/:id
+✅
+
+/sales?saleId=<id>
+✅
+
+Sale PDF
+✅
+```
+
+CURRENT debt:
+
+```text
+Sale create request idempotency
+⏳
+
+server-side pagination
+⏳
+
+server-side search/filtering
+⏳
+
+generic DRAFT editing if required
+⏳
+
+confirmed Sale reversal
+⏳
+
+OPTIONAL-lot batch allocation
+⏳
+
+REQUIRED-lot fulfillment
+⏳
+
+SERIALIZED fulfillment
+⏳
+
+ASSET commercial fulfillment
+⏳
+
+Audit integration
+⏳
+```
+
+Deferred:
+
+```text
+Commercial Returns
+⏳ P1
+
+Billing / Invoice
+⏳
+
+Payments / Accounts Receivable
+⏳
+```
+
+TARGET:
 
 ```text
 SalesOrder
+↓
+commercial commitment
+↓
+no Inventory OUT
+
+Delivery
+↓
+physical fulfillment
+↓
+Inventory OUT
+```
+
+---
+
+# 137. Secuencia de proyecto
+
+Sales V1 forma parte del ERP Core actual.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto:
+
+```text
+SalesOrder / Delivery refactor
+```
+
+y:
+
+```text
+Generic Commercial Returns
+```
+
+no deben introducirse automáticamente antes de cerrar los gates actuales.
+
+---
+
+# 138. Regla de transición
+
+Mientras `Sale` continúe siendo el modelo operativo:
+
+```text
+Sale
+→ CURRENT
+```
+
+debe documentarse como comportamiento real.
+
+Cuando se hable de:
+
+```text
+SalesOrder
+
 Delivery
 ```
 
-debe identificarse como:
+debe marcarse:
 
 ```text
 TARGET
 ```
 
-hasta que el refactor sea implementado y validado.
+hasta que el refactor sea implementado, migrado y validado.
+
+La futura transición deberá preservar:
+
+```text
+historical Sales
+
+historical folios
+
+Quote relationships
+
+InventoryMovement history
+
+tenant integrity
+```
+
+sin duplicar movimientos físicos.
 
 ---
 
-# 163. Principio final
+# 139. Principio final
 
-El dominio comercial debe reflejar hechos distintos:
+El modelo CURRENT es:
 
 ```text
-Quote
-→ lo que proponemos
+Direct Sale
 
-SalesOrder
-→ lo que el cliente compra
-
-Delivery
-→ lo que realmente entregamos
-
-InventoryMovement
-→ la consecuencia física
-
-Return
-→ lo que posteriormente regresa
+Customer
+↓
+Sale DRAFT
+↓
+Approve
+↓
+Sale CONFIRMED
+↓
+Inventory OUT
 ```
 
-Por tanto:
+También:
 
-> **Vender no significa necesariamente entregar en ese mismo momento.**
+```text
+Quote CONFIRMED
+↓
+Convert
+↓
+Sale CONFIRMED
+↓
+Inventory OUT
+```
 
-La arquitectura debe preservar esa diferencia incluso cuando la interfaz permita realizar ambos pasos de forma rápida dentro de una venta inmediata.
+La arquitectura TARGET será:
+
+```text
+SalesOrder
+↓
+Commercial Commitment
+
+Delivery
+↓
+Physical Fulfillment
+
+InventoryMovement OUT
+↓
+Physical Consequence
+```
+
+Debe mantenerse una distinción clara entre:
+
+```text
+CURRENT implementation
+```
+
+y:
+
+```text
+TARGET architecture
+```
+
+sin fingir que SalesOrder / Delivery ya sustituyeron a Sale.
+
+> **En el ERP Core actual, una Sale confirmada representa tanto la confirmación
+> comercial como la salida física de inventario. La arquitectura futura separará
+> esos hechos mediante SalesOrder y Delivery, pero esa transición debe realizarse
+> de forma deliberada sin alterar la historia ni duplicar movimientos.**

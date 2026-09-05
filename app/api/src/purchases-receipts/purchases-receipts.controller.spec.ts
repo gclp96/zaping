@@ -1,4 +1,5 @@
 import { UserRole } from '@prisma/client';
+import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -14,6 +15,7 @@ type PurchaseReceiptsServiceMock = {
 };
 
 describe('PurchaseReceiptsController', () => {
+  const idempotencyKey = 'receipt-request-key';
   let controller: PurchaseReceiptsController;
   let purchaseReceiptsService: PurchaseReceiptsServiceMock;
   let request: AuthenticatedRequest;
@@ -76,15 +78,67 @@ describe('PurchaseReceiptsController', () => {
 
     purchaseReceiptsService.create.mockResolvedValue(expectedResult);
 
-    const result = await controller.create(request, dto);
+    const result = await controller.create(request, idempotencyKey, dto);
 
     expect(purchaseReceiptsService.create).toHaveBeenCalledWith(
       request.user.companyId,
       request.user.id,
+      idempotencyKey,
       dto,
     );
 
     expect(result).toEqual(expectedResult);
+  });
+
+  it.each([undefined, '', '   ', 'x'.repeat(129)])(
+    'rechaza una clave Idempotency-Key inválida: %p',
+    (invalidKey) => {
+      const dto = {
+        purchaseId: '33333333-3333-4333-8333-333333333333',
+        items: [
+          {
+            purchaseItemId: '44444444-4444-4444-8444-444444444444',
+            quantityReceived: 1,
+          },
+        ],
+      };
+
+      let error: unknown;
+
+      try {
+        void controller.create(request, invalidKey, dto);
+      } catch (caughtError: unknown) {
+        error = caughtError;
+      }
+
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect(error).toMatchObject({
+        message: 'Se requiere una clave Idempotency-Key válida',
+        status: 400,
+      });
+      expect(purchaseReceiptsService.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('recorta la clave Idempotency-Key antes de enviarla al servicio', async () => {
+    const dto = {
+      purchaseId: '33333333-3333-4333-8333-333333333333',
+      items: [
+        {
+          purchaseItemId: '44444444-4444-4444-8444-444444444444',
+          quantityReceived: 1,
+        },
+      ],
+    };
+
+    await controller.create(request, `  ${idempotencyKey}  `, dto);
+
+    expect(purchaseReceiptsService.create).toHaveBeenCalledWith(
+      request.user.companyId,
+      request.user.id,
+      idempotencyKey,
+      dto,
+    );
   });
 
   it('debe listar las recepciones de la empresa autenticada', async () => {

@@ -1,150 +1,406 @@
-# Módulo de Proveedores — Zaping ERP
+# Suppliers — Zaping ERP
 
 **Módulo:** Suppliers
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** SUPPLIERS V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Suppliers administra el catálogo maestro de proveedores de una Company.
+Suppliers administra el catálogo maestro de proveedores de una Company.
 
 Su responsabilidad principal es responder:
 
 ```text
-¿Quién nos suministra?
+¿Quién suministra a la Company?
+
 ¿Cómo podemos contactarlo?
-¿Puede utilizarse actualmente?
-¿Qué compras se han realizado con él?
+
+¿Está habilitado para nuevas operaciones?
+
+¿Qué Purchases históricas están relacionadas con él?
 ```
 
-Supplier representa una organización o persona utilizada como contraparte de abastecimiento.
+Supplier representa:
+
+```text
+procurement counterpart
++
+master-data identity
++
+master-data lifecycle
+```
+
+No representa una Purchase ni una recepción física.
 
 ---
 
-# 2. Principio fundamental
+# 2. Ownership
+
+Suppliers es propietario de información maestra como:
+
+```text
+name
+
+contactName
+
+email
+
+phone
+
+address
+
+notes
+
+isActive
+
+tenant ownership
+```
+
+No es propietario de:
+
+```text
+Purchase lifecycle
+
+Purchase quantities
+
+Purchase commercial values
+
+PurchaseReceipt
+
+Inventory stock
+
+InventoryMovement
+
+InventoryBatch semantics
+
+Product
+
+Accounts Payable
+
+Supplier invoices
+
+Healthcare Case Logistics
+```
+
+---
+
+# 3. Fronteras de dominio
+
+Debe mantenerse:
 
 ```text
 Supplier
-=
-quién suministra
+→ who supplies
 ```
-
-mientras:
 
 ```text
 Purchase
-=
-qué se ordena al Supplier
+→ what was ordered from Supplier
 ```
-
-y:
 
 ```text
 PurchaseReceipt
-=
-qué se recibió físicamente
+→ what physically arrived
+```
+
+```text
+Inventory
+→ resulting quantity / movement effects
 ```
 
 Por tanto:
 
-> Supplier define al proveedor. Purchases define las operaciones realizadas con él.
-
----
-
-# 3. Responsabilidades
-
-Suppliers es propietario de información maestra como:
-
-* nombre;
-* contacto;
-* email;
-* teléfono;
-* dirección;
-* notas;
-* estado activo/inactivo;
-* identidad dentro de la Company.
-
----
-
-# 4. Fuera del alcance
-
-Suppliers no es propietario de:
-
-* Purchase lifecycle;
-* cantidades compradas;
-* Inventory;
-* lotes;
-* caducidades;
-* Products;
-* pagos;
-* cuentas por pagar;
-* facturas de proveedor;
-* movimientos de inventario.
-
----
-
-# 5. Modelo actual
-
-El modelo actual de `Supplier` contiene conceptualmente:
+```text
+Supplier
+≠
+Purchase
+```
 
 ```text
 Supplier
-├── id
-├── companyId
-├── name
-├── email
-├── phone
-├── address
-├── contactName
-├── notes
-├── isActive
-├── createdAt
-├── updatedAt
-└── purchases
+≠
+Product
 ```
 
-La definición técnica exacta permanece en `schema.prisma`.
+```text
+Supplier
+≠
+Inventory
+```
 
 ---
 
-# 6. Identificador
+# 4. CURRENT vs TARGET vs FUTURE
 
-Supplier utiliza UUID como identificador técnico.
+Este documento distingue:
+
+## CURRENT
+
+Capacidades implementadas actualmente.
+
+## TARGET
+
+Evoluciones aprobadas o de deuda inmediata.
+
+## FUTURE
+
+Capacidades posteriores cuya implementación dependerá de necesidades reales.
+
+---
+
+# 5. Estado CURRENT
+
+Actualmente Suppliers V1 soporta:
+
+```text
+Supplier create
+
+Supplier list
+
+Supplier detail
+
+Supplier master-data update
+
+soft-deactivation
+
+active-only list
+
+inactive historical detail
+
+tenant-scoped operations
+
+name uniqueness per Company
+
+duplicate handling
+
+NotFound handling
+```
+
+Lifecycle vigente:
+
+```text
+ACTIVE
+↓
+INACTIVE
+```
+
+---
+
+# 6. Modelo Supplier actual
 
 Conceptualmente:
 
 ```text
+Supplier
+
 id
-→ UUID
+companyId
+
+name
+
+email
+phone
+address
+contactName
+notes
+
+isActive
+
+createdAt
+updatedAt
+
+purchases
 ```
 
-El usuario no necesita conocerlo para operar normalmente.
-
----
-
-# 7. Multi-tenancy
-
-Cada Supplier pertenece a una Company.
+La definición técnica exacta pertenece a:
 
 ```text
-Company
-↓
-Supplier
+schema.prisma
 ```
-
-No debe existir acceso cruzado entre tenants.
 
 ---
 
-# 8. Nombre
+# 7. Supplier como Master Data
 
-`name` constituye actualmente la identidad empresarial principal del Supplier.
+Supplier utiliza un lifecycle de Master Data.
+
+La transición principal es:
+
+```text
+ACTIVE
+↓
+INACTIVE
+```
+
+No:
+
+```text
+ACTIVE
+↓
+physical DELETE
+```
+
+como comportamiento empresarial normal.
+
+---
+
+# 8. Supplier ACTIVE
+
+Un Supplier activo puede utilizarse normalmente en nuevas operaciones compatibles,
+principalmente:
+
+```text
+Purchase
+```
+
+La utilización final depende de validaciones backend del workflow consumidor.
+
+---
+
+# 9. Supplier INACTIVE
+
+Un Supplier inactivo:
+
+```text
+remains persisted
+
+remains historically referenceable
+
+retains Purchase history
+
+must not disappear from historical documents
+```
+
+Normalmente no debe utilizarse para nuevas Purchases.
+
+---
+
+# 10. Desactivación CURRENT
+
+Actualmente:
+
+```text
+DELETE /suppliers/:id
+```
+
+implementa:
+
+```text
+isActive = false
+```
+
+No elimina físicamente el Supplier.
+
+Debe interpretarse como:
+
+```text
+Deactivate Supplier
+```
+
+y no como:
+
+```text
+Hard Delete Supplier
+```
+
+---
+
+# 11. Desactivación tenant-scoped
+
+La operación de desactivación debe ejecutarse dentro de:
+
+```text
+authenticated Company
+```
+
+No debe ser posible:
+
+```text
+Company A User
+↓
+DELETE Supplier Company B
+```
+
+---
+
+# 12. Desactivación idempotente
+
+La desactivación actual es idempotente.
+
+Si Supplier ya está:
+
+```text
+isActive = false
+```
+
+repetir la operación no debe eliminar historia ni producir un efecto destructivo
+adicional.
+
+---
+
+# 13. Reactivación
+
+Actualmente:
+
+```text
+Supplier reactivation
+→ NOT IMPLEMENTED
+```
+
+Una futura transición:
+
+```text
+INACTIVE
+↓
+ACTIVE
+```
+
+deberá realizarse mediante un workflow explícito que valide:
+
+```text
+tenant
+
+authorization
+
+name uniqueness
+
+current business rules
+```
+
+No debe introducirse accidentalmente mediante un PATCH genérico.
+
+---
+
+# 14. Hard Delete
+
+Suppliers V1 no expone hard delete.
+
+Una futura eliminación física requeriría una decisión específica sobre:
+
+```text
+historical relationships
+
+retention
+
+auditability
+
+foreign-key dependencies
+```
+
+No forma parte del lifecycle normal.
+
+---
+
+# 15. Name
+
+`name` constituye la identidad empresarial principal del Supplier dentro de una
+Company.
 
 Ejemplos:
 
@@ -158,43 +414,35 @@ Terumo México
 
 ---
 
-# 9. Unicidad del nombre
+# 16. Name uniqueness
 
-Actualmente la regla técnica es:
+La regla técnica actual es:
 
 ```text
-unique(companyId, name)
+companyId
++
+name
+→ UNIQUE
 ```
 
-Por tanto, dentro de una Company no deben existir dos Suppliers con exactamente el mismo nombre según la comparación aplicada por la base de datos.
+La misma organización puede existir como Supplier en Companies diferentes.
 
----
-
-# 10. Nombre entre Companies
-
-Sí puede existir:
+Ejemplo válido:
 
 ```text
 Company A
-→ Supplier "Proveedor ABC"
-```
+→ Supplier ABC
 
-y:
-
-```text
 Company B
-→ Supplier "Proveedor ABC"
+→ Supplier ABC
 ```
-
-porque los tenants son independientes.
 
 ---
 
-# 11. Duplicados
+# 17. Duplicate handling
 
-El backend debe detectar conflictos de nombre dentro de la Company.
-
-El mensaje debe ser comprensible.
+Cuando ya existe un Supplier con el mismo nombre dentro de la Company, backend
+debe responder con un error empresarial comprensible.
 
 Ejemplo:
 
@@ -202,244 +450,147 @@ Ejemplo:
 Ya existe un proveedor con este nombre.
 ```
 
-No debe exponerse directamente un error de constraint de Prisma.
+No debe exponerse directamente al usuario un error interno de constraint Prisma.
 
 ---
 
-# 12. Lifecycle
+# 18. UUID
 
-Supplier es Master Data.
-
-Por tanto sigue ADR-012:
+Supplier utiliza:
 
 ```text
-ACTIVE
-↓
-INACTIVE
+id
+→ UUID
 ```
 
-como estrategia principal.
+como identificador técnico.
 
----
-
-# 13. Supplier activo
-
-Un Supplier activo puede utilizarse normalmente en:
+El usuario normalmente opera utilizando:
 
 ```text
-Purchase
+name
+
+contact data
+
+Purchase context
 ```
 
-y otros futuros workflows de abastecimiento.
-
----
-
-# 14. Supplier inactivo
-
-Un Supplier inactivo:
-
-* continúa existiendo;
-* conserva sus compras históricas;
-* conserva referencias;
-* puede consultarse;
-* normalmente no debe utilizarse para nuevas Purchases.
-
----
-
-# 15. Desactivación
-
-La acción empresarial correcta es:
-
-```text
-Desactivar proveedor
-```
-
-cuando el objetivo es dejar de utilizarlo.
-
-No:
-
-```text
-Eliminar proveedor
-```
-
-si posee historia empresarial.
-
----
-
-# 16. Reactivación
-
-Cuando sea válido:
-
-```text
-INACTIVE
-↓
-ACTIVE
-```
-
-puede restaurarse su uso en nuevas operaciones.
-
-La reactivación debe mantener las reglas de:
-
-* tenant;
-* unicidad;
-* autorización.
-
----
-
-# 17. Eliminación física
-
-Hard Delete no debe ser la estrategia normal.
-
-Solo puede considerarse cuando el Supplier:
-
-* fue creado por error;
-* nunca participó en una Purchase;
-* no tiene relaciones históricas;
-* y el módulo permite explícitamente eliminarlo.
-
----
-
-# 18. Compras históricas
-
-Desactivar un Supplier no debe afectar:
-
-```text
-Purchase
-PurchaseReceipt
-InventoryMovement
-InventoryBatch
-```
-
-que ya se encuentren relacionados histórica o indirectamente con él.
+y no necesita conocer el UUID.
 
 ---
 
 # 19. Contact Name
 
-`contactName` representa la persona de contacto principal conocida.
+`contactName` representa actualmente el contacto principal conocido del Supplier.
 
 Ejemplo:
 
 ```text
-Proveedor
+Supplier
 Distribuidora ABC
 
-Contacto
+Contact
 María López
 ```
 
 ---
 
-# 20. Contacto no es User
+# 20. Contact Name ≠ User
 
-El contacto de un Supplier no debe confundirse con:
+Debe mantenerse:
 
 ```text
-User
+Supplier.contactName
+≠
+Zaping User
 ```
 
-de Zaping.
+`contactName` es información descriptiva del proveedor.
 
-Actualmente es información descriptiva del proveedor.
+No representa una identidad autenticada dentro de Zaping.
 
 ---
 
-# 21. Múltiples contactos
-
-El modelo actual contempla un contacto principal.
-
-En el futuro podría requerirse:
-
-```text
-Supplier
-└── Contacts[]
-```
-
-si las empresas necesitan administrar:
-
-* ventas;
-* cobranza;
-* logística;
-* soporte;
-* dirección administrativa.
-
-No debe implementarse antes de validar la necesidad.
-
----
-
-# 22. Email
+# 21. Email
 
 `email` es opcional.
 
 Puede utilizarse para:
 
-* contacto;
-* futuras órdenes enviadas por correo;
-* documentación;
-* comunicación empresarial.
+```text
+contact
+
+documentation
+
+future Purchase communication
+
+future notifications
+```
+
+Cuando se proporcione, debe respetar las validaciones del DTO vigente.
 
 ---
 
-# 23. Validación de email
-
-Cuando exista un valor, debe validarse su formato en el DTO correspondiente.
-
-No debe asumirse que el frontend siempre enviará información válida.
-
----
-
-# 24. Phone
+# 22. Phone
 
 `phone` es opcional.
 
-El modelo no debe imponer prematuramente un formato internacional complejo mientras las necesidades reales no lo requieran.
+Actualmente no debe sobrearquitecturarse con un modelo internacional complejo sin
+una necesidad funcional real.
 
 ---
 
-# 25. Address
+# 23. Address
 
-Actualmente Supplier utiliza:
+Supplier utiliza actualmente:
 
 ```text
 address
 ```
 
-como un campo de dirección.
+como campo simple de dirección.
 
-La UI puede organizarlo visualmente dentro de una sección:
+La UI puede presentarlo en una sección:
 
 ```text
 Dirección
 ```
 
-sin asumir que ya existe un modelo estructurado de direcciones.
+sin afirmar que exista una entidad Address separada.
 
 ---
 
-# 26. Dirección estructurada futura
+# 24. Structured Address — FUTURE
 
-Si el producto necesita posteriormente:
+Si posteriormente se requieren campos estructurados como:
 
 ```text
 street
+
 externalNumber
+
 internalNumber
+
 neighborhood
+
 city
+
 state
+
 postalCode
+
 country
 ```
 
-debe evaluarse una evolución específica.
+deberá diseñarse una evolución específica.
 
-No crear múltiples campos únicamente para anticipar integraciones futuras.
+No deben agregarse únicamente para anticipar necesidades futuras.
 
 ---
 
-# 27. Notes
+# 25. Notes
 
-`notes` permite conservar contexto administrativo no estructurado.
+`notes` permite almacenar contexto administrativo no estructurado.
 
 Ejemplos:
 
@@ -447,75 +598,264 @@ Ejemplos:
 Entrega normalmente en 48 horas.
 ```
 
-o:
-
 ```text
 Contactar por correo antes de enviar OC.
 ```
 
 ---
 
-# 28. Notes no sustituye campos estructurados
+# 26. Notes no sustituye datos estructurados
 
-No debe utilizarse `notes` para almacenar información que Zaping necesite posteriormente:
-
-* filtrar;
-* validar;
-* calcular;
-* automatizar.
-
-Ejemplo incorrecto:
+No debe utilizarse `notes` como sustituto permanente de información que el sistema
+necesite:
 
 ```text
-notes =
-"crédito 30 días, RFC ABC..., lead time 5 días"
+validate
+
+filter
+
+calculate
+
+automate
 ```
 
-si esas propiedades se convierten en reglas operativas reales.
+Ejemplo:
+
+```text
+payment terms
+
+lead time
+
+RFC
+
+bank information
+```
+
+deben convertirse en campos o dominios estructurados cuando empiecen a afectar
+workflows reales.
 
 ---
 
-# 29. Supplier y Product
+# 27. Create Supplier
+
+La creación requiere al menos:
+
+```text
+name
+```
+
+según el modelo actual.
+
+Otros campos vigentes son opcionales según DTO.
+
+Backend debe determinar:
+
+```text
+companyId
+```
+
+desde el contexto autenticado.
+
+---
+
+# 28. Tenant authority
+
+Debe mantenerse:
+
+```text
+JWT / authenticated context
+↓
+companyId
+↓
+Supplier operation
+```
+
+No:
+
+```text
+client-provided companyId
+→ tenant authority
+```
+
+Frontend no decide arbitrariamente el tenant.
+
+---
+
+# 29. Update Supplier
+
+La edición normal puede modificar, según el contrato vigente:
+
+```text
+name
+
+email
+
+phone
+
+address
+
+contactName
+
+notes
+```
+
+Lifecycle debe mantenerse separado.
+
+No debe tratarse:
+
+```text
+isActive
+```
+
+como un campo ordinario para reactivar o desactivar libremente mediante PATCH.
+
+---
+
+# 30. Update name uniqueness
+
+Cuando cambia:
+
+```text
+name
+```
+
+backend debe volver a validar:
+
+```text
+companyId + name
+→ UNIQUE
+```
+
+excluyendo al Supplier actual.
+
+---
+
+# 31. Lifecycle separado de PATCH
+
+Debe mantenerse:
+
+```text
+PATCH /suppliers/:id
+→ master-data update
+```
+
+```text
+DELETE /suppliers/:id
+→ ACTIVE → INACTIVE
+```
+
+```text
+INACTIVE → ACTIVE
+→ NOT IMPLEMENTED
+```
+
+Esto evita que el lifecycle se convierta en una modificación genérica difícil de
+auditar.
+
+---
+
+# 32. Active list
 
 Actualmente:
 
 ```text
-Supplier
-≠
-owner of Product
+GET /suppliers
+→ active Suppliers
 ```
 
-Un mismo Product puede adquirirse desde diferentes proveedores.
+Esto permite utilizar el listado principal como catálogo operativo para nuevas
+operaciones.
 
 ---
 
-# 30. No utilizar supplierId fijo en Product
+# 33. Historical detail
 
-No debe asumirse:
+Un Supplier inactivo continúa siendo consultable mediante detalle tenant-scoped
+cuando sea necesario preservar:
+
+```text
+Purchase history
+
+historical document context
+
+audit context
+```
+
+Debe mantenerse:
+
+```text
+Inactive
+≠
+historically invisible
+```
+
+---
+
+# 34. Not Found
+
+Solicitar un Supplier inexistente debe devolver un error apropiado.
+
+La implementación actual contempla manejo explícito de recurso no encontrado.
+
+---
+
+# 35. Wrong Tenant
+
+Un Supplier perteneciente a otra Company debe tratarse como recurso no accesible.
+
+Debe mantenerse:
+
+```text
+Supplier exists globally
+≠
+authenticated tenant may access it
+```
+
+---
+
+# 36. API CURRENT
+
+Endpoints actuales:
+
+```text
+GET    /suppliers
+
+GET    /suppliers/:id
+
+POST   /suppliers
+
+PATCH  /suppliers/:id
+
+DELETE /suppliers/:id
+```
+
+Semántica:
+
+```text
+DELETE
+→ deactivate
+→ not hard delete
+```
+
+---
+
+# 37. Supplier ↔ Product
+
+Supplier no es propietario del Product.
+
+Debe mantenerse:
+
+```text
+Supplier
+→ procurement source
+```
 
 ```text
 Product
-└── supplierId
+→ catalog identity
 ```
 
-como única relación posible de abastecimiento.
-
-Esto bloquearía escenarios donde:
-
-```text
-Product A
-├── Supplier 1
-├── Supplier 2
-└── Supplier 3
-```
-
-son válidos.
-
----
-
-# 31. Relación actual con Products
-
-La relación entre Supplier y Product ocurre principalmente mediante documentos:
+La relación actual ocurre principalmente mediante:
 
 ```text
 Supplier
@@ -529,9 +869,33 @@ Product
 
 ---
 
-# 32. Supplier Catalog futuro
+# 38. No fixed Supplier on Product
 
-En una etapa posterior puede resultar útil una entidad conceptual como:
+No debe asumirse:
+
+```text
+Product.supplierId
+```
+
+como única relación posible de abastecimiento.
+
+Un Product puede adquirirse desde:
+
+```text
+Supplier A
+
+Supplier B
+
+Supplier C
+```
+
+según operación.
+
+---
+
+# 39. SupplierProduct — FUTURE
+
+En una evolución posterior puede resultar útil un modelo como:
 
 ```text
 SupplierProduct
@@ -539,37 +903,34 @@ SupplierProduct
 
 para representar:
 
-* código del proveedor;
-* costo;
-* presentación;
-* lead time;
-* mínimo de compra;
-* disponibilidad;
-* preferencia.
-
-No forma parte actualmente del Core aprobado.
-
----
-
-# 33. Supplier Product Code
-
-Un proveedor puede identificar un Product utilizando un código diferente al SKU interno de Zaping.
-
-Ejemplo futuro:
-
 ```text
-Zaping SKU
-CAT-001
+supplier-specific product code
 
-Supplier ABC Code
-TRM-15X-22
+supplier-specific cost
+
+presentation
+
+minimum order
+
+lead time
+
+availability
+
+preferred relationship
 ```
 
-Esta capacidad deberá diseñarse si los workflows reales la requieren.
+Actualmente:
+
+```text
+SupplierProduct
+→ NOT IMPLEMENTED
+```
+
+No forma parte de Supplier V1.
 
 ---
 
-# 34. Supplier preferido
+# 40. Preferred Supplier — FUTURE
 
 No debe agregarse automáticamente:
 
@@ -577,21 +938,29 @@ No debe agregarse automáticamente:
 Product.preferredSupplierId
 ```
 
-sin definir cómo se decide y mantiene esa preferencia.
+sin definir cómo se determina y mantiene esa preferencia.
 
-Una evolución futura puede utilizar factores como:
+Una futura decisión puede considerar:
 
-* precio;
-* disponibilidad;
-* lead time;
-* desempeño;
-* contrato.
+```text
+price
+
+availability
+
+lead time
+
+performance
+
+commercial agreement
+```
 
 ---
 
-# 35. Integración con Purchases
+# 41. Supplier ↔ Purchase
 
-Supplier participa directamente en:
+Purchases es el consumidor principal de Supplier dentro del ERP Core actual.
+
+Relación:
 
 ```text
 Supplier
@@ -599,154 +968,211 @@ Supplier
 Purchase
 ```
 
-Toda Purchase debe referenciar un Supplier válido.
+Toda Purchase debe referenciar un Supplier perteneciente al mismo tenant.
 
 ---
 
-# 36. Validación de Purchase
+# 42. Purchase Supplier validation — CURRENT
 
-Cuando Purchases recibe:
-
-```text
-supplierId
-```
-
-debe comprobar:
+Actualmente `PurchasesService.create()` y `update()` validan:
 
 ```text
 Supplier exists
-AND
-Supplier belongs to Company
+
++
+
+Supplier belongs to authenticated Company
 ```
 
-y, cuando la regla sea exigida:
+Esto protege la relación tenant-scoped.
+
+---
+
+# 43. Inactive Supplier business invariant
+
+La regla empresarial es:
 
 ```text
-Supplier isActive = true
+New Purchase
+→ requires active Supplier
+```
+
+Por tanto:
+
+```text
+Inactive Supplier
+→ unavailable for new Purchase
 ```
 
 ---
 
-# 37. Supplier inactivo y Purchase histórica
+# 44. Current backend gap
 
-Una Purchase existente continúa siendo válida aunque después:
+Aunque la UI utiliza Suppliers activos, actualmente Purchase backend no exige de
+forma completa:
+
+```text
+Supplier.isActive = true
+```
+
+en create/update.
+
+Estado:
+
+```text
+same-tenant Supplier validation
+✅ IMPLEMENTED
+```
+
+```text
+active Supplier backend enforcement
+⏳ TECHNICAL DEBT
+```
+
+La validación debe cerrarse antes de considerar definitiva esa frontera.
+
+---
+
+# 45. Historical Purchase with inactive Supplier
+
+Una Purchase histórica continúa siendo válida aunque posteriormente:
 
 ```text
 Supplier.isActive = false
 ```
 
----
-
-# 38. Supplier inactivo y nueva Purchase
-
-Normalmente debe rechazarse o impedirse:
+No debe ocurrir:
 
 ```text
-New Purchase
+Supplier deactivated
 ↓
-Inactive Supplier
+historical Purchase becomes invalid
 ```
 
-porque el Supplier ya no está habilitado para nuevas operaciones.
+La desactivación afecta nuevas operaciones, no reescribe historia.
 
 ---
 
-# 39. PurchaseReceipt
+# 46. PurchaseReceipt provenance
 
-PurchaseReceipt deriva su relación con Supplier principalmente a través de:
+PurchaseReceipt obtiene su Supplier mediante la Purchase asociada.
+
+Conceptualmente:
 
 ```text
+PurchaseReceipt
+↓
 Purchase
-```
-
-No es necesario duplicar el Supplier en todas las entidades si la relación puede determinarse de manera segura.
-
----
-
-# 40. InventoryBatch
-
-Actualmente algunos modelos de Inventory pueden conservar contexto de Supplier.
-
-Esto permite trazabilidad de origen.
-
-Sin embargo, Inventory no debe convertirse en propietario de los datos maestros del proveedor.
-
----
-
-# 41. Trazabilidad
-
-Una cadena futura puede responder:
-
-```text
-Batch L001
 ↓
-Received from
-Supplier ABC
+Supplier
+```
+
+No es necesario duplicar Supplier en todas las entidades si la relación puede
+resolverse de manera íntegra.
+
+---
+
+# 47. Supplier provenance
+
+La procedencia Core puede reconstruirse conceptualmente mediante:
+
+```text
+Supplier
 ↓
-Purchase OC-001
+Purchase
 ↓
-Receipt REC-001
+PurchaseReceipt
+↓
+Inventory
 ```
 
----
-
-# 42. Supplier 360
-
-La arquitectura objetivo contempla una futura vista:
+y, cuando corresponde:
 
 ```text
-Supplier 360
+PurchaseReceipt
+↓
+EquipmentAsset
 ```
 
-que reúna contexto operativo.
+No debe asumirse una relación específica adicional en `InventoryBatch` salvo que
+el schema vigente la defina explícitamente.
 
 ---
 
-# 43. Objetivo de Supplier 360
+# 48. Inventory boundary
 
-Debe permitir responder:
+Inventory puede utilizar Supplier como contexto indirecto de procedencia.
+
+Pero Inventory continúa siendo propietario de:
 
 ```text
-¿Quién es?
-¿Cómo lo contacto?
-¿Está activo?
-¿Qué le compramos?
-¿Qué compras están pendientes?
-¿Qué hemos recibido?
-¿Cuánto compramos?
+stock
+
+InventoryMovement
+
+InventoryBatch semantics
 ```
 
-sin navegar manualmente por múltiples módulos.
+Supplier sigue siendo propietario únicamente de sus datos maestros.
 
 ---
 
-# 44. Información conceptual de Supplier 360
+# 49. Supplier ≠ Manufacturer
 
-Puede incluir progresivamente:
+Debe mantenerse:
 
 ```text
-General
-Contacto
-Compras
-Recepciones
-Productos
-Documentos
-Historial
+Supplier
+≠
+Manufacturer
 ```
 
+Supplier:
+
+```text
+sells / supplies Product to Company
+```
+
+Manufacturer:
+
+```text
+manufactures Product
+```
+
+Una misma organización puede desempeñar ambos roles, pero no deben modelarse como
+sinónimos.
+
 ---
 
-# 45. Supplier 360 no absorbe Purchases
+# 50. Supplier ≠ Brand
 
-Mostrar Purchases dentro de Supplier 360 no significa que Suppliers sea propietario de su lifecycle.
+También:
 
-La vista únicamente combina contexto.
+```text
+Supplier
+≠
+Brand
+```
+
+Ejemplo válido:
+
+```text
+Brand
+Terumo
+
+Supplier
+Distribuidora ABC
+```
+
+Products administra Brand como dato de catálogo vigente.
+
+Supplier administra la contraparte de abastecimiento.
 
 ---
 
-# 46. UX actual
+# 51. Frontend Suppliers V1
 
-La interfaz implementada utiliza una organización por secciones semejante a:
+La experiencia actual organiza datos en secciones como:
 
 ```text
 General
@@ -758,75 +1184,57 @@ Dirección
 Notas
 ```
 
-Este patrón es compatible con `ZAPING_WAY.md`.
-
----
-
-# 47. General
-
-Puede incluir principalmente:
-
-```text
-Nombre
-Estado
-```
-
-y otros datos maestros futuros.
-
----
-
-# 48. Contacto
+y utiliza patrones coherentes con el diseño general del ERP.
 
 Puede incluir:
 
 ```text
-Nombre del contacto
-Email
-Teléfono
+Supplier list
+
+create
+
+edit
+
+deactivate
+
+active state
+
+contact data
+
+empty states
+
+loading / error states
 ```
+
+según la implementación vigente.
 
 ---
 
-# 49. Dirección
+# 52. Main list
 
-Actualmente representa el campo:
+La tabla puede priorizar información operativa como:
 
 ```text
-address
-```
+Supplier
 
-sin afirmar que exista una entidad Address independiente.
+Contact
 
----
+Phone
 
-# 50. Notas
-
-Debe mantenerse como información secundaria.
-
-No debe competir visualmente con los datos necesarios para identificar al Supplier.
-
----
-
-# 51. Listado
-
-La tabla principal puede priorizar:
-
-```text
-Proveedor
-Contacto
-Teléfono
 Email
-Estado
-Acciones
+
+Status
+
+Actions
 ```
 
-La composición exacta puede evolucionar con UX.
+La composición exacta puede evolucionar mediante UX sin cambiar el dominio.
 
 ---
 
-# 52. Empty State
+# 53. Empty State
 
-Ejemplo:
+Una experiencia adecuada puede mostrar:
 
 ```text
 Todavía no hay proveedores.
@@ -837,141 +1245,53 @@ a crear órdenes de compra.
 [Agregar proveedor]
 ```
 
----
-
-# 53. Estado
-
-Supplier debe utilizar un patrón visual consistente mediante:
-
-```text
-StatusBadge
-```
-
-o equivalente.
-
-Ejemplo:
-
-```text
-Activo
-Inactivo
-```
+El texto exacto pertenece a UX.
 
 ---
 
-# 54. Crear Supplier
+# 54. Status presentation
 
-Para crear un Supplier se requiere al menos:
+Supplier puede representarse visualmente mediante:
+
+```text
+Active
+
+Inactive
+```
+
+utilizando `StatusBadge` o un equivalente del Design System.
+
+El componente visual no define el lifecycle.
+
+---
+
+# 55. Search
+
+Criterios útiles para localizar Suppliers incluyen:
 
 ```text
 name
+
+contactName
+
+email
 ```
 
-según el modelo actual.
+cuando la implementación correspondiente lo soporte.
 
-Otros campos son opcionales.
-
----
-
-# 55. Create y tenant
-
-El backend debe asignar:
-
-```text
-companyId
-```
-
-utilizando el contexto autenticado.
-
-No debe aceptar el tenant desde frontend como autoridad.
+La evolución server-side dependerá de escala y UX.
 
 ---
 
-# 56. Update Supplier
+# 56. Searchable SupplierSelector — TARGET
 
-Puede permitir modificar:
-
-* name;
-* email;
-* phone;
-* address;
-* contactName;
-* notes;
-* isActive;
-
-según DTO y reglas actuales.
-
----
-
-# 57. Cambio de nombre
-
-Al cambiar `name` debe verificarse nuevamente:
-
-```text
-unique(companyId, name)
-```
-
-excluyendo al Supplier actual.
-
----
-
-# 58. Not Found
-
-Solicitar un Supplier inexistente debe devolver un error apropiado.
-
-La implementación actual ya contempla manejo explícito de `NotFound`.
-
----
-
-# 59. Wrong Tenant
-
-Un Supplier perteneciente a otra Company debe tratarse como recurso no accesible.
-
-No debe devolverse simplemente porque el UUID exista.
-
----
-
-# 60. API
-
-El módulo implementado utiliza un CRUD de Suppliers protegido mediante autenticación.
-
-Conceptualmente:
-
-```text
-GET    /suppliers
-GET    /suppliers/:id
-POST   /suppliers
-PATCH  /suppliers/:id
-```
-
-La operación actual o histórica de eliminación/desactivación debe revisarse progresivamente contra ADR-012.
-
----
-
-# 61. API de lifecycle objetivo
-
-Preferir una operación cuyo significado sea:
-
-```text
-isActive = false
-```
-
-cuando el usuario realmente desea dejar de utilizar al Supplier.
-
-No es necesario cambiar inmediatamente la API únicamente por estilo si el comportamiento actual todavía está siendo migrado.
-
----
-
-# 62. SupplierSelector
-
-La dirección UX contempla:
+Una futura Business Component Library puede incorporar:
 
 ```text
 SupplierSelector
 ```
 
-como Business Component reutilizable.
-
-Debe permitir:
+con flujo:
 
 ```text
 Search
@@ -981,142 +1301,177 @@ Identify
 Select Supplier
 ```
 
-dentro de workflows como Purchases.
+No debe marcarse como `IMPLEMENTED` sin verificar que exista como componente
+reutilizable formal en frontend.
 
----
-
-# 63. Estado de SupplierSelector
-
-La documentación histórica lo identificaba como componente planeado dentro de la Business Components Library.
-
-Su existencia técnica actual deberá confirmarse directamente en el frontend antes de marcarlo documentalmente como `IMPLEMENTED`.
-
----
-
-# 64. Select tradicional
-
-Para pocos Suppliers puede funcionar inicialmente un `<select>`.
-
-Pero conforme crezca el catálogo debe preferirse:
+Por tanto:
 
 ```text
 Searchable SupplierSelector
+→ TARGET UX
 ```
-
-para mantener escalabilidad de UX.
 
 ---
 
-# 65. Creación contextual
+# 57. Contextual Supplier creation — FUTURE UX
 
 Una evolución útil puede permitir:
 
 ```text
-Nueva Purchase
+New Purchase
 ↓
-SupplierSelector
+Supplier not found
 ↓
-Proveedor no existe
+Create Supplier
 ↓
-[Crear proveedor]
-↓
-Supplier creado
-↓
-continuar Purchase
+Return to Purchase
 ```
 
 sin perder el formulario original.
 
----
-
-# 66. Búsqueda
-
-La búsqueda debe priorizar información reconocible.
-
-Ejemplos:
+Actualmente:
 
 ```text
-name
-contactName
-email
-```
-
-cuando la implementación lo soporte.
-
----
-
-# 67. Filtros
-
-Filtros futuros pueden incluir:
-
-```text
-Active
-Inactive
-```
-
-y posteriormente otros criterios si aparecen necesidades reales.
-
----
-
-# 68. Multi-tenancy
-
-Todas las búsquedas deben incorporar el tenant.
-
-Conceptualmente:
-
-```text
-WHERE companyId = authenticatedCompanyId
+Contextual Supplier creation
+→ NOT REQUIRED FOR SUPPLIERS V1
 ```
 
 ---
 
-# 69. Seguridad
+# 58. Supplier 360 — FUTURE UX
 
-El módulo debe respetar:
+Una futura experiencia:
 
 ```text
-Authentication
-+
-Authorization
-+
-Tenant Isolation
-+
-Validation
+Supplier 360
 ```
 
-como todos los módulos empresariales.
+puede responder:
+
+```text
+Who is this Supplier?
+
+How do we contact them?
+
+Are they active?
+
+What have we purchased?
+
+What remains pending?
+
+What has been received?
+```
 
 ---
 
-# 70. RBAC
+# 59. Supplier 360 content
 
-Una futura granularidad puede incluir:
+Puede integrar como read model:
 
 ```text
-suppliers.read
-suppliers.create
-suppliers.update
-suppliers.deactivate
+General
+
+Contact
+
+Purchases
+
+Receipts
+
+Products
+
+Documents
+
+History
 ```
 
-Los permisos definitivos se implementarán progresivamente según ADR-007.
+Esto no cambia ownership.
+
+Debe mantenerse:
+
+```text
+Supplier 360
+→ contextual read experience
+```
+
+No:
+
+```text
+Supplier
+→ owns Purchase lifecycle
+```
 
 ---
 
-# 71. Auditoría
+# 60. Audit — TARGET
 
-Cambios relevantes pueden requerir eventos como:
+Una futura capacidad transversal de Audit puede registrar:
 
 ```text
 Supplier created
+
 Supplier updated
+
 Supplier deactivated
+
 Supplier reactivated
+```
+
+Actualmente no existe un Audit transversal completo.
+
+Por tanto:
+
+```text
+Supplier Audit integration
+→ TARGET
 ```
 
 ---
 
-# 72. Datos sensibles
+# 61. Authorization
+
+Suppliers utiliza el modelo transversal de Identity & Access.
+
+Permisos conceptuales futuros pueden incluir:
+
+```text
+suppliers.read
+
+suppliers.create
+
+suppliers.update
+
+suppliers.deactivate
+```
+
+El Permission-Based RBAC completo continúa como TARGET.
+
+---
+
+# 62. Security before production
+
+Suppliers participa en revisiones transversales como:
+
+```text
+critical endpoint authorization
+
+systematic tenant-isolation regression
+
+inactive-user enforcement
+
+safe role provisioning
+```
+
+Además, Purchases debe cerrar:
+
+```text
+inactive Supplier backend enforcement
+```
+
+antes de producción.
+
+---
+
+# 63. Sensitive information
 
 No deben almacenarse innecesariamente secretos o información bancaria dentro de:
 
@@ -1128,128 +1483,156 @@ sin un modelo y controles adecuados.
 
 ---
 
-# 73. Información bancaria futura
+# 64. Banking information — FUTURE
 
 Si posteriormente se administran:
 
-* cuentas bancarias;
-* CLABE;
-* condiciones de pago;
+```text
+bank accounts
 
-debe evaluarse:
+CLABE
 
-* permisos;
-* cifrado cuando corresponda;
-* auditoría;
-* minimización;
-* exposición API.
+payment information
+```
 
-No pertenece actualmente al modelo base de Supplier.
+deberán evaluarse:
+
+```text
+permissions
+
+auditability
+
+data minimization
+
+API exposure
+
+encryption where appropriate
+```
+
+No pertenece al Supplier Core actual.
 
 ---
 
-# 74. RFC / información fiscal
+# 65. Fiscal profile — FUTURE
 
-El Supplier actual no contiene un modelo fiscal completo.
-
-La futura facturación/compras fiscales puede necesitar:
+Una futura integración con Billing/CFDI puede necesitar:
 
 ```text
 RFC
-Razón social
-Régimen
-Código postal fiscal
+
+legal name
+
+tax regime
+
+fiscal postal code
 ```
 
-Estos datos deberán diseñarse junto con Billing/CFDI y no agregarse de manera aislada.
+Estos datos deberán diseñarse coordinadamente con Billing.
+
+No deben agregarse de forma aislada únicamente desde Suppliers.
 
 ---
 
-# 75. Condiciones de pago
+# 66. Payment Terms — FUTURE
 
-Conceptos futuros pueden incluir:
+Pueden existir conceptos como:
 
 ```text
-Contado
-Crédito 15 días
-Crédito 30 días
+Cash
+
+Net 15
+
+Net 30
 ```
 
-Si comienzan a determinar vencimientos o cuentas por pagar, deben convertirse en información estructurada.
+Si comienzan a determinar vencimientos o Accounts Payable, deberán modelarse como
+datos estructurados.
+
+No deben permanecer escondidos dentro de `notes`.
 
 ---
 
-# 76. Lead Time
+# 67. Lead Time — FUTURE
 
-El tiempo habitual de entrega puede ser útil posteriormente para recomendaciones de compra.
+Supplier lead time puede ser útil para:
+
+```text
+replenishment recommendations
+
+purchase planning
+
+supplier comparison
+```
 
 Conceptualmente:
 
 ```text
 Supplier lead time
 +
-stock
+Inventory
 +
-demand
+Demand
 ↓
-replenishment recommendation
+Recommendation
 ```
 
-No forma parte todavía de la lógica obligatoria.
+No forma parte de Supplier V1.
 
 ---
 
-# 77. Evaluación de proveedores
+# 68. Supplier Performance — FUTURE
 
-Una evolución futura puede medir:
-
-* puntualidad;
-* precio;
-* diferencias de recepción;
-* calidad;
-* incidencias.
-
-No debe implementarse como un simple rating manual sin definir primero qué significa.
-
----
-
-# 78. Supplier Performance
-
-Ejemplo futuro:
+Una futura capacidad puede medir:
 
 ```text
-Supplier ABC
+on-time delivery
 
-On-time delivery      92%
-Average lead time     4.8 días
-Receipt discrepancies 2%
+average lead time
+
+receipt discrepancies
+
+price competitiveness
+
+quality incidents
 ```
 
-Esto debe derivarse de operaciones reales cuando sea posible.
+Preferentemente derivada de datos reales.
+
+No debe implementarse como un rating arbitrario sin una definición funcional.
 
 ---
 
-# 79. Zaping AI futuro
+# 69. AI recommendations — FUTURE
 
-La información histórica de Supplier puede alimentar recomendaciones como:
+Información histórica podrá alimentar recomendaciones como:
 
 ```text
-Proveedor A es 8 % más económico,
-pero tarda en promedio 4 días más.
+Supplier A has lower cost
+but longer delivery time.
 ```
 
-La IA no debe inventar métricas que Zaping no pueda respaldar con datos.
+Cualquier recomendación deberá basarse en datos disponibles y trazables.
+
+La IA no debe inventar métricas inexistentes.
 
 ---
 
-# 80. Importación
+# 70. Import — FUTURE
 
-Suppliers forma parte de las entidades prioritarias para futura importación masiva.
-
-Debe contemplarse:
+Suppliers es candidato natural para Data Import mediante:
 
 ```text
-CSV / XLSX
+CSV
+
+XLSX
+
+external systems
+```
+
+Flujo conceptual:
+
+```text
+File
 ↓
 Mapping
 ↓
@@ -1257,92 +1640,94 @@ Validation
 ↓
 Duplicate detection
 ↓
+Preview
+↓
 Import
 ```
 
 ---
 
-# 81. Duplicados durante importación
+# 71. Duplicate detection during Import
 
-Actualmente el principal identificador de duplicado disponible es:
+Actualmente el principal identificador disponible es:
 
 ```text
 name within Company
 ```
 
-Una futura estructura fiscal puede proporcionar identificadores más sólidos como RFC.
+Una futura estructura fiscal puede proporcionar identificadores adicionales.
 
----
-
-# 82. Migraciones desde otros ERP
-
-En migraciones desde:
+La política exacta de:
 
 ```text
-CONTPAQi
-Aspel
-Microsip
-Odoo
-SAP
-Excel
+create
+
+skip
+
+merge
+
+update
 ```
 
-debe preservarse, cuando exista:
-
-* identificador externo;
-* nombre;
-* contacto;
-* estado;
-* historial relevante.
-
-No debe mezclarse automáticamente el identificador externo con el UUID interno.
+deberá definirse en Data Import.
 
 ---
 
-# 83. External ID futuro
+# 72. External IDs — FUTURE
 
-El módulo de importaciones puede requerir una estrategia de referencia externa.
+Migraciones desde otros sistemas pueden requerir conservar un identificador
+externo.
 
-No se agrega `externalId` a Supplier únicamente desde este documento.
-
----
-
-# 84. Dashboard
-
-Dashboard puede consumir información de Suppliers para métricas o tareas.
-
-Ejemplo futuro:
+Debe distinguirse:
 
 ```text
-Suppliers activos
-Purchases por Supplier
-Pending receipts
+external system ID
+≠
+Zaping Supplier UUID
 ```
 
-Dashboard no es propietario de las reglas.
+No se agrega `externalId` al schema únicamente desde este documento.
 
 ---
 
-# 85. Warehouse Operations
+# 73. Dashboard
 
-Warehouse normalmente consume Purchases y Receipts.
+Dashboard puede consumir Supplier para métricas o contexto como:
 
-El Supplier puede mostrarse como contexto:
+```text
+active Suppliers
+
+Purchases by Supplier
+
+pending Receipts
+```
+
+sin convertirse en propietario de Supplier.
+
+---
+
+# 74. Warehouse boundary
+
+Warehouse puede mostrar Supplier como contexto de una Purchase o Receipt.
+
+Ejemplo:
 
 ```text
 OC-001
-Supplier: ABC Medical
+
+Supplier:
+ABC Medical
 ```
 
-sin requerir que Warehouse administre directamente el catálogo.
+Warehouse no administra el catálogo maestro de Suppliers.
 
 ---
 
-# 86. Healthcare
+# 75. Healthcare boundary
 
-Healthcare puede necesitar conocer el origen de determinados productos o lotes.
+Healthcare no debe crear un catálogo paralelo de Suppliers.
 
-La trazabilidad correcta continúa siendo:
+La procedencia Core actual puede mantenerse como:
 
 ```text
 Supplier
@@ -1351,150 +1736,310 @@ Purchase
 ↓
 PurchaseReceipt
 ↓
-InventoryBatch
-↓
+Inventory / Equipment
+```
+
+Healthcare podrá consumir esa procedencia posteriormente.
+
+---
+
+# 76. Healthcare TARGET
+
+Futuros workflows Healthcare podrán relacionar Inventory o Equipment con:
+
+```text
 Case
+
+Assignment
+
+Dispatch
+
+Custody
+
+Return
 ```
 
-Healthcare no debe crear su propio catálogo duplicado de Suppliers.
+sin agregar:
 
----
+```text
+caseId
+```
 
-# 87. Supplier vs Manufacturer
+o relaciones Healthcare directas dentro de Supplier.
 
-Supplier y Manufacturer son conceptos distintos.
-
-Un Supplier:
-
-> vende o suministra el producto a la Company.
-
-Un Manufacturer:
-
-> fabrica el producto.
-
-Una misma organización puede desempeñar ambos roles, pero el dominio no debe asumir que siempre son equivalentes.
-
----
-
-# 88. Supplier vs Brand
-
-También:
+Debe mantenerse:
 
 ```text
 Supplier
-≠
-Brand
+→ Core master data
 ```
-
-Ejemplo:
-
-```text
-Brand: Terumo
-Supplier: Distribuidora ABC
-```
-
-puede ser perfectamente válido.
 
 ---
 
-# 89. Estado CURRENT
+# 77. IMPLEMENTED
 
-El módulo actual contempla:
+Actualmente:
 
 ```text
-Supplier
-companyId
-name
-email
-phone
-address
-contactName
-notes
-isActive
-createdAt
-updatedAt
-Purchase relationship
+Supplier persistence
+
+Supplier create
+
+Supplier list
+
+Supplier detail
+
+Supplier update
+
+soft-deactivation
+
+active-only list
+
+inactive historical detail
+
+tenant-scoped operations
+
 name uniqueness per Company
-authenticated CRUD
-duplicate handling
-NotFound handling
-```
 
-El schema y código son la fuente técnica exacta.
+duplicate handling
+
+NotFound handling
+
+Purchase relationship
+```
 
 ---
 
-# 90. Estado TARGET
+# 78. VALIDATED
 
-Evolución aprobada:
+La validación registrada cubre según los hitos correspondientes:
 
 ```text
-Correct active/inactive lifecycle
-Supplier 360
-Searchable SupplierSelector
-Contextual creation
-Improved audit
-OpenAPI documentation
-Import support
+Supplier create
+
+Supplier update
+
+name uniqueness
+
+tenant isolation within Supplier operations
+
+soft-deactivation
+
+repeated deactivation
+
+active-only list
+
+inactive historical detail
+
+Purchase historical compatibility
+
+frontend Supplier workflows
+```
+
+Los gates técnicos pueden incluir:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+```
+
+Los snapshots cuantitativos pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
 ```
 
 ---
 
-# 91. Estado FUTURE
+# 79. TECHNICAL DEBT
+
+Permanece pendiente:
+
+```text
+Supplier reactivation workflow
+```
+
+```text
+Purchases backend active-Supplier enforcement
+```
+
+```text
+Searchable SupplierSelector formal verification / implementation
+```
+
+```text
+server-side Supplier search / pagination when scale requires it
+```
+
+```text
+Supplier Audit integration
+```
+
+---
+
+# 80. TARGET
+
+Evoluciones posteriores pueden incluir:
+
+```text
+Supplier reactivation
+
+Purchase active-Supplier backend enforcement
+
+Searchable SupplierSelector
+
+Supplier 360
+
+Audit integration
+
+Data Import
+```
+
+No todas tienen la misma prioridad.
+
+La validación backend de Supplier activo en Purchases es una deuda más inmediata
+que las mejoras UX avanzadas.
+
+---
+
+# 81. FUTURE
 
 Capacidades posibles:
 
 ```text
-Multiple contacts
-Structured addresses
-Fiscal profile
-Payment terms
-Supplier Product Catalog
-Supplier-specific product codes
-Lead times
-Price history
-Performance metrics
-Supplier documents
-Banking information
-Supplier portal
-AI recommendations
+Multiple Contacts
+
+Structured Addresses
+
+Fiscal Profile
+
+Payment Terms
+
+SupplierProduct Catalog
+
+Supplier-specific Product Codes
+
+Lead Times
+
+Price History
+
+Performance Metrics
+
+Supplier Documents
+
+Banking Information
+
+Supplier Portal
+
+AI Recommendations
 ```
 
-Estas capacidades no forman parte automáticamente del MVP.
+No forman parte automáticamente del ERP Core V1.
 
 ---
 
-# 92. Invariantes
+# 82. Invariantes
+
+## Tenant
 
 ```text
 Supplier
 → belongs to one Company
 ```
 
+---
+
+## Name
+
 ```text
-Supplier name
-→ unique within Company
+companyId + name
+→ unique
+```
+
+---
+
+## Lifecycle
+
+```text
+ACTIVE
+→ may be used in new operations
 ```
 
 ```text
-Purchase supplier
-→ same Company
-```
-
-```text
-Inactive Supplier
+INACTIVE
 → remains historically visible
 ```
 
+---
+
+## Deactivation
+
 ```text
-Inactive Supplier
-→ normally unavailable for new Purchases
+DELETE /suppliers/:id
+→ isActive = false
 ```
+
+No:
+
+```text
+physical deletion
+```
+
+---
+
+## Reactivation
+
+```text
+INACTIVE → ACTIVE
+→ not implemented currently
+```
+
+---
+
+## Purchase tenant
+
+```text
+Purchase Supplier
+→ same Company
+```
+
+---
+
+## Purchase activity rule
+
+Business invariant:
+
+```text
+New Purchase
+→ active Supplier required
+```
+
+Current implementation gap:
+
+```text
+backend isActive enforcement
+→ pending
+```
+
+---
+
+## Historical Purchase
 
 ```text
 Supplier deactivation
-→ does not delete Purchases
+→ does not invalidate historical Purchase
 ```
+
+---
+
+## Supplier vs Product
 
 ```text
 Supplier
@@ -1502,11 +2047,19 @@ Supplier
 Product owner
 ```
 
+---
+
+## Supplier vs Manufacturer
+
 ```text
 Supplier
 ≠
 Manufacturer
 ```
+
+---
+
+## Supplier vs Brand
 
 ```text
 Supplier
@@ -1516,21 +2069,26 @@ Brand
 
 ---
 
-# 93. Anti-patrones
-
-## Fixed Supplier on Product
-
-```text
-Product.supplierId
-```
-
-como única fuente de abastecimiento.
-
----
+# 83. Anti-patrones
 
 ## Hard Delete Historical Supplier
 
-Borrar un Supplier que ya participa en Purchases.
+Eliminar físicamente un Supplier que ya forma parte de Purchases.
+
+Incorrecto.
+
+---
+
+## isActive as arbitrary PATCH
+
+```text
+PATCH Supplier
+isActive = true / false
+```
+
+como lifecycle genérico sin workflow explícito.
+
+Incorrecto para el contrato actual.
 
 ---
 
@@ -1541,41 +2099,98 @@ Company A Purchase
 → Supplier Company B
 ```
 
----
-
-## Notes as Database
-
-Guardar fiscal, crédito, lead time y múltiples contactos dentro de un solo campo `notes` cuando ya afectan workflows.
+Incorrecto.
 
 ---
 
-## Duplicate Supplier Catalogs
+## Frontend-only active enforcement
 
-Crear un catálogo separado de proveedores únicamente para Healthcare.
+Asumir:
+
+```text
+UI only shows active Suppliers
+→ sufficient security/business validation
+```
+
+Incorrecto.
+
+Backend también debe aplicar la regla.
+
+---
+
+## Fixed Supplier on Product
+
+```text
+Product.supplierId
+```
+
+como único proveedor posible.
+
+Incorrecto.
+
+---
+
+## Supplier = Manufacturer
+
+Asumir que quien suministra siempre es quien fabrica.
+
+Incorrecto.
+
+---
+
+## Supplier = Brand
+
+Asumir que Supplier y Brand representan la misma entidad.
+
+Incorrecto.
+
+---
+
+## Notes as database
+
+Guardar dentro de `notes` información estructurada que ya gobierna workflows.
+
+Incorrecto.
+
+---
+
+## Duplicate Supplier catalog for Healthcare
+
+Crear otra tabla de Suppliers exclusivamente para Healthcare.
+
+Incorrecto.
 
 ---
 
 ## UI Security
 
-Asumir que esconder Suppliers de otro tenant en frontend es suficiente.
+Ocultar recursos de otros tenants solamente en frontend.
+
+Incorrecto.
 
 ---
 
-# 94. Relación con Products
+# 84. Relación con Products
+
+Debe mantenerse:
 
 ```text
 Supplier
-→ source of procurement
+→ procurement counterpart
+```
 
+```text
 Product
 → catalog identity
 ```
 
-Se conectan mediante operaciones de abastecimiento.
+Se relacionan mediante operaciones comerciales como Purchase.
 
 ---
 
-# 95. Relación con Purchases
+# 85. Relación con Purchases
+
+Debe mantenerse:
 
 ```text
 Supplier
@@ -1583,92 +2198,344 @@ Supplier
 Purchase
 ```
 
-Purchases es el consumidor principal del Supplier dentro del ERP Core actual.
-
----
-
-# 96. Relación con Inventory
-
-Supplier puede formar parte de la trazabilidad del origen.
-
-Pero Inventory continúa siendo propietario de las existencias.
-
----
-
-# 97. Relación con Zaping Way
-
-La experiencia debe evitar que el usuario abandone una Purchase solo para consultar información básica del Supplier.
-
-`Purchase 360` puede mostrar contexto suficiente y permitir navegar a `Supplier 360` cuando se necesite mayor detalle.
-
----
-
-# 98. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-012 — Entity Lifecycle.
-
----
-
-# 99. Documentos relacionados
+Purchases administra:
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-ux/BUSINESS_COMPONENTS.md
-modules/erp/PRODUCTS.md
-modules/erp/PURCHASES.md
-modules/erp/INVENTORY.md
+ordered Products
+
+quantities
+
+commercial values
+
+lifecycle
+```
+
+Supplier no administra esas reglas.
+
+---
+
+# 86. Relación con Purchase Receipts
+
+PurchaseReceipt obtiene contexto de Supplier mediante Purchase.
+
+Debe mantenerse:
+
+```text
+Supplier
+↓
+Purchase
+↓
+PurchaseReceipt
+```
+
+Purchase Receipt administra la recepción física.
+
+---
+
+# 87. Relación con Inventory
+
+Inventory puede reconstruir la procedencia a partir del flujo de compras.
+
+Debe mantenerse:
+
+```text
+Supplier
+→ provenance context
+```
+
+```text
+Inventory
+→ physical quantity / movement semantics
 ```
 
 ---
 
-# 100. Fuente de verdad
+# 88. Relación con Equipment
 
-La división documental es:
+Cuando una PurchaseReceipt recibe Product ASSET:
+
+```text
+Supplier
+↓
+Purchase
+↓
+PurchaseReceipt
+↓
+EquipmentAsset
+```
+
+Supplier no es propietario de:
+
+```text
+Equipment lifecycle
+
+condition
+
+Inspection
+
+Retirement
+```
+
+---
+
+# 89. ADR relacionados
+
+```text
+ADR-001 — Multi-Tenant
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-012 — Entity Lifecycle
+```
+
+---
+
+# 90. Documentación relacionada
+
+```text
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/PURCHASES.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+---
+
+# 91. Fuente de verdad
 
 ```text
 SUPPLIERS.md
-→ reglas del catálogo de proveedores
+→ Supplier master-data behavior
+→ Supplier lifecycle
+```
 
+```text
 PURCHASES.md
-→ operaciones con proveedores
+→ use of Supplier in Purchase
+→ active-Supplier business rule
+```
 
+```text
+PURCHASE_RECEIPTS.md
+→ physical receipt workflow
+```
+
+```text
+PRODUCTS.md
+→ Product catalog identity
+```
+
+```text
 INVENTORY.md
-→ consecuencia física y trazabilidad
+→ inventory quantity and provenance consequences
+```
 
+```text
 schema.prisma
-→ modelo técnico vigente
+→ CURRENT persistence
+```
 
-backend
-→ implementación actual
+```text
+Suppliers backend
+→ CURRENT API/business implementation
+```
 
+```text
+Suppliers frontend
+→ CURRENT user experience
+```
+
+```text
 tests
-→ comportamiento validado
+→ validated behavior
+```
 
+```text
 PROJECT_BOARD.md
-→ estado del trabajo
+→ current status and active debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 101. Principio final
-
-Supplier debe representar de forma estable:
+# 92. Estado consolidado
 
 ```text
-quién abastece a la empresa
+Supplier create
+✅ IMPLEMENTED / VALIDATED
+
+Supplier list
+✅ IMPLEMENTED / VALIDATED
+
+Supplier detail
+✅ IMPLEMENTED / VALIDATED
+
+Supplier master-data update
+✅ IMPLEMENTED / VALIDATED
+
+soft-deactivation
+✅ IMPLEMENTED / VALIDATED
+
+active-only default list
+✅ IMPLEMENTED / VALIDATED
+
+inactive historical detail
+✅ IMPLEMENTED / VALIDATED
+
+tenant-scoped operations
+✅ IMPLEMENTED / VALIDATED
+
+name uniqueness per Company
+✅ IMPLEMENTED / VALIDATED
 ```
 
-sin absorber las reglas de compra o inventario.
+Pendiente:
+
+```text
+Supplier reactivation
+⏳
+
+Purchase backend active-Supplier enforcement
+⏳
+
+Searchable SupplierSelector verification / reusable component
+⏳
+
+server-side search / pagination when required
+⏳
+
+Audit integration
+⏳
+```
+
+Future:
+
+```text
+Supplier 360
+
+Contextual Supplier creation
+
+SupplierProduct catalog
+
+Multiple contacts
+
+Structured addresses
+
+Fiscal profile
+
+Payment terms
+
+Lead times
+
+Performance metrics
+
+Supplier Portal
+
+AI recommendations
+```
+
+---
+
+# 93. Secuencia de proyecto
+
+Suppliers V1 forma parte del ERP Core ya normalizado.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto, capacidades como:
+
+```text
+Supplier 360
+
+SupplierProduct
+
+Supplier Portal
+
+advanced Supplier Performance
+```
+
+no deben convertirse automáticamente en el siguiente sprint únicamente porque
+están documentadas.
+
+La deuda más relevante para el flujo actual es:
+
+```text
+Purchases backend
+→ enforce Supplier.isActive for new/edited Purchase
+```
+
+---
+
+# 94. Principio final
+
+Supplier debe responder:
+
+```text
+¿Quién nos suministra?
+```
+
+Purchase debe responder:
+
+```text
+¿Qué le ordenamos?
+```
+
+Purchase Receipt debe responder:
+
+```text
+¿Qué llegó físicamente?
+```
+
+Inventory debe responder:
+
+```text
+¿Qué consecuencia tuvo esa recepción?
+```
 
 La cadena correcta es:
 
@@ -1682,4 +2549,25 @@ PurchaseReceipt
 Inventory
 ```
 
-> **El proveedor identifica la contraparte. La compra registra el compromiso. La recepción confirma lo que llegó. Inventory registra la consecuencia física.**
+y, para Products ASSET:
+
+```text
+PurchaseReceipt
+↓
+EquipmentAsset
+```
+
+Debe mantenerse:
+
+```text
+Supplier identity
+≠
+Purchase transaction
+≠
+physical Receipt
+≠
+Inventory state
+```
+
+> **Supplier identifica la contraparte de abastecimiento; Purchases registra el
+> compromiso comercial y Purchase Receipts confirma lo que realmente llegó.**

@@ -44,6 +44,7 @@ const prismaMock = {
     findMany: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   customer: {
     findFirst: jest.fn(),
@@ -276,17 +277,18 @@ describe('QuotesService', () => {
 
   describe('approve', () => {
     it('cambia una cotización en borrador a confirmada', async () => {
-      prismaMock.quote.findFirst.mockResolvedValue({
-        id: quoteId,
-        status: DocumentStatus.DRAFT,
-      });
-
       const confirmedQuote = {
         id: quoteId,
         status: DocumentStatus.CONFIRMED,
       };
 
-      prismaMock.quote.update.mockResolvedValue(confirmedQuote);
+      prismaMock.quote.findFirst
+        .mockResolvedValueOnce({
+          id: quoteId,
+          status: DocumentStatus.DRAFT,
+        })
+        .mockResolvedValueOnce(confirmedQuote);
+      prismaMock.quote.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.approve(companyId, quoteId);
 
@@ -301,12 +303,21 @@ describe('QuotesService', () => {
         },
       });
 
-      expect(prismaMock.quote.update).toHaveBeenCalledWith({
+      expect(prismaMock.quote.updateMany).toHaveBeenCalledWith({
         where: {
           id: quoteId,
+          companyId,
+          status: DocumentStatus.DRAFT,
         },
         data: {
           status: DocumentStatus.CONFIRMED,
+        },
+      });
+
+      expect(prismaMock.quote.findFirst).toHaveBeenLastCalledWith({
+        where: {
+          id: quoteId,
+          companyId,
         },
         include: {
           customer: true,
@@ -328,7 +339,7 @@ describe('QuotesService', () => {
         NotFoundException,
       );
 
-      expect(prismaMock.quote.update).not.toHaveBeenCalled();
+      expect(prismaMock.quote.updateMany).not.toHaveBeenCalled();
     });
 
     it.each([DocumentStatus.CONFIRMED, DocumentStatus.CANCELLED])(
@@ -343,24 +354,25 @@ describe('QuotesService', () => {
           BadRequestException,
         );
 
-        expect(prismaMock.quote.update).not.toHaveBeenCalled();
+        expect(prismaMock.quote.updateMany).not.toHaveBeenCalled();
       },
     );
   });
 
   describe('cancel', () => {
     it('cambia una cotización en borrador a cancelada', async () => {
-      prismaMock.quote.findFirst.mockResolvedValue({
-        id: quoteId,
-        status: DocumentStatus.DRAFT,
-      });
-
       const cancelledQuote = {
         id: quoteId,
         status: DocumentStatus.CANCELLED,
       };
 
-      prismaMock.quote.update.mockResolvedValue(cancelledQuote);
+      prismaMock.quote.findFirst
+        .mockResolvedValueOnce({
+          id: quoteId,
+          status: DocumentStatus.DRAFT,
+        })
+        .mockResolvedValueOnce(cancelledQuote);
+      prismaMock.quote.updateMany.mockResolvedValue({ count: 1 });
 
       const result = await service.cancel(companyId, quoteId);
 
@@ -375,12 +387,21 @@ describe('QuotesService', () => {
         },
       });
 
-      expect(prismaMock.quote.update).toHaveBeenCalledWith({
+      expect(prismaMock.quote.updateMany).toHaveBeenCalledWith({
         where: {
           id: quoteId,
+          companyId,
+          status: DocumentStatus.DRAFT,
         },
         data: {
           status: DocumentStatus.CANCELLED,
+        },
+      });
+
+      expect(prismaMock.quote.findFirst).toHaveBeenLastCalledWith({
+        where: {
+          id: quoteId,
+          companyId,
         },
         include: {
           customer: true,
@@ -402,7 +423,7 @@ describe('QuotesService', () => {
         NotFoundException,
       );
 
-      expect(prismaMock.quote.update).not.toHaveBeenCalled();
+      expect(prismaMock.quote.updateMany).not.toHaveBeenCalled();
     });
 
     it.each([DocumentStatus.CONFIRMED, DocumentStatus.CANCELLED])(
@@ -417,7 +438,7 @@ describe('QuotesService', () => {
           BadRequestException,
         );
 
-        expect(prismaMock.quote.update).not.toHaveBeenCalled();
+        expect(prismaMock.quote.updateMany).not.toHaveBeenCalled();
       },
     );
   });

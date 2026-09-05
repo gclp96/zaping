@@ -1,29 +1,42 @@
 # Principios de Seguridad — Zaping
 
-**Producto:** Zaping
-**Versión:** 2.0.0
+**Producto:** Zaping Platform
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Última actualización:** 2026-08-19
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping Team
 
 ---
 
 # 1. Propósito
 
-Este documento define los principios y requisitos de seguridad aplicables al ecosistema Zaping.
+Este documento define los principios, requisitos y límites de seguridad aplicables al ecosistema Zaping.
 
 Su objetivo es proteger:
 
-* cuentas de usuario;
-* datos empresariales;
-* aislamiento entre compañías;
-* inventario;
-* información comercial;
-* operaciones financieras;
-* información Healthcare;
-* documentos;
-* integraciones;
-* y la infraestructura de la plataforma.
+```text
+cuentas de usuario
+
+datos empresariales
+
+aislamiento entre Companies
+
+inventario
+
+información comercial
+
+operaciones financieras
+
+Equipment
+
+información Healthcare
+
+documentos
+
+integraciones
+
+infraestructura
+```
 
 La seguridad debe formar parte del diseño de cada funcionalidad.
 
@@ -31,7 +44,51 @@ No debe tratarse como una revisión opcional al final del desarrollo.
 
 ---
 
-# 2. Principio fundamental
+# 2. Alcance
+
+Estas reglas aplican a:
+
+```text
+Zaping ERP Core
+
+Zaping Healthcare
+
+Zaping Radar future
+
+Zaping AI future
+
+Frontend
+
+Backend
+
+Database
+
+Public endpoints
+
+Integrations
+
+Infrastructure
+
+Development workflow
+```
+
+Este documento establece principios y requisitos.
+
+El estado operativo y los blockers vigentes pertenecen a:
+
+```text
+docs/project/PROJECT_BOARD.md
+```
+
+La arquitectura general pertenece a:
+
+```text
+docs/architecture/ARCHITECTURE.md
+```
+
+---
+
+# 3. Principio fundamental
 
 Zaping utiliza:
 
@@ -39,85 +96,395 @@ Zaping utiliza:
 
 Toda funcionalidad debe asumir que:
 
-* los inputs pueden ser maliciosos;
-* los usuarios pueden intentar acciones no autorizadas;
-* los identificadores pueden ser manipulados;
-* los datos recibidos desde frontend no son confiables;
-* los tenants deben permanecer completamente aislados;
-* y los errores no deben exponer información interna.
+```text
+inputs may be malicious
+
+frontend data is untrusted
+
+identifiers may be manipulated
+
+authenticated users may attempt unauthorized actions
+
+tenants must remain isolated
+
+external integrations are trust boundaries
+
+errors may expose sensitive information if poorly handled
+```
+
+Principio adicional:
+
+```text
+Authorization uncertainty
+→ DENY
+```
+
+No:
+
+```text
+Authorization uncertainty
+→ ALLOW
+```
+
+Cuando identidad, tenant o permiso no puedan determinarse con seguridad, la operación debe fallar de forma cerrada.
 
 ---
 
-# 3. Objetivos de seguridad
-
-Zaping debe proteger principalmente:
+# 4. Objetivos de seguridad
 
 ## Confidencialidad
 
 La información debe ser visible únicamente para usuarios autorizados.
 
+---
+
 ## Integridad
 
-La información no debe poder modificarse sin autorización ni trazabilidad.
+La información no debe poder modificarse sin autorización ni reglas apropiadas.
+
+---
 
 ## Disponibilidad
 
-Los servicios deben mantenerse disponibles dentro de los objetivos definidos para la plataforma.
+Los servicios deben mantenerse disponibles de acuerdo con los objetivos operacionales definidos.
+
+---
 
 ## Trazabilidad
 
-Las acciones relevantes deben poder atribuirse a un usuario, proceso o integración.
+Las acciones relevantes deben poder atribuirse cuando el dominio lo requiera a:
+
+```text
+User
+process
+integration
+business operation
+```
 
 ---
 
-# 4. Principio de mínimo privilegio
+# 5. Estado actual de seguridad
 
-Todo usuario, servicio o integración debe recibir únicamente los permisos necesarios para realizar su función.
+La documentación debe distinguir entre:
 
-No se deben conceder privilegios amplios por comodidad.
+```text
+IMPLEMENTED
+
+VALIDATED
+
+P0 / P1 DEBT
+
+FUTURE
+```
+
+No debe presentarse una capacidad futura como si ya protegiera el sistema actual.
+
+---
+
+## 5.1 Implementado
+
+Actualmente Zaping incorpora:
+
+```text
+bcrypt para passwordHash
+
+JWT firmado
+
+JWT con expiración
+
+JWT secret mediante configuración de entorno
+
+Passport JWT
+
+JwtAuthGuard en endpoints privados inspeccionados
+
+companyId derivado del usuario autenticado
+
+ValidationPipe global
+
+whitelist = true
+
+forbidNonWhitelisted = true
+
+transform = true
+
+DTOs por operación
+
+register/login sanitizados sin passwordHash
+
+secure password recovery with one-time hashed tokens
+
+authVersion-based invalidation after password change/reset
+
+RolesGuard
+
+@Roles(...) en ERP Core y Healthcare Cases
+
+tenant-scoped operations en módulos normalizados
+
+UUID como identidad técnica
+
+non-destructive lifecycle en varios master data
+
+server-side ownership de campos sensibles en workflows normalizados
+```
+
+La eliminación de `passwordHash` de las respuestas de autenticación es una corrección ya implementada.
+
+No debe mantenerse como deuda abierta.
+
+---
+
+## 5.2 Validado
+
+Los módulos normalizados cuentan con cobertura relacionada con:
+
+```text
+DTO validation
+
+business rules
+
+tenant scoping
+
+invalid relations
+
+forbidden fields
+
+lifecycle behavior
+```
+
+La evidencia cuantitativa vigente pertenece a:
+
+```text
+PROJECT_BOARD.md
+```
+
+y no debe duplicarse permanentemente en este documento.
+
+### 5.2.1 Authorization + Tenant Isolation V1
+
+El cierre B2D validó el siguiente estado de seguridad del ERP Core:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
+```
+
+El backend aplica `JwtAuthGuard`, `RolesGuard` y `@Roles(...)`. La autoridad
+final es `request.user.role`, reconstruido desde el estado actual de User por
+`JwtStrategy`; un cambio de rol aplica en requests protegidas posteriores.
+El frontend sólo ofrece visibilidad role-aware y nunca es la frontera de
+seguridad.
+
+La autoridad de tenant es siempre `req.user.companyId`. Los DTOs ERP normales
+no aceptan `companyId` controlado por el cliente y se conservan
+`whitelist`, `forbidNonWhitelisted` y `transform` en `ValidationPipe`.
+
+Las mutaciones tenant-owned incluyen ownership en el predicado final, y las
+relaciones entre entidades se validan dentro de la Company autenticada. La
+regresión validó además la semántica `401` para no autenticado, `403` para rol
+no permitido, `404` para recurso foreign-tenant y `400` para transición de
+negocio inválida sobre un recurso propio.
+
+---
+
+## 5.3 P0 — Security Release Blockers
+
+Password Security V1 y Authorization + Tenant Isolation V1 están implementados
+y validados. Antes de un piloto externo o una exposición productiva deben
+resolverse o verificarse como mínimo los gates B3 restantes:
+
+```text
+basic authentication endpoint abuse protection
+
+production secrets/configuration review
+
+real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
+
+protected frontend/session architecture review
+```
+
+Estos puntos son blockers de seguridad para una exposición real.
+
+---
+
+## 5.4 P1 — Security Hardening
+
+Después de los blockers P0 deben fortalecerse:
+
+```text
+session / token strategy
+
+refresh / revocation
+
+frontend authenticated-route hardening
+
+business audit foundation
+
+dependency security review
+
+security observability
+
+```
+
+---
+
+## 5.5 Future
+
+Capacidades posteriores:
+
+```text
+permission-based RBAC
+
+MFA
+
+advanced anomaly detection
+
+enterprise session controls
+
+advanced security analytics
+
+SIEM-class integrations
+```
+
+---
+
+# 6. Principio de mínimo privilegio
+
+Todo usuario, servicio o integración debe recibir únicamente los permisos necesarios para cumplir su función.
+
+No deben otorgarse privilegios amplios por comodidad.
 
 Ejemplo:
 
-Un usuario que puede consultar inventario no debería automáticamente poder:
+Un usuario que puede consultar Inventory no debería automáticamente poder:
 
-* modificar stock;
-* aprobar compras;
-* administrar usuarios;
-* emitir facturas;
-* o acceder a información de otra empresa.
+```text
+adjust stock
 
----
+approve Purchases
 
-# 5. Autenticación
+manage Users
 
-Zaping debe exigir autenticación para toda operación privada.
+change roles
 
-El sistema utiliza actualmente JWT como mecanismo principal de autenticación.
+access Billing
 
-El flujo debe garantizar:
-
-* credenciales válidas;
-* usuario activo;
-* token válido;
-* expiración;
-* firma válida;
-* contexto de usuario;
-* contexto de empresa.
-
-Los endpoints públicos deben mantenerse al mínimo necesario.
+access another Company
+```
 
 ---
 
-# 6. Contraseñas
+# 7. Autenticación
+
+Toda operación privada debe exigir autenticación.
+
+Actualmente Zaping utiliza JWT.
+
+Flujo:
+
+```text
+Credentials
+↓
+Authentication
+↓
+JWT
+↓
+JwtAuthGuard
+↓
+Authenticated User
+↓
+Protected Operation
+```
+
+El sistema debe validar:
+
+```text
+credentials
+
+token signature
+
+token expiration
+
+required claims
+
+User identity
+
+Company context
+```
+
+---
+
+# 8. Usuario activo
+
+## Estado actual
+
+Existe una deuda de seguridad:
+
+```text
+User.isActive = false
+→ login / JwtStrategy enforcement incompleto
+```
+
+Por tanto, el sistema todavía no debe afirmar que un usuario inactivo está completamente bloqueado.
+
+---
+
+## Requisito
+
+Debe garantizarse:
+
+```text
+User.isActive = false
+↓
+authentication denied
+```
+
+y, cuando la estrategia de sesiones lo permita:
+
+```text
+existing access
+↓
+revoked / rejected
+```
+
+Un usuario deshabilitado no debe continuar utilizando normalmente la aplicación.
+
+---
+
+# 9. Contraseñas
 
 Las contraseñas deben:
 
-* almacenarse únicamente como hash seguro;
-* utilizar algoritmos adecuados como bcrypt;
-* nunca almacenarse en texto plano;
-* nunca registrarse en logs;
-* nunca incluirse en respuestas API;
-* nunca enviarse de vuelta al frontend.
+```text
+be stored only as secure hashes
+
+use an appropriate password hashing algorithm
+
+never be stored as plaintext
+
+never be written to logs
+
+never be returned by API
+
+never be sent back to frontend
+```
+
+Actualmente:
+
+```text
+bcrypt
+```
+
+es utilizado para `passwordHash`.
+
+Los contratos de registro, creación interna y reset exigen una longitud mínima
+de 8 caracteres, sin imponer requisitos artificiales de mayúsculas o símbolos.
 
 La aplicación no debe exponer:
 
@@ -126,13 +493,13 @@ password
 passwordHash
 ```
 
-ni campos equivalentes innecesarios.
+ni equivalentes innecesarios.
 
 ---
 
-# 7. Respuestas de autenticación
+# 10. Respuestas de autenticación
 
-Los endpoints de autenticación deben devolver únicamente la información necesaria.
+Los endpoints de autenticación deben devolver únicamente información necesaria.
 
 Ejemplo conceptual:
 
@@ -149,78 +516,350 @@ Ejemplo conceptual:
 }
 ```
 
-No deben devolver automáticamente el modelo completo de persistencia.
+No debe devolverse automáticamente el objeto completo persistido de `User`.
+
+La sanitización de `register` y `login` para evitar exposición de `passwordHash` ya fue implementada.
 
 ---
 
-# 8. Tokens JWT
+# 11. Recuperación de contraseña
+
+## Estado actual
+
+Existe un flujo seguro implementado para recuperar el control de la cuenta:
+
+```text
+POST /auth/forgot-password
+→ generic response, no account enumeration
+
+POST /auth/reset-password
+→ token + newPassword only
+```
+
+El token es aleatorio de 256 bits, se persiste únicamente como hash SHA-256,
+expira en 30 minutos y es de un solo uso. Los tokens pendientes anteriores se
+invalidan al emitir uno nuevo y los demás se invalidan al completar el reset.
+Las cuentas desconocidas o inactivas no reciben token y mantienen la misma
+respuesta genérica.
+
+La entrega se orquesta mediante `PasswordRecoveryService` y `EmailService` con
+Resend. Si falla la entrega, la configuración o la construcción de la URL tras
+emitir el token, se invalida el token recién creado. No se registran tokens,
+reset URLs, contraseñas ni `passwordHash`.
+
+Los casos inválido, expirado, usado o inactivo usan el mensaje genérico. Un
+reset concurrente consume como máximo una vez mediante actualización
+condicional y transacción.
+
+La implementación está completa; la verificación de sender/domain, variables
+válidas y flujo real forgot → email → reset → login sigue siendo un gate de
+producción.
+
+---
+
+## Arquitectura objetivo
+
+La recuperación segura deberá utilizar un mecanismo equivalente a:
+
+```text
+Recovery request
+↓
+temporary random token
+↓
+verified account control
+↓
+token validation
+↓
+password change
+↓
+token invalidation
+```
+
+Los tokens de recuperación deben:
+
+```text
+have expiration
+
+be difficult to predict
+
+be single-use when practical
+
+not reveal unnecessary account-existence information
+
+be invalidated after use
+
+not be logged
+```
+
+No debe permitirse cambiar una contraseña únicamente con conocimiento del email u otro identificador público.
+
+---
+
+# 12. Tokens JWT
 
 Los JWT deben:
 
-* estar firmados;
-* utilizar secretos configurados mediante variables de entorno;
-* tener expiración;
-* validarse en cada request protegido;
-* contener únicamente claims necesarios.
+```text
+be signed
+
+have expiration
+
+use secrets from external configuration
+
+be validated on protected requests
+
+contain only necessary claims
+```
 
 Nunca deben:
 
-* almacenarse en código fuente;
-* registrarse completos en logs;
-* compartirse entre usuarios;
-* considerarse seguros únicamente porque están codificados.
+```text
+be hardcoded
 
-Un JWT firmado no equivale a información cifrada.
+be committed to repository
+
+be logged completely
+
+be shared between users
+
+be treated as encrypted data
+```
+
+Principio:
+
+```text
+Signed JWT
+≠
+Encrypted JWT
+```
+
+El payload puede ser legible aunque la firma impida modificaciones válidas.
 
 ---
 
-# 9. Secretos
+# 13. Sesiones y revocación
 
-Todos los secretos deben almacenarse fuera del código fuente.
+## Estado actual
+
+El sistema utiliza access tokens JWT.
+
+No existe todavía una arquitectura completa de:
+
+```text
+refresh tokens
+
+session registry
+
+remote logout
+
+token revocation
+
+device sessions
+```
+
+Sin embargo, password change y password reset incrementan `authVersion`; el
+JWT lleva ese claim y `JwtStrategy` lo compara con la base de datos en cada
+request protegida. Un JWT legado sin claim se interpreta como `0`. Al aumentar
+el valor persistido, los JWT anteriores dejan de autorizar. Esto no equivale a
+un session registry, refresh tokens o remote logout generales.
+
+---
+
+## Evolución requerida
+
+La estrategia debe permitir responder a escenarios como:
+
+```text
+User disabled
+
+password changed
+
+credential compromise
+
+remote logout
+
+administrative revocation
+```
+
+Esto debe evaluarse antes de una madurez productiva mayor.
+
+---
+
+# 14. Seguridad del token en frontend
+
+## Estado actual
+
+El frontend conserva actualmente el JWT en:
+
+```text
+localStorage
+```
+
+Esto debe documentarse explícitamente.
+
+Riesgo principal:
+
+```text
+successful XSS
+→ possible token theft
+```
+
+`localStorage` no es por sí mismo una vulnerabilidad automática, pero aumenta la importancia de proteger el frontend contra ejecución de JavaScript no confiable.
+
+---
+
+## Evolución
+
+Antes de producción debe revisarse formalmente la estrategia de sesión.
+
+Si en el futuro se utilizan cookies de autenticación:
+
+```text
+HttpOnly
+Secure
+SameSite
+```
+
+deberán evaluarse conjuntamente con protección CSRF.
+
+---
+
+# 15. Secretos
+
+Los secretos deben permanecer fuera del código fuente.
 
 Ejemplos:
 
 ```text
 JWT_SECRET
+
 DATABASE_URL
+
 API_KEYS
+
 SMTP_PASSWORD
+
 THIRD_PARTY_SECRETS
 ```
 
-Deben utilizarse:
-
-* variables de entorno;
-* secret managers cuando exista infraestructura productiva;
-* configuraciones separadas por entorno.
-
-Nunca deben agregarse secretos reales al repositorio.
-
----
-
-# 10. Autorización
-
-Autenticación y autorización son responsabilidades distintas.
+Usar:
 
 ```text
-Autenticación
-→ ¿Quién eres?
+environment variables
 
-Autorización
-→ ¿Qué puedes hacer?
+secret manager
+when production infrastructure exists
+
+environment-specific configuration
 ```
 
-Estar autenticado no significa tener permiso para ejecutar cualquier operación.
+Nunca deben versionarse secretos reales.
 
 ---
 
-# 11. Roles y permisos
+# 16. Autorización
 
-Zaping utiliza RBAC como base de autorización.
+Autenticación y autorización son controles diferentes.
 
-Los roles agrupan permisos.
+```text
+Authentication
+→ Who are you?
 
-La arquitectura debe permitir evolucionar hacia permisos granulares.
+Authorization
+→ What are you allowed to do?
+```
+
+Estar autenticado no otorga acceso universal.
+
+---
+
+# 17. Backend como autoridad
+
+Frontend puede ocultar acciones para mejorar UX.
+
+Sin embargo:
+
+> **El backend es la autoridad final.**
+
+No confiar únicamente en:
+
+```text
+hidden buttons
+
+disabled fields
+
+frontend routes
+
+navigation guards
+
+client-side role checks
+```
+
+Todo endpoint sensible debe validar sus reglas en servidor.
+
+---
+
+# 18. Roles
+
+Zaping utiliza RBAC como base.
+
+Actualmente existen roles base utilizados por el sistema.
+
+`RolesGuard` y `@Roles` se encuentran implementados en el ERP Core y en
+Healthcare Cases. ERP Core V1 utiliza una matriz cerrada de roles fijos
+(`ADMIN`, `MANAGER`, `SALES`, `WAREHOUSE`), documentada en
+`docs/modules/erp/IDENTITY_ACCESS.md`.
+
+Esto no significa que exista autorización granular basada en un catálogo de
+permisos: Permission-Based RBAC continúa diferido P1.
+
+---
+
+# 19. Safe Role Provisioning
+
+Existe un riesgo relevante relacionado con:
+
+```text
+User.role @default(ADMIN)
+```
+
+La persistencia no debe otorgar privilegios administrativos accidentalmente.
+
+Requisito:
+
+```text
+User creation
+↓
+explicit authorized role assignment
+```
+
+No:
+
+```text
+missing role
+↓
+implicit ADMIN
+```
+
+La creación y administración de Users debe impedir privilege escalation.
+
+Este punto es:
+
+> **P0 antes de exposición real.**
+
+---
+
+# 20. Permission-Based Authorization
+
+La arquitectura futura puede evolucionar hacia:
+
+```text
+User
+↓
+Role
+↓
+Permissions
+```
 
 Ejemplos:
 
@@ -237,923 +876,165 @@ purchases.approve
 receipts.create
 
 sales.create
+sales.approve
 
 cases.view
-cases.assign
+cases.manage
 
-caseKits.prepare
-caseKits.dispatch
+equipment.inspect
+equipment.retire
 
 billing.view
 ```
 
-Los permisos reales deberán definirse progresivamente por dominio.
+Los permisos deben definirse progresivamente según necesidades reales.
+
+No implementar una matriz excesivamente compleja antes de necesitarla.
 
 ---
 
-# 12. Backend como autoridad
+# 21. Multi-tenancy
 
-La interfaz puede ocultar acciones no autorizadas para mejorar UX.
-
-Sin embargo:
-
-> El backend es la autoridad final.
-
-No debe confiarse en:
-
-* botones ocultos;
-* rutas frontend;
-* campos deshabilitados;
-* navegación condicionada.
-
-Todo endpoint protegido debe validar autorización en servidor.
-
----
-
-# 13. Multi-tenancy
-
-El aislamiento multiempresa es una propiedad de seguridad crítica.
-
-Toda entidad empresarial debe estar asociada a su `companyId` cuando corresponda.
-
-Un usuario de una empresa nunca debe poder:
-
-* consultar;
-* modificar;
-* eliminar;
-* relacionar;
-* exportar;
-* o inferir
-
-información perteneciente a otra empresa.
-
----
-
-# 14. CompanyId confiable
-
-El sistema no debe asumir que un `companyId` recibido desde frontend es verdadero.
-
-La empresa debe derivarse principalmente del contexto autenticado.
+El aislamiento entre Companies es una propiedad de seguridad crítica.
 
 Conceptualmente:
+
+```text
+Company A
+≠
+Company B
+```
+
+Un usuario nunca debe poder utilizar acceso autorizado a Company A para:
+
+```text
+read
+
+modify
+
+delete
+
+relate
+
+export
+
+aggregate
+
+infer
+```
+
+datos de Company B.
+
+---
+
+# 22. CompanyId confiable
+
+La autoridad del tenant debe provenir del contexto autenticado.
 
 ```text
 JWT
 ↓
 Authenticated User
 ↓
-companyId confiable
+companyId
 ↓
-Query aislada
+Tenant-scoped operation
 ```
 
 No:
 
 ```text
-Frontend envía companyId
+Frontend sends companyId
 ↓
-Backend confía directamente
+Backend trusts it
 ```
 
----
-
-# 15. Queries multi-tenant
-
-Todas las operaciones empresariales deben aplicar aislamiento.
-
-Esto incluye:
-
-* `find`;
-* `findMany`;
-* `update`;
-* `delete`;
-* relaciones;
-* búsquedas;
-* reportes;
-* exportaciones.
-
-No basta con aplicar `companyId` únicamente al listado principal.
+Un `companyId` enviado por cliente no debe sustituir el tenant autenticado.
 
 ---
 
-# 16. Relaciones entre entidades
+# 23. Queries multi-tenant
 
-Antes de crear una relación entre dos entidades empresariales se debe comprobar que ambas pertenecen al mismo tenant.
+Tenant isolation debe aplicarse a:
+
+```text
+find
+
+findMany
+
+create relations
+
+update
+
+lifecycle operations
+
+delete where allowed
+
+search
+
+reports
+
+exports
+
+dashboards
+
+deep-linked resources
+```
+
+No basta con proteger únicamente los listados.
+
+---
+
+# 24. Relaciones entre tenants
+
+Antes de relacionar entidades debe comprobarse tenant ownership.
 
 Ejemplo:
 
-Una compra de Empresa A no debe poder relacionarse con un proveedor de Empresa B.
+```text
+Purchase from Company A
 
-El simple hecho de conocer el UUID de otra entidad no debe permitir utilizarla.
+Supplier from Company B
 
----
+→ DENY
+```
 
-# 17. UUID no es autorización
-
-Zaping utiliza UUID como estrategia de identificación.
-
-Sin embargo:
-
-> Un UUID difícil de adivinar no sustituye la autorización.
-
-Todos los recursos deben continuar verificando permisos y pertenencia al tenant.
-
----
-
-# 18. Validación de entrada
-
-Toda entrada externa debe considerarse no confiable.
-
-Validar:
-
-* tipos;
-* formatos;
-* valores permitidos;
-* longitud;
-* campos obligatorios;
-* enumeraciones;
-* relaciones;
-* límites.
-
-El backend utiliza DTOs y `ValidationPipe` como primera capa de validación.
-
-Las reglas de negocio adicionales deben validarse posteriormente en el dominio correspondiente.
-
----
-
-# 19. Mass Assignment
-
-No debe permitirse que el cliente modifique campos internos simplemente enviándolos en el request.
-
-Ejemplos sensibles:
+También:
 
 ```text
-companyId
-role
-permissions
-createdBy
-approvedBy
-status interno
-passwordHash
+EquipmentAsset Company A
+
+HealthcareCase Company B
+
+→ DENY
 ```
 
-Los DTOs deben aceptar únicamente los campos permitidos para esa operación.
+Conocer el UUID de una entidad no debe permitir utilizarla.
 
 ---
 
-# 20. Whitelisting
+# 25. UUID no es autorización
 
-La configuración de validación debe continuar utilizando enfoques equivalentes a:
+Zaping utiliza UUID.
 
-* whitelist;
-* rechazo de propiedades no permitidas;
-* transformación controlada.
+Esto dificulta algunas formas triviales de enumeración, pero:
 
-Esto reduce el riesgo de campos inesperados.
+> **UUID no sustituye autorización ni tenant isolation.**
 
----
-
-# 21. Manejo de errores
-
-Los errores enviados al usuario deben ser útiles pero no revelar detalles internos.
-
-No exponer:
-
-* stack traces;
-* SQL;
-* consultas Prisma completas;
-* rutas internas;
-* secretos;
-* tokens;
-* variables de entorno;
-* infraestructura;
-* información de otros usuarios.
+Todo recurso debe verificar contexto y permisos independientemente de lo difícil que sea adivinar su identificador.
 
 ---
 
-# 22. Logging seguro
+# 26. Testing multi-tenant
 
-Los logs deben ayudar a diagnosticar incidentes sin convertirse en una fuente de exposición.
-
-No registrar:
-
-* contraseñas;
-* JWT completos;
-* secretos;
-* claves API;
-* datos sensibles innecesarios.
-
-Cuando sea necesario identificar una operación, utilizar identificadores y contexto seguro.
-
----
-
-# 23. Auditoría
-
-Las acciones críticas deben generar trazabilidad de negocio independiente de los logs técnicos.
-
-Ejemplos:
-
-* login;
-* creación de usuarios;
-* cambios de permisos;
-* aprobaciones;
-* ajustes de inventario;
-* recepciones;
-* entregas;
-* devoluciones;
-* salidas Healthcare;
-* retornos;
-* conciliaciones;
-* cambios de estado críticos.
-
-Idealmente debe conocerse:
-
-```text
-Quién
-Qué
-Cuándo
-Dónde
-Entidad
-Acción
-Resultado
-```
-
----
-
-# 24. Inventario
-
-Inventario es un dominio de alta sensibilidad.
-
-No debe permitirse:
-
-* modificación directa arbitraria de stock;
-* movimientos sin origen;
-* eliminación silenciosa de movimientos;
-* reescritura de historia confirmada.
-
-Las correcciones deben preservar trazabilidad.
-
----
-
-# 25. Operaciones financieras
-
-Operaciones relacionadas con:
-
-* precios;
-* ventas;
-* facturación;
-* pagos;
-* impuestos;
-* descuentos;
-
-deben requerir permisos apropiados.
-
-Los cambios posteriores a una operación confirmada deben preservar historial cuando corresponda.
-
----
-
-# 26. Zaping Healthcare
-
-Healthcare introduce información operacional que puede tener mayor sensibilidad.
-
-El alcance inicial de Zaping Healthcare debe mantenerse en:
-
-* hospitales;
-* médicos;
-* procedimientos;
-* técnicos;
-* logística;
-* material;
-* equipo;
-* casos;
-* aseguradoras;
-* y facturación relacionada.
-
----
-
-# 27. No convertirse en expediente clínico
-
-Zaping Healthcare no debe almacenar información clínica innecesaria.
-
-No incorporar de forma predeterminada:
-
-* diagnósticos clínicos;
-* expedientes médicos completos;
-* estudios;
-* tratamientos;
-* notas médicas;
-* historia clínica.
-
-Si una funcionalidad futura requiere este tipo de información deberá realizarse una evaluación formal de:
-
-* necesidad;
-* regulación;
-* privacidad;
-* seguridad;
-* acceso;
-* cifrado;
-* retención;
-* auditoría.
-
----
-
-# 28. Minimización de datos
-
-Guardar únicamente la información necesaria para cumplir la función empresarial.
-
-Antes de agregar un nuevo campo sensible preguntar:
-
-1. ¿Realmente es necesario?
-2. ¿Quién necesita verlo?
-3. ¿Por cuánto tiempo?
-4. ¿Qué ocurre si se filtra?
-5. ¿Existe una alternativa menos sensible?
-
----
-
-# 29. Datos personales
-
-La información personal debe limitarse a lo necesario.
-
-Ejemplos:
-
-* nombres;
-* correos;
-* teléfonos;
-* contactos;
-* responsables.
-
-El acceso debe estar alineado con las responsabilidades del usuario.
-
----
-
-# 30. Aseguradoras y pagadores
-
-Información relacionada con:
-
-* aseguradora;
-* autorización;
-* número de referencia;
-* responsable de pago;
-
-puede ser sensible.
-
-Debe exponerse únicamente a roles que realmente la necesiten.
-
----
-
-# 31. Segregación de responsabilidades
-
-Algunas operaciones pueden requerir separar responsabilidades.
-
-Ejemplos futuros:
-
-```text
-Usuario A
-→ prepara compra
-
-Usuario B
-→ aprueba compra
-```
-
-o:
-
-```text
-Almacén
-→ entrega material
-
-Administración
-→ factura
-```
-
-No debe implementarse separación artificial en todos los workflows, pero la arquitectura debe permitirla donde exista riesgo financiero u operacional.
-
----
-
-# 32. Acciones destructivas
-
-Las acciones destructivas deben minimizarse.
-
-Preferir:
-
-* Soft Delete;
-* desactivación;
-* cancelación;
-* reversión;
-* movimientos compensatorios.
-
-Una entidad con historia relevante no debe eliminarse físicamente sin evaluar las consecuencias.
-
----
-
-# 33. Confirmaciones
-
-Las acciones críticas deben solicitar confirmación cuando exista riesgo significativo.
-
-La confirmación debe explicar la consecuencia.
-
-Preferir:
-
-> Confirmar recepción. Esta operación aumentará inventario.
-
-sobre:
-
-> ¿Estás seguro?
-
----
-
-# 34. Base de datos
-
-El acceso a PostgreSQL debe realizarse mediante credenciales protegidas.
-
-La base de datos no debe exponerse públicamente sin necesidad.
-
-Los usuarios de base de datos deben tener privilegios adecuados al entorno.
-
----
-
-# 35. Prisma
-
-Prisma debe utilizarse mediante consultas parametrizadas y contratos controlados.
-
-SQL manual debe evitarse salvo necesidad específica.
-
-Cuando exista SQL manual debe revisarse:
-
-* inyección;
-* multi-tenancy;
-* permisos;
-* performance;
-* compatibilidad.
-
----
-
-# 36. Migraciones
-
-Las migraciones deben proteger la integridad de los datos.
-
-Antes de una migración crítica:
-
-* evaluar impacto;
-* revisar datos;
-* crear respaldo cuando corresponda;
-* evitar operaciones destructivas no necesarias.
-
-Nunca realizar resets de datos productivos como solución rutinaria.
-
----
-
-# 37. Backups
-
-Cuando exista entorno productivo deben existir respaldos periódicos de información crítica.
-
-La estrategia deberá definir:
-
-* frecuencia;
-* retención;
-* ubicación;
-* restauración;
-* pruebas de recuperación.
-
-Un backup que nunca se ha probado restaurar no debe considerarse suficiente.
-
----
-
-# 38. HTTPS
-
-Todo tráfico productivo debe utilizar HTTPS.
-
-Las credenciales y tokens no deben transmitirse mediante conexiones inseguras.
-
----
-
-# 39. CORS
-
-La configuración CORS debe permitir únicamente los orígenes requeridos por cada entorno.
-
-No utilizar configuraciones excesivamente abiertas en producción sin justificación.
-
----
-
-# 40. Rate Limiting
-
-Endpoints expuestos públicamente deben evaluar rate limiting.
-
-Especial atención futura a:
-
-* login;
-* reset password;
-* API pública;
-* búsquedas costosas;
-* integraciones.
-
-La implementación se priorizará según exposición real.
-
----
-
-# 41. Protección contra ataques de autenticación
-
-El sistema deberá evolucionar para reducir:
-
-* brute force;
-* credential stuffing;
-* abuso de recuperación de contraseña.
-
-Posibles mecanismos futuros:
-
-* rate limits;
-* bloqueo temporal;
-* alertas;
-* MFA;
-* detección de comportamiento anómalo.
-
----
-
-# 42. Recuperación de contraseña
-
-Los tokens de recuperación deben:
-
-* ser temporales;
-* tener expiración;
-* ser de un solo uso cuando sea posible;
-* no revelar si una cuenta existe de forma innecesaria;
-* invalidarse después de utilizarse.
-
----
-
-# 43. MFA
-
-La autenticación multifactor no es requisito inmediato del MVP.
-
-Debe considerarse para:
-
-* administradores;
-* clientes enterprise;
-* acciones sensibles;
-* cuentas de alto privilegio.
-
----
-
-# 44. Sesiones y revocación
-
-La arquitectura debe permitir evolucionar hacia mecanismos de revocación de sesiones o tokens cuando sea necesario.
-
-Casos futuros:
-
-* usuario deshabilitado;
-* contraseña cambiada;
-* sospecha de compromiso;
-* cierre remoto de sesión.
-
----
-
-# 45. Dependencias
-
-Las dependencias externas deben mantenerse actualizadas razonablemente.
-
-Antes de incorporar una nueva librería evaluar:
-
-* necesidad;
-* mantenimiento;
-* reputación;
-* vulnerabilidades conocidas;
-* licencia;
-* tamaño;
-* alternativas.
-
-No agregar dependencias únicamente para resolver problemas triviales.
-
----
-
-# 46. Vulnerabilidades de dependencias
-
-Deben realizarse revisiones periódicas mediante herramientas como las disponibles en el ecosistema npm.
-
-Ejemplo:
-
-```bash
-npm audit
-```
-
-Los hallazgos deben evaluarse según:
-
-* explotabilidad;
-* contexto;
-* severidad;
-* dependencia directa o indirecta.
-
-No actualizar versiones mayores ciegamente únicamente para eliminar una alerta sin revisar compatibilidad.
-
----
-
-# 47. Archivos y documentos
-
-Cuando Zaping permita subir archivos deben aplicarse controles como:
-
-* tamaño máximo;
-* tipos permitidos;
-* nombres seguros;
-* autorización;
-* tenant;
-* almacenamiento controlado.
-
-No confiar únicamente en la extensión enviada por el usuario.
-
----
-
-# 48. Integraciones externas
-
-Toda integración debe tratarse como un límite de confianza.
-
-Debe evaluarse:
-
-* autenticación;
-* secretos;
-* permisos;
-* datos enviados;
-* datos recibidos;
-* reintentos;
-* logs;
-* disponibilidad;
-* errores.
-
-Nunca permitir que una integración externa pueda operar fuera del tenant autorizado.
-
----
-
-# 49. API pública
-
-La futura Public API deberá incorporar:
-
-* autenticación propia;
-* scopes;
-* rate limiting;
-* versionado;
-* auditoría;
-* revocación;
-* documentación.
-
-Una API key no debe otorgar acceso ilimitado por defecto.
-
----
-
-# 50. Separación por ambientes
-
-Los ambientes deben permanecer separados.
-
-Ejemplos:
-
-```text
-development
-test
-staging
-production
-```
-
-No reutilizar:
-
-* bases de datos productivas;
-* secretos productivos;
-* credenciales;
-* tokens;
-
-en desarrollo local sin necesidad y controles específicos.
-
----
-
-# 51. Datos de prueba
-
-Los entornos no productivos deben utilizar preferentemente datos ficticios o sanitizados.
-
-No copiar datos sensibles reales a desarrollo únicamente por comodidad.
-
----
-
-# 52. Seguridad frontend
-
-El frontend no debe almacenar información sensible innecesariamente.
-
-Evitar:
-
-* secretos;
-* credenciales;
-* información privada en variables públicas;
-* logs de tokens.
-
-Toda variable expuesta al navegador debe considerarse públicamente visible.
-
----
-
-# 53. XSS
-
-Los valores externos deben tratarse como datos, no como HTML ejecutable.
-
-Evitar renderizar HTML sin sanitización.
-
-No utilizar mecanismos equivalentes a:
-
-```text
-dangerouslySetInnerHTML
-```
-
-salvo necesidad explícita y sanitización adecuada.
-
----
-
-# 54. CSRF
-
-La estrategia CSRF debe evaluarse según el mecanismo final de almacenamiento y transmisión de autenticación.
-
-Si en el futuro se utilizan cookies de sesión para autenticación, deberán incorporarse las protecciones correspondientes.
-
----
-
-# 55. Redirects y URLs
-
-No confiar en URLs externas proporcionadas por usuario sin validación.
-
-Evitar open redirects.
-
-Las URLs almacenadas o abiertas por el sistema deben validarse cuando representen un riesgo.
-
----
-
-# 56. Seguridad de exportaciones
-
-Las exportaciones deben respetar:
-
-* tenant;
-* permisos;
-* filtros;
-* datos sensibles.
-
-Un usuario no debe poder exportar información que no puede consultar normalmente.
-
----
-
-# 57. Reportes
-
-Los reportes deben aplicar exactamente las mismas reglas de autorización que las pantallas operativas.
-
-Un reporte no debe convertirse en una ruta alternativa para obtener información restringida.
-
----
-
-# 58. Dashboard
-
-Los indicadores agregados también deben respetar tenant y permisos.
-
-La agregación no elimina la sensibilidad de los datos.
-
----
-
-# 59. Auditoría de permisos
-
-Los cambios de:
-
-* rol;
-* permisos;
-* acceso administrativo;
-
-deben registrarse.
-
-Idealmente se debe conocer:
-
-* quién realizó el cambio;
-* usuario afectado;
-* permisos anteriores;
-* permisos nuevos;
-* fecha.
-
----
-
-# 60. Cuentas administrativas
-
-Las cuentas administrativas deben protegerse especialmente.
-
-Evitar:
-
-* compartir cuentas;
-* usuarios genéricos;
-* contraseñas comunes;
-* privilegios administrativos innecesarios.
-
-Cada persona debe utilizar su propia identidad.
-
----
-
-# 61. Seguridad de infraestructura
-
-Cuando exista infraestructura productiva deben evaluarse:
-
-* firewall;
-* redes privadas;
-* acceso a base de datos;
-* secretos;
-* TLS;
-* backups;
-* logging;
-* monitoreo;
-* actualizaciones;
-* acceso administrativo.
-
-La infraestructura deberá documentarse cuando se formalice el entorno productivo.
-
----
-
-# 62. Observabilidad de seguridad
-
-La plataforma debe evolucionar para detectar eventos como:
-
-* fallos repetidos de login;
-* acciones administrativas;
-* accesos anómalos;
-* errores de autorización;
-* operaciones críticas;
-* cambios de configuración.
-
-No es necesario construir un SIEM durante el MVP.
-
-Sí debemos generar información que permita investigar incidentes.
-
----
-
-# 63. Incidentes de seguridad
-
-Cuando exista sospecha de incidente:
-
-```text
-Detectar
-↓
-Contener
-↓
-Investigar
-↓
-Corregir
-↓
-Recuperar
-↓
-Documentar
-↓
-Prevenir recurrencia
-```
-
-Un incidente crítico puede requerir:
-
-* revocar accesos;
-* rotar secretos;
-* aislar servicios;
-* restaurar datos;
-* revisar logs.
-
----
-
-# 64. Vulnerabilidades
-
-Una vulnerabilidad encontrada no debe ocultarse.
-
-Debe registrarse y priorizarse según riesgo.
-
-Clasificación orientativa:
-
-```text
-Critical
-High
-Medium
-Low
-```
-
-Critical y High deben recibir atención prioritaria.
-
----
-
-# 65. Testing de seguridad
-
-Las áreas críticas deben incluir pruebas específicas cuando corresponda.
-
-Ejemplos:
-
-* endpoint sin token;
-* token inválido;
-* usuario sin rol;
-* usuario de otra empresa;
-* manipulación de UUID;
-* campos no permitidos;
-* acceso a recurso inexistente;
-* datos sensibles en respuesta.
-
----
-
-# 66. Pruebas multi-tenant
-
-Los módulos críticos deben validar explícitamente escenarios como:
+Los módulos críticos deben validar explícitamente:
 
 ```text
 Company A
 ↓
-intenta leer recurso de Company B
+read Company B resource
 ↓
-DENEGADO
+DENY
 ```
 
 y:
@@ -1161,130 +1042,1807 @@ y:
 ```text
 Company A
 ↓
-intenta modificar recurso de Company B
+modify Company B resource
 ↓
-DENEGADO
+DENY
 ```
 
-Estas pruebas tienen prioridad alta.
+También deben probarse cuando corresponda:
+
+```text
+cross-tenant relation injection
+
+cross-tenant nested resource access
+
+cross-tenant exports
+
+cross-tenant lifecycle command
+```
+
+La regresión sistemática de Authorization + Tenant Isolation V1 quedó validada
+en B2D. No equivale a penetration testing ni cierra los gates B3 restantes.
 
 ---
 
-# 67. Revisión de seguridad antes de release
+# 27. Validación de entrada
+
+Toda entrada externa debe considerarse no confiable.
+
+Validar:
+
+```text
+type
+
+format
+
+length
+
+required values
+
+enums
+
+ranges
+
+relationships
+
+business constraints
+```
+
+DTO + `ValidationPipe` representan la primera capa.
+
+Las reglas empresariales adicionales pertenecen al Service o dominio responsable.
+
+---
+
+# 28. Mass Assignment
+
+El cliente no debe poder modificar campos internos únicamente enviándolos en el payload.
+
+Ejemplos sensibles:
+
+```text
+companyId
+
+role
+
+permissions
+
+createdById
+
+approvedById
+
+retiredById
+
+status internal
+
+passwordHash
+
+assetCode when server-owned
+
+folio when server-generated
+```
+
+Los DTOs deben permitir únicamente los campos válidos para la operación correspondiente.
+
+---
+
+# 29. Whitelisting
+
+La API mantiene:
+
+```text
+whitelist = true
+
+forbidNonWhitelisted = true
+
+transform = true
+```
+
+Esto debe conservarse salvo decisión explícita.
+
+Campos inesperados deben ser rechazados en operaciones sensibles.
+
+---
+
+# 30. Manejo de errores
+
+Los errores deben ser útiles sin revelar detalles internos innecesarios.
+
+No exponer:
+
+```text
+stack traces
+
+raw SQL
+
+full Prisma internals
+
+filesystem paths
+
+environment variables
+
+secrets
+
+tokens
+
+data from another tenant
+```
+
+También debe evitarse que una diferencia innecesaria de mensajes permita enumerar recursos restringidos.
+
+---
+
+# 31. Logging seguro
+
+Los logs deben apoyar troubleshooting sin convertirse en una fuente de exposición.
+
+No registrar:
+
+```text
+passwords
+
+full JWTs
+
+recovery tokens
+
+API secrets
+
+database credentials
+
+sensitive payloads without need
+```
+
+Preferir:
+
+```text
+requestId
+
+resourceId
+
+companyId when appropriate
+
+safe actorId
+
+operation name
+
+safe error category
+```
+
+---
+
+# 32. Auditoría de negocio
+
+Debe distinguirse:
+
+```text
+Technical Logging
+≠
+Business Audit
+```
+
+---
+
+## Estado actual
+
+Algunos dominios ya preservan hechos específicos como:
+
+```text
+createdBy
+
+receivedBy
+
+inspectedBy
+
+retiredBy
+
+cancelledBy
+
+timestamps
+```
+
+cuando el workflow lo requiere.
+
+No existe todavía un audit trail transversal completo para toda la plataforma.
+
+---
+
+## Objetivo
+
+Una capacidad futura de auditoría puede registrar:
+
+```text
+actor
+
+companyId
+
+action
+
+resource
+
+timestamp
+
+result
+
+safe metadata
+```
+
+Especialmente para:
+
+```text
+user administration
+
+role changes
+
+inventory adjustments
+
+receipts
+
+deliveries
+
+returns
+
+Equipment lifecycle
+
+Healthcare custody
+
+billing
+```
+
+---
+
+# 33. Inventario
+
+Inventory es un dominio de alta sensibilidad.
+
+No debe permitirse:
+
+```text
+arbitrary direct stock editing
+
+untraceable stock changes
+
+silent deletion of InventoryMovement
+
+rewriting confirmed history
+```
+
+`Product.stock` debe cambiar mediante operaciones controladas.
+
+Ejemplos actuales:
+
+```text
+Purchase Receipt
+→ Inventory IN
+
+Sale approval
+→ Inventory OUT
+```
+
+---
+
+# 34. Integridad histórica
+
+Cuando una operación ya representa un hecho histórico confirmado, las correcciones deben preservar trazabilidad.
+
+Preferir:
+
+```text
+Original operation
++
+corrective / compensating operation
+```
+
+cuando corresponda.
+
+No:
+
+```text
+silent rewrite of history
+```
+
+Esto es especialmente importante para:
+
+```text
+Inventory
+
+Receipts
+
+Deliveries future
+
+Returns
+
+Billing
+```
+
+---
+
+# 35. Operaciones financieras
+
+Operaciones relacionadas con:
+
+```text
+price
+
+discount
+
+sales
+
+invoice
+
+payment
+
+tax
+
+credit
+```
+
+deben utilizar autorización adecuada.
+
+Los cambios posteriores a una operación confirmada deben preservar historia cuando el dominio lo requiera.
+
+---
+
+# 36. Idempotencia y seguridad operacional
+
+La idempotencia también protege integridad frente a:
+
+```text
+double-click
+
+retry
+
+network timeout
+
+response loss
+```
+
+## Implementado
+
+Purchase Receipt create utiliza:
+
+```text
+Idempotency-Key
+
+tenant-scoped identity
+
+request hash
+
+replay
+
+conflict detection
+
+transactional protection
+```
+
+---
+
+## Pendiente
+
+```text
+Sale create
+→ idempotency pending
+
+Healthcare Case create
+→ idempotency pending
+```
+
+---
+
+## Futuro
+
+Evaluar idempotencia para:
+
+```text
+Delivery
+
+Dispatch
+
+Return
+
+Reconciliation
+
+financial operations
+```
+
+---
+
+# 37. Zaping Healthcare — Security Boundary
+
+Healthcare introduce información operacional potencialmente más sensible.
+
+Debe minimizarse su alcance.
+
+---
+
+## Current
+
+Healthcare Case Foundation almacena información operacional de:
+
+```text
+Case
+
+schedule
+
+responsible User
+
+procedure description
+
+lifecycle
+
+creation/cancellation audit facts
+```
+
+No almacena actualmente:
+
+```text
+patient name
+
+patient identifier
+
+diagnosis
+
+medical history
+
+clinical notes
+
+clinical records
+```
+
+---
+
+## Target
+
+Healthcare podrá incorporar cuando sea necesario:
+
+```text
+Hospital
+
+Doctor
+
+Requirements
+
+Equipment Assignment
+
+Custody
+
+CaseKit
+
+Return
+
+Payer / Insurance
+
+commercial references
+```
+
+Estos conceptos deben implementarse con minimización de datos y autorización apropiada.
+
+---
+
+# 38. No convertirse en expediente clínico
+
+Zaping Healthcare no debe convertirse por defecto en:
+
+```text
+Electronic Medical Record
+```
+
+No incorporar automáticamente:
+
+```text
+diagnosis
+
+complete medical records
+
+studies
+
+treatment plans
+
+clinical notes
+
+medical history
+```
+
+Si una capacidad futura necesita información clínica, deberá realizarse una evaluación específica de:
+
+```text
+business necessity
+
+privacy
+
+regulation
+
+authorization
+
+encryption
+
+retention
+
+audit
+
+incident impact
+```
+
+antes de implementarla.
+
+---
+
+# 39. Minimización de datos
+
+Guardar únicamente datos necesarios para cumplir la función empresarial.
+
+Antes de agregar un campo sensible preguntar:
+
+```text
+1. ¿Es realmente necesario?
+
+2. ¿Quién necesita verlo?
+
+3. ¿Qué operación depende de él?
+
+4. ¿Durante cuánto tiempo debe conservarse?
+
+5. ¿Qué impacto tendría una filtración?
+
+6. ¿Existe una alternativa menos sensible?
+```
+
+---
+
+# 40. Datos personales
+
+La información personal debe limitarse a lo necesario.
+
+Ejemplos:
+
+```text
+names
+
+emails
+
+phones
+
+business contacts
+
+responsible users
+```
+
+El acceso debe corresponder con la función del usuario.
+
+---
+
+# 41. Payers / Insurance
+
+La información futura sobre:
+
+```text
+Insurance
+
+authorization
+
+payment reference
+
+payer
+
+coverage
+```
+
+puede tener sensibilidad adicional.
+
+Debe definirse qué roles necesitan verla antes de exponerla ampliamente.
+
+---
+
+# 42. Segregación de responsabilidades
+
+Algunas operaciones pueden requerir separación de funciones.
+
+Ejemplo futuro:
+
+```text
+User A
+→ creates Purchase
+
+User B
+→ approves Purchase
+```
+
+o:
+
+```text
+Warehouse
+→ dispatches material
+
+Administration
+→ invoices
+```
+
+No debe imponerse separación artificial en cada workflow.
+
+Debe utilizarse cuando exista riesgo financiero, operacional o regulatorio suficiente.
+
+---
+
+# 43. Lifecycle y acciones destructivas
+
+No existe una estrategia universal de Soft Delete.
+
+Debe utilizarse el lifecycle apropiado según el tipo de entidad.
+
+```text
+Master Data
+→ deactivate
+
+Transactional Document
+→ cancel / explicit state transition
+
+Historical Event
+→ preserve / compensate
+
+Temporary Data
+→ delete / expire when appropriate
+```
+
+Ejemplos:
+
+```text
+Customer
+Supplier
+Product
+→ deactivation
+
+EquipmentAsset
+→ retirement
+
+Sale DRAFT
+→ cancellation
+
+InventoryMovement
+→ preserve history
+```
+
+Una entidad con historia relevante no debe eliminarse físicamente sin evaluar impacto.
+
+---
+
+# 44. Confirmaciones de acciones críticas
+
+Frontend debe solicitar confirmación cuando exista riesgo operacional significativo.
+
+Preferir:
+
+```text
+Confirmar recepción.
+
+Esta operación aumentará inventario.
+```
+
+sobre:
+
+```text
+¿Estás seguro?
+```
+
+La confirmación del frontend no sustituye autorización ni validación backend.
+
+---
+
+# 45. Base de datos
+
+PostgreSQL debe utilizar credenciales protegidas.
+
+La base de datos no debe exponerse públicamente sin necesidad.
+
+En producción deberán utilizarse controles apropiados de:
+
+```text
+network access
+
+credentials
+
+TLS when applicable
+
+backups
+
+least privilege
+
+monitoring
+```
+
+---
+
+# 46. Prisma y SQL
+
+Prisma utiliza consultas parametrizadas para sus operaciones habituales.
+
+SQL manual debe utilizarse únicamente cuando exista una necesidad concreta.
+
+Debe revisarse:
+
+```text
+SQL injection
+
+tenant isolation
+
+permissions
+
+performance
+
+transaction semantics
+
+migration compatibility
+```
+
+---
+
+# 47. Migraciones
+
+Las migraciones deben preservar integridad.
+
+Antes de una migración crítica:
+
+```text
+evaluate impact
+
+inspect affected data
+
+review generated SQL
+
+prepare backup when appropriate
+
+validate rollback/recovery strategy
+
+avoid unnecessary destructive operations
+```
+
+Nunca utilizar un reset de datos productivos como solución rutinaria.
+
+---
+
+# 48. Backups
+
+Antes de producción debe existir una estrategia de backup.
+
+Debe definir:
+
+```text
+frequency
+
+retention
+
+storage
+
+access protection
+
+restoration process
+
+recovery testing
+```
+
+Principio:
+
+> **Un backup no probado mediante restauración no debe considerarse una estrategia de recuperación validada.**
+
+---
+
+# 49. HTTPS y transporte
+
+Todo tráfico productivo debe utilizar HTTPS.
+
+No deben transmitirse:
+
+```text
+credentials
+
+tokens
+
+recovery secrets
+
+sensitive application data
+```
+
+sobre conexiones inseguras.
+
+---
+
+# 50. CORS
+
+CORS debe configurarse según los orígenes necesarios para cada ambiente.
+
+Producción no debe utilizar configuración excesivamente abierta sin una justificación documentada.
+
+---
+
+# 51. Rate Limiting y endpoints públicos
+
+Endpoints públicos requieren protección proporcional a su exposición.
+
+Especial atención:
+
+```text
+login
+
+register when public
+
+password recovery
+
+future Public API
+
+expensive searches
+
+external integrations
+```
+
+Antes de exposición productiva debe existir protección básica contra abuso de autenticación.
+
+Esto puede incluir:
+
+```text
+rate limiting
+
+temporary throttling
+
+monitoring
+
+abuse detection
+```
+
+No es necesario comenzar con infraestructura compleja.
+
+---
+
+# 52. Brute Force y Credential Stuffing
+
+La plataforma debe reducir riesgo de:
+
+```text
+brute force
+
+credential stuffing
+
+password recovery abuse
+```
+
+Mecanismos posibles:
+
+```text
+rate limiting
+
+progressive throttling
+
+temporary lockout
+
+security alerts
+
+MFA
+
+anomaly detection
+```
+
+La implementación debe ser proporcional al riesgo y madurez del sistema.
+
+---
+
+# 53. MFA
+
+MFA no es requisito inmediato del ERP Core V1.
+
+Debe considerarse posteriormente para:
+
+```text
+Administrators
+
+enterprise customers
+
+high-privilege accounts
+
+high-risk operations
+```
+
+---
+
+# 54. Dependencias
+
+Antes de incorporar una librería evaluar:
+
+```text
+necessity
+
+maintenance
+
+reputation
+
+known vulnerabilities
+
+license
+
+size
+
+alternatives
+```
+
+No agregar dependencias para resolver problemas triviales que puedan manejarse de forma segura con capacidades existentes.
+
+---
+
+# 55. Vulnerabilidades de dependencias
+
+Debe existir revisión periódica de dependencias.
+
+Herramientas del ecosistema pueden incluir:
+
+```bash
+npm audit
+```
+
+Los hallazgos deben evaluarse considerando:
+
+```text
+severity
+
+exploitability
+
+application context
+
+direct vs transitive dependency
+
+available remediation
+
+compatibility impact
+```
+
+No ejecutar automáticamente:
+
+```text
+major upgrades
+
+forced audit fixes
+```
+
+sin revisar impacto.
+
+Snapshot actual de `npm audit --audit-level=high`:
+
+```text
+5 vulnerabilities: 4 high, 1 moderate
+
+deepmerge-ts < 8.0.0
+→ high severity
+→ transitive through @prisma/config / Prisma tooling
+
+fast-uri
+→ high severity
+
+qs
+→ moderate severity
+```
+
+El arreglo forzado propone instalar `prisma@6.12.0` con cambio rompedor. No se
+ejecuta `npm audit fix --force`; el hallazgo queda clasificado como
+dependency/security maintenance before RC. No se afirma exploitability ni
+impacto runtime sin análisis separado.
+
+---
+
+# 56. Archivos y documentos
+
+Cuando Zaping permita uploads deberán evaluarse:
+
+```text
+maximum size
+
+allowed MIME types
+
+content verification
+
+safe file names
+
+authorization
+
+tenant ownership
+
+storage isolation
+
+malware scanning when risk justifies it
+
+download authorization
+```
+
+No confiar únicamente en extensión o nombre enviado por cliente.
+
+---
+
+# 57. Integraciones externas
+
+Toda integración es un trust boundary.
+
+Debe evaluarse:
+
+```text
+authentication
+
+authorization
+
+credentials
+
+tenant context
+
+data sent
+
+data received
+
+input validation
+
+retry behavior
+
+logging
+
+timeouts
+
+availability
+
+failure handling
+```
+
+Una integración no debe poder operar fuera del tenant autorizado.
+
+---
+
+# 58. Public API
+
+Una futura Public API deberá incorporar:
+
+```text
+dedicated authentication
+
+scopes
+
+rate limits
+
+versioning
+
+revocation
+
+audit
+
+documentation
+
+compatibility policy
+```
+
+Una API key no debe representar permiso ilimitado por defecto.
+
+---
+
+# 59. Separación por ambientes
+
+Deben distinguirse:
+
+```text
+development
+
+test
+
+staging
+
+production
+```
+
+No reutilizar indiscriminadamente:
+
+```text
+production database
+
+production credentials
+
+production secrets
+
+production tokens
+```
+
+en ambientes de desarrollo.
+
+---
+
+# 60. Datos de prueba
+
+Preferir:
+
+```text
+fictional data
+
+sanitized data
+
+purpose-built QA fixtures
+```
+
+en ambientes no productivos.
+
+No copiar datos sensibles reales únicamente por conveniencia.
+
+---
+
+# 61. Seguridad frontend
+
+Frontend no debe almacenar secretos de servidor.
+
+Toda variable expuesta al navegador debe considerarse públicamente visible.
+
+Evitar:
+
+```text
+private API secrets
+
+database credentials
+
+JWT secrets
+
+internal service credentials
+```
+
+en bundles frontend.
+
+También deben evitarse logs innecesarios de tokens o información sensible.
+
+---
+
+# 62. XSS
+
+Todo contenido externo debe tratarse como dato.
+
+Evitar renderizar HTML arbitrario.
+
+No utilizar:
+
+```text
+dangerouslySetInnerHTML
+```
+
+sin una necesidad explícita y sanitización adecuada.
+
+Dado que el JWT actual vive en `localStorage`, la prevención de XSS es especialmente relevante para la seguridad de sesión.
+
+---
+
+# 63. CSRF
+
+Con el almacenamiento actual de JWT, CSRF no presenta exactamente el mismo modelo de riesgo que una autenticación automática basada en cookies.
+
+Si en el futuro se utilizan cookies para autenticación, deberán evaluarse conjuntamente:
+
+```text
+HttpOnly
+
+Secure
+
+SameSite
+
+CSRF token or equivalent controls
+```
+
+La estrategia de sesión y la estrategia CSRF deben diseñarse como un conjunto.
+
+---
+
+# 64. Redirects y URLs externas
+
+No confiar en URLs proporcionadas por usuario sin validación.
+
+Deben evitarse:
+
+```text
+open redirects
+
+unsafe schemes
+
+unvalidated external destinations
+```
+
+cuando representen un riesgo.
+
+---
+
+# 65. Exportaciones
+
+Las exportaciones deben respetar:
+
+```text
+tenant
+
+authorization
+
+filters
+
+data sensitivity
+```
+
+Un usuario no debe poder exportar información que normalmente no puede consultar.
+
+---
+
+# 66. Reportes y Dashboard
+
+Reports y Dashboard deben aplicar las mismas reglas de acceso que los datos operacionales.
+
+```text
+aggregation
+≠
+permission bypass
+```
+
+Un indicador agregado puede seguir siendo información sensible.
+
+---
+
+# 67. Cuentas administrativas
+
+Las cuentas administrativas requieren protección especial.
+
+Evitar:
+
+```text
+shared accounts
+
+generic admin users
+
+common passwords
+
+unnecessary ADMIN privileges
+```
+
+Cada persona debe utilizar su propia identidad.
+
+---
+
+# 68. Infraestructura productiva
+
+Antes de producción deben evaluarse como mínimo:
+
+```text
+network exposure
+
+firewall
+
+database access
+
+TLS
+
+secret storage
+
+backup
+
+monitoring
+
+logging
+
+patching
+
+administrative access
+
+deployment permissions
+```
+
+La topología concreta deberá documentarse al formalizar producción.
+
+---
+
+# 69. Observabilidad de seguridad
+
+La plataforma debe poder detectar progresivamente:
+
+```text
+repeated login failures
+
+authorization failures
+
+administrative operations
+
+unexpected tenant access attempts
+
+critical lifecycle operations
+
+configuration changes
+
+security-related errors
+```
+
+No es necesario construir un SIEM para el MVP.
+
+Sí debe existir suficiente información para investigar incidentes.
+
+---
+
+# 70. Gestión de incidentes
+
+Ante sospecha de incidente:
+
+```text
+Detect
+↓
+Contain
+↓
+Investigate
+↓
+Correct
+↓
+Recover
+↓
+Document
+↓
+Prevent recurrence
+```
+
+Acciones pueden incluir:
+
+```text
+revoke access
+
+disable users
+
+rotate secrets
+
+isolate services
+
+restore data
+
+inspect logs
+
+apply patches
+```
+
+---
+
+# 71. Gestión de vulnerabilidades
+
+Una vulnerabilidad no debe ocultarse.
+
+Debe registrarse y priorizarse.
+
+Clasificación orientativa:
+
+```text
+Critical
+
+High
+
+Medium
+
+Low
+```
+
+Critical y High requieren atención prioritaria.
+
+El nivel debe considerar no solo severidad teórica sino también:
+
+```text
+exposure
+
+exploitability
+
+data affected
+
+tenant impact
+
+business impact
+```
+
+---
+
+# 72. Testing de seguridad
+
+Áreas críticas deben incluir pruebas específicas cuando corresponda.
+
+Ejemplos:
+
+```text
+missing token
+
+invalid token
+
+expired token
+
+inactive User
+
+unauthorized role
+
+cross-tenant resource
+
+UUID manipulation
+
+forbidden DTO field
+
+invalid relationship
+
+sensitive response fields
+
+public endpoint abuse protections
+```
+
+---
+
+# 73. Revisión de seguridad antes de release
 
 Una release relevante debe revisar:
 
-* autenticación;
-* autorización;
-* multi-tenancy;
-* secretos;
-* migraciones;
-* dependencias;
-* exposición de endpoints;
-* datos sensibles.
+```text
+authentication
 
-No todas las releases necesitan pentesting formal.
+authorization
 
-La profundidad debe ser proporcional al riesgo.
+tenant isolation
+
+public endpoints
+
+secrets
+
+migration impact
+
+dependencies
+
+sensitive data exposure
+
+error handling
+
+session behavior
+```
+
+La profundidad depende del riesgo.
+
+No todas las releases requieren un pentest formal.
+
+Una release candidata a producción sí requiere una evaluación sustancialmente más profunda que una entrega local.
 
 ---
 
-# 68. Seguridad en el Definition of Done
+# 74. Seguridad en Definition of Done
 
-Una funcionalidad no puede considerarse terminada si deja una vulnerabilidad conocida crítica dentro de su propio alcance.
+Una funcionalidad no se considera terminada si introduce una vulnerabilidad crítica conocida dentro de su alcance.
 
-El Definition of Done debe incluir, cuando corresponda:
+Cuando corresponda, Definition of Done debe incluir:
 
-* autorización;
-* tenant;
-* validación;
-* datos sensibles;
-* logs;
-* auditoría.
+```text
+authentication
+
+authorization
+
+tenant isolation
+
+DTO validation
+
+mass-assignment protection
+
+sensitive data review
+
+logging review
+
+audit facts
+
+security tests
+```
 
 ---
 
-# 69. Deuda de seguridad
+# 75. Deuda de seguridad
 
-Cuando una mejora de seguridad no pueda implementarse inmediatamente debe registrarse explícitamente.
+La deuda debe documentarse explícitamente.
 
 Debe conocerse:
 
-* riesgo;
-* impacto;
-* workaround;
-* prioridad.
+```text
+risk
 
-La deuda de seguridad no debe esconderse dentro de comentarios o conversaciones.
+impact
+
+priority
+
+mitigation
+
+desired resolution
+```
+
+No debe mantenerse únicamente en:
+
+```text
+comments
+
+chat conversations
+
+tribal knowledge
+```
+
+La fuente operativa es:
+
+```text
+PROJECT_BOARD.md
+```
 
 ---
 
-# 70. Prioridades actuales de seguridad
+# 76. Prioridades actuales de seguridad
 
-Para la etapa actual del proyecto, las prioridades principales son:
+## P0 — Release Blockers
 
-1. aislamiento multi-tenant;
-2. autenticación JWT correcta;
-3. RBAC;
-4. protección de endpoints;
-5. no exposición de información sensible;
-6. validación de DTOs;
-7. protección de secretos;
-8. auditoría;
-9. pruebas de autorización;
-10. endurecimiento progresivo previo a producción.
+```text
+1. Basic rate limiting / abuse protection for authentication endpoints
+
+2. Production secret and configuration review
+
+3. Real password-recovery email delivery/configuration verification
+
+4. Dependency/security maintenance before RC
+```
 
 ---
 
-# 71. Seguridad antes de producción
+## P1 — Hardening
+
+```text
+session / token strategy
+
+refresh / revocation
+
+frontend protected-route hardening
+
+business audit foundation
+
+dependency security review
+
+security observability
+
+CORS / environment-specific hardening
+```
+
+---
+
+## Future
+
+```text
+permission-based RBAC
+
+MFA
+
+advanced anomaly detection
+
+enterprise session controls
+
+SIEM integrations
+
+advanced security analytics
+```
+
+---
+
+# 77. Seguridad antes de producción
 
 Antes del primer entorno productivo deben revisarse como mínimo:
 
-* secretos;
-* JWT;
-* contraseñas;
-* permisos;
-* multi-tenancy;
-* CORS;
-* HTTPS;
-* base de datos;
-* backups;
-* logs;
-* dependencias;
-* manejo de errores;
-* endpoints públicos;
-* rate limiting de autenticación;
-* auditoría;
-* recuperación de contraseña;
-* datos sensibles;
-* configuraciones de producción.
+```text
+JWT configuration
+
+session/token strategy
+
+tenant isolation
+
+authorization
+
+public endpoint protection
+
+rate limiting
+
+CORS
+
+HTTPS
+
+database exposure
+
+database credentials
+
+secrets
+
+backups
+
+restore procedure
+
+logs
+
+dependency vulnerabilities
+
+error handling
+
+data sensitivity
+
+Healthcare boundary
+
+production configuration
+
+verified recovery sender/domain and real email E2E
+
+monitoring
+
+incident response
+```
+
+No debe asumirse que una aplicación funcional está lista para producción únicamente porque:
+
+```text
+tests pass
+```
 
 ---
 
-# 72. Principio final
+# 78. Principios que no deben romperse
 
-La seguridad de Zaping depende de múltiples capas.
+## Authentication
 
 ```text
-Usuario
-↓
-Autenticación
-↓
-Autorización
-↓
-Tenant
-↓
-Validación
-↓
-Reglas de negocio
-↓
-Persistencia
-↓
-Auditoría
+Protected operation
+→ authenticated identity
 ```
 
-Ninguna capa individual es suficiente por sí sola.
+---
 
-El objetivo es construir una plataforma en la que cada usuario pueda confiar en que:
+## Authorization
 
-> su información pertenece a su empresa, solo las personas correctas pueden acceder a ella y las operaciones críticas permanecen protegidas y trazables.
+```text
+Authenticated
+≠
+Authorized
+```
+
+---
+
+## Tenant
+
+```text
+Company A
+≠
+Company B data access
+```
+
+---
+
+## UUID
+
+```text
+UUID
+≠
+Authorization
+```
+
+---
+
+## Passwords
+
+```text
+Password
+→ never plaintext at rest
+```
+
+---
+
+## Secrets
+
+```text
+Secret
+→ never committed
+```
+
+---
+
+## Input
+
+```text
+Client input
+→ untrusted
+```
+
+---
+
+## Historical Operations
+
+```text
+Confirmed history
+→ no silent rewrite
+```
+
+---
+
+## Healthcare
+
+```text
+Operational Healthcare
+≠
+Clinical record by default
+```
+
+---
+
+## Failure Mode
+
+```text
+Uncertain authorization
+→ DENY
+```
+
+---
+
+# 79. Documentación relacionada
+
+## Architecture
+
+```text
+docs/architecture/ARCHITECTURE.md
+```
+
+## Engineering
+
+```text
+docs/engineering/ENGINEERING_GUIDE.md
+
+docs/engineering/DEVELOPMENT_WORKFLOW.md
+
+docs/engineering/QUALITY_STANDARDS.md
+
+docs/engineering/API_GUIDELINES.md
+```
+
+## Project
+
+```text
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+## Modules
+
+```text
+docs/modules/erp/
+
+docs/modules/healthcare/
+```
+
+---
+
+# 80. Principio final
+
+La seguridad de Zaping depende de múltiples controles.
+
+```text
+User
+↓
+Authentication
+↓
+Authorization
+↓
+Tenant Isolation
+↓
+Validation
+↓
+Business Rules
+↓
+Persistence
+↓
+Audit / Observability
+```
+
+Ninguna capa individual es suficiente.
+
+La prioridad es que:
+
+```text
+identity is trustworthy
+
+permissions are explicit
+
+tenant boundaries are enforced
+
+inputs are untrusted
+
+sensitive information is minimized
+
+critical operations preserve integrity
+
+security failures deny access safely
+```

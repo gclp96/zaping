@@ -1,9 +1,9 @@
 # Arquitectura de Zaping
 
-**Producto:** Zaping
-**Versión:** 2.0.0
+**Producto:** Zaping Platform
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Última actualización:** 2026-08-19
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping Architecture Team
 
 ---
@@ -14,13 +14,25 @@ Este documento describe la arquitectura técnica vigente y la dirección arquite
 
 Su objetivo es explicar:
 
-* cómo está organizada la plataforma;
-* qué responsabilidades existen;
-* cómo se relacionan los dominios;
-* cuáles son los límites principales;
-* qué tecnologías forman parte actualmente del sistema;
-* qué reglas arquitectónicas deben respetarse;
-* y cómo puede evolucionar la plataforma sin sobreingeniería.
+```text
+cómo está organizada la plataforma;
+
+qué responsabilidades existen;
+
+cómo se relacionan los dominios;
+
+cuáles son sus límites;
+
+qué tecnologías forman parte actualmente del sistema;
+
+qué reglas arquitectónicas deben respetarse;
+
+qué está implementado actualmente;
+
+qué pertenece a la arquitectura objetivo;
+
+y cómo puede evolucionar Zaping sin sobreingeniería.
+```
 
 Las razones detrás de decisiones arquitectónicas específicas se documentan mediante ADR.
 
@@ -30,28 +42,56 @@ Las razones detrás de decisiones arquitectónicas específicas se documentan me
 
 Este documento cubre la arquitectura general de:
 
-* Zaping Platform;
-* Zaping ERP Core;
-* Zaping Healthcare;
-* frontend;
-* backend;
-* persistencia;
-* APIs;
-* seguridad;
-* multi-tenancy;
-* inventario;
-* integraciones;
-* despliegue;
-* y evolución futura.
+```text
+Zaping Platform
+Zaping ERP Core
+Zaping Healthcare
+
+Frontend
+Backend
+Persistencia
+APIs
+Seguridad
+Multi-tenancy
+Inventory
+Equipment
+Integraciones
+Deployment
+Evolución futura
+```
 
 No reemplaza:
 
-* `PRODUCT_REQUIREMENTS.md`;
-* documentación específica de módulos;
-* ADR;
-* `SECURITY_PRINCIPLES.md`;
-* `API_GUIDELINES.md`;
-* `ZAPING_WAY.md`.
+```text
+PRODUCT_VISION.md
+PRODUCT_REQUIREMENTS.md
+PROJECT_BOARD.md
+ROADMAP.md
+SECURITY_PRINCIPLES.md
+API_GUIDELINES.md
+ZAPING_WAY.md
+documentación específica de módulos
+ADR
+```
+
+Responsabilidades principales:
+
+```text
+ARCHITECTURE.md
+→ arquitectura vigente y dirección técnica
+
+ADR
+→ por qué se tomó una decisión
+
+PROJECT_BOARD.md
+→ estado actual de implementación
+
+ROADMAP.md
+→ dirección futura del producto
+
+docs/modules/
+→ comportamiento funcional específico
+```
 
 ---
 
@@ -85,175 +125,305 @@ Las decisiones técnicas deben facilitar la evolución del producto sin introduc
 
 # 4. Principios arquitectónicos
 
-Zaping utiliza los siguientes principios.
-
 ## Business First
 
 Las reglas del negocio tienen prioridad sobre conveniencias técnicas.
 
+---
+
 ## Modular Monolith
 
-Los dominios viven actualmente dentro de una aplicación modular desplegable como unidad.
+Los dominios viven actualmente dentro de una aplicación modular desplegable como una unidad principal.
+
+---
 
 ## Multi-Tenant
 
-La plataforma atiende múltiples Companies manteniendo aislamiento lógico.
+Zaping atiende múltiples Companies manteniendo aislamiento lógico entre tenants.
+
+---
 
 ## API First
 
-Las capacidades empresariales deben poder consumirse mediante contratos independientes de una interfaz concreta.
+Las capacidades empresariales deben poder consumirse mediante contratos backend independientes de una interfaz concreta.
+
+---
 
 ## Layered Architecture
 
-Las responsabilidades deben separarse mediante capas pragmáticas.
+Las responsabilidades se separan mediante capas pragmáticas.
+
+---
 
 ## Domain Ownership
 
-Cada dominio es propietario de sus reglas.
+Cada dominio es propietario de sus reglas y de la interpretación de su información.
+
+---
 
 ## Security by Design
 
-Autenticación, autorización, tenant y protección de datos forman parte del diseño.
+Autenticación, autorización, tenant isolation y protección de datos forman parte del diseño.
+
+---
 
 ## Documentation First
 
-Las decisiones relevantes deben comprenderse y documentarse antes de comprometer la implementación.
+Las decisiones relevantes deben comprenderse y documentarse antes de comprometer una implementación importante.
+
+---
 
 ## Event Ready
 
-La arquitectura puede incorporar eventos de dominio cuando aporten valor sin exigir una infraestructura distribuida.
+La arquitectura puede incorporar eventos de dominio cuando aporten valor sin exigir una arquitectura distribuida.
+
+---
 
 ## Simplicity First
 
-No se introducen patrones, servicios o infraestructura sin una necesidad concreta.
+No se introducen patrones, servicios, capas o infraestructura sin una necesidad concreta.
 
 ---
 
 # 5. Arquitectura conceptual de producto
 
-La visión de plataforma es:
+La estructura conceptual vigente es:
 
 ```text
-                     Zaping Platform
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-          ERP Core                Verticales
-              │                         │
-              │                   Healthcare
-              │
-              ├───────────────┐
-              │               │
-            Radar       Business Intelligence
-              │               │
-              └───────┬───────┘
-                      │
-                     AI
+Zaping Platform
+│
+├── Zaping ERP Core
+│   └── capacidades empresariales reutilizables
+│
+├── Zaping Healthcare
+│   └── vertical especializada inicial
+│
+├── Zaping Radar
+│   └── inteligencia de oportunidades externas
+│
+└── Zaping AI
+    └── capa futura de inteligencia
 ```
 
-Los canales pueden evolucionar hacia:
+Relación principal:
+
+```text
+Zaping Healthcare
+↓
+consume
+↓
+Zaping ERP Core
+```
+
+Healthcare no reemplaza al ERP Core.
+
+Radar puede integrarse con ERP cuando exista valor, pero mantiene identidad propia.
+
+AI será una capa consumidora de información confiable, no una fuente primaria de verdad.
+
+---
+
+# 6. Canales
+
+Actualmente:
 
 ```text
 Web Application
+```
+
+Puede evolucionar posteriormente hacia:
+
+```text
 Customer Portal
-Mobile Application
+Mobile Applications
 Public API
 External Integrations
 ```
 
-No todos estos componentes están implementados actualmente.
+No todos estos canales están implementados.
 
-El diagrama representa la dirección conceptual de la plataforma.
+Los canales deben consumir las mismas capacidades de negocio.
+
+No deben crear reglas independientes por interfaz.
 
 ---
 
-# 6. Arquitectura técnica actual
+# 7. Arquitectura técnica actual
 
-La arquitectura principal actual sigue:
+La arquitectura implementada actualmente sigue:
 
 ```text
 Browser
    ↓
 Next.js Frontend
+web/
    ↓
-REST API
+REST + JWT
    ↓
 NestJS Backend
+app/api/
    ↓
-Application / Domain Logic
+Application / Domain Coordination
    ↓
-Prisma
+Prisma ORM
    ↓
 PostgreSQL
 ```
 
-La aplicación se mantiene como un **Modular Monolith**.
+El backend continúa como:
+
+> **Modular Monolith**
 
 ---
 
-# 7. Stack tecnológico actual
+# 8. Snapshot técnico implementado
 
 ## Frontend
 
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
+`web/app` utiliza Next.js App Router.
 
-## Backend
+Route groups principales:
 
-* NestJS
-* Node.js
-* TypeScript
+```text
+(public)
+→ login
+→ register
+→ forgot-password
 
-## Persistencia
+(app)
+→ rutas autenticadas del ERP
+→ AppShell compartido
+```
 
-* PostgreSQL
-* Prisma ORM
+`AppShell` contiene:
 
-## Autenticación
+```text
+Header
+Sidebar desktop
+navegación móvil
+active navigation state
+layout autenticado común
+```
 
-* JWT
-* Passport
-* bcrypt
-
-## Validación
-
-* class-validator
-* class-transformer
-
-## Infraestructura de desarrollo
-
-* Docker
-* variables de entorno
-
-Las tecnologías futuras deben incorporarse únicamente cuando exista una necesidad arquitectónica o de producto clara.
+Los route groups no forman parte de la URL pública.
 
 ---
 
-# 8. Capas del sistema
+## Backend
+
+`app/api` contiene el monolito modular NestJS.
+
+Módulos relevantes actuales:
+
+```text
+Auth
+Users
+Companies
+Dashboard
+
+Customers
+Suppliers
+
+Categories
+Products
+Inventory
+
+Quotes
+Sales
+
+Purchases
+Purchase Receipts
+
+Equipment
+
+Healthcare Cases
+```
+
+La implementación concreta puede continuar evolucionando sin modificar el principio de Modular Monolith.
+
+---
+
+# 9. Stack tecnológico actual
+
+## Frontend
+
+```text
+Next.js
+React
+TypeScript
+Tailwind CSS
+Vitest
+```
+
+## Backend
+
+```text
+NestJS
+Node.js
+TypeScript
+Jest
+Passport JWT
+PDFKit
+```
+
+## Persistencia
+
+```text
+PostgreSQL
+Prisma ORM
+```
+
+## Autenticación
+
+```text
+JWT
+Passport
+bcrypt
+```
+
+## Validación
+
+```text
+class-validator
+class-transformer
+ValidationPipe
+```
+
+## Infraestructura de desarrollo
+
+```text
+Docker
+Docker Compose
+variables de entorno
+```
+
+Nuevas tecnologías deben incorporarse únicamente cuando exista una necesidad técnica o de producto demostrable.
+
+---
+
+# 10. Capas del sistema
 
 La separación conceptual es:
 
 ```text
 Presentation
-      ↓
+↓
 Application
-      ↓
+↓
 Domain
-      ↓
+↓
 Infrastructure
-      ↓
+↓
 Persistence
 ```
 
 Estas capas representan responsabilidades.
 
-No es obligatorio crear una carpeta física por cada capa en cada módulo.
+No es obligatorio crear una carpeta física diferente para cada capa dentro de cada módulo.
 
 ---
 
-# 9. Presentation Layer
+# 11. Presentation Layer
 
 Responsable de interacción con usuarios o consumidores externos.
 
@@ -261,83 +431,147 @@ Actualmente incluye principalmente:
 
 ```text
 Next.js Web Application
-REST Controllers
+NestJS REST Controllers
 ```
 
-Futuros consumidores pueden incluir:
+Futuros consumidores:
 
-* Customer Portal;
-* Mobile App;
-* Public API;
-* integraciones.
+```text
+Customer Portal
+Mobile Apps
+Public API
+External Integrations
+```
 
-La presentación no debe ser propietaria de reglas centrales del negocio.
+Presentation no debe ser propietaria de reglas centrales del negocio.
 
 ---
 
-# 10. Application Layer
+# 12. Application Layer
 
 Coordina casos de uso.
 
-Ejemplos:
+Ejemplos actuales:
 
 ```text
 Create Purchase
+
 Register Purchase Receipt
+
 Create Quote
+
+Create / Approve Sale
+
+Inspect Equipment
+
+Retire Equipment
+
+Cancel Healthcare Case
+```
+
+Ejemplos de arquitectura objetivo:
+
+```text
 Confirm Delivery
+
 Prepare Case
+
+Dispatch Case
+
 Reconcile Case
 ```
 
-Actualmente gran parte de esta responsabilidad vive en los Services de NestJS.
+Gran parte de esta responsabilidad vive actualmente en Services de NestJS.
 
-La capa de aplicación puede:
+La Application Layer puede:
 
-* coordinar dominios;
-* validar precondiciones;
-* abrir transacciones;
-* invocar contratos públicos.
+```text
+coordinar módulos;
+
+validar precondiciones;
+
+orquestar operaciones;
+
+abrir o participar en transacciones;
+
+invocar servicios de dominio;
+
+invocar capacidades públicas de otros módulos.
+```
 
 ---
 
-# 11. Domain Layer
+# 13. Domain Layer
 
-Contiene las reglas que definen el comportamiento empresarial.
+Contiene reglas que definen comportamiento empresarial.
 
-Ejemplos:
+Ejemplos actuales:
 
-* disponibilidad de inventario;
-* cantidades pendientes de recepción;
-* lifecycle de documentos;
-* reglas de entrega;
-* conciliación de Case;
-* trazabilidad por lote.
+```text
+cantidad pendiente de Purchase Receipt
+
+Product lot tracking
+
+Sales eligibility
+
+Equipment lifecycle
+
+Equipment condition
+
+Current Equipment Availability
+
+entity lifecycle
+
+folio allocation rules
+```
+
+Ejemplos Target:
+
+```text
+Delivery allocation
+
+Case Availability
+
+Case reconciliation
+
+Custody rules
+
+Healthcare dispatch rules
+```
 
 El dominio debe permanecer conceptualmente independiente de detalles de interfaz.
 
 ---
 
-# 12. Infrastructure Layer
+# 14. Infrastructure Layer
 
-Contiene capacidades técnicas necesarias para ejecutar el sistema.
+Contiene capacidades técnicas necesarias para operar el sistema.
 
 Ejemplos:
 
-* autenticación;
-* email;
-* almacenamiento;
-* logging;
-* configuración;
-* servicios externos;
-* Docker;
-* adapters futuros.
+```text
+authentication
 
-Infraestructura no debe determinar las reglas fundamentales del negocio.
+configuration
+
+email future
+
+storage future
+
+logging
+
+external services
+
+Docker
+
+future adapters
+```
+
+Infrastructure no debe determinar reglas fundamentales del negocio.
 
 ---
 
-# 13. Persistence Layer
+# 15. Persistence Layer
 
 Actualmente:
 
@@ -347,144 +581,235 @@ Prisma
 PostgreSQL
 ```
 
-Responsable de:
+Responsable técnico de:
 
-* persistencia;
-* relaciones;
-* constraints;
-* índices;
-* migraciones;
-* transacciones.
+```text
+persistencia
+relaciones
+constraints
+indexes
+migrations
+transactions
+```
 
-La capacidad técnica de acceder a una tabla no significa tener propiedad arquitectónica sobre ella.
+Principio:
+
+```text
+Technical DB access
+≠
+Domain ownership
+```
+
+Que un módulo pueda acceder técnicamente a una tabla no significa que sea propietario de sus reglas.
 
 ---
 
-# 14. Arquitectura backend
+# 16. Arquitectura backend
 
-La dirección general es:
+Dirección general:
 
 ```text
 Controller
-    ↓
-Service
-    ↓
-Prisma / Repository cuando aporta valor
-    ↓
+↓
+Service / Domain Capability
+↓
+Prisma / Repository when useful
+↓
 PostgreSQL
 ```
 
 Repository es opcional.
 
-No debe introducirse una capa únicamente para cumplir una estructura predeterminada.
+No debe introducirse únicamente para cumplir una estructura artificial.
 
 ---
 
-# 15. Controllers
+## Controllers
 
-Los Controllers deben principalmente:
+Deben principalmente:
 
-* recibir requests;
-* resolver parámetros;
-* aplicar Guards;
-* aplicar decoradores;
-* delegar;
-* devolver respuestas.
+```text
+recibir requests
 
-No deben contener lógica compleja de negocio.
+resolver parámetros
+
+aplicar Guards
+
+aplicar decoradores
+
+validar boundary HTTP
+
+delegar
+
+devolver respuestas
+```
+
+No deben contener lógica de negocio compleja.
 
 ---
 
-# 16. Services
+## Services
 
-Los Services son actualmente la principal capa de coordinación.
+Actualmente son la principal capa de coordinación backend.
 
 Pueden contener:
 
-* casos de uso;
-* validaciones;
-* reglas;
-* coordinación;
-* transacciones;
-* llamadas permitidas a otros módulos.
+```text
+use cases
 
-Cuando un Service crece excesivamente debe evaluarse si existen responsabilidades diferentes que deben separarse.
+business validation
+
+coordination
+
+transactions
+
+tenant-scoped persistence
+
+calls to other allowed module capabilities
+```
+
+Cuando un Service crece excesivamente debe evaluarse si contiene varias responsabilidades.
 
 ---
 
-# 17. Repository
+## Repositories
 
-Repository puede utilizarse cuando proporciona:
+Pueden introducirse cuando proporcionen:
 
-* aislamiento de persistencia;
-* reutilización de queries;
-* claridad;
-* testabilidad.
+```text
+persistence isolation
 
-No es obligatorio para todos los módulos.
+query reuse
 
-Prisma puede utilizarse directamente desde Services cuando esto mantenga responsabilidades claras.
+clarity
+
+testability
+
+complex data access encapsulation
+```
+
+No son obligatorios para todos los módulos.
+
+Prisma puede utilizarse directamente desde Services cuando el ownership y las responsabilidades sigan siendo claros.
+
+---
+
+# 17. Comunicación entre módulos
+
+La dirección preferida es utilizar capacidades explícitas de módulo.
+
+Conceptualmente:
+
+```text
+Module A
+↓
+public capability / service contract
+↓
+Module B
+```
+
+en lugar de:
+
+```text
+Module A
+↓
+arbitrary writes to Module B internals
+```
+
+Sin embargo, Zaping es actualmente un Modular Monolith.
+
+Algunas operaciones transaccionales coordinan varios dominios usando Prisma dentro de una misma transacción cuando esto es necesario para mantener atomicidad.
+
+Ejemplo real:
+
+```text
+PurchaseReceiptsService
+↓
+Receipt
+Inventory
+Equipment provisioning
+Purchase status
+```
+
+Principio:
+
+> **La coordinación transaccional compartida es válida cuando el ownership de cada regla permanece claro.**
+
+A medida que los límites maduren, deben preferirse capacidades públicas de módulo sobre dependencia indiscriminada de estructuras internas.
 
 ---
 
 # 18. Arquitectura frontend
 
-La dirección conceptual del frontend es:
+Dirección conceptual:
 
 ```text
 Pages / Routes
-      ↓
+↓
 Features
-      ↓
+↓
 Business Components
-      ↓
+↓
 UI Components
 ```
 
-Layouts y elementos compartidos pueden participar transversalmente.
+Layouts y componentes compartidos pueden participar transversalmente.
 
 ---
 
-# 19. Pages
+## Pages / Routes
 
-Las páginas organizan:
+Responsables de:
 
-* routing;
-* composición;
-* contexto;
-* estructura del workflow.
+```text
+routing
+composition
+page context
+workflow structure
+```
 
-No deben acumular toda la lógica de interacción ni reglas empresariales.
+No deben acumular toda la lógica de interacción.
 
 ---
 
-# 20. Features
+## Features
 
-Una Feature representa una capacidad funcional.
+Representan capacidades funcionales.
 
-Puede contener:
+Pueden contener:
 
-* hooks;
-* formularios;
-* lógica de interacción;
-* componentes específicos;
-* tipos;
-* integración con API.
+```text
+hooks
+forms
+interaction logic
+feature components
+types
+API integration
+```
 
-Ejemplos:
+Ejemplos actuales:
 
 ```text
 Purchase Form
 Receipt Registration
+Sale Creation
+Equipment Inspection
+Equipment Retirement
+```
+
+Ejemplos futuros:
+
+```text
 Case Preparation
 Delivery Confirmation
+Case Reconciliation
 ```
 
 ---
 
-# 21. Business Components
+## Business Components
 
-Representan componentes reutilizables con conocimiento empresarial controlado.
+Componentes reutilizables con conocimiento empresarial controlado.
 
 Ejemplos:
 
@@ -498,9 +823,9 @@ MoneyInput
 
 ---
 
-# 22. UI Components
+## UI Components
 
-Representan componentes visuales genéricos.
+Componentes visuales genéricos.
 
 Ejemplos:
 
@@ -510,7 +835,7 @@ Modal
 Input
 Table
 Badge
-LoadingSpinner
+Loading
 ConfirmDialog
 ```
 
@@ -518,126 +843,149 @@ No deben conocer reglas específicas de dominio.
 
 ---
 
-# 23. Arquitectura modular
+# 19. Arquitectura modular
 
-El backend se organiza mediante módulos orientados a capacidades de negocio.
+El backend se organiza mediante módulos orientados a capacidades empresariales.
 
-El objetivo no es replicar tablas.
+Principio:
+
+```text
+Module
+≠
+Database table
+```
 
 Un módulo existe porque posee una responsabilidad empresarial.
 
 ---
 
-# 24. Dominios principales
+# 20. Dominios principales
 
-La arquitectura reconoce actualmente o contempla los siguientes dominios principales:
+| Dominio | Responsabilidad |
+|---|---|
+| Auth / Identity | autenticación e identidad |
+| Companies | contexto de tenant |
+| Customers | clientes |
+| Suppliers | proveedores |
+| Products | catálogo |
+| Inventory | stock, lotes y movimientos |
+| Purchases | abastecimiento |
+| Purchase Receipts | recepción física de compras |
+| Equipment | identidad y ciclo de vida de activos físicos |
+| Quotes | cotización comercial |
+| Sales | proceso comercial V1 actual |
+| Returns | devolución comercial futura/evolutiva |
+| Dashboard | lectura operacional |
+| Healthcare | logística especializada de Cases |
+| Billing | facturación futura |
+| Radar | inteligencia externa |
+| AI | inteligencia futura |
 
-| Dominio         | Responsabilidad principal            |
-| --------------- | ------------------------------------ |
-| Auth / Identity | autenticación e identidad            |
-| Companies       | contexto de tenant                   |
-| Customers       | clientes                             |
-| Suppliers       | proveedores                          |
-| Products        | catálogo de productos                |
-| Purchases       | abastecimiento                       |
-| Inventory       | existencias y trazabilidad           |
-| Quotes / Sales  | proceso comercial                    |
-| Returns         | devoluciones                         |
-| Dashboard       | lectura y contexto operacional       |
-| Healthcare      | Case Logistics                       |
-| Equipment       | activos reutilizables especializados |
-| Billing         | facturación futura                   |
-| Radar           | inteligencia externa                 |
-| AI              | inteligencia futura                  |
+El estado exacto de implementación vive en:
 
-El estado concreto de implementación se registra en `PROJECT_BOARD.md`, no en este documento.
+```text
+docs/project/PROJECT_BOARD.md
+```
 
 ---
 
-# 25. Propiedad de dominio
+# 21. Domain Ownership
 
-Cada dominio debe controlar sus reglas.
+Cada dominio controla sus reglas.
 
-Ejemplo:
+## Inventory
+
+Responsabilidades principales:
 
 ```text
-Inventory
-├── stock
-├── movimientos
-├── lotes
-├── series
-└── disponibilidad
+Product.stock projection
+
+InventoryMovement
+
+InventoryBatch
+
+lot quantities
+
+inventory traceability
 ```
 
-Otros dominios pueden solicitar operaciones a Inventory.
+No debe considerarse propietario directo de:
 
-No deben modificar directamente sus estructuras evitando las reglas correspondientes.
+```text
+Equipment lifecycle
+
+Equipment condition
+
+Current Equipment Availability
+
+Healthcare Assignment
+
+Healthcare Custody
+```
 
 ---
 
-# 26. Comunicación entre módulos
+## Equipment
 
-Preferir:
-
-```text
-Purchases
-↓
-Inventory Contract
-↓
-Inventory
-```
-
-sobre:
+Responsable de:
 
 ```text
-Purchases
-↓
-Direct Prisma access to Inventory internals
+EquipmentAsset identity
+
+assetCode
+
+serialNumber
+
+lifecycle
+
+condition
+
+origin
+
+inspection history
+
+retirement
+
+Current Availability
 ```
-
-La misma regla aplica entre:
-
-* Sales e Inventory;
-* Healthcare e Inventory;
-* Healthcare y Sales;
-* Billing y Sales;
-* otros dominios.
 
 ---
 
-# 27. Modular Monolith
+## Healthcare
 
-Zaping se despliega inicialmente como una unidad lógica principal.
+Responsable futuro de:
 
 ```text
-Zaping Backend
-│
-├── Auth
-├── Customers
-├── Products
-├── Purchases
-├── Inventory
-├── Sales
-├── Healthcare
-└── ...
+Equipment Requirements
+
+Case Equipment Assignment
+
+Case Availability
+
+Preparation
+
+Dispatch
+
+Custody
+
+Return
+
+Case reconciliation
+
+Case calendar
 ```
 
-Esto permite:
+Healthcare consume `EquipmentAsset`.
 
-* transacciones locales;
-* debugging sencillo;
-* infraestructura reducida;
-* desarrollo rápido.
-
-Los límites modulares continúan siendo obligatorios aunque exista una base de datos compartida.
+No lo redefine.
 
 ---
 
-# 28. Base de datos compartida
+# 22. Base de datos compartida
 
-Los módulos pueden compartir PostgreSQL.
+Los módulos comparten PostgreSQL.
 
-Sin embargo:
+Principio:
 
 ```text
 Shared Database
@@ -647,42 +995,33 @@ Shared Domain Ownership
 
 Prisma proporciona acceso técnico.
 
-La arquitectura determina quién puede modificar qué información.
+La arquitectura define quién posee cada regla.
 
 ---
 
-# 29. Multi-tenancy
+# 23. Multi-tenancy
 
 Zaping utiliza arquitectura multi-tenant.
 
 Conceptualmente:
 
 ```text
-Zaping
-│
+Zaping Platform
+
 ├── Company A
-│
 ├── Company B
 └── Company C
 ```
 
+`Company` representa la raíz del tenant.
+
 Las entidades empresariales pertenecen a una Company directa o indirectamente.
-
-El aislamiento debe aplicarse en:
-
-* consultas;
-* mutaciones;
-* relaciones;
-* reportes;
-* exportaciones;
-* dashboards;
-* documentos.
 
 ---
 
-# 30. Contexto del tenant
+# 24. Contexto del tenant
 
-El tenant debe derivarse principalmente del usuario autenticado.
+El tenant se deriva principalmente del usuario autenticado.
 
 ```text
 JWT
@@ -694,13 +1033,85 @@ companyId
 Business Operation
 ```
 
-Un `companyId` enviado por frontend no debe convertirse en la autoridad de seguridad.
+Un `companyId` enviado arbitrariamente por frontend no debe convertirse en autoridad de seguridad.
 
 ---
 
-# 31. Identificadores
+## Estado actual
 
-Las entidades principales utilizan UUID como identificadores técnicos.
+Los módulos normalizados y workflows nuevos aplican tenant scoping mediante:
+
+```text
+companyId
+```
+
+Sin embargo, todavía existe deuda relacionada con:
+
+```text
+legacy tenant-safe write hardening
+
+systematic cross-tenant regression coverage
+```
+
+Por tanto, la arquitectura no declara aislamiento perfecto ya demostrado en toda la base histórica.
+
+---
+
+# 25. Autenticación y autorización
+
+Flujo actual:
+
+```text
+Authorization: Bearer <JWT>
+↓
+Passport JWT
+↓
+JwtAuthGuard
+↓
+request.user
+↓
+companyId / role
+↓
+business operation
+```
+
+`RolesGuard` existe.
+
+Actualmente se utiliza explícitamente en algunos dominios, incluyendo Healthcare Cases.
+
+No debe interpretarse como un sistema granular de permisos completamente implementado para toda la plataforma.
+
+---
+
+# 26. Validación HTTP
+
+La API utiliza globalmente `ValidationPipe` con:
+
+```text
+whitelist = true
+
+forbidNonWhitelisted = true
+
+transform = true
+```
+
+DTOs se utilizan en los límites HTTP.
+
+Principio:
+
+```text
+Structural validation
+→ boundary / DTO
+
+Complex business validation
+→ domain / service
+```
+
+---
+
+# 27. Identificadores
+
+Las entidades principales utilizan UUID como identidad técnica.
 
 Ejemplo:
 
@@ -712,61 +1123,75 @@ Los documentos pueden utilizar además folios legibles.
 
 ```text
 UUID
-→ identidad técnica
+→ technical identity
 
 OC-000421
-→ identidad de negocio
+→ business identity
 ```
+
+Otros ejemplos:
+
+```text
+V-000001
+CASE-000001
+EQ-000001
+```
+
+Los folios no sustituyen UUID como identidad técnica.
 
 ---
 
-# 32. Ciclo de vida de entidades
+# 28. Ciclo de vida de entidades
 
 No existe Soft Delete universal.
 
 La estrategia depende del tipo de entidad.
 
-Conceptualmente:
-
 ```text
 Master Data
 → ACTIVE / INACTIVE
 
-Transactional Document
-→ DRAFT / CONFIRMED / CANCELLED
+Transactional Documents
+→ explicit lifecycle states
 
-Historical Event
-→ IMMUTABLE
+Historical Events
+→ preserve history
 
 Temporary Data
-→ EXPIRE / DELETE
+→ delete / expire when appropriate
 ```
 
-La decisión completa se encuentra en ADR-012.
+La estrategia completa se documenta mediante ADR-012.
 
 ---
 
-# 33. Arquitectura de inventario
+# 29. Arquitectura de inventario
 
-Inventario se basa en operaciones trazables.
+Inventory se basa en operaciones trazables.
 
 ```text
 Business Event
 ↓
-Inventory Movement
+InventoryMovement
 ↓
 Balance / Projection
 ```
 
-`Product.stock` puede funcionar como proyección optimizada mientras siga siendo necesario.
+`Product.stock` funciona actualmente como una proyección operacional optimizada.
 
-No debe tratarse como una entrada independiente editable libremente.
+No debe tratarse como:
+
+```text
+freely editable source of truth
+```
+
+Los cambios de stock deben provenir de operaciones controladas.
 
 ---
 
-# 34. Entrada de inventario
+# 30. Compras y Recepciones
 
-El flujo correcto de abastecimiento es:
+La arquitectura vigente es:
 
 ```text
 Purchase
@@ -776,7 +1201,7 @@ PurchaseReceipt
 Inventory IN
 ```
 
-Por lo tanto:
+Principio:
 
 ```text
 Purchase
@@ -784,13 +1209,33 @@ Purchase
 Inventory IN
 ```
 
+Confirmar una Purchase no significa recibir físicamente mercancía.
+
 ---
 
-# 35. Recepciones parciales
+## Recepción física
+
+Una creación válida de `PurchaseReceipt` representa el evento físico.
+
+```text
+Valid PurchaseReceipt creation
+↓
+InventoryMovement IN
+```
+
+No existe actualmente un lifecycle adicional de:
+
+```text
+PurchaseReceipt CONFIRMED
+```
+
+La creación válida del Receipt es la operación relevante.
+
+---
+
+## Recepciones parciales
 
 Una Purchase puede tener múltiples Purchase Receipts.
-
-Conceptualmente:
 
 ```text
 Ordered
@@ -800,33 +1245,400 @@ Received
 Pending
 ```
 
-La recepción confirmada representa el evento físico.
-
----
-
-# 36. Trazabilidad
-
-Inventory debe poder evolucionar para rastrear:
+Estados de Purchase:
 
 ```text
-Receipt
+CONFIRMED
 ↓
-Batch / Serial
+PARTIALLY_RECEIVED
 ↓
-Inventory
-↓
-Delivery / Consumption / Return
+RECEIVED
 ```
 
 ---
 
-# 37. Flujo comercial objetivo
+# 31. Purchase Receipt Transaction Boundary
 
-La arquitectura comercial objetivo es:
+Una creación válida de Purchase Receipt puede coordinar atómicamente:
+
+```text
+Idempotency claim
+
++
+
+PurchaseReceipt
+
++
+
+PurchaseReceiptItems
+
++
+
+InventoryBatch when applicable
+
++
+
+Equipment provisioning for ASSET Products
+
++
+
+Product.stock update
+
++
+
+InventoryMovement IN
+
++
+
+Purchase status recalculation
+```
+
+Estas mutaciones se ejecutan dentro de una transacción Prisma cuando forman parte de la misma operación.
+
+Principio:
+
+```text
+critical partial failure
+→ transaction rollback
+```
+
+---
+
+# 32. Lot Tracking
+
+Product define:
+
+```text
+ProductLotTracking
+
+NONE
+OPTIONAL
+REQUIRED
+```
+
+Purchase Receipts aplica actualmente estas reglas.
+
+Conceptualmente:
+
+```text
+NONE
+→ no lot data
+
+OPTIONAL
+→ lot optional
+
+REQUIRED
+→ lot required
+```
+
+`InventoryBatch` representa existencia asociada a lote cuando corresponde.
+
+---
+
+# 33. SERIALIZED y ASSET
+
+Debe mantenerse:
+
+```text
+SERIALIZED
+≠
+ASSET
+```
+
+## SERIALIZED
+
+Representa inventario unitario serializado que no necesariamente es un activo reutilizable.
+
+Su semántica operacional completa todavía debe evolucionar.
+
+---
+
+## ASSET
+
+Representa identidad física persistente mediante:
+
+```text
+EquipmentAsset
+```
+
+Especialmente útil para equipos reutilizables.
+
+Ambos conceptos pueden utilizar números de serie, pero pertenecen a workflows diferentes.
+
+---
+
+# 34. Equipment Core
+
+`EquipmentAsset` pertenece a ERP/Core.
+
+Representa:
+
+```text
+qué unidad física exacta existe
+```
+
+y no únicamente:
+
+```text
+qué Product/modelo es
+```
+
+---
+
+## Modelo conceptual
+
+```text
+EquipmentAsset
+├── assetCode
+├── Product
+├── serialNumber
+├── lifecycle
+├── condition
+├── origin
+├── batch when applicable
+├── purchaseReceiptItem when applicable
+└── operational history
+```
+
+No debe agregarse directamente por conveniencia:
+
+```text
+currentCase
+custodian
+doctorId
+hospitalId
+```
+
+si esos hechos pertenecen al dominio Healthcare.
+
+---
+
+# 35. Equipment Lifecycle
+
+Actualmente:
+
+```text
+ACTIVE
+RETIRED
+```
+
+`RETIRED` es terminal.
+
+Retirement:
+
+```text
+≠ DELETE
+```
+
+La identidad física e historia del Equipment se conservan.
+
+---
+
+# 36. Equipment Condition
+
+Actualmente:
+
+```text
+GOOD
+INSPECTION_PENDING
+DAMAGED
+OUT_OF_SERVICE
+```
+
+Principio:
+
+```text
+Lifecycle
+≠
+Condition
+```
+
+Un activo puede ser:
+
+```text
+ACTIVE + DAMAGED
+```
+
+o:
+
+```text
+RETIRED + DAMAGED
+```
+
+Lifecycle y Condition representan dimensiones distintas.
+
+---
+
+# 37. Equipment Inspection
+
+Inspection representa una operación explícita.
+
+Conceptualmente:
+
+```text
+EquipmentAsset.condition
+↓
+Inspection
+↓
+new EquipmentAsset.condition
+```
+
+Inspection preserva historia y actor.
+
+Principio:
+
+```text
+Inspection
+→ changes Condition
+
+Inspection
+≠
+direct Availability flag
+```
+
+---
+
+# 38. Current Equipment Availability
+
+Current Availability está implementado como valor derivado.
+
+Actualmente utiliza:
+
+```text
+EquipmentAsset.lifecycle
+EquipmentAsset.condition
+```
+
+Reglas:
+
+```text
+ACTIVE + GOOD
+→ available
+
+ACTIVE + INSPECTION_PENDING
+→ unavailable
+
+ACTIVE + DAMAGED
+→ unavailable
+
+ACTIVE + OUT_OF_SERVICE
+→ unavailable
+
+RETIRED
+→ unavailable
+```
+
+Availability:
+
+```text
+derived
+not manually persisted
+```
+
+Principio:
+
+```text
+Condition
+≠
+Availability
+```
+
+---
+
+# 39. Purchase Receipt → EquipmentAsset
+
+Para:
+
+```text
+Product.inventoryTracking = ASSET
+```
+
+una Purchase Receipt puede aprovisionar:
+
+```text
+quantityReceived = N
+↓
+N EquipmentAsset
+```
+
+Los activos creados utilizan:
+
+```text
+lifecycle = ACTIVE
+
+condition = INSPECTION_PENDING
+
+origin = PURCHASE_RECEIPT
+```
+
+Equipment provisioning:
+
+```text
+does not increment stock again
+
+does not create one InventoryMovement per asset
+```
+
+El Receipt sigue siendo propietario de la mutación de inventario.
+
+---
+
+# 40. Sales — arquitectura actual
+
+Debe distinguirse claramente entre:
+
+```text
+CURRENT
+```
+
+y:
+
+```text
+TARGET
+```
+
+---
+
+## CURRENT — ERP Core V1
+
+Actualmente:
 
 ```text
 Quote
-↓
+↓ optional
+Sale
+```
+
+Para Sales genéricas compatibles:
+
+```text
+Create Sale
+→ DRAFT
+→ no Inventory OUT
+
+Approve Sale
+→ CONFIRMED
+→ Product.stock decrement
+→ InventoryMovement OUT
+
+Cancel DRAFT
+→ CANCELLED
+→ no Inventory OUT
+```
+
+Esta es la implementación vigente.
+
+---
+
+# 41. Sales — arquitectura objetivo
+
+**Estado:** TARGET
+
+La arquitectura objetivo futura es:
+
+```text
+Quote
+↓ optional
 SalesOrder
 ↓
 Delivery
@@ -834,53 +1646,61 @@ Delivery
 Inventory OUT
 ```
 
-Quote es opcional cuando el negocio permite una venta directa.
+Esta arquitectura todavía no sustituye la implementación actual `Sale`.
 
 ---
 
-# 38. SalesOrder
+## SalesOrder
 
-SalesOrder representa:
+Representa:
 
-> compromiso comercial.
+> **compromiso comercial**
 
 No representa:
 
-> salida física.
+> **salida física**
 
 ---
 
-# 39. Delivery
+## Delivery
 
-Delivery representa:
+Representa:
 
-> cumplimiento físico definitivo.
+> **cumplimiento físico definitivo**
 
-Una SalesOrder puede tener varias Deliveries.
+Una SalesOrder puede tener múltiples Deliveries.
 
-Esto permite entregas parciales.
+Esto permite:
+
+```text
+partial deliveries
+pending quantities
+batch allocation
+```
 
 ---
 
-# 40. Inventory OUT
+## Target Inventory OUT
 
-La salida definitiva ocurre cuando existe el evento físico aprobado.
-
-Conceptualmente:
+En la arquitectura objetivo:
 
 ```text
 Delivery CONFIRMED
 ↓
-Inventory Movement OUT
+InventoryMovement OUT
 ```
 
-No simplemente al confirmar un pedido.
+No simplemente:
+
+```text
+SalesOrder confirmed
+```
 
 ---
 
-# 41. Facturación
+# 42. Facturación
 
-Arquitectónicamente:
+Arquitectura objetivo:
 
 ```text
 SalesOrder
@@ -890,77 +1710,289 @@ Delivery
 Invoice
 ```
 
-Facturación puede ocurrir en momentos diferentes dependiendo del proceso comercial.
+Facturación y fulfillment físico son responsabilidades diferentes.
 
-La integración fiscal será diseñada como una capacidad específica.
+La integración fiscal será diseñada como un dominio/capacidad específica.
 
 ---
 
-# 42. Arquitectura Healthcare
+# 43. Returns
 
-Healthcare extiende ERP Core mediante procesos especializados.
+Returns representa devoluciones comerciales.
 
-No debe reemplazar las capacidades genéricas.
+Su implementación histórica/evolutiva no debe mezclarse con Healthcare Case Return.
 
-Conceptualmente:
+Arquitectura objetivo:
+
+```text
+DeliveryItem
+↓
+ReturnItem
+```
+
+en lugar de profundizar permanentemente:
+
+```text
+SaleItem
+↓
+ReturnItem
+```
+
+Returns operacional completo permanece como evolución posterior.
+
+---
+
+# 44. Arquitectura Healthcare
+
+Healthcare extiende ERP Core.
 
 ```text
 ERP Core
-        │
-        └── Healthcare
+↑
+Healthcare orchestration
 ```
 
-Una venta normal no requiere Case.
+Una operación comercial normal no requiere Healthcare Case.
+
+Healthcare no debe contaminar módulos genéricos con conceptos médicos específicos.
 
 ---
 
-# 43. Case
+# 45. Healthcare — Current
 
-`Case` representa el contexto operacional de un procedimiento Healthcare.
-
-Puede relacionarse con:
-
-* médico;
-* hospital;
-* técnico;
-* fecha;
-* material;
-* equipo;
-* oportunidad;
-* venta;
-* pagador.
-
----
-
-# 44. Case Logistics
-
-El flujo conceptual es:
+Actualmente existe:
 
 ```text
-Case
+HealthcareCase Foundation
+```
+
+Incluye:
+
+```text
+id
+companyId
+folio
+title
+procedureDescription
+status
+scheduledStart
+scheduledEnd
+responsibleUser
+creation audit
+cancellation audit
+```
+
+Estados actuales:
+
+```text
+DRAFT
+SCHEDULED
+CANCELLED
+```
+
+HealthcareCase Foundation no incluye todavía:
+
+```text
+Hospital
+Doctor
+Requirements
+Equipment Assignment
+Case Availability
+CaseKit
+Dispatch
+Custody
+Return
+Reconciliation
+```
+
+---
+
+# 46. Healthcare — Target
+
+La arquitectura objetivo Healthcare incorpora:
+
+```text
+HealthcareCase
+├── Hospital
+├── Doctor
+├── Requirements
+├── Equipment Assignment
+├── Case Availability
+├── CaseKit
+├── Dispatch
+├── Custody
+├── Return
+├── Reconciliation
+├── Calendar
+└── commercial references
+```
+
+Estos conceptos no deben interpretarse como implementados únicamente porque aparecen en la arquitectura objetivo.
+
+---
+
+# 47. Healthcare Actors
+
+Deben mantenerse separados:
+
+```text
+Doctor
+Hospital
+Customer
+Payer
+Technician
+```
+
+No debe asumirse:
+
+```text
+Customer
+=
+Hospital
+=
+Doctor
+=
+Payer
+```
+
+Representan responsabilidades empresariales diferentes.
+
+---
+
+# 48. Healthcare Requirements
+
+Target:
+
+```text
+HealthcareCase
+↓
+Requirements
+```
+
+Requirements representa:
+
+```text
+qué necesita el Case
+```
+
+y puede incluir:
+
+```text
+Products / Materials
+Equipment requirements
+```
+
+Requirement:
+
+```text
+≠
+physical Assignment
+```
+
+---
+
+# 49. Equipment Assignment
+
+Target Healthcare:
+
+```text
+HealthcareCase
++
+EquipmentAsset
+↓
+Case Equipment Assignment
+```
+
+Assignment representa:
+
+```text
+selección de una unidad física para un Case
+```
+
+Principio:
+
+```text
+EquipmentAsset
+→ Core identity
+
+Case Equipment Assignment
+→ Healthcare relationship
+```
+
+No duplicar EquipmentAsset.
+
+---
+
+# 50. Case Availability
+
+Current Equipment Availability responde:
+
+```text
+Can this asset be used now
+according to Core Equipment facts?
+```
+
+Case Availability deberá responder:
+
+```text
+Can this asset be used
+for this specific Case
+at this time?
+```
+
+Podrá considerar:
+
+```text
+Current Equipment Availability
+Assignment conflicts
+Case schedule
+Custody
+Maintenance
+Calibration
+Turnaround
+```
+
+Case Availability pertenece a Healthcare.
+
+---
+
+# 51. Case Logistics
+
+**Estado:** TARGET
+
+Flujo conceptual:
+
+```text
+Healthcare Case
+↓
+Requirements
 ↓
 Preparation
 ↓
 CaseKit
 ↓
-CaseDispatch
+Assignment
+↓
+Dispatch
 ↓
 Custody
 ↓
 Procedure
 ↓
-CaseReturn
+Return
 ↓
 Inspection
 ↓
 Reconciliation
 ```
 
+No todos estos dominios están implementados actualmente.
+
 ---
 
-# 45. Custodia
+# 52. Custodia Healthcare
 
-Una salida hacia un Case no significa automáticamente una salida definitiva de inventario.
+Una salida de almacén hacia un Case:
 
 ```text
 Warehouse
@@ -968,7 +2000,7 @@ Warehouse
 Technician Custody
 ```
 
-El material puede continuar siendo propiedad de la Company.
+no significa necesariamente transferencia de propiedad ni consumo definitivo.
 
 Por tanto:
 
@@ -978,11 +2010,19 @@ CaseDispatch
 Customer Delivery
 ```
 
+y:
+
+```text
+CaseDispatch
+≠
+Definitive Inventory OUT
+```
+
 ---
 
-# 46. Conciliación Healthcare
+# 53. Healthcare Reconciliation
 
-La conciliación determina el destino final.
+Target:
 
 ```text
 Dispatched
@@ -994,13 +2034,21 @@ Returned
 Unresolved
 ```
 
-El material utilizado puede generar posteriormente una operación comercial y salida definitiva.
+Reconciliation determina el destino final del material.
+
+Material usado puede generar posteriormente la consecuencia comercial apropiada.
+
+Debe evitarse:
+
+```text
+double Inventory decrement
+```
 
 ---
 
-# 47. Ubicación, custodia y propiedad
+# 54. Location, Custody, Availability y Ownership
 
-La arquitectura distingue:
+Estos conceptos deben mantenerse separados:
 
 ```text
 Location
@@ -1009,124 +2057,123 @@ Availability
 Ownership
 ```
 
-como conceptos diferentes.
-
-El modelo Prisma definitivo para representar estas dimensiones todavía debe diseñarse antes de implementación.
-
----
-
-# 48. Equipment
-
-El equipo reutilizable debe poder evolucionar hacia activos identificables individualmente.
-
-Conceptualmente:
+Ejemplo:
 
 ```text
-Equipment Asset
-├── serial
-├── status
-├── location
-├── custodian
-├── condition
-└── history
+fuera del almacén
+≠
+vendido
+
+en custodia
+≠
+consumido
+
+GOOD condition
+≠
+available for a Case
 ```
 
-La definición detallada pertenece a Healthcare/Equipment.
+El modelo persistente futuro debe respetar estas diferencias.
 
 ---
 
-# 49. API Architecture
+# 55. API Architecture
 
 La aplicación utiliza REST como interfaz principal entre frontend y backend.
 
 API First significa:
 
-> la capacidad pertenece al backend y puede ser utilizada por múltiples clientes.
+> **La capacidad pertenece al backend y puede ser utilizada por múltiples clientes.**
 
 No significa que todas las APIs sean públicas.
 
 ---
 
-# 50. Application API y Public API
-
-Se distingue entre:
+# 56. Application API vs Public API
 
 ## Application API
 
 Utilizada por aplicaciones oficiales de Zaping.
 
-## Public API
-
-Futura interfaz estable para terceros.
-
-La Public API requerirá adicionalmente:
-
-* versionado;
-* scopes;
-* rate limits;
-* credenciales;
-* documentación;
-* lifecycle.
+Actualmente es la interfaz principal.
 
 ---
 
-# 51. Versionado de API
+## Public API
 
-La documentación histórica proponía:
+Interfaz futura para terceros.
+
+Puede requerir:
+
+```text
+versioning
+scopes
+credentials
+rate limits
+documentation
+compatibility guarantees
+webhooks
+```
+
+---
+
+# 57. Versionado de API
+
+La arquitectura histórica propuso:
 
 ```text
 /api/v1/
 ```
 
-como estándar universal.
+como esquema general.
 
-Esta decisión **no se considera actualmente formalizada para todas las APIs internas**.
+Actualmente no existe una obligación de versionar todas las APIs internas de esta manera.
 
-El versionado será obligatorio cuando exista un contrato externo que requiera estabilidad independiente.
-
-Los lineamientos definitivos se establecerán en `API_GUIDELINES.md`.
-
----
-
-# 52. API orientada al negocio
-
-Los endpoints pueden representar acciones explícitas.
-
-Ejemplo:
+El versionado será especialmente importante cuando existan:
 
 ```text
-POST /purchases/:id/receipts
+external consumers
+stable public contracts
+integration compatibility requirements
 ```
 
-o:
+Los lineamientos específicos pertenecen a:
 
 ```text
-POST /deliveries/:id/confirm
+API_GUIDELINES.md
 ```
 
-cuando expresen mejor el negocio que una operación CRUD genérica.
+---
+
+# 58. APIs orientadas al negocio
+
+Los endpoints pueden representar acciones explícitas cuando expresan mejor el dominio que un CRUD genérico.
+
+Ejemplos actuales:
+
+```text
+POST /purchase-receipts
+
+POST /equipment/:equipmentId/inspections
+
+POST /equipment/:equipmentId/retire
+
+POST /healthcare/cases/:id/cancel
+```
+
+Principio:
+
+```text
+explicit domain operation
+>
+generic PATCH when business meaning matters
+```
 
 ---
 
-# 53. Validación
+# 59. Seguridad
 
-Los límites HTTP deben utilizar DTOs.
-
-Actualmente Zaping utiliza:
-
-* `class-validator`;
-* `class-transformer`;
-* `ValidationPipe`.
-
-La validación estructural pertenece al boundary.
-
-Las reglas complejas pertenecen al dominio.
-
----
-
-# 54. Seguridad
-
-El flujo conceptual de seguridad es:
+Modelo conceptual:
 
 ```text
 Request
@@ -1143,38 +2190,53 @@ Business Rules
 ↓
 Persistence
 ↓
-Audit
+Audit when applicable
 ```
 
-Las capas concretas pueden ejecutarse en distinto orden técnico cuando el framework lo requiera.
+El orden técnico puede variar según framework.
 
-El principio es que ninguna operación crítica dependa de una sola barrera.
+Principio:
+
+> **Ninguna operación crítica debe depender de una única barrera de seguridad.**
 
 ---
 
-# 55. Autenticación
+# 60. Protección de datos
+
+No deben exponerse:
+
+```text
+passwordHash
+secrets
+internal tokens
+data from another tenant
+unnecessary internal details
+stack traces in inappropriate contexts
+```
+
+La deuda histórica de exposición de `passwordHash` en respuestas de autenticación fue corregida.
+
+Las reglas completas viven en:
+
+```text
+SECURITY_PRINCIPLES.md
+```
+
+---
+
+# 61. RBAC
 
 Actualmente:
 
 ```text
-Credentials
+User
 ↓
-Authentication
+Role
 ↓
-JWT
-↓
-Protected Request
+RolesGuard where configured
 ```
 
-La estrategia puede evolucionar sin modificar las reglas fundamentales de autorización.
-
----
-
-# 56. Autorización
-
-Zaping utiliza RBAC como base.
-
-La arquitectura objetivo evoluciona hacia permisos granulares.
+La dirección futura es:
 
 ```text
 User
@@ -1182,97 +2244,166 @@ User
 Role
 ↓
 Permissions
+↓
+Permission-based authorization
 ```
 
-RBAC y tenant son controles diferentes.
+RBAC y tenant isolation son controles diferentes.
+
+Un usuario puede tener un rol correcto y aun así no tener derecho a datos de otra Company.
 
 ---
 
-# 57. Protección de datos
+# 62. Datos Healthcare
 
-No deben exponerse:
-
-* `passwordHash`;
-* secretos;
-* tokens internos;
-* información de otro tenant;
-* stack traces;
-* detalles internos innecesarios.
-
-Las reglas completas se encuentran en `SECURITY_PRINCIPLES.md`.
-
----
-
-# 58. Datos Healthcare
-
-Zaping Healthcare no debe convertirse inicialmente en un Electronic Medical Record.
-
-La plataforma debe guardar solamente la información necesaria para logística, operación y proceso comercial.
-
-Información clínica sensible requiere evaluación específica antes de incorporarse.
-
----
-
-# 59. Transacciones
-
-Las operaciones que producen múltiples efectos inseparables deben ejecutarse atómicamente.
-
-Ejemplo:
+Zaping Healthcare no debe convertirse inicialmente en:
 
 ```text
-PurchaseReceipt
+Electronic Medical Record
+```
+
+Healthcare Case Foundation evita:
+
+```text
+patient identifiers
+diagnosis
+medical history
+clinical notes
+clinical record fields
+```
+
+Información clínica sensible requiere análisis específico de:
+
+```text
+privacy
+security
+regulation
+business necessity
+```
+
+antes de incorporarse.
+
+---
+
+# 63. Transacciones
+
+Operaciones con múltiples efectos inseparables deben ejecutarse atómicamente.
+
+Ejemplo actual:
+
+```text
+Purchase Receipt
+
+Idempotency claim
++
+Receipt
 +
 ReceiptItems
 +
-InventoryBatch
+Batch
++
+Equipment provisioning when applicable
++
+Stock
 +
 InventoryMovement
 +
-Stock
+Purchase status
 ```
 
-Si falla una operación crítica, la transacción debe revertirse.
+Principio:
+
+```text
+all critical effects succeed
+or
+rollback
+```
 
 ---
 
-# 60. Idempotencia
+# 64. Idempotencia
 
-Las operaciones confirmables que puedan repetirse por:
+Operaciones susceptibles a retry, doble click o pérdida de respuesta deben evitar efectos duplicados cuando el riesgo lo justifique.
 
-* retry;
-* doble click;
-* red;
+## Current
 
-deben evitar producir efectos duplicados.
+Purchase Receipts implementa:
 
-Especialmente:
+```text
+Idempotency-Key
+```
 
-* Receipts;
-* Deliveries;
-* Dispatches;
-* Returns;
-* Reconciliations;
-* operaciones financieras.
+con:
+
+```text
+tenant-scoped key
+request hash
+replay
+conflict detection
+transactional protection
+```
 
 ---
 
-# 61. Integridad histórica
+## Deuda actual
 
-Eventos confirmados no deben reescribirse para ocultar errores.
+```text
+Sale create
+→ idempotency pending
+
+Healthcare Case create
+→ idempotency pending
+```
+
+---
+
+## Target
+
+Deberá evaluarse idempotencia para:
+
+```text
+Delivery
+Dispatch
+Return
+Reconciliation
+financial commands
+other high-impact operations
+```
+
+---
+
+# 65. Integridad histórica
+
+Eventos confirmados no deben reescribirse silenciosamente para ocultar errores.
 
 Preferir:
 
 ```text
 Original Event
 +
-Compensating Event
+Compensating / Corrective Event
 ```
 
-sobre modificar silenciosamente la historia.
+sobre:
+
+```text
+silent historical mutation
+```
+
+Esto será especialmente importante para:
+
+```text
+Inventory
+Receipts
+Deliveries
+Returns
+Billing
+Audit
+```
 
 ---
 
-# 62. Dashboard y lectura
+# 66. Dashboard
 
 Dashboard es principalmente consumidor de información.
 
@@ -1280,17 +2411,21 @@ No debe convertirse en propietario de reglas empresariales.
 
 Puede utilizar:
 
-* agregaciones;
-* read models;
-* consultas optimizadas.
+```text
+aggregations
+read models
+optimized queries
+```
+
+para presentar contexto operacional.
 
 ---
 
-# 63. Read Models
+# 67. Read Models
 
-Cuando los workflows crezcan puede resultar útil construir representaciones optimizadas para lectura.
+Cuando los workflows crezcan pueden utilizarse representaciones optimizadas para lectura.
 
-Ejemplos futuros:
+Ejemplos:
 
 ```text
 Action Dashboard
@@ -1298,35 +2433,41 @@ Warehouse Operations
 Case Calendar
 Customer 360
 Product 360
+Case 360
 ```
 
-Estas vistas pueden combinar múltiples dominios sin apropiarse de sus reglas.
+Read Models pueden combinar varios dominios.
+
+No se apropian de sus reglas.
 
 ---
 
-# 64. Workspaces
+# 68. Workspaces
 
 Un Workspace representa una experiencia orientada a tareas.
 
-Ejemplo:
+Ejemplo futuro:
 
 ```text
 Warehouse Operations
 ```
 
-puede mostrar:
+Puede reunir:
 
-* compras por recibir;
-* Cases por preparar;
-* Deliveries;
-* Returns;
-* incidencias.
+```text
+Purchase Receipts
+Case Preparation
+Deliveries
+Returns
+Equipment
+Inventory alerts
+```
 
-No necesita convertirse en un nuevo dominio backend.
+sin convertirse necesariamente en un nuevo dominio backend.
 
 ---
 
-# 65. Eventos de dominio
+# 69. Eventos de dominio
 
 Zaping está preparado conceptualmente para utilizar Domain Events.
 
@@ -1334,67 +2475,98 @@ Ejemplos:
 
 ```text
 PurchaseReceived
+EquipmentRetired
 DeliveryConfirmed
 CaseReconciled
 ```
 
-Los eventos pueden inicialmente ejecutarse dentro del mismo proceso.
+Pueden inicialmente ejecutarse:
+
+```text
+inside the same process
+```
 
 ---
 
-# 66. Event Driven no es requisito actual
+# 70. Event Driven no es requisito actual
 
-Zaping **no adopta actualmente** una arquitectura distribuida basada en eventos.
+Zaping no adopta actualmente una arquitectura distribuida basada en eventos.
 
-No existe una obligación arquitectónica de introducir:
+No existe obligación de utilizar:
 
-* Kafka;
-* RabbitMQ;
-* message brokers;
-* event sourcing.
+```text
+Kafka
+RabbitMQ
+message brokers
+event sourcing
+```
 
-Se utilizarán únicamente si una necesidad futura lo justifica.
-
----
-
-# 67. Integraciones externas
-
-La arquitectura puede evolucionar hacia integraciones con:
-
-* SAT / CFDI;
-* email;
-* almacenamiento;
-* paqueterías;
-* sistemas contables;
-* APIs de clientes;
-* portales de licitaciones;
-* otros proveedores.
-
-Cada integración constituye un límite de confianza.
+Se introducirán únicamente si una necesidad concreta lo justifica.
 
 ---
 
-# 68. Radar
+# 71. Integraciones externas
 
-Zaping Radar representa una capacidad de inteligencia externa.
+La arquitectura puede evolucionar hacia:
 
-Puede requerir arquitectónicamente:
+```text
+SAT / CFDI
 
-* jobs;
-* conectores;
-* procesamiento asíncrono;
-* normalización de fuentes;
-* alertas.
+email
 
-Su despliegue independiente se decidirá cuando exista una necesidad concreta.
+storage
+
+carriers
+
+accounting systems
+
+customer APIs
+
+supplier APIs
+
+public procurement sources
+```
+
+Cada integración constituye un trust boundary.
+
+Debe considerar:
+
+```text
+authentication
+authorization
+retries
+failure handling
+observability
+audit where appropriate
+```
 
 ---
 
-# 69. AI
+# 72. Zaping Radar
 
-Zaping AI será una capa consumidora de información.
+Radar representa inteligencia sobre información externa.
 
-Conceptualmente:
+Puede requerir:
+
+```text
+source connectors
+jobs
+asynchronous processing
+normalization
+alerts
+saved searches
+document processing
+```
+
+Su topología de deployment independiente se decidirá cuando exista evidencia operativa.
+
+Radar no debe acoplarse directamente al modelo transaccional del ERP.
+
+---
+
+# 73. Zaping AI
+
+AI será una capa consumidora de información confiable.
 
 ```text
 Operational Systems
@@ -1406,37 +2578,101 @@ Context
 AI
 ```
 
-AI no debe convertirse en fuente de verdad para operaciones empresariales críticas.
+AI:
+
+```text
+≠
+source of truth
+```
+
+y:
+
+```text
+≠
+authorization bypass
+```
+
+Toda acción futura asistida por AI deberá respetar:
+
+```text
+Identity
+Tenant
+Permissions
+Domain Rules
+Audit when required
+```
 
 ---
 
-# 70. Performance
+# 74. Performance
 
-La arquitectura debe evitar problemas conocidos como:
+La arquitectura debe evitar problemas conocidos:
 
-* N+1 queries;
-* colecciones sin paginación cuando crecen;
-* consultas sin índices necesarios;
-* procesamiento repetido;
-* payloads excesivos.
+```text
+N+1 queries
 
-No se debe optimizar sin medir.
+unbounded collections
 
-Los objetivos de rendimiento del PRD son referencias iniciales, no SLO productivos formales.
+missing indexes
+
+repeated processing
+
+oversized payloads
+
+unnecessary round trips
+```
+
+Principio:
+
+> **No optimizar sin medir.**
+
+Los objetivos de rendimiento de producto no son automáticamente SLOs productivos formales.
 
 ---
 
-# 71. Caching
+# 75. Paginación
+
+Listados que puedan crecer deben evolucionar hacia:
+
+```text
+backend pagination
+server-side filtering
+server-side search
+```
+
+Actualmente algunos módulos todavía dependen de:
+
+```text
+client-side filtering
+loaded-list deep-link resolution
+```
+
+Esto se mantiene como deuda arquitectónica de escalabilidad.
+
+---
+
+# 76. Caching
 
 Caching puede incorporarse cuando exista una necesidad demostrable.
 
-No debe agregarse automáticamente a operaciones cuyo comportamiento correcto depende de información altamente mutable sin una estrategia de invalidación clara.
+No debe utilizarse indiscriminadamente en información altamente mutable sin una estrategia de invalidación clara.
+
+Especial atención a:
+
+```text
+Inventory
+Equipment Availability
+Case Availability
+financial balances
+```
 
 ---
 
-# 72. Escalabilidad
+# 77. Escalabilidad
 
-La estrategia inicial de escalamiento puede mantener varias instancias del mismo backend:
+El Modular Monolith puede escalar inicialmente mediante múltiples instancias de la misma aplicación.
+
+Conceptualmente:
 
 ```text
 Load Balancer
@@ -1448,30 +2684,32 @@ Load Balancer
 
 cuando la infraestructura futura lo requiera.
 
-No es necesario dividir dominios para conseguir escalamiento horizontal básico.
+No es necesario dividir dominios en microservicios para conseguir escalamiento horizontal básico.
 
 ---
 
-# 73. Observabilidad
+# 78. Observabilidad
 
-La plataforma debe evolucionar progresivamente hacia:
-
-* logs estructurados;
-* métricas;
-* monitoreo;
-* alertas;
-* tracing cuando sea útil.
-
-La infraestructura concreta dependerá del entorno productivo.
-
----
-
-# 74. Logging
-
-Deben distinguirse:
+La plataforma deberá evolucionar hacia:
 
 ```text
-Technical Logs
+structured logs
+metrics
+monitoring
+alerts
+tracing when useful
+```
+
+La infraestructura concreta se definirá al formalizar ambientes productivos.
+
+---
+
+# 79. Logging y Audit
+
+Debe distinguirse:
+
+```text
+Technical Logging
 ```
 
 de:
@@ -1480,27 +2718,83 @@ de:
 Business Audit
 ```
 
-Los logs ayudan a operar el sistema.
+Logs:
 
-Audit preserva acciones relevantes del negocio.
+```text
+→ operate and troubleshoot system
+```
+
+Audit:
+
+```text
+→ preserve relevant business actions
+```
 
 No son intercambiables.
 
 ---
 
-# 75. Deployment
+# 80. Deployment
 
-La arquitectura está diseñada para despliegue cloud-native.
+Actualmente el proyecto utiliza:
 
-Actualmente el proyecto utiliza Docker como parte de su infraestructura técnica.
+```text
+Docker
+Docker Compose
+```
 
-La topología definitiva de producción deberá formalizarse antes del primer despliegue productivo.
+principalmente para infraestructura y desarrollo local.
+
+La arquitectura está preparada para:
+
+```text
+containerized deployment
++
+future cloud environments
+```
+
+No se declara todavía una topología productiva cloud definitiva.
 
 ---
 
-# 76. Configuración
+## Development
 
-La configuración dependiente del entorno debe utilizar variables externas.
+Actualmente:
+
+```text
+Docker / Docker Compose
+Node.js
+PostgreSQL
+Next.js
+NestJS
+```
+
+---
+
+## Production
+
+La topología productiva deberá formalizarse antes de una exposición comercial real.
+
+Debe considerar como mínimo:
+
+```text
+runtime hosting
+database
+secrets
+TLS
+backups
+logging
+monitoring
+deployment strategy
+rollback
+availability
+```
+
+---
+
+# 81. Configuración
+
+Configuración dependiente del entorno debe proporcionarse externamente.
 
 Ejemplos:
 
@@ -1509,11 +2803,11 @@ DATABASE_URL
 JWT_SECRET
 ```
 
-No debe incorporarse configuración sensible al código fuente.
+No deben almacenarse secretos reales en código fuente ni documentación versionada.
 
 ---
 
-# 77. Ambientes
+# 82. Ambientes
 
 La arquitectura debe distinguir progresivamente:
 
@@ -1524,279 +2818,339 @@ staging
 production
 ```
 
-Los secretos y datos no deben compartirse indiscriminadamente entre ellos.
+Cada ambiente debe mantener separación adecuada de:
+
+```text
+data
+credentials
+secrets
+configuration
+```
 
 ---
 
-# 78. Testing
+# 83. Testing
 
 La arquitectura debe permitir pruebas en diferentes niveles.
 
-Según la funcionalidad:
+```text
+unit tests
 
-* unitarias;
-* integración;
-* componentes;
-* E2E;
-* QA manual;
-* regresión.
+integration tests
 
-Las reglas críticas merecen mayor cobertura.
+component tests
 
----
+end-to-end tests
 
-# 79. Áreas de alto riesgo
+manual QA
 
-Se consideran arquitectónicamente sensibles:
+regression
+```
 
-* Authentication;
-* Authorization;
-* Multi-Tenancy;
-* Inventory;
-* Money;
-* Receipts;
-* Deliveries;
-* Returns;
-* Healthcare Custody;
-* Migrations;
-* Billing.
-
-Los cambios en estas áreas requieren controles adicionales.
+Áreas de mayor riesgo requieren mayor cobertura.
 
 ---
 
-# 80. C4 Model
+# 84. Áreas de alto riesgo
 
-La arquitectura utiliza C4 como herramienta de comunicación.
+Se consideran especialmente sensibles:
 
-Se mantendrán:
+```text
+Authentication
+
+Authorization
+
+Multi-Tenancy
+
+Inventory
+
+Money
+
+Purchase Receipts
+
+Equipment provisioning
+
+Deliveries future
+
+Returns
+
+Healthcare Custody
+
+Healthcare Reconciliation
+
+Migrations
+
+Billing
+```
+
+Cambios en estas áreas requieren controles adicionales.
+
+---
+
+# 85. C4 Model
+
+Zaping utiliza C4 como herramienta de comunicación.
+
+Se mantienen cuando aportan valor:
 
 ```text
 C1 — System Context
+
 C2 — Containers
+
 C3 — Components
 ```
 
-cuando aporten valor.
-
 ---
 
-# 81. C4 Level 4
+## C4 Level 4
 
-No se mantendrá un documento manual global de:
-
-```text
-C4 — Code
-```
-
-porque el código cambia con demasiada frecuencia y produciría documentación rápidamente obsoleta.
+No se mantiene un documento manual global de Code Level porque el código cambia con demasiada frecuencia.
 
 El nivel de código se representa mejor mediante:
 
-* source code;
-* module documentation;
-* tests;
-* diagramas específicos cuando sean realmente necesarios.
+```text
+source code
+module documentation
+tests
+focused diagrams when needed
+```
 
 ---
 
-# 82. ADR
+# 86. ADR
 
-Las decisiones arquitectónicas se mantienen en:
+Las decisiones arquitectónicas viven en:
 
 ```text
 docs/architecture/adr/
 ```
 
-`ARCHITECTURE.md` describe el estado vigente.
+Responsabilidad:
 
-ADR explica:
+```text
+ARCHITECTURE.md
+→ what is current / target
 
-> por qué se eligió.
+ADR
+→ why a decision was made
+```
 
-No debe duplicarse todo el contenido de los ADR dentro de este documento.
+El contenido de los ADR no debe duplicarse completamente dentro de este documento.
 
 ---
 
-# 83. Decisiones arquitectónicas vigentes
+# 87. Decisiones arquitectónicas principales
 
-Entre las decisiones principales se encuentran:
+Entre las decisiones relevantes se encuentran:
 
 ```text
 ADR-001  Multi-Tenant
+
 ADR-002  Inventory Movements
-ADR-004  UUID
+
+ADR-004  UUID Strategy
+
 ADR-005  Layered Architecture
+
 ADR-006  API First
+
 ADR-007  RBAC
+
 ADR-008  Documentation First
+
 ADR-009  Modular Monolith
+
 ADR-011  SalesOrder / Delivery
+
 ADR-012  Entity Lifecycle
+
 ADR-013  Inventory Custody / Case Logistics
 ```
 
-ADR-003 y ADR-010 permanecen únicamente por historia después de haber sido reemplazados.
+ADR-003 y ADR-010 se conservan históricamente después de ser superseded.
 
-El índice oficial vive en `architecture/adr/README.md`.
+El índice oficial vive en:
+
+```text
+docs/architecture/adr/README.md
+```
 
 ---
 
-# 84. Evolución arquitectónica
+# 88. Evolución arquitectónica
 
 La evolución no debe seguir un calendario artificial.
 
-La dirección es:
+Dirección:
 
 ```text
 Modular Monolith
-        ↓
-Mejores límites
-        ↓
-Domain Events cuando aporten valor
-        ↓
-Extracción selectiva de servicios
-solo si existe necesidad
+↓
+Clearer Domain Boundaries
+↓
+Domain Events when valuable
+↓
+Selective service extraction
+only when evidence exists
 ```
 
-No existe obligación de llegar a microservicios.
+No existe obligación de evolucionar hacia microservicios.
 
 ---
 
-# 85. Criterios para separar un servicio
+# 89. Criterios para separar servicios
 
-Un dominio puede considerarse candidato cuando exista evidencia como:
+Un dominio puede considerarse candidato a servicio independiente si aparece evidencia como:
 
-* escala independiente;
-* lifecycle independiente;
-* infraestructura diferente;
-* resiliencia específica;
-* boundary estable;
-* equipo independiente;
-* carga especializada.
+```text
+independent scaling
 
-No porque “podría ser útil en el futuro”.
+independent lifecycle
+
+different infrastructure needs
+
+special resilience requirements
+
+stable boundary
+
+independent team ownership
+
+specialized workload
+```
+
+No simplemente porque:
+
+```text
+"it may be useful someday"
+```
 
 ---
 
-# 86. Compatibilidad con nuevas verticales
+# 90. Compatibilidad con verticales
 
-ERP Core debe permanecer suficientemente genérico para permitir otras verticales.
+ERP Core debe permanecer suficientemente genérico para permitir nuevas verticales.
 
 Healthcare debe utilizar contratos del Core.
 
-No debe introducir reglas médicas dentro de módulos genéricos cuando esas reglas pertenecen únicamente a la vertical.
+No debe introducir reglas médicas dentro de módulos empresariales genéricos si esas reglas solo pertenecen a Healthcare.
 
 ---
 
-# 87. Principio de no contaminación
+# 91. Principio de no contaminación
 
 Ejemplo incorrecto:
 
 ```text
-Inventory Product
+Product
 ├── surgeryId
 ├── doctorId
 └── hospitalId
 ```
 
-si esos conceptos únicamente existen para Healthcare.
+si estos conceptos pertenecen exclusivamente a Healthcare.
 
 Preferir:
 
 ```text
-Inventory
+ERP Core
 ↑
 Healthcare relationships / orchestration
 ```
 
-manteniendo separación de dominio.
-
 ---
 
-# 88. Principio de extensibilidad
+# 92. Principio de extensibilidad
 
-Extensible no significa configurable de manera infinita.
+Extensible no significa configurable infinitamente.
 
-La arquitectura debe proporcionar puntos claros de evolución sin convertir todo en:
-
-* plugins;
-* metadata;
-* dynamic schemas;
-* reglas genéricas;
-
-antes de necesitarlo.
-
----
-
-# 89. Deuda arquitectónica
-
-Cuando una implementación temporal contradiga la arquitectura objetivo debe registrarse.
-
-Ejemplo actual:
+No convertir prematuramente la plataforma en:
 
 ```text
-legacy Sale behavior
+plugin framework
+
+metadata-driven engine
+
+dynamic schemas
+
+generic workflow engine
+
+fully configurable rule system
 ```
 
-puede continuar existiendo mientras se prepara la transición hacia ADR-011.
-
-El código existente no debe redefinir silenciosamente la arquitectura futura.
+antes de tener una necesidad real.
 
 ---
 
-# 90. Revisión arquitectónica
+# 93. Deuda arquitectónica
+
+Cuando una implementación temporal contradiga la arquitectura objetivo debe registrarse explícitamente.
+
+Ejemplos actuales:
+
+```text
+legacy Sale
+→ current V1 implementation
+
+SalesOrder + Delivery
+→ target architecture
+```
+
+También:
+
+```text
+Product.stock
++
+EquipmentAsset
+→ reconciliation invariant still pending
+```
+
+y:
+
+```text
+SERIALIZED receipt semantics
+→ not yet fully modeled
+```
+
+La implementación existente no debe redefinir silenciosamente la dirección futura.
+
+---
+
+# 94. Revisión arquitectónica
 
 Cambios que afecten:
 
-* límites de dominio;
-* modelo de inventario;
-* multi-tenancy;
-* seguridad;
-* lifecycle;
-* arquitectura de integración;
-* persistencia fundamental;
+```text
+domain boundaries
 
-deben pasar por revisión arquitectónica y ADR cuando corresponda.
+Inventory model
+
+Equipment identity
+
+multi-tenancy
+
+security
+
+entity lifecycle
+
+integration architecture
+
+fundamental persistence
+
+financial semantics
+
+Healthcare custody
+```
+
+deben pasar por revisión arquitectónica.
+
+ADR debe utilizarse cuando exista una decisión arquitectónica significativa que deba preservarse.
 
 ---
 
-# 91. Documentación relacionada
+# 95. Invariantes arquitectónicas
 
-## Producto
-
-```text
-product/PRODUCT_VISION.md
-product/PRODUCT_REQUIREMENTS.md
-```
-
-## Ingeniería
-
-```text
-engineering/ENGINEERING_GUIDE.md
-engineering/DEVELOPMENT_WORKFLOW.md
-engineering/QUALITY_STANDARDS.md
-engineering/SECURITY_PRINCIPLES.md
-```
-
-## Arquitectura
-
-```text
-architecture/adr/
-architecture/c4/
-```
-
-## Dominios
-
-```text
-modules/
-```
-
----
-
-# 92. Invariantes arquitectónicas
-
-Las siguientes propiedades no deben romperse sin una nueva decisión explícita.
+Estas propiedades no deben romperse sin una decisión explícita.
 
 ## Tenant
 
@@ -1806,14 +3160,18 @@ Company A
 Company B data access
 ```
 
-## Inventario
+---
+
+## Inventory
 
 ```text
 Stock change
-→ traceable operation
+→ traceable controlled operation
 ```
 
-## Compra
+---
+
+## Purchase
 
 ```text
 Purchase
@@ -1821,14 +3179,54 @@ Purchase
 Inventory IN
 ```
 
-## Recepción
+---
+
+## Purchase Receipt — Current
 
 ```text
-PurchaseReceipt CONFIRMED
-→ Inventory IN
+Valid PurchaseReceipt creation
+→ InventoryMovement IN
 ```
 
-## Venta
+---
+
+## Equipment
+
+```text
+Product
+≠
+EquipmentAsset
+```
+
+```text
+Lifecycle
+≠
+Condition
+```
+
+```text
+Condition
+≠
+Availability
+```
+
+---
+
+## Sale — Current
+
+```text
+Sale DRAFT
+→ no Inventory OUT
+```
+
+```text
+Sale approval
+→ InventoryMovement OUT
+```
+
+---
+
+## Sales — Target
 
 ```text
 SalesOrder
@@ -1836,20 +3234,40 @@ SalesOrder
 Inventory OUT
 ```
 
-## Entrega
-
 ```text
 Delivery CONFIRMED
-→ Inventory OUT
+→ InventoryMovement OUT
 ```
 
-## Healthcare
+---
+
+## Healthcare — Target
 
 ```text
 CaseDispatch
 ≠
-Definitive OUT
+Customer Delivery
 ```
+
+```text
+CaseDispatch
+≠
+Definitive Inventory OUT
+```
+
+```text
+Assignment
+≠
+Custody
+```
+
+```text
+Return
+≠
+Available
+```
+
+---
 
 ## Historia
 
@@ -1858,7 +3276,9 @@ Confirmed historical event
 → no silent rewrite
 ```
 
-## Dominios
+---
+
+## Domain Ownership
 
 ```text
 Technical DB access
@@ -1868,43 +3288,157 @@ Domain ownership
 
 ---
 
-# 93. Arquitectura actual vs arquitectura objetivo
+# 96. Current vs Target vs Future
 
-Es importante distinguir tres estados.
+Todo documento arquitectónico debe distinguir:
 
-## Current
+## CURRENT
 
 Funcionalidad realmente implementada.
 
-## Target
+Ejemplos:
 
-Arquitectura aprobada hacia la que está evolucionando el sistema.
+```text
+Purchase Receipt → Inventory IN
 
-## Future
+Sale approval → Inventory OUT
 
-Posibilidad todavía no comprometida.
+EquipmentAsset
 
-Un documento arquitectónico puede describir `Target` sin afirmar que ya se encuentra implementado.
+Current Equipment Availability
 
-El estado operativo concreto debe consultarse en `PROJECT_BOARD.md`.
+HealthcareCase Foundation
+```
 
 ---
 
-# 94. Principio final
+## TARGET
+
+Arquitectura aprobada hacia la que el sistema evoluciona.
+
+Ejemplos:
+
+```text
+SalesOrder + Delivery
+
+Healthcare Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Dispatch / Custody / Return
+
+Healthcare Reconciliation
+```
+
+---
+
+## FUTURE
+
+Posibilidades que todavía requieren suficiente validación.
+
+Ejemplos:
+
+```text
+Microservices
+
+Advanced event infrastructure
+
+Public API
+
+AI automation
+
+multi-region infrastructure
+```
+
+El estado operativo concreto debe consultarse siempre en:
+
+```text
+PROJECT_BOARD.md
+```
+
+---
+
+# 97. Documentación relacionada
+
+## Producto
+
+```text
+docs/product/PRODUCT_VISION.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+```
+
+## Ingeniería
+
+```text
+docs/engineering/ENGINEERING_GUIDE.md
+
+docs/engineering/DEVELOPMENT_WORKFLOW.md
+
+docs/engineering/QUALITY_STANDARDS.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+```
+
+## Arquitectura
+
+```text
+docs/architecture/c4/
+
+docs/architecture/adr/
+```
+
+## Dominios
+
+```text
+docs/modules/erp/
+
+docs/modules/healthcare/
+```
+
+## Estado del proyecto
+
+```text
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+---
+
+# 98. Principio final
 
 La arquitectura de Zaping debe permitir que el producto crezca sin perder claridad.
 
-La dirección es:
+Debe priorizar:
 
 ```text
 Correct Domain Boundaries
+
 +
+
 Traceable Business Operations
+
 +
+
 Secure Multi-Tenancy
+
 +
+
+Explicit Lifecycle
+
++
+
 Simple Infrastructure
+
 +
+
 Stable Contracts
 ```
 
@@ -1912,10 +3446,32 @@ antes que:
 
 ```text
 More Services
+
 +
+
 More Layers
+
 +
+
 More Technologies
+
++
+
+More Infrastructure
 ```
 
-La arquitectura debe volverse más compleja solamente cuando el negocio realmente lo necesite.
+La dirección es:
+
+```text
+Reliable Modular Monolith
+↓
+Clear Domain Boundaries
+↓
+Explicit Business Workflows
+↓
+Healthcare Differentiation
+↓
+Selective Expansion
+↓
+Distributed Complexity only when justified
+```

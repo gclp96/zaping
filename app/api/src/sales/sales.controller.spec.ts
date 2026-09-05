@@ -1,4 +1,5 @@
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
+import { NotFoundException, ParseUUIDPipe } from '@nestjs/common';
 
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -46,6 +47,7 @@ const createSaleDto: CreateSaleDto = {
 const salesServiceMock = {
   create: jest.fn(),
   findAll: jest.fn(),
+  findOne: jest.fn(),
   approve: jest.fn(),
   generatePDF: jest.fn(),
   createFromQuote: jest.fn(),
@@ -123,6 +125,62 @@ describe('SalesController', () => {
     expect(salesServiceMock.findAll).toHaveBeenCalledWith(companyId);
 
     expect(result).toEqual(sales);
+  });
+
+  it('consulta el detalle de una venta usando el companyId autenticado', async () => {
+    const sale = {
+      id: saleId,
+      companyId,
+      customer: {
+        id: customerId,
+      },
+      items: [
+        {
+          id: 'sale-item-1',
+          product: {
+            id: productId,
+          },
+        },
+      ],
+    };
+
+    salesServiceMock.findOne.mockResolvedValue(sale);
+
+    const result = await controller.findOne(
+      request as Parameters<SalesController['findOne']>[0],
+      saleId,
+    );
+
+    expect(salesServiceMock.findOne).toHaveBeenCalledWith(companyId, saleId);
+
+    expect(result).toEqual(sale);
+  });
+
+  it('propaga errores del servicio al consultar el detalle', async () => {
+    const error = new NotFoundException('Venta no encontrada');
+
+    salesServiceMock.findOne.mockRejectedValue(error);
+
+    await expect(
+      controller.findOne(
+        request as Parameters<SalesController['findOne']>[0],
+        saleId,
+      ),
+    ).rejects.toBe(error);
+  });
+
+  it('valida el id del detalle con ParseUUIDPipe', () => {
+    const metadata = Reflect.getMetadata(
+      ROUTE_ARGS_METADATA,
+      SalesController,
+      'findOne',
+    ) as Record<string, { data?: string; pipes?: unknown[] }>;
+
+    const idParam = Object.values(metadata).find(
+      (value) => value.data === 'id',
+    );
+
+    expect(idParam?.pipes).toContain(ParseUUIDPipe);
   });
 
   it('aprueba una venta usando el companyId autenticado', async () => {

@@ -12,10 +12,15 @@ import {
 
 import { CustomersService } from './customers.service';
 
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
-@UseGuards(JwtAuthGuard)
+import { RolesGuard } from '../auth/guards/roles.guards';
+import { UserRole } from '@prisma/client';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES)
 @Controller('customers')
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}

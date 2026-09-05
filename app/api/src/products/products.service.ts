@@ -16,6 +16,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
       },
 
       orderBy: {
@@ -53,6 +54,8 @@ export class ProductsService {
       );
     }
 
+    await this.validateCategory(companyId, dto.categoryId);
+
     return this.prisma.product.create({
       data: {
         companyId,
@@ -64,13 +67,14 @@ export class ProductsService {
         barcode: dto.barcode,
         cost: dto.cost,
         price: dto.price,
-        stock: dto.stock,
         minStock: dto.minStock,
+        inventoryTracking: dto.inventoryTracking,
+        lotTracking: dto.lotTracking,
       },
     });
   }
 
-  async findOne(productId: string, companyId: string) {
+  async findOne(companyId: string, productId: string) {
     const product = await this.prisma.product.findFirst({
       where: {
         id: productId,
@@ -86,7 +90,7 @@ export class ProductsService {
   }
 
   async update(companyId: string, productId: string, dto: UpdateProductDto) {
-    await this.findOne(productId, companyId);
+    await this.findOne(companyId, productId);
 
     const existingProduct = await this.prisma.product.findFirst({
       where: {
@@ -118,9 +122,14 @@ export class ProductsService {
       }
     }
 
+    await this.validateCategory(companyId, dto.categoryId);
+
     return this.prisma.product.update({
       where: {
-        id: productId,
+        id_companyId: {
+          id: productId,
+          companyId,
+        },
       },
       data: {
         sku: dto.sku,
@@ -131,7 +140,6 @@ export class ProductsService {
         barcode: dto.barcode || null,
         cost: dto.cost,
         price: dto.price,
-        stock: dto.stock,
         minStock: dto.minStock,
       },
     });
@@ -141,6 +149,7 @@ export class ProductsService {
     return this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
         stock: {
           lte: this.prisma.product.fields.minStock,
         },
@@ -149,12 +158,46 @@ export class ProductsService {
   }
 
   async remove(companyId: string, productId: string) {
-    await this.findOne(productId, companyId);
+    await this.findOne(companyId, productId);
 
-    return this.prisma.product.delete({
+    const updateResult = await this.prisma.product.updateMany({
       where: {
         id: productId,
+        companyId,
+        isActive: true,
+      },
+      data: {
+        isActive: false,
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new NotFoundException('Producto no encontrado');
+    }
+
+    return this.findOne(companyId, productId);
+  }
+
+  private async validateCategory(
+    companyId: string,
+    categoryId?: string | null,
+  ) {
+    if (categoryId === undefined || categoryId === null) {
+      return;
+    }
+
+    const category = await this.prisma.category.findFirst({
+      where: {
+        id: categoryId,
+        companyId,
+        isActive: true,
+      },
+    });
+
+    if (!category) {
+      throw new NotFoundException(
+        'Categoría no encontrada, inactiva o fuera de la empresa',
+      );
+    }
   }
 }

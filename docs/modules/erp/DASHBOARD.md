@@ -1,31 +1,41 @@
-# Módulo de Dashboard — Zaping ERP
+# Dashboard — Zaping ERP
 
 **Módulo:** Dashboard
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** DASHBOARD V1 IMPLEMENTED / VALIDATED
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-Dashboard proporciona una vista consolidada del estado operativo y comercial de una Company.
+Dashboard proporciona una vista consolidada del estado operativo y comercial de
+una Company.
 
-Su responsabilidad es transformar información distribuida entre distintos módulos en una vista que permita responder rápidamente:
+Su responsabilidad principal es responder:
 
 ```text
 ¿Qué está ocurriendo?
-¿Qué necesita atención?
+
+¿Qué información importante debo revisar?
+
 ¿Qué cambió recientemente?
-¿Qué debería revisar ahora?
+
+¿A qué módulo necesito ir?
 ```
 
-Dashboard es principalmente un:
+Dashboard funciona principalmente como:
 
-> **Read Model y punto de coordinación de información.**
+```text
+Read Model
++
+Operational Overview
++
+Navigation Context
+```
 
 No constituye un dominio transaccional independiente.
 
@@ -33,1333 +43,1037 @@ No constituye un dominio transaccional independiente.
 
 # 2. Principio fundamental
 
-La evolución de Dashboard sigue:
+La evolución deseada es:
 
 ```text
-Datos
+Data
 ↓
-Contexto
+Context
 ↓
-Atención
+Attention
 ↓
-Acción
+Action
 ```
 
-No debe limitarse a mostrar números aislados.
+Sin embargo, debe distinguirse:
+
+```text
+CURRENT
+→ Operational Overview
+```
+
+de:
+
+```text
+TARGET
+→ Action Dashboard
+```
 
 ---
 
-# 3. Objetivo de experiencia
+# 3. Ownership
 
-El Dashboard debe ayudar al usuario a:
+Dashboard puede ser propietario de:
 
-* comprender el estado general de la empresa;
-* detectar problemas rápidamente;
-* identificar trabajo pendiente;
-* navegar directamente a la operación relacionada;
-* reducir consultas manuales entre módulos;
-* apoyar decisiones operativas.
+```text
+read-model composition
+
+aggregations
+
+presentation-oriented metrics
+
+summary DTOs
+
+navigation context
+
+widget composition
+```
+
+No es propietario del lifecycle de los dominios que consulta.
 
 ---
 
-# 4. Dashboard no almacena la verdad de otros dominios
+# 4. Fuera del alcance
 
-Dashboard consume información proveniente de:
+Dashboard no administra directamente:
 
 ```text
-Customers
-Suppliers
-Products
-Inventory
-Purchases
-Quotes
-Sales
-Returns
-Healthcare
-Audit
-Notifications
+Customer lifecycle
+
+Supplier lifecycle
+
+Product lifecycle
+
+Purchase lifecycle
+
+PurchaseReceipt creation
+
+Quote lifecycle
+
+Sale lifecycle
+
+Inventory mutations
+
+Equipment lifecycle
+
+Healthcare Case lifecycle
 ```
-
-según las capacidades disponibles.
-
-No debe convertirse en propietario de esos datos.
 
 ---
 
-# 5. Ejemplo
+# 5. Read Model principle
 
-Incorrecto:
+Debe mantenerse:
 
 ```text
-Dashboard.lowStock = true
+Domain Modules
+↓
+Dashboard Read Model
+↓
+Dashboard UI
 ```
 
-como regla independiente.
+No:
+
+```text
+Dashboard
+↓
+redefines domain rules
+```
+
+Dashboard puede agregar información.
+
+No debe reinventar el significado de esa información.
+
+---
+
+# 6. Ejemplo
 
 Correcto:
 
 ```text
-Inventory
-→ determina qué significa Low Stock
+Inventory / Products
+→ defines low-stock semantics
 
 Dashboard
-→ consulta y presenta esos productos
+→ presents Low Stock Products
+```
+
+Incorrecto:
+
+```text
+Dashboard
+→ invents a second low-stock rule
 ```
 
 ---
 
-# 6. Responsabilidades
+# 7. CURRENT vs TARGET vs FUTURE
 
-Dashboard puede ser responsable de:
+Este documento distingue:
 
-* agregación;
-* KPIs;
-* contadores;
-* resúmenes;
-* tendencias;
-* actividad reciente;
-* alertas visibles;
-* tareas accionables;
-* enlaces contextuales;
-* Read Models optimizados.
+## CURRENT
 
----
+Capacidades implementadas actualmente.
 
-# 7. Fuera del alcance
+## TARGET
 
-Dashboard no es propietario de:
+Mejoras aprobadas para evolucionar Dashboard hacia una experiencia más
+accionable.
 
-* creación de Customer;
-* aprobación de Purchase;
-* confirmación de Receipt;
-* modificación de stock;
-* confirmación de Delivery;
-* lifecycle de Quote;
-* reglas de Return;
-* reglas Healthcare.
+## FUTURE
+
+Capacidades posteriores que requieren nuevos dominios, métricas o infraestructura.
 
 ---
 
-# 8. Quick Actions
+# 8. Estado CURRENT
 
-Dashboard puede ofrecer accesos como:
-
-```text
-[Nueva cotización]
-[Nueva compra]
-[Registrar recepción]
-[Revisar bajo stock]
-```
-
-pero estas acciones deben:
+Dashboard V1 implementa actualmente:
 
 ```text
-abrir / iniciar
-el workflow correspondiente
-```
+GET /dashboard
 
-No trasladar la lógica del dominio al Dashboard.
+real tenant-scoped metrics
 
----
+Customers metric
 
-# 9. Estado actual
+Suppliers metric
 
-La implementación actual de Zaping ya dispone de un Dashboard operativo con información agregada.
+Products metric
 
-El estado registrado del proyecto incluye métricas como:
+Quotes metric
 
-```text
-Customers
-Suppliers
-Products
-Quotes
-Purchases
-Sales
+Purchases metric
+
+Sales metric
+
 Inventory Value
+
 Low Stock Products
+
 Recent Sales
+
+KPI navigation
+
+main loading state
+
+main error state
+
+retry
+
+empty-state handling
+
+localized Recent Sales failure
 ```
 
-La implementación técnica exacta debe verificarse en el código vigente.
+No utiliza datos mock para representar Sales actuales.
 
 ---
 
-# 10. Dashboard actual
+# 9. Dashboard CURRENT
 
-La primera versión cumple principalmente una función de:
+La experiencia vigente es principalmente:
 
 ```text
 Operational Overview
 ```
 
-mediante:
+y presenta:
 
-* contadores;
-* métricas;
-* inventario;
-* actividad reciente.
+```text
+catalog context
 
-Esto constituye la base.
+commercial context
 
-No representa todavía el diseño completo del Action Dashboard objetivo.
+procurement context
+
+inventory context
+
+recent commercial activity
+```
+
+No constituye todavía el Action Dashboard completo definido como dirección de
+producto.
 
 ---
 
-# 11. Dirección objetivo
+# 10. API CURRENT
 
-Según `ZAPING_WAY.md`, Dashboard debe evolucionar hacia:
-
-> **Action Dashboard**
-
-donde la prioridad es:
-
-```text
-Qué requiere atención
-↓
-Qué puedo hacer
-↓
-Indicadores
-↓
-Actividad y tendencias
-```
-
----
-
-# 12. Jerarquía objetivo
-
-Una dirección recomendada es:
-
-```text
-1. Atención / tareas
-2. KPIs importantes
-3. Actividad reciente
-4. Tendencias
-5. Información secundaria
-```
-
-No todos los bloques deben aparecer para todos los usuarios.
-
----
-
-# 13. Ejemplo de Action Dashboard
-
-```text
-Requiere atención
-
-5 productos con bajo stock
-[Revisar]
-
-3 compras pendientes de recepción
-[Recibir]
-
-2 pedidos pendientes de entrega
-[Preparar]
-
-1 devolución pendiente
-[Revisar]
-```
-
----
-
-# 14. KPIs
-
-Los KPIs deben responder una pregunta empresarial concreta.
-
-Ejemplos:
-
-```text
-Ventas
-Compras
-Clientes
-Productos
-Valor de inventario
-Bajo stock
-Cotizaciones
-```
-
----
-
-# 15. No mostrar métricas por disponibilidad técnica
-
-Una métrica no debe existir únicamente porque sea fácil ejecutar:
-
-```sql
-COUNT(*)
-```
-
-Debe tener utilidad para el usuario.
-
----
-
-# 16. Total Customers
-
-Puede mostrar el tamaño actual del catálogo de Customers.
-
-Debe quedar claro si en el futuro representa:
-
-```text
-todos
-```
-
-o:
-
-```text
-solo activos
-```
-
-No deben mezclarse ambas semánticas.
-
----
-
-# 17. Total Suppliers
-
-Puede proporcionar contexto de abastecimiento.
-
-Al igual que Customers, debe definirse qué lifecycle participa en la métrica.
-
----
-
-# 18. Total Products
-
-Representa el catálogo según la semántica definida.
-
-Cuando sea necesario deberá distinguir:
-
-```text
-Products activos
-Products inactivos
-```
-
----
-
-# 19. Quotes
-
-Puede mostrar métricas como:
-
-```text
-Total Quotes
-Quotes Draft
-Quotes Confirmed
-Quotes pendientes de seguimiento
-```
-
-cuando sus definiciones sean claras.
-
----
-
-# 20. Purchases
-
-Puede evolucionar desde:
-
-```text
-Total Purchases
-```
-
-hacia información más operativa:
-
-```text
-Pending Receipt
-Partially Received
-Received Today
-```
-
----
-
-# 21. Sales
-
-Mientras exista `Sale` legacy, Dashboard puede consumir ese modelo.
-
-Después del refactor debe migrar hacia:
-
-```text
-SalesOrder
-Delivery
-```
-
-sin mantener métricas duplicadas permanentemente.
-
----
-
-# 22. Inventory Value
-
-La implementación actual incluye:
-
-```text
-inventoryValue
-```
-
-como indicador operativo.
-
-Antes de presentarlo como cifra contable oficial debe existir una política de valuación formal.
-
-Por tanto:
-
-> Inventory Value actual es una métrica operacional, no necesariamente un valor financiero auditado.
-
----
-
-# 23. Low Stock
-
-Dashboard puede consumir la regla de Inventory para mostrar productos con:
-
-```text
-stock bajo
-```
-
-No debe implementar su propia definición distinta.
-
----
-
-# 24. Recent Sales
-
-La implementación actual incluye actividad de Sales reciente.
-
-Con ADR-011 deberá evolucionar progresivamente hacia eventos más precisos como:
-
-```text
-SalesOrder created
-Delivery confirmed
-```
-
-según lo que aporte mayor valor.
-
----
-
-# 25. Comparación contra períodos
-
-La documentación histórica contempla que ciertos KPIs puedan mostrar:
-
-```text
-Current Value
-Previous Period
-Trend
-Percentage Variation
-```
-
-Esta capacidad es TARGET salvo donde ya exista implementación específica.
-
----
-
-# 26. Ejemplo
-
-```text
-Ventas del mes
-$420,000 MXN
-↑ 12.5 % vs mes anterior
-```
-
-La comparación debe utilizar períodos equivalentes y reglas de cálculo explícitas.
-
----
-
-# 27. No inventar tendencias
-
-Si Zaping no dispone de suficiente historial o el período no es comparable, no debe mostrar:
-
-```text
-+25 %
-```
-
-sin una base válida.
-
----
-
-# 28. Charts
-
-La documentación original propone gráficas para:
-
-### Sales
-
-```text
-Daily Sales
-Monthly Sales
-Sales by Customer
-Sales by Salesperson
-```
-
-### Purchases
-
-```text
-Monthly Purchases
-Purchases by Supplier
-```
-
-### Inventory
-
-```text
-Top Products
-Low Stock
-Inventory Value
-Products Near Expiration
-```
-
-Estas capacidades constituyen principalmente evolución TARGET.
-
----
-
-# 29. Gráficas con propósito
-
-No debe agregarse una gráfica únicamente para hacer que Dashboard parezca más completo.
-
-Cada visualización debe permitir:
-
-* detectar tendencia;
-* comparar;
-* identificar anomalía;
-* tomar una decisión.
-
----
-
-# 30. Ejemplo incorrecto
-
-```text
-Pie chart
-20 categorías
-20 colores
-```
-
-sin una pregunta empresarial clara.
-
----
-
-# 31. Ejemplo útil
-
-```text
-Compras por mes
-últimos 6 meses
-```
-
-puede ayudar a identificar tendencias de abastecimiento.
-
----
-
-# 32. Activity Timeline
-
-La documentación histórica contempla un Timeline de actividad.
-
-Puede mostrar eventos como:
-
-```text
-Purchase created
-PurchaseReceipt registered
-Quote confirmed
-Sale / SalesOrder confirmed
-Delivery confirmed
-Inventory adjusted
-Customer created
-Return confirmed
-```
-
-según la arquitectura vigente.
-
----
-
-# 33. Fuente del Timeline
-
-El Timeline no debe reconstruirse mediante lógica duplicada en frontend.
-
-La dirección objetivo es utilizar:
-
-```text
-Audit / Domain Events / Read Models
-```
-
-cuando la infraestructura correspondiente exista.
-
----
-
-# 34. No confundir actividad con auditoría completa
-
-Dashboard puede mostrar:
-
-```text
-actividad reciente
-```
-
-pero no sustituye un módulo de Audit.
-
-Audit debe conservar mayor detalle y trazabilidad.
-
----
-
-# 35. Alertas
-
-Dashboard puede presentar alertas operativas.
-
-Ejemplos:
-
-```text
-Producto sin stock
-Producto con bajo stock
-Caducidad próxima
-Compra pendiente de recepción
-Pedido pendiente de entrega
-Return pendiente
-Healthcare Case sin preparar
-Incidencia de reconciliación
-```
-
-según los módulos implementados.
-
----
-
-# 36. Severidad
-
-La documentación histórica propone niveles:
-
-```text
-Critical
-High
-Medium
-Low
-```
-
-La idea es válida, pero el uso debe estandarizarse para evitar que cada módulo asigne severidad de forma arbitraria.
-
----
-
-# 37. Semántica recomendada
-
-Puede alinearse visualmente con el Design System:
-
-```text
-Info
-Warning
-Danger
-```
-
-mientras la prioridad operacional puede manejarse de forma separada cuando sea necesario.
-
----
-
-# 38. Alertas accionables
-
-Una alerta debe permitir pasar al contexto relacionado.
-
-Ejemplo:
-
-```text
-5 productos con bajo stock
-
-[Revisar productos]
-```
-
-No debe ser solo texto decorativo.
-
----
-
-# 39. Alertas no son Notifications
-
-Debe distinguirse:
-
-```text
-Dashboard Alert
-→ información visible al abrir Dashboard
-```
-
-de:
-
-```text
-Notification
-→ comunicación dirigida al usuario
-```
-
-Un mismo evento puede alimentar ambos sistemas en el futuro, pero no son equivalentes.
-
----
-
-# 40. Quick Actions
-
-La documentación histórica incluye:
-
-```text
-New Sale
-New Purchase
-New Customer
-New Product
-Create Quote
-Inventory Adjustment
-```
-
-La dirección continúa siendo válida con algunos ajustes de arquitectura.
-
----
-
-# 41. Quick Actions objetivo
-
-Con el modelo futuro podrían existir:
-
-```text
-Nueva cotización
-Nueva venta / SalesOrder
-Nueva compra
-Registrar recepción
-Registrar cliente
-Registrar producto
-```
-
-según permisos y contexto.
-
----
-
-# 42. Inventory Adjustment
-
-Debido a su sensibilidad, no debe aparecer como acción rápida para todos los usuarios únicamente porque exista una capacidad técnica.
-
-Debe depender de:
-
-```text
-RBAC
-+
-business need
-```
-
----
-
-# 43. Acciones por rol
-
-Un Dashboard puede adaptarse progresivamente a las responsabilidades del usuario.
-
-Ejemplo:
-
-### Sales
-
-```text
-Nueva cotización
-Pedidos pendientes
-Clientes recientes
-```
-
-### Warehouse
-
-```text
-Por recibir
-Por entregar
-Bajo stock
-Returns
-```
-
-### Management
-
-```text
-KPIs
-Tendencias
-Alertas
-```
-
----
-
-# 44. Role-Based Dashboard
-
-La documentación histórica lo planteaba como una evolución posterior.
-
-La dirección continúa siendo válida.
-
-No significa crear desde ahora un Dashboard completamente distinto por cada rol.
-
----
-
-# 45. Personalización
-
-Capacidades futuras pueden incluir:
-
-```text
-Favorite Widgets
-Saved Filters
-Custom Dashboards
-```
-
-pero deben posponerse hasta conocer cómo utilizan realmente los usuarios el producto.
-
----
-
-# 46. Drag & Drop
-
-La documentación antigua propone:
-
-```text
-Drag & Drop Widgets
-```
-
-como una fase futura.
-
-No constituye prioridad actual.
-
-Un Dashboard configurable pero confuso puede ofrecer peor UX que uno bien diseñado.
-
----
-
-# 47. Global Filters
-
-La documentación original contempla filtros globales.
-
-Pueden incluir posteriormente:
-
-```text
-Date Range
-Branch
-Warehouse
-Salesperson
-```
-
-cuando esos conceptos existan.
-
----
-
-# 48. Filtros no aplicables
-
-No todos los widgets deben responder artificialmente a todos los filtros.
-
-Ejemplo:
-
-```text
-Date Range
-```
-
-puede tener sentido para Sales.
-
-Pero no necesariamente para:
-
-```text
-Current Product Count
-```
-
-Debe definirse semántica clara.
-
----
-
-# 49. Current Company
-
-En el uso normal:
-
-```text
-Dashboard
-→ authenticated Company
-```
-
-No debe aceptar un `companyId` arbitrario desde frontend para cambiar de tenant.
-
----
-
-# 50. Multi-Company Dashboard futuro
-
-La documentación histórica contempla:
-
-```text
-Multi-company dashboards
-```
-
-como capacidad futura.
-
-Esto requeriría permisos y contexto explícito.
-
-No debe debilitar el aislamiento multi-tenant normal.
-
----
-
-# 51. Arquitectura
-
-Conceptualmente:
-
-```text
-Domain Modules
-     │
-     ▼
-Read / Aggregation Layer
-     │
-     ▼
-DashboardService
-     │
-     ▼
-Dashboard API
-     │
-     ▼
-Dashboard UI
-```
-
----
-
-# 52. DashboardService
-
-`DashboardService` puede encargarse de:
-
-* coordinar consultas;
-* ejecutar agregaciones;
-* construir DTOs de lectura;
-* proporcionar un modelo optimizado para frontend.
-
----
-
-# 53. Regla importante
-
-La documentación antigua decía:
-
-> Business logic must never exist inside dashboard components.
-
-Esta regla se conserva.
-
-Pero requiere precisión.
-
-DashboardService **sí puede contener lógica de agregación específica del Read Model**.
-
-Lo que no debe hacer es redefinir reglas de dominio.
-
----
-
-# 54. Ejemplo válido
-
-```text
-DashboardService
-↓
-count Purchases with pending receipt
-```
-
-utilizando estados/reglas proporcionados por Purchases.
-
----
-
-# 55. Ejemplo inválido
-
-```text
-DashboardService
-↓
-decide cuándo una Purchase debe cambiar a RECEIVED
-```
-
-Esa regla pertenece a Purchases.
-
----
-
-# 56. Frontend
-
-El frontend de Dashboard debe recibir un modelo orientado a presentación.
-
-No debería necesitar realizar una cascada como:
-
-```text
-GET customers
-GET suppliers
-GET products
-GET purchases
-GET quotes
-GET sales
-GET inventory
-```
-
-y reconstruir todas las métricas por sí mismo.
-
----
-
-# 57. API agregada
-
-Es preferible contar con una API similar conceptualmente a:
+Actualmente existe:
 
 ```text
 GET /dashboard
 ```
 
-o endpoints de Read Model específicos.
+como endpoint agregado principal.
 
-El contrato exacto debe verificarse en código/OpenAPI.
-
----
-
-# 58. Razón
-
-Esto reduce:
-
-* requests;
-* duplicación;
-* conocimiento de dominios en frontend;
-* inconsistencias;
-* complejidad de Dashboard.
-
----
-
-# 59. Read Model
-
-Dashboard puede devolver una estructura optimizada para consumo.
-
-Ejemplo conceptual:
-
-```json
-{
-  "totals": {},
-  "inventory": {},
-  "activity": [],
-  "attention": []
-}
-```
-
-No es necesario reproducir directamente todas las entidades Prisma.
-
----
-
-# 60. DTO dedicado
-
-Dashboard debe preferir DTOs de lectura específicos.
-
-No devolver modelos completos únicamente para obtener un contador.
-
----
-
-# 61. Performance
-
-La documentación histórica establece como objetivo:
+Dashboard frontend también utiliza:
 
 ```text
-Dashboard < 500 ms
+GET /sales
 ```
 
-bajo condiciones normales.
-
-Se mantiene como **objetivo de rendimiento**, no como garantía absoluta para cualquier cantidad de datos o infraestructura.
+para construir el bloque CURRENT de Recent Sales.
 
 ---
 
-# 62. Estrategias de performance
+# 11. Current request composition
 
-Conforme crezca el producto pueden utilizarse:
-
-* aggregate queries;
-* índices;
-* queries paralelas cuando sean seguras;
-* Read Models;
-* caching;
-* pre-aggregation.
-
----
-
-# 63. No optimizar prematuramente
-
-No introducir:
+La implementación actual utiliza principalmente:
 
 ```text
-Redis
-materialized views
-event pipelines
-analytics warehouse
+GET /dashboard
++
+GET /sales
 ```
 
-únicamente porque Dashboard podría necesitarlos algún día.
+Esto no equivale al anti-patrón de que frontend consulte individualmente cada
+dominio para reconstruir todas las métricas.
 
-Primero medir.
-
----
-
-# 64. Cache
-
-Puede utilizarse cuando:
-
-* la consulta sea costosa;
-* la métrica tolere cierta latencia;
-* exista beneficio medible.
-
-No toda métrica debe cachearse.
-
----
-
-# 65. Datos altamente operativos
-
-Información como:
+La agregación principal continúa concentrada en:
 
 ```text
-Pending Receipt
-Pending Delivery
-Critical Stock
+GET /dashboard
 ```
-
-puede requerir mayor frescura que una gráfica mensual.
-
-La estrategia de caching debe considerar esa diferencia.
 
 ---
 
-# 66. “Real-time”
+# 12. DashboardService
 
-En el contexto actual:
-
-> Real-time significa información operacional suficientemente actual para la tarea, normalmente calculada al consultar/refrescar Dashboard.
-
-No implica necesariamente:
+`DashboardService` puede encargarse de:
 
 ```text
-WebSockets
-Server-Sent Events
-streaming
+coordinating read queries
+
+aggregating counts
+
+calculating read-model values
+
+building presentation DTOs
 ```
 
----
+Puede contener lógica de agregación.
 
-# 67. Actualización futura
-
-Si los workflows requieren actualización automática, podrán evaluarse:
-
-* polling;
-* revalidation;
-* WebSockets;
-* server events.
-
-La tecnología debe responder a la necesidad real.
+No debe contener reglas que modifiquen lifecycle de otros módulos.
 
 ---
 
-# 68. Error isolation
+# 13. Valid aggregation logic
 
-Un fallo en una métrica secundaria no debería necesariamente inutilizar todo el Dashboard si la arquitectura permite degradación segura.
-
-Ejemplo futuro:
+Ejemplo válido:
 
 ```text
-Sales metrics ✓
-Inventory metrics ✓
-Recent activity ✗
+DashboardService
+→ calculate / retrieve a metric
+→ return presentation-oriented value
 ```
-
-podría mostrar el resto junto con un error localizado.
 
 ---
 
-# 69. No ocultar errores críticos
+# 14. Invalid domain logic
 
-Si el Dashboard no puede cargar información fundamental, debe comunicarlo claramente.
+Ejemplo inválido:
 
-No presentar:
+```text
+DashboardService
+→ decides that a Purchase becomes RECEIVED
+```
+
+Ese comportamiento pertenece a Purchases.
+
+---
+
+# 15. Current metrics
+
+El Dashboard vigente presenta información real relacionada con:
+
+```text
+Customers
+
+Suppliers
+
+Products
+
+Quotes
+
+Purchases
+
+Sales
+
+Inventory Value
+
+Low Stock Products
+
+Recent Sales
+```
+
+---
+
+# 16. Customers metric CURRENT
+
+Dashboard presenta una métrica de Customers.
+
+La semántica exacta de:
+
+```text
+all Customers
+```
+
+frente a:
+
+```text
+active Customers only
+```
+
+debe corresponder al query CURRENT implementado en DashboardService.
+
+Este documento no inventa una semántica distinta.
+
+---
+
+# 17. Suppliers metric CURRENT
+
+Dashboard presenta una métrica de Suppliers.
+
+Al igual que Customers, la definición exacta debe corresponder al query CURRENT y
+no inferirse únicamente desde el lifecycle del módulo Suppliers.
+
+---
+
+# 18. Products metric CURRENT
+
+Dashboard presenta una métrica de Products.
+
+Si posteriormente se requiere diferenciar:
+
+```text
+active Products
+
+inactive Products
+```
+
+deberá definirse explícitamente la métrica correspondiente.
+
+---
+
+# 19. Quotes metric CURRENT
+
+Dashboard presenta actualmente contexto de Quotes.
+
+Las métricas más avanzadas como:
+
+```text
+Draft Quotes
+
+Confirmed Quotes
+
+conversion rate
+
+follow-up required
+```
+
+no deben considerarse CURRENT salvo implementación específica.
+
+---
+
+# 20. Purchases metric CURRENT
+
+Dashboard presenta actualmente contexto general de Purchases.
+
+No debe confundirse con una experiencia operativa completa de:
+
+```text
+pending receipts
+
+partial receipts
+
+receipts today
+```
+
+Estas métricas pueden añadirse posteriormente.
+
+---
+
+# 21. Sales metric CURRENT
+
+Dashboard consume actualmente el modelo:
+
+```text
+Sale
+```
+
+que continúa siendo:
+
+```text
+CURRENT ERP Core V1
+```
+
+Debe describirse como:
+
+```text
+CURRENT transitional commercial model
+```
+
+y no como un modelo meramente histórico.
+
+---
+
+# 22. SalesOrder / Delivery
+
+La futura arquitectura:
+
+```text
+SalesOrder
+↓
+Delivery
+```
+
+pertenece a:
+
+```text
+TARGET
+```
+
+No debe utilizarse actualmente como fuente de métricas reales del Dashboard.
+
+---
+
+# 23. Inventory Value CURRENT
+
+Dashboard incluye:
+
+```text
+inventoryValue
+```
+
+como métrica operativa.
+
+Debe mantenerse:
+
+```text
+Inventory Value
+→ operational indicator
+```
+
+No:
+
+```text
+Inventory Value
+→ audited accounting valuation
+```
+
+---
+
+# 24. Inventory Value boundary
+
+Antes de utilizar `inventoryValue` como cifra contable oficial deberán existir
+reglas explícitas de:
+
+```text
+valuation
+
+cost methodology
+
+financial reporting
+
+accounting semantics
+```
+
+Actualmente esa formalización no forma parte de Dashboard V1.
+
+---
+
+# 25. Low Stock CURRENT
+
+Dashboard presenta Products con bajo stock según la semántica CURRENT:
+
+```text
+stock <= minStock
+```
+
+Debe mantenerse alineado con Products / Inventory.
+
+---
+
+# 26. Low Stock ownership
+
+Debe mantenerse:
+
+```text
+Products / Inventory
+→ source semantics
+```
+
+```text
+Dashboard
+→ presentation
+```
+
+Dashboard no debe crear una segunda definición incompatible.
+
+---
+
+# 27. Recent Sales CURRENT
+
+Dashboard incluye un bloque de:
+
+```text
+Recent Sales
+```
+
+utilizando el response CURRENT de:
+
+```text
+GET /sales
+```
+
+---
+
+# 28. Recent Sales selection
+
+La implementación CURRENT utiliza:
+
+```text
+first five Sales
+returned by the current Sales list response
+```
+
+No debe afirmarse una garantía más fuerte de orden temporal si el contrato del
+backend no la define explícitamente.
+
+---
+
+# 29. Recent Sales failure isolation
+
+La consulta de Recent Sales está aislada del resumen principal.
+
+Debe mantenerse conceptualmente:
+
+```text
+GET /dashboard
+✓
+
+GET /sales
+✗
+
+→ main Dashboard remains usable
+```
+
+cuando la degradación sea segura.
+
+---
+
+# 30. Main Dashboard failure
+
+Si falla información fundamental de:
+
+```text
+GET /dashboard
+```
+
+la UI debe comunicar el error principal.
+
+No debe sustituir un fallo por valores ficticios.
+
+---
+
+# 31. Zero vs unavailable
+
+Debe mantenerse:
 
 ```text
 0
+≠
+query failed
 ```
 
-cuando en realidad ocurrió:
+Ejemplo:
 
 ```text
-query failed
+0 Purchases
+```
+
+no equivale a:
+
+```text
+Purchases query unavailable
 ```
 
 ---
 
-# 70. Zero vs unavailable
+# 32. Loading CURRENT
 
-Debe distinguirse:
+Dashboard implementa estado de carga.
+
+La UI no debe presentar una pantalla vacía mientras espera información.
+
+Puede utilizar:
 
 ```text
-0 compras pendientes
+loading state
+
+spinner
+
+skeleton
+```
+
+según Design System.
+
+---
+
+# 33. Error CURRENT
+
+Dashboard implementa:
+
+```text
+error state
+
+retry
+```
+
+para la carga principal.
+
+Los mensajes deben distinguir:
+
+```text
+empty valid data
 ```
 
 de:
 
 ```text
-No fue posible consultar compras pendientes.
+failed data retrieval
 ```
 
 ---
 
-# 71. Loading
+# 34. Empty states
 
-Dashboard puede utilizar:
-
-* skeletons;
-* LoadingSpinner;
-* loading localizado;
-
-según la estructura.
-
-No debe mostrar una pantalla vacía mientras carga.
-
----
-
-# 72. Empty State
-
-Al inicio de una empresa nueva, muchos KPIs serán cero.
-
-Dashboard debe orientar.
-
-Ejemplo:
+Una Company nueva puede tener métricas:
 
 ```text
-Todavía no tienes productos.
-
-Agrega tu catálogo para comenzar a utilizar Inventory.
-
-[Agregar producto]
+0
 ```
+
+de forma completamente válida.
+
+Dashboard debe presentar ese estado sin sugerir que ocurrió un error.
 
 ---
 
-# 73. Onboarding Dashboard
+# 35. KPI navigation CURRENT
 
-Una Company recién creada puede beneficiarse más de:
+Los KPIs enlazables pueden navegar a sus módulos propietarios.
+
+Debe mantenerse:
 
 ```text
-Completa estos pasos
+Dashboard
+→ context
+→ module navigation
 ```
 
-que de:
+No:
 
 ```text
-Ventas: 0
-Compras: 0
-Inventario: 0
+Dashboard
+→ duplicates module workflow
 ```
 
 ---
 
-# 74. Onboarding objetivo
+# 36. Quick Actions
 
-Conceptualmente:
+Quick Actions son una dirección UX válida, pero no deben marcarse como CURRENT
+salvo verificación específica de cada acción en Dashboard.
+
+Por tanto:
 
 ```text
-Configura tu empresa      ✓
-Agrega productos          ○
-Agrega clientes           ○
-Crea primera cotización   ○
-Registra primera compra   ○
+Quick Actions
+→ TARGET UX
 ```
-
-Esta es una capacidad futura de experiencia.
 
 ---
 
-# 75. Inventory alerts
+# 37. Quick Actions TARGET
 
-Dashboard puede mostrar:
+Posibles acciones:
 
 ```text
-Low Stock
-Out of Stock
-Near Expiration
-Expired
+Nueva cotización
+
+Nueva venta
+
+Nueva compra
+
+Registrar recepción
+
+Registrar cliente
+
+Registrar producto
+
+Revisar bajo stock
 ```
 
-cuando Inventory soporte de forma confiable cada concepto.
+Cada acción debe delegar al workflow propietario.
 
 ---
 
-# 76. Near Expiration
+# 38. Sensitive Quick Actions
 
-No debe mostrarse como feature actual únicamente porque `expirationDate` existe.
-
-Debe existir:
-
-* regla de ventana;
-* consulta;
-* UX;
-* definición de lotes elegibles.
-
----
-
-# 77. Products Near Expiration
-
-Es una capacidad TARGET coherente con Healthcare y Inventory avanzado.
-
-Puede evolucionar hacia períodos como:
+Acciones como:
 
 ```text
-30 días
-60 días
-90 días
+Inventory Adjustment
 ```
 
-configurables o definidos por producto/empresa en el futuro.
+no deben exponerse universalmente desde Dashboard.
+
+Requieren:
+
+```text
+business need
++
+authorization
++
+validated Inventory workflow
+```
 
 ---
 
-# 78. Purchase summary
+# 39. Action Dashboard TARGET
 
-El Dashboard objetivo debe priorizar información operacional:
+La dirección de producto es evolucionar hacia:
+
+```text
+Action Dashboard
+```
+
+con prioridad en:
+
+```text
+attention
+
+tasks
+
+context
+
+navigation
+```
+
+por encima de mostrar únicamente contadores.
+
+---
+
+# 40. Attention blocks TARGET
+
+Un futuro Dashboard puede presentar:
+
+```text
+Low Stock Products
+
+Purchases requiring receipt
+
+commercial operations requiring action
+
+expiration alerts
+
+Healthcare operational attention
+```
+
+únicamente cuando cada fuente esté implementada y tenga reglas claras.
+
+---
+
+# 41. Purchase Receipt indicators TARGET
+
+PurchaseReceipt ya existe como dominio.
+
+Sin embargo, Dashboard no debe afirmar actualmente widgets como:
 
 ```text
 Purchases pending receipt
-Partially received
+
+Partially received Purchases
+
 Recent receipts
 ```
 
-por encima de únicamente:
+si todavía no están implementados en el Read Model actual.
+
+Estado:
 
 ```text
-Purchases this month
-```
-
-cuando el usuario está realizando trabajo operativo.
-
----
-
-# 79. Sales summary
-
-Después de ADR-011:
-
-```text
-SalesOrder pending delivery
-Partially delivered
-Recent deliveries
-```
-
-serán indicadores más precisos que tratar cualquier `Sale` como un único evento.
-
----
-
-# 80. Quote summary
-
-Una evolución futura puede mostrar:
-
-```text
-Draft Quotes
-Confirmed Quotes
-Quotes awaiting follow-up
-Conversion rate
-```
-
-pero la métrica `conversion rate` requiere definir claramente:
-
-```text
-qué constituye conversión
-qué período
-qué denominator
+Purchase Receipt Dashboard indicators
+→ TARGET
 ```
 
 ---
 
-# 81. Average Ticket
+# 42. Sales attention TARGET
 
-La documentación histórica propone:
-
-```text
-Average Ticket
-```
-
-como KPI.
-
-Debe definirse antes de implementarlo.
-
-Ejemplo:
+Cuando exista SalesOrder / Delivery, Dashboard podrá mostrar:
 
 ```text
-Confirmed Sales total
-/
-Confirmed Sales count
+SalesOrders pending fulfillment
+
+Partially delivered orders
+
+Deliveries requiring action
 ```
 
-puede ser distinto a utilizar Invoice o Delivery.
+Actualmente:
+
+```text
+SalesOrder / Delivery indicators
+→ TARGET
+```
 
 ---
 
-# 82. Salesperson metrics
+# 43. Commercial Returns
 
-La documentación histórica menciona:
+Generic Commercial Returns permanece:
 
 ```text
-Sales by Salesperson
+P1 / DEFERRED
 ```
 
-pero el modelo actual no formaliza completamente ownership comercial.
+Por tanto:
 
-Por tanto esta métrica permanece FUTURE/TARGET hasta que exista una relación confiable.
+```text
+Return pending
+
+Return rate
+
+Returns confirmed
+```
+
+no deben presentarse como métricas CURRENT.
 
 ---
 
-# 83. Active Customers
+# 44. Commercial Returns Dashboard
 
-El término:
+Cuando Commercial Returns sea implementado podrá aportar métricas específicas.
+
+Debe mantenerse:
+
+```text
+Commercial Returns
+→ future Dashboard consumer
+```
+
+No:
+
+```text
+Dashboard currently consumes Returns
+```
+
+---
+
+# 45. Commercial Return ≠ Healthcare Return
+
+Debe mantenerse:
+
+```text
+Commercial Return
+≠
+Healthcare custody Return
+```
+
+Los futuros widgets tampoco deben mezclar ambas semánticas.
+
+---
+
+# 46. Expiration alerts TARGET
+
+La existencia de:
+
+```text
+expirationDate
+```
+
+en InventoryBatch no significa que Dashboard ya soporte alertas de caducidad.
+
+Hace falta definir:
+
+```text
+expiration window
+
+eligible batches
+
+expired semantics
+
+query
+
+UX
+```
+
+Por tanto:
+
+```text
+Near Expiration
+→ TARGET
+```
+
+---
+
+# 47. Trends TARGET
+
+Dashboard puede evolucionar hacia:
+
+```text
+current period
+
+previous period
+
+variation
+
+trend
+```
+
+pero:
+
+```text
+trends
+→ NOT CURRENT
+```
+
+---
+
+# 48. No inventar trends
+
+No mostrar:
+
+```text
++25%
+```
+
+sin poder definir:
+
+```text
+current period
+
+comparison period
+
+included records
+
+status filters
+
+calculation
+```
+
+---
+
+# 49. Charts TARGET
+
+Charts pueden utilizarse cuando respondan una pregunta real.
+
+Ejemplos futuros:
+
+```text
+Sales over time
+
+Purchases by month
+
+Purchases by Supplier
+
+Sales by Customer
+
+Inventory trends
+```
+
+No son requisito para Dashboard V1.
+
+---
+
+# 50. Decorative charts anti-pattern
+
+No debe agregarse una gráfica únicamente porque visualmente haga parecer más
+completo al producto.
+
+Debe aportar:
+
+```text
+comparison
+
+trend
+
+anomaly detection
+
+decision support
+```
+
+---
+
+# 51. KPI definitions
+
+Cada métrica futura debe tener una definición explícita.
+
+Por ejemplo:
 
 ```text
 Active Customers
@@ -1367,585 +1081,1078 @@ Active Customers
 
 puede significar:
 
-1. `isActive = true`, o
-2. Customers que han comprado recientemente.
-
-No deben mezclarse.
-
----
-
-# 84. Nombres de métricas
-
-Las etiquetas deben comunicar su significado.
-
-Preferir:
-
 ```text
-Clientes habilitados
-```
-
-si significa `isActive`.
-
-O:
-
-```text
-Clientes con compra en 90 días
-```
-
-si significa actividad comercial.
-
----
-
-# 85. Top Customers
-
-Una métrica de Top Customers debe especificar:
-
-* período;
-* medida;
-* estados incluidos.
-
-Ejemplo:
-
-```text
-Top Customers by confirmed sales
-Current month
-```
-
----
-
-# 86. Top Products
-
-También debe definirse:
-
-```text
-por unidades
-por revenue
-por margen
-```
-
-antes de utilizar la etiqueta genérica:
-
-```text
-Top Products
-```
-
----
-
-# 87. Purchases by Supplier
-
-Puede calcularse según:
-
-* importe;
-* número de órdenes;
-* unidades;
-
-por lo que Dashboard debe evitar métricas ambiguas.
-
----
-
-# 88. KPI definitions
-
-Cuando Dashboard crezca, conviene mantener cada métrica con una definición explícita en código/documentación técnica.
-
-Ejemplo:
-
-```text
-Metric:
-pendingPurchaseReceipts
-
-Definition:
-Purchases with remaining quantity > 0
-and lifecycle allowing receipt
-```
-
----
-
-# 89. Metric ownership
-
-Dashboard puede ser propietario de:
-
-```text
-cómo se presenta una métrica agregada
-```
-
-pero debe reutilizar la semántica de los módulos fuente.
-
----
-
-# 90. Audit integration
-
-Cuando Audit esté implementado, Dashboard podrá utilizarlo para Recent Activity.
-
-Debe respetar:
-
-* tenant;
-* permisos;
-* minimización.
-
----
-
-# 91. Información sensible
-
-No todos los usuarios necesitan ver:
-
-* revenue;
-* costos;
-* márgenes;
-* valor de inventario;
-* actividad de otros usuarios.
-
-Dashboard debe respetar autorización.
-
----
-
-# 92. `dashboard.read`
-
-La documentación histórica contempla:
-
-```text
-dashboard.read
-```
-
-como permiso.
-
-Esta dirección es coherente con ADR-007.
-
----
-
-# 93. Permisos de datos subyacentes
-
-Tener:
-
-```text
-dashboard.read
-```
-
-no debería convertirse automáticamente en acceso a toda información sensible de la Company.
-
-Un Dashboard por rol debe considerar las políticas aplicables a sus métricas.
-
----
-
-# 94. `dashboard.export`
-
-La documentación histórica propone:
-
-```text
-dashboard.export
-```
-
-para exportación de métricas.
-
-Esta capacidad sigue siendo futura mientras no exista el workflow correspondiente.
-
----
-
-# 95. Export
-
-Cuando exista, exportar Dashboard debe respetar:
-
-* permisos;
-* filtros;
-* tenant;
-* datos sensibles;
-* límites de volumen.
-
----
-
-# 96. Multi-tenancy
-
-Toda métrica debe estar aislada por Company.
-
-Nunca:
-
-```text
-SUM sales
-```
-
-sin:
-
-```text
-Company context
-```
-
-en una consulta multi-tenant.
-
----
-
-# 97. Cross-tenant aggregation
-
-Debe evitarse cualquier consulta que accidentalmente calcule:
-
-```text
-Company A + Company B
-```
-
-para un usuario normal.
-
----
-
-# 98. Multi-company future
-
-Un usuario autorizado podría algún día consultar varias Companies.
-
-Esto requerirá un modelo explícito de:
-
-* membership;
-* autorización;
-* scope.
-
-No se obtiene removiendo el filtro de tenant.
-
----
-
-# 99. Healthcare Dashboard
-
-Healthcare podrá añadir una experiencia operacional especializada.
-
-Ejemplos:
-
-```text
-Cases today
-Cases requiring preparation
-CaseKit pending
-Equipment conflict
-Returns pending
-Reconciliation incidents
-```
-
----
-
-# 100. Healthcare no debe contaminar Dashboard Core
-
-Una empresa que no utiliza Healthcare no necesita widgets como:
-
-```text
-Cases
-Doctors
-Hospitals
-```
-
-en su Dashboard principal.
-
-La experiencia debe especializarse según capacidades habilitadas.
-
----
-
-# 101. Case Calendar vs Dashboard
-
-Debe distinguirse:
-
-```text
-Dashboard
-→ resumen y atención
-```
-
-de:
-
-```text
-Case Calendar
-→ planificación temporal Healthcare
-```
-
-Pueden enlazarse, pero no son la misma vista.
-
----
-
-# 102. Warehouse Workspace vs Dashboard
-
-También:
-
-```text
-Dashboard
-→ panorama
-```
-
-mientras:
-
-```text
-Warehouse Operations
-→ workspace de ejecución
-```
-
-Dashboard puede mostrar:
-
-```text
-3 recepciones pendientes
-```
-
-y enlazar al Workspace correspondiente.
-
----
-
-# 103. Radar
-
-En el futuro Zaping Radar podrá proporcionar información externa.
-
-No debe mezclarse con KPIs internos sin distinguir el origen.
-
-Ejemplo:
-
-```text
-ERP
-→ operación interna
-
-Radar
-→ oportunidad externa
-```
-
----
-
-# 104. Zaping AI
-
-La capa futura de inteligencia puede añadir:
-
-```text
-Insights
-Recommendations
-Anomaly detection
-Natural-language queries
-```
-
----
-
-# 105. AI no sustituye KPI
-
-Una recomendación de IA debe apoyarse en datos verificables.
-
-Ejemplo:
-
-```text
-Recomendamos revisar Product CAT-001.
-
-Stock: 4
-MinStock: 10
-Pending Purchases: 0
-```
-
----
-
-# 106. AI explicable
-
-No mostrar:
-
-```text
-Compra 50 unidades.
-```
-
-sin explicar la razón.
-
----
-
-# 107. Natural Language futuro
-
-Una capacidad futura puede permitir preguntas como:
-
-```text
-¿Qué productos tienen bajo stock?
+isActive = true
 ```
 
 o:
 
 ```text
-¿Cuáles fueron mis ventas este mes?
+Customers with recent commercial activity
 ```
 
-Debe respetar los mismos permisos y reglas que las APIs tradicionales.
+Estas dos definiciones no deben mezclarse.
 
 ---
 
-# 108. Executive Dashboard
+# 52. Metric labels
 
-La documentación histórica contempla:
+Las etiquetas deben comunicar su significado.
+
+Ejemplo:
 
 ```text
-Executive Dashboard
+Clientes habilitados
 ```
 
-como evolución futura.
+si significa:
 
-Podría priorizar:
+```text
+isActive = true
+```
 
-* tendencias;
-* revenue;
-* compras;
-* inventario;
-* riesgos;
-* performance.
+frente a:
 
-No debe construirse antes de contar con datos confiables.
+```text
+Clientes con compra en 90 días
+```
+
+si mide actividad comercial.
 
 ---
 
-# 109. Financial Dashboard
+# 53. Ambiguous metrics
 
-Requiere primero dominios financieros suficientemente sólidos.
-
-No debe utilizar:
+Métricas como:
 
 ```text
-Sales total
+Top Customers
+
+Top Products
+
+Average Ticket
+
+Conversion Rate
 ```
 
-como sustituto automático de:
+requieren definir antes:
 
 ```text
-Revenue recognized
-Cash collected
-Profit
+period
+
+measure
+
+included lifecycle states
+
+denominator when applicable
 ```
 
 ---
 
-# 110. Warehouse Dashboard
+# 54. Salesperson metrics FUTURE
 
-Puede evolucionar mejor como:
+Actualmente no existe ownership comercial suficientemente formalizado para tratar:
 
 ```text
-Warehouse Operations Workspace
+Sales by Salesperson
 ```
 
-orientado a tareas.
+como métrica confiable.
 
-Esto está alineado con Zaping Way.
-
----
-
-# 111. Mobile Dashboard
-
-Una futura App móvil puede necesitar un Dashboard distinto por contexto.
-
-No debe suponerse que la pantalla desktop debe copiarse pixel por pixel.
-
----
-
-# 112. Estado CURRENT
-
-El estado registrado del proyecto incluye actualmente un Dashboard con información agregada como:
+Debe permanecer:
 
 ```text
-customer totals
-supplier totals
-product totals
-quote totals
-purchase totals
-sale totals
+FUTURE
+```
+
+hasta que exista la relación correspondiente.
+
+---
+
+# 55. Recent Activity TARGET
+
+Una futura sección de Recent Activity puede mostrar eventos como:
+
+```text
+Purchase created
+
+PurchaseReceipt registered
+
+Quote approved
+
+Sale confirmed
+
+Customer created
+```
+
+cuando exista una fuente adecuada.
+
+---
+
+# 56. Audit boundary
+
+Debe mantenerse:
+
+```text
+Dashboard Recent Activity
+≠
+Audit System
+```
+
+Dashboard puede consumir Audit en el futuro.
+
+No sustituye un registro completo de auditoría.
+
+---
+
+# 57. Audit CURRENT status
+
+Actualmente no existe una plataforma transversal de Audit completamente
+implementada.
+
+Por tanto:
+
+```text
+Audit-fed Dashboard Timeline
+→ TARGET
+```
+
+No debe describirse como fuente CURRENT.
+
+---
+
+# 58. Notifications boundary
+
+Debe mantenerse:
+
+```text
+Dashboard Alert
+≠
+Notification
+```
+
+Dashboard Alert:
+
+```text
+visible context when user opens Dashboard
+```
+
+Notification:
+
+```text
+directed communication to a user
+```
+
+Notifications continúa siendo una capacidad separada/futura salvo implementación
+específica.
+
+---
+
+# 59. Operational alerts TARGET
+
+Un futuro sistema de alertas puede incluir:
+
+```text
+Low Stock
+
+Out of Stock
+
+Near Expiration
+
+Pending Receipt
+
+Operational exceptions
+```
+
+Debe existir una semántica consistente de severidad.
+
+---
+
+# 60. Severity
+
+No debe diseñarse un segundo sistema visual dentro de Dashboard.
+
+La representación visual debe alinearse con:
+
+```text
+Design System
+```
+
+La prioridad empresarial puede mantenerse separada de la presentación visual si
+es necesario.
+
+---
+
+# 61. Role-aware Dashboard TARGET
+
+Una futura evolución puede adaptar información según responsabilidades.
+
+Ejemplo conceptual:
+
+```text
+Sales
+→ commercial work
+
+Warehouse
+→ receipts / fulfillment / stock attention
+
+Management
+→ KPIs / trends / exceptions
+```
+
+Actualmente:
+
+```text
+role-aware widget composition
+→ TARGET
+```
+
+---
+
+# 62. Widget permissions TARGET
+
+El Dashboard CURRENT no debe afirmar granularidad de permisos por widget.
+
+Una futura estrategia puede requerir:
+
+```text
+dashboard.read
+
+domain permissions
+
+sensitive-metric permissions
+```
+
+según la arquitectura RBAC final.
+
+---
+
+# 63. Sensitive metrics
+
+Información como:
+
+```text
 inventory value
-low-stock products
-recent sales
+
+cost
+
+revenue
+
+margin
+
+activity of other users
+```
+
+puede requerir autorización específica.
+
+El acceso al Dashboard no debe asumirse automáticamente como permiso para toda
+información sensible.
+
+---
+
+# 64. Authorization
+
+Dashboard debe respetar:
+
+```text
+Authentication
+
+Authorization
+
+Tenant Isolation
+
+Data minimization
+```
+
+La revisión transversal de permisos críticos continúa siendo necesaria antes de
+producción.
+
+---
+
+# 65. Multi-tenancy
+
+Dashboard opera dentro de:
+
+```text
+authenticated Company
+```
+
+Debe mantenerse:
+
+```text
+Dashboard
+→ one tenant context
+```
+
+No debe aceptar un `companyId` arbitrario desde frontend para cambiar el scope del
+usuario.
+
+---
+
+# 66. Cross-tenant aggregation
+
+Nunca debe ocurrir:
+
+```text
+Company A metrics
++
+Company B metrics
+```
+
+para un usuario que solo pertenece al contexto de Company A.
+
+Toda agregación debe permanecer tenant-scoped.
+
+---
+
+# 67. Multi-company Dashboard FUTURE
+
+Una futura experiencia multi-company requerirá:
+
+```text
+explicit membership
+
+authorization
+
+scope selection
+```
+
+No debe construirse simplemente retirando los filtros de tenant.
+
+---
+
+# 68. Read Model DTO
+
+Dashboard debe preferir un response orientado a presentación.
+
+Conceptualmente:
+
+```text
+DashboardResponse
+
+totals
+
+inventory
+
+attention
+
+activity
+```
+
+cuando esos bloques existan.
+
+No necesita devolver entidades Prisma completas.
+
+---
+
+# 69. Frontend aggregation boundary
+
+Debe evitarse que frontend tenga que ejecutar:
+
+```text
+GET customers
+
+GET suppliers
+
+GET products
+
+GET purchases
+
+GET quotes
+
+GET inventory
+```
+
+y reconstruir la lógica completa.
+
+CURRENT:
+
+```text
+GET /dashboard
++
+GET /sales
+```
+
+es una composición controlada y no ese anti-patrón.
+
+---
+
+# 70. Performance
+
+El objetivo histórico de:
+
+```text
+< 500 ms
+```
+
+puede mantenerse como:
+
+```text
+performance target
+under representative normal conditions
+```
+
+No constituye:
+
+```text
+current SLA
+```
+
+ni garantía universal.
+
+---
+
+# 71. Performance evolution
+
+Conforme el volumen crezca pueden evaluarse:
+
+```text
+aggregate queries
+
+indexes
+
+safe parallel reads
+
+caching
+
+pre-aggregation
+
+optimized Read Models
+```
+
+solo cuando mediciones reales lo justifiquen.
+
+---
+
+# 72. No premature analytics infrastructure
+
+No introducir automáticamente:
+
+```text
+Redis
+
+materialized views
+
+event streaming
+
+analytics warehouse
+```
+
+sin evidencia de necesidad.
+
+Debe mantenerse:
+
+```text
+measure
+↓
+identify bottleneck
+↓
+optimize
 ```
 
 ---
 
-# 113. Estado TARGET
+# 73. Cache
+
+La estrategia de cache dependerá del tipo de dato.
+
+Por ejemplo:
+
+```text
+monthly trend
+```
+
+puede tolerar más latencia que:
+
+```text
+critical operational attention
+```
+
+No toda métrica necesita la misma frescura.
+
+---
+
+# 74. Real-time semantics
+
+En Dashboard CURRENT:
+
+```text
+real-time
+```
+
+no implica necesariamente:
+
+```text
+WebSockets
+
+SSE
+
+streaming
+```
+
+Significa información suficientemente actual para la operación cuando el usuario
+consulta o refresca la vista.
+
+---
+
+# 75. Onboarding Dashboard FUTURE
+
+Una Company nueva puede beneficiarse posteriormente de un flujo como:
+
+```text
+Add Products
+
+Add Customers
+
+Create first Quote
+
+Create first Purchase
+```
+
+en lugar de recibir únicamente KPIs en cero.
+
+Actualmente:
+
+```text
+Onboarding Dashboard
+→ FUTURE UX
+```
+
+---
+
+# 76. Healthcare boundary
+
+Healthcare puede requerir posteriormente una experiencia especializada.
+
+Debe mantenerse:
+
+```text
+ERP Dashboard
+≠
+Healthcare operational workspace
+```
+
+---
+
+# 77. Healthcare CURRENT status
+
+Healthcare Case Foundation existe, pero Dashboard no debe presentar como CURRENT
+capacidades como:
+
+```text
+Case preparation
+
+CaseKit
+
+Equipment Assignment
+
+CaseDispatch
+
+Healthcare Return
+
+Reconciliation
+```
+
+mientras esos workflows no estén implementados.
+
+---
+
+# 78. Healthcare Dashboard TARGET
+
+Una futura experiencia especializada puede mostrar:
+
+```text
+Cases today
+
+Cases requiring preparation
+
+Equipment conflicts
+
+Returns pending
+
+Reconciliation incidents
+```
+
+según los dominios que realmente existan en ese momento.
+
+---
+
+# 79. Case Calendar boundary
+
+Debe mantenerse:
+
+```text
+Dashboard
+→ summary / attention
+```
+
+```text
+Case Calendar
+→ temporal Healthcare planning
+```
+
+Pueden enlazarse.
+
+No son la misma experiencia.
+
+---
+
+# 80. Warehouse boundary
+
+Debe mantenerse:
+
+```text
+Dashboard
+→ overview / attention
+```
+
+frente a:
+
+```text
+Warehouse Operations
+→ execution workspace
+```
+
+Un futuro Dashboard puede decir:
+
+```text
+3 operaciones requieren atención
+```
+
+y navegar al workspace correspondiente.
+
+---
+
+# 81. Radar boundary
+
+Si Zaping Radar se integra posteriormente, debe mantenerse:
+
+```text
+ERP
+→ internal operational data
+```
+
+```text
+Radar
+→ external opportunity data
+```
+
+El origen de cada información debe ser claro.
+
+---
+
+# 82. AI FUTURE
+
+Una futura capa de AI puede aportar:
+
+```text
+insights
+
+recommendations
+
+anomaly detection
+
+natural-language queries
+```
+
+pero debe estar basada en información real y autorizada.
+
+---
+
+# 83. Explainable AI
+
+Una recomendación futura debe poder explicar el dato que la origina.
+
+Ejemplo:
+
+```text
+Review Product X
+
+stock = 4
+
+minStock = 10
+```
+
+No:
+
+```text
+Buy 50 units
+```
+
+sin justificación trazable.
+
+---
+
+# 84. Financial boundary
+
+Debe mantenerse:
+
+```text
+Sale total
+≠
+recognized revenue
+```
+
+```text
+Sale total
+≠
+cash collected
+```
+
+```text
+Sale total
+≠
+profit
+```
+
+Un futuro Financial Dashboard requerirá dominios financieros suficientemente
+formalizados.
+
+---
+
+# 85. Executive Dashboard FUTURE
+
+Una futura experiencia ejecutiva puede utilizar:
+
+```text
+trends
+
+operational risk
+
+commercial performance
+
+inventory context
+
+financial data
+```
+
+solo cuando cada métrica sea confiable y esté definida.
+
+---
+
+# 86. Custom Dashboard FUTURE
+
+Capacidades como:
+
+```text
+Favorite Widgets
+
+Saved Filters
+
+Custom Dashboards
+
+Drag & Drop
+
+Exports
+```
+
+permanecen FUTURE.
+
+No son prioritarias para Dashboard V1.
+
+---
+
+# 87. IMPLEMENTED
+
+Actualmente:
+
+```text
+Dashboard page
+
+GET /dashboard integration
+
+GET /sales integration for Recent Sales
+
+real metrics
+
+Customers metric
+
+Suppliers metric
+
+Products metric
+
+Quotes metric
+
+Purchases metric
+
+Sales metric
+
+Inventory Value
+
+Low Stock Products
+
+Recent Sales
+
+KPI links
+
+main loading
+
+main error
+
+retry
+
+empty-state handling
+
+Recent Sales error isolation
+```
+
+---
+
+# 88. VALIDATED
+
+La validación registrada cubre según los hitos correspondientes:
+
+```text
+real Dashboard data
+
+no mocked Sales data
+
+Dashboard loading
+
+main error handling
+
+retry
+
+empty states
+
+KPI navigation
+
+Low Stock presentation
+
+Inventory Value presentation
+
+Recent Sales
+
+localized Recent Sales failure
+```
+
+Los detalles cuantitativos pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+```
+
+---
+
+# 89. TECHNICAL DEBT
+
+Permanece pendiente:
+
+```text
+more explicit metric definitions where semantics are ambiguous
+```
+
+```text
+server-defined Recent Activity
+```
+
+```text
+role-aware sensitive metric authorization
+```
+
+```text
+Dashboard-level operational attention Read Models
+```
+
+```text
+performance measurement under representative data volume
+```
+
+---
+
+# 90. TARGET
 
 La evolución aprobada incluye:
 
 ```text
 Action Dashboard
-Operational alerts
-Task-oriented summaries
-Contextual navigation
-Recent activity
-More precise KPIs
-Charts where useful
-Purchase receipt indicators
-SalesOrder / Delivery indicators
-Expiration alerts
-Role-aware presentation
+
+task-oriented summaries
+
+operational attention blocks
+
+Purchase Receipt indicators
+
+expiration alerts
+
+Recent Activity
+
+contextual Quick Actions
+
+role-aware presentation
+
+more precise KPI definitions
+
+useful charts / trends
+
+stronger sensitive-metric authorization
 ```
 
 ---
 
-# 114. Estado FUTURE
+# 91. FUTURE
 
 Capacidades posteriores:
 
 ```text
+SalesOrder / Delivery indicators
+
+Commercial Return indicators
+
+Healthcare Dashboard
+
 Custom Dashboards
+
 Favorite Widgets
+
 Saved Filters
+
 Drag & Drop
+
 Multi-company views
+
 Executive Dashboard
+
 Financial Dashboard
-Advanced Analytics
-PDF / Excel exports
-AI Insights
-Predictive Analytics
-Natural Language Queries
+
+advanced analytics
+
+exports
+
+AI insights
+
+predictive analytics
+
+natural-language queries
+```
+
+No forman parte automáticamente del siguiente sprint.
+
+---
+
+# 92. Invariantes
+
+## Tenant
+
+```text
+Dashboard
+→ authenticated Company context
 ```
 
 ---
 
-# 115. Invariantes
-
-```text
-Dashboard
-→ belongs to authenticated Company context
-```
+## Read Model
 
 ```text
 Dashboard
 → consumes domain information
 ```
 
+---
+
+## Ownership
+
 ```text
 Dashboard
 → does not own transactional lifecycle
 ```
 
+---
+
+## Inventory
+
 ```text
 Dashboard
-→ does not directly change Inventory
+→ does not directly mutate Inventory
 ```
+
+---
+
+## Metrics
 
 ```text
 Dashboard metric
 → must have explicit meaning
 ```
 
+---
+
+## Error semantics
+
 ```text
-Zero
+0
 ≠
-Query failure
-```
-
-```text
-Quick Action
-→ delegates to owning workflow
-```
-
-```text
-Dashboard UI
-→ should not independently reconstruct every domain
+query failure
 ```
 
 ---
 
-# 116. Anti-patrones
+## Navigation
+
+```text
+Dashboard action
+→ delegates to owning workflow
+```
+
+---
+
+## Domain rules
+
+```text
+Dashboard
+→ must not duplicate domain business rules
+```
+
+---
+
+## Multi-tenancy
+
+```text
+cross-tenant aggregation
+→ forbidden
+```
+
+---
+
+# 93. Anti-patrones
 
 ## Database Counter Dashboard
 
-Mostrar únicamente:
+Incorrecto limitar toda la experiencia a:
 
 ```text
 Customers: 45
+
 Products: 810
+
 Sales: 92
 ```
 
-sin contexto ni acciones.
+sin contexto ni navegación.
 
 ---
 
 ## Duplicated Business Rules
 
-Reimplementar Low Stock, Purchase Pending o Delivery Status dentro de Dashboard.
+Incorrecto redefinir:
+
+```text
+Low Stock
+
+Purchase state
+
+Sale state
+```
+
+dentro de Dashboard.
 
 ---
 
 ## Dashboard as Transaction Service
+
+Incorrecto:
 
 ```text
 POST /dashboard/adjust-stock
@@ -1955,262 +2162,616 @@ POST /dashboard/adjust-stock
 
 ## Frontend Aggregation Explosion
 
-Hacer muchas consultas independientes y reconstruir toda la lógica en React.
+Incorrecto reconstruir todo el ERP mediante múltiples requests independientes en
+React.
 
 ---
 
 ## Metric Without Definition
 
-Mostrar:
+Incorrecto mostrar:
 
 ```text
 Active Customers
 ```
 
-sin poder explicar qué significa “Active”.
+sin poder explicar qué significa.
 
 ---
 
 ## Decorative Charts
 
-Agregar gráficas que no ayudan a tomar decisiones.
+Incorrecto agregar gráficas sin una pregunta empresarial.
 
 ---
 
 ## False Zero
 
-Mostrar `0` cuando ocurrió un error de consulta.
+Incorrecto:
+
+```text
+query failed
+↓
+display 0
+```
 
 ---
 
-## Unprotected Financial Metrics
+## Unprotected Sensitive Metrics
 
-Mostrar costos/revenue a cualquier usuario únicamente porque puede abrir Dashboard.
+Incorrecto asumir:
+
+```text
+Dashboard access
+→ access to every financial / cost metric
+```
 
 ---
 
 ## Premature BI Platform
 
-Construir infraestructura analítica compleja antes de que el Core y los workflows estén maduros.
+Incorrecto construir una infraestructura analítica compleja antes de medir la
+necesidad.
 
 ---
 
-# 117. Relación con Customers
+## Target documented as Current
 
-Customers proporciona los datos del catálogo.
+Incorrecto presentar:
 
-Dashboard puede mostrar:
+```text
+SalesOrder
+
+Delivery
+
+Commercial Returns
+
+Healthcare operations
+
+Audit Timeline
+
+Notifications
+```
+
+como si fueran fuentes CURRENT del Dashboard.
+
+---
+
+# 94. Relación con Customers
+
+Customers proporciona el catálogo maestro.
+
+Dashboard puede presentar:
 
 ```text
 counts
-activity
-commercial summaries
+
+summary context
 ```
 
 sin modificar Customers.
 
 ---
 
-# 118. Relación con Suppliers
+# 95. Relación con Suppliers
 
-Suppliers proporciona contexto para métricas de abastecimiento.
+Suppliers proporciona contexto de abastecimiento.
+
+Dashboard puede consumir métricas relacionadas sin administrar el lifecycle del
+Supplier.
 
 ---
 
-# 119. Relación con Products
+# 96. Relación con Products
 
 Products proporciona identidad de catálogo.
 
-Inventory proporciona las métricas físicas relacionadas.
+Inventory proporciona información física.
+
+Dashboard presenta ambas cuando corresponda.
 
 ---
 
-# 120. Relación con Purchases
-
-Dashboard debe evolucionar hacia métricas operativas como:
-
-```text
-Pending Receipt
-Partially Received
-```
-
-basadas en el lifecycle real.
-
----
-
-# 121. Relación con Inventory
-
-Inventory es propietario de:
-
-* stock;
-* movements;
-* batches;
-* availability.
-
-Dashboard los presenta.
-
----
-
-# 122. Relación con Quotes
-
-Quotes puede alimentar:
-
-* volumen;
-* estados;
-* actividad;
-* futuras conversiones.
-
----
-
-# 123. Relación con Sales
+# 97. Relación con Purchases
 
 CURRENT:
 
 ```text
-Sale metrics
+Purchase metric
 ```
 
 TARGET:
 
 ```text
-SalesOrder
-Delivery
+pending receipt attention
+
+partial receipt attention
+
+recent receipts
 ```
 
-Dashboard debe migrar junto con Sales.
+según el Read Model futuro.
 
 ---
 
-# 124. Relación con Returns
+# 98. Relación con Purchase Receipts
 
-Cuando Returns sea operativo puede aportar:
+PurchaseReceipts puede alimentar métricas operativas futuras.
+
+Dashboard no administra:
 
 ```text
-Returns pending
-Returns confirmed
-Return rate
+receipt creation
+
+receipt idempotency
+
+Inventory effects
 ```
 
-según las reglas definidas.
+---
+
+# 99. Relación con Inventory
+
+Inventory es propietario de:
+
+```text
+stock
+
+movements
+
+batches
+
+inventory semantics
+```
+
+Dashboard presenta contexto como:
+
+```text
+Inventory Value
+
+Low Stock
+```
 
 ---
 
-# 125. Relación con Healthcare
+# 100. Relación con Quotes
 
-Healthcare aportará Read Models especializados sin transferir sus reglas al Dashboard Core.
+Quotes puede alimentar:
+
+```text
+counts
+
+status summaries
+
+future follow-up metrics
+```
+
+sin transferir lifecycle a Dashboard.
 
 ---
 
-# 126. Relación con Zaping Way
+# 101. Relación con Sales
 
-`ZAPING_WAY.md` define el objetivo:
+CURRENT:
 
-> pasar de un Dashboard de métricas a un Dashboard orientado a atención y acción.
+```text
+Sale metrics
 
-Este documento define cómo esa dirección aplica al módulo Dashboard.
+Recent Sales
+```
+
+TARGET:
+
+```text
+SalesOrder metrics
+
+Delivery metrics
+```
+
+Dashboard debe evolucionar junto con la arquitectura comercial.
 
 ---
 
-# 127. Relación con Design System
+# 102. Relación con Returns
 
-`DESIGN_SYSTEM.md` gobierna:
+Commercial Returns permanece:
 
-* Cards;
-* estados;
-* jerarquía;
-* Loading;
-* Empty;
-* Error;
-* responsive;
-* accesibilidad.
+```text
+P1 / DEFERRED
+```
+
+Cuando exista, podrá proporcionar Read Models específicos.
+
+No forma parte del Dashboard CURRENT.
+
+---
+
+# 103. Relación con Healthcare
+
+Healthcare podrá aportar Read Models especializados.
+
+Dashboard Core no debe convertirse en propietario de:
+
+```text
+Case
+
+Dispatch
+
+Return
+
+Reconciliation
+
+Equipment Assignment
+```
+
+---
+
+# 104. Relación con Design System
+
+Design System gobierna:
+
+```text
+Cards
+
+Loading
+
+Empty
+
+Error
+
+Status presentation
+
+responsive behavior
+
+accessibility
+
+visual hierarchy
+```
 
 Dashboard no debe crear un sistema visual paralelo.
 
 ---
 
-# 128. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-011 — SalesOrder y Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
-
----
-
-# 129. Documentos relacionados
+# 105. ADR relacionados
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-product/ZAPING_WAY.md
+ADR-001 — Multi-Tenant
 
-architecture/ARCHITECTURE.md
+ADR-005 — Layered Architecture
 
-engineering/API_GUIDELINES.md
-engineering/QUALITY_STANDARDS.md
-engineering/SECURITY_PRINCIPLES.md
+ADR-006 — API First
 
-ux/DESIGN_SYSTEM.md
+ADR-007 — RBAC
 
-modules/erp/CUSTOMERS.md
-modules/erp/SUPPLIERS.md
-modules/erp/PRODUCTS.md
-modules/erp/PURCHASES.md
-modules/erp/INVENTORY.md
-modules/erp/QUOTES.md
-modules/erp/SALES.md
-modules/erp/RETURNS.md
+ADR-009 — Modular Monolith
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
+
+ADR-013 — Inventory Custody & Case Logistics
 ```
 
 ---
 
-# 130. Fuente de verdad
+# 106. Documentación relacionada
+
+```text
+docs/modules/erp/CUSTOMERS.md
+
+docs/modules/erp/SUPPLIERS.md
+
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/PURCHASES.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/INVENTORY.md
+
+docs/modules/erp/QUOTES.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/QUALITY_STANDARDS.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/product/ZAPING_WAY.md
+
+docs/ux/DESIGN_SYSTEM.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
+```
+
+`RETURNS.md` puede permanecer como documentación estratégica/deferred, pero no
+representa una dependencia CURRENT de Dashboard V1.
+
+---
+
+# 107. Fuente de verdad
 
 ```text
 DASHBOARD.md
-→ reglas funcionales del Read Model y experiencia Dashboard
+→ Dashboard Read Model behavior
+→ Dashboard UX boundaries
+```
 
-módulos ERP
-→ significado de los datos
+```text
+Dashboard backend
+→ CURRENT metrics and aggregation
+```
 
-ZAPING_WAY.md
-→ dirección de experiencia
+```text
+Dashboard frontend
+→ CURRENT presentation and error behavior
+```
 
-backend
-→ implementación actual
+```text
+ERP module documentation
+→ source-domain semantics
+```
 
+```text
+SALES.md
+→ CURRENT Sale semantics
+```
+
+```text
+INVENTORY.md
+→ Inventory / Low Stock semantics
+```
+
+```text
+ADR-011
+→ TARGET SalesOrder / Delivery architecture
+```
+
+```text
+Healthcare documentation
+→ future Healthcare-specific operational context
+```
+
+```text
 tests
-→ comportamiento validado
+→ validated Dashboard behavior
+```
 
+```text
 PROJECT_BOARD.md
-→ estado del trabajo
+→ active status / technical debt
+```
+
+```text
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 131. Principio final
+# 108. Estado consolidado
 
-Dashboard no debe responder únicamente:
+CURRENT:
+
+```text
+GET /dashboard
+✅
+
+real tenant-scoped data
+✅
+
+Customers metric
+✅
+
+Suppliers metric
+✅
+
+Products metric
+✅
+
+Quotes metric
+✅
+
+Purchases metric
+✅
+
+Sales metric
+✅
+
+Inventory Value
+✅
+
+Low Stock Products
+✅
+
+GET /sales for Recent Sales
+✅
+
+Recent Sales
+✅
+
+KPI navigation
+✅
+
+loading
+✅
+
+main error
+✅
+
+retry
+✅
+
+empty states
+✅
+
+Recent Sales error isolation
+✅
+```
+
+TARGET:
+
+```text
+Action Dashboard
+⏳
+
+Purchase Receipt attention
+⏳
+
+operational alerts
+⏳
+
+expiration alerts
+⏳
+
+Recent Activity
+⏳
+
+Quick Actions
+⏳
+
+role-aware presentation
+⏳
+
+sensitive metric authorization improvements
+⏳
+
+charts / trends
+⏳
+```
+
+FUTURE:
+
+```text
+SalesOrder / Delivery indicators
+
+Commercial Return indicators
+
+Healthcare Dashboard
+
+custom widgets
+
+exports
+
+Executive Dashboard
+
+Financial Dashboard
+
+advanced analytics
+
+AI insights
+
+natural-language queries
+```
+
+---
+
+# 109. Secuencia de proyecto
+
+Dashboard V1 forma parte del ERP Core actual.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Por tanto no deben introducirse automáticamente antes del cierre actual:
+
+```text
+SalesOrder / Delivery Dashboard
+
+Commercial Returns Dashboard
+
+Healthcare Action Dashboard
+
+advanced analytics
+
+AI
+```
+
+únicamente porque aparezcan como dirección futura en este documento.
+
+---
+
+# 110. Principio final
+
+Dashboard no debe limitarse a responder:
 
 ```text
 ¿Cuántos registros existen?
 ```
 
-Debe evolucionar hacia:
+La dirección de producto es evolucionar hacia:
 
 ```text
-¿Qué está pasando?
+¿Qué está ocurriendo?
 ↓
 ¿Qué necesita atención?
 ↓
 ¿Por qué?
 ↓
-¿Qué puedo hacer?
+¿A dónde debo ir?
 ```
 
-La regla es:
+CURRENT:
 
-> **El Dashboard no gobierna la empresa. Hace visible lo que los dominios ya saben y ayuda al usuario a actuar sobre ello.**
+```text
+Dashboard
+→ real operational overview
+→ real KPIs
+→ Inventory context
+→ Low Stock
+→ Recent Sales
+→ contextual navigation
+```
+
+TARGET:
+
+```text
+Dashboard
+→ attention
+→ tasks
+→ context
+→ action
+```
+
+Debe mantenerse:
+
+```text
+Dashboard
+≠
+transactional domain
+```
+
+y:
+
+```text
+Dashboard
+≠
+source of truth for domain rules
+```
+
+> **El Dashboard hace visible lo que los dominios ya saben. Su responsabilidad es
+> agregar contexto, señalar información relevante y conducir al usuario hacia el
+> workflow correcto sin apropiarse de la lógica transaccional.**

@@ -85,9 +85,10 @@ export class CategoriesService {
       }
     }
 
-    return this.prisma.category.update({
+    const updateResult = await this.prisma.category.updateMany({
       where: {
         id,
+        companyId,
       },
       data: {
         ...(name ? { name } : {}),
@@ -97,10 +98,16 @@ export class CategoriesService {
         ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new NotFoundException('Categoría no encontrada');
+    }
+
+    return this.findOne(companyId, id);
   }
 
   async remove(companyId: string, id: string) {
-    await this.findOne(companyId, id);
+    const category = await this.findOne(companyId, id);
 
     const productsCount = await this.prisma.product.count({
       where: {
@@ -115,10 +122,17 @@ export class CategoriesService {
       );
     }
 
-    return this.prisma.category.delete({
+    const deleteResult = await this.prisma.category.deleteMany({
       where: {
         id,
+        companyId,
       },
     });
+
+    if (deleteResult.count === 0) {
+      throw new NotFoundException('Categoría no encontrada');
+    }
+
+    return category;
   }
 }

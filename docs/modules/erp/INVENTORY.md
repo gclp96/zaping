@@ -1,2222 +1,2596 @@
-# Módulo de Inventario — Zaping ERP
+# Inventory — Zaping ERP
 
 **Módulo:** Inventory
 **Producto:** Zaping ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / EN EVOLUCIÓN
-**Última actualización:** 2026-08-19
+**Estado de implementación:** INVENTORY V1 LEDGER IMPLEMENTED / VALIDATED; LOCATION-AWARE INVENTORY TARGET
+**Última actualización:** 2026-08-27
 **Responsable:** Zaping ERP Team
 
 ---
 
 # 1. Propósito
 
-El módulo Inventory administra las existencias físicas y su trazabilidad dentro de Zaping.
+Inventory administra la cantidad, trazabilidad y movimientos de las existencias
+controladas por una Company.
 
-Su responsabilidad principal es responder de manera confiable:
+Actualmente debe responder principalmente:
 
 ```text
-¿Qué existe?
-¿Cuánto existe?
-¿Por qué existe esa cantidad?
-¿De dónde llegó?
-¿Qué movimientos la afectaron?
-¿Qué lote está involucrado?
-¿Cuándo caduca?
-¿Qué puede utilizarse?
-¿Qué ocurrió históricamente?
+¿Qué Product existe en inventario?
+
+¿Cuántas unidades existen?
+
+¿Qué movimiento produjo ese cambio?
+
+¿Qué lote corresponde cuando aplica?
+
+¿Qué caducidad posee ese lote?
 ```
 
-Inventory no debe limitarse a almacenar un número llamado `stock`.
+La evolución aprobada deberá permitir además responder:
 
-Debe conservar la historia que explica ese número.
+```text
+¿Dónde está esa cantidad?
+
+¿Cuánto está disponible?
+
+¿Cuánto continúa perteneciendo a la Company?
+
+¿Qué movimiento explica cada cambio de posición?
+```
+
+Inventory es un dominio central de Zaping ERP Core.
 
 ---
 
-# 2. Principio fundamental
+# 2. Ownership
 
-> **Todo cambio de inventario debe tener una causa empresarial trazable.**
+Inventory es propietario de conceptos como:
+
+```text
+Product.stock projection
+
+InventoryMovement
+
+InventoryBatch
+
+inventory quantity semantics
+
+inventory IN
+
+inventory OUT
+
+approved target InventoryLocation
+
+approved target InventoryPosition
+
+approved target TRANSFER
+```
+
+Inventory no es propietario de:
+
+```text
+Product catalog definition
+
+EquipmentAsset physical identity
+
+Equipment lifecycle
+
+Equipment condition
+
+Equipment Inspection
+
+Equipment Retirement
+
+Healthcare Case
+
+Case Equipment Assignment
+
+Healthcare Custody
+```
+
+Debe mantenerse:
+
+```text
+Inventory
+→ quantity / batch / movement truth
+```
+
+mientras:
+
+```text
+Equipment
+→ individual reusable ASSET identity
+```
+
+---
+
+# 3. Principio fundamental
+
+> **Stock debe ser consecuencia de operaciones controladas de inventario y no un
+> valor que el usuario edite libremente como operación ordinaria.**
 
 Conceptualmente:
 
 ```text
-Business Event
+Business Operation
 ↓
-Inventory Operation
+Confirmed Inventory Effect
 ↓
 InventoryMovement
++
+Stock Projection
+```
+
+Cuando una misma operación modifica ambos:
+
+```text
+Product.stock
++
+InventoryMovement
+```
+
+deben mantenerse consistentes dentro de la misma unidad de negocio.
+
+---
+
+# 4. CURRENT vs TARGET vs FUTURE
+
+Este documento distingue:
+
+## CURRENT
+
+Capacidad implementada actualmente.
+
+## TARGET
+
+Arquitectura aprobada pero todavía no implementada.
+
+## FUTURE
+
+Capacidades posteriores cuya implementación dependerá de necesidad y prioridad.
+
+No debe interpretarse una arquitectura TARGET como una capacidad disponible hoy.
+
+---
+
+# 5. Estado CURRENT
+
+Actualmente Inventory utiliza principalmente:
+
+```text
+Product.stock
+
+InventoryMovement
+
+InventoryBatch
+
+PurchaseReceipt
+
+Sale
+```
+
+Están implementados:
+
+```text
+aggregate stock projection
+
+InventoryMovement ledger
+
+IN
+
+OUT
+
+ADJUSTMENT movement type
+
+InventoryBatch
+
+lot / expiration traceability
+
+PurchaseReceipt → Inventory IN
+
+Sale CONFIRMED → Inventory OUT
+
+transactional stock mutation in supported workflows
+
+frontend Inventory workspace
+
+movement history
+
+reference-based Receipt deep-link
+```
+
+---
+
+# 6. Modelo CURRENT simplificado
+
+```text
+Product
+├── stock
+├── inventoryTracking
+└── lotTracking
+
+InventoryBatch
+├── Product
+├── lotNumber
+└── expirationDate
+
+InventoryMovement
+├── Product
+├── movementType
+├── quantity
+├── balance
+├── unitCost
+├── referenceType
+├── referenceId
+└── notes
+```
+
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
+
+---
+
+# 7. Product.stock
+
+Actualmente:
+
+```text
+Product.stock
+```
+
+es un campo persistido que funciona como:
+
+```text
+aggregate inventory projection
+```
+
+No debe interpretarse como una entrada libre del usuario.
+
+La arquitectura actual mantiene esta proyección mediante operaciones controladas
+como:
+
+```text
+Purchase Receipt
+
+Sale approval
+```
+
+---
+
+# 8. Product.stock no es ledger
+
+Debe distinguirse:
+
+```text
+Product.stock
+→ current aggregate projection
+```
+
+de:
+
+```text
+InventoryMovement
+→ history explaining inventory changes
+```
+
+Actualmente `Product.stock` no se reconstruye automáticamente desde cero
+reproduciendo todo el ledger en cada consulta.
+
+Por tanto debe mantenerse consistente mediante las operaciones de dominio que lo
+modifican.
+
+---
+
+# 9. Product.stock no es disponibilidad futura
+
+Actualmente:
+
+```text
+Product.stock
+```
+
+representa una cantidad agregada.
+
+En la arquitectura TARGET podrá representar:
+
+```text
+Company-owned aggregate quantity
+```
+
+y no necesariamente:
+
+```text
+immediately available warehouse quantity
+```
+
+Debe mantenerse conceptualmente:
+
+```text
+Owned
+≠
+Available
+```
+
+---
+
+# 10. InventoryMovement — CURRENT
+
+Actualmente `InventoryMovement` representa el historial de mutaciones de
+inventario agregado.
+
+Tipos observados/implementados:
+
+```text
+IN
+
+OUT
+
+ADJUSTMENT
+```
+
+Actualmente no existe:
+
+```text
+TRANSFER
+```
+
+como semántica completa location-aware implementada.
+
+`TRANSFER` pertenece a TARGET.
+
+---
+
+# 11. Ledger histórico
+
+Un `InventoryMovement` confirmado debe tratarse como un hecho histórico.
+
+Principio:
+
+```text
+Confirmed InventoryMovement
+→ historical fact
+```
+
+No debe editarse silenciosamente para cambiar el pasado.
+
+---
+
+# 12. Correcciones
+
+Si una mutación histórica fue incorrecta, la dirección arquitectónica es:
+
+```text
+corrective / compensating operation
+```
+
+y no:
+
+```text
+rewrite confirmed historical movement
+```
+
+El workflow completo de correcciones todavía requiere diseño específico.
+
+---
+
+# 13. ADJUSTMENT
+
+El tipo:
+
+```text
+ADJUSTMENT
+```
+
+forma parte del ledger actual y puede mostrarse en Inventory.
+
+Sin embargo:
+
+```text
+Manual Adjustment UI / workflow
+→ NOT IMPLEMENTED as normal Inventory V1 operation
+```
+
+No debe confundirse:
+
+```text
+movement type exists
+```
+
+con:
+
+```text
+complete manual adjustment workflow exists
+```
+
+---
+
+# 14. Manual stock editing
+
+No debe existir como operación ordinaria:
+
+```text
+User
 ↓
-Balance / Projection
+product.stock = arbitrary value
+```
+
+Si el inventario físico difiere del sistema, debe existir una operación explícita
+y trazable que explique la corrección.
+
+---
+
+# 15. Balance
+
+Los movimientos actuales conservan:
+
+```text
+balance
+```
+
+como el stock posterior a la mutación correspondiente.
+
+Esto permite reconstruir y auditar el efecto de operaciones como:
+
+```text
+PurchaseReceipt IN
+
+Sale OUT
+```
+
+---
+
+# 16. InventoryBatch
+
+`InventoryBatch` representa trazabilidad por lote.
+
+Conceptualmente contiene información relacionada con:
+
+```text
+Company
+
+Product
+
+lotNumber
+
+expirationDate
+
+quantity / cost information according to current schema
+```
+
+Debe mantenerse:
+
+```text
+Batch
+≠
+Product
+```
+
+y:
+
+```text
+Batch
+≠
+EquipmentAsset
+```
+
+---
+
+# 17. Lot Tracking
+
+Product utiliza:
+
+```text
+NONE
+
+OPTIONAL
+
+REQUIRED
+```
+
+como estrategia de `ProductLotTracking`.
+
+Las reglas actuales completas de recepción pertenecen a:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+Inventory consume esa trazabilidad mediante `InventoryBatch`.
+
+---
+
+# 18. Lot consistency
+
+Debe cumplirse:
+
+```text
+InventoryBatch.product
+=
+Inventory operation Product
+```
+
+y:
+
+```text
+InventoryBatch.company
+=
+authenticated Company
+```
+
+cuando el workflow utiliza Batch.
+
+---
+
+# 19. Expiration
+
+Un lote puede seguir existiendo físicamente aunque esté vencido.
+
+Debe mantenerse conceptualmente:
+
+```text
+Exists
+≠
+Eligible for new use
+```
+
+La política completa de elegibilidad basada en caducidad pertenece a la evolución
+de Availability/FEFO de Inventory.
+
+---
+
+# 20. Purchase ≠ Inventory IN
+
+Debe mantenerse:
+
+```text
+Purchase
+≠
+Inventory receipt
+```
+
+Crear o confirmar una Purchase:
+
+```text
+→ does not increase Product.stock
+```
+
+y:
+
+```text
+→ does not create the physical Inventory IN
+```
+
+---
+
+# 21. PurchaseReceipt → Inventory IN
+
+La entrada física ocurre mediante:
+
+```text
+PurchaseReceipt
+```
+
+Flujo CURRENT:
+
+```text
+Purchase CONFIRMED / PARTIALLY_RECEIVED
+↓
+PurchaseReceipt
+↓
+InventoryMovement IN
++
+Product.stock increment
+```
+
+La Receipt es el documento que explica la entrada física.
+
+---
+
+# 22. Partial Receipts
+
+Una Purchase puede recibirse mediante múltiples Receipts.
+
+Ejemplo:
+
+```text
+Purchase quantity = 10
+
+Receipt A = 4
+
+Receipt B = 3
+
+Receipt C = 3
+```
+
+El stock aumenta únicamente por las cantidades efectivamente recibidas.
+
+---
+
+# 23. Over-receipt
+
+Actualmente se bloquea recibir una cantidad superior al pendiente.
+
+Debe mantenerse:
+
+```text
+quantityReceived
+≤
+quantityPending
+```
+
+salvo que en el futuro exista un workflow explícito distinto.
+
+---
+
+# 24. PurchaseReceipt + Batch
+
+Cuando una partida recibida utiliza lote:
+
+```text
+PurchaseReceiptItem
+↓
+InventoryBatch
+↓
+InventoryMovement IN
+```
+
+deben mantener:
+
+```text
+same Company
+
+same Product
+```
+
+---
+
+# 25. Atomicidad de Receipt
+
+Purchase Receipt coordina en una sola transacción los efectos que corresponden a
+la recepción.
+
+Puede incluir:
+
+```text
+PurchaseReceipt
+
+PurchaseReceiptItems
+
+InventoryBatch
+
+Equipment provisioning when ASSET
+
+Product.stock
+
+InventoryMovement IN
+
+Purchase status
+```
+
+Debe evitarse:
+
+```text
+Receipt created
++
+Inventory mutation missing
+```
+
+o:
+
+```text
+Inventory mutation committed
++
+Receipt missing
+```
+
+---
+
+# 26. PurchaseReceipt idempotency
+
+La creación de Purchase Receipts utiliza actualmente:
+
+```text
+Idempotency-Key
+```
+
+con protección implementada para:
+
+```text
+same logical retry
+→ replay same Receipt
+```
+
+```text
+same key + different payload
+→ conflict
+```
+
+```text
+same key in another Company
+→ independent scope
+```
+
+La operación utiliza transacción `Serializable` y cuenta con manejo del camino
+de conflicto idempotente.
+
+Permanece como deuda de QA:
+
+```text
+real simultaneous PostgreSQL concurrency race
+```
+
+La especificación completa pertenece a:
+
+```text
+PURCHASE_RECEIPTS.md
+```
+
+---
+
+# 27. Sale — CURRENT
+
+Actualmente el flujo comercial implementado utiliza:
+
+```text
+Sale
 ```
 
 No:
 
 ```text
-User
+SalesOrder + Delivery
+```
+
+como workflow operativo actual.
+
+Flujo:
+
+```text
+Sale DRAFT
+→ no Inventory OUT
+```
+
+```text
+Sale approval
 ↓
-edita Product.stock directamente
+Sale CONFIRMED
+↓
+Product.stock decrement
++
+InventoryMovement OUT
 ```
 
 ---
 
-# 3. Fuente de verdad
+# 28. Sale DRAFT
 
-La arquitectura adoptada establece:
+Crear:
 
 ```text
-InventoryMovement
-=
-historial de cambios de inventario
+Sale DRAFT
+```
+
+no debe modificar stock.
+
+Debe mantenerse:
+
+```text
+Commercial intention
+≠
+physical Inventory OUT
+```
+
+aunque en el modelo V1 la salida física se materialice al confirmar la Sale.
+
+---
+
+# 29. Sale CONFIRMED
+
+En Sales V1:
+
+```text
+DRAFT
+↓
+Approve
+↓
+CONFIRMED
+↓
+Inventory OUT
+```
+
+La aprobación produce el decremento correspondiente de `Product.stock` y el
+movimiento `OUT`.
+
+---
+
+# 30. Limitaciones de Sales V1
+
+El flujo genérico actual de Sale soporta inventario compatible con:
+
+```text
+inventoryTracking = QUANTITY
+```
+
+y no resuelve todavía de forma completa:
+
+```text
+ASSET commercial fulfillment
+
+SERIALIZED commercial fulfillment
+
+REQUIRED-lot allocation
+```
+
+Estas capacidades necesitan workflows específicos antes de ampliarse.
+
+---
+
+# 31. Sale cancellation
+
+Cancelar una Sale mientras permanece en:
+
+```text
+DRAFT
+```
+
+no produce mutación de Inventory.
+
+La reversa genérica de una Sale ya confirmada no forma parte del workflow actual.
+
+No debe corregirse una salida histórica mediante eliminación silenciosa.
+
+---
+
+# 32. Sales TARGET
+
+La arquitectura futura aprobada podrá evolucionar hacia:
+
+```text
+Quote
+↓
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+En ese modelo:
+
+```text
+SalesOrder
+→ commercial commitment
+```
+
+mientras:
+
+```text
+Delivery
+→ physical fulfillment
+```
+
+y será Delivery quien origine el `OUT`.
+
+---
+
+# 33. CURRENT Sale vs TARGET Delivery
+
+Debe mantenerse claramente:
+
+```text
+CURRENT
+
+Sale CONFIRMED
+→ Inventory OUT
+```
+
+```text
+TARGET
+
+SalesOrder
+→ no physical OUT by itself
+
+Delivery
+→ Inventory OUT
+```
+
+La arquitectura TARGET no debe documentarse como si ya estuviera implementada.
+
+---
+
+# 34. No double OUT durante evolución
+
+Cuando el sistema evolucione hacia Delivery debe garantizarse:
+
+```text
+same physical quantity
+→ exactly one definitive OUT
+```
+
+No deberá ocurrir:
+
+```text
+Sale confirmation OUT
++
+Delivery OUT
+```
+
+para el mismo hecho físico.
+
+La migración deberá cambiar ownership de la mutación de forma controlada.
+
+---
+
+# 35. Movement references
+
+`InventoryMovement` conserva referencias hacia la operación que originó el
+cambio.
+
+En el estado actual pueden observarse valores como:
+
+```text
+PURCHASE_RECEIPT
+
+SALE
+
+PURCHASE
+
+null
+```
+
+---
+
+# 36. Semántica actual de referencias
+
+Para nuevas Recepciones:
+
+```text
+PURCHASE_RECEIPT
+→ current physical Purchase IN reference
+```
+
+Para Sales V1:
+
+```text
+SALE
+→ current physical commercial OUT reference
+```
+
+`PURCHASE` puede existir por compatibilidad o historia, pero no significa que
+confirmar una Purchase deba generar Inventory IN actualmente.
+
+Debe mantenerse:
+
+```text
+PurchaseReceipt
+→ preferred current Receipt-origin reference
+```
+
+---
+
+# 37. Reference no es autorización
+
+Debe mantenerse:
+
+```text
+referenceType
++
+referenceId
+```
+
+como trazabilidad.
+
+No como mecanismo de autorización.
+
+Una referencia no puede:
+
+```text
+bypass tenant isolation
+
+authorize cross-company relation
+
+justify invalid Inventory mutation
+```
+
+---
+
+# 38. Inventory frontend CURRENT
+
+La ruta:
+
+```text
+/inventory
+```
+
+ofrece dos vistas:
+
+```text
+Existencias
+
+Movimientos
+```
+
+---
+
+# 39. Existencias
+
+La vista:
+
+```text
+Existencias
+```
+
+presenta el estado actual basado en la proyección disponible del inventario.
+
+Actualmente continúa utilizando principalmente:
+
+```text
+Product.stock
+```
+
+como cantidad agregada.
+
+---
+
+# 40. Movimientos
+
+La vista:
+
+```text
+Movimientos
+```
+
+consume:
+
+```text
+GET /inventory/movements
+```
+
+y muestra información equivalente a:
+
+```text
+Fecha
+
+Producto
+
+Tipo
+
+Cantidad
+
+Balance posterior
+
+Referencia
+
+Notas
+```
+
+---
+
+# 41. Mapping de movimientos
+
+Frontend presenta:
+
+```text
+IN
+→ Entrada
+```
+
+```text
+OUT
+→ Salida
+```
+
+```text
+ADJUSTMENT
+→ Ajuste
+```
+
+---
+
+# 42. Reference deep-link
+
+Purchase Receipt puede navegar hacia Inventory mediante:
+
+```text
+/inventory?tab=movements
+&referenceType=PURCHASE_RECEIPT
+&referenceId=<receiptId>
+```
+
+La vista:
+
+```text
+opens Movimientos
++
+filters the loaded ledger by reference
+```
+
+según la implementación actual.
+
+---
+
+# 43. Search y filters CURRENT
+
+Movimientos soporta búsqueda y filtros client-side sobre los movimientos
+cargados.
+
+Existen estados separados de:
+
+```text
+loading
+
+error
+
+retry
+
+empty result
+```
+
+para las superficies principales.
+
+Actualmente los endpoints no cuentan con paginación server-side completa.
+
+---
+
+# 44. Frontend read-only
+
+Inventory V1 es principalmente:
+
+```text
+read-only operational workspace
+```
+
+No existe actualmente una UI normal para:
+
+```text
+Manual Inventory Adjustment
+```
+
+La introducción de esa operación requerirá revisión separada.
+
+---
+
+# 45. Equipment boundary
+
+`EquipmentAsset` pertenece a ERP Core y está:
+
+```text
+IMPLEMENTED / VALIDATED
+```
+
+Debe mantenerse:
+
+```text
+Inventory
+→ aggregate quantity / batch / movement
+```
+
+y:
+
+```text
+Equipment
+→ physical reusable ASSET identity
+```
+
+---
+
+# 46. ASSET tracking
+
+Para:
+
+```text
+Product.inventoryTracking = ASSET
+```
+
+Purchase Receipt puede:
+
+```text
+increase Product.stock
++
+create corresponding EquipmentAsset identities
+```
+
+Equipment provisioning no vuelve a incrementar stock.
+
+Debe mantenerse:
+
+```text
+PurchaseReceipt
+→ owns Inventory IN
+```
+
+```text
+Equipment provisioning
+→ owns physical ASSET identity creation
+```
+
+---
+
+# 47. Product.stock ↔ EquipmentAsset
+
+Para Products ASSET:
+
+```text
+EquipmentAsset
+→ physical unit identity
 ```
 
 mientras:
 
 ```text
 Product.stock
-=
-proyección operacional
+→ aggregate inventory projection
 ```
 
-utilizada para consultas rápidas.
-
-Por tanto:
-
-> `Product.stock` no constituye un registro histórico independiente.
-
-Debe ser consistente con las operaciones de inventario que lo originaron.
-
----
-
-# 4. Responsabilidades
-
-Inventory es propietario de:
-
-* existencias;
-* movimientos;
-* validación de stock;
-* lotes;
-* cantidades disponibles por lote;
-* trazabilidad;
-* consecuencias físicas de Receipts;
-* consecuencias físicas de Deliveries;
-* ajustes;
-* futuras ubicaciones;
-* futuras series;
-* futura lógica FEFO.
-
----
-
-# 5. Fuera del alcance de Inventory
-
-Inventory no es propietario de:
-
-* Supplier;
-* Purchase lifecycle;
-* Sales pricing;
-* Customer;
-* Quote;
-* SalesOrder;
-* Case;
-* Billing;
-* Invoice;
-* condiciones comerciales.
-
-Otros dominios producen eventos que requieren cambios de inventario.
-
-Inventory ejecuta y registra la consecuencia física correspondiente.
-
----
-
-# 6. Flujos principales
-
-## Entrada por compra
-
-```text
-Purchase
-↓
-PurchaseReceipt
-↓
-Inventory IN
-```
-
----
-
-## Salida comercial objetivo
-
-```text
-SalesOrder
-↓
-Delivery
-↓
-Inventory OUT
-```
-
----
-
-## Retorno
-
-Conceptualmente:
-
-```text
-Return confirmado
-↓
-Inspection / Restock decision
-↓
-Inventory IN
-```
-
-cuando el producto realmente puede reintegrarse.
-
----
-
-## Ajuste
-
-```text
-Stock discrepancy
-↓
-Authorized Adjustment
-↓
-InventoryMovement ADJUSTMENT
-```
-
----
-
-## Healthcare
-
-```text
-CaseDispatch
-↓
-Custody
-```
-
-no debe interpretarse automáticamente como:
-
-```text
-Inventory OUT definitivo
-```
-
-La semántica completa se encuentra en ADR-013.
-
----
-
-# 7. Purchase no aumenta inventario
-
-Regla obligatoria:
-
-```text
-Purchase created
-→ no stock change
-```
-
-```text
-Purchase confirmed
-→ no stock change
-```
-
-```text
-PurchaseReceipt registered
-→ Inventory IN
-```
-
-La mercancía ordenada todavía no forma parte de las existencias físicas hasta que se recibe.
-
----
-
-# 8. SalesOrder no disminuye inventario
-
-Arquitectura objetivo:
-
-```text
-SalesOrder created
-→ no stock change
-```
-
-```text
-SalesOrder confirmed
-→ no stock change
-```
-
-```text
-Delivery confirmed
-→ Inventory OUT
-```
-
-El compromiso comercial y la entrega física son hechos distintos.
-
----
-
-# 9. InventoryMovement
-
-`InventoryMovement` registra un cambio de inventario.
-
-Información relevante puede incluir:
-
-```text
-id
-companyId
-productId
-movementType
-quantity
-balance
-referenceType
-referenceId
-notes
-createdBy
-unitCost
-batchId
-createdAt
-```
-
-La definición técnica exacta debe verificarse contra el schema y la implementación vigentes.
-
----
-
-# 10. Tipos implementados
-
-La implementación consolidada utiliza el modelo genérico:
-
-```text
-IN
-OUT
-ADJUSTMENT
-```
-
----
-
-# 11. IN
-
-Representa un incremento físico válido.
-
-Ejemplos:
-
-```text
-PurchaseReceipt
-Return reintegrable
-Positive correction
-Initial inventory import controlado
-```
-
-La causa concreta debe quedar identificada mediante la referencia o contexto correspondiente.
-
----
-
-# 12. OUT
-
-Representa una disminución definitiva válida.
-
-Ejemplos objetivo:
-
-```text
-Delivery
-Supplier Return
-Write-off
-Confirmed consumption
-```
-
-No todo artículo que sale físicamente de un almacén produce necesariamente `OUT`.
-
----
-
-# 13. ADJUSTMENT
-
-`ADJUSTMENT` representa una corrección autorizada de inventario.
-
-No debe convertirse en:
-
-> una forma genérica de editar stock.
-
-Toda operación de ajuste debe poder explicar:
-
-* motivo;
-* usuario;
-* fecha;
-* producto;
-* cantidad;
-* balance resultante.
-
-Antes de ampliar la funcionalidad de ajustes deberá formalizarse claramente la semántica de ajustes positivos y negativos en el contrato correspondiente.
-
----
-
-# 14. Tipos históricos más específicos
-
-La documentación antigua proponía valores como:
-
-```text
-INITIAL_BALANCE
-PURCHASE
-SALE
-RETURN_IN
-RETURN_OUT
-ADJUSTMENT_IN
-ADJUSTMENT_OUT
-TRANSFER_IN
-TRANSFER_OUT
-STOCK_COUNT
-```
-
-Estos nombres representan causas empresariales útiles, pero **no corresponden al enum genérico actualmente adoptado**.
-
-No deben agregarse nuevamente al enum únicamente para conservar la documentación antigua.
-
----
-
-# 15. Dirección recomendada para causas
-
-La causa empresarial puede expresarse mediante información como:
-
-```text
-movementType = IN
-referenceType = PURCHASE_RECEIPT
-```
-
-o:
-
-```text
-movementType = OUT
-referenceType = DELIVERY
-```
-
-Esto permite mantener:
-
-```text
-dirección física
-```
-
-separada de:
-
-```text
-motivo empresarial
-```
-
----
-
-# 16. Reference Type
-
-`referenceType` identifica conceptualmente qué evento originó el movimiento.
-
-Ejemplos objetivo:
-
-```text
-PURCHASE_RECEIPT
-DELIVERY
-RETURN
-INVENTORY_ADJUSTMENT
-SUPPLIER_RETURN
-CASE_RECONCILIATION
-```
-
-Los valores definitivos deben mantenerse controlados por la implementación.
-
----
-
-# 17. Reference ID
-
-`referenceId` permite rastrear el movimiento hasta el documento que lo originó.
-
-Ejemplo:
-
-```text
-InventoryMovement
-movementType = IN
-referenceType = PURCHASE_RECEIPT
-referenceId = receiptId
-```
-
----
-
-# 18. Referencias legacy
-
-Una parte de la implementación histórica generó movimientos relacionados directamente con:
-
-```text
-PURCHASE
-```
-
-al aprobar compras.
-
-Esos registros pueden existir como comportamiento legacy.
-
-No deben utilizarse como precedente para nuevas entradas.
-
-La arquitectura vigente es:
-
-```text
-PurchaseReceipt
-→ Inventory IN
-```
-
----
-
-# 19. Inmutabilidad
-
-Un movimiento confirmado representa historia.
-
-No debe editarse posteriormente para modificar:
-
-* tipo;
-* cantidad;
-* producto;
-* lote;
-* referencia;
-* balance;
-
-de manera que reescriba lo ocurrido.
-
----
-
-# 20. Correcciones
-
-Un error de inventario debe resolverse mediante una nueva operación trazable.
-
-Conceptualmente:
-
-```text
-Incorrect Movement
-+
-Corrective / Compensating Movement
-```
-
-No mediante:
-
-```text
-editar movimiento histórico
-```
-
-o:
-
-```text
-eliminar movimiento
-```
-
----
-
-# 21. Eliminación
-
-Los movimientos históricos no deben eliminarse como parte de operaciones empresariales normales.
-
-Su lifecycle sigue ADR-012:
-
-```text
-InventoryMovement
-→ IMMUTABLE
-```
-
----
-
-# 22. Product.stock
-
-Actualmente `Product` conserva:
-
-```text
-stock
-```
-
-como resumen operativo.
-
-Esto proporciona consultas rápidas para:
-
-* listados;
-* Dashboard;
-* validaciones;
-* estados de stock.
-
----
-
-# 23. Product.stock no se captura libremente
-
-El usuario no debe modificar directamente:
-
-```text
-Product.stock = 50
-```
-
-desde un formulario de Product.
-
-El stock debe cambiar mediante una operación de Inventory.
-
----
-
-# 24. Actualización transaccional
-
-Cuando una operación válida cambia inventario:
-
-```text
-Business operation
-↓
-Product.stock update
-+
-InventoryMovement
-```
-
-debe mantenerse consistencia.
-
-No debe ocurrir:
-
-```text
-stock updated
-✓
-
-movement missing
-✗
-```
-
----
-
-# 25. Balance
-
-`InventoryMovement.balance` puede conservar el saldo resultante después del movimiento.
-
-Ejemplo:
-
-```text
-Stock anterior: 10
-IN: +5
-Balance: 15
-```
-
-Esto facilita:
-
-* auditoría;
-* lectura;
-* debugging;
-* Kardex futuro.
-
----
-
-# 26. Balance no sustituye movimientos
-
-Guardar un balance en cada movimiento es una optimización y registro contextual.
-
-La operación que produjo el cambio continúa siendo la información fundamental.
-
----
-
-# 27. Stock negativo
-
-Regla vigente de dominio:
-
-> Inventory no debe permitir stock negativo en la operación normal.
-
-Ejemplo:
-
-```text
-Available = 4
-Requested OUT = 6
-↓
-REJECT
-```
-
----
-
-# 28. Validación backend
-
-Frontend puede indicar:
-
-```text
-Solo hay 4 unidades disponibles.
-```
-
-pero backend debe verificar nuevamente antes de aplicar la salida.
-
-Nunca debe confiar únicamente en el valor mostrado previamente en UI.
-
----
-
-# 29. Concurrencia
-
-La disponibilidad puede cambiar entre:
-
-```text
-usuario abre pantalla
-```
-
-y:
-
-```text
-usuario confirma operación
-```
-
-Por eso las operaciones críticas deben validar el estado actual dentro del proceso transaccional correspondiente.
-
----
-
-# 30. InventoryBatch
-
-`InventoryBatch` representa una existencia identificable por lote.
-
-Conceptualmente:
-
-```text
-Product
-↓
-InventoryBatch
-↓
-InventoryMovement
-```
-
----
-
-# 31. Product vs InventoryBatch
-
-```text
-Product
-=
-qué producto es
-```
-
-```text
-InventoryBatch
-=
-qué existencia física por lote existe
-```
-
-Ejemplo:
-
-```text
-Product
-Catéter 15 mm Terumo
-```
-
-puede tener:
-
-```text
-Batch L001
-Caduca 2027-01
-30 unidades
-```
-
-y:
-
-```text
-Batch L002
-Caduca 2028-05
-50 unidades
-```
-
----
-
-# 32. Lote no pertenece a Product
-
-`lotNumber` no debe almacenarse como propiedad única del Product.
-
-Un mismo producto puede existir simultáneamente en múltiples lotes.
-
----
-
-# 33. Datos conceptuales de InventoryBatch
-
-La implementación consolidada contempla información como:
-
-```text
-id
-companyId
-productId
-supplierId
-purchaseId
-lotNumber
-expirationDate
-initialQuantity
-availableQuantity
-unitCost
-receivedAt
-notes
-isActive
-```
-
-además de sus relaciones correspondientes.
-
-La estructura exacta se verifica en el modelo vigente.
-
----
-
-# 34. Creación del lote
-
-El lote se conoce normalmente durante:
-
-```text
-PurchaseReceipt
-```
-
-y no durante:
-
-```text
-Purchase
-```
-
-porque el proveedor puede entregar:
-
-* lotes diferentes;
-* cantidades parciales;
-* caducidades distintas.
-
----
-
-# 35. Regla de captura
-
-```text
-Purchase
-→ lo solicitado
-
-PurchaseReceipt
-→ lo recibido
-
-InventoryBatch
-→ lote físico recibido
-```
-
----
-
-# 36. Lote existente
-
-Cuando una recepción corresponde al mismo lote reconocido por la implementación, Inventory puede reutilizar el Batch existente e incrementar:
-
-```text
-initialQuantity
-availableQuantity
-```
-
-según las reglas del servicio.
-
----
-
-# 37. Costo del Batch
-
-Al agregar nuevas cantidades a un Batch existente, la implementación de Receipts contempla costo promedio ponderado.
-
-Conceptualmente:
-
-```text
-Nuevo costo =
-(
-  cantidad existente × costo existente
-  +
-  cantidad nueva × costo nuevo
-)
-/
-cantidad total
-```
-
-Esta regla representa costo del lote, no una política contable completa de valuación de inventario.
-
----
-
-# 38. Inventory valuation
-
-La valuación financiera completa continúa siendo una capacidad futura.
-
-Antes de soportar:
-
-* FIFO financiero;
-* average costing global;
-* cost of goods sold;
-* accounting;
-
-debe diseñarse explícitamente su política.
-
----
-
-# 39. Initial Quantity
-
-`initialQuantity` representa cuánto ingresó históricamente al Batch a través de su formación/acumulación.
-
-No debe reducirse al realizar salidas normales.
-
----
-
-# 40. Available Quantity
-
-`availableQuantity` representa actualmente la cantidad restante operativa dentro del Batch.
-
-Conceptualmente:
-
-```text
-Initial / Received
--
-Consumed / Delivered
-+
-Valid Returns
-=
-Remaining Batch Quantity
-```
-
----
-
-# 41. Precaución con `availableQuantity`
-
-Con la futura arquitectura de:
-
-* ubicaciones;
-* custodia;
-* quarantine;
-* mantenimiento;
-* expiración;
-
-el concepto de “available” requerirá mayor precisión.
-
-Por tanto, no debemos convertir el campo actual en una solución universal para todos los estados futuros.
-
----
-
-# 42. Stock total y lotes
-
-Para productos completamente trazados por Batch, la existencia agregada puede relacionarse conceptualmente con:
-
-```text
-Σ Batch quantities
-```
-
-pero no debe asumirse esta igualdad universal mientras existan:
-
-* productos sin lote;
-* movimientos legacy;
-* estados futuros;
-* migraciones históricas.
-
----
-
-# 43. Caducidad
-
-`expirationDate` pertenece al Batch.
-
-No al Product maestro.
-
-Un mismo Product puede tener múltiples fechas de caducidad simultáneamente.
-
----
-
-# 44. Regla de Receipt
-
-La implementación actual no permite:
-
-```text
-expirationDate
-```
-
-sin:
-
-```text
-lotNumber
-```
-
----
-
-# 45. Producto vencido
-
-Un producto vencido puede continuar físicamente existiendo.
-
-Por tanto:
-
-```text
-Expired
-≠
-Does not exist
-```
-
-Pero normalmente:
-
-```text
-Expired
-→ Not sellable / Not usable
-```
-
-según las reglas del dominio.
-
----
-
-# 46. Physical vs Sellable
-
-Zaping debe distinguir progresivamente:
-
-```text
-Physical Stock
-```
-
-de:
-
-```text
-Available / Sellable Stock
-```
-
-Ejemplo:
-
-```text
-100 unidades físicas
-
-70 disponibles
-20 en custodia
-10 vencidas
-```
-
-No todas las 100 son necesariamente utilizables para una nueva operación.
-
----
-
-# 47. FEFO
-
-Healthcare y productos con caducidad requieren evolución hacia:
-
-> **First Expired, First Out**
-
-Conceptualmente:
-
-```text
-Batch A
-expires 2026-12
-
-Batch B
-expires 2027-06
-
-↓
-suggest Batch A first
-```
-
----
-
-# 48. Estado de FEFO
-
-FEFO es arquitectura objetivo.
-
-No debe documentarse como completamente implementado hasta que Inventory pueda:
-
-* determinar lotes elegibles;
-* excluir vencidos;
-* considerar disponibilidad;
-* recomendar orden;
-* respetar excepciones;
-* asignar cantidades.
-
----
-
-# 49. FEFO no debe ser ciego
-
-FEFO no significa simplemente:
-
-```text
-ORDER BY expirationDate
-```
-
-sin considerar:
-
-* stock disponible;
-* estado del lote;
-* ubicación;
-* custodia;
-* restricciones;
-* cantidades.
-
----
-
-# 50. Serial Numbers
-
-El diseño original contempla trazabilidad por número de serie.
-
-Esta capacidad sigue siendo objetivo, pero no debe confundirse con Batch.
-
----
-
-# 51. Batch vs Serial
-
-```text
-Batch
-→ grupo de unidades
-```
-
-```text
-Serial
-→ unidad individual
-```
-
-Ejemplo:
-
-```text
-Batch L001
-100 catéteres
-```
-
-vs:
-
-```text
-Equipment Serial SN-10042
-1 unidad específica
-```
-
----
-
-# 52. Serial uniqueness
-
-Cuando se implemente serialización, una unidad serializada debe tener identidad única dentro del alcance adecuado.
-
-No podrá estar simultáneamente:
-
-```text
-Warehouse A
-```
-
-y:
-
-```text
-Customer / Case B
-```
-
----
-
-# 53. Equipment
-
-Los equipos reutilizables requerirán un lifecycle específico.
-
-No deben representarse únicamente como:
-
-```text
-Product.stock = 3
-```
-
-si la operación necesita saber cuál unidad física está disponible.
-
----
-
-# 54. Identificación de inventario
-
-La operación puede utilizar información proveniente de Product como:
-
-* SKU;
-* nombre;
-* descripción;
-* marca;
-* barcode.
-
-Y de InventoryBatch como:
-
-* lote;
-* caducidad;
-* cantidad.
-
-Cada dato debe permanecer en el dominio correcto.
-
----
-
-# 55. Barcode
-
-Barcode pertenece principalmente a la identificación del Product.
-
-En el futuro puede utilizarse para:
-
-* recepción;
-* picking;
-* conteo;
-* entrega.
-
-No cambia las reglas fundamentales del dominio.
-
----
-
-# 56. Inventory Entry
-
-Una entrada debe tener cantidad:
-
-```text
-> 0
-```
-
-La operación debe identificar su causa.
-
----
-
-# 57. Inventory Output
-
-Una salida debe tener cantidad:
-
-```text
-> 0
-```
-
-y debe cumplir:
-
-```text
-requestedQuantity
-<=
-availableQuantity
-```
-
-según las reglas aplicables.
-
----
-
-# 58. Ajustes
-
-Un ajuste debe existir por una razón verificable.
-
-Ejemplos:
-
-* diferencia en conteo;
-* daño confirmado;
-* corrección documentada;
-* pérdida;
-* carga inicial controlada.
-
-No debe utilizarse para evitar implementar el workflow correcto.
-
----
-
-# 59. Ejemplo incorrecto
-
-```text
-Compra recibida
-↓
-usuario hace Adjustment +10
-```
-
-para evitar registrar PurchaseReceipt.
-
-Incorrecto.
-
-La causa real es:
-
-```text
-PurchaseReceipt
-```
-
-y debe registrarse como tal.
-
----
-
-# 60. Initial Balance
-
-La carga inicial de existencias puede requerir una operación especial durante:
-
-* onboarding;
-* migración;
-* implementación inicial.
-
-No debe simularse mediante una Purchase ficticia si no existió una compra real.
-
----
-
-# 61. Migración de inventario
-
-El futuro módulo de importaciones debe distinguir:
-
-```text
-Historical data import
-```
-
-de:
-
-```text
-Operational business transaction
-```
-
-La migración puede necesitar un tipo de origen específico para conservar trazabilidad sin inventar documentos comerciales inexistentes.
-
----
-
-# 62. Inventory Count
-
-El conteo físico es una capacidad futura.
-
-Conceptualmente:
-
-```text
-System Quantity
-vs
-Physical Quantity
-↓
-Difference
-↓
-Authorized Adjustment
-```
-
-El conteo no debe sobrescribir silenciosamente la historia.
-
----
-
-# 63. Kardex
-
-Una evolución natural es un Kardex por Product.
-
-Puede mostrar:
-
-```text
-Fecha
-Tipo
-Origen
-Entrada
-Salida
-Balance
-Lote
-Costo
-Usuario
-```
-
----
-
-# 64. Product 360
-
-Inventory debe alimentar `Product 360` con información como:
-
-```text
-Stock
-Estado
-Lotes
-Caducidades
-Movimientos
-Recepciones
-Entregas
-```
-
-sin convertir Product en propietario de la historia.
-
----
-
-# 65. Estado visual de stock
-
-La UI actual utiliza estados como:
-
-```text
-Sin stock
-Bajo stock
-En stock
-```
-
-utilizando `StatusBadge`.
-
----
-
-# 66. Sin stock
-
-Conceptualmente:
-
-```text
-stock <= 0
-```
-
-debe representarse como ausencia de disponibilidad normal.
-
-La lógica concreta debe mantenerse centralizada y consistente.
-
----
-
-# 67. Bajo stock
-
-`minStock` permite detectar productos con inventario bajo.
-
-Conceptualmente:
-
-```text
-stock > 0
-AND
-stock <= minStock
-```
-
-según la regla vigente de UI/dominio.
-
----
-
-# 68. En stock
-
-Representa existencia superior al umbral operativo definido.
-
-Estas categorías son indicadores.
-
-No sustituyen el saldo numérico.
-
----
-
-# 69. minStock
-
-`Product.minStock` representa un umbral operativo.
-
-Puede utilizarse para:
-
-* alertas;
-* Dashboard;
-* recomendaciones futuras.
-
-No genera automáticamente una Purchase.
-
----
-
-# 70. Replenishment futuro
-
-En etapas posteriores Zaping podrá considerar:
-
-```text
-Current Stock
-Minimum Stock
-Pending Purchases
-Historical Demand
-Lead Time
-```
-
-para recomendar abastecimiento.
-
-Una recomendación no constituye inventario ni Purchase hasta que se cree el documento correspondiente.
-
----
-
-# 71. Integración con Purchases
-
-```text
-Purchases
-↓
-PurchaseReceipt
-↓
-Inventory
-```
-
-Inventory no debe revisar simplemente el estado de una Purchase y aumentar stock.
-
-Debe recibir un hecho físico específico.
-
----
-
-# 72. PurchaseReceipt → Movement
-
-Cada partida recibida genera conceptualmente:
-
-```text
-InventoryMovement
-movementType = IN
-referenceType = PURCHASE_RECEIPT
-referenceId = receiptId
-quantity = quantityReceived
-batchId = related batch
-```
-
-cuando corresponda.
-
----
-
-# 73. Atomicidad de Receipt
-
-La operación puede incluir:
-
-```text
-PurchaseReceipt
-+
-ReceiptItem
-+
-InventoryBatch
-+
-Product.stock
-+
-InventoryMovement
-+
-Purchase.status
-```
-
-y debe conservar consistencia transaccional.
-
----
-
-# 74. Integración con Sales
-
-La arquitectura objetivo es:
-
-```text
-SalesOrder
-↓
-Delivery
-↓
-Inventory
-```
-
-Sales no debe modificar directamente:
+La reconciliación formal:
 
 ```text
 Product.stock
+↔
+EquipmentAsset
 ```
+
+continúa como deuda conocida.
+
+Inventory no debe declarar `Product.stock` como única verdad física de las
+unidades ASSET.
 
 ---
 
-# 75. Lot allocation en Delivery
+# 48. SERIALIZED
 
-Para productos trazados por lote, la futura Delivery deberá conocer qué lotes fueron realmente entregados.
-
-Esto permitirá:
+El tracking:
 
 ```text
-PurchaseReceipt
-↓
-InventoryBatch
-↓
-Delivery allocation
-↓
-Customer
+SERIALIZED
 ```
 
----
+continúa requiriendo semántica específica.
 
-# 76. Returns
-
-Una devolución comercial no significa automáticamente que el producto esté nuevamente disponible.
-
-Debe existir una decisión válida de:
+Debe mantenerse:
 
 ```text
-restock
-```
-
-y, cuando el producto sea trazable:
-
-```text
-batch verification
-```
-
----
-
-# 77. Trazabilidad de Return
-
-Para reintegrar correctamente un producto por lote, Zaping debe poder demostrar de qué Batch salió originalmente.
-
-No debe reconstruir la relación mediante suposiciones.
-
----
-
-# 78. Supplier Return
-
-Una devolución al proveedor es diferente de cancelar una PurchaseReceipt.
-
-Conceptualmente:
-
-```text
-Inventory
-↓
-Supplier Return
-↓
-Inventory OUT
-```
-
-La Receipt original permanece en la historia.
-
----
-
-# 79. Healthcare Custody
-
-Healthcare agrega un nuevo estado operacional:
-
-```text
-Company-owned inventory
-outside warehouse
-```
-
----
-
-# 80. CaseDispatch
-
-Regla:
-
-```text
-CaseDispatch
+SERIALIZED
 ≠
-Definitive Inventory OUT
+ASSET
 ```
 
-Representa:
-
-* salida física del almacén;
-* cambio de custodia;
-* menor disponibilidad local;
-* propiedad todavía de la Company.
+No debe resolverse automáticamente utilizando `EquipmentAsset`.
 
 ---
 
-# 81. CaseReturn
+# 49. Multi-tenancy
 
-El material puede regresar después del procedimiento.
+Las operaciones Inventory deben ejecutarse dentro del tenant autenticado.
 
-El retorno resuelve custodia, pero puede requerir inspección antes de regresar a disponibilidad.
-
----
-
-# 82. Reconciliation
-
-Healthcare determina posteriormente:
+Debe mantenerse:
 
 ```text
-Used
-Returned
-Unresolved
-```
-
-sobre la cantidad despachada.
-
----
-
-# 83. Used
-
-El material confirmado como consumido puede producir posteriormente una salida definitiva.
-
-Conceptualmente:
-
-```text
-Used
-↓
-Commercial / disposition process
-↓
-Inventory OUT
-```
-
-según ADR-011 y ADR-013.
-
----
-
-# 84. Returned
-
-```text
-Returned
-≠
-automatically Available
-```
-
-Puede requerirse:
-
-```text
-Inspection
-↓
-Available
-Quarantine
-Damaged
-Maintenance
-```
-
----
-
-# 85. Ubicaciones
-
-Inventory debe poder evolucionar hacia múltiples ubicaciones.
-
-Ejemplos:
-
-```text
-Warehouse A
-Warehouse B
-Field
-Technician Custody
-Quarantine
-Maintenance
-```
-
----
-
-# 86. Estado de Multi-Warehouse
-
-Multi-Warehouse es arquitectura objetivo.
-
-No debe introducirse una tabla o modelo únicamente para anticiparlo sin diseñar:
-
-* balances;
-* transfers;
-* locations;
-* permissions;
-* receiving;
-* delivery;
-* custody.
-
----
-
-# 87. Transferencias
-
-Cuando exista Multi-Warehouse:
-
-```text
-Warehouse A
-↓
-Transfer
-↓
-Warehouse B
-```
-
-representa movimiento interno de propiedad.
-
-Normalmente:
-
-```text
-Company Physical Inventory
-```
-
-no cambia en total.
-
-Cambian:
-
-```text
-location balances
-```
-
----
-
-# 88. InventoryLocation
-
-Conceptos como:
-
-```text
-InventoryLocation
-StockPosition
-InventoryBalance
-```
-
-son candidatos futuros.
-
-Este documento no decide todavía cuál modelo Prisma debe utilizarse.
-
----
-
-# 89. No modificar schema prematuramente
-
-No se debe agregar de inmediato:
-
-```text
-warehouseId
-locationId
-custodyId
-```
-
-a múltiples tablas únicamente porque aparezcan en la arquitectura objetivo.
-
-Primero debe diseñarse el modelo operacional completo.
-
----
-
-# 90. Physical Stock
-
-Conceptualmente:
-
-```text
-Physical Stock
+Movement.company
 =
-existencia todavía propiedad de Company
-```
-
-puede encontrarse en distintos estados o ubicaciones.
-
----
-
-# 91. Available Stock
-
-Conceptualmente:
-
-```text
-Available Stock
+Product.company
 =
-existencia elegible para una nueva operación
+Batch.company
 ```
 
-No necesariamente:
+cuando esas relaciones existan.
+
+Futuras Locations/Positions deberán cumplir la misma regla.
+
+---
+
+# 50. Backend tenant authority
+
+Frontend no debe decidir arbitrariamente:
 
 ```text
-Physical Stock
-=
-Available Stock
+companyId
+
+stock result
+
+Batch ownership
+
+future source Location
+
+future destination Location
 ```
 
----
+sin validación backend.
 
-# 92. Ejemplo futuro
-
-```text
-Physical stock: 100
-
-Warehouse available: 70
-Technician custody: 20
-Expired: 5
-Quarantine: 5
-```
-
-Entonces una nueva Delivery no debería asumir disponibilidad de 100.
+La Company debe derivarse del contexto autenticado.
 
 ---
 
-# 93. Inventory availability
+# 51. Autorización
 
-La lógica futura de disponibilidad debe considerar progresivamente:
+Inventory utiliza la arquitectura actual de Identity & Access.
 
-* ubicación;
-* Batch;
-* caducidad;
-* reserva;
-* custodia;
-* condición;
-* serial;
-* estado.
+El Permission-Based RBAC completo permanece como TARGET.
 
-No debe duplicarse entre Sales, Healthcare y Purchases.
-
----
-
-# 94. Reserva
-
-Reservation no forma parte todavía del modelo obligatorio.
-
-En el futuro podría diferenciarse:
-
-```text
-Physical
-Reserved
-Available
-```
-
-pero requiere una decisión específica antes de implementarse.
-
----
-
-# 95. Seguridad multiempresa
-
-Toda operación debe estar aislada por Company.
-
-Debe impedirse:
-
-```text
-Company A
-↓
-InventoryMovement Company B
-```
-
-o:
-
-```text
-Receipt A
-↓
-Batch from Company B
-```
-
----
-
-# 96. companyId
-
-El `companyId` debe derivarse del contexto autenticado.
-
-No debe confiarse en un `companyId` arbitrario enviado por frontend.
-
----
-
-# 97. Relaciones cross-tenant
-
-Cuando Inventory recibe:
-
-* productId;
-* batchId;
-* referenceId;
-
-debe verificar que las relaciones válidas pertenezcan al tenant correspondiente.
-
----
-
-# 98. RBAC
-
-Permisos conceptuales pueden incluir:
+Permisos conceptuales futuros pueden incluir:
 
 ```text
 inventory.read
+
 inventory.adjust
-inventory.count
-inventory.transfer
-inventory.export
+
+inventory.transfers.create
+
+inventory.transfers.confirm
+
+inventory.locations.read
+
+inventory.locations.manage
 ```
 
-y permisos específicos futuros para:
-
-```text
-inventory.quarantine
-inventory.writeOff
-```
-
-La implementación granular continúa evolucionando.
+Estos nombres no significan que exista actualmente un catálogo persistido de
+Permissions.
 
 ---
 
-# 99. Ajustes sensibles
+# 52. Seguridad transversal
 
-`inventory.adjust` debe considerarse un permiso sensible.
+Antes de producción, Inventory participa en las revisiones generales de:
 
-Modificar existencias mediante ajuste puede afectar:
+```text
+critical endpoint authorization
 
-* operación;
-* costo;
-* auditoría;
-* disponibilidad.
+systematic tenant-isolation regression
 
-No debe concederse indiscriminadamente.
+inactive-user enforcement
+
+safe role provisioning
+```
+
+No debe crear un sistema de autorización independiente del resto de Zaping.
 
 ---
 
-# 100. Auditoría
+# 53. Atomicidad
 
-Debe poder determinarse:
+Toda operación crítica que modifique múltiples hechos relacionados debe ser
+atómica.
+
+Ejemplos CURRENT:
 
 ```text
-qué cambió
-cuánto
-por qué
-quién
-cuándo
-qué documento lo originó
-qué lote estuvo involucrado
+PurchaseReceipt
++
+stock
++
+InventoryMovement
+```
+
+```text
+Sale approval
++
+stock
++
+InventoryMovement
+```
+
+Debe evitarse:
+
+```text
+stock changed
++
+movement missing
+```
+
+y:
+
+```text
+movement created
++
+stock unchanged
+```
+
+---
+
+# 54. Concurrencia
+
+Inventory debe proteger operaciones donde dos requests puedan consumir o
+incrementar la misma cantidad de forma incompatible.
+
+Debe utilizar según el caso:
+
+```text
+transactions
+
+database constraints
+
+state validation
+
+atomic writes
+
+idempotency
+```
+
+La estrategia exacta pertenece a cada workflow propietario.
+
+---
+
+# 55. Negative stock
+
+La arquitectura debe impedir que una operación válida produzca stock negativo
+cuando el workflow exige cantidad disponible.
+
+Conceptualmente:
+
+```text
+available aggregate quantity = 3
+
+requested OUT = 5
+→ BLOCK
+```
+
+Las futuras Positions deberán mantener la misma regla por posición.
+
+---
+
+# 56. Idempotencia
+
+Operaciones de negocio susceptibles a retries deben evitar efectos duplicados.
+
+Ejemplos:
+
+```text
+double click
+
+network timeout
+
+request retry
+```
+
+Purchase Receipt ya implementa idempotencia explícita.
+
+Otros workflows deberán incorporar protección cuando su riesgo lo justifique.
+
+---
+
+# 57. TARGET — Location-aware Inventory
+
+ADR-014 y `ADVANCED_INVENTORY.md` aprueban el diseño objetivo hacia:
+
+```text
+InventoryLocation
+
+InventoryPosition
+
+InventoryMovement
+├── direction = IN
+└── direction = OUT
+
+TRANSFER
+→ operación interna relacionada con una entrada y una salida
+
+ADJUSTMENT / correction
+→ workflow explícito cuando corresponda
+```
+
+Estas capacidades pertenecen a:
+
+```text
+ERP Core
+```
+
+y no exclusivamente a Healthcare.
+
+Actualmente:
+
+```text
+InventoryLocation
+→ NOT IMPLEMENTED
+
+InventoryPosition
+→ NOT IMPLEMENTED
+
+TRANSFER
+→ NOT IMPLEMENTED
+```
+
+---
+
+# 58. Owned vs Available — TARGET
+
+La arquitectura futura debe distinguir:
+
+```text
+Company-owned quantity
+```
+
+de:
+
+```text
+Available quantity
+```
+
+Ejemplo conceptual:
+
+```text
+Owned
+20
+
+Available
+12
+```
+
+La diferencia puede corresponder a cantidades físicamente separadas, en otra
+posición o no elegibles para una nueva operación.
+
+---
+
+# 59. Company-owned quantity — TARGET
+
+Representará inventario que sigue bajo propiedad/control de la Company aunque no
+esté disponible en el almacén normal.
+
+Conceptualmente:
+
+```text
+Company-owned
+=
+sum of relevant Company-owned positions
+```
+
+---
+
+# 60. Available quantity — TARGET
+
+Available deberá calcularse desde cantidades elegibles.
+
+Puede depender de:
+
+```text
+InventoryLocation
+
+Batch
+
+expiration
+
+reservation future
+
+other inventory eligibility rules
+```
+
+Para Equipment ASSET, la elegibilidad también dependerá de reglas propias del
+dominio Equipment y no exclusivamente de Inventory quantities.
+
+---
+
+# 61. InventoryLocation — TARGET
+
+`InventoryLocation` representará una posición física o lógica útil para Inventory.
+
+Ejemplos conceptuales posibles:
+
+```text
+Main Warehouse
+
+Staging Area
+
+Inspection Area
+
+Quarantine Area
+
+Other Inventory Location
+```
+
+Los nombres, tipos y enums definitivos:
+
+```text
+→ NOT DECIDED
+```
+
+hasta realizar el diseño técnico correspondiente.
+
+---
+
+# 62. Location no es Condition
+
+No debe introducirse una Location como:
+
+```text
+DAMAGED
+```
+
+solo para representar una condición física.
+
+Debe mantenerse:
+
+```text
+Location
+→ where inventory is
+```
+
+y:
+
+```text
+Condition / eligibility
+→ why it may or may not be usable
 ```
 
 cuando corresponda.
 
 ---
 
-# 101. createdBy
+# 63. Location no sustituye Custody
 
-Los movimientos deben preservar el usuario responsable cuando exista.
+Una futura Position puede indicar dónde se encuentra una cantidad.
 
-El backend debe obtener esta identidad desde el contexto autenticado.
-
----
-
-# 102. Notas
-
-`notes` puede proporcionar contexto adicional.
-
-No debe sustituir información estructurada crítica.
-
-Incorrecto:
+No debe sustituir un registro operacional que responda:
 
 ```text
-notes = "lote L001, salieron 5"
+who has custody?
+
+for which Case?
+
+since when?
+
+who dispatched it?
 ```
 
-si esos datos deben existir como campos/relaciones estructurados.
-
----
-
-# 103. API
-
-Inventory debe exponer capacidades del dominio, no edición arbitraria de sus tablas.
-
-Evitar:
+Debe mantenerse:
 
 ```text
-POST /inventory/set-stock
+Inventory Position
+≠
+Healthcare Custody record
 ```
 
-como operación general.
-
 ---
 
-# 104. Operaciones correctas
+# 64. InventoryPosition — TARGET
 
-Preferir operaciones como:
-
-```text
-PurchaseReceipt
-Delivery
-Return
-Adjustment
-Transfer
-Count
-```
-
-cada una con reglas propias.
-
----
-
-# 105. Consultas
-
-Inventory puede ofrecer consultas como:
-
-```text
-GET inventory
-GET inventory movements
-GET product inventory
-GET batches
-```
-
-según la implementación.
-
-La referencia exacta de endpoints debe evolucionar a OpenAPI.
-
----
-
-# 106. Dashboard
-
-Dashboard puede consumir Inventory para mostrar:
-
-* valor de inventario;
-* productos con bajo stock;
-* movimientos recientes;
-* alertas de caducidad futuras.
-
-No debe modificar inventario.
-
----
-
-# 107. Valor de inventario
-
-`inventoryValue` puede proporcionar una métrica operacional.
-
-Antes de utilizarla como cifra contable oficial debe existir una política definida de valuación.
-
----
-
-# 108. Expiration Dashboard
-
-La arquitectura futura puede mostrar:
-
-```text
-Caduca en 30 días
-Caduca en 60 días
-Caduca en 90 días
-Vencido
-```
-
-priorizando lotes que requieren atención.
-
----
-
-# 109. Notifications
-
-Eventos como:
-
-```text
-Low Stock
-Expiration approaching
-Negative stock attempt
-Reconciliation issue
-```
-
-pueden generar alertas futuras.
-
-No todo movimiento debe generar una notificación al usuario.
-
----
-
-# 110. Domain Events
-
-Eventos conceptuales pueden incluir:
-
-```text
-InventoryMovementCreated
-InventoryAdjusted
-InventoryLowStock
-InventoryExpired
-InventoryNegativeAttemptBlocked
-```
-
-y posteriormente:
-
-```text
-InventoryTransferred
-InventoryCountCompleted
-```
-
-Estos eventos no implican infraestructura distribuida obligatoria.
-
----
-
-# 111. UI actual
-
-La interfaz de Inventory debe mostrar como mínimo información útil como:
-
-```text
-Producto
-SKU
-Stock
-Mínimo
-Estado
-```
-
-según la implementación.
-
----
-
-# 112. Evolución de la UI
-
-Inventory debe evolucionar desde una tabla de stock hacia contexto más rico:
+`InventoryPosition` representará conceptualmente:
 
 ```text
 Product
-Stock
-Available
-Lots
-Nearest Expiration
-Status
-Actions
++
+InventoryLocation
++
+optional Batch
++
+quantity
 ```
 
-cuando esas capacidades estén realmente disponibles.
-
----
-
-# 113. Product 360
-
-Desde Product debería ser posible acceder progresivamente a:
+Ejemplo:
 
 ```text
-Inventario
-Lotes
-Movimientos
-Compras
-Entregas
-Returns
-```
+Product A
 
-sin convertir la pantalla en un bloque único de información.
+Lot L001
 
----
+Main Warehouse
 
-# 114. Warehouse Operations
-
-El Workspace futuro puede consumir Inventory para mostrar:
-
-```text
-Bajo stock
-Por recibir
-Por preparar
-Returns
-Quarantine
-Incidents
-```
-
-Inventory continúa siendo propietario de existencias.
-
----
-
-# 115. Loading / Empty / Error
-
-Las pantallas deben distinguir:
-
-```text
-Loading
-Empty
-Data
-Error
-```
-
-y no confundir:
-
-```text
-No hay inventario
-```
-
-con:
-
-```text
-No fue posible cargar inventario
+Quantity 8
 ```
 
 ---
 
-# 116. Trazabilidad
+# 65. InventoryPosition no es input libre
 
-La meta arquitectónica es poder reconstruir cadenas como:
+Debe mantenerse:
 
 ```text
-Supplier
+InventoryPosition.quantity
+→ consequence of Inventory operations
+```
+
+No:
+
+```text
+user types arbitrary position quantity
+```
+
+como operación normal.
+
+---
+
+# 66. Ledger vs Position — TARGET
+
+La arquitectura futura deberá distinguir:
+
+```text
+InventoryMovement
+→ historical ledger
+```
+
+de:
+
+```text
+InventoryPosition
+→ current position projection
+```
+
+Una Position persistida deberá permanecer reconciliable contra los movimientos
+que la produjeron.
+
+---
+
+# 67. TRANSFER — TARGET
+
+`TRANSFER` representa cambio de posición sin salida definitiva de propiedad.
+
+Conceptualmente:
+
+```text
+Location A
 ↓
-Purchase
+TRANSFER
 ↓
+Location B
+```
+
+Invariante:
+
+```text
+Company-owned before
+=
+Company-owned after
+```
+
+---
+
+# 68. TRANSFER ≠ OUT
+
+Debe mantenerse:
+
+```text
+TRANSFER
+≠
+OUT
+```
+
+`TRANSFER` cambia:
+
+```text
+where inventory is
+```
+
+`OUT` cambia:
+
+```text
+how much inventory remains Company-owned
+```
+
+---
+
+# 69. TRANSFER atomicity — TARGET
+
+Una transferencia deberá coordinar:
+
+```text
+decrease source Position
+
+increase destination Position
+
+create Movement
+```
+
+dentro de una operación consistente.
+
+No debe existir:
+
+```text
+source decreased
++
+destination not increased
+```
+
+---
+
+# 70. Location-aware IN — TARGET
+
+Una futura entrada podrá expresarse como:
+
+```text
 PurchaseReceipt
 ↓
-InventoryBatch
+InventoryMovement IN
 ↓
-InventoryMovement
+Warehouse Location
+```
+
+sin cambiar la regla actual:
+
+```text
+PurchaseReceipt
+→ physical Inventory entry
+```
+
+---
+
+# 71. Location-aware OUT — TARGET
+
+Una futura salida podrá conocer:
+
+```text
+source InventoryLocation
+```
+
+y disminuir la Position correcta.
+
+Para el modelo comercial futuro:
+
+```text
+Delivery
+↓
+OUT
+↓
+from actual fulfillment position
+```
+
+---
+
+# 72. SalesOrder + Delivery — TARGET
+
+La evolución comercial aprobada podrá ser:
+
+```text
+Quote
+↓
+SalesOrder
 ↓
 Delivery
 ↓
-Customer
+Inventory OUT
+```
+
+Debe mantenerse:
+
+```text
+SalesOrder
+→ no physical OUT by itself
+```
+
+y:
+
+```text
+Delivery
+→ physical OUT
+```
+
+cuando ese modelo sustituya de forma controlada al comportamiento V1 de Sale.
+
+---
+
+# 73. Healthcare integration boundary
+
+Healthcare será un consumidor futuro de capacidades de Inventory.
+
+Debe mantenerse:
+
+```text
+Healthcare workflow
+↓
+Inventory capability
+↓
+Inventory invariants
+↓
+Persistence
+```
+
+No:
+
+```text
+Healthcare
+↓
+direct uncontrolled mutation of Inventory tables
 ```
 
 ---
 
-# 117. Trazabilidad Healthcare
+# 74. Healthcare Preparation — TARGET principle
+
+Cuando material físico sea separado para un Case, la arquitectura futura puede
+requerir una transferencia interna.
+
+Conceptualmente:
+
+```text
+Warehouse
+↓
+internal transfer
+↓
+Staging
+```
+
+Esto no cambia la propiedad de la Company.
+
+El workflow detallado pertenece a Healthcare.
+
+---
+
+# 75. Healthcare Dispatch
+
+Debe mantenerse:
+
+```text
+Healthcare Dispatch
+≠
+Commercial Inventory OUT
+```
+
+Para material todavía propiedad de la Company, un Dispatch representa movimiento
+operacional/custodia, no una salida comercial definitiva.
+
+La implementación exacta dependerá del futuro diseño Core Inventory + Healthcare.
+
+---
+
+# 76. Healthcare Return
+
+Debe mantenerse:
+
+```text
+Healthcare Return
+≠
+Commercial Inventory IN
+```
+
+El material reutilizable o no consumido ya pertenecía a la Company.
+
+Return cambia la realidad operacional/custodia, no crea una nueva adquisición.
+
+---
+
+# 77. Return ≠ Available
 
 También:
 
 ```text
-PurchaseReceipt
-↓
-InventoryBatch
-↓
-CaseDispatch
-↓
-Technician Custody
-↓
-Case
-↓
-Return / Consumption
-↓
-Final disposition
+Returned
+≠
+Automatically Available
+```
+
+Pueden existir reglas posteriores de:
+
+```text
+inspection
+
+quarantine
+
+batch eligibility
+
+Equipment condition
+```
+
+antes de una nueva utilización.
+
+---
+
+# 78. Healthcare consumption / fulfillment
+
+Cuando material deje definitivamente de formar parte del inventario Company-owned,
+deberá existir un único `OUT` que represente ese hecho.
+
+Debe mantenerse:
+
+```text
+same physical quantity
+→ at most one definitive OUT for same disposition
+```
+
+No debe descontarse una vez por Dispatch y otra vez por Delivery/consumo.
+
+---
+
+# 79. Equipment y Healthcare
+
+Equipment reutilizable mantiene su identidad en:
+
+```text
+EquipmentAsset
+```
+
+Healthcare podrá registrar:
+
+```text
+Assignment
+
+Dispatch
+
+Custody
+
+Return
+```
+
+sin obligar a que la identidad física del activo dependa de
+`InventoryPosition.quantity`.
+
+Debe mantenerse:
+
+```text
+Equipment identity
+≠
+quantity-only tracking
 ```
 
 ---
 
-# 118. Estado CURRENT
+# 80. InventoryReservation — TARGET
 
-La documentación consolidada confirma capacidades relacionadas con:
+`InventoryReservation` representará conceptualmente:
+
+```text
+inventory committed
+but not yet physically moved
+```
+
+Debe distinguirse de Staging:
+
+```text
+InventoryReservation
+→ logical claim
+```
+
+```text
+Staging
+→ physical separation / position change
+```
+
+Actualmente:
+
+```text
+InventoryReservation
+→ NOT IMPLEMENTED
+```
+
+---
+
+# 81. FEFO — FUTURE
+
+FEFO podrá priorizar inventario elegible considerando:
+
+```text
+expirationDate
+```
+
+sobre batches/positions adecuados.
+
+Actualmente:
+
+```text
+advanced FEFO
+→ NOT IMPLEMENTED
+```
+
+---
+
+# 82. Multi-Warehouse — TARGET
+
+La jerarquía Company → Branch → Warehouse → StorageLocation está definida en
+`ADVANCED_INVENTORY.md` como diseño objetivo aprobado.
+
+Sin embargo:
+
+```text
+Full Multi-Warehouse
+→ NOT IMPLEMENTED
+```
+
+No debe crearse un catálogo Healthcare de almacenes paralelo al futuro Core.
+
+---
+
+# 83. Migration principles — TARGET
+
+La evolución hacia Locations/Positions deberá ser incremental.
+
+Principios:
+
+```text
+no big-bang rewrite
+```
+
+```text
+reconcile current data before backfill
+```
+
+```text
+do not invent historical locations
+```
+
+```text
+preserve backward compatibility while transitioning
+```
+
+---
+
+# 84. Default Warehouse — TARGET
+
+Una implementación futura location-aware podrá requerir una ubicación inicial para
+las existencias existentes.
+
+Conceptualmente:
+
+```text
+Default Warehouse Location
+```
+
+El diseño exacto se decidirá cuando se implemente InventoryLocation.
+
+No constituye trabajo CURRENT.
+
+---
+
+# 85. Historical migration
+
+Si no existe evidencia suficiente para reconstruir ubicación histórica:
+
+```text
+do not fabricate history
+```
+
+Los movimientos legacy podrán conservarse con semántica histórica sin inventar
+una Location retrospectiva falsa.
+
+---
+
+# 86. Product.stock durante transición
+
+Durante una migración futura hacia Positions:
 
 ```text
 Product.stock
-Product.minStock
-InventoryMovement
+```
+
+podrá mantenerse temporalmente como proyección agregada de compatibilidad.
+
+Su eventual retiro solo podrá evaluarse cuando:
+
+```text
+operational modules
+
+reports
+
+queries
+
+tests
+```
+
+ya no dependan incorrectamente de él.
+
+---
+
+# 87. Inventory 360 — FUTURE
+
+Una futura vista puede presentar:
+
+```text
+Product
+
+Owned
+
+Available
+
+Warehouse
+
+Staged
+
+Other positions
+
+Batch breakdown
+```
+
+sin crear fuentes paralelas de stock.
+
+---
+
+# 88. Movement history — TARGET evolution
+
+Con Locations, el ledger podrá evolucionar para mostrar:
+
+```text
 IN
+External → Warehouse
+
+TRANSFER
+Warehouse → Staging
+
+TRANSFER
+Staging → Another Position
+
 OUT
-ADJUSTMENT
-balance
-referenceType
-referenceId
-unitCost
-Purchase Receipts
+Position → External
+```
+
+Actualmente source/destination Location no forman parte del modelo completo
+implementado.
+
+---
+
+# 89. Traceability
+
+La dirección general debe permitir reconstruir, según los dominios aplicables:
+
+```text
+Business Document
+↓
+InventoryMovement
+↓
+Batch
+↓
+current projection
+```
+
+y, en arquitectura futura:
+
+```text
+Movement
+↓
+Location / Position
+```
+
+sin perder el documento que originó cada hecho.
+
+---
+
+# 90. Dashboard
+
+Dashboard puede consumir las proyecciones de Inventory.
+
+No debe mantener una segunda lógica independiente para decidir:
+
+```text
+stock
+
+availability
+
+movement meaning
+```
+
+---
+
+# 91. Warehouse Operations
+
+Futuros workflows de Warehouse podrán consumir Inventory para:
+
+```text
+receiving
+
+preparation
+
+internal transfer
+
+delivery
+
+return processing
+```
+
+sin convertirse en un segundo ledger de cantidades.
+
+---
+
+# 92. Testing CURRENT
+
+Inventory V1 debe cubrir al menos comportamiento sobre:
+
+```text
+PurchaseReceipt IN
+
+Sale OUT
+
+stock mutation
+
+movement balance
+
+referenceType / referenceId
+
+tenant scope
+
+invalid quantity protection
+
+PurchaseReceipt over-receipt protection
+```
+
+---
+
+# 93. Ledger frontend validation
+
+La validación actual incluye:
+
+```text
+real PurchaseReceipt IN movements
+
+real Sale OUT movements
+
+balance presentation
+
+reference presentation
+
+search
+
+filters
+
+Receipt deep-link
+
+browser behavior
+```
+
+Los snapshots cuantitativos pertenecen a:
+
+```text
+PROJECT_BOARD.md
+
+CHANGELOG.md
+```
+
+---
+
+# 94. Testing TARGET
+
+Cuando existan Locations/Positions deberán añadirse pruebas para:
+
+```text
+IN to correct Position
+
+TRANSFER source decrease
+
+TRANSFER destination increase
+
+Owned unchanged after TRANSFER
+
+negative Position blocked
+
+cross-tenant Position blocked
+
+Batch mismatch blocked
+
+duplicate retry blocked
+
+OUT from correct source Position
+
+Position reconciliation
+```
+
+---
+
+# 95. Healthcare integration testing — TARGET
+
+Cuando Healthcare consuma Inventory deberán existir pruebas que garanticen
+invariantes como:
+
+```text
+Preparation
+→ does not create definitive OUT
+```
+
+```text
+Dispatch
+→ does not double-decrement Company-owned quantity
+```
+
+```text
+Return
+→ does not create commercial IN
+```
+
+```text
+Consumption / Delivery
+→ definitive OUT exactly once
+```
+
+El workflow detallado pertenece a Healthcare.
+
+---
+
+# 96. IMPLEMENTED
+
+Actualmente:
+
+```text
+Product.stock aggregate projection
+
+InventoryMovement ledger
+
+IN
+
+OUT
+
+ADJUSTMENT movement type
+
 InventoryBatch
-lotNumber
-expirationDate
-availableQuantity
-receipt-generated IN movements
-low-stock state
-```
 
-La implementación técnica vigente debe seguir verificándose en código antes de realizar cambios de schema.
+lot / expiration persistence
 
----
+PurchaseReceipt → IN
 
-# 119. Estado TARGET
+partial Receipt stock mutation
 
-Arquitectura aprobada:
+over-receipt protection
 
-```text
-Delivery-based OUT
-FEFO
-Expired-stock blocking
-Batch allocation on Delivery
-Return batch traceability
-Advanced availability
-Inventory correction/reversal
-Healthcare custody integration
-Equipment integration
+Sale CONFIRMED → OUT
+
+Inventory frontend
+
+Existencias view
+
+Movimientos view
+
+client-side movement search/filter
+
+Receipt reference deep-link
+
+transactional stock updates in supported workflows
 ```
 
 ---
 
-# 120. Estado FUTURE
+# 97. VALIDATED
 
-Capacidades posteriores:
+La validación registrada cubre:
 
 ```text
-Multi-Warehouse
-Locations
-Transfers
-Stock Counts
-Serial tracking
-Reservations
-Barcode workflows
-QR workflows
-Inventory valuation
-Advanced replenishment
-Forecasting
-Inventory analytics
-AI recommendations
+PurchaseReceipt IN
+
+Sale OUT
+
+InventoryMovement references
+
+stock balances
+
+partial receipts
+
+over-receipt protection
+
+frontend Existencias / Movimientos
+
+search / filters
+
+Receipt deep-link
+
+related backend/frontend regression
+```
+
+Los gates técnicos incluyen según el hito:
+
+```text
+tests
+
+build
+
+lint
+
+git diff --check
+
+Prisma validation/status when applicable
+```
+
+Los totales específicos no deben fijarse permanentemente en este documento.
+
+---
+
+# 98. TECHNICAL DEBT
+
+Permanece pendiente:
+
+```text
+backend pagination
+```
+
+```text
+server-side movement filtering
+```
+
+```text
+date-range filtering
+```
+
+```text
+server-side reference filtering
+```
+
+```text
+deep-link compatibility after server pagination
+```
+
+```text
+manual Inventory Adjustment workflow
+```
+
+```text
+SERIALIZED inventory semantics
+```
+
+```text
+Product.stock ↔ EquipmentAsset reconciliation
+```
+
+```text
+formal Sale reversal / corrective Inventory workflow
+```
+
+```text
+legacy tenant-safe write hardening where applicable
 ```
 
 ---
 
-# 121. Invariantes principales
+# 99. APPROVED TARGET
+
+Está aprobado arquitectónicamente, pero no implementado:
 
 ```text
-Inventory change
-→ traceable operation
+InventoryLocation
+
+InventoryPosition
+
+Company → Branch → Warehouse → StorageLocation
+
+InventoryReservation
+
+InventoryRelocation
+
+InventoryTransfer
+
+TRANSFER
+
+Owned vs Available
+
+location-aware IN
+
+location-aware OUT
+
+position-aware availability
+
+incremental location migration
+
+SalesOrder → Delivery → OUT
 ```
+
+---
+
+# 100. FUTURE / OUTSIDE APPROVED ADVANCED INVENTORY DESIGN
+
+Fuera del Inventory V1 actual:
+
+```text
+advanced FEFO
+
+bins
+
+warehouse routes
+
+barcode / QR
+
+advanced inventory valuation
+
+WMS capabilities
+
+advanced reconciliation
+
+generic serial tracking
+```
+
+---
+
+# 101. Invariantes CURRENT
+
+## Stock
+
+```text
+Product.stock
+→ controlled aggregate projection
+```
+
+No:
+
+```text
+arbitrary user input
+```
+
+---
+
+## Purchase
 
 ```text
 Purchase
@@ -2224,271 +2598,578 @@ Purchase
 Inventory IN
 ```
 
+---
+
+## Receipt
+
 ```text
 PurchaseReceipt
 → Inventory IN
 ```
 
+---
+
+## Sale V1
+
 ```text
-SalesOrder
-≠
-Inventory OUT
+Sale DRAFT
+→ no Inventory OUT
 ```
 
 ```text
-Delivery
+Sale CONFIRMED
 → Inventory OUT
 ```
 
-```text
-CaseDispatch
-≠
-Definitive OUT
-```
+---
+
+## Movement history
 
 ```text
 Confirmed InventoryMovement
-→ immutable
+→ historical fact
 ```
 
-```text
-Normal operation
-→ no negative stock
-```
+---
+
+## Correction
 
 ```text
-Expired inventory
-→ may physically exist
-→ not normally sellable
+Correction
+→ explicit / compensating operation
 ```
 
+No:
+
 ```text
-Cross-tenant inventory
+silent historical rewrite
+```
+
+---
+
+## Tenant
+
+```text
+Cross-tenant Inventory mutation
 → forbidden
 ```
 
 ---
 
-# 122. Anti-patrones
-
-## Direct Stock Editing
+## Equipment
 
 ```text
-Product.stock = arbitraryValue
+Inventory quantity
+≠
+EquipmentAsset identity
 ```
 
 ---
 
-## Inventory on Purchase Approval
+# 102. Invariantes TARGET
+
+## Owned vs Available
+
+```text
+Owned
+≠
+Available
+```
+
+---
+
+## TRANSFER
+
+```text
+TRANSFER
+→ changes position
+→ does not change Company-owned quantity
+```
+
+---
+
+## OUT
+
+```text
+OUT
+→ decreases Company-owned quantity
+```
+
+---
+
+## Position
+
+```text
+InventoryPosition
+→ never negative
+```
+
+---
+
+## Healthcare Dispatch
+
+```text
+Dispatch
+≠
+commercial OUT
+```
+
+---
+
+## Healthcare Return
+
+```text
+Return
+≠
+commercial IN
+```
+
+---
+
+## Definitive disposition
+
+```text
+Same physical quantity
+→ cannot be OUT twice for same disposition
+```
+
+---
+
+# 103. Anti-patrones
+
+## Direct stock editing
+
+```text
+product.stock = userInput
+```
+
+como operación ordinaria.
+
+---
+
+## Purchase = Inventory
 
 ```text
 Purchase CONFIRMED
-→ IN
+→ stock increment
+```
+
+Incorrecto.
+
+---
+
+## Sale DRAFT = OUT
+
+```text
+Sale DRAFT
+→ stock decrement
+```
+
+Incorrecto.
+
+---
+
+## Future SalesOrder = OUT
+
+```text
+SalesOrder
+→ physical decrement
+```
+
+Incorrecto en la arquitectura Target.
+
+---
+
+## Dispatch = OUT
+
+```text
+Healthcare Dispatch
+→ definitive commercial OUT
+```
+
+Incorrecto para inventario todavía Company-owned.
+
+---
+
+## Return = IN
+
+```text
+Healthcare Return
+→ new commercial Inventory IN
+```
+
+Incorrecto para inventario que nunca dejó de pertenecer a la Company.
+
+---
+
+## Return = Available
+
+```text
+Returned
+→ immediately available
+```
+
+Incorrecto.
+
+---
+
+## One stock number for everything
+
+Utilizar una única cantidad futura como si significara simultáneamente:
+
+```text
+owned
+available
+staged
+custody
+inspection
 ```
 
 ---
 
-## Inventory on SalesOrder
+## HealthcareInventory
+
+Crear un ledger de stock paralelo exclusivo para Healthcare.
+
+---
+
+## Equipment as quantity only
+
+Ignorar `EquipmentAsset` para Products ASSET.
+
+---
+
+## Location as Condition
+
+Utilizar:
 
 ```text
-SalesOrder CONFIRMED
-→ OUT
+DAMAGED
 ```
 
----
-
-## Delete Historical Movement
-
-Eliminar un movimiento para corregir saldo.
+como Location únicamente para expresar Condition.
 
 ---
 
-## Rewrite Receipt
+## Location as Custody
 
-Editar una Receipt histórica para cambiar el inventario pasado.
-
----
-
-## Assume Batch
-
-Asignar una Return al lote que “parece correcto” sin trazabilidad.
-
----
-
-## Treat Custody as Sale
+Pretender que una Position sustituya:
 
 ```text
-CaseDispatch
-→ OUT / Sale
-```
-
-automáticamente.
-
----
-
-## Add Future Fields Prematurely
-
-Agregar Warehouse, Location, Reservation o Serial al schema sin diseñar el workflow correspondiente.
-
----
-
-# 123. Relación con Products
-
-`Product` define:
-
-```text
-qué producto es
-```
-
-Inventory define:
-
-```text
-cuánto existe
-cómo llegó
-dónde está conceptualmente
-qué movimientos lo afectaron
-```
-
----
-
-# 124. Relación con Purchases
-
-`PURCHASES.md` define:
-
-```text
-qué se ordenó
-qué se recibió
-```
-
-Inventory aplica la consecuencia física de la recepción.
-
----
-
-# 125. Relación con Sales
-
-Sales define:
-
-```text
-qué se vende
-```
-
-Inventory define:
-
-```text
-si puede salir
-qué existencia sale
-cómo queda el saldo
-```
-
----
-
-# 126. Relación con Returns
-
-Returns define:
-
-```text
-qué se devuelve
-por qué
-en qué condición
-si debe reintegrarse
-```
-
-Inventory ejecuta la disposición física válida.
-
----
-
-# 127. Relación con Healthcare
-
-Healthcare define:
-
-```text
+custodian
 Case
-Dispatch
-Custody
-Return
-Reconciliation
+dispatch actor
+timestamps
 ```
 
-Inventory conserva la representación correcta de las existencias.
+---
 
-Healthcare no debe modificar stock directamente.
+## Manual Position editing
+
+Modificar Position directamente para “cuadrar” cantidades.
 
 ---
 
-# 128. ADR relacionados
+## Rewrite movement history
 
-* ADR-001 — Multi-Tenant.
-* ADR-002 — Inventory Movements.
-* ADR-005 — Layered Architecture.
-* ADR-007 — RBAC.
-* ADR-009 — Modular Monolith.
-* ADR-011 — SalesOrder y Delivery.
-* ADR-012 — Entity Lifecycle.
-* ADR-013 — Inventory Custody & Case Logistics.
+Editar movimientos confirmados para cambiar resultados anteriores.
 
 ---
 
-# 129. Documentos relacionados
+## Cross-module Prisma mutation
+
+Healthcare modificando directamente internals de Inventory sin pasar por las
+reglas de la capacidad Inventory correspondiente.
+
+---
+
+## Double OUT
+
+Descontar físicamente la misma cantidad dos veces por un solo hecho comercial.
+
+---
+
+# 104. ADR relacionados
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-architecture/ARCHITECTURE.md
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-modules/erp/PURCHASES.md
-product/ZAPING_WAY.md
+ADR-001 — Multi-Tenant
+
+ADR-002 — Inventory Movements
+
+ADR-004 — UUID
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — RBAC
+
+ADR-009 — Modular Monolith
+
+ADR-011 — SalesOrder + Delivery
+
+ADR-012 — Entity Lifecycle
+
+ADR-013 — Inventory Custody & Case Logistics
+
+ADR-014 — Inventory Locations and Internal Transfers
+```
+
+Los ADR TARGET no significan automáticamente que sus modelos estén implementados.
+
+---
+
+# 105. Documentación relacionada
+
+```text
+docs/modules/erp/PRODUCTS.md
+
+docs/modules/erp/PURCHASES.md
+
+docs/modules/erp/PURCHASE_RECEIPTS.md
+
+docs/modules/erp/SALES.md
+
+docs/modules/erp/EQUIPMENT.md
+
+docs/modules/erp/ADVANCED_INVENTORY.md
+
+docs/modules/erp/IDENTITY_ACCESS.md
+
+docs/modules/healthcare/DOMAIN_MODEL.md
+
+docs/modules/healthcare/HEALTHCARE.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+
+docs/project/CHANGELOG.md
 ```
 
 ---
 
-# 130. Fuente de verdad
-
-Este documento constituye la fuente documental principal de las reglas funcionales de Inventory.
-
-La división de responsabilidades es:
+# 106. Fuente de verdad
 
 ```text
 INVENTORY.md
-→ comportamiento del dominio
+→ Inventory functional/domain behavior
 
-ADR
-→ decisiones arquitectónicas
+PRODUCTS.md
+→ Product tracking configuration
+
+PURCHASE_RECEIPTS.md
+→ Purchase physical receipt and IN orchestration
+
+SALES.md
+→ CURRENT Sale inventory behavior
+
+EQUIPMENT.md
+→ ASSET physical identity
+
+Healthcare documentation
+→ Case Logistics / Custody workflows
+
+ADR-002
+→ Inventory Movement architecture
+
+ADR-014
+→ approved Locations / Positions / Transfers architecture
+
+ADVANCED_INVENTORY.md
+→ canonical Advanced Inventory target design
 
 schema.prisma
-→ modelo técnico vigente
+→ CURRENT technical persistence
 
-backend
-→ implementación actual
+Inventory backend
+→ CURRENT implementation
+
+Inventory frontend
+→ CURRENT user experience
 
 tests
-→ comportamiento validado
+→ validated behavior
 
 PROJECT_BOARD.md
-→ estado del trabajo
+→ current project state and debt
+
+CHANGELOG.md
+→ historical implementation evolution
 ```
 
 ---
 
-# 131. Principio final
-
-Inventory debe representar hechos físicos y conservar su historia.
-
-La regla principal de Zaping es:
+# 107. Estado consolidado
 
 ```text
-Business Event
-↓
-Inventory Consequence
-↓
-Traceable Movement
+Product.stock
+✅ CURRENT
+
+InventoryMovement ledger
+✅ CURRENT
+
+InventoryBatch
+✅ CURRENT
+
+PurchaseReceipt → IN
+✅ CURRENT
+
+Sale CONFIRMED → OUT
+✅ CURRENT
+
+Inventory frontend
+✅ CURRENT
+
+Receipt reference deep-link
+✅ CURRENT
 ```
 
-Nunca:
+Pendiente:
 
 ```text
-Need different stock
-↓
-edit the number
+backend pagination
+⏳
+
+server-side filtering
+⏳
+
+date-range filtering
+⏳
+
+manual Adjustment workflow
+⏳
+
+SERIALIZED semantics
+⏳
+
+Product.stock ↔ EquipmentAsset reconciliation
+⏳
 ```
 
-> **El stock es una consecuencia. La trazabilidad es la evidencia.**
+Target:
+
+```text
+InventoryLocation
+⏳
+
+InventoryPosition
+⏳
+
+InventoryReservation
+⏳
+
+InventoryRelocation / InventoryTransfer
+⏳
+
+TRANSFER
+⏳
+
+Owned vs Available
+⏳
+
+location-aware IN / OUT
+⏳
+
+SalesOrder → Delivery → OUT
+⏳
+```
+
+---
+
+# 108. Secuencia de proyecto
+
+Advanced Inventory continúa siendo un diseño aprobado del ERP Core, pero no
+representa el siguiente cambio inmediato del proyecto. Su diseño canónico es
+`ADVANCED_INVENTORY.md` y su ejecución se registra en `PROJECT_BOARD.md`.
+
+La secuencia vigente es:
+
+```text
+H8 Documentation / Technical Regression
+↓
+UX-B.6 Full ERP End-to-End QA
+↓
+ERP Core V1 Closure
+↓
+Healthcare specialization
+```
+
+Después de esa etapa, las capacidades Inventory TARGET deberán priorizarse de
+acuerdo con las necesidades reales de:
+
+```text
+Healthcare
+
+Sales fulfillment
+
+Warehouse operations
+
+scale
+```
+
+No debe realizarse una migración location-aware únicamente porque el ADR ya
+existe.
+
+---
+
+# 109. Principio final
+
+Inventory debe preservar dos niveles claramente separados.
+
+CURRENT:
+
+```text
+¿Cuánto tengo?
+↓
+¿Qué movimiento modificó esa cantidad?
+↓
+¿Qué lote corresponde?
+```
+
+TARGET:
+
+```text
+¿Cuánto tengo?
+↓
+¿Dónde está?
+↓
+¿Cuánto continúa siendo mío?
+↓
+¿Cuánto está disponible?
+↓
+¿Qué movimiento explica cada cambio de posición?
+```
+
+sin confundir:
+
+```text
+quantity
+with
+physical ASSET identity
+```
+
+ni:
+
+```text
+internal movement
+with
+definitive disposition
+```
+
+La regla central es:
+
+```text
+IN
+→ increases Company-owned inventory
+
+TRANSFER
+→ changes where inventory is
+
+OUT
+→ decreases Company-owned inventory
+```

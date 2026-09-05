@@ -1,43 +1,56 @@
-# Documentación de Zaping
+Documentación de Zaping
 
-**Producto:** Zaping
-**Versión del índice:** 2.0.0
-**Última actualización:** 2026-08-19
-**Estado:** En consolidación
+Producto: Zaping
+Versión del índice: 2.2.0
+Última actualización: 2026-09-04
+Estado: H8A DOCUMENTATION SYNCHRONIZATION — IN PROGRESS
 
----
-
-# 1. Propósito
+1. Propósito
 
 Esta carpeta contiene la documentación oficial del ecosistema Zaping.
 
 La documentación debe permitir comprender:
 
-* qué es Zaping;
-* qué problemas resuelve;
-* cómo está estructurado;
-* cómo funcionan sus dominios;
-* qué decisiones arquitectónicas se han tomado;
-* cuáles son los estándares de ingeniería;
-* cómo debe funcionar la experiencia de usuario;
-* qué se está desarrollando actualmente;
-* y hacia dónde evoluciona el producto.
+qué es Zaping;
 
-La documentación debe representar el comportamiento real del sistema.
+qué problemas resuelve;
 
----
+cómo está estructurado;
 
-# 2. Principio documental
+cómo funcionan sus dominios;
+
+qué decisiones arquitectónicas se han tomado;
+
+cuáles son los estándares de ingeniería;
+
+cómo debe funcionar la experiencia de usuario;
+
+qué se está desarrollando actualmente;
+
+y hacia dónde evoluciona el producto.
+
+La documentación debe representar el comportamiento real del sistema y distinguir con claridad entre:
+
+CURRENT
+
+TARGET
+
+FUTURE
+
+TECHNICAL DEBT
+
+ARCHITECTURAL CANDIDATE
+
+2. Principio documental
 
 Zaping utiliza el principio:
 
-> **Una verdad → una fuente responsable.**
+Una verdad → una fuente responsable.
 
 No deben existir varios documentos activos definiendo versiones diferentes de la misma regla.
 
 Ejemplos:
 
-```text
 Visión del producto
 → PRODUCT_VISION.md
 
@@ -54,7 +67,7 @@ Reglas de negocio específicas
 → documentación del módulo
 
 Experiencia de usuario
-→ ZAPING_WAY.md
+→ ZAPING_WAY.md / ERP_UI_UX.md según alcance
 
 Estado actual
 → PROJECT_BOARD.md
@@ -64,45 +77,225 @@ Dirección futura
 
 Cambios realizados
 → CHANGELOG.md
+
+2.1 Estados de implementación y documentación
+
+La documentación distingue las siguientes categorías:
+
+CURRENT / IMPLEMENTED
+→ existe en código y persistencia cuando corresponde
+
+VALIDATED
+→ cuenta con evidencia automatizada o QA registrada
+
+TECHNICAL DEBT
+→ existe una limitación conocida pendiente
+
+TARGET
+→ dirección funcional o técnica aprobada, todavía no implementada
+
+FUTURE
+→ capacidad posterior o todavía no priorizada para implementación
+
+ARCHITECTURAL CANDIDATE
+→ solución técnica posible que requiere ADR o diseño antes de aprobarse
+
+No todo lo no implementado debe etiquetarse simplemente como FUTURE.
+
+2.2 Mapa de fuentes CURRENT
+
+Fuentes principales:
+
+ERP Core frontend y navegación
+→ modules/erp/ERP_UI_UX.md
+
+Recepciones e idempotencia
+→ modules/erp/PURCHASE_RECEIPTS.md
+
+Equipment identity / lifecycle / condition
+→ modules/erp/EQUIPMENT.md
+
+Inventory CURRENT
+→ modules/erp/INVENTORY.md
+
+Advanced Inventory target design
+→ modules/erp/ADVANCED_INVENTORY.md
+
+Sales CURRENT
+→ modules/erp/SALES.md
+
+Quotes CURRENT
+→ modules/erp/QUOTES.md
+
+Estado de ejecución
+→ project/PROJECT_BOARD.md
+
+Healthcare boundaries
+→ modules/healthcare/HEALTHCARE.md
+
+Healthcare cross-domain model
+→ modules/healthcare/DOMAIN_MODEL.md
+
+Healthcare Case Foundation
+→ modules/healthcare/CASES.md
+
+2.3 Healthcare status
+
+Actualmente:
+
+HealthcareCase Foundation
+✅ CURRENT / IMPLEMENTED / VALIDATED
+
+También existe en ERP Core:
+
+EquipmentAsset
+✅ CURRENT
+
+EquipmentInspection
+✅ CURRENT
+
+Healthcare operational workflows permanecen TARGET:
+
+Hospital / Doctor
+
+Requirements
+
+Equipment Assignment
+
+Case Availability
+
+Dispatch / Custody
+
+Return
+
+CaseKit / Maletín
+
+Calendar
+
+Case 360
+
+Capacidades posteriores permanecen FUTURE:
+
+Opportunity
+
+Payer / Insurance
+
+KitTemplate
+
+advanced Mobile / offline
+
+QR
+
+Notifications
+
+Analytics
+
+AI
+
+2.4 Authorization + Tenant Isolation V1
+
+ERP Core V1 security closure:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
 ```
 
----
+B2D validó la regresión automatizada de autorización, aislamiento tenant,
+relaciones cross-company y manejo frontend de `403`. La fuente técnica principal
+es `modules/erp/IDENTITY_ACCESS.md` y las reglas transversales están en
+`engineering/SECURITY_PRINCIPLES.md`.
 
-# 3. Idioma oficial
+2.5 Production readiness boundary
 
-La documentación oficial de Zaping se mantiene en **español**.
+Deployment, staging y operaciones
+→ [DEPLOYMENT.md](DEPLOYMENT.md)
+
+Backup y restore operacional
+→ [BACKUP_RESTORE.md](BACKUP_RESTORE.md)
+
+Debe mantenerse:
+
+functional validation
+≠
+production readiness
+
+La preparación preproducción depende también de cerrar blockers de seguridad y arquitectura de sesión.
+
+Las fuentes responsables son:
+
+engineering/SECURITY_PRINCIPLES.md
+
+project/PROJECT_BOARD.md
+
+Entre los temas críticos que permanecen abiertos deben permanecer visibles:
+
+protected-route / session architecture
+
+authentication abuse protection / rate limiting
+
+production secrets / configuration
+
+real password-recovery email delivery/configuration
+
+dependency/security maintenance before RC
+
+RC-DATA: posible lost update / stock concurrency issue en
+`InventoryService.createMovement`
+
+Password Security V1 y Authorization + Tenant Isolation V1 están implementados;
+estos gates son independientes y no deben presentarse como una autorización o
+recovery inseguro pendiente.
+
+3. Idioma oficial
+
+La documentación oficial de Zaping se mantiene en español.
 
 Se conservan en inglés cuando resulte apropiado:
 
-* nombres de clases;
-* entidades de código;
-* endpoints;
-* nombres de tecnologías;
-* patrones reconocidos;
-* términos técnicos;
-* y conceptos cuyo nombre oficial se utilice directamente en implementación.
+nombres de clases;
+
+entidades de código;
+
+endpoints;
+
+nombres de tecnologías;
+
+patrones reconocidos;
+
+términos técnicos;
+
+conceptos cuyo nombre oficial se utilice directamente en implementación.
 
 Ejemplos:
 
-```text
+Sale
+
 SalesOrder
+
 PurchaseReceipt
-Case
+
+HealthcareCase
+
 CaseKit
+
 DTO
+
 JWT
+
 RBAC
+
 Soft Delete
+
 API First
-```
 
----
+4. Estructura documental objetivo
 
-# 4. Estructura documental objetivo
+La estructura oficial evoluciona hacia:
 
-La estructura oficial de documentación evolucionará hacia:
-
-```text
 docs/
 │
 ├── README.md
@@ -134,7 +327,10 @@ docs/
 │
 ├── ux/
 │   ├── DESIGN_SYSTEM.md
-│   └── BUSINESS_COMPONENTS.md
+│   ├── BUSINESS_COMPONENTS.md
+│   ├── UX_PRINCIPLES.md
+│   ├── UX_DECISIONS.md
+│   └── UX_IMPROVEMENT_BACKLOG.md
 │
 ├── modules/
 │   ├── erp/
@@ -152,594 +348,899 @@ docs/
     ├── MODULE_TEMPLATE.md
     ├── POSTMORTEM_TEMPLATE.md
     └── RELEASE_TEMPLATE.md
-```
 
 Las carpetas deben crearse únicamente cuando exista documentación real que guardar en ellas.
 
 No deben mantenerse estructuras vacías únicamente para anticipar funcionalidades futuras.
 
----
+5. Estado de consolidación
 
-# 5. Estado de consolidación
+La documentación se encuentra en la fase final de H8A Documentation Synchronization.
 
-La documentación se encuentra actualmente en proceso de depuración y consolidación.
+5.1 Producto
 
-## 5.1 Producto
+Consolidado
 
-### ✅ Consolidado
-
-```text
 product/
+
 ├── PRODUCT_VISION.md
 └── PRODUCT_REQUIREMENTS.md
-```
 
-### ⏳ Pendiente
+Pendiente / por consolidar
 
-```text
 product/
+
 └── ZAPING_WAY.md
-```
 
----
+ZAPING_WAY.md permanece como fuente objetivo para principios generales de experiencia de producto cuando su consolidación formal se complete.
 
-## 5.2 Glosario
+5.2 Glosario
 
-### ✅ Consolidado
+Consolidado
 
-```text
 GLOSSARY.md
-```
 
-Contiene la terminología oficial utilizada en:
+Debe mantenerse sincronizado con:
 
-* ERP Core;
-* Healthcare;
-* arquitectura;
-* UX;
-* seguridad;
-* inventario;
-* ventas;
-* compras;
-* y documentación.
+ERP Core
 
----
+Healthcare
 
-## 5.3 Ingeniería
+architecture
 
-### ✅ Consolidado
+UX
 
-```text
+security
+
+inventory
+
+sales
+
+purchases
+
+5.3 Ingeniería
+
+Consolidado / vigente
+
 engineering/
+
 ├── ENGINEERING_GUIDE.md
 ├── DEVELOPMENT_WORKFLOW.md
 ├── QUALITY_STANDARDS.md
 └── SECURITY_PRINCIPLES.md
-```
 
-### ⏳ Pendiente
+API Guidelines
 
-```text
-engineering/
-└── API_GUIDELINES.md
-```
+API_GUIDELINES.md debe considerarse una fuente de ingeniería cuando exista y haya sido consolidado formalmente.
 
-`API_GUIDELINES.md` será creado después de consolidar la documentación útil existente dentro de la antigua carpeta `api/`.
+Este índice no debe asumir su ausencia ni crear una versión duplicada sin verificar primero el repositorio.
 
----
+5.4 Arquitectura
 
-## 5.4 Arquitectura
+Core architecture consolidated
 
-### 🔄 En consolidación
-
-La documentación arquitectónica existente será revisada y reducida.
-
-La estructura objetivo será:
-
-```text
 architecture/
-├── ARCHITECTURE.md
-├── c4/
-└── adr/
-```
 
-Se revisarán especialmente:
+└── ARCHITECTURE.md
 
-* arquitectura general;
-* Modular Monolith;
-* multi-tenancy;
-* API First;
-* arquitectura por capas;
-* frontend;
-* backend;
-* seguridad;
-* C4;
-* y ADR existentes.
+ARCHITECTURE.md fue sincronizado durante H8A.
 
----
+Los ADR continúan evolucionando por decisión arquitectónica.
 
-## 5.5 UX y Design System
+Debe mantenerse:
 
-### ⏳ Pendiente
+architecture/adr/
+→ ongoing architectural history
 
-La documentación existente de:
+No toda la carpeta architecture/ debe considerarse “pendiente” solamente porque existan ADR o C4 futuros.
 
-```text
-design-system/
-business-components/
-```
+5.5 UX y Design System
 
-será consolidada en:
+La documentación UX dedicada está consolidada para la baseline UX-01.
 
-```text
-ux/
-├── DESIGN_SYSTEM.md
-└── BUSINESS_COMPONENTS.md
-```
+Fuentes relevantes:
 
-Además se creará:
+modules/erp/ERP_UI_UX.md
+→ CURRENT ERP UI/UX state
 
-```text
 product/ZAPING_WAY.md
-```
 
-para definir los principios de experiencia de producto.
+ux/DESIGN_SYSTEM.md
 
----
+ux/BUSINESS_COMPONENTS.md
 
-## 5.6 Módulos
+ux/UX_PRINCIPLES.md
 
-### 🔄 En consolidación
+ux/UX_DECISIONS.md
 
-La documentación modular existente será revisada contra:
+ux/UX_IMPROVEMENT_BACKLOG.md
 
-* modelo Prisma;
-* backend;
-* frontend;
-* pruebas;
-* y reglas de negocio aprobadas.
+No deben crearse documentos vacíos únicamente para completar una estructura teórica.
 
-La estructura futura distinguirá:
+5.6 ERP Core modules
 
-```text
-modules/
-├── erp/
-├── healthcare/
-└── radar/
-```
+Primary module documentation consolidated during H8A
 
-No se conservará documentación de features históricas individuales cuando su contenido pueda integrarse correctamente en el documento principal del módulo.
+Entre las fuentes principales se encuentran:
 
----
+modules/erp/
 
-## 5.7 Estado del proyecto
+├── CUSTOMERS.md
+├── SUPPLIERS.md
+├── PRODUCTS.md
+├── PURCHASES.md
+├── PURCHASE_RECEIPTS.md
+├── INVENTORY.md
+├── ADVANCED_INVENTORY.md
+├── EQUIPMENT.md
+├── QUOTES.md
+├── SALES.md
+├── DASHBOARD.md
+├── IDENTITY_ACCESS.md
+└── ERP_UI_UX.md
 
-### ⏳ Pendiente
+Cada documento debe mantener claramente:
 
-La documentación actual de:
+CURRENT
 
-```text
-PROJECT_BOARD
-roadmap/
-releases/
-```
+VALIDATED behavior
 
-será consolidada posteriormente en:
+TECHNICAL DEBT
 
-```text
+TARGET / FUTURE
+
+sin presentar arquitectura futura como comportamiento actual.
+
+5.7 Healthcare
+
+Root Healthcare documentation consolidated during H8A
+
+modules/healthcare/
+
+├── HEALTHCARE.md
+├── DOMAIN_MODEL.md
+└── CASES.md
+
+Estado:
+
+HEALTHCARE.md
+✅ consolidated
+
+DOMAIN_MODEL.md
+✅ consolidated
+
+CASES.md
+✅ consolidated
+
+Estos documentos distinguen:
+
+CURRENT
+→ HealthcareCase Foundation
+→ Equipment Core reuse
+
+TARGET
+→ operational Healthcare workflows
+
+FUTURE
+→ CRM / payer / advanced capabilities
+
+Los documentos especializados Healthcare futuros deberán mantenerse alineados con estas fuentes.
+
+5.8 Radar
+
+La documentación de Radar se mantiene separada del ERP Core y Healthcare.
+
+No debe mezclarse su roadmap con el cierre ERP Core V1.
+
+5.9 Estado del proyecto
+
+Consolidado
+
 project/
+
 ├── ROADMAP.md
 ├── PROJECT_BOARD.md
 └── CHANGELOG.md
-```
 
----
+Responsabilidad:
 
-# 6. Documentos principales
+PROJECT_BOARD.md
+→ trabajo activo / blockers / debt
 
-## PRODUCT_VISION.md
+ROADMAP.md
+→ secuencia futura
+
+CHANGELOG.md
+→ cambios ya completados
+
+6. Estado actual del proyecto
+
+Secuencia vigente:
+
+H7
+ERP Functional Normalization
+✅ CLOSED
+
+↓
+
+H8A
+Documentation Synchronization
+→ CURRENT
+
+↓
+
+H8B
+Full Automated Regression / Technical Health
+→ NEXT
+
+↓
+
+UX-B.6
+Full ERP End-to-End QA
+→ AFTER H8
+
+↓
+
+ERP Core V1 Closure
+
+↓
+
+Healthcare specialization
+
+La existencia de documentación Healthcare TARGET no autoriza a iniciar nuevos modelos Prisma antes del cierre correspondiente del ERP Core.
+
+7. Documentos principales
+
+PRODUCT_VISION.md
 
 Responde:
 
-> ¿Qué queremos que Zaping llegue a ser?
+¿Qué queremos que Zaping llegue a ser?
 
 Contiene:
 
-* misión;
-* visión;
-* filosofía;
-* posicionamiento;
-* ERP Core;
-* Zaping Healthcare;
-* Zaping Radar;
-* Zaping AI;
-* evolución del ecosistema.
+mission
 
----
+vision
 
-## PRODUCT_REQUIREMENTS.md
+positioning
+
+ERP Core
+
+Zaping Healthcare
+
+Zaping Radar
+
+ecosystem evolution
+
+PRODUCT_REQUIREMENTS.md
 
 Responde:
 
-> ¿Qué debe ser capaz de hacer Zaping?
+¿Qué debe ser capaz de hacer Zaping?
 
 Contiene:
 
-* requerimientos;
-* actores;
-* reglas transversales;
-* prioridades P0/P1/P2;
-* criterios de éxito;
-* alcance;
-* restricciones.
+requirements
 
----
+actors
 
-## ZAPING_WAY.md
+cross-cutting rules
 
-Responde:
+priorities
 
-> ¿Cómo debe funcionar y sentirse Zaping?
+success criteria
 
-Definirá:
+scope
 
-* UX;
-* navegación;
-* patrones;
-* formularios;
-* tablas;
-* acciones;
-* workspaces;
-* vistas 360;
-* experiencia Healthcare;
-* y filosofía de interacción.
+constraints
 
----
-
-## ARCHITECTURE.md
+ZAPING_WAY.md
 
 Responde:
 
-> ¿Cómo está estructurado técnicamente Zaping?
+¿Cómo debe funcionar y sentirse Zaping?
 
-Definirá:
+Cuando esté consolidado formalmente deberá definir:
 
-* estilo arquitectónico;
-* capas;
-* dominios;
-* límites;
-* frontend;
-* backend;
-* persistencia;
-* integraciones;
-* multi-tenancy;
-* evolución técnica.
+UX
 
----
+navigation
 
-## ADR
+forms
+
+tables
+
+actions
+
+workspaces
+
+360 views
+
+Healthcare experience
+
+interaction philosophy
+
+ARCHITECTURE.md
 
 Responde:
 
-> ¿Por qué tomamos una decisión arquitectónica determinada?
+¿Cómo está estructurado técnicamente Zaping?
+
+Contiene:
+
+architectural style
+
+layers
+
+domains
+
+boundaries
+
+frontend
+
+backend
+
+persistence
+
+multi-tenancy
+
+technical evolution
+
+ADR
+
+Responde:
+
+¿Por qué tomamos una decisión arquitectónica determinada?
 
 Los ADR preservan historia.
 
-Una decisión reemplazada debe marcarse como:
+Una decisión reemplazada debe marcarse:
 
-```text
 SUPERSEDED
-```
 
 y no eliminarse.
 
----
-
-## ENGINEERING_GUIDE.md
+ENGINEERING_GUIDE.md
 
 Responde:
 
-> ¿Cómo desarrollamos software en Zaping?
-
-Contiene:
-
-* principios;
-* TypeScript;
-* frontend;
-* backend;
-* Prisma;
-* APIs;
-* pruebas;
-* mantenibilidad;
-* y Definition of Done.
-
----
-
-## DEVELOPMENT_WORKFLOW.md
-
-Responde:
-
-> ¿Qué proceso seguimos para desarrollar un cambio?
-
-Define:
-
-```text
-Idea
-↓
-Análisis
-↓
-Diseño
-↓
-Implementación
-↓
-Pruebas
-↓
-Documentación
-↓
-Release
-```
-
-El proceso es proporcional al riesgo.
-
----
-
-## QUALITY_STANDARDS.md
-
-Responde:
-
-> ¿Qué nivel mínimo de calidad debe cumplir un cambio?
-
-Define Quality Gates para:
-
-* negocio;
-* arquitectura;
-* backend;
-* frontend;
-* base de datos;
-* seguridad;
-* multi-tenancy;
-* inventario;
-* pruebas;
-* documentación.
-
----
-
-## SECURITY_PRINCIPLES.md
-
-Responde:
-
-> ¿Cómo protegemos Zaping y sus datos?
+¿Cómo desarrollamos software en Zaping?
 
 Incluye:
 
-* autenticación;
-* JWT;
-* autorización;
-* RBAC;
-* multi-tenancy;
-* secretos;
-* datos sensibles;
-* Healthcare;
-* logging;
-* auditoría;
-* infraestructura;
-* seguridad previa a producción.
+engineering principles
 
----
+TypeScript
 
-## GLOSSARY.md
+frontend
+
+backend
+
+Prisma
+
+testing
+
+maintainability
+
+Definition of Done
+
+DEVELOPMENT_WORKFLOW.md
 
 Responde:
 
-> ¿Qué significa cada término dentro de Zaping?
+¿Qué proceso seguimos para desarrollar un cambio?
 
-Debe mantenerse sincronizado con el lenguaje de negocio y arquitectura.
+Define conceptualmente:
 
----
+Idea
+↓
+Analysis
+↓
+Design
+↓
+Implementation
+↓
+Tests
+↓
+Documentation
+↓
+Release
 
-## PROJECT_BOARD.md
+El proceso es proporcional al riesgo.
 
-Responderá:
+QUALITY_STANDARDS.md
 
-> ¿En qué estamos trabajando actualmente?
+Responde:
+
+¿Qué nivel mínimo de calidad debe cumplir un cambio?
+
+Incluye Quality Gates para:
+
+business rules
+
+architecture
+
+backend
+
+frontend
+
+database
+
+security
+
+multi-tenancy
+
+inventory
+
+tests
+
+documentation
+
+SECURITY_PRINCIPLES.md
+
+Responde:
+
+¿Cómo protegemos Zaping y sus datos?
+
+Incluye:
+
+authentication
+
+JWT
+
+authorization
+
+RBAC
+
+multi-tenancy
+
+secrets
+
+sensitive data
+
+Healthcare
+
+logging
+
+audit
+
+infrastructure
+
+preproduction security
+
+GLOSSARY.md
+
+Responde:
+
+¿Qué significa cada término dentro de Zaping?
+
+Debe mantenerse sincronizado con el lenguaje real del producto y arquitectura.
+
+ERP_UI_UX.md
+
+Responde:
+
+¿Cuál es el estado real de experiencia ERP Core?
+
+Debe distinguir:
+
+CURRENT frontend behavior
+
+shared UI patterns
+
+known UX debt
+
+H7 normalization
+
+H8 / B6 quality gates
+
+HEALTHCARE.md
+
+Responde:
+
+¿Cuál es la frontera general de Zaping Healthcare?
+
+Distingue:
+
+CURRENT
+
+TARGET
+
+FUTURE
+
+y protege la separación:
+
+ERP Core
+vs
+Healthcare specialized workflow
+
+DOMAIN_MODEL.md
+
+Responde:
+
+¿Cómo se relacionan los conceptos Healthcare y quién posee cada verdad?
+
+Define:
+
+domain ownership
+
+entity boundaries
+
+derived concepts
+
+architectural candidates
+
+CASES.md
+
+Responde:
+
+¿Qué es HealthcareCase y qué comportamiento existe hoy?
+
+Es la fuente principal para:
+
+HealthcareCase Foundation
+
+CURRENT lifecycle
+
+Case API
+
+planning
+
+cancellation
+
+technical debt
+
+PROJECT_BOARD.md
+
+Responde:
+
+¿En qué estamos trabajando actualmente?
 
 No debe utilizarse como historial permanente.
 
----
+ROADMAP.md
 
-## ROADMAP.md
+Responde:
 
-Responderá:
+¿Qué construiremos después y en qué orden?
 
-> ¿Qué construiremos después y en qué orden?
+CHANGELOG.md
 
----
+Responde:
 
-## CHANGELOG.md
+¿Qué cambios ya fueron completados?
 
-Responderá:
-
-> ¿Qué cambios ya fueron completados?
-
----
-
-# 7. Jerarquía de fuentes
+8. Jerarquía de fuentes
 
 Cuando exista una aparente contradicción, debe determinarse cuál documento es responsable del tema.
 
 Ejemplo:
 
-Una regla de inventario específica debe resolverse principalmente mediante:
+Inventory-specific rule
 
-```text
-PRODUCT_REQUIREMENTS
+→ PRODUCT_REQUIREMENTS.md
 +
-Inventory.md
+modules/erp/INVENTORY.md
 +
-ADR aplicable
-```
+applicable ADR
 
-No mediante una nota antigua de Sprint.
+No debe resolverse mediante una nota histórica de Sprint.
 
 El código implementado debe compararse con la documentación aprobada.
 
 Si difieren, no debe asumirse automáticamente que uno de los dos es correcto.
 
-Debe revisarse la decisión y sincronizar ambos.
+Debe revisarse:
 
----
+intended decision
 
-# 8. Documentación histórica
+implemented behavior
+
+tests
+
+current documentation
+
+y sincronizarlos.
+
+9. Fuente responsable por dominio
+
+Mapa recomendado:
+
+Product vision
+→ PRODUCT_VISION.md
+
+Product requirements
+→ PRODUCT_REQUIREMENTS.md
+
+Architecture
+→ ARCHITECTURE.md + ADR
+
+Security
+→ SECURITY_PRINCIPLES.md
+
+ERP frontend / navigation
+→ ERP_UI_UX.md
+
+ERP domain behavior
+→ module docs
+
+Healthcare boundaries
+→ HEALTHCARE.md
+
+Healthcare domain model
+→ DOMAIN_MODEL.md
+
+HealthcareCase CURRENT
+→ CASES.md
+
+Active work / blockers
+→ PROJECT_BOARD.md
+
+Sequence / priorities
+→ ROADMAP.md
+
+Completed changes
+→ CHANGELOG.md
+
+10. Documentación histórica
 
 Git es la principal fuente de historia técnica de archivos eliminados o modificados.
 
 Por esta razón no es necesario conservar indefinidamente:
 
-* documentos duplicados;
-* especificaciones temporales;
-* planes de sprint antiguos;
-* documentación vacía;
-* archivos de feature cuyo conocimiento ya fue consolidado.
+duplicate documents
+
+temporary specifications
+
+old sprint plans
+
+empty documentation
+
+feature documents already fully consolidated
 
 Los ADR son una excepción importante porque preservan decisiones arquitectónicas y sus razones.
 
----
-
-# 9. Estados documentales
+11. Estados documentales
 
 Cuando sea necesario se utilizarán estados como:
 
-## Draft
+Draft
 
 Documento en desarrollo.
 
-## Proposed
+Proposed
 
 Propuesta todavía no aprobada.
 
-## Approved
+Approved
 
 Documento vigente y aprobado.
 
-## Deprecated
+Deprecated
 
 Documento todavía disponible pero que ya no debe utilizarse para nuevas decisiones.
 
-## Superseded
+Superseded
 
 Documento o decisión reemplazada por otra.
 
----
+12. Versiones
 
-# 10. Versiones
+La versión de un documento representa cambios significativos de contenido.
 
-La versión de un documento representa cambios significativos de su contenido.
+No es necesario incrementar versión por:
 
-No es necesario incrementar la versión por:
+typos
 
-* typos;
-* formato;
-* correcciones menores sin impacto conceptual.
+formatting
 
-Los cambios de reglas, estructura o alcance sí pueden justificar una nueva versión.
+minor wording corrections
 
----
+sin impacto conceptual.
 
-# 11. Convenciones de nombres
+Sí puede incrementarse por:
 
-Los documentos principales utilizan:
+business-rule changes
 
-```text
+scope changes
+
+source-of-truth changes
+
+architecture changes
+
+CURRENT / TARGET classification changes
+
+13. Convenciones de nombres
+
+La convención dominante de documentación principal y modular es:
+
 UPPER_SNAKE_CASE.md
-```
 
 Ejemplos:
 
-```text
 PRODUCT_VISION.md
+
 PRODUCT_REQUIREMENTS.md
+
 ENGINEERING_GUIDE.md
-```
 
-La documentación de módulos puede utilizar nombres de dominio legibles:
+PURCHASE_RECEIPTS.md
 
-```text
-Inventory.md
-Purchases.md
-PurchaseReceipts.md
-```
+ERP_UI_UX.md
+
+DOMAIN_MODEL.md
 
 Los ADR utilizan:
 
-```text
 ADR-XXX-descripcion.md
-```
 
 Ejemplo:
 
-```text
 ADR-001-multi-tenant.md
-```
 
 Evitar:
 
-* espacios;
-* nombres ambiguos;
-* errores tipográficos;
-* convenciones diferentes dentro de la misma carpeta.
+spaces
 
----
+ambiguous names
 
-# 12. Reglas de mantenimiento
+typos
+
+mixed naming conventions within the same folder
+
+14. Reglas de mantenimiento
 
 Al modificar una funcionalidad relevante:
 
-1. identificar su fuente documental;
-2. actualizar esa fuente;
-3. actualizar ADR si cambia una decisión;
-4. actualizar PROJECT_BOARD si cambia el trabajo actual;
-5. actualizar CHANGELOG cuando corresponda;
-6. evitar duplicar la misma información.
+identificar su fuente documental;
 
----
+actualizar esa fuente;
 
-# 13. Documentation First
+actualizar ADR si cambia una decisión arquitectónica;
+
+actualizar PROJECT_BOARD si cambia trabajo activo o deuda;
+
+actualizar ROADMAP si cambia el orden futuro;
+
+actualizar CHANGELOG cuando corresponda;
+
+evitar duplicar la misma información;
+
+revisar que CURRENT / TARGET / FUTURE continúen siendo correctos.
+
+15. Documentation First
 
 Documentation First no significa:
 
-> crear más Markdown.
+crear más Markdown.
 
 Significa:
 
-> comprender y registrar correctamente las decisiones importantes antes de implementarlas.
+comprender y registrar correctamente las decisiones importantes antes de implementarlas.
 
-Un solo documento actualizado es preferible a cinco documentos contradictorios.
+Un documento actualizado es preferible a múltiples documentos contradictorios.
 
----
+16. Regla de no sobre-documentar
 
-# 14. Filosofía de la nueva estructura
+No toda idea necesita:
+
+new Markdown file
+
+new Prisma model
+
+new ADR
+
+Debe utilizarse el nivel documental proporcional a:
+
+risk
+
+scope
+
+architectural impact
+
+business importance
+
+17. Architectural candidates
+
+Cuando una necesidad del dominio sugiera una solución técnica todavía no aprobada, debe documentarse como:
+
+ARCHITECTURAL CANDIDATE
+
+Ejemplo Healthcare:
+
+InventoryLocation
+
+InventoryPosition
+
+internal transfer semantics
+
+pueden ser candidatos para resolver:
+
+physical positioning
+
+custody
+
+availability
+
+pero requieren decisión arquitectónica antes de implementarse.
+
+18. Filosofía de la estructura
 
 La documentación debe ser:
 
-* suficiente;
-* clara;
-* navegable;
-* mantenible;
-* consistente;
-* actual;
-* y útil.
+sufficient
+
+clear
+
+navigable
+
+maintainable
+
+consistent
+
+current
+
+useful
 
 No se mide su calidad por la cantidad de archivos.
 
 Se mide por la capacidad de responder correctamente preguntas sobre el producto y el sistema.
 
----
+19. Cierre H8A
 
-# 15. Regla final
+H8A puede cerrarse únicamente después de completar:
+
+final cross-document synchronization
+
+security blocker synchronization
+
+PROJECT_BOARD final sync
+
+ROADMAP / README wording review where needed
+
+Markdown consistency
+
+git status --short
+
+git diff --check
+
+credential / .env backup review
+
+No debe realizarse commit final de H8A antes de esa validación.
+
+20. Después de H8A
+
+El siguiente gate es:
+
+H8B
+Full Automated Regression / Technical Health
+
+Debe validar:
+
+backend tests
+
+frontend tests
+
+builds
+
+lints
+
+Prisma validate
+
+migration status
+
+git health
+
+Después:
+
+UX-B.6
+Full ERP End-to-End QA
+
+21. Regla final
 
 La documentación de Zaping debe permitir que una persona pueda comprender:
 
-```text
 Qué es Zaping
 ↓
 Qué debe hacer
@@ -754,10 +1255,15 @@ Cómo se protege
 ↓
 Cómo se usa
 ↓
+Qué existe hoy
+↓
+Qué es TARGET
+↓
+Qué es FUTURE
+↓
 Qué se está construyendo
 ↓
 Qué viene después
-```
 
 sin depender de conversaciones antiguas ni documentos contradictorios.
 

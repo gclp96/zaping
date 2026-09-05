@@ -2,17 +2,17 @@
 
 **Módulo:** Identity & Access
 **Producto:** Zaping Platform / ERP Core
-**Versión:** 2.0.0
+**Versión:** 2.3.0
 **Estado:** Aprobado
-**Estado de implementación:** AUTH IMPLEMENTED / RBAC PARTIAL / PERMISSIONS TARGET
-**Última actualización:** 2026-08-19
+**Estado de implementación:** AUTH IMPLEMENTED / USERS V1 IMPLEMENTED / PASSWORD SECURITY V1 IMPLEMENTED / ROLE-BASED AUTHORIZATION V1 IMPLEMENTED / TENANT ISOLATION V1 IMPLEMENTED / PERMISSION-BASED RBAC DEFERRED P1
+**Última actualización:** 2026-09-02
 **Responsable:** Zaping Platform & Security Team
 
 ---
 
 # 1. Propósito
 
-Identity & Access administra:
+Identity & Access administra conceptualmente:
 
 ```text
 quién es el usuario
@@ -26,24 +26,87 @@ qué puede hacer
 sobre qué recursos puede hacerlo
 ```
 
-Este dominio reúne conceptualmente:
+Este dominio reúne:
 
 ```text
 Authentication
+
 Users
+
 Roles
-Permissions
+
 Authorization
+
 Tenant Context
+
+Permissions future
 ```
 
 Estas capacidades se documentan juntas porque forman una sola cadena de seguridad.
 
 ---
 
-# 2. Principio fundamental
+# 2. Alcance
 
-Toda operación protegida debe responder, en orden:
+Identity & Access es responsable de:
+
+```text
+internal User identity
+
+authentication
+
+password hashing
+
+JWT
+
+authenticated user context
+
+Company membership current model
+
+User lifecycle
+
+current roles
+
+RolesGuard
+
+future permissions
+
+Users V1 administration
+
+future session/revocation capabilities
+```
+
+No es propietario de:
+
+```text
+Customer lifecycle
+
+Inventory rules
+
+Purchases
+
+Sales
+
+Equipment business rules
+
+Healthcare business rules
+
+Billing
+
+Customer Portal identity
+
+SSO
+
+MFA
+```
+
+Estos dominios consumen Identity & Access, pero mantienen ownership de sus propias reglas.
+
+---
+
+# 3. Principio fundamental
+
+Toda operación protegida debe responder:
 
 ```text
 ¿Quién eres?
@@ -61,66 +124,243 @@ Por tanto:
 
 > **Authentication no implica Authorization, y Authorization nunca debe ignorar Tenant Isolation.**
 
----
-
-# 3. Arquitectura de seguridad
-
-La secuencia conceptual es:
+También:
 
 ```text
-Authentication
-↓
-Tenant Context
-↓
-Authorization
-↓
-Business Validation
-↓
-Persistence
-↓
-Audit
+Authorization uncertainty
+→ DENY
+```
+
+No:
+
+```text
+Authorization uncertainty
+→ ALLOW
 ```
 
 ---
 
-# 4. Responsabilidades
+# 4. Current vs Target vs Future
 
-Identity & Access es propietario de:
+Este documento distingue:
 
-* identidad interna de usuario;
-* autenticación;
-* password hashing;
-* JWT;
-* estado de usuario;
-* roles actuales;
-* futura resolución de permisos;
-* Guards de autenticación/autorización;
-* contexto de usuario autenticado;
-* integración entre User y Company.
+## CURRENT
 
----
+Capacidad realmente implementada.
 
-# 5. Fuera del alcance
+## P0 / P1
 
-Identity & Access no es propietario de:
+Deuda de seguridad o hardening pendiente.
 
-* lifecycle de Customers;
-* Inventory;
-* Purchases;
-* Sales;
-* Healthcare;
-* reglas comerciales;
-* lógica de stock;
-* Customer Portal externo completo;
-* OAuth empresarial;
-* SSO;
-* MFA.
+## TARGET
 
-Estas capacidades pueden integrarse posteriormente.
+Arquitectura aprobada hacia la que debe evolucionar el módulo.
+
+## FUTURE
+
+Capacidad posible que todavía no forma parte del compromiso inmediato.
 
 ---
 
-# 6. User
+# 5. Arquitectura actual de Identity & Access
+
+```text
+Credentials
+↓
+AuthService
+↓
+bcrypt validation
+↓
+JWT
+↓
+Passport JWT / JwtStrategy
+↓
+JwtAuthGuard
+↓
+request.user
+├── user identity
+├── companyId
+└── role
+↓
+RolesGuard where configured
+↓
+Tenant-scoped business operation
+```
+
+Actualmente:
+
+```text
+Authentication
+→ implemented
+
+Tenant context
+→ implemented
+
+Static role model
+→ implemented
+
+RolesGuard
+→ implemented
+
+Users V1 administration
+→ implemented
+
+Current role-based RBAC
+→ implemented for ERP Core V1 fixed roles
+
+Permission-based / granular authorization
+→ NOT implemented
+
+Permission-based RBAC
+→ DEFERRED P1
+```
+
+## 5.1 Authorization + Tenant Isolation V1 — IMPLEMENTED
+
+Estado de cierre:
+
+```text
+AUTHENTICATION V1                  IMPLEMENTED
+USERS V1                           IMPLEMENTED
+PASSWORD SECURITY V1               IMPLEMENTED
+ROLE-BASED AUTHORIZATION V1        IMPLEMENTED
+TENANT ISOLATION V1                IMPLEMENTED
+```
+
+La matriz CURRENT utiliza únicamente los roles fijos `ADMIN`, `MANAGER`,
+`SALES` y `WAREHOUSE`:
+
+| Módulo | Lectura | Escritura / acciones sensibles |
+| --- | --- | --- |
+| Dashboard | ALL | — |
+| Products / Categories | ALL | ADMIN, MANAGER |
+| Customers | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Suppliers | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER |
+| Purchases | ADMIN, MANAGER, WAREHOUSE | create/edit: ADMIN, MANAGER, WAREHOUSE; approve/cancel: ADMIN, MANAGER |
+| Purchase Receipts | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER, WAREHOUSE |
+| Inventory | ALL | movimientos normales: ADMIN, MANAGER, WAREHOUSE; `ADJUSTMENT`: ADMIN, MANAGER |
+| Quotes | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Sales | ADMIN, MANAGER, SALES | ADMIN, MANAGER, SALES |
+| Equipment | ADMIN, MANAGER, WAREHOUSE | ADMIN, MANAGER, WAREHOUSE |
+| Users | ADMIN | ADMIN |
+| Companies | sin superficie ERP HTTP normal | — |
+
+No se agregan permisos implícitos fuera de esta matriz.
+
+### Modelo de autorización CURRENT
+
+El backend es la autoridad:
+
+```text
+JwtAuthGuard
+↓
+RolesGuard
+↓
+@Roles(...)
+↓
+request.user.role
+```
+
+`request.user.role` proviene del estado actual de User en DB porque
+`JwtStrategy` revalida el usuario y reconstruye el rol en cada request protegida.
+Un cambio de rol aplica en solicitudes autenticadas posteriores; no se utiliza
+un rol antiguo del JWT para autorizar.
+
+La visibilidad role-aware del frontend sólo mejora UX. Ocultar una ruta o acción
+no constituye una frontera de seguridad.
+
+### Tenant authority y DTOs
+
+El tenant siempre se deriva del contexto autenticado:
+
+```text
+req.user.companyId
+↓
+tenant-scoped read / relation / mutation
+```
+
+Los DTOs ERP normales no aceptan `companyId` controlado por el cliente. Se
+conservan `whitelist`, `forbidNonWhitelisted` y `transform` en el
+`ValidationPipe` global.
+
+Las escrituras tenant-owned incluyen ownership en la mutación final, usando
+`id_companyId` cuando existe o predicados equivalentes con `id`, `companyId` y
+verificación de `count` cuando corresponde. No basta con un pre-read.
+
+Los IDs relacionales se validan dentro de la Company actual. Esto aplica a
+`supplierId`, `customerId`, `productId`, `categoryId`, `purchaseId`,
+`purchaseItemId`, `batchId`, `equipmentAssetId` y `quoteId`. Las relaciones
+mixtas entre tenants se rechazan antes de efectos de negocio.
+
+### Semántica de errores
+
+```text
+no autenticado
+→ 401
+
+autenticado con rol no permitido
+→ 403
+
+rol permitido + recurso de otro tenant o inexistente
+→ 404 / NotFound
+
+rol permitido + recurso propio + transición de negocio inválida
+→ 400 / BadRequest
+```
+
+Esta distinción fue validada en la regresión B2D.
+
+### Garantías de dominios críticos
+
+```text
+Purchases
+→ supplier/product same-tenant validation
+→ tenant-safe updates and status mutations
+
+Purchase Receipts
+→ purchase/item/product/batch ownership validation
+→ tenant-scoped stock, batch and purchase effects
+→ mixed-tenant rejection before business side effects
+→ Serializable transaction preserved
+
+Quotes / Sales
+→ customer/product ownership validation
+→ foreign quote/sale relation rejection
+→ tenant-safe status mutations
+
+Equipment
+→ Product, Batch, EquipmentAsset, Inspection and retirement are company-scoped
+→ foreign IDs return NotFound
+
+Users
+→ ADMIN-only and company-scoped
+→ foreign user ID returns NotFound
+→ self-deactivation and last active ADMIN protections preserved
+→ no DELETE /users
+```
+
+No existe una superficie ERP normal `GET /companies` o `POST /companies` ni un
+superadmin/platform admin. `POST /auth/register` crea una Company y su primer
+ADMIN.
+
+### Límites V1 y gates separados
+
+El modelo actual es `User → one Company`; no implementa multi-company
+memberships, branch-scoped access, composite tenant foreign-key rollout ni una
+abstracción central de repositorios. Son evolución posterior, no blockers de
+Authorization + Tenant Isolation V1.
+
+El hallazgo de integridad de datos permanece separado y abierto: posible lost
+update/concurrencia en `InventoryService.createMovement`. Es un blocker
+`RC-DATA` antes de Release Candidate y no forma parte del cierre B2.
+
+Permission-based RBAC, custom roles, múltiples roles por usuario, permisos
+granulares, `PermissionsGuard`, delegated admin y ABAC/policy engine permanecen
+deferred P1/P2.
+
+---
+
+# 6. Modelo User actual
 
 El modelo técnico actual contiene conceptualmente:
 
@@ -140,26 +380,39 @@ User
 └── company
 ```
 
-La definición técnica exacta permanece en `schema.prisma`.
+La definición técnica exacta pertenece a:
+
+```text
+schema.prisma
+```
 
 ---
 
-# 7. Identificador
+# 7. User identity
 
-User utiliza:
+`User.id` utiliza:
 
 ```text
-id
-→ UUID
+UUID
 ```
 
 como identidad técnica.
+
+Principio:
+
+```text
+UUID
+≠
+Authorization
+```
+
+Conocer un UUID no concede acceso al recurso.
 
 ---
 
 # 8. User y Company
 
-Actualmente:
+El modelo actual es:
 
 ```text
 User
@@ -172,93 +425,142 @@ mediante:
 companyId
 ```
 
----
-
-# 9. Regla multi-tenant
-
-La Company del User define su contexto empresarial actual.
-
 Conceptualmente:
 
 ```text
 Authenticated User
 ↓
-companyId
+Company
 ↓
 Tenant-owned resources
 ```
 
 ---
 
-# 10. companyId no proviene del frontend
+# 9. Tenant authority
 
-Frontend no debe poder elevar o cambiar su tenant mediante:
-
-```json
-{
-  "companyId": "otra-company"
-}
-```
-
-El tenant debe derivarse de la identidad autenticada.
-
----
-
-# 11. User de otra Company
-
-Conocer:
+La autoridad del tenant debe provenir del contexto autenticado validado.
 
 ```text
-userId
-resourceId
+Validated JWT
+↓
+Authenticated User context
+↓
 companyId
+↓
+Tenant-scoped operation
 ```
 
-de otra Company no concede acceso.
+No:
+
+```text
+Frontend sends companyId
+↓
+Backend trusts it
+```
+
+Un `companyId` enviado arbitrariamente por cliente nunca debe convertirse en autoridad de seguridad.
 
 ---
 
-# 12. Email
+# 10. Tenant Isolation
+
+Debe cumplirse:
+
+```text
+Company A User
++
+Company B resource
+=
+DENY
+```
+
+Esto aplica aunque el usuario conozca:
+
+```text
+resourceId
+userId
+companyId
+folio
+```
+
+de otra Company.
+
+Tenant isolation debe proteger:
+
+```text
+reads
+
+writes
+
+relations
+
+lifecycle commands
+
+search
+
+reports
+
+exports
+
+deep-links
+
+nested resources
+```
+
+---
+
+# 11. ADMIN no bypass tenant
 
 Actualmente:
 
 ```text
+ADMIN
+```
+
+es un rol dentro de la Company.
+
+No significa:
+
+```text
+Platform Administrator
+```
+
+ni:
+
+```text
+access every Company
+```
+
+Debe cumplirse:
+
+```text
+ADMIN Company A
+↛
+Company B resources
+```
+
+---
+
+# 12. Multi-company futuro
+
+Actualmente:
+
+```text
+User
+→ one Company
+```
+
+Además:
+
+```text
 User.email
+→ globally unique
 ```
 
-es único globalmente.
+Por tanto, una misma identidad no puede representarse naturalmente como Users independientes con el mismo email en múltiples Companies.
 
-Conceptualmente:
-
-```text
-email @unique
-```
-
----
-
-# 13. Consecuencia de email global
-
-El modelo actual no permite naturalmente:
-
-```text
-same email
-→ User Company A
-
-same email
-→ User Company B
-```
-
-como dos Users independientes.
-
----
-
-# 14. Relación con multi-company futuro
-
-Si posteriormente una misma persona necesita acceso a múltiples Companies, la solución recomendada no es duplicar Users con el mismo email.
-
-Debe diseñarse un modelo explícito de memberships.
-
-Conceptualmente:
+Si posteriormente se necesita acceso multi-company, debe diseñarse explícitamente algo equivalente a:
 
 ```text
 Identity
@@ -268,55 +570,57 @@ CompanyMembership
 Company
 ```
 
-Este modelo no existe actualmente.
-
----
-
-# 15. firstName y lastName
-
-Representan la identidad visible del usuario interno.
-
-No deben utilizarse como identificadores únicos.
-
----
-
-# 16. locale
-
-User contiene actualmente:
+Este modelo:
 
 ```text
-locale
+DOES NOT EXIST CURRENTLY
 ```
-
-con default:
-
-```text
-es
-```
-
-Esto permite una preferencia individual distinta del idioma por defecto de Company.
 
 ---
 
-# 17. Company language vs User locale
+# 13. Email
+
+Actualmente:
+
+```text
+User.email
+→ globally unique
+```
+
+El email no debe utilizarse como sustituto de autorización ni tenant ownership.
+
+---
+
+# 14. Nombre y locale
+
+`firstName` y `lastName` representan identidad visible.
+
+No son identificadores técnicos.
+
+`locale` permite preferencia individual de idioma.
+
+Actualmente:
+
+```text
+User.locale
+→ default "es"
+```
 
 Conceptualmente:
 
 ```text
-Company.language
+Company language
 → default empresarial
-```
 
-```text
 User.locale
 → preferencia personal
 ```
 
-La precedencia completa deberá formalizarse cuando i18n esté implementado integralmente.
+La precedencia completa se definirá cuando i18n esté formalizado integralmente.
 
 ---
 
-# 18. isActive
+# 15. User lifecycle
 
 User utiliza:
 
@@ -324,19 +628,7 @@ User utiliza:
 isActive
 ```
 
-para representar disponibilidad de acceso.
-
----
-
-# 19. User activo
-
-Un User activo puede autenticarse cuando cumple las demás condiciones de seguridad.
-
----
-
-# 20. User inactivo
-
-Un User inactivo debe conservarse históricamente.
+como estado principal de acceso.
 
 Conceptualmente:
 
@@ -346,47 +638,88 @@ ACTIVE
 INACTIVE
 ```
 
-No:
+La desactivación debe preservar historia.
+
+No debe utilizarse:
 
 ```text
-User
-↓
-DELETE
+hard DELETE
 ```
 
-como mecanismo normal para retirar acceso.
+como mecanismo normal de retiro de acceso.
 
 ---
 
-# 21. Desactivar usuario
+# 16. User histórico
 
-La operación empresarial recomendada es:
-
-```text
-Desactivar usuario
-```
-
-cuando una persona deja de trabajar o deja de requerir acceso.
-
----
-
-# 22. User histórico
-
-Desactivar un User no debe borrar referencias como:
+Desactivar un User no debe eliminar referencias históricas como:
 
 ```text
 createdBy
+
 receivedBy
-confirmedBy
+
+inspectedBy
+
+retiredBy
+
 cancelledBy
-audit events
+
+future audit records
 ```
+
+Identity debe preservarse aunque el usuario ya no pueda acceder al sistema.
 
 ---
 
-# 23. Reactivación
+# 17. Inactive User — CURRENT
 
-Cuando sea apropiado:
+Actualmente:
+
+```text
+login
+→ rejects User.isActive = false
+
+JwtStrategy
+→ revalidates active User state against database
+```
+
+Por tanto:
+
+```text
+User.isActive = false
+↓
+new login rejected
+↓
+existing JWT stops authorizing on subsequent protected requests
+```
+
+`JwtStrategy` consulta el estado vigente de DB para cada request protegida.
+También reconstruye el `role` desde DB, por lo que un cambio de rol aplica en
+requests posteriores sin esperar a que expire el token.
+
+Esto no representa revocación global de tokens; representa enforcement
+DB-backed en el ciclo normal de requests autenticados.
+
+---
+
+# 18. Inactive User — invariant
+
+Debe mantenerse:
+
+```text
+User.isActive = false
+↓
+no normal protected application access
+```
+
+Reactivar un User requiere una operación administrativa explícita.
+
+---
+
+# 19. User reactivation
+
+La posible transición:
 
 ```text
 INACTIVE
@@ -394,101 +727,135 @@ INACTIVE
 ACTIVE
 ```
 
-puede restaurarse acceso.
+debe tratarse como una operación administrativa explícita.
 
-La operación debe requerir autorización administrativa.
+Actualmente:
+
+```text
+User reactivation workflow
+→ TARGET / NOT VERIFIED AS IMPLEMENTED
+```
+
+No debe inferirse desde un `PATCH` genérico.
 
 ---
 
-# 24. Password
+# 20. Password handling
 
 La contraseña en texto plano:
 
-> nunca debe persistirse.
-
----
-
-# 25. passwordHash
-
-El modelo conserva:
-
 ```text
-passwordHash
+must never be persisted
 ```
 
-como representación derivada mediante hashing.
-
----
-
-# 26. Hashing
-
-La arquitectura actual utiliza:
+Actualmente se utiliza:
 
 ```text
 bcrypt
 ```
 
-para almacenar y verificar contraseñas.
+para generar y validar:
+
+```text
+passwordHash
+```
+
+El contrato vigente de contraseña es:
+
+```text
+minimum length: 8
+
+no artificial uppercase requirement
+
+no artificial symbol requirement
+
+plaintext never persisted
+
+passwordHash never returned or logged
+```
 
 ---
 
-# 27. PasswordHash es sensible
+# 21. passwordHash
 
-`passwordHash` nunca debe aparecer en:
-
-* respuestas API;
-* JWT;
-* logs;
-* errores;
-* frontend;
-* archivos exportados.
-
----
-
-# 28. Regla crítica
+`passwordHash` es información sensible.
 
 Debe cumplirse:
 
 ```text
-User stored in database
-→ contains passwordHash
+User persisted
+→ may contain passwordHash
+
+User returned by API
+→ must not contain passwordHash
 ```
 
-pero:
+Nunca debe aparecer en:
 
 ```text
-User returned by API
-→ never contains passwordHash
+API responses
+
+JWT
+
+frontend
+
+logs
+
+exceptions
+
+exports
+
+audit metadata
 ```
 
 ---
 
-# 29. Deuda de seguridad conocida
+# 22. Estado de sanitización
 
-Existe una mejora de seguridad registrada:
+Actualmente:
 
-> `AuthService.login()` no debe devolver el objeto User completo si contiene `passwordHash`.
+```text
+AuthService.register()
+→ returns sanitized user
 
-La respuesta debe incluir únicamente información necesaria.
+AuthService.login()
+→ returns sanitized user
+
+/auth/me
+→ uses sanitized authenticated claims/context
+```
+
+La exposición histórica de `passwordHash` en respuestas de Auth:
+
+```text
+RESOLVED
+```
+
+No debe continuar apareciendo como deuda vigente.
 
 ---
 
-# 30. Respuesta segura de User
+# 23. Respuesta segura de User
 
-Conceptualmente puede incluir:
+Una representación segura puede incluir, según contrato:
 
 ```text
 id
+
 companyId
+
 firstName
+
 lastName
+
 email
+
 role
+
 locale
+
 isActive
 ```
-
-según el contrato necesario.
 
 Nunca:
 
@@ -498,99 +865,116 @@ passwordHash
 
 ---
 
-# 31. Sanitización centralizada
+# 24. No exponer Prisma User directamente
 
-La solución no debe depender de recordar manualmente:
+Anti-patrón:
 
 ```ts
-delete user.passwordHash
+return user;
 ```
 
-en cada Controller.
+cuando `user` contiene campos internos sensibles.
 
-Debe existir una estrategia consistente de:
+La arquitectura debe preferir estrategias como:
 
-* DTO de respuesta;
-* mapping;
-* serializer;
-* selección Prisma segura;
+```text
+safe selection
 
-según el patrón adoptado.
+mapping
+
+response DTO
+
+serializer
+```
+
+No debe depender de recordar manualmente eliminar `passwordHash` en cada Controller.
 
 ---
 
-# 32. Authentication
+# 25. Authentication
 
-La implementación actual utiliza JWT para Authentication.
-
-Conceptualmente:
+La implementación actual utiliza:
 
 ```text
 Email + Password
 ↓
 Credential Validation
 ↓
-JWT
+JWT Access Token
 ↓
 Authenticated Requests
 ```
 
----
-
-# 33. Login
-
-El endpoint de login debe:
-
-1. validar credenciales;
-2. verificar el estado del User;
-3. construir identidad autenticada;
-4. emitir token;
-5. devolver únicamente datos seguros.
-
----
-
-# 34. Credenciales inválidas
-
-La API no debe revelar información innecesaria como:
+Authentication responde:
 
 ```text
-El usuario existe pero la contraseña es incorrecta.
+Who are you?
 ```
 
-cuando esto facilite enumeración de usuarios.
+No:
 
-Preferir un mensaje suficientemente genérico para credenciales inválidas.
-
----
-
-# 35. Contraseña durante Login
-
-La contraseña recibida debe utilizarse únicamente para validación.
-
-No debe:
-
-* almacenarse;
-* registrarse;
-* incluirse en logs;
-* incluirse en excepciones.
+```text
+Can you execute every action?
+```
 
 ---
 
-# 36. JWT Access Token
+# 26. Login
 
-La implementación actual utiliza:
+Un login seguro debe:
+
+```text
+validate credentials
+
+validate account access state
+
+construct safe authenticated identity
+
+issue token
+
+return safe response
+```
+
+Actualmente:
+
+```text
+User.isActive = false
+→ login rejected
+```
+
+---
+
+# 27. Invalid credentials
+
+Errores de login no deben revelar innecesariamente:
+
+```text
+email exists but password is wrong
+```
+
+Preferir mensajes suficientemente genéricos para reducir user enumeration.
+
+La contraseña recibida no debe:
+
+```text
+be stored
+
+be logged
+
+appear in exception metadata
+```
+
+---
+
+# 28. JWT Access Token
+
+Actualmente Zaping utiliza:
 
 ```text
 JWT Access Token
 ```
 
-para autenticar solicitudes.
-
----
-
-# 37. Bearer Token
-
-Las solicitudes protegidas utilizan conceptualmente:
+Las solicitudes protegidas utilizan:
 
 ```http
 Authorization: Bearer <token>
@@ -598,280 +982,337 @@ Authorization: Bearer <token>
 
 ---
 
-# 38. JwtStrategy
+# 29. JwtStrategy
 
-La estrategia JWT actual obtiene la identidad desde el Bearer Token y reconstruye:
+`JwtStrategy` reconstruye el contexto autenticado utilizado por la aplicación.
+
+El contexto actual incluye conceptos como:
 
 ```text
-req.user
+User id
+
+companyId
+
+email
+
+role
 ```
 
-o contexto equivalente.
+según el payload implementado.
+
+Actualmente:
+
+```text
+JwtStrategy
+→ revalidates active User state against database
+→ uses current DB role for request.user
+→ compares JWT authVersion with current DB authVersion
+```
 
 ---
 
-# 39. JWT_SECRET
+# 30. JWT_SECRET
 
-La firma del token depende de una configuración secreta.
+La firma depende de:
+
+```text
+JWT_SECRET
+```
 
 Debe provenir de:
 
 ```text
-Environment / Secret Management
+environment configuration
+
+future secret management
 ```
 
-Nunca del código fuente.
+Nunca:
+
+```text
+source code
+
+Git
+
+documentation
+
+screenshots
+
+shared fixtures
+```
 
 ---
 
-# 40. Secrets
+# 31. JWT payload
 
-No deben almacenarse en Git:
+El JWT debe contener únicamente claims necesarios.
 
-```text
-JWT_SECRET
-DATABASE_URL
-API keys
-passwords
-private credentials
-```
-
----
-
-# 41. JWT Payload
-
-El token debe contener únicamente información necesaria para Authentication/Authorization.
-
-Puede necesitar conceptos como:
+Puede incluir:
 
 ```text
-userId
+userId / sub
+
 companyId
-role / authorization context
+
+email
+
+role
+
+authVersion
 ```
 
-según la implementación.
+según contrato.
 
----
-
-# 42. No incluir información sensible
-
-Nunca incluir:
+Nunca:
 
 ```text
-passwordHash
 password
+
+passwordHash
+
 secrets
-unnecessary personal data
+
+unnecessary sensitive data
 ```
 
-en el JWT.
+Principio:
+
+```text
+Signed JWT
+≠
+Encrypted data
+```
+
+Quien posee el token normalmente puede leer su payload.
+
+La revocación de credenciales usa `authVersion`:
+
+```text
+User.authVersion
+→ Int @default(0)
+
+JWT authVersion
+→ compared with DB value on every protected request
+
+legacy JWT without claim
+→ treated as authVersion 0
+```
+
+Si el valor persistido aumenta, los JWT anteriores dejan de autorizar. La
+estrategia también vuelve a validar en base de datos el usuario activo y el rol
+actual en cada request autenticada.
 
 ---
 
-# 43. JWT no es almacenamiento privado
-
-El contenido de un JWT firmado normalmente puede ser leído por quien posea el token.
-
-Por tanto:
-
-> Firmado no significa secreto.
-
----
-
-# 44. Token expiration
+# 32. Token expiration
 
 Los Access Tokens deben tener expiración.
 
-No deben diseñarse como credenciales permanentes.
+No deben actuar como credenciales permanentes.
 
 La duración exacta pertenece a configuración de seguridad.
 
 ---
 
-# 45. Refresh Tokens
+# 33. Frontend token storage — CURRENT
 
-La arquitectura histórica contempla:
+Actualmente el frontend conserva el JWT en:
 
 ```text
-Refresh Tokens
+localStorage
 ```
 
-como capacidad futura.
+Este es el estado real del sistema.
 
-No deben documentarse como implementados actualmente.
+Riesgo relevante:
+
+```text
+successful XSS
+→ token may be compromised
+```
+
+Esto hace especialmente importante proteger el frontend contra ejecución de JavaScript no confiable.
 
 ---
 
-# 46. Estrategia futura de sesión
+# 34. Session strategy — P1
 
-Una evolución puede introducir:
+Antes de mayor madurez productiva debe revisarse formalmente:
 
 ```text
-Short-lived Access Token
+token lifetime
+
+frontend storage
+
+logout behavior
+
+refresh tokens
+
+revocation
+
+User deactivation
+
+password-change invalidation
+```
+
+El sistema no debe asumir que eliminar el token de `localStorage` equivale a revocarlo en servidor.
+
+---
+
+# 35. Stateless logout
+
+Con Access JWT stateless:
+
+```text
+Frontend logout
+→ deletes local token
+```
+
+pero:
+
+```text
+previously issued token
+→ may remain cryptographically valid until expiration
+```
+
+Una revocación inmediata requiere infraestructura adicional.
+
+---
+
+# 36. Refresh Tokens
+
+Actualmente:
+
+```text
+Refresh Tokens
+→ NOT IMPLEMENTED
+```
+
+Una arquitectura futura puede utilizar:
+
+```text
+short-lived Access Token
 +
 Refresh Token
 ```
 
 pero deberá definir:
 
-* almacenamiento;
-* rotación;
-* revocación;
-* expiración;
-* logout;
-* detección de reuse.
+```text
+storage
+
+rotation
+
+expiration
+
+reuse detection
+
+revocation
+
+logout
+```
 
 ---
 
-# 47. Logout con JWT stateless
+# 37. Current Auth endpoints
 
-Con únicamente Access Tokens stateless, logout del frontend puede significar eliminar su copia local.
-
-Eso no revoca automáticamente un token previamente emitido.
-
-Una estrategia de revocación requiere diseño adicional.
-
----
-
-# 48. Token storage en frontend
-
-La estrategia exacta de almacenamiento debe evaluarse de acuerdo con:
-
-* XSS;
-* CSRF;
-* arquitectura Next.js;
-* expiración;
-* refresh tokens.
-
-Este documento no impone todavía `localStorage`, cookies u otra estrategia específica.
-
----
-
-# 49. Regla
-
-No debe elegirse almacenamiento de token únicamente por comodidad.
-
-La decisión pertenece a seguridad de frontend.
-
----
-
-# 50. Auth endpoints actuales
-
-El estado validado del proyecto contempla capacidades bajo:
+Actualmente existen capacidades bajo:
 
 ```text
 /auth
 ```
 
-incluyendo:
+Contrato público exacto:
 
 ```text
-register
-login
-reset-password
-me
+POST /auth/register
+
+POST /auth/login
+
+POST /auth/forgot-password
+
+POST /auth/reset-password
 ```
 
-La implementación exacta continúa siendo la fuente técnica para DTOs y contratos.
+Contrato autenticado exacto:
+
+```text
+GET /auth/me
+
+POST /auth/change-password
+```
+
+Administración de Users V1, protegida para `ADMIN` y tenant-scoped:
+
+```text
+GET /users
+
+GET /users/:id
+
+POST /users
+
+PATCH /users/:id
+
+DELETE /users
+→ no existe
+```
+
+Los DTOs y contratos exactos pertenecen al código vigente.
 
 ---
 
-# 51. `/auth/me`
-
-Una capacidad `me` permite recuperar la identidad del usuario autenticado.
-
-Debe devolver únicamente información segura y necesaria.
-
----
-
-# 52. `me` no consulta otro usuario
+# 38. `/auth/me`
 
 Conceptualmente:
 
 ```text
 GET /auth/me
-```
-
-debe derivar el User desde la identidad autenticada.
-
-No debe aceptar arbitrariamente:
-
-```text
-userId
-```
-
-para consultar otra identidad.
-
----
-
-# 53. Registration
-
-El significado de:
-
-```text
-/auth/register
-```
-
-debe distinguirse según el workflow.
-
-Puede representar actualmente provisioning inicial o registro permitido por la aplicación.
-
-No debe convertirse automáticamente en un endpoint público para crear Users privilegiados.
-
----
-
-# 54. Riesgo crítico: role default ADMIN
-
-El schema actual define:
-
-```text
-role UserRole @default(ADMIN)
-```
-
-Esto debe tratarse con especial cuidado.
-
----
-
-# 55. Consecuencia
-
-Si una operación genérica crea un User sin especificar explícitamente su rol:
-
-```text
-new User
 ↓
-ADMIN
+authenticated identity
 ```
 
-puede producir una elevación de privilegios accidental.
+No debe utilizarse para consultar arbitrariamente otro User.
 
----
-
-# 56. Regla objetivo de menor privilegio
-
-> **Nunca debe utilizarse el default `ADMIN` como mecanismo de autorización para creación genérica de usuarios.**
-
-Todo flujo de creación debe asignar explícitamente un rol autorizado.
-
----
-
-# 57. Recomendación de evolución
-
-Durante el refactor de Identity & Access debe evaluarse:
+No debe aceptar:
 
 ```text
-eliminar @default(ADMIN)
+userId of another account
 ```
 
-o sustituirlo por una estrategia segura de provisioning.
-
-No se modifica Prisma únicamente desde este documento.
+como sustituto de la identidad autenticada.
 
 ---
 
-# 58. Initial Administrator
+# 39. Company Sign-up
 
-La creación del primer administrador de una Company es diferente de crear un usuario interno adicional.
+`POST /auth/register` existe actualmente como Company sign-up.
+
+Su semántica vigente:
+
+```text
+New Company
+↓
+first User
+↓
+explicit ADMIN
+```
+
+No es un endpoint para crear usuarios internos posteriores.
+
+Usuarios posteriores:
+
+```text
+Users administration
+↓
+ADMIN-only
+```
+
+El provisioning inicial de una Company es diferente de la creación posterior de
+usuarios internos.
+
+---
+
+# 40. Initial Administrator
 
 Conceptualmente:
 
@@ -887,102 +1328,231 @@ puede asignar explícitamente:
 ADMIN
 ```
 
+porque forma parte de un flujo controlado de bootstrap.
+
+Esto no justifica que usuarios posteriores hereden `ADMIN` por default.
+
 ---
 
-# 59. Additional User
+# 41. Implicit ADMIN default — RESOLVED
 
-La creación posterior de otro usuario debe requerir:
+El modelo vigente ya no define:
 
 ```text
-authorized administrator
+User.role
+→ @default(ADMIN)
+```
+
+La creación de usuarios administrativos exige `role` explícito en el contrato
+de Users V1.
+
+Este riesgo histórico deja de ser P0 activo para el código actual, pero sigue
+siendo un anti-patrón prohibido.
+
+---
+
+# 42. Safe role provisioning
+
+Debe cumplirse:
+
+```text
+Initial Company Administrator
+→ ADMIN assigned explicitly
+```
+
+y:
+
+```text
+Additional User
+→ authorized actor
 +
-explicit role assignment
+explicit authorized role
+```
+
+No:
+
+```text
+role omitted
+↓
+implicit ADMIN
+```
+
+Esta regla está implementada para el flujo actual:
+
+```text
+Company sign-up
+→ first ADMIN explicit
+
+Users V1 create
+→ ADMIN-only
+→ explicit role required
 ```
 
 ---
 
-# 60. Password Reset
+# 43. Password Recovery — IMPLEMENTED / VERIFIED
 
-Existe una capacidad actual denominada:
+El reset inseguro anterior fue retirado.
+
+Actualmente:
 
 ```text
-reset-password
+secure recovery
+→ IMPLEMENTED / VERIFIED
+
+/forgot-password
+→ recovery request with generic response
+
+/reset-password?token=...
+→ one-time password reset
 ```
 
-pero su semántica completa debe revisarse antes de considerarla un sistema completo de recuperación de contraseña.
+`POST /auth/forgot-password` recibe únicamente `email`. Para una cuenta activa
+existente invalida el token pendiente anterior, genera un token aleatorio de
+256 bits y persiste únicamente su hash SHA-256. El token expira en 30 minutos,
+es de un solo uso y se entrega por `EmailService`.
+
+La respuesta pública es genérica para cuentas activas, inactivas, desconocidas
+y fallos del proveedor; no permite account enumeration. Si falla la entrega,
+la configuración o la construcción de la URL después de emitir el token, el
+token recién creado se invalida. No se registran el token, la reset URL, la
+contraseña ni `passwordHash`.
+
+El modelo `PasswordResetToken` conserva:
+
+```text
+user relation
+
+userId
+
+unique tokenHash
+
+expiresAt
+
+usedAt
+
+createdAt
+
+usedAt = null while pending
+
+one valid pending reset per user
+```
+
+`POST /auth/reset-password` recibe sólo `{ token, newPassword }`: no acepta
+email, `userId`, `companyId` ni JWT. Requiere un token vigente, no usado y de un
+usuario activo. Los casos inválido, expirado, usado o inactivo responden con el
+mensaje genérico `El enlace no es válido o ha expirado.`. El mismo password
+produce un error seguro específico y conserva el token para retry; errores de
+red o 5xx también conservan el token para retry.
+
+El éxito actualiza el hash bcrypt, incrementa `authVersion`, invalida los demás
+tokens pendientes y no emite un JWT nuevo: el usuario debe iniciar sesión. El
+consumo es condicional y transaccional, por lo que un token concurrentemente
+reutilizado puede producir como máximo un reset exitoso.
+
+La arquitectura de entrega es:
+
+```text
+Auth/application orchestration
+→ PasswordRecoveryService
+→ EmailService
+→ Resend
+```
+
+El dominio Auth no depende directamente del SDK del proveedor. El contrato de
+configuración usa únicamente los nombres `RESEND_API_KEY`, `EMAIL_FROM` y
+`FRONTEND_BASE_URL`; sus valores válidos y la verificación de sender/domain
+pertenecen al gate de producción.
+
+Por tanto:
+
+```text
+forgot / reset password
+→ IMPLEMENTED as secure account-control recovery
+```
+
+Validación del cierre:
+
+```text
+API: 58 suites / 594 tests PASS
+frontend D3: 640 tests PASS bounded + serial
+frontend lint and production build: PASS
+```
 
 ---
 
-# 61. Dos casos distintos
+# 44. Forgot Password — CURRENT CONTRACT
 
-Debe distinguirse conceptualmente:
+El flujo seguro vigente es equivalente a:
 
 ```text
+Request password recovery
+↓
+Generate temporary random token
+↓
+Verify account control
+↓
+Validate expiration
+↓
+Reset password
+↓
+Invalidate token
+```
+
+`POST /auth/forgot-password` pide sólo el email y mantiene respuesta genérica.
+La pantalla nunca pide una contraseña y no distingue si la cuenta existe.
+
+El token debe ser:
+
+```text
+random
+
+hard to predict
+
+temporary
+
+single-use when practical
+
+not logged
+```
+
+No debe permitirse cambiar una contraseña únicamente con conocimiento del email.
+
+---
+
+# 45. Change Password
+
+Debe distinguirse de Forgot Password.
+
+Conceptualmente:
+
+```text
+Authenticated User
+↓
 Change Password
 ```
 
-usuario autenticado conoce su contraseña o posee sesión válida.
-
-de:
+es distinto de:
 
 ```text
-Forgot Password
+Lost Account Access
+↓
+Forgot Password Recovery
 ```
 
-usuario perdió acceso y requiere recuperación segura.
+Estos workflows no deben mezclarse en un endpoint genérico sin reglas claras.
+
+El contrato vigente de `POST /auth/change-password` es autenticado y recibe
+`currentPassword` y `newPassword`. Requiere JWT y usuario activo. Current
+password incorrecta y new password igual a la actual responden `400`.
+
+En éxito actualiza `passwordHash`, incrementa `authVersion`, invalida tokens de
+recovery pendientes y revoca los JWT existentes. No emite un JWT nuevo. El
+frontend elimina el token local y retorna a login.
 
 ---
 
-# 62. Forgot Password futuro
-
-Un workflow robusto puede requerir:
-
-```text
-Request reset
-↓
-single-use token
-↓
-expiration
-↓
-password change
-↓
-token invalidation
-```
-
-No debe afirmarse que esta infraestructura existe actualmente.
-
----
-
-# 63. No enviar passwords por email
-
-Nunca debe enviarse:
-
-```text
-your password is...
-```
-
-por correo.
-
-Las contraseñas deben ser elegidas/reestablecidas mediante un proceso seguro.
-
----
-
-# 64. UserRole actual
-
-El schema actual define:
-
-```text
-ADMIN
-MANAGER
-SALES
-WAREHOUSE
-```
-
----
-
-# 65. Estado de UserRole
-
-Este enum representa el modelo de autorización **CURRENT**.
+# 46. UserRole actual
 
 Actualmente:
 
@@ -992,187 +1562,212 @@ User
 one UserRole
 ```
 
----
-
-# 66. ADMIN
-
-Conceptualmente representa el mayor nivel operativo dentro del tenant.
-
-No debe confundirse automáticamente con:
+Enum:
 
 ```text
-Platform Administrator
+ADMIN
+
+MANAGER
+
+SALES
+
+WAREHOUSE
 ```
 
-de Zaping.
+Este es el modelo:
+
+```text
+CURRENT
+```
 
 ---
 
-# 67. MANAGER
+# 47. ADMIN
 
-Representa un rol empresarial con capacidades de gestión.
+Representa el mayor nivel empresarial actual dentro del tenant.
 
-La matriz exacta de acciones permitidas debe mantenerse explícita en la implementación.
+No significa:
 
----
+```text
+Zaping Platform Administrator
+```
 
-# 68. SALES
-
-Representa funciones relacionadas con workflows comerciales.
-
-No debe tener acceso automático a toda capacidad únicamente porque un Controller olvidó protección.
+No elimina tenant isolation.
 
 ---
 
-# 69. WAREHOUSE
+# 48. MANAGER
 
-Representa operaciones relacionadas principalmente con:
+Representa gestión empresarial dentro del tenant.
 
-* Inventory;
-* Receipts;
-* Deliveries;
-* Warehouse workflows.
-
-La matriz concreta debe evolucionar con Permissions.
+La matriz exacta de autorización debe ser explícita en implementación.
 
 ---
 
-# 70. Role no es tenant
+# 49. SALES
 
-Debe distinguirse:
+Representa operaciones comerciales.
+
+No debe obtener acceso a otras capacidades simplemente porque una ruta carezca de protección apropiada.
+
+---
+
+# 50. WAREHOUSE
+
+Actualmente se relaciona principalmente con capacidades como:
+
+```text
+Inventory
+
+Purchase Receipts
+
+selected operational reads
+```
+
+Capacidades como:
+
+```text
+Delivery
+advanced Warehouse Operations
+```
+
+pertenecen a arquitectura TARGET/FUTURE y no deben presentarse como implementadas actualmente.
+
+---
+
+# 51. Role y tenant son controles distintos
 
 ```text
 role
-→ qué puede hacer
+→ what can you do?
 ```
-
-de:
 
 ```text
 companyId
-→ dónde puede hacerlo
+→ where can you do it?
+```
+
+Debe cumplirse:
+
+```text
+has role/permission
++
+resource belongs to another Company
+=
+DENY
 ```
 
 ---
 
-# 71. Authentication vs Authorization
+# 52. JwtAuthGuard
 
-```text
-Valid JWT
-```
-
-solo responde:
-
-```text
-Who are you?
-```
-
-No:
-
-```text
-Can you do this?
-```
-
----
-
-# 72. JwtAuthGuard
-
-Las rutas protegidas deben requerir Authentication mediante:
+Las rutas privadas deben utilizar:
 
 ```text
 JwtAuthGuard
 ```
 
-o el mecanismo equivalente adoptado.
+o el mecanismo equivalente aprobado.
+
+Solo rutas deliberadamente públicas deben omitir Authentication.
 
 ---
 
-# 73. Public routes
+# 53. Public endpoints
 
-Solo endpoints explícitamente públicos deben omitir Authentication.
-
-Ejemplos potenciales:
+Contrato público actual:
 
 ```text
-login
-password recovery request
+POST /auth/register
+
+POST /auth/login
+
+POST /auth/forgot-password
+
+POST /auth/reset-password
 ```
 
-según su diseño.
+Toda ruta pública aumenta superficie de ataque y debe revisarse proporcionalmente.
 
 ---
 
-# 74. Default secure posture
+# 54. Default secure posture
 
-Una nueva operación sensible no debe quedar pública accidentalmente.
+Una operación sensible nueva no debe quedar pública por accidente.
 
-La protección debe ser visible y verificable.
+La protección debe ser:
+
+```text
+explicit
+
+reviewable
+
+testable
+```
 
 ---
 
-# 75. RolesGuard actual
+# 55. RolesGuard — CURRENT
 
-La implementación actual utiliza una estrategia basada en roles.
+Actualmente existen:
+
+```text
+@Roles(...)
+
+RolesGuard
+```
 
 Conceptualmente:
 
 ```text
-@Roles(...)
+required roles
 ↓
 RolesGuard
 ↓
-user.role
+request.user.role
 ↓
 allow / deny
 ```
 
+Su uso está verificado en los controladores del ERP Core y en Healthcare Cases.
+
+La autorización CURRENT de ERP Core usa roles fijos y está implementada. La
+autorización granular basada en catálogo de permisos continúa diferida.
+
 ---
 
-# 76. Comportamiento actual
+# 56. Limitaciones de Role-Only RBAC
 
-Si una ruta declara roles requeridos:
+Un modelo basado únicamente en:
 
 ```text
-requiredRoles
+ADMIN
+MANAGER
+SALES
+WAREHOUSE
 ```
 
-el Guard compara contra:
+puede producir:
 
 ```text
-user.role
+role explosion
+
+duplicated controller rules
+
+exceptions
+
+limited customization
+
+weak granularity
 ```
 
----
-
-# 77. Limitación del modelo actual
-
-Esto funciona para una primera versión, pero conduce a reglas como:
-
-```text
-ADMIN can
-MANAGER can
-SALES cannot
-```
-
-distribuidas en múltiples Controllers.
+Conforme el producto crece.
 
 ---
 
-# 78. Problema de Role-Only RBAC
+# 57. Permission-Based Authorization — TARGET
 
-Conforme crece el producto puede producir:
-
-* role explosion;
-* reglas duplicadas;
-* excepciones;
-* dificultad para custom roles;
-* poca granularidad.
-
----
-
-# 79. Arquitectura objetivo ADR-007
-
-El modelo objetivo es:
+La dirección arquitectónica es:
 
 ```text
 User
@@ -1184,213 +1779,108 @@ Permissions
 Business Action
 ```
 
----
+Principio:
 
-# 80. Principio objetivo
-
-> **Las operaciones deben autorizar capacidades, no depender permanentemente de nombres de roles.**
+> **Las operaciones deben evolucionar hacia capacidades autorizables, no depender permanentemente de nombres de roles.**
 
 ---
 
-# 81. Permission
+# 58. Permissions
 
-Un Permission representa una acción autorizable.
-
-Convención:
+Convención conceptual:
 
 ```text
 resource.action
 ```
 
----
-
-# 82. Ejemplos
+Ejemplos sobre dominios actuales:
 
 ```text
 customers.read
-customers.create
-customers.update
-customers.deactivate
 
-purchases.read
-purchases.create
-purchases.approve
+customers.update
+
+products.read
 
 inventory.read
+
 inventory.adjust
 
+purchases.create
+
+purchases.approve
+
+purchaseReceipts.create
+
 sales.read
+
 sales.create
 
+sales.approve
+
+equipment.read
+
+equipment.inspect
+
+equipment.retire
+
+cases.view
+
+cases.manage
+```
+
+Ejemplos futuros:
+
+```text
 deliveries.confirm
 
 returns.confirm
 
-dashboard.read
+caseKits.prepare
+
+caseKits.dispatch
+
+billing.view
 ```
 
 ---
 
-# 83. Roles objetivo
+# 59. Roles TARGET
 
-Un Role debe funcionar principalmente como:
+Un Role puede convertirse en:
 
 ```text
 permission group
 ```
 
-Ejemplo:
+Ejemplo conceptual:
 
 ```text
 WAREHOUSE
 ├── inventory.read
 ├── purchaseReceipts.create
-├── deliveries.read
-└── deliveries.confirm
+└── equipment.read
 ```
 
----
-
-# 84. Business code no debe depender del nombre
-
-Evitar arquitectura permanente como:
-
-```ts
-if (user.role === 'ADMIN') {
-  ...
-}
-```
-
-dentro de lógica empresarial.
-
----
-
-# 85. Excepción razonable
-
-El rol puede seguir utilizándose:
-
-* en administración;
-* presentación;
-* agrupación;
-* defaults;
-
-pero la autorización de acciones objetivo debe resolverse mediante Permissions.
-
----
-
-# 86. Modelo Prisma TARGET
-
-Actualmente no existen necesariamente modelos persistidos como:
-
-```text
-Role
-Permission
-RolePermission
-```
-
-porque el sistema utiliza `UserRole`.
-
----
-
-# 87. No crear tablas todavía por documentación
-
-Este documento no ordena crear inmediatamente:
-
-```text
-Role
-Permission
-UserRoleAssignment
-RolePermission
-```
-
----
-
-# 88. Secuencia correcta
-
-La migración deberá seguir:
-
-```text
-Permission catalog
-↓
-Role model
-↓
-Default role mappings
-↓
-Authorization Guard
-↓
-Migrate Controllers
-↓
-Administration UI
-↓
-Retire static role-only checks where appropriate
-```
-
----
-
-# 89. Compatibilidad
-
-Durante la transición:
-
-```text
-UserRole enum
-```
-
-puede seguir funcionando.
-
-No debe existir un período donde rutas críticas queden sin autorización debido a una migración incompleta.
-
----
-
-# 90. Default Roles
-
-Los roles actuales pueden convertirse posteriormente en roles predefinidos:
-
-```text
-Administrator
-Manager
-Sales
-Warehouse
-```
-
-con conjuntos iniciales de Permissions.
-
----
-
-# 91. Custom Roles
-
-TARGET/FUTURE puede permitir:
+Posteriormente podrían existir Custom Roles como:
 
 ```text
 Compras Senior
+
 Almacén Recepción
+
 Almacén Supervisor
+
 Ventas Junior
+
 Auditor
 ```
 
-sin modificar código para cada nuevo nombre.
+sin requerir lógica específica por nombre.
 
 ---
 
-# 92. Permissions por Company
-
-Cuando existan Custom Roles, deberá definirse claramente cuáles son:
-
-```text
-system-defined
-```
-
-y cuáles:
-
-```text
-company-defined
-```
-
-No se decide aún el schema exacto.
-
----
-
-# 93. Guard objetivo
+# 60. PermissionsGuard — TARGET
 
 Conceptualmente:
 
@@ -1399,333 +1889,413 @@ Conceptualmente:
 ↓
 PermissionsGuard
 ↓
-resolved user permissions
+resolved User permissions
 ↓
 allow / deny
 ```
 
----
-
-# 94. Controller
-
-Controller declara la autorización necesaria.
-
-Ejemplo conceptual:
+Actualmente:
 
 ```text
-POST /inventory-adjustments
-requires inventory.adjust
+PermissionsGuard
+→ TARGET
 ```
 
----
-
-# 95. Service
-
-Los Services pueden asumir que la autorización de endpoint fue realizada para casos normales.
-
-Pero deben continuar protegiendo:
-
-* tenant;
-* invariantes;
-* reglas empresariales.
+No debe documentarse como implementado.
 
 ---
 
-# 96. Authorization no sustituye business rule
+# 61. No crear tablas solo por documentación
 
-Un usuario con:
+Este documento no ordena crear inmediatamente:
 
 ```text
-inventory.adjust
+Role
+
+Permission
+
+RolePermission
+
+UserRoleAssignment
 ```
 
-no puede crear un ajuste inválido.
+La evolución debe producirse cuando exista una necesidad real y una migración aprobada.
 
 ---
 
-# 97. Business rule no sustituye authorization
+# 62. Secuencia de evolución RBAC
 
-Una operación empresarialmente válida tampoco puede ejecutarse si el usuario no está autorizado.
-
----
-
-# 98. Repository / Prisma
-
-La capa de persistencia no debe convertirse en el lugar primario para decidir Permissions.
-
-Su responsabilidad principal es acceso a datos.
-
----
-
-# 99. Tenant Isolation siempre aplica
-
-Debe cumplirse:
+Orden recomendado:
 
 ```text
-User has permission
-+
-resource belongs to another Company
-=
-DENY
-```
-
----
-
-# 100. ADMIN no bypass tenant
-
-También:
-
-```text
-role = ADMIN
-```
-
-no significa:
-
-```text
-access every Company
-```
-
-ADMIN es actualmente un rol del tenant.
-
----
-
-# 101. Platform Administrator
-
-Una futura capacidad administrativa interna de Zaping debe modelarse separadamente.
-
-No debe lograrse mediante:
-
-```text
-ADMIN
-+
-skip company filter
-```
-
----
-
-# 102. User management
-
-Un administrador autorizado debe poder gestionar usuarios de su propia Company.
-
-Conceptualmente:
-
-```text
-Company
+Permission catalog
 ↓
-Users
+Role model design
+↓
+Default role mappings
+↓
+Permission resolver
+↓
+PermissionsGuard
+↓
+Controller migration
+↓
+Administration UI
+↓
+retire static role-only checks where appropriate
 ```
 
----
-
-# 103. Create User
-
-Al crear otro User deben validarse:
+Durante la transición:
 
 ```text
-authenticated admin/permission
-Company scope
-email uniqueness
-role assignment
-password policy
-input validation
+UserRole + RolesGuard
 ```
+
+pueden continuar funcionando.
+
+No debe existir un período donde rutas críticas queden sin protección.
 
 ---
 
-# 104. No permitir companyId arbitrario
+# 63. Users V1 Administration — CURRENT
 
-Un administrador de Company A no debe poder crear:
+Users V1 está implementado como administración interna controlada.
+
+Endpoints:
 
 ```text
-User
-companyId = Company B
+GET /users
+
+GET /users/:id
+
+POST /users
+
+PATCH /users/:id
 ```
+
+No existe:
+
+```text
+DELETE /users
+```
+
+Protección:
+
+```text
+JwtAuthGuard
++
+RolesGuard
++
+ADMIN
+```
+
+Tenant isolation:
+
+```text
+authenticated companyId
+↓
+UsersService tenant scope
+```
+
+No se acepta `companyId` como input administrativo.
+
+Las respuestas utilizan un select seguro y no incluyen `passwordHash`.
 
 ---
 
-# 105. Role assignment
+# 64. Users V1 business rules
 
-Un User no debe poder asignarse a sí mismo privilegios superiores mediante:
+Reglas implementadas:
+
+```text
+role required on create
+
+User.role has no default ADMIN
+
+minimum password length: 8
+
+passwordHash never returned
+
+self-deactivation blocked
+
+last active ADMIN cannot be deactivated
+
+last active ADMIN cannot be demoted
+
+self-demotion allowed only if another active ADMIN remains
+
+ADMIN can create another ADMIN
+```
+
+Administración de estado:
+
+```text
+activate/deactivate
+↓
+PATCH isActive
+```
+
+No hay borrado físico de Users.
+
+---
+
+# 65. Role assignment
+
+Un usuario no debe poder elevar sus propios privilegios mediante operaciones de perfil.
+
+Ejemplo prohibido:
 
 ```text
 PATCH /users/me
+
 {
   "role": "ADMIN"
 }
 ```
 
----
-
-# 106. Mass Assignment
-
-DTOs de actualización deben evitar aceptar campos sensibles indiscriminadamente.
-
-Especialmente:
-
-```text
-companyId
-passwordHash
-role
-isActive
-```
-
-cuando el endpoint no está diseñado para modificarlos.
+si esa operación no es explícitamente administrativa y autorizada.
 
 ---
 
-# 107. Separar operaciones sensibles
+# 66. Separar operaciones sensibles
 
-Puede ser preferible disponer conceptualmente de acciones distintas:
+Preferir capacidades explícitas:
 
 ```text
 Update Profile
+
+Change Password
+
 Change Role
+
 Deactivate User
-Reset Password
+
+Reactivate User
 ```
 
-en lugar de un:
+sobre un:
 
 ```text
 PATCH User
 ```
 
-que permita modificar cualquier propiedad.
-
----
-
-# 108. Self Profile
-
-Un usuario puede necesitar modificar información personal limitada.
-
-Ejemplos:
-
-```text
-firstName
-lastName
-locale
-```
-
-según las reglas aprobadas.
-
----
-
-# 109. Self Profile no es Administration
-
-Modificar el propio perfil no debe permitir:
+que permita modificar indiscriminadamente:
 
 ```text
 role
 companyId
 isActive
+passwordHash
 ```
 
 ---
 
-# 110. Deactivate User
+# 67. Self Profile
 
-Desactivar a un User debe impedir nuevo acceso.
-
----
-
-# 111. Access Token de User desactivado
-
-Con JWT stateless, existe una consideración importante:
-
-> un token emitido antes de la desactivación puede continuar siendo criptográficamente válido hasta expirar.
-
----
-
-# 112. Estrategia de invalidación
-
-Si el sistema necesita revocación inmediata deberá considerar mecanismos como:
-
-* verificar estado del User;
-* token version;
-* session store;
-* revocation strategy;
-
-según el nivel de riesgo y performance.
-
-No está definido todavía como infraestructura obligatoria.
-
----
-
-# 113. Password Change y sesiones
-
-Cuando cambia una contraseña puede existir la misma necesidad:
+Una operación de perfil personal puede permitir:
 
 ```text
-¿deben invalidarse los demás tokens?
+firstName
+
+lastName
+
+locale
 ```
 
-La estrategia debe definirse antes de producción si el riesgo lo requiere.
+según contrato.
 
----
-
-# 114. Password Policy
-
-La política mínima de contraseña debe evitar credenciales triviales.
-
-La definición exacta debe configurarse mediante requerimientos de seguridad y UX.
-
----
-
-# 115. No imponer reglas arbitrarias
-
-Una política como:
+No debe permitir:
 
 ```text
-1 uppercase
-1 lowercase
-1 symbol
-1 number
-exactly 14 chars
+companyId
+
+role
+
+isActive
+
+passwordHash
 ```
-
-no debe adoptarse únicamente por tradición.
-
-Debe priorizarse:
-
-* longitud adecuada;
-* bloqueo de passwords débiles;
-* almacenamiento seguro;
-* rate limiting;
-* MFA futuro.
 
 ---
 
-# 116. Login brute force
+# 68. Mass Assignment
 
-Antes de producción debe existir protección apropiada contra intentos automatizados.
+DTOs deben impedir modificación accidental de campos internos.
 
-Puede incluir:
+Especialmente:
+
+```text
+companyId
+
+role
+
+permissions
+
+passwordHash
+
+isActive
+
+createdById
+```
+
+cuando la operación no tenga ownership explícito sobre ellos.
+
+---
+
+# 69. Backend como autoridad
+
+Frontend puede ocultar o deshabilitar acciones.
+
+Sin embargo:
+
+```text
+Frontend
+≠
+security authority
+```
+
+Una acción oculta debe continuar protegida en backend.
+
+---
+
+# 70. Frontend authorization
+
+Mientras exista Role-only RBAC, frontend puede utilizar:
+
+```text
+role === ADMIN
+```
+
+para presentación.
+
+Esto es:
+
+```text
+temporary UI authorization context
+```
+
+No sustituye la validación backend.
+
+---
+
+# 71. Hidden vs disabled
+
+Como guía UX:
+
+```text
+Hidden
+→ User never has that capability
+
+Disabled
+→ User may have capability
+  but current resource state prevents action
+```
+
+No es una regla de seguridad backend.
+
+---
+
+# 72. Protected-route architecture
+
+El frontend utiliza un AppShell autenticado, pero:
+
+```text
+AppShell
+≠
+server-side authorization guard
+```
+
+La arquitectura de rutas/sesión frontend todavía requiere hardening.
+
+Actualmente la API y su manejo de `401` continúan siendo una línea crítica de protección.
+
+---
+
+# 73. Auth state
+
+Frontend necesita conocer:
+
+```text
+authenticated state
+
+safe User identity
+
+authorization context
+```
+
+Mientras se resuelve la sesión debe evitar mostrar innecesariamente contenido protegido.
+
+---
+
+# 74. Expired token UX
+
+Cuando el token expira:
+
+```text
+session invalid
+↓
+consistent application handling
+↓
+authentication flow
+```
+
+No debe producir únicamente errores dispersos sin contexto.
+
+---
+
+# 75. Brute force y abuse protection
+
+Antes de exposición externa deben protegerse endpoints como:
+
+```text
+login
+
+register if public
+
+password recovery
+```
+
+mediante controles básicos proporcionales al riesgo.
+
+Ejemplos:
 
 ```text
 rate limiting
-temporary throttling
+
+throttling
+
 monitoring
 ```
 
-según arquitectura.
+Este punto pertenece a:
+
+> **P0 antes de piloto/producción.**
 
 ---
 
-# 117. Account Lockout
+# 76. Account lockout
 
-Un bloqueo permanente después de pocos intentos puede convertirse en mecanismo de denial-of-service.
+No debe utilizarse un bloqueo permanente demasiado agresivo que permita a terceros provocar denial-of-service sobre una cuenta.
 
-La estrategia deberá balancear seguridad y disponibilidad.
+La protección contra brute force debe balancear:
+
+```text
+security
++
+availability
+```
 
 ---
 
-# 118. User enumeration
+# 77. User enumeration
 
 Los flujos de:
 
 ```text
 login
-forgot password
+
+password recovery
+
 registration
 ```
 
@@ -1733,152 +2303,85 @@ no deben revelar innecesariamente qué cuentas existen.
 
 ---
 
-# 119. Reset tokens
+# 78. Audit — CURRENT
 
-Los futuros tokens de recuperación deben ser:
-
-* aleatorios;
-* de uso único;
-* con expiración;
-* protegidos en almacenamiento.
-
-No deben reutilizar Access JWT normales como token de recuperación sin diseño específico.
-
----
-
-# 120. MFA
-
-Multi-Factor Authentication es una evolución futura recomendable para:
-
-* administradores;
-* usuarios sensibles;
-* operaciones críticas.
-
-No está implementado actualmente.
-
----
-
-# 121. SSO
-
-Empresas mayores pueden requerir posteriormente:
+Actualmente existen hechos de auditoría específicos en algunos dominios:
 
 ```text
-Microsoft Entra ID
-Google Workspace
-OIDC
-SAML
+createdBy
+
+receivedBy
+
+inspectedBy
+
+retiredBy
+
+cancelledBy
 ```
 
-No pertenece al Core actual.
+No existe todavía un sistema transversal completo de Identity & Access Audit.
 
 ---
 
-# 122. External Identities
+# 79. Audit — TARGET
 
-Customer Portal y aplicaciones externas pueden necesitar identidades diferentes de `User` interno.
-
-No debe asumirse que:
-
-```text
-Customer contact
-=
-internal User
-```
-
----
-
-# 123. Customer Portal futuro
-
-Conceptualmente:
-
-```text
-External Identity
-↓
-Customer Access
-↓
-Company Context
-↓
-Authorized Customer Resources
-```
-
----
-
-# 124. API Clients
-
-La futura Public API puede utilizar:
-
-```text
-API Keys
-OAuth Client Credentials
-Service Accounts
-```
-
-u otro modelo.
-
-No deben reutilizarse cuentas humanas con contraseña para integraciones automatizadas por defecto.
-
----
-
-# 125. Service Accounts
-
-Si posteriormente existen, deberán tener:
-
-* identidad propia;
-* tenant;
-* permissions;
-* lifecycle;
-* audit.
-
----
-
-# 126. Audit
-
-Identity & Access debe integrarse con Audit para acciones sensibles.
-
-Ejemplos:
+Identity & Access deberá integrarse con una capacidad general de Audit para eventos como:
 
 ```text
 Login success
+
 Login failure
+
 User created
+
 User deactivated
+
+User reactivated
+
 Role changed
+
 Permission changed
+
 Password changed
+
+session revoked
 ```
 
-según la política de auditoría.
+cuando la política de auditoría lo requiera.
 
----
-
-# 127. Password en Audit
-
-Nunca registrar:
+Nunca almacenar en Audit:
 
 ```text
 password
+
 passwordHash
-reset token
+
 JWT
+
+recovery token
+
+secret
 ```
 
-en Audit.
+---
+
+# 80. Logging de seguridad
+
+Los logs deben contener contexto suficiente para diagnóstico sin capturar secretos.
+
+Nunca:
+
+```text
+console.log(loginDto)
+```
+
+si incluye contraseña.
+
+Nunca registrar JWT completos activos.
 
 ---
 
-# 128. Security logging
-
-Los eventos de seguridad deben proporcionar suficiente contexto para investigación sin capturar secretos.
-
----
-
-# 129. Authentication errors
-
-Errores deben ser comprensibles para el cliente pero no revelar información sensible.
-
----
-
-# 130. HTTP semantics
+# 81. HTTP semantics
 
 Conceptualmente:
 
@@ -1892,468 +2395,526 @@ Conceptualmente:
 → Authenticated but not authorized
 ```
 
----
-
-# 131. 404 y tenant isolation
-
-En algunos casos cross-tenant puede ser preferible responder:
+En escenarios cross-tenant puede utilizarse:
 
 ```text
 404
 ```
 
-para no revelar que el recurso existe en otra Company.
+cuando sea apropiado para no revelar la existencia del recurso.
 
 La estrategia debe ser consistente.
 
 ---
 
-# 132. Frontend Authorization
+# 82. DTOs
 
-Frontend puede:
+Los límites HTTP deben utilizar contratos específicos.
 
-* esconder acciones;
-* deshabilitar controles;
-* adaptar navegación;
-
-según Permissions.
-
----
-
-# 133. Frontend no es autoridad
-
-Aunque frontend oculte:
+Conceptualmente:
 
 ```text
-[Eliminar]
+RegisterDto
+
+LoginDto
+
+ResetPasswordDto
+
+CreateUserDto future
+
+UpdateProfileDto future
+
+ChangeRoleDto future
+
+UserResponseDto
 ```
 
-backend debe continuar bloqueando la operación.
+No exponer directamente Prisma `User` como contrato público.
 
 ---
 
-# 134. Navigation by role/permission
+# 83. Select mínimo
 
-Una UX más limpia puede ocultar módulos que el usuario nunca podrá utilizar.
+Cuando un Service necesita validar un User debe evitar consultar columnas sensibles innecesarias cuando sea práctico.
 
 Ejemplo:
 
 ```text
-WAREHOUSE
-→ no necesita administración de Users
-```
+need:
+id
+companyId
+isActive
+role
 
----
-
-# 135. Disabled vs hidden
-
-Una acción puede ocultarse cuando nunca pertenece al User.
-
-Puede deshabilitarse cuando pertenece al usuario pero el estado del recurso la impide.
-
----
-
-# 136. Permissions source
-
-En la arquitectura TARGET, frontend debería poder obtener capacidades autorizadas de forma segura.
-
-No mantener una segunda matriz hardcodeada incompatible con backend.
-
----
-
-# 137. Frontend role checks CURRENT
-
-Mientras exista Role-only RBAC, pueden existir controles como:
-
-```text
-role === ADMIN
-```
-
-en UI.
-
-Deben considerarse lógica de presentación temporal.
-
-La autoridad continúa siendo backend.
-
----
-
-# 138. Authentication state
-
-Frontend necesita conocer al menos:
-
-```text
-authenticated
-user
-authorization context
-```
-
-para construir la experiencia.
-
----
-
-# 139. Loading auth state
-
-Mientras se determina la sesión, la UI debe evitar mostrar brevemente contenido protegido como si el usuario tuviera acceso.
-
----
-
-# 140. Expired token UX
-
-Cuando expira la sesión, el usuario debe recibir una experiencia consistente.
-
-No múltiples errores HTTP dispersos sin explicación.
-
----
-
-# 141. HTTPS
-
-En producción, credenciales y tokens deben transmitirse únicamente mediante conexiones seguras.
-
----
-
-# 142. CORS
-
-CORS debe configurarse explícitamente para los clientes autorizados.
-
-No debe utilizarse:
-
-```text
-allow everything
-```
-
-como configuración de producción por comodidad.
-
----
-
-# 143. ValidationPipe
-
-Los DTOs de Auth/Users deben aprovechar la validación global del backend.
-
-Debe rechazarse información inesperada cuando la configuración del sistema así lo determine.
-
----
-
-# 144. DTOs
-
-Debe existir separación entre:
-
-```text
-CreateUserDto
-LoginDto
-ResetPasswordDto
-UpdateUserDto
-UserResponseDto
-```
-
-o contratos equivalentes.
-
-No exponer Prisma User directamente como contrato público.
-
----
-
-# 145. Never expose entities directly
-
-Particularmente importante para `User`, porque el modelo persistido contiene:
-
-```text
+do not automatically fetch:
 passwordHash
 ```
 
----
-
-# 146. Select mínimo
-
-Cuando un Service necesita validar User, debe evitar consultar columnas sensibles que no necesita cuando sea práctico.
+si no se necesita.
 
 ---
 
-# 147. Logs
+# 84. Services y autorización
 
-Nunca:
-
-```ts
-console.log(loginDto);
-```
-
-si puede contener la contraseña.
-
----
-
-# 148. Exceptions
-
-Nunca incluir credenciales dentro de:
+Responsabilidades:
 
 ```text
-BadRequestException
-UnauthorizedException
-logging metadata
+Controller / Guard
+→ endpoint authentication / authorization
+```
+
+```text
+Service
+→ tenant
+→ business invariants
+→ state validation
+```
+
+Si un caso de uso crítico puede ser invocado desde varios entry points, no debe depender ciegamente de que un único Controller haya aplicado autorización correctamente.
+
+Debe preservarse el contexto necesario para protegerlo.
+
+---
+
+# 85. Authorization no sustituye business rule
+
+Ejemplo:
+
+```text
+User has inventory.adjust
+```
+
+no significa que pueda crear:
+
+```text
+invalid inventory adjustment
+```
+
+La operación debe cumplir reglas de negocio.
+
+---
+
+# 86. Business rule no sustituye authorization
+
+Una operación empresarialmente válida:
+
+```text
+≠
+authorized operation
+```
+
+Ambas condiciones deben cumplirse.
+
+---
+
+# 87. External identities — FUTURE
+
+Customer Portal y otras aplicaciones externas pueden necesitar identidades diferentes de `User`.
+
+No asumir:
+
+```text
+Customer contact
+=
+internal User
+```
+
+Conceptualmente:
+
+```text
+External Identity
+↓
+Customer Access
+↓
+Company context
+↓
+Authorized resources
 ```
 
 ---
 
-# 149. Environment
+# 88. Platform Administrator — FUTURE
 
-Los secretos deben mantenerse fuera de:
+Una futura capacidad administrativa interna de Zaping debe modelarse separadamente.
 
-* documentación pública;
-* screenshots;
-* commits;
-* fixtures compartidas;
-* respuestas de soporte.
+No:
+
+```text
+ADMIN
++
+skip companyId filter
+```
+
+Debe existir una frontera explícita entre:
+
+```text
+Tenant Administrator
+```
+
+y:
+
+```text
+Platform Operator / Administrator
+```
+
+si algún día se necesita.
 
 ---
 
-# 150. Tests
+# 89. Service Accounts — FUTURE
 
-Authentication debe probar como mínimo:
+Integraciones automatizadas no deberían reutilizar cuentas humanas por defecto.
+
+Una futura identidad de servicio debe tener:
+
+```text
+own identity
+
+Company / tenant context
+
+permissions
+
+lifecycle
+
+audit
+```
+
+---
+
+# 90. MFA — FUTURE
+
+MFA puede incorporarse para:
+
+```text
+Administrators
+
+high-privilege users
+
+enterprise customers
+
+sensitive actions
+```
+
+No está implementado actualmente.
+
+---
+
+# 91. SSO — FUTURE
+
+Posibles integraciones futuras:
+
+```text
+Microsoft Entra ID
+
+Google Workspace
+
+OIDC
+
+SAML
+```
+
+No pertenecen al ERP Core V1 actual.
+
+---
+
+# 92. API Clients — FUTURE
+
+Una futura Public API puede utilizar:
+
+```text
+API Keys
+
+OAuth Client Credentials
+
+Service Accounts
+```
+
+No debe utilizar cuentas humanas con password como mecanismo universal para integraciones.
+
+---
+
+# 93. Testing de Authentication
+
+Debe cubrir según capacidad implementada:
 
 ```text
 valid login
+
 invalid credentials
-inactive user
+
 safe response without passwordHash
+
 JWT protection
+
 invalid token
+
 expired token
+
+inactive User enforcement
+
+password change invalidates authVersion
+
+forgot-password generic response
+
+reset token single-use / expiry / reuse rejection
+
+same-password retry behavior
+
+delivery-failure token invalidation
 ```
 
-según las capacidades implementadas.
+Una vulnerabilidad corregida debe recibir una prueba de regresión cuando sea razonable.
 
 ---
 
-# 151. Tenant tests
+# 94. Testing de Tenant Isolation
 
-Debe comprobarse:
+Los módulos críticos deben probar:
 
 ```text
-authenticated User Company A
-→ cannot operate on Company B resources
+Company A User
+→ read Company B resource
+→ DENY
 ```
 
-en módulos críticos.
+y:
+
+```text
+Company A User
+→ mutate Company B resource
+→ DENY
+```
+
+También relaciones cross-tenant cuando correspondan.
+
+La matriz sistemática completa continúa siendo trabajo P0.
 
 ---
 
-# 152. Authorization tests CURRENT
+# 95. Testing de RolesGuard — CURRENT
 
-Mientras exista `RolesGuard`, deben probarse:
+Mientras exista Role-only RBAC deben probarse:
 
 ```text
 allowed role
+
 denied role
-route without role requirement
-missing authenticated user
+
+missing authenticated User
+
+route with required roles
+
+route without role restriction
 ```
 
-según su comportamiento.
+según comportamiento del Guard.
 
 ---
 
-# 153. Authorization tests TARGET
+# 96. Testing Permissions — TARGET
 
-Con Permissions deberán probarse:
+Cuando exista Permissions:
 
 ```text
 has permission
+→ allowed
+
 missing permission
-permission through role
-tenant still enforced
+→ denied
+
+permission via role
+→ allowed
+
+valid permission + wrong tenant
+→ denied
 ```
 
 ---
 
-# 154. Security regression
+# 97. Current capabilities
 
-Toda vulnerabilidad corregida debe producir una prueba que impida regresión cuando sea razonable.
-
----
-
-# 155. Current endpoints
-
-El estado validado del proyecto contiene actualmente capacidades equivalentes a:
+Actualmente Identity & Access cuenta con:
 
 ```text
-POST /auth/register
-POST /auth/login
-POST /auth/reset-password
-GET  /auth/me
-```
+User model
 
-Los DTOs y contratos exactos pertenecen al código vigente.
+Company ownership
 
----
+global unique email
 
-# 156. Roles endpoints
+bcrypt password hashing
 
-Los antiguos archivos API de Roles y Permissions no contenían contratos implementados.
+JWT authentication
 
-Por tanto, este documento no inventa endpoints como:
+JwtStrategy
 
-```text
-POST /roles
-POST /permissions
-```
+JwtAuthGuard
 
-como capacidades actuales.
-
----
-
-# 157. Users API
-
-De igual manera, el contrato completo de administración de Users debe verificarse contra el backend vigente antes de declararlo implementado.
-
----
-
-# 158. Current model
-
-CURRENT:
-
-```text
-User
-↓
 UserRole enum
-↓
-RolesGuard
-```
 
-con:
-
-```text
 ADMIN
 MANAGER
 SALES
 WAREHOUSE
+
+RolesGuard
+
+@Roles where configured
+
+isActive field
+
+locale
+
+safe register/login responses
+
+inactive user enforcement
+
+DB-backed current role revalidation
+
+Company sign-up with explicit first ADMIN
+
+Users V1 ADMIN-only administration
+
+tenant-safe Users API
+
+safe Users responses without passwordHash
+
+authVersion-based JWT invalidation on password change/reset
+
+secure PasswordResetToken recovery with SHA-256 hash, 30-minute TTL and
+single-use atomic consumption
+
+generic anti-enumeration recovery response
+
+EmailService → Resend delivery integration
+
+/auth/register
+
+/auth/login
+
+/auth/me
+
+/auth/change-password
+
+/auth/forgot-password
+
+/auth/reset-password
+
+/users
+
+/users/:id
 ```
 
 ---
 
-# 159. Target model
+# 98. P0 — Release Blockers
 
-TARGET:
+Antes de un piloto externo o producción deben resolverse los gates que siguen
+abiertos:
 
 ```text
-User
-↓
-Role
-↓
-Permissions
-↓
-PermissionsGuard
-↓
-Business Action
+1. Basic abuse/rate-limit protection for Auth public endpoints
+
+2. Protected frontend/session hardening
+
+3. Real email delivery/configuration verification for recovery
+
+4. Production secrets/configuration and dependency review
 ```
+
+Authorization + Tenant Isolation V1:
+
+```text
+IMPLEMENTED / VALIDATED — B2 CLOSED
+```
+
+`passwordHash` response sanitization:
+
+```text
+RESOLVED
+```
+
+`User.isActive` enforcement, explicit safe role provisioning, implicit ADMIN
+default removal, and Users V1 administration are also resolved for the current
+code boundary. La regresión transversal de autorización y tenant isolation fue
+validada en B2D.
+
+Estado de workstream:
+
+```text
+AUTH-PASSWORD-SECURITY-V1
+→ IMPLEMENTED
+```
+
+Esto significa implementation complete, no production-ready ni RC-ready. Los
+gates de abuso, correo real, configuración, dependencias, sesión y QA transversal
+permanecen separados.
 
 ---
 
-# 160. Future model
+# 99. P1 — Hardening
 
-FUTURE puede incluir:
+Después de P0:
+
+```text
+session/token strategy review
+
+refresh / revocation
+
+frontend protected-route hardening
+
+business Audit integration
+
+dependency security review
+
+security observability
+```
+
+Permission-based RBAC puede avanzar dentro de esta evolución según prioridad de
+producto; permanece DEFERRED P1/P2 y no forma parte de Authorization V1.
+
+---
+
+# 100. FUTURE
 
 ```text
 Custom Roles
-Multiple Roles
-Temporary Permissions
-Delegated Administration
-Field-Level Security
-Approval Workflows
+
+multiple role assignments if needed
+
 MFA
+
 SSO
-Service Accounts
-Multi-company memberships
+
+external identities
+
+service accounts
+
+multi-company memberships
+
+delegated administration
+
+temporary permissions
+
+advanced session management
 ```
 
-Solo deben implementarse cuando exista necesidad.
+No deben implementarse antes de existir una necesidad clara.
 
 ---
 
-# 161. Current capabilities
+# 101. Invariantes
 
-El estado consolidado permite identificar:
-
-```text
-JWT authentication
-bcrypt password hashing
-User model
-Company ownership
-UserRole enum
-isActive
-locale
-RolesGuard
-protected routes
-authenticated user context
-```
-
----
-
-# 162. Current security debt
-
-Debe mantenerse visible al menos:
-
-```text
-Remove passwordHash from login/API responses
-```
-
-y revisar:
-
-```text
-UserRole default ADMIN
-```
-
-antes de considerar Identity & Access listo para producción.
-
----
-
-# 163. Target priorities
-
-La evolución recomendada es:
-
-```text
-P0
-Safe Auth responses
-Explicit safe user creation
-Tenant isolation
-Inactive-user enforcement
-Security tests
-```
-
-```text
-P1
-Permission-based RBAC
-User administration
-Audit integration
-Password recovery hardening
-```
-
-```text
-P2
-Custom roles
-MFA
-Session/revocation improvements
-```
-
----
-
-# 164. No sobrearquitecturar ahora
-
-No necesitamos inmediatamente:
-
-```text
-IAM microservice
-external identity provider
-policy engine
-distributed authorization service
-```
-
-El Modular Monolith puede manejar Identity & Access correctamente mientras la escala lo permita.
-
----
-
-# 165. Invariantes
+## Password
 
 ```text
 Password
 → never persisted in plaintext
 ```
+
+---
+
+## PasswordHash
 
 ```text
 passwordHash
@@ -2365,14 +2926,13 @@ passwordHash
 → never inside JWT
 ```
 
-```text
-Authenticated User
-→ belongs to one Company in current model
-```
+---
+
+## Tenant
 
 ```text
-companyId from JWT/context
-→ authoritative tenant
+Validated authenticated context
+→ authoritative Company context
 ```
 
 ```text
@@ -2380,44 +2940,91 @@ Client companyId
 → not authorization
 ```
 
+---
+
+## Authentication
+
 ```text
 Valid JWT
 ≠
 permission for every action
 ```
 
+---
+
+## Authorization
+
 ```text
-ADMIN
+Role / Permission
 ≠
-cross-tenant administrator
-```
-
-```text
-Inactive User
-→ should not receive normal application access
-```
-
-```text
-Role
-→ does not bypass tenant isolation
-```
-
-```text
-User creation
-→ must not accidentally escalate to ADMIN
+Tenant bypass
 ```
 
 ---
 
-# 166. Anti-patrones
+## ADMIN
+
+```text
+ADMIN
+≠
+Platform Administrator
+```
+
+---
+
+## Inactive User
+
+```text
+User.isActive = false
+→ must not have normal application access
+```
+
+---
+
+## User Creation
+
+```text
+Additional User creation
+→ explicit authorized role
+```
+
+Not:
+
+```text
+role omitted
+→ accidental ADMIN
+```
+
+---
+
+## Frontend
+
+```text
+Hidden button
+≠
+protected endpoint
+```
+
+---
+
+## Failure mode
+
+```text
+Uncertain authorization
+→ DENY
+```
+
+---
+
+# 102. Anti-patrones
 
 ## Returning Prisma User directly
 
-```text
-return user
+```ts
+return user;
 ```
 
-cuando contiene:
+cuando puede contener:
 
 ```text
 passwordHash
@@ -2427,11 +3034,16 @@ passwordHash
 
 ## ADMIN by default
 
-Crear usuarios genéricos dependiendo silenciosamente de:
-
 ```text
+generic User create
+↓
 @default(ADMIN)
+↓
+privilege escalation
 ```
+
+Este anti-patrón no describe el modelo vigente de `User.role`; permanece aquí
+como regla de seguridad a no reintroducir.
 
 ---
 
@@ -2457,54 +3069,67 @@ ADMIN
 
 ```text
 Button hidden
-→ endpoint considered protected
+→ endpoint considered secure
 ```
 
 ---
 
-## Hardcoded roles everywhere
+## Generic User PATCH
 
 ```text
-if ADMIN...
-if MANAGER...
-if SALES...
+PATCH User
+
+role
+companyId
+passwordHash
+isActive
 ```
 
-distribuido por toda la lógica empresarial como arquitectura permanente.
+sin operaciones explícitas y autorizadas.
 
 ---
 
 ## Password logging
 
-Registrar DTOs o excepciones que contienen contraseña.
+Registrar DTOs que incluyen contraseña.
 
 ---
 
 ## JWT logging
 
-Guardar tokens activos completos en logs.
+Registrar tokens completos.
 
 ---
 
-## Public generic registration
+## Public privileged registration
 
-Permitir crear usuarios privilegiados sin un flujo controlado de provisioning.
+Permitir crear Users privilegiados mediante un flujo público no controlado.
 
 ---
 
 ## User hard delete
 
-Eliminar usuarios históricos que ya aparecen como responsables de operaciones.
+Eliminar físicamente Users con historia operacional.
 
 ---
 
 ## Secrets in repository
 
-Guardar `JWT_SECRET` o credenciales en Git.
+Versionar:
+
+```text
+JWT_SECRET
+
+DATABASE_URL
+
+API keys
+
+passwords
+```
 
 ---
 
-# 167. Relación con Companies
+# 103. Relación con Companies
 
 `COMPANIES.md` responde:
 
@@ -2517,115 +3142,119 @@ Guardar `JWT_SECRET` o credenciales en Git.
 ```text
 ¿Quién?
 ¿Qué puede hacer?
+¿Cómo demuestra su identidad?
 ```
 
 ---
 
-# 168. Relación con módulos empresariales
+# 104. Relación con Security Principles
 
-Cada módulo debe utilizar Identity & Access.
+`SECURITY_PRINCIPLES.md` define controles transversales.
 
-Ejemplo:
+`IDENTITY_ACCESS.md` especifica su aplicación al dominio de:
 
 ```text
-Authenticated User
-↓
-Permission
-↓
-Purchase Service
-↓
-Tenant validation
-↓
-Business rule
+Authentication
+
+Users
+
+Roles
+
+Tenant context
+
+Authorization
 ```
 
 ---
 
-# 169. Relación con Audit
+# 105. Relación con Audit
 
-Audit deberá registrar acciones relevantes de identidad y autorización sin almacenar secretos.
+Identity & Access deberá producir o colaborar con Audit para registrar eventos sensibles sin almacenar secretos.
 
----
-
-# 170. Relación con API Guidelines
-
-`API_GUIDELINES.md` define convenciones generales.
-
-Identity & Access define la semántica específica de:
-
-* Authentication;
-* Authorization;
-* User security;
-* tenant context.
-
----
-
-# 171. Relación con Security Principles
-
-`SECURITY_PRINCIPLES.md` contiene reglas transversales de seguridad.
-
-Este documento especifica cómo aplican al dominio Identity & Access.
-
----
-
-# 172. ADR relacionados
-
-* ADR-001 — Multi-Tenant.
-* ADR-004 — UUID.
-* ADR-005 — Layered Architecture.
-* ADR-006 — API First.
-* ADR-007 — Role-Based Access Control.
-* ADR-009 — Modular Monolith.
-* ADR-012 — Entity Lifecycle.
-
----
-
-# 173. Documentos relacionados
+Audit:
 
 ```text
-product/PRODUCT_REQUIREMENTS.md
-
-architecture/ARCHITECTURE.md
-architecture/adr/ADR-001-*.md
-architecture/adr/ADR-007-*.md
-
-engineering/API_GUIDELINES.md
-engineering/SECURITY_PRINCIPLES.md
-engineering/QUALITY_STANDARDS.md
-
-modules/erp/COMPANIES.md
+≠
+technical logs
 ```
 
 ---
 
-# 174. Fuente de verdad
+# 106. ADR relacionados
+
+```text
+ADR-001 — Multi-Tenant
+
+ADR-004 — UUID Strategy
+
+ADR-005 — Layered Architecture
+
+ADR-006 — API First
+
+ADR-007 — Role-Based Access Control
+
+ADR-009 — Modular Monolith
+
+ADR-012 — Entity Lifecycle
+```
+
+---
+
+# 107. Documentación relacionada
+
+```text
+docs/product/PRODUCT_REQUIREMENTS.md
+
+docs/architecture/ARCHITECTURE.md
+
+docs/architecture/adr/
+
+docs/engineering/API_GUIDELINES.md
+
+docs/engineering/SECURITY_PRINCIPLES.md
+
+docs/engineering/QUALITY_STANDARDS.md
+
+docs/modules/erp/COMPANIES.md
+
+docs/project/PROJECT_BOARD.md
+
+docs/project/ROADMAP.md
+```
+
+---
+
+# 108. Fuente de verdad
 
 ```text
 IDENTITY_ACCESS.md
-→ comportamiento funcional de identidad y acceso
-
-ADR-001
-→ tenant isolation
-
-ADR-007
-→ arquitectura RBAC objetivo
+→ comportamiento funcional y arquitectura de Identity & Access
 
 SECURITY_PRINCIPLES.md
-→ controles transversales
+→ reglas transversales de seguridad
+
+ADR-001
+→ tenant architecture
+
+ADR-007
+→ RBAC architecture direction
 
 schema.prisma
-→ modelo técnico actual
+→ current persistence model
 
 Auth / Users backend
-→ implementación CURRENT
+→ CURRENT implementation
 
 tests
-→ comportamiento validado
+→ validated behavior
+
+PROJECT_BOARD.md
+→ current security blockers and active work
 ```
 
 ---
 
-# 175. Regla de transición
+# 109. Regla de transición RBAC
 
 Mientras el código utilice:
 
@@ -2657,11 +3286,11 @@ debe identificarse como:
 TARGET RBAC
 ```
 
-hasta que sea implementada y validada.
+hasta quedar implementada y validada.
 
 ---
 
-# 176. Principio final
+# 110. Principio final
 
 Identity & Access debe mantener separadas cuatro preguntas:
 
@@ -2679,7 +3308,7 @@ Business Rule
 → ¿Es válida esta operación?
 ```
 
-La respuesta correcta nunca debe reducirse simplemente a:
+La respuesta nunca debe reducirse a:
 
 ```text
 Tiene JWT
@@ -2693,4 +3322,16 @@ Es ADMIN
 → permitir todo
 ```
 
-> **La seguridad de Zaping depende de combinar identidad, tenant, autorización y reglas de negocio; ninguna de ellas sustituye a las demás.**
+La dirección correcta es:
+
+```text
+Verified Identity
++
+Trusted Tenant Context
++
+Explicit Authorization
++
+Valid Business Operation
+=
+Allowed Action
+```

@@ -5,6 +5,18 @@ type ApiErrorBody = {
   error?: string;
 };
 
+export function getApiErrorStatus(error: unknown): number | undefined {
+  if (!axios.isAxiosError(error)) {
+    return undefined;
+  }
+
+  return error.response?.status;
+}
+
+export function isForbiddenError(error: unknown): boolean {
+  return getApiErrorStatus(error) === 403;
+}
+
 export function getApiErrorMessage(
   error: unknown,
   fallback = 'Ocurrió un error',

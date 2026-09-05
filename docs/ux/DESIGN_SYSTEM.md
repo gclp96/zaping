@@ -3,7 +3,7 @@
 **Producto:** Zaping
 **Versión:** 2.0.0
 **Estado:** Aprobado
-**Última actualización:** 2026-08-19
+**Última actualización:** 2026-08-29
 **Responsable:** Zaping Product & Engineering Team
 
 ---
@@ -158,7 +158,8 @@ PageHeader
 +
 Section
 +
-Table
++
+DataTable / StaticTable
 +
 Actions
 ```
@@ -197,7 +198,8 @@ Ejemplos actuales o esperados:
 Button
 Input
 Modal
-Table
+DataTable
+StaticTable
 Badge
 Card
 Section
@@ -1429,7 +1431,8 @@ EmptyState
 LoadingSpinner
 Badge
 Button
-Table
+DataTable
+StaticTable
 ConfirmDialog
 Modal
 Input
@@ -1519,7 +1522,8 @@ Badge lo representa.
 
 ## Direct API calls in generic UI
 
-Un `Button` o `Table` genérico no debe conocer endpoints de negocio.
+Un `Button`, `DataTable` o `StaticTable` genérico no debe conocer endpoints de
+negocio.
 
 ---
 

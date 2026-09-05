@@ -1,19 +1,25 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
 
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guards';
 import { CreatePurchaseReceiptDto } from './dto/create-purchase-receipt.dto';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
 @Controller('purchase-receipts')
 export class PurchaseReceiptsController {
   constructor(
@@ -23,11 +29,15 @@ export class PurchaseReceiptsController {
   @Post()
   create(
     @Req() request: AuthenticatedRequest,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() dto: CreatePurchaseReceiptDto,
   ) {
+    const idempotencyKey = this.validateIdempotencyKey(idempotencyKeyHeader);
+
     return this.purchaseReceiptsService.create(
       request.user.companyId,
       request.user.id,
+      idempotencyKey,
       dto,
     );
   }
@@ -57,5 +67,17 @@ export class PurchaseReceiptsController {
       request.user.companyId,
       receiptId,
     );
+  }
+
+  private validateIdempotencyKey(value: string | undefined): string {
+    const normalizedValue = value?.trim();
+
+    if (!normalizedValue || normalizedValue.length > 128) {
+      throw new BadRequestException(
+        'Se requiere una clave Idempotency-Key válida',
+      );
+    }
+
+    return normalizedValue;
   }
 }

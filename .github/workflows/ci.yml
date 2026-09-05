@@ -1,0 +1,167 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    name: API
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: zaping_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d zaping_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/zaping_test?schema=public
+      JWT_SECRET: ci-only-zaping-jwt-secret-012345678901234567890123456789
+      FRONTEND_ORIGIN: http://localhost:3000
+      FRONTEND_BASE_URL: http://localhost:3000
+      PORT: '3001'
+      TRUST_PROXY_HOPS: '0'
+      RUN_DB_CONCURRENCY_TESTS: '1'
+    defaults:
+      run:
+        working-directory: app/api
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Deploy migrations to ephemeral PostgreSQL
+        run: npm run prisma:migrate:deploy
+
+      - name: Validate Prisma schema
+        run: npx prisma validate
+
+      - name: Run API tests
+        run: npm test -- --runInBand
+
+      - name: Run PostgreSQL concurrency E2E
+        run: npm run test:concurrency
+
+      - name: Typecheck production source
+        run: npm run typecheck
+
+      - name: Build API
+        run: npm run build
+
+      - name: Smoke production startup
+        run: |
+          set -eu
+          set -o pipefail
+
+          export NODE_ENV=production
+          export FRONTEND_ORIGIN=https://app.example.test
+          export FRONTEND_BASE_URL=https://app.example.test
+          export RESEND_API_KEY=ci-only-no-network-placeholder
+          export EMAIL_FROM=qa@example.test
+          export PORT=3201
+          export TRUST_PROXY_HOPS=0
+
+          startup_log="$RUNNER_TEMP/zaping-api-startup.log"
+          setsid npm run start:prod > "$startup_log" 2>&1 &
+          api_pid=$!
+
+          cleanup() {
+            kill -- -"$api_pid" 2>/dev/null || true
+            wait "$api_pid" 2>/dev/null || true
+            rm -f "$startup_log"
+          }
+          trap cleanup EXIT
+
+          live_ok=false
+          ready_ok=false
+          for attempt in $(seq 1 30); do
+            if ! kill -0 "$api_pid" 2>/dev/null; then
+              exit 1
+            fi
+
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:3201/health/live | grep -Fq '"status":"ok"'; then
+              live_ok=true
+            fi
+
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:3201/health/ready | grep -Fq '"status":"ok"'; then
+              ready_ok=true
+            fi
+
+            if [ "$live_ok" = true ] && [ "$ready_ok" = true ]; then
+              break
+            fi
+
+            sleep 1
+          done
+
+          test "$live_ok" = true
+          test "$ready_ok" = true
+
+      - name: Lint API
+        run: npm run lint:check
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_API_URL: https://api.example.test
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Run web tests
+        run: npm run test -- --pool=forks --maxWorkers=2 --testTimeout=10000
+
+      - name: Typecheck web
+        run: npm run typecheck
+
+      - name: Build web
+        run: npm run build
+
+      - name: Lint web
+        run: npm run lint

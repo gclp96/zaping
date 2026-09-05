@@ -3,7 +3,7 @@
 **Producto:** Zaping
 **Versión:** 2.0.0
 **Estado:** Aprobado
-**Última actualización:** 2026-08-20
+**Última actualización:** 2026-08-29
 **Responsable:** Zaping Product & Engineering Team
 
 ---
@@ -40,7 +40,8 @@ Ejemplos:
 Button
 Card
 Modal
-Table
+DataTable
+StaticTable
 Input
 Badge
 ```

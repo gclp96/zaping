@@ -1,0 +1,3207 @@
+# ADR-014 — Inventory Locations and Internal Transfers
+
+**Estado:** ACCEPTED
+**Fecha:** 2026-08-20
+**Decisión:** Introducir ubicaciones, posiciones y transferencias internas como parte de la arquitectura objetivo de Inventory
+**Impacto:** ERP Core / Inventory / Purchases / Sales / Healthcare
+**Responsable:** Zaping Architecture Team
+
+---
+
+# 1. Contexto
+
+El modelo actual de Inventory de Zaping fue diseñado inicialmente alrededor de tres conceptos principales:
+
+```text
+Product
+InventoryMovement
+Stock
+```
+
+y de operaciones como:
+
+```text
+Purchase Receipt
+→ Inventory IN
+```
+
+y:
+
+```text
+Sale / Delivery
+→ Inventory OUT
+```
+
+Este modelo es suficiente para responder preguntas básicas como:
+
+```text
+¿Cuánto inventario posee la Company?
+```
+
+pero no representa correctamente operaciones donde el inventario:
+
+```text
+continúa siendo propiedad de la Company
+```
+
+mientras cambia:
+
+```text
+ubicación
+custodia
+disponibilidad
+estado operacional
+```
+
+---
+
+# 2. Problema descubierto
+
+Zaping Healthcare requiere representar operaciones como:
+
+```text
+Warehouse
+↓
+Case Preparation
+↓
+Case Staging
+↓
+Technician Custody
+↓
+Hospital
+↓
+Return
+↓
+Inspection
+↓
+Warehouse
+```
+
+En todo ese recorrido, una unidad puede continuar siendo propiedad de la Company.
+
+---
+
+# 3. Problema con IN / OUT únicamente
+
+Si el sistema utiliza únicamente:
+
+```text
+IN
+OUT
+ADJUSTMENT
+```
+
+para todos los cambios físicos, un CaseDispatch podría terminar representado como:
+
+```text
+Warehouse
+↓ OUT
+Technician
+```
+
+aunque el material todavía pertenezca a la Company.
+
+Esto es semánticamente incorrecto.
+
+---
+
+# 4. Segundo problema
+
+Si posteriormente el material utilizado genera una `Delivery`:
+
+```text
+CaseDispatch
+→ OUT
+
+Delivery
+→ OUT
+```
+
+la misma unidad podría descontarse dos veces.
+
+---
+
+# 5. Tercer problema
+
+La alternativa de no modificar Inventory y registrar únicamente:
+
+```text
+CaseDispatch
+custodian = Technician
+```
+
+también es incorrecta.
+
+El sistema podría continuar mostrando esas unidades como:
+
+```text
+available inventory
+```
+
+y permitir:
+
+```text
+another CaseKit
+another Delivery
+another assignment
+```
+
+sobre la misma existencia física.
+
+---
+
+# 6. Necesidad
+
+Inventory debe poder responder simultáneamente:
+
+```text
+¿Cuánto posee la Company?
+```
+
+```text
+¿Dónde está?
+```
+
+```text
+¿Cuánto está disponible?
+```
+
+```text
+¿Cuánto está preparado?
+```
+
+```text
+¿Cuánto está bajo custodia?
+```
+
+```text
+¿Cuánto está pendiente de inspección?
+```
+
+sin convertir movimientos internos en salidas definitivas.
+
+---
+
+# 7. Decisión
+
+Zaping adoptará conceptualmente:
+
+```text
+InventoryLocation
+InventoryPosition
+Internal Inventory Transfer
+```
+
+como capacidades de ERP Core.
+
+---
+
+# 8. Nueva semántica fundamental
+
+Inventory distinguirá tres clases principales de operación física:
+
+```text
+IN
+TRANSFER
+OUT
+```
+
+En el ledger, `IN` y `OUT` son las únicas direcciones de un
+`InventoryMovement`. `TRANSFER` describe la operación interna que relaciona
+una salida de la posición origen con una entrada en la posición destino.
+
+además de mecanismos explícitos de:
+
+```text
+ADJUSTMENT / CORRECTION
+```
+
+cuando corresponda.
+
+---
+
+# 9. Definición de IN
+
+`IN` significa:
+
+> inventario entra a una posición controlada por la Company desde fuera de su inventario previamente poseído.
+
+Ejemplo:
+
+```text
+Supplier
+↓
+Purchase Receipt
+↓ IN
+Warehouse
+```
+
+---
+
+# 10. Definición de TRANSFER
+
+`TRANSFER` significa:
+
+> inventario cambia de ubicación, posición o custodia interna sin abandonar la propiedad de la Company.
+
+Ejemplo:
+
+```text
+Warehouse
+↓ TRANSFER
+Case Staging
+```
+
+---
+
+# 11. Otro TRANSFER
+
+```text
+Case Staging
+↓ TRANSFER
+Technician Custody
+```
+
+---
+
+# 12. Otro TRANSFER
+
+```text
+Technician Custody
+↓ TRANSFER
+Inspection
+```
+
+---
+
+# 13. Otro TRANSFER
+
+```text
+Inspection
+↓ TRANSFER
+Warehouse Available
+```
+
+---
+
+# 14. Definición de OUT
+
+`OUT` significa:
+
+> inventario deja definitivamente la posición de propiedad/disponibilidad de la Company como consecuencia de una disposición válida.
+
+Ejemplos:
+
+```text
+Warehouse
+↓ OUT
+Customer Delivery
+```
+
+o:
+
+```text
+Technician Custody
+↓ OUT
+Consumed / Commercial Fulfillment
+```
+
+---
+
+# 15. Regla crítica
+
+Debe mantenerse:
+
+```text
+TRANSFER
+≠
+OUT
+```
+
+---
+
+# 16. Consecuencia sobre stock total
+
+Un `TRANSFER`:
+
+```text
+→ no cambia Company-owned aggregate stock
+```
+
+---
+
+# 17. Consecuencia sobre posición
+
+Un `TRANSFER` sí cambia:
+
+```text
+quantity at source location
+quantity at destination location
+```
+
+---
+
+# 18. Ejemplo
+
+Estado inicial:
+
+```text
+Product A
+
+Warehouse: 10
+Company-owned total: 10
+```
+
+Transfer:
+
+```text
+Warehouse
+↓ 4
+Technician Custody
+```
+
+Resultado:
+
+```text
+Warehouse:           6
+Technician Custody:  4
+
+Company-owned total: 10
+```
+
+---
+
+# 19. OUT posterior
+
+Si durante el Case se consumen 2:
+
+```text
+Technician Custody
+↓ OUT 2
+```
+
+resultado:
+
+```text
+Warehouse:           6
+Technician Custody:  2
+
+Company-owned total: 8
+```
+
+---
+
+# 20. Return posterior
+
+Las otras 2 regresan:
+
+```text
+Technician Custody
+↓ TRANSFER
+Inspection
+↓ TRANSFER
+Warehouse
+```
+
+resultado final:
+
+```text
+Warehouse: 8
+
+Company-owned total: 8
+```
+
+---
+
+# 21. InventoryLocation
+
+`InventoryLocation` representa una posición lógica o física donde inventario propiedad de una Company puede encontrarse.
+
+---
+
+# 22. Ownership
+
+Toda InventoryLocation pertenece a una:
+
+```text
+Company
+```
+
+---
+
+# 23. Multi-tenancy
+
+Debe cumplirse:
+
+```text
+InventoryLocation.companyId
+=
+authenticated Company
+```
+
+---
+
+# 24. Cross-tenant
+
+Nunca:
+
+```text
+Movement Company A
+→ Location Company B
+```
+
+---
+
+# 25. Location no significa únicamente warehouse
+
+Una `InventoryLocation` puede representar:
+
+```text
+warehouse
+staging
+custody
+inspection
+quarantine
+damaged inventory
+other controlled position
+```
+
+---
+
+# 26. Location Type
+
+La arquitectura necesita clasificar ubicaciones.
+
+Tipos conceptuales iniciales:
+
+```text
+WAREHOUSE
+STAGING
+CUSTODY
+INSPECTION
+QUARANTINE
+DAMAGED
+OTHER
+```
+
+---
+
+# 27. Enum no necesariamente definitivo
+
+La implementación Prisma puede refinar los nombres, pero debe mantener la semántica aprobada por este ADR.
+
+---
+
+# 28. Healthcare no debe contaminar Core
+
+No se utilizarán tipos Core como:
+
+```text
+HEALTHCARE_CASE
+SURGERY
+CASE_KIT
+```
+
+para representar conceptos específicos de la vertical.
+
+---
+
+# 29. Ejemplo correcto
+
+Core:
+
+```text
+Location Type:
+STAGING
+```
+
+Healthcare:
+
+```text
+CaseKit
+→ uses staging location
+```
+
+---
+
+# 30. Otro ejemplo
+
+Core:
+
+```text
+Location Type:
+CUSTODY
+```
+
+Healthcare:
+
+```text
+CaseDispatch
+→ Technician responsible for that custody
+```
+
+---
+
+# 31. Ubicación vs contexto
+
+Inventory Location responde:
+
+```text
+¿Dónde está?
+```
+
+Healthcare responde:
+
+```text
+¿Por qué está ahí?
+¿Para qué Case?
+¿Quién es responsable?
+```
+
+---
+
+# 32. No foreign key Healthcare dentro de InventoryLocation
+
+ERP Core no debería requerir:
+
+```text
+InventoryLocation.healthcareCaseId
+```
+
+---
+
+# 33. Razón
+
+Eso produciría dependencia:
+
+```text
+Inventory
+→ Healthcare
+```
+
+contraria a la arquitectura modular.
+
+---
+
+# 34. Relación desde Healthcare
+
+Healthcare puede mantener:
+
+```text
+CaseKit
+→ stagingLocationId
+```
+
+o una asociación equivalente hacia Inventory.
+
+---
+
+# 35. Location lifecycle
+
+InventoryLocation es configuración operacional.
+
+Puede utilizar:
+
+```text
+isActive
+```
+
+siguiendo ADR-012.
+
+---
+
+# 36. Inactive Location
+
+Una ubicación inactiva:
+
+```text
+→ remains historically referenced
+```
+
+pero:
+
+```text
+→ cannot receive new normal operations
+```
+
+salvo reglas excepcionales.
+
+---
+
+# 37. No deactivate with stock blindly
+
+No debe desactivarse una Location con posiciones activas sin resolver qué ocurrirá con esas existencias.
+
+---
+
+# 38. Default Warehouse Location
+
+Toda Company que utiliza Inventory debe tener conceptualmente una ubicación principal inicial.
+
+Ejemplo:
+
+```text
+MAIN-WAREHOUSE
+```
+
+---
+
+# 39. Compatibilidad
+
+Esto permite migrar el Inventory existente:
+
+```text
+Product.stock = N
+```
+
+a:
+
+```text
+Default Warehouse Location
+Product quantity = N
+```
+
+sin perder existencias actuales.
+
+---
+
+# 40. Multi-Warehouse futuro
+
+El modelo de Locations debe ser compatible con múltiples almacenes futuros.
+
+Pero este ADR **no declara implementado Multi-Warehouse**.
+
+---
+
+# 41. Alcance inmediato
+
+La prioridad es:
+
+```text
+one Company
++
+default warehouse
++
+internal logical locations
+```
+
+---
+
+# 42. Inventario por ubicación
+
+El sistema necesita conocer cantidad de cada Product en cada Location.
+
+---
+
+# 43. InventoryPosition
+
+`InventoryPosition` representa la proyección operacional actual de inventario en una ubicación.
+
+Conceptualmente:
+
+```text
+Product
++
+Location
++
+Batch optional
+=
+Current Quantity
+```
+
+---
+
+# 44. Ejemplo
+
+```text
+Product A
+Lot L001
+Warehouse
+Quantity 8
+```
+
+---
+
+# 45. Otro ejemplo
+
+```text
+Product A
+Lot L001
+Technician Custody
+Quantity 2
+```
+
+---
+
+# 46. Batch-aware
+
+Cuando existe InventoryBatch:
+
+```text
+InventoryPosition
+```
+
+debe preservar esa dimensión.
+
+---
+
+# 47. No mezclar lotes
+
+Nunca:
+
+```text
+Lot A quantity
++
+Lot B quantity
+```
+
+en una posición que pierda trazabilidad cuando el Product requiere lote.
+
+---
+
+# 48. Serials
+
+La posición por serial/unidad individual requerirá la futura estrategia de tracking individual.
+
+No debe improvisarse agregando seriales como texto dentro de una posición cuantitativa.
+
+---
+
+# 49. Equipment
+
+`EquipmentAsset` puede utilizar Location/Custody conceptualmente, pero no necesariamente `InventoryPosition.quantity`.
+
+Un activo individual:
+
+```text
+EQ-0041
+```
+
+tiene identidad propia.
+
+---
+
+# 50. Ledger vs Position
+
+Debe mantenerse:
+
+```text
+InventoryMovement
+→ historical ledger
+```
+
+```text
+InventoryPosition
+→ current projection
+```
+
+---
+
+# 51. Source of Truth
+
+La fuente histórica autoritativa continúa siendo:
+
+```text
+confirmed Inventory Movements
+```
+
+---
+
+# 52. Position como proyección
+
+InventoryPosition puede persistirse por:
+
+```text
+performance
+concurrency
+availability queries
+```
+
+pero debe poder reconciliarse contra el ledger.
+
+---
+
+# 53. Invariante
+
+Conceptualmente:
+
+```text
+Initial Position
++
+Movements
+=
+Current Position
+```
+
+---
+
+# 54. No manual editing
+
+No debe permitirse al usuario escribir directamente:
+
+```text
+InventoryPosition.quantity = 100
+```
+
+como operación ordinaria.
+
+---
+
+# 55. Stock sigue siendo consecuencia
+
+Se mantiene ADR-002:
+
+> **Stock es consecuencia de movimientos confirmados, nunca input libre de usuario.**
+
+---
+
+# 56. Product.stock
+
+Durante la transición:
+
+```text
+Product.stock
+```
+
+puede conservarse como proyección agregada de existencia total propiedad de la Company.
+
+---
+
+# 57. Semántica objetivo de Product.stock
+
+Si se conserva:
+
+```text
+Product.stock
+=
+sum of company-owned inventory positions
+```
+
+---
+
+# 58. Lo que Product.stock no representa
+
+No debe interpretarse como:
+
+```text
+immediately available warehouse quantity
+```
+
+una vez que existan Locations.
+
+---
+
+# 59. Ejemplo
+
+```text
+Product.stock = 20
+
+Warehouse Available = 12
+Staging = 3
+Technician Custody = 4
+Inspection = 1
+```
+
+---
+
+# 60. Available Quantity
+
+La cantidad disponible debe derivarse de posiciones elegibles.
+
+---
+
+# 61. No todas las Locations son disponibles
+
+Por ejemplo:
+
+```text
+WAREHOUSE
+→ potentially available
+```
+
+mientras:
+
+```text
+CUSTODY
+INSPECTION
+QUARANTINE
+DAMAGED
+```
+
+normalmente:
+
+```text
+→ unavailable for new allocation
+```
+
+---
+
+# 62. Availability no es propiedad universal de Product
+
+No agregar únicamente:
+
+```text
+Product.availableStock
+```
+
+como número independiente sin relación con Locations.
+
+---
+
+# 63. Location availability policy
+
+Cada tipo/location debe tener semántica sobre si su inventario puede utilizarse para nuevos commitments.
+
+---
+
+# 64. Preferencia por regla
+
+Inicialmente puede derivarse de:
+
+```text
+Location type
++
+Location active state
++
+Batch validity
+```
+
+---
+
+# 65. Future
+
+Podría evolucionar a políticas configurables si empresas requieren workflows más complejos.
+
+---
+
+# 66. Movement model
+
+InventoryMovement deberá evolucionar para representar origen y destino.
+
+Conceptualmente:
+
+```text
+InventoryMovement
+├── companyId
+├── productId
+├── batchId?
+├── direction (IN | OUT)
+├── quantity
+├── fromLocationId?
+├── toLocationId?
+├── sourceType?
+├── sourceId?
+├── notes?
+├── createdBy
+└── createdAt
+```
+
+---
+
+# 67. No schema Prisma todavía
+
+La estructura anterior expresa el contrato arquitectónico.
+
+El diseño exacto se hará después de aprobar documentación.
+
+---
+
+# 68. Movimiento IN válido
+
+Conceptualmente:
+
+```text
+direction = IN
+
+fromLocation = null
+toLocation = Warehouse
+```
+
+---
+
+# 69. Movimiento OUT válido
+
+```text
+direction = OUT
+
+fromLocation = Current Location
+toLocation = null
+```
+
+---
+
+# 70. Operación TRANSFER válida
+
+```text
+TRANSFER operation
+
+origin movement: direction = OUT
+destination movement: direction = IN
+
+fromLocation = A
+toLocation = B
+```
+
+`TRANSFER` no es una tercera dirección del ledger ni requiere un enum
+gigante de tipos de movimiento. Su significado de negocio se conserva en
+`sourceType` / `sourceId` y en la relación entre sus movimientos asociados.
+
+---
+
+# 71. Invalid TRANSFER
+
+No debe permitirse:
+
+```text
+fromLocation = null
+```
+
+o:
+
+```text
+toLocation = null
+```
+
+para un Transfer normal.
+
+---
+
+# 72. Same Location
+
+No tiene sentido ordinariamente:
+
+```text
+A
+↓ TRANSFER
+A
+```
+
+---
+
+# 73. Quantity
+
+Debe cumplirse:
+
+```text
+quantity > 0
+```
+
+para movimientos normales.
+
+---
+
+# 74. Balance
+
+Si `balance` continúa existiendo, su significado debe revisarse.
+
+Un único:
+
+```text
+balance
+```
+
+puede ser ambiguo cuando existen múltiples Locations.
+
+---
+
+# 75. Problema
+
+¿Balance significa:
+
+```text
+Company total?
+Source Location balance?
+Destination balance?
+```
+
+---
+
+# 76. Decisión
+
+El futuro diseño no debe depender de un único `balance` ambiguo para representar posiciones múltiples.
+
+---
+
+# 77. Migration
+
+El campo existente puede mantenerse temporalmente por compatibilidad mientras se migra la arquitectura.
+
+---
+
+# 78. Corrections
+
+Confirmed InventoryMovements siguen siendo inmutables.
+
+---
+
+# 79. Regla
+
+Si un movimiento confirmado es incorrecto:
+
+```text
+→ create compensating/reversal movement
+```
+
+No:
+
+```text
+→ edit historical quantity silently
+```
+
+---
+
+# 80. Transfer correction
+
+Ejemplo incorrecto:
+
+```text
+Warehouse → Custody
+5
+```
+
+pero debieron ser 4.
+
+No editar:
+
+```text
+5 → 4
+```
+
+silenciosamente.
+
+---
+
+# 81. Corrección conceptual
+
+Puede utilizarse:
+
+```text
+Custody → Warehouse
+1
+```
+
+como compensación, con referencia a la corrección.
+
+La estrategia exacta se definirá técnicamente.
+
+---
+
+# 82. Atomicidad
+
+Todo movimiento confirmado debe actualizar:
+
+```text
+ledger
++
+source position
++
+destination position
++
+aggregate projection if applicable
+```
+
+de forma atómica.
+
+---
+
+# 83. Invariante transaccional
+
+Nunca debe quedar:
+
+```text
+InventoryMovement created
+✓
+
+InventoryPosition update
+✗
+```
+
+o al revés.
+
+---
+
+# 84. Database transaction
+
+Las operaciones críticas deben ejecutarse dentro de una transacción de base de datos.
+
+---
+
+# 85. IN transaction
+
+Conceptualmente:
+
+```text
+validate
+↓
+create movement
+↓
+increase destination position
+↓
+update aggregate projection
+↓
+commit
+```
+
+---
+
+# 86. TRANSFER transaction
+
+```text
+validate source
+↓
+decrease source position
+↓
+increase destination position
+↓
+create movement
+↓
+commit
+```
+
+---
+
+# 87. OUT transaction
+
+```text
+validate source
+↓
+decrease source position
+↓
+create movement
+↓
+decrease aggregate Company-owned stock
+↓
+commit
+```
+
+---
+
+# 88. Negative stock
+
+Debe mantenerse la regla:
+
+```text
+source position cannot become negative
+```
+
+---
+
+# 89. Example
+
+Si:
+
+```text
+Warehouse Product A = 3
+```
+
+no puede ejecutarse:
+
+```text
+TRANSFER 5
+```
+
+---
+
+# 90. Company aggregate
+
+Tampoco puede quedar negativo.
+
+---
+
+# 91. Concurrencia
+
+Dos operaciones pueden intentar utilizar la misma posición.
+
+---
+
+# 92. Ejemplo
+
+```text
+Warehouse available = 5
+
+Transaction A
+TRANSFER 5
+
+Transaction B
+OUT 5
+```
+
+Solo una puede consumir esas cinco unidades.
+
+---
+
+# 93. Requisito
+
+La implementación debe utilizar mecanismos de concurrencia/transacción adecuados para impedir:
+
+```text
+double allocation
+negative position
+```
+
+---
+
+# 94. Idempotencia
+
+Workflows que confirman movimientos desde documentos deben evitar movimientos duplicados por:
+
+```text
+double click
+network retry
+client retry
+```
+
+---
+
+# 95. Source document
+
+Cada movimiento generado por otro módulo debe conservar suficiente referencia para identificar su origen.
+
+---
+
+# 96. Purchase Receipt
+
+Ejemplo:
+
+```text
+sourceType:
+PURCHASE_RECEIPT
+
+sourceId:
+receiptId
+```
+
+o representación equivalente.
+
+---
+
+# 97. Healthcare Dispatch
+
+Ejemplo:
+
+```text
+sourceType:
+HEALTHCARE_CASE_DISPATCH
+```
+
+si la estrategia de referencias aprobada lo permite.
+
+---
+
+# 98. Modular dependency
+
+La referencia permite trazabilidad sin que Inventory tenga que importar toda la lógica del módulo origen.
+
+---
+
+# 99. No generic relation sin control
+
+Los identificadores de referencia no deben utilizarse para saltarse:
+
+```text
+tenant validation
+domain validation
+transaction boundaries
+```
+
+---
+
+# 100. Purchase Receipt integration
+
+El target pasa a ser:
+
+```text
+PurchaseReceipt
+↓
+Inventory IN
+↓
+Default Warehouse Location
+```
+
+---
+
+# 101. Receipt no cambia
+
+Se mantiene:
+
+```text
+Purchase
+≠
+Inventory
+```
+
+y:
+
+```text
+PurchaseReceipt
+→ physical inventory entry
+```
+
+---
+
+# 102. Batch creation
+
+Si Receipt crea/actualiza InventoryBatch:
+
+```text
+batch
++
+location
+```
+
+deben quedar coordinados dentro de la misma transacción.
+
+---
+
+# 103. Sales integration
+
+El target general de Sales continúa:
+
+```text
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+---
+
+# 104. Nueva capacidad Sales
+
+Delivery deberá poder consumir inventario desde una:
+
+```text
+source Inventory Location
+```
+
+---
+
+# 105. Venta normal
+
+```text
+Warehouse
+↓ OUT
+Delivery
+```
+
+---
+
+# 106. Venta Healthcare
+
+```text
+Technician Custody
+↓ OUT
+Delivery
+```
+
+cuando el material ya salió previamente bajo custodia.
+
+---
+
+# 107. Regla
+
+Sales no debe asumir permanentemente:
+
+```text
+all OUT
+come from
+default Warehouse
+```
+
+---
+
+# 108. Healthcare Preparation
+
+La preparación física confirmada puede producir:
+
+```text
+Warehouse
+↓ TRANSFER
+Staging
+```
+
+---
+
+# 109. Draft CaseKit
+
+Mientras solo existe intención:
+
+```text
+CaseKit DRAFT
+```
+
+no debe producir movimiento.
+
+---
+
+# 110. Start Preparation
+
+Tampoco es necesario que cualquier click de preparación mueva inventario.
+
+---
+
+# 111. Confirm Preparation
+
+Cuando Warehouse confirme que las unidades fueron físicamente separadas:
+
+```text
+Warehouse
+↓ TRANSFER
+Case Staging
+```
+
+es el punto recomendado.
+
+---
+
+# 112. Beneficio
+
+Desde ese momento:
+
+```text
+Warehouse available quantity
+```
+
+ya no incluye las unidades preparadas.
+
+---
+
+# 113. Case Staging
+
+Staging representa inventario:
+
+```text
+physically prepared
++
+still Company-owned
++
+not available for unrelated normal use
+```
+
+---
+
+# 114. Case cancellation before Dispatch
+
+Si el Case se cancela:
+
+```text
+Staging
+↓ TRANSFER
+Warehouse
+```
+
+---
+
+# 115. Preparation modification
+
+Si se retira una unidad del CaseKit antes del Dispatch:
+
+```text
+Staging
+↓ TRANSFER
+Warehouse
+```
+
+---
+
+# 116. Healthcare Dispatch
+
+Target:
+
+```text
+Staging
+↓ TRANSFER
+Technician Custody
+```
+
+---
+
+# 117. Direct Dispatch
+
+En algunos casos Warehouse puede despachar sin staging previo.
+
+Debe ser posible conceptualmente:
+
+```text
+Warehouse
+↓ TRANSFER
+Technician Custody
+```
+
+si el workflow lo permite.
+
+---
+
+# 118. Regla
+
+Case Logistics no debe depender de que exista necesariamente una Location física distinta por cada paso.
+
+Debe depender de la semántica correcta del movimiento.
+
+---
+
+# 119. Custody Locations
+
+Existen varias posibles implementaciones para representar custodia.
+
+---
+
+# 120. Opción considerada: una Location por User
+
+Ejemplo:
+
+```text
+CUSTODY-CARLOS
+CUSTODY-ANA
+```
+
+---
+
+# 121. Ventaja
+
+Permite consultar directamente:
+
+```text
+qué inventario tiene Carlos
+```
+
+desde posiciones.
+
+---
+
+# 122. Desventaja
+
+Puede crear muchas ubicaciones y mezcla parcialmente:
+
+```text
+location
+```
+
+con:
+
+```text
+business responsibility
+```
+
+---
+
+# 123. Opción considerada: una Location genérica CUSTODY
+
+```text
+TECHNICIAN-CUSTODY
+```
+
+y CaseDispatch conserva:
+
+```text
+custodianUserId
+```
+
+---
+
+# 124. Ventaja
+
+Mantiene Inventory más genérico.
+
+---
+
+# 125. Desventaja
+
+InventoryPosition por sí solo no puede responder:
+
+```text
+qué cantidad tiene cada Technician
+```
+
+sin consultar Case Logistics.
+
+---
+
+# 126. Decisión
+
+Para la primera implementación:
+
+> **Inventory conservará la ubicación física/lógica; el módulo origen conservará el responsable de negocio.**
+
+---
+
+# 127. Implicación
+
+No es requisito inicial crear:
+
+```text
+one InventoryLocation per User
+```
+
+---
+
+# 128. Custody detail
+
+Healthcare conservará:
+
+```text
+CaseDispatch.custodianUserId
+```
+
+o representación equivalente.
+
+---
+
+# 129. Inventory conserva
+
+```text
+Location Type:
+CUSTODY
+```
+
+y las posiciones físicas correspondientes.
+
+---
+
+# 130. Evolución
+
+Si el volumen operacional demuestra que inventario por custodian debe consultarse directamente desde Core, podremos generalizar:
+
+```text
+InventoryLocation
+↔ responsible User
+```
+
+posteriormente.
+
+---
+
+# 131. Staging Locations
+
+Tampoco es obligatorio crear:
+
+```text
+one InventoryLocation per Case
+```
+
+---
+
+# 132. Primera implementación
+
+Puede existir una ubicación lógica:
+
+```text
+CASE STAGING
+```
+
+y `CaseKitStockAllocation` mantiene qué cantidad corresponde a cada Case.
+
+---
+
+# 133. Ventaja
+
+Evita crear miles de Locations efímeras.
+
+---
+
+# 134. Invariante
+
+Aunque varios Cases compartan Location `STAGING`, sus asignaciones deben impedir que una misma cantidad sea atribuida a múltiples Cases.
+
+---
+
+# 135. Future physical bins
+
+Si Warehouse utiliza físicamente:
+
+```text
+rack
+shelf
+bin
+case preparation cart
+```
+
+pueden agregarse Locations más específicas.
+
+---
+
+# 136. Inspection Location
+
+Returned inventory debe poder pasar a:
+
+```text
+INSPECTION
+```
+
+sin quedar disponible.
+
+---
+
+# 137. Inspection approved
+
+Después:
+
+```text
+Inspection
+↓ TRANSFER
+Warehouse
+```
+
+---
+
+# 138. Quarantine
+
+Si Inspection determina cuarentena:
+
+```text
+Inspection
+↓ TRANSFER
+Quarantine
+```
+
+---
+
+# 139. Damaged
+
+Si determina daño:
+
+```text
+Inspection
+↓ TRANSFER
+Damaged
+```
+
+o posición equivalente.
+
+---
+
+# 140. Expired inventory
+
+Un lote vencido puede permanecer en una Location física.
+
+Pero debe excluirse de disponibilidad utilizable.
+
+---
+
+# 141. FEFO
+
+FEFO deberá operar sobre:
+
+```text
+eligible positions
++
+InventoryBatch.expirationDate
+```
+
+no únicamente sobre todos los lotes existentes.
+
+---
+
+# 142. Availability Query
+
+Conceptualmente:
+
+```text
+Available Quantity
+=
+sum(
+  eligible InventoryPositions
+)
+```
+
+filtrando:
+
+```text
+Company
+Product
+Batch validity
+Location eligibility
+```
+
+---
+
+# 143. Global stock query
+
+En cambio:
+
+```text
+Company-owned Quantity
+=
+sum(
+  all company-owned InventoryPositions
+)
+```
+
+---
+
+# 144. Diferencia visible
+
+La UI debe evitar mostrar únicamente:
+
+```text
+Stock: 100
+```
+
+cuando operacionalmente:
+
+```text
+Available: 70
+Staging: 10
+Custody: 15
+Inspection: 5
+```
+
+---
+
+# 145. Product UI futuro
+
+Puede mostrar:
+
+```text
+Owned
+Available
+Committed / Staged
+Custody
+Inspection
+```
+
+según el nivel de detalle requerido.
+
+---
+
+# 146. No saturar MVP
+
+La primera UI puede mostrar:
+
+```text
+Stock total
+Available
+```
+
+y permitir detalle por ubicación cuando sea útil.
+
+---
+
+# 147. Inventory 360
+
+Un futuro Product/Inventory 360 debería explicar:
+
+```text
+Where is my stock?
+```
+
+---
+
+# 148. Example
+
+```text
+Product A
+
+Total owned: 20
+
+Main Warehouse      12
+Case Staging         3
+Technician Custody   4
+Inspection            1
+```
+
+---
+
+# 149. Movement History
+
+El ledger debe mostrar:
+
+```text
+IN
+TRANSFER
+OUT
+ADJUSTMENT
+```
+
+con origen/destino.
+
+---
+
+# 150. Example history
+
+```text
+08:00
+IN 10
+Supplier → Warehouse
+Purchase Receipt PR-001
+
+09:30
+TRANSFER 4
+Warehouse → Staging
+Case CASE-0145
+
+10:00
+TRANSFER 4
+Staging → Custody
+Dispatch DSP-001
+
+14:00
+TRANSFER 3
+Custody → Inspection
+Return RET-001
+
+15:00
+TRANSFER 3
+Inspection → Warehouse
+
+15:30
+OUT 1
+Custody → External
+Delivery DEL-001
+```
+
+---
+
+# 151. Traceability
+
+La secuencia anterior permite reconstruir la vida física de cada cantidad.
+
+---
+
+# 152. Batch traceability
+
+Cuando existe lote, cada movimiento debe conservarlo.
+
+---
+
+# 153. Lot example
+
+```text
+Product A
+Lot L001
+```
+
+debe mantenerse desde:
+
+```text
+Receipt
+↓
+Warehouse
+↓
+Staging
+↓
+Custody
+↓
+Return / OUT
+```
+
+---
+
+# 154. No lot swapping
+
+No puede:
+
+```text
+TRANSFER Lot L001
+```
+
+y después aparecer:
+
+```text
+Return Lot L002
+```
+
+como la misma existencia sin una corrección válida.
+
+---
+
+# 155. Cost
+
+Internal Transfers:
+
+```text
+→ do not create new acquisition cost
+```
+
+---
+
+# 156. Unit cost
+
+Si InventoryMovement conserva `unitCost`, los Transfers deben mantener la valoración correspondiente sin reinterpretarlos como compra/venta.
+
+---
+
+# 157. Valuation
+
+Este ADR no define todavía:
+
+```text
+FIFO costing
+weighted average
+specific identification
+accounting valuation
+```
+
+---
+
+# 158. Accounting
+
+Inventory Location architecture debe ser compatible con futura contabilidad, pero este ADR es operacional, no contable.
+
+---
+
+# 159. Security
+
+Inventory Location operations deben respetar:
+
+```text
+authentication
+tenant
+permissions
+```
+
+---
+
+# 160. Permissions
+
+Capacidades conceptuales futuras pueden incluir:
+
+```text
+inventory.locations.read
+inventory.locations.manage
+
+inventory.transfer.create
+inventory.transfer.confirm
+```
+
+---
+
+# 161. Healthcare users
+
+Healthcare no debe obtener permisos Inventory automáticamente solo por utilizar Cases.
+
+---
+
+# 162. Workflow permissions
+
+Una acción:
+
+```text
+Confirm Case Dispatch
+```
+
+puede ejecutar internamente una transferencia autorizada desde Application Layer sin exponer una transferencia manual al Technician.
+
+---
+
+# 163. Backend authority
+
+Frontend nunca debe enviar:
+
+```text
+fromLocation
+toLocation
+```
+
+arbitrarios y conseguir mover stock sin reglas.
+
+---
+
+# 164. Domain action
+
+Healthcare determina:
+
+```text
+Confirm Dispatch
+```
+
+Application orchestration determina el Transfer requerido.
+
+---
+
+# 165. Inventory valida
+
+Inventory valida:
+
+```text
+Company
+Product
+Batch
+quantity
+source position
+destination location
+```
+
+---
+
+# 166. Layer boundaries
+
+Conceptualmente:
+
+```text
+Healthcare Application
+↓
+Inventory Application / Domain capability
+↓
+Inventory persistence
+```
+
+---
+
+# 167. No direct Prisma mutations cross-module
+
+Healthcare no debería implementar:
+
+```text
+prisma.inventoryPosition.update(...)
+```
+
+directamente como lógica propia.
+
+---
+
+# 168. Razón
+
+Inventory debe conservar sus invariantes en un solo lugar.
+
+---
+
+# 169. Modular Monolith
+
+Esto es coherente con ADR-009:
+
+```text
+one deployable
++
+strong module boundaries
+```
+
+---
+
+# 170. In-process orchestration
+
+No se requieren:
+
+```text
+Kafka
+RabbitMQ
+microservices
+distributed transactions
+```
+
+para resolver esta primera versión.
+
+---
+
+# 171. Transaction boundaries
+
+Cuando Healthcare e Inventory participan en una misma operación crítica, pueden compartir una transacción Prisma de forma controlada mediante la arquitectura de Application/Infrastructure existente.
+
+---
+
+# 172. No event-only consistency inicialmente
+
+Para:
+
+```text
+Confirm Dispatch
+```
+
+no aceptamos inicialmente:
+
+```text
+Dispatch confirmed
+↓
+event eventually updates Inventory
+```
+
+si eso deja una ventana donde el mismo stock puede reutilizarse.
+
+---
+
+# 173. Decisión
+
+Las operaciones que cambian disponibilidad física deben ser:
+
+```text
+transactionally consistent
+```
+
+en la implementación inicial.
+
+---
+
+# 174. Events
+
+Después del commit pueden emitirse eventos internos para:
+
+```text
+Audit
+Notifications
+Read Models
+```
+
+---
+
+# 175. Audit
+
+Operaciones candidatas:
+
+```text
+inventory.location.created
+
+inventory.transfer.confirmed
+
+inventory.adjustment.confirmed
+```
+
+---
+
+# 176. Inventory Ledger
+
+El propio InventoryMovement continúa siendo la evidencia física.
+
+Audit no lo sustituye.
+
+---
+
+# 177. Migration strategy
+
+La incorporación de Locations debe realizarse sin perder el historial existente.
+
+---
+
+# 178. Paso 1
+
+Crear:
+
+```text
+Default Warehouse Location
+```
+
+para cada Company que utiliza Inventory.
+
+---
+
+# 179. Paso 2
+
+Crear posición inicial por Product/Batch según los datos disponibles.
+
+---
+
+# 180. Existing stock
+
+Para Products actuales sin posición detallada:
+
+```text
+Product.stock
+↓
+Default Warehouse
+```
+
+será la migración inicial.
+
+---
+
+# 181. Batches
+
+Cuando existen InventoryBatches actuales, la migración debe utilizar cantidades reales disponibles en ellos cuando sean fuente más precisa.
+
+---
+
+# 182. Reconciliation before migration
+
+Antes de migrar debe comprobarse:
+
+```text
+Product.stock
+vs
+Batch totals
+vs
+Movement ledger
+```
+
+para detectar discrepancias.
+
+---
+
+# 183. No inventar reconciliation silenciosa
+
+Si existen diferencias:
+
+```text
+→ report
+→ resolve
+→ document
+```
+
+No ajustar datos silenciosamente para que coincidan.
+
+---
+
+# 184. Historical movements
+
+No es obligatorio reconstruir una Location histórica exacta para todos los movimientos antiguos si esos datos nunca existieron.
+
+---
+
+# 185. Transitional marker
+
+Los movimientos legacy pueden continuar mostrando:
+
+```text
+location unknown / legacy
+```
+
+si es necesario.
+
+---
+
+# 186. New movements
+
+Desde la migración adelante:
+
+```text
+location-aware semantics
+```
+
+deben ser obligatorias para operaciones físicas relevantes.
+
+---
+
+# 187. Backward compatibility
+
+Durante transición:
+
+```text
+Product.stock
+```
+
+puede mantenerse y actualizarse junto con posiciones.
+
+---
+
+# 188. Removal future
+
+Solo podrá considerarse retirar `Product.stock` cuando:
+
+```text
+all modules
++
+all queries
++
+all reports
+```
+
+dependan correctamente del nuevo modelo.
+
+---
+
+# 189. No big-bang rewrite
+
+La migración debe ser incremental.
+
+---
+
+# 190. Implementation phases
+
+## Phase A — Foundation
+
+```text
+InventoryLocation
+InventoryPosition
+TRANSFER semantics
+Default Warehouse
+```
+
+---
+
+# 191. Phase B — Existing Inventory integration
+
+```text
+PurchaseReceipt
+↓ IN to Location
+
+Inventory adjustments
+↓ location-aware
+```
+
+---
+
+# 192. Phase C — Existing Sales integration
+
+```text
+Delivery / legacy Sale transition
+↓ OUT from Location
+```
+
+---
+
+# 193. Phase D — Healthcare Staging
+
+```text
+CaseKit Preparation
+↓ TRANSFER
+Staging
+```
+
+---
+
+# 194. Phase E — Healthcare Custody
+
+```text
+CaseDispatch
+↓ TRANSFER
+Custody
+```
+
+---
+
+# 195. Phase F — Return / Inspection
+
+```text
+Custody
+↓ Inspection
+↓ Warehouse / Quarantine / Damaged
+```
+
+---
+
+# 196. Phase G — Healthcare Consumption
+
+```text
+Custody
+↓ OUT
+Delivery / other disposition
+```
+
+---
+
+# 197. Testing requirements
+
+Antes de production-ready deben existir tests para:
+
+```text
+IN
+OUT
+TRANSFER
+ADJUSTMENT
+```
+
+---
+
+# 198. Transfer tests
+
+Como mínimo:
+
+```text
+source decreases
+destination increases
+company total unchanged
+negative source blocked
+cross-tenant blocked
+batch mismatch blocked
+retry does not duplicate
+```
+
+---
+
+# 199. Receipt tests
+
+```text
+Receipt
+→ correct Warehouse position
+→ total stock increases once
+```
+
+---
+
+# 200. Delivery tests
+
+```text
+Delivery
+→ correct source decreases
+→ total stock decreases once
+```
+
+---
+
+# 201. Healthcare tests
+
+```text
+Preparation
+→ available stock decreases
+→ owned stock unchanged
+```
+
+---
+
+# 202. Dispatch tests
+
+```text
+Staging decreases
+Custody increases
+Owned total unchanged
+```
+
+---
+
+# 203. Return tests
+
+```text
+Custody decreases
+Inspection increases
+Owned total unchanged
+```
+
+---
+
+# 204. Inspection pass tests
+
+```text
+Inspection decreases
+Warehouse increases
+Owned total unchanged
+```
+
+---
+
+# 205. Consumption tests
+
+```text
+Custody decreases
+Owned total decreases once
+```
+
+---
+
+# 206. Double decrement regression
+
+Debe existir explícitamente un test que demuestre:
+
+```text
+Dispatch
++
+Delivery
+```
+
+sobre el mismo consumo:
+
+```text
+→ only one definitive decrease
+```
+
+---
+
+# 207. Invariants
+
+```text
+IN
+→ increases Company-owned stock
+```
+
+```text
+TRANSFER
+→ does not change Company-owned stock
+```
+
+```text
+OUT
+→ decreases Company-owned stock
+```
+
+```text
+TRANSFER
+→ source decreases
+→ destination increases
+```
+
+```text
+Position
+→ never negative
+```
+
+```text
+Movement quantity
+→ greater than zero
+```
+
+```text
+Source and Destination
+→ same Company
+```
+
+```text
+Product / Batch
+→ same Company
+```
+
+```text
+Batch
+→ belongs to Product
+```
+
+```text
+Confirmed Movement
+→ immutable
+```
+
+```text
+Correction
+→ compensating event
+```
+
+```text
+Position
+→ consequence of movements
+```
+
+```text
+Product.stock
+→ projection during transition
+```
+
+```text
+Available
+≠
+Company-owned
+```
+
+```text
+Staging
+→ Company-owned but unavailable for unrelated use
+```
+
+```text
+Custody
+→ Company-owned but temporarily held externally/internally
+```
+
+```text
+Inspection
+→ Company-owned but not automatically available
+```
+
+```text
+Same physical quantity
+→ cannot exist in two positions simultaneously
+```
+
+```text
+Same physical quantity
+→ cannot be definitively OUT twice
+```
+
+---
+
+# 208. Alternatives considered
+
+## Alternative A — Keep Product.stock only
+
+Rejected.
+
+No puede representar:
+
+```text
+location
+custody
+staging
+inspection
+```
+
+---
+
+# 209. Alternative B — CaseDispatch as OUT
+
+Rejected.
+
+Confunde:
+
+```text
+temporary custody
+```
+
+con:
+
+```text
+definitive disposition
+```
+
+y crea riesgo de double decrement.
+
+---
+
+# 210. Alternative C — Track custody only in Healthcare
+
+Rejected as complete solution.
+
+Permitiría que Inventory siguiera considerando la misma cantidad disponible.
+
+---
+
+# 211. Alternative D — Create healthcare-specific stock table
+
+Ejemplo:
+
+```text
+HealthcareInventory
+```
+
+Rejected.
+
+Duplicaría la fuente de inventario y contaminaría ownership.
+
+---
+
+# 212. Alternative E — One Location per Case
+
+Not selected as default.
+
+Generaría gran cantidad de Locations efímeras y no es necesario si Healthcare conserva asignaciones por Case.
+
+---
+
+# 213. Alternative F — One Location per Technician
+
+Not selected initially.
+
+Puede ser útil posteriormente, pero la primera implementación mantendrá responsable/custodian en el dominio que origina la transferencia.
+
+---
+
+# 214. Alternative G — Implement Reservations only
+
+Rejected as complete solution.
+
+Reservation responde:
+
+```text
+who has a claim on stock
+```
+
+pero no necesariamente:
+
+```text
+where is the physical stock now
+```
+
+---
+
+# 215. InventoryReservation target
+
+`InventoryReservation` forma parte del diseño aprobado de Advanced Inventory,
+pero permanece `NOT IMPLEMENTED`. Afecta availability sin crear un movimiento
+hasta que ocurra el movimiento físico real.
+
+---
+
+# 216. Consecuencias positivas
+
+Esta decisión permite:
+
+* representar ubicación real;
+* representar custodia sin venta;
+* evitar doble decremento;
+* separar stock owned de available;
+* soportar Healthcare Logistics;
+* preparar Multi-Warehouse futuro;
+* mejorar Delivery;
+* mejorar Batch traceability;
+* soportar inspección y cuarentena;
+* mejorar trazabilidad general.
+
+---
+
+# 217. Consecuencias negativas
+
+La arquitectura introduce mayor complejidad en:
+
+```text
+queries
+transactions
+migrations
+testing
+availability
+sales fulfillment
+inventory UI
+```
+
+---
+
+# 218. Coste aceptado
+
+La complejidad es necesaria porque el modelo anterior no puede representar de forma segura los workflows físicos descubiertos.
+
+---
+
+# 219. Scope control
+
+No aprovecharemos este cambio para construir simultáneamente:
+
+```text
+full WMS
+multiwarehouse routing
+bin optimization
+barcode infrastructure
+advanced reservations
+accounting valuation
+IoT tracking
+```
+
+---
+
+# 220. Arquitectura objetivo
+
+```text
+                        COMPANY
+                           │
+                           ▼
+                        PRODUCT
+                           │
+                    INVENTORY BATCH
+                           │
+                           ▼
+                  INVENTORY POSITION
+                    │             │
+                    │             │
+             InventoryLocation    │
+                    │             │
+                    └──────┬──────┘
+                           │
+                           ▼
+                  INVENTORY MOVEMENT
+                           │
+           ┌───────────────┼───────────────┐
+           │               │               │
+          IN           TRANSFER           OUT
+           │               │               │
+External → Location   A → B        Location → External
+```
+
+---
+
+# 221. Healthcare sobre esta arquitectura
+
+```text
+Purchase Receipt
+      │
+      ▼ IN
+Warehouse
+      │
+      ▼ TRANSFER
+Case Staging
+      │
+      ▼ TRANSFER
+Technician Custody
+      │
+      ├───────────────┐
+      │               │
+      ▼ TRANSFER      ▼ OUT
+Inspection          Consumed
+      │               │
+      ▼ TRANSFER      ▼
+Warehouse          Delivery /
+                   Disposition
+```
+
+---
+
+# 222. Relación con ADR-002
+
+ADR-002 continúa vigente.
+
+Este ADR lo extiende conceptualmente:
+
+```text
+InventoryMovement
+→ remains source of historical truth
+```
+
+pero ahora incluye movimientos internos entre posiciones.
+
+---
+
+# 223. Relación con ADR-011
+
+ADR-011 continúa vigente:
+
+```text
+SalesOrder
+↓
+Delivery
+↓
+Inventory OUT
+```
+
+Este ADR agrega que:
+
+```text
+OUT
+```
+
+debe conocer su posición de origen.
+
+---
+
+# 224. Relación con ADR-013
+
+ADR-013 estableció:
+
+```text
+CaseDispatch
+≠
+Commercial OUT
+```
+
+ADR-014 define cómo implementarlo:
+
+```text
+CaseDispatch
+→ Internal Transfer
+```
+
+---
+
+# 225. Relación con ADR-012
+
+InventoryLocation puede utilizar lifecycle de Master Data.
+
+Confirmed InventoryMovements continúan siendo históricos/inmutables.
+
+---
+
+# 226. Relación con Healthcare Domain Model
+
+`DOMAIN_MODEL.md` deberá tratar este ADR como decisión aprobada y dejar de describir Inventory Locations únicamente como propuesta.
+
+---
+
+# 227. Documentación a actualizar
+
+Después de aprobar ADR-014 deben sincronizarse:
+
+```text
+modules/erp/INVENTORY.md
+
+modules/erp/ADVANCED_INVENTORY.md
+
+modules/healthcare/HEALTHCARE.md
+modules/healthcare/DOMAIN_MODEL.md
+modules/healthcare/CASE_KITS.md
+modules/healthcare/CASE_LOGISTICS.md
+modules/healthcare/EQUIPMENT.md
+
+architecture/ARCHITECTURE.md
+architecture/adr/README.md
+
+project/PROJECT_BOARD.md
+project/ROADMAP.md
+```
+
+---
+
+# 228. No schema todavía
+
+Aceptar ADR-014 no significa ejecutar inmediatamente una migración.
+
+La secuencia correcta continúa siendo:
+
+```text
+ADR
+↓
+documentation synchronization
+↓
+technical design
+↓
+schema proposal
+↓
+migration review
+↓
+implementation
+↓
+tests
+```
+
+---
+
+# 229. Próxima decisión
+
+Después de sincronizar documentación deberá diseñarse técnicamente:
+
+```text
+InventoryLocation
+InventoryPosition
+InventoryMovement location-awareness
+```
+
+antes de comenzar Case Logistics.
+
+---
+
+# 230. Equipment
+
+La decisión sobre `EquipmentAsset` como ERP Core se documentará por separado durante su diseño técnico si el cambio de ownership requiere una decisión arquitectónica explícita.
+
+---
+
+# 231. Estado final de la decisión
+
+Se acepta:
+
+```text
+InventoryLocation
+→ ERP Core capability
+
+InventoryPosition
+→ current inventory projection by location
+
+TRANSFER
+→ first-class Inventory operation semantics using IN / OUT ledger entries
+
+IN
+→ ownership enters
+
+OUT
+→ ownership leaves
+
+Product.stock
+→ transitional aggregate projection
+
+Case Preparation
+→ may transfer Warehouse → Staging
+
+CaseDispatch
+→ transfer to Custody
+
+CaseReturn
+→ transfer to Inspection
+
+Inspection approval
+→ transfer back to available location
+
+Healthcare Consumption
+→ definitive OUT when disposition requires it
+```
+
+---
+
+# 232. Principio final
+
+Zaping ya no debe modelar inventario únicamente como:
+
+```text
+¿cuántas unidades tengo?
+```
+
+Debe poder responder:
+
+```text
+¿Cuántas unidades tengo?
+↓
+¿Dónde están?
+↓
+¿Cuáles están disponibles?
+↓
+¿Cuáles están preparadas?
+↓
+¿Cuáles están bajo custodia?
+↓
+¿Cuáles están en inspección?
+↓
+¿Cuáles salieron definitivamente?
+```
+
+manteniendo una sola historia física coherente.
+
+> **La propiedad del inventario y su ubicación son dimensiones diferentes. Un traslado interno cambia dónde está una unidad, no quién la posee; solo una disposición definitiva debe producir un Inventory OUT.**

@@ -5,11 +5,37 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException } from '@nestjs/common';
 import { Response } from 'express';
 import PDFDocument from 'pdfkit';
+import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
 import { CreateSaleDto } from './dto/create-sale.dto';
+import { SalesFolioService } from './sales-folio.service';
+
+type GenericSalesProduct = {
+  id: string;
+  name: string;
+  inventoryTracking: ProductInventoryTracking;
+  lotTracking: ProductLotTracking;
+};
 
 @Injectable()
 export class SalesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly salesFolioService: SalesFolioService,
+  ) {}
+
+  private validateGenericSalesProductEligibility(product: GenericSalesProduct) {
+    if (product.inventoryTracking !== ProductInventoryTracking.QUANTITY) {
+      throw new BadRequestException(
+        `El producto ${product.name} no es compatible con el flujo de venta genérico por su tipo de seguimiento de inventario`,
+      );
+    }
+
+    if (product.lotTracking === ProductLotTracking.REQUIRED) {
+      throw new BadRequestException(
+        `El producto ${product.name} requiere selección de lote para completar la venta`,
+      );
+    }
+  }
 
   async create(companyId: string, dto: CreateSaleDto) {
     const customer = await this.prisma.customer.findFirst({
@@ -72,20 +98,37 @@ export class SalesService {
 
     let subtotal = 0;
 
-    for (const item of dto.items) {
-      const product = await this.prisma.product.findFirst({
-        where: {
-          id: item.productId,
-          companyId,
-          isActive: true,
+    const products = await this.prisma.product.findMany({
+      where: {
+        id: {
+          in: Array.from(productIds),
         },
-      });
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        price: true,
+        inventoryTracking: true,
+        lotTracking: true,
+      },
+    });
+
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+
+    for (const item of dto.items) {
+      const product = productsById.get(item.productId);
 
       if (!product) {
         throw new NotFoundException(
           `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
         );
       }
+
+      this.validateGenericSalesProductEligibility(product);
 
       /*
        * En venta manual el backend utiliza
@@ -107,29 +150,34 @@ export class SalesService {
 
     const total = roundMoney(subtotal + iva);
 
-    const folio = `V-${Date.now()}`;
-
-    return this.prisma.sale.create({
-      data: {
+    return this.prisma.$transaction(async (tx) => {
+      const folio = await this.salesFolioService.allocateNextAvailableFolio(
+        tx,
         companyId,
-        customerId: dto.customerId,
+      );
 
-        folio,
+      return tx.sale.create({
+        data: {
+          companyId,
+          customerId: dto.customerId,
 
-        subtotal,
-        iva,
-        total,
+          folio,
 
-        status: 'DRAFT',
+          subtotal,
+          iva,
+          total,
 
-        items: {
-          create: saleItems,
+          status: 'DRAFT',
+
+          items: {
+            create: saleItems,
+          },
         },
-      },
 
-      include: {
-        items: true,
-      },
+        include: {
+          items: true,
+        },
+      });
     });
   }
 
@@ -202,6 +250,43 @@ export class SalesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const saleProductIds = Array.from(
+        new Set(sale.items.map((item) => item.productId)),
+      );
+
+      const products = await tx.product.findMany({
+        where: {
+          id: {
+            in: saleProductIds,
+          },
+          companyId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          cost: true,
+          inventoryTracking: true,
+          lotTracking: true,
+        },
+      });
+
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+
+      for (const item of sale.items) {
+        const product = productsById.get(item.productId);
+
+        if (!product) {
+          throw new NotFoundException(
+            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+          );
+        }
+
+        this.validateGenericSalesProductEligibility(product);
+      }
+
       /*
        * Reservar la transición DRAFT -> CONFIRMED.
        *
@@ -227,26 +312,7 @@ export class SalesService {
       }
 
       for (const item of sale.items) {
-        /*
-         * Obtener nuevamente el producto dentro de la
-         * transacción.
-         *
-         * No utilizamos el stock precargado de la venta,
-         * porque podría haberse modificado entre la lectura
-         * inicial y la aprobación.
-         */
-        const product = await tx.product.findFirst({
-          where: {
-            id: item.productId,
-            companyId,
-            isActive: true,
-          },
-          select: {
-            id: true,
-            name: true,
-            cost: true,
-          },
-        });
+        const product = productsById.get(item.productId);
 
         if (!product) {
           throw new NotFoundException(
@@ -509,6 +575,48 @@ export class SalesService {
         throw new BadRequestException('La cotización no contiene productos');
       }
 
+      const quoteProductIds = Array.from(
+        new Set(quote.items.map((item) => item.productId)),
+      );
+
+      const products = await tx.product.findMany({
+        where: {
+          id: {
+            in: quoteProductIds,
+          },
+          companyId,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          cost: true,
+          inventoryTracking: true,
+          lotTracking: true,
+        },
+      });
+
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+
+      for (const item of quote.items) {
+        const product = productsById.get(item.productId);
+
+        if (!product) {
+          throw new NotFoundException(
+            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+          );
+        }
+
+        this.validateGenericSalesProductEligibility(product);
+      }
+
+      const folio = await this.salesFolioService.allocateNextAvailableFolio(
+        tx,
+        companyId,
+      );
+
       /*
        * Reservar la conversión dentro de la misma
        * transacción.
@@ -534,8 +642,6 @@ export class SalesService {
           'La cotización ya fue convertida o ya no puede convertirse',
         );
       }
-
-      const folio = `V-${Date.now()}`;
 
       const sale = await tx.sale.create({
         data: {
@@ -564,18 +670,7 @@ export class SalesService {
       });
 
       for (const item of quote.items) {
-        const product = await tx.product.findFirst({
-          where: {
-            id: item.productId,
-            companyId,
-            isActive: true,
-          },
-          select: {
-            id: true,
-            name: true,
-            cost: true,
-          },
-        });
+        const product = productsById.get(item.productId);
 
         if (!product) {
           throw new NotFoundException(

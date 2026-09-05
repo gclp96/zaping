@@ -1,19 +1,33 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { PrismaModule } from '../prisma/prisma.module';
+import { EmailModule } from '../email/email.module';
 
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
     PrismaModule,
+    EmailModule,
     PassportModule.register({
       defaultStrategy: 'jwt',
+    }),
+
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          limit: 10,
+          ttl: 60_000,
+        },
+      ],
     }),
 
     JwtModule.register({
@@ -24,7 +38,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
 
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, PasswordRecoveryService],
 
   controllers: [AuthController],
 

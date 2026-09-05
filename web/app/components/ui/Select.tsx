@@ -53,7 +53,7 @@ export default function Select({
   const ariaDescribedBy =
     [externalAriaDescribedBy, descriptionId]
       .filter(Boolean)
-      .join('') || undefined;
+      .join(' ') || undefined;
 
   return (
     <div
@@ -62,7 +62,7 @@ export default function Select({
         containerClassName,
       ]
         .filter(Boolean)
-        .join('')}
+        .join(' ')}
     >
       {label ? (
         <label

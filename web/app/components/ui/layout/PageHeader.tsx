@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode } from 'react';
 
 type PageHeaderProps = {
   title: string;
@@ -12,21 +12,21 @@ export default function PageHeader({
   action,
 }: PageHeaderProps) {
   return (
-    <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold">
+    <div className="mb-6 flex min-w-0 flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="min-w-0 flex-1">
+        <h1 className="break-words text-3xl font-bold text-text">
           {title}
         </h1>
 
         {description && (
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 max-w-3xl text-text-muted">
             {description}
           </p>
         )}
       </div>
 
       {action && (
-        <div className="shrink-0">
+        <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:shrink-0 md:justify-end">
           {action}
         </div>
       )}
