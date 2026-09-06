@@ -12,25 +12,29 @@ Zaping Platform
 └── Zaping Healthcare
     └── Case Foundation backend implementado
 
-Estado actual: desarrollo activo.
+Estado actual: ERP Core V1 integrado en la branch canónica `main`.
 
-La normalización funcional del ERP Core correspondiente a H7 está implementada y validada.
+La normalización funcional del ERP Core, la UI/UX principal, los controles de
+auth/security y la base Healthcare están implementados y validados.
+
+Baseline canónico: `main` en `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d`.
+
+PR #1 está integrado y el CI post-merge pasó. OPS-RC-B5B está cerrado.
+OPS-RC-B5C (staging real) queda `DEFERRED / READY WHEN NEEDED`.
+
+No se afirma despliegue de staging o producción.
 
 La posición actual del proyecto es:
 
-B1 ✅
+ERP Core V1 integrated in `main`
 ↓
-B2 ✅ — Authorization + Tenant Isolation V1
+documentation sync + local QA / hardening
 ↓
-B3 ← NEXT — Production / Security Hardening
-↓
-C — Full Technical Regression
-↓
-D — Full ERP End-to-End QA
-↓
-RC — ERP Core V1 Release Candidate
-↓
-Zaping Healthcare
+next functional initiative — decision pending
+
+Deferred: OPS-RC-B5C real staging acceptance — READY WHEN NEEDED
+
+Healthcare and Advanced Inventory remain future options; neither is preselected.
 
 Estado de seguridad ERP Core V1:
 
@@ -81,7 +85,9 @@ El companyId obtenido del usuario autenticado constituye la frontera principal d
 
 Los módulos actuales implementan tenant scoping sobre sus operaciones principales.
 La cobertura sistemática de Authorization + Tenant Isolation V1 fue validada en
-B2D. Los gates B3, C, D y RC permanecen separados.
+B2D. La implementación B3 y el gate técnico pre-merge OPS-RC-B5B quedaron
+integrados; la aceptación operativa real de roles, email y staging permanece
+separada.
 
 La validación global de NestJS utiliza:
 
@@ -805,21 +811,16 @@ La implementación cubre cambio autenticado de contraseña, invalidación por
 `authVersion` y recovery seguro con token de un solo uso. No equivale a
 production-ready ni RC-ready.
 
-Antes de pilot/commercial production deben completarse o verificarse los P0
-relacionados con:
+Antes de pilot/commercial production deben completarse o verificarse los
+pendientes operativos:
 
-protected-route / session architecture
-
-authentication abuse protection / rate limiting
-
-production secrets / configuration review
+manual role QA
 
 real password-recovery email delivery/configuration
 
-dependency/security maintenance before RC
+OPS-RC-B5C staging acceptance when reactivated
 
-RC-DATA: posible lost update / stock concurrency issue en
-`InventoryService.createMovement`
+backup / restore provider validation
 
 Regla:
 
@@ -832,13 +833,14 @@ mediante un mecanismo seguro antes de permitir el cambio de contraseña. La
 verificación de sender/domain, configuración válida y E2E real
 forgot → email → reset → login sigue pendiente.
 
-La arquitectura exacta se mantiene en:
+La implementación de seguridad y la arquitectura exacta se mantienen en:
 
 docs/engineering/SECURITY_PRINCIPLES.md
 
 docs/project/PROJECT_BOARD.md
 
-La estrategia CURRENT de JWT almacenado en cliente debe revisarse antes de producción y no debe considerarse una decisión irreversible.
+La estrategia CURRENT de JWT almacenado en cliente debe revisarse como parte
+de la aceptación operativa de producción; no es una implementación B3 pendiente.
 
 Deuda técnica visible
 
@@ -848,15 +850,13 @@ docs/project/PROJECT_BOARD.md
 
 Entre los temas principales permanecen:
 
-authentication abuse protection / rate limiting
-
-protected-route / session architecture
-
-production secrets / configuration
-
 real password-recovery email delivery/configuration
 
-dependency/security maintenance before RC
+manual role QA
+
+OPS-RC-B5C staging acceptance — DEFERRED / READY WHEN NEEDED
+
+backup / restore provider validation
 
 Sales create idempotency
 
@@ -909,24 +909,20 @@ Estado inmediato
 
 El orden vigente del proyecto es:
 
-H8A
-→ final documentation/security synchronization
+ERP Core V1 integrado en `main`
+→ documentación sincronizada
+→ QA local / hardening
+→ siguiente iniciativa funcional — decisión pendiente
 
-H8B
-→ full automated technical regression
+OPS-RC-B5C real staging
+→ DEFERRED / READY WHEN NEEDED
 
-UX-B.6
-→ full ERP end-to-end QA
+Healthcare y Advanced Inventory permanecen como opciones futuras no
+preseleccionadas.
 
-ERP Core V1
-→ formal closure after quality + security gates
-
-Zaping Healthcare
-→ next strategic stage
-
-Durante este cierre no deben abrirse nuevas funcionalidades importantes del ERP Core salvo que aparezca un defecto P0 que bloquee la release.
-
-Healthcare TARGET tampoco debe expandirse en Prisma durante H8.
+Durante esta etapa no deben abrirse nuevas funcionalidades importantes del ERP
+Core hasta aprobar la siguiente iniciativa, salvo defectos P0 o trabajo de
+hardening necesario.
 
 Principio del proyecto
 

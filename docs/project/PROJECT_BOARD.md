@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: H8 — Documentación, regresión y preparación de cierre de ERP Core V1
-Última actualización: 2026-09-02
+Fase actual: Post-merge ERP Core V1 — sincronización documental, QA local y hardening
+Última actualización: 2026-09-05
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -31,6 +31,24 @@ Los detalles históricos de implementación y snapshots antiguos deben conservar
 docs/project/CHANGELOG.md
 
 y no duplicarse dentro de este Board.
+
+POST-MERGE BASELINE
+
+Canonical branch: `main`
+
+Canonical baseline: `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d`
+
+PR #1: MERGED
+
+Post-merge CI: PASS
+
+ERP Core V1: INTEGRATED
+
+OPS-RC-B5B: CLOSED
+
+OPS-RC-B5C real staging acceptance: DEFERRED / READY WHEN NEEDED
+
+No staging or production deployment is claimed by this baseline.
 
 IMPLEMENTED / VALIDATED
 
@@ -76,13 +94,13 @@ ERP Core
 
 CURRENT
 
-H8 — ERP Core release preparation
+ERP Core V1 integrated in `main`
 
-├── H8A Documentation synchronization
-│   └── AUTH-USERS-V1 completed
+├── documentation baseline synchronization
 │
-└── H8B Full technical regression
-    └── B2 Authorization + Tenant Isolation V1 completed; B2E documentation closure completed
+├── local QA / hardening
+│
+└── next functional initiative still to be approved
 
 Frontend UX workstream
 
@@ -96,38 +114,31 @@ Frontend UX workstream
 
 NEXT
 
-ERP-V1-CLOSE-B3 — production / security hardening
+documentation sync
         ↓
-ERP-V1-CLOSE-C — technical regression
+local QA / hardening
         ↓
-ERP-V1-CLOSE-D — full ERP end-to-end QA
-        ↓
-ERP-V1-RC — ERP Core V1 release candidate
-        ↓
-Healthcare specialization
+next functional initiative — decision pending
+
+DEFERRED
+
+OPS-RC-B5C — real staging acceptance
+        → READY WHEN NEEDED; not executed by this baseline
 
 RELEASE BLOCKERS — P0
 
-Antes de pilot/commercial production deben resolverse o verificarse formalmente:
+Antes de pilot/commercial production deben resolverse o verificarse formalmente
+los pendientes operativos:
 
-protected-route / session architecture
-
-authentication abuse protection / rate limiting
-
-production secrets / configuration review
-
-CORS / environment-specific origins
+manual role QA
 
 real password-recovery email delivery/configuration
 
-dependency/security maintenance
+staging acceptance when OPS-RC-B5C is reactivated
 
-RC-DATA — InventoryService.createMovement possible lost update / stock
-concurrency issue
+backup / restore provider validation
 
-technical regression
-
-full ERP end-to-end QA
+formal pilot acceptance evidence
 
 Authorization + Tenant Isolation V1:
 
@@ -1149,28 +1160,20 @@ Frontend coverage:
 
 /reset-password?token=...
 
-La implementación fue validada en B1D-D2/D3. El snapshot cuantitativo vigente
-de regresión pertenece a B2D.
+La implementación fue validada en B1D-D2/D3. El snapshot cuantitativo de B2D
+se conserva como evidencia histórica, anterior al gate pre-merge B5B.10.
 
-Permanecen fuera de este cierre:
-
-authentication abuse protection / rate limiting
+Permanecen como validación operativa posterior:
 
 real email delivery/configuration verification:
 verified sender/domain, valid RESEND_API_KEY, EMAIL_FROM and
 FRONTEND_BASE_URL, plus real forgot → email → reset → login E2E
 
-dependency/security maintenance before RC
-
-protected frontend/session architecture
-
-technical regression
-
-full ERP end-to-end QA
+manual role QA and staging acceptance when B5C is reactivated.
 
 SEC-006 — Authentication Abuse Protection / Rate Limiting
 
-Estado: ⏳ PENDING
+Estado: ✅ IMPLEMENTED / VALIDATED — operational QA pending
 Prioridad: P0 preproduction / B3
 
 Endpoints sensibles como:
@@ -1200,9 +1203,13 @@ No aplicar una estrategia de lockout que permita denegación de servicio trivial
 Debe cubrir también cualquier otro endpoint auth-sensitive aprobado por la
 política final.
 
+La configuración de `@nestjs/throttler` y su cobertura focal fueron integradas
+en B3B1. El pendiente restante es la verificación operativa en el entorno de
+staging cuando OPS-RC-B5C sea reactivado.
+
 SEC-007 — Protected Route / Session Architecture
 
-Estado: ⏳ PENDING REVIEW
+Estado: ✅ IMPLEMENTED / VALIDATED — operational QA pending
 Prioridad: P0 preproduction
 
 CURRENT frontend utiliza:
@@ -1217,9 +1224,10 @@ axios interceptor
 
 401 clear / redirect
 
-Esto no constituye todavía un global protected-route/session contract completo.
+El contrato de bootstrap de sesión, deep-link protegido, ausencia de flash,
+redirect 401 y preservación ante network/5xx quedó validado en B3B4.
 
-Debe revisarse:
+La aceptación operativa debe confirmar:
 
 session bootstrap
 
@@ -1233,7 +1241,9 @@ unauthenticated navigation behavior
 
 storage strategy before production
 
-JWT en localStorage es estrategia CURRENT, no una decisión que deba asumirse irreversible para producción.
+JWT en localStorage sigue siendo la estrategia CURRENT y debe revisarse como
+decisión operativa antes de producción; no es un blocker de implementación
+pendiente en este baseline.
 
 SEC-008 — Critical Authorization Review
 
@@ -1258,7 +1268,7 @@ El frontend role-aware es UX; el backend mantiene la autoridad.
 
 SEC-009 — Production Secrets / Configuration Review
 
-Estado: ⏳ PENDING
+Estado: ✅ IMPLEMENTED / VALIDATED — real provider QA pending
 Prioridad: P0 preproduction
 
 Debe verificarse:
@@ -1277,17 +1287,17 @@ debug/dev settings disabled where appropriate
 
 CORS / environment-specific origins reviewed
 
-El cierre de Password Security no valida todavía el correo real. El gate exige
+La configuración fail-closed, CORS por entorno y la separación de variables
+quedaron validadas en B3B2. El gate operativo todavía exige
 sender/domain verificado, `RESEND_API_KEY`, `EMAIL_FROM` y
 `FRONTEND_BASE_URL` válidos, y una prueba real forgot → email → reset → login.
 
 DEPENDENCY AUDIT NOTE
 
-`npm audit --audit-level=high` reporta 5 vulnerabilidades (4 high, 1
-moderate), incluyendo `deepmerge-ts < 8.0.0` vía `@prisma/config` / Prisma
-tooling. La corrección `--force` propone un cambio rompedor de Prisma y no se
-ejecuta. Queda como dependency/security maintenance before RC; no se afirma
-exploitability ni impacto runtime sin análisis separado.
+La alerta de `deepmerge-ts` vía `@prisma/config` / Prisma tooling fue
+remediada con un override compatible y la actualización correspondiente del
+lockfile en OPS-RC-B5B.10B1 (`bac9ab5`, override `^8.0.1`). No queda como
+blocker de este baseline; el mantenimiento periódico de dependencias continúa.
 
 B2D VALIDATION SNAPSHOT
 
@@ -1306,8 +1316,9 @@ validó autenticación, role denial, aislamiento de listados/detalles/mutaciones
 relaciones mixtas, ausencia de side effects en rechazos cross-tenant, predicados
 finales, semántica de errores y preservación de sesión ante `403`.
 
-Permanece abierto y separado el blocker `RC-DATA`: posible lost update de stock
-en `InventoryService.createMovement`.
+El blocker `RC-DATA` de posible lost update en
+`InventoryService.createMovement` fue resuelto mediante control de concurrencia
+y su regresión quedó integrada antes del merge de PR #1.
 
 13. Release Readiness
 
@@ -1851,16 +1862,17 @@ La siguiente deuda permanece vigente y debe revisarse periódicamente.
 
 Security / Release
 
-authentication abuse protection / rate limiting
+B3 security implementation — CLOSED / VALIDATED
 
-protected-route / session architecture
+manual role QA
 
-production secrets / configuration review
+real password-recovery email delivery/configuration
+
+OPS-RC-B5C staging acceptance — DEFERRED / READY WHEN NEEDED
+
+backup / restore provider validation
 
 Reliability / Integrity
-
-RC-DATA — InventoryService.createMovement possible lost update / stock
-concurrency issue
 
 Sales create idempotency
 
@@ -1934,13 +1946,9 @@ Modal accessibility / focus management
 
 drawer complete focus trap
 
-authenticated Home post-login redirect
-
 branch/context selector / notifications / global search
 
-role-aware navigation / collaboration
-
-auth protected-route / session architecture
+collaboration
 
 global pagination strategy
 
@@ -1955,18 +1963,18 @@ Riesgos vigentes:
 B2 Authorization + Tenant Isolation V1
 → CLOSED / VERIFIED
 
-protected-route / session architecture
+B3 security implementation
+→ CLOSED / VALIDATED
 
-authentication abuse protection
-
-production secrets / configuration
+remaining operational validation: real Resend delivery, manual role QA and
+staging acceptance when OPS-RC-B5C is reactivated
 
 passwordHash exposure ya no forma parte de este riesgo.
 
 Mitigación:
 
-complete remaining B3 security work
-before pilot / commercial production release
+complete the remaining operational validation before pilot / commercial
+production release
 
 RISK-002 — Legacy Sales Architecture
 
@@ -2135,31 +2143,19 @@ Future
 
 CURRENT
 
-H8 — Documentation + Regression
+ERP Core V1 integrated in canonical `main`
 
-Subfases:
+→ documentation baseline synchronization
 
-H8A
+→ local QA / hardening
 
-→ documentation synchronization
+NEXT LOCAL WORK
 
-→ final cross-document sync
+→ next functional initiative still to be approved
 
-→ security blocker sync
+DEFERRED
 
-→ final repository/doc health checks
-
-H8B
-
-→ full technical regression
-
-→ technical health snapshot
-
-NEXT
-
-UX-B.6
-
-→ Full ERP end-to-end QA
+→ OPS-RC-B5C real staging acceptance — READY WHEN NEEDED
 
 Flujos principales a validar:
 
@@ -2209,13 +2205,11 @@ authorization
 
 idempotency replay / conflict
 
-AFTER
+OPCIÓN FUTURA — sujeta a aprobación como siguiente iniciativa
 
-ERP Core V1 closure
-        ↓
 Healthcare specialization
 
-Inicio Healthcare recomendado:
+Secuencia orientativa si se aprueba Healthcare:
 
 Hospital / Doctor
 ↓
@@ -2237,9 +2231,12 @@ Case 360
 ↓
 Mobile Technician
 
-27. Snapshot de calidad vigente
+27. Calidad post-merge y snapshot histórico
 
-Último snapshot validado al cierre de ERP-V1-CLOSE-B2D:
+Baseline vigente: gate pre-merge B5B.10 aprobado con hallazgos no bloqueantes
+y CI post-merge PASS. La aceptación operativa sigue pendiente según §0.
+
+Snapshot histórico al cierre de ERP-V1-CLOSE-B2D:
 
 ```text
 Backend: 60 suites / 628 tests PASS
@@ -2251,9 +2248,10 @@ Prisma validate/status: PASS
 25 migrations found; database schema up to date
 ```
 
-Este snapshot valida la regresión completa de autorización y tenant isolation,
-además de los controles técnicos indicados. No equivale a penetration testing ni
-cierra los gates B3, C, D o RC-DATA.
+Este snapshot es histórico de B2D y valida la regresión completa de autorización
+y tenant isolation de ese cierre. Los controles B3 y la corrección RC-DATA fueron
+integrados posteriormente; la validación operativa de Resend, roles y staging
+permanece separada.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
 
@@ -2266,7 +2264,8 @@ application test failure
 La suite completa puede ejecutarse con workers limitados o de forma serial para
 obtener un resultado confiable.
 
-El snapshot backend definitivo de release deberá obtenerse durante H8B y no debe inferirse desde resultados antiguos.
+Los conteos de B2D no representan el total actual de tests; cualquier nuevo
+snapshot cuantitativo debe basarse en su propia ejecución y evidencia.
 
 28. Fuente de verdad por dominio
 
@@ -2319,7 +2318,7 @@ Historical delivery record
 
 Estado: ✅ CLOSED / VERIFIED
 
-B2E puede cerrarse únicamente después de:
+Condiciones documentales verificadas al cierre B2E:
 
 primary documentation reviewed
 
@@ -2327,7 +2326,8 @@ cross-document CURRENT / TARGET / FUTURE sync
 
 Authorization + Tenant Isolation V1 reflected
 
-B3 gates and RC-DATA blocker reflected
+B3 gates and the then-open RC-DATA finding reflected (both superseded by the
+post-merge baseline above)
 
 PROJECT_BOARD final sync
 
@@ -2343,7 +2343,8 @@ no secrets / credentials / .env backup committed
 
 only intended documentation changes present
 
-No realizar el commit final de B2E antes de estos checks.
+Esta lista conserva la evidencia documental del cierre B2E; los checks fueron
+completados antes de la integración de PR #1.
 
 30. Principio final
 
@@ -2353,27 +2354,22 @@ Este documento debe poder responder siempre:
 
 Respuesta vigente:
 
-B1 ✅
+ERP Core V1
+→ INTEGRATED in canonical `main`
 
-B2 ✅
+OPS-RC-B5B
+→ CLOSED
 
-B3
-← NEXT — production / security hardening
+Documentation synchronization
+→ CURRENT
 
-C
-→ technical regression
+Local QA / hardening
+→ NEXT LOCAL WORK
 
-D
-→ full ERP end-to-end QA
+OPS-RC-B5C real staging acceptance
+→ DEFERRED / READY WHEN NEEDED
 
-RC
-→ ERP Core V1 release candidate after all gates
+Next functional initiative
+→ decision pending; Healthcare and Advanced Inventory are not preselected
 
-Then:
-
-Healthcare specialization
-→ next strategic product stage
-
-No deben abrirse nuevas funcionalidades del ERP Core antes de completar H8 y UX-B.6, salvo que aparezca un defecto P0 que bloquee el cierre.
-
-Healthcare TARGET tampoco debe expandirse en Prisma durante H8.
+No staging or production deployment is claimed by this baseline.

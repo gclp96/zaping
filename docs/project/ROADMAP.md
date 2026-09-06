@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-02
+Última actualización: 2026-09-05
 Responsable: Zaping Team
 
 1. Propósito
@@ -79,21 +79,20 @@ CHANGELOG
 3. Secuencia estratégica vigente
 La normalización funcional H7 del ERP Core está completada.
 
-La posición actual del cierre ERP Core V1 es:
+La posición actual es:
 
-B1 ✅
+CURRENT — ERP Core V1 integrated in canonical `main`
 ↓
-B2 ✅ — Authorization + Tenant Isolation V1
+NEXT LOCAL WORK — documentation sync + local QA / hardening
 ↓
-B3 ← NEXT — Production / Security Hardening
-↓
-C — Full Technical Regression
-↓
-D — Full ERP End-to-End QA
-↓
-RC — ERP Core V1 Release Candidate
-↓
-Zaping Healthcare
+DECISION PENDING — next functional initiative still to be approved
+
+DEFERRED — OPS-RC-B5C real staging acceptance
+→ READY WHEN NEEDED; no staging deployment is claimed
+
+PR #1 is merged at `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d` and post-merge CI
+passed. OPS-RC-B5B is closed. Healthcare and Advanced Inventory remain future
+options; neither is preselected as the next initiative.
 Healthcare Case Foundation ya existe en backend.
 
 Permanecen como TARGET Healthcare:
@@ -117,7 +116,8 @@ Calendar
 Case 360
 
 Mobile Technician
-Después del cierre del ERP Core V1, Healthcare se convierte en el workstream principal de producto.
+Después del cierre del ERP Core V1, Healthcare queda disponible como workstream
+estratégico candidato, sujeto a aprobación explícita.
 
 4. Visión de evolución
 La dirección general es:
@@ -214,8 +214,8 @@ Esta distribución no es contractual.
 
 Después del cierre del ERP Core V1:
 
-Healthcare
-→ principal workstream estratégico
+Healthcare o Advanced Inventory
+→ opciones estratégicas sujetas a aprobación; ninguna está preseleccionada
 7. Etapa 0 — Documentation & Architecture Baseline
 Estado: En cierre
 
@@ -336,23 +336,24 @@ Critical authorization review — ✅ CLOSED / VALIDATED in B2D
 
 ↓
 
-Protected-route / session hardening
+Protected-route / session hardening — ✅ IMPLEMENTED / VALIDATED in B3B4
 
 ↓
 
-Authentication abuse protection / rate limiting
+Authentication abuse protection / rate limiting — ✅ IMPLEMENTED / VALIDATED in B3B1
 
 ↓
 
-Production secrets / configuration review
+Production secrets / configuration review — ✅ IMPLEMENTED / VALIDATED in B3B2
 
 ↓
 
-Real password-recovery email delivery/configuration
+Real password-recovery email/configuration — ⏳ OPERATIONAL VALIDATION PENDING
 
 ↓
 
-Dependency/security maintenance before RC
+Dependency hardening — integrado en B3B3A; `deepmerge-ts` remediado en
+OPS-RC-B5B.10B1 (`bac9ab5`). El mantenimiento periódico continúa.
 La sanitización histórica de passwordHash ya fue resuelta y no forma parte del trabajo futuro.
 
 8.2 Secure Password Recovery — CLOSED / CURRENT
@@ -394,15 +395,9 @@ generic anti-enumeration response
 
 delivery-failure token invalidation
 
-La implementación está completa. Fuera de este workstream permanecen:
-
-real email delivery/configuration verification
-
-rate limiting / abuse protection
-
-dependency/security maintenance
-
-session hardening
+La implementación está completa. Fuera de este workstream permanece la
+verificación operativa de email real y la aceptación de staging cuando
+OPS-RC-B5C sea reactivado.
 Regla de seguridad:
 
 public password reset
@@ -503,7 +498,7 @@ no frontend-only access assumptions
 La matriz CURRENT utiliza sólo `ADMIN`, `MANAGER`, `SALES` y `WAREHOUSE`.
 Permission-based RBAC permanece diferido P1.
 
-8.7 Protected Route / Session Architecture
+8.7 Protected Route / Session Architecture — CLOSED / VALIDATED
 CURRENT frontend utiliza:
 
 authenticated route group
@@ -513,7 +508,7 @@ AppShell
 JWT client-side storage
 
 API interceptor / 401 handling
-Antes de producción debe revisarse formalmente:
+La implementación B3B4 validó:
 
 session bootstrap
 
@@ -523,13 +518,13 @@ unauthenticated access behavior
 
 logout consistency
 
-token/session storage strategy
+protected-page flash prevention
 
-protected-page flash
+401 redirect and network/5xx session preservation
 La estrategia CURRENT de JWT en localStorage no debe tratarse como irreversible para producción.
 
-8.8 Authentication Abuse Protection
-Antes de producción deben protegerse especialmente:
+8.8 Authentication Abuse Protection — CLOSED / VALIDATED
+Los endpoints sensibles quedaron protegidos especialmente:
 
 /auth/login
 
@@ -547,34 +542,32 @@ retry controls where appropriate
 monitoring
 
 safe error semantics
-La estrategia debe evitar introducir un lockout fácilmente explotable como denial-of-service.
+La configuración y las ventanas de rate limiting fueron validadas en B3B1. La
+verificación operativa de observabilidad queda pendiente para staging.
 
-8.9 Production Secrets / Configuration
-Antes de pilot/commercial production debe revisarse:
+8.9 Production Secrets / Configuration — IMPLEMENTED / VALIDATED
+La implementación exige `NODE_ENV` explícito, valida la presencia de variables
+requeridas y la longitud mínima de `JWT_SECRET`, y exige URLs frontend HTTPS
+en producción. CORS utiliza el origin configurado por entorno.
 
-JWT_SECRET / secrets management
+Pendiente de aceptación operativa:
 
-environment separation
+gestión de secretos, configuración real de la base de datos y revisión de
+credenciales versionadas en cada release
 
-no committed credentials
-
-production database configuration
-
-CORS / environment-specific origins
-
-verified sender/domain for password recovery
-
-valid RESEND_API_KEY, EMAIL_FROM and FRONTEND_BASE_URL
+sender/domain verificado y credenciales Resend válidas ante el proveedor
 
 real forgot → email → reset → login E2E
 
-debug/dev settings
+configuración final del host de staging/producción, incluido debug/dev settings
 
-production-safe defaults
+La validación de variables no verifica el sender/domain ni la entrega real.
 8.10 Core Regression
 B2D completó la regresión automatizada de autorización y tenant isolation.
 
-La regresión técnica C y el QA funcional D permanecen como gates posteriores.
+La implementación B3 y el gate técnico pre-merge OPS-RC-B5B quedaron
+integrados; la aceptación operativa de roles, email real y staging permanece
+separada.
 
 La validación B2D incluyó:
 
@@ -662,12 +655,14 @@ ERP Core
 → security P0 resolved or formally closed
 
 → known debt explicitly recorded
+Estos son criterios del cierre formal; la integración en `main` no acredita
+por sí sola QA manual de roles, Resend real ni aceptación de staging.
 No significa que el ERP esté terminado para siempre.
 
 Significa que la base V1 es suficientemente estable para dejar de abrir nuevas funcionalidades Core de manera indiscriminada.
 
 9. Etapa 2 — Zaping Healthcare
-Prioridad: P1 estratégica inmediata después del cierre ERP Core V1
+Prioridad: P1 estratégica futura; no seleccionada como siguiente iniciativa
 
 Objetivo:
 
@@ -1208,7 +1203,9 @@ Objetivo:
 
 reducir fricción y convertir módulos funcionales en una experiencia ERP más eficiente.
 
-Healthcare será el workstream principal después del Core, pero mejoras UX seleccionadas pueden ejecutarse en paralelo si no retrasan dependencias Healthcare.
+Healthcare y Advanced Inventory permanecen como workstreams candidatos después
+del Core. Cualquier prioridad futura requiere aprobación explícita; mejoras UX
+seleccionadas pueden ejecutarse en paralelo si no crean dependencias nuevas.
 
 10.1 360 Views
 Prioridad:
@@ -2556,24 +2553,20 @@ Authorization + Tenant Isolation V1
 
 Role-based authorization V1
 
-Remaining:
+Remaining operational validation:
 
-B3 production / security hardening
+real email delivery/configuration and forgot → email → reset → login E2E
 
-Dependency/security maintenance
+manual role QA
 
-Real email delivery
+OPS-RC-B5C real staging acceptance — DEFERRED / READY WHEN NEEDED
 
-Rate limiting / authentication abuse protection
+backup / restore provider validation before pilot / production
 
-C technical regression
-
-D full ERP end-to-end QA
-
-Release candidate gate
+Formal release-candidate acceptance remains a later decision.
 Commercial Returns Backend no es P0.
 
-P1 estratégica inmediata
+P1 estratégica futura — decisión pendiente
 Zaping Healthcare
 
 Hospital / Doctor
@@ -2700,15 +2693,13 @@ External Intelligence
 AI
 La prioridad inmediata es:
 
-H8A
+ERP Core V1 integrado en `main`
 ↓
-H8B
+documentación sincronizada
 ↓
-UX-B.6
+QA local / hardening
 ↓
-ERP Core V1 Closure
-↓
-Healthcare
-No deben abrirse nuevas funcionalidades importantes del ERP Core antes de completar H8 y UX-B.6, salvo correcciones P0 necesarias para el cierre.
+siguiente iniciativa funcional — decisión pendiente
 
-Healthcare TARGET tampoco debe expandirse en Prisma durante H8.
+Healthcare y Advanced Inventory permanecen como opciones futuras no
+preseleccionadas. No se afirma despliegue de staging o producción.

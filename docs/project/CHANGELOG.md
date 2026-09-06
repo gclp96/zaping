@@ -3,8 +3,33 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.3.0
 **Estado:** Activo
-**Última actualización:** 2026-09-02
+**Última actualización:** 2026-09-05
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-05 — PR #1 integration — ERP Core V1 post-merge baseline
+
+**Estado:** INTEGRATED / VALIDATED
+
+**Merge commit:** `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d`
+
+PR #1 integró el ERP Core V1 en la branch canónica `main`. La entrega incluye
+el core empresarial y su UI/UX operativa, autenticación y hardening de
+seguridad, equipment y la base Healthcare.
+
+También quedaron integrados el CI operativo y la preparación de Docker/
+deployment para API. OPS-RC-B5B quedó cerrado con el merge. La aceptación de
+staging real de OPS-RC-B5C permanece `DEFERRED / READY WHEN NEEDED`; no se
+afirma despliegue de staging o producción.
+
+Este registro resume la integración completa de PR #1 y no enumera sus commits
+individuales.
+
+`RC-DATA` quedó resuelto y la alerta de `deepmerge-ts` fue remediada mediante
+el override `^8.0.1` en OPS-RC-B5B.10B1 (`bac9ab5`). Los pendientes descritos
+en las entradas B2E anteriores representan su estado histórico. Siguen
+pendientes Resend real, QA manual de roles y backup/restore cloud.
 
 ---
 

@@ -1,7 +1,7 @@
 # UX Improvement Backlog — Zaping
 
 **Estado:** Activo
-**Última actualización:** 2026-08-29
+**Última actualización:** 2026-09-05
 **Baseline:** UX-01 y UX-02 completados
 
 ---
@@ -133,13 +133,13 @@ inconsistentes en cada módulo.
 
 ## 6. Navegación y contexto futuros
 
-Estado: `FUTURE`
+Estado: `PARTIAL / OPEN`
 
-- redirect post-login hacia Home autenticado;
+- redirect post-login hacia Home autenticado: `COMPLETE / VALIDATED` (`/home`);
+- role-aware navigation: `IMPLEMENTED / VALIDATED`;
 - branch/context selector;
 - notifications;
 - global search;
-- role-aware navigation;
 - collaboration.
 
 Estos elementos no forman parte de UX-01 ni de UX-02 DataTable por defecto.
@@ -148,10 +148,12 @@ La navegación role-aware no sustituye autorización backend.
 
 ## 7. Sesión y rutas protegidas
 
-El redirect post-login es una decisión UX futura. La arquitectura de sesión,
-rutas protegidas, almacenamiento JWT e invalidación es una revisión de seguridad
-P0 separada y permanece gobernada por `PROJECT_BOARD.md` y
-`SECURITY_PRINCIPLES.md`.
+El redirect post-login hacia `/home` ya está implementado y validado.
+
+La arquitectura de sesión, rutas protegidas, almacenamiento JWT e invalidación
+permanece gobernada por `PROJECT_BOARD.md` y `SECURITY_PRINCIPLES.md`; su
+aceptación operativa de staging continúa pendiente y no constituye una nueva
+decisión UX.
 
 ## 8. Infraestructura de tests frontend
 
