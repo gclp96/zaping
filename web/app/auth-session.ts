@@ -47,6 +47,7 @@ export function hasStoredAuthToken(): boolean {
 
 let cachedSession: AuthenticatedSession | null = null;
 let sessionRequest: Promise<AuthenticatedSession> | null = null;
+let sessionGeneration = 0;
 
 export async function loadAuthenticatedSession({
   requireToken = false,
@@ -60,22 +61,38 @@ export async function loadAuthenticatedSession({
     return cachedSession;
   }
 
+  const generation = sessionGeneration;
   sessionRequest ??= api
     .get<AuthenticatedSession>("/auth/me")
     .then((response) => {
-      cachedSession = response.data;
+      if (generation === sessionGeneration) cachedSession = response.data;
       return response.data;
     })
     .finally(() => {
-      sessionRequest = null;
+      if (generation === sessionGeneration) sessionRequest = null;
     });
 
   return sessionRequest;
 }
 
 export function clearAuthenticatedSessionCache() {
+  sessionGeneration += 1;
   cachedSession = null;
   sessionRequest = null;
+}
+
+export function clearAuthenticatedSession() {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    } catch {
+      // The in-memory session still clears when storage is unavailable.
+    }
+    clearAuthenticatedSessionCache();
+    return;
+  }
+
+  clearAuthenticatedSessionCache();
 }
 
 export function useAuthenticatedSession({

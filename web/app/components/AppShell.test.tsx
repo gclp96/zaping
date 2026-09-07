@@ -18,6 +18,7 @@ import {
 
 import {
   clearAuthenticatedSessionCache,
+  loadAuthenticatedSession,
   type AuthenticatedSession,
 } from "@/app/auth-session";
 import { api } from "@/services/api";
@@ -134,6 +135,59 @@ describe("AppShell session gate", () => {
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  it.each(["ADMIN", "MANAGER", "SALES", "WAREHOUSE"] as const)(
+    "logs out %s and clears protected content and cached session",
+    async (role) => {
+      window.localStorage.setItem("token", "valid-token");
+      mockAuthSuccess({ ...adminSession, role });
+      renderShell();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Cerrar sesión" }),
+      );
+      expect(window.localStorage.getItem("token")).toBeNull();
+      expect(screen.queryByTestId("protected-child")).toBeNull();
+      expect(screen.getByRole("status").textContent).toContain(
+        "Redirigiendo al inicio de sesión...",
+      );
+      await waitFor(() =>
+        expect(navigationMock.replace).toHaveBeenCalledWith("/login"),
+      );
+      expect(await loadAuthenticatedSession({ requireToken: true })).toBeNull();
+      window.localStorage.setItem("token", "new-session");
+      mockAuthSuccess(salesSession);
+      expect(
+        (await loadAuthenticatedSession({ requireToken: true }))?.role,
+      ).toBe("SALES");
+    },
+  );
+
+  it("offers logout inside the mobile drawer and closes it", async () => {
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    renderShell();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Abrir navegación" }),
+    );
+    const buttons = screen.getAllByRole("button", { name: "Cerrar sesión" });
+    await userEvent.click(buttons[buttons.length - 1]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(window.localStorage.getItem("token")).toBeNull();
+    await waitFor(() =>
+      expect(navigationMock.replace).toHaveBeenCalledWith("/login"),
+    );
+  });
+
+  it("does not restore a cleared session cache from an older request", async () => {
+    const pending = deferred<{ data: AuthenticatedSession }>();
+    vi.mocked(api.get).mockReturnValueOnce(pending.promise as never);
+    const oldRequest = loadAuthenticatedSession();
+    clearAuthenticatedSessionCache();
+    pending.resolve({ data: adminSession });
+    await oldRequest;
+    mockAuthSuccess(salesSession);
+    expect((await loadAuthenticatedSession())?.role).toBe("SALES");
   });
 
   it("redirects without calling auth/me or rendering protected children when no token exists", async () => {

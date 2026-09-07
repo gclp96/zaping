@@ -1,0 +1,45 @@
+# Explicit LOCAL QA only. No seed/migration runs automatically at startup.
+name: zaping-local-qa
+services:
+  zaping-qa-postgres:
+    image: postgres:16
+    env_file: .qa/postgres.env
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - qa-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zaping_qa -d zaping_qa"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+  api:
+    image: node:24.20.0-bookworm-slim
+    env_file: .qa/api.env
+    working_dir: /app
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      zaping-qa-postgres:
+        condition: service_healthy
+    volumes:
+      - ./app/api:/source:ro
+      - ./scripts/qa:/qa-tools:ro
+      - ./.qa:/qa-private
+      - qa-api:/app
+    command: ["sh", "/qa-tools/start.sh", "api"]
+  web:
+    image: node:24.20.0-bookworm-slim
+    env_file: .qa/web.env
+    working_dir: /app
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./web:/source:ro
+      - ./scripts/qa:/qa-tools:ro
+      - qa-web:/app
+    command: ["sh", "/qa-tools/start.sh", "web"]
+volumes:
+  qa-postgres:
+  qa-api:
+  qa-web:

@@ -5,7 +5,10 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import AppHeader from "@/app/components/AppHeader";
-import { useAuthenticatedSession } from "@/app/auth-session";
+import {
+  clearAuthenticatedSession,
+  useAuthenticatedSession,
+} from "@/app/auth-session";
 import { getRouteTitle } from "@/app/components/navigation";
 import Sidebar from "@/app/components/sidebar";
 import Loading from "@/app/components/ui/Loading";
@@ -22,6 +25,7 @@ export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [loggedOut, setLoggedOut] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceReady, setSidebarPreferenceReady] = useState(false);
   const sessionState = useAuthenticatedSession({ requireToken: true });
@@ -30,14 +34,14 @@ export default function AppShell({ children }: AppShellProps) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (sessionState.status !== "unauthenticated") {
+    if (!loggedOut && sessionState.status !== "unauthenticated") {
       return;
     }
 
     router.replace("/login");
     // The router is stable in the App Router; status prevents repeated redirects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionState.status]);
+  }, [sessionState.status, loggedOut]);
 
   useEffect(() => {
     try {
@@ -84,6 +88,7 @@ export default function AppShell({ children }: AppShellProps) {
   }, [mobileNavigationOpen]);
 
   if (
+    loggedOut ||
     sessionState.status === "loading" ||
     sessionState.status === "unauthenticated"
   ) {
@@ -92,7 +97,7 @@ export default function AppShell({ children }: AppShellProps) {
         <div className="w-full max-w-md" role="status" aria-live="polite">
           <Loading
             message={
-              sessionState.status === "unauthenticated"
+              loggedOut || sessionState.status === "unauthenticated"
                 ? "Redirigiendo al inicio de sesión..."
                 : "Cargando sesión..."
             }
@@ -130,6 +135,12 @@ export default function AppShell({ children }: AppShellProps) {
   const title = getRouteTitle(pathname);
   const currentUserRole = sessionState.user.role;
 
+  function logout() {
+    clearAuthenticatedSession();
+    setMobileNavigationOpen(false);
+    setLoggedOut(true);
+  }
+
   function toggleSidebarCollapsed() {
     setSidebarCollapsed((currentValue) => {
       const nextValue = !currentValue;
@@ -158,6 +169,7 @@ export default function AppShell({ children }: AppShellProps) {
         onToggleCollapsed={toggleSidebarCollapsed}
         transitionEnabled={sidebarPreferenceReady}
         currentUserRole={currentUserRole}
+        onLogout={logout}
       />
 
       {mobileNavigationOpen ? (
@@ -187,6 +199,7 @@ export default function AppShell({ children }: AppShellProps) {
             showCloseButton
             onClose={() => setMobileNavigationOpen(false)}
             currentUserRole={currentUserRole}
+            onLogout={logout}
           />
         </div>
       ) : null}
