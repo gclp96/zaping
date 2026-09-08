@@ -81,6 +81,52 @@ describe('CORS configuration', () => {
     expect(foreign.headers['access-control-allow-origin']).toBeUndefined();
   });
 
+  it('accepts the local QA purchase receipt preflight without wildcard access', async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [CorsProbeController],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.enableCors(
+      buildCorsOptions({
+        nodeEnv: 'development',
+        frontendOrigin: 'http://127.0.0.1:3000',
+      }),
+    );
+    await app.init();
+
+    const preflight = await httpRequest(app)
+      .options('/probe')
+      .set('Origin', 'http://127.0.0.1:3000')
+      .set('Access-Control-Request-Method', 'POST')
+      .set(
+        'Access-Control-Request-Headers',
+        'authorization,content-type,idempotency-key',
+      )
+      .expect(204);
+
+    const allowedHeaders = String(
+      preflight.headers['access-control-allow-headers'],
+    );
+    const allowedHeaderNames = allowedHeaders
+      .toLowerCase()
+      .split(',')
+      .map((header) => header.trim());
+
+    expect(preflight.headers['access-control-allow-origin']).toBe(
+      'http://127.0.0.1:3000',
+    );
+    expect(allowedHeaderNames).toEqual(
+      expect.arrayContaining([
+        'authorization',
+        'content-type',
+        'idempotency-key',
+      ]),
+    );
+    expect(preflight.headers['access-control-allow-origin']).not.toBe('*');
+    expect(allowedHeaders).not.toContain('*');
+  });
+
   it('uses explicit methods and request headers without wildcard access', () => {
     expect(
       buildCorsOptions({
@@ -90,7 +136,7 @@ describe('CORS configuration', () => {
     ).toMatchObject({
       credentials: false,
       methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
     });
   });
 });
