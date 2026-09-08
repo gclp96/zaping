@@ -20,6 +20,9 @@ type PrismaServiceMock = {
   product: {
     findFirst: jest.Mock;
   };
+  inventoryMovement: {
+    findMany: jest.Mock;
+  };
 };
 
 describe('InventoryService', () => {
@@ -48,6 +51,9 @@ describe('InventoryService', () => {
       ),
       product: {
         findFirst: jest.fn(),
+      },
+      inventoryMovement: {
+        findMany: jest.fn(),
       },
     };
 
@@ -93,6 +99,24 @@ describe('InventoryService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('keeps movement reads scoped to the authenticated company', async () => {
+    prisma.inventoryMovement.findMany.mockResolvedValue([]);
+
+    await expect(service.findMovements(companyId)).resolves.toEqual([]);
+
+    expect(prisma.inventoryMovement.findMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+      },
+      include: {
+        product: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
   });
 
   it('registra un movimiento IN dentro de una transacción Serializable', async () => {

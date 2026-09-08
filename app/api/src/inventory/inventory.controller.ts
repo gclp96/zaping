@@ -34,7 +34,7 @@ export class InventoryController {
   }
 
   @Get('movements')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   findMovements(@Request() req: InventoryRequest) {
     return this.inventoryService.findMovements(req.user.companyId);
   }

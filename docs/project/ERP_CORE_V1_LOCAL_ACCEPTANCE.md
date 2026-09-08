@@ -123,7 +123,7 @@ Fuente: controllers y `@Roles`, `RolesGuard`, `web/app/erp-role-access.ts`, nave
 | Suppliers | V C E D | V C E D | — | V | W sólo lectura |
 | Products | V C E D | V C E D | V | V | Desactivación; tracking no editable |
 | Categories | V C E D | V C E D | V | V | DELETE real sólo sin productos relacionados |
-| Inventory | V X | V X | V | V X | Escrituras sólo API; W no ADJUSTMENT |
+| Inventory | V X | V X | V | V X | S sólo Existencias; Movimientos A/M/W; escrituras sólo API; W no ADJUSTMENT |
 | Purchases | V C E X | V C E X | — | V C E X | W recibe, no confirma/cancela |
 | Purchase Receipts | V C | V C | — | V C | Sin edit/delete; cierre compra automático |
 | Quotes | V C X | V C X | V C X | — | Confirmar/cancelar/convertir; sin edit/delete genérico |
@@ -158,6 +158,13 @@ Discrepancias observadas por código, pendientes de reproducción:
 - **P2 accesibilidad potencial:** drawer implementa Escape/focus inicial/restauración/scroll lock, pero no se encontró trampa de Tab como la del componente Modal.
 - **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout. Su QA visual permanece NOT RUN.
 - No se confirmó bypass de autorización en esta revisión focal. Cualquier reproducción de autorización incorrecta o acceso cross-tenant se clasifica **P1/HIGH como mínimo**, aunque el botón estuviera oculto.
+
+### QA-005 — SALES podía consultar Inventory Movements
+
+- Hallazgo manual: SALES veía `Inventario -> Movimientos` y el ledger seguía cargando después de Ctrl+F5.
+- Causa: `GET /inventory/movements` incluía SALES en `@Roles(...)`, mientras la página siempre mostraba la pestaña y solicitaba el ledger sin consultar el rol autenticado.
+- Corrección implementada: el backend limita la lectura del ledger a ADMIN/MANAGER/WAREHOUSE y conserva las restricciones vigentes de sus mutaciones; el frontend mantiene Existencias para SALES, oculta Movimientos, evita su request y normaliza deep links de Movimientos a `/inventory`.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
 
 ## F. Action matrix
 

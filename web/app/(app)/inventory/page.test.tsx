@@ -2,6 +2,7 @@ import {
   cleanup,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -14,6 +15,10 @@ import {
   vi,
 } from 'vitest';
 
+import {
+  clearAuthenticatedSessionCache,
+  type UserRole,
+} from '@/app/auth-session';
 import { api } from '@/services/api';
 
 import {
@@ -204,14 +209,30 @@ function configureApiMocks({
   movementData = movements,
   inventoryError,
   movementError,
+  role = 'ADMIN',
 }: {
   inventoryData?: InventoryItem[];
   movementData?: InventoryMovement[];
   inventoryError?: Error;
   movementError?: Error;
+  role?: UserRole;
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: {
+          id: 'user-1',
+          companyId: 'company-1',
+          email: 'user@zaping.test',
+          firstName: 'Usuario',
+          lastName: 'Prueba',
+          role,
+          companyTimezone: 'America/Hermosillo',
+        },
+      } as never;
+    }
 
     if (endpoint === '/inventory') {
       if (inventoryError) {
@@ -257,6 +278,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('InventoryPage', () => {
   beforeEach(() => {
+    clearAuthenticatedSessionCache();
     vi.clearAllMocks();
     navigationMock.search = '';
     configureApiMocks();
@@ -266,6 +288,7 @@ describe('InventoryPage', () => {
   });
 
   afterEach(() => {
+    clearAuthenticatedSessionCache();
     consoleErrorSpy.mockRestore();
     cleanup();
   });
@@ -319,6 +342,48 @@ describe('InventoryPage', () => {
     expect(screen.queryByRole('button', { name: /ajustar stock/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /nuevo movimiento/i })).toBeNull();
   });
+
+  it('keeps SALES on Existencias without rendering or requesting Movimientos', async () => {
+    clearAuthenticatedSessionCache();
+    navigationMock.search = new URLSearchParams({
+      tab: 'movements',
+      referenceType: 'PURCHASE_RECEIPT',
+      referenceId: purchaseReceiptMovement.referenceId!,
+      receiptFolio: 'REC-000001',
+    }).toString();
+    configureApiMocks({ role: 'SALES' });
+
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('MED-001')).toBeTruthy();
+    expect(
+      screen.getByRole('tab', { name: 'Existencias' }).getAttribute(
+        'aria-selected',
+      ),
+    ).toBe('true');
+    expect(screen.queryByRole('tab', { name: 'Movimientos' })).toBeNull();
+    expect(api.get).not.toHaveBeenCalledWith('/inventory/movements');
+    await waitFor(() => {
+      expect(navigationMock.replace).toHaveBeenCalledWith('/inventory');
+    });
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'] as const)(
+    'keeps Movimientos available for %s',
+    async (role) => {
+      clearAuthenticatedSessionCache();
+      configureApiMocks({ role });
+
+      render(<InventoryPage />);
+
+      expect(
+        await screen.findByRole('tab', { name: 'Movimientos' }),
+      ).toBeTruthy();
+      await waitFor(() => {
+        expect(api.get).toHaveBeenCalledWith('/inventory/movements');
+      });
+    },
+  );
 
   it('ordena Stock por SKU y valores numéricos sin agregar acciones de fila', async () => {
     const user = userEvent.setup();
@@ -625,6 +690,20 @@ describe('InventoryPage', () => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
 
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@zaping.test',
+            firstName: 'Admin',
+            lastName: 'Prueba',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
+
       if (endpoint === '/inventory') {
         inventoryAttempts += 1;
 
@@ -664,6 +743,20 @@ describe('InventoryPage', () => {
 
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: {
+            id: 'user-1',
+            companyId: 'company-1',
+            email: 'admin@zaping.test',
+            firstName: 'Admin',
+            lastName: 'Prueba',
+            role: 'ADMIN',
+            companyTimezone: 'America/Hermosillo',
+          },
+        } as never;
+      }
 
       if (endpoint === '/inventory') {
         return { data: inventory } as never;

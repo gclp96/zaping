@@ -96,7 +96,7 @@ const roleMatrix: RoleMatrix[] = [
     controller: InventoryController,
     methods: {
       findInventory: allRoles,
-      findMovements: allRoles,
+      findMovements: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       createMovement: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
     },
   },
@@ -323,6 +323,35 @@ describe('ERP Core role matrix', () => {
       'company-1',
       adjustment,
     );
+  });
+
+  it.each([
+    [UserRole.ADMIN, true],
+    [UserRole.MANAGER, true],
+    [UserRole.WAREHOUSE, true],
+    [UserRole.SALES, false],
+  ])('enforces Inventory movement read access for %s', (role, allowed) => {
+    const rolesGuard = new RolesGuard(new Reflector());
+
+    expect(
+      rolesGuard.canActivate(
+        buildRoleContext(InventoryController, 'findMovements', role),
+      ),
+    ).toBe(allowed);
+  });
+
+  it('denies SALES Inventory movement mutations through RolesGuard', () => {
+    const rolesGuard = new RolesGuard(new Reflector());
+
+    expect(
+      rolesGuard.canActivate(
+        buildRoleContext(
+          InventoryController,
+          'createMovement',
+          UserRole.SALES,
+        ),
+      ),
+    ).toBe(false);
   });
 });
 
