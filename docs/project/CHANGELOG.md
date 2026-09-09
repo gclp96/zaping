@@ -3,8 +3,53 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.3.0
 **Estado:** Activo
-**Última actualización:** 2026-09-05
+**Última actualización:** 2026-09-09
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-09 — ERP Core V1 Local Acceptance closure / PR #3
+
+**Estado:** CLOSED / ACCEPTED — DEV-NEXT-03B PASS
+
+**PR #3:** MERGED
+
+**Merge commit:** `a4434a6`
+
+DEV-NEXT-03B cerró la aceptación local del ERP Core V1 sobre `main`. La matriz
+manual terminó con los cuatro roles aceptados:
+
+| Rol | Resultado |
+| --- | --- |
+| ADMIN | PASS |
+| MANAGER | PASS |
+| SALES | PASS |
+| WAREHOUSE | PASS |
+
+QA-001 a QA-008 quedaron `CLOSED / PASS`. Las correcciones cubrieron el origen
+local de QA, CORS para `Idempotency-Key`, el filtro operacional de productos
+inactivos, Dashboard/Home/Inventory role-aware, RBAC de Inventory Movements y
+la administración de Suppliers para WAREHOUSE, preservando aislamiento de
+tenant y sesión ante `403`.
+
+Evidencia técnica final:
+
+```text
+API: 65 suites / 705 tests PASS
+Web: 57 files / 696 tests PASS — stable one-worker strategy
+API/Web lint: PASS
+API/Web typecheck: PASS
+API/Web production build: PASS
+Web production routes: 22 / 22
+Git diff checks: PASS
+```
+
+La evidencia detallada se conserva en
+`docs/project/ERP_CORE_V1_LOCAL_ACCEPTANCE.md`. Este cierre no representa
+aceptación de staging ni despliegue de producción. La entrega real por Resend,
+OPS-RC-B5C staging acceptance y la validación de backup/restore con proveedor
+real permanecen como seguimientos operativos separados antes de piloto o
+producción.
 
 ---
 
@@ -27,9 +72,9 @@ Este registro resume la integración completa de PR #1 y no enumera sus commits
 individuales.
 
 `RC-DATA` quedó resuelto y la alerta de `deepmerge-ts` fue remediada mediante
-el override `^8.0.1` en OPS-RC-B5B.10B1 (`bac9ab5`). Los pendientes descritos
-en las entradas B2E anteriores representan su estado histórico. Siguen
-pendientes Resend real, QA manual de roles y backup/restore cloud.
+el override `^8.0.1` en OPS-RC-B5B.10B1 (`bac9ab5`). En ese baseline permanecían pendientes Resend real, QA manual de roles y
+backup/restore cloud. La QA manual de roles fue cerrada posteriormente por
+DEV-NEXT-03B; los demás seguimientos operativos continúan según el estado vigente.
 
 ---
 

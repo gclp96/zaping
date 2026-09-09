@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: Post-merge ERP Core V1 — sincronización documental, QA local y hardening
-Última actualización: 2026-09-05
+Fase actual: Post-acceptance ERP Core V1 — sincronización documental y preparación de Healthcare
+Última actualización: 2026-09-09
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -32,17 +32,23 @@ docs/project/CHANGELOG.md
 
 y no duplicarse dentro de este Board.
 
-POST-MERGE BASELINE
+POST-ACCEPTANCE BASELINE
 
 Canonical branch: `main`
 
-Canonical baseline: `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d`
+Canonical baseline: `a4434a6`
 
-PR #1: MERGED
+PR #3: MERGED
 
 Post-merge CI: PASS
 
-ERP Core V1: INTEGRATED
+ERP Core V1: CLOSED / ACCEPTED — local V1 baseline
+
+DEV-NEXT-03B — ERP Core V1 Local Acceptance: COMPLETED / PASS
+
+Manual role matrix: ADMIN / MANAGER / SALES / WAREHOUSE — PASS
+
+QA-001 through QA-008: CLOSED / PASS
 
 OPS-RC-B5B: CLOSED
 
@@ -94,13 +100,11 @@ ERP Core
 
 CURRENT
 
-ERP Core V1 integrated in `main`
+Post-acceptance documentation synchronization
 
-├── documentation baseline synchronization
+├── reconcile Board / Roadmap / Changelog with DEV-NEXT-03B
 │
-├── local QA / hardening
-│
-└── next functional initiative still to be approved
+└── preserve local acceptance evidence separately from operational release gates
 
 Frontend UX workstream
 
@@ -114,23 +118,21 @@ Frontend UX workstream
 
 NEXT
 
-documentation sync
+M-HC1 — Healthcare Operations Foundation
+        → SELECTED / PLANNED — P1
         ↓
-local QA / hardening
-        ↓
-next functional initiative — decision pending
+HC-NEXT-01 — Hospital / Doctor Domain Design
+        → READY / DESIGN
 
 DEFERRED
 
 OPS-RC-B5C — real staging acceptance
         → READY WHEN NEEDED; not executed by this baseline
 
-RELEASE BLOCKERS — P0
+PRE-PILOT / PRE-PRODUCTION OPERATIONAL GATES
 
 Antes de pilot/commercial production deben resolverse o verificarse formalmente
-los pendientes operativos:
-
-manual role QA
+los pendientes operativos. No reabren la aceptación local de ERP Core V1:
 
 real password-recovery email delivery/configuration
 
@@ -189,7 +191,7 @@ Zaping Platform
 │   ├── Inventario transaccional
 │   ├── Equipment Core
 │   ├── trazabilidad entre módulos
-│   └── preparación de cierre V1
+│   └── V1 CLOSED / ACCEPTED — local baseline
 │
 ├── Healthcare
 │   ├── Case Foundation implementado
@@ -1169,7 +1171,10 @@ real email delivery/configuration verification:
 verified sender/domain, valid RESEND_API_KEY, EMAIL_FROM and
 FRONTEND_BASE_URL, plus real forgot → email → reset → login E2E
 
-manual role QA and staging acceptance when B5C is reactivated.
+staging acceptance when B5C is reactivated.
+
+La matriz manual de roles fue completada por DEV-NEXT-03B con ADMIN, MANAGER,
+SALES y WAREHOUSE en PASS; no forma parte de la validación operativa pendiente.
 
 SEC-006 — Authentication Abuse Protection / Rate Limiting
 
@@ -1324,36 +1329,12 @@ y su regresión quedó integrada antes del merge de PR #1.
 
 QA-CORE — Commercial Core Regression
 
-Estado: ⏳ PENDING
+Estado: ✅ COMPLETED / PASS — DEV-NEXT-03B
 Prioridad: P0
 
-Se ejecutará durante:
-
-H8B
-+
-UX-B.6
-
-H8B debe incluir:
-
-backend tests
-
-frontend tests
-
-backend build
-
-frontend build
-
-backend lint
-
-frontend lint
-
-Prisma validate
-
-Prisma migrate status
-
-git health
-
-UX-B.6 debe incluir el QA funcional transversal real:
+La aceptación local del ERP Core V1 cerró la regresión comercial y la matriz
+manual de roles. La evidencia canónica se conserva en
+`docs/project/ERP_CORE_V1_LOCAL_ACCEPTANCE.md`:
 
 critical business flows
 
@@ -1377,7 +1358,18 @@ idempotency replay/conflict
 
 historical deactivation behavior
 
-Release readiness también requiere cerrar los P0 de seguridad de §12.
+Resultado final:
+
+```text
+API: 65 suites / 705 tests PASS
+Web: 57 files / 696 tests PASS — stable one-worker strategy
+API/Web lint, typecheck and production build: PASS
+Web production routes: 22 / 22
+Git diff checks: PASS
+```
+
+Este cierre es aceptación local, no aceptación de staging ni despliegue de
+producción. Los gates operativos pre-piloto permanecen separados en §0 y §12.
 
 14. Returns
 
@@ -1504,7 +1496,7 @@ alerts
 
 Dashboard integration
 
-Advanced Inventory — approved target (not implemented)
+Advanced Inventory — DESIGNED / APPROVED TARGET — NOT IMPLEMENTED
 
 Necesidades futuras:
 
@@ -1550,17 +1542,23 @@ Backlog aprobado:
 | INV-CNT-001 | Physical / Cycle Counts | 🎯 TARGET |
 | INV-SCN-001 | Location QR / Barcode | 🎯 TARGET |
 | INV-LED-001 | Inventory Ledger V2 | 🎯 TARGET |
-| EQ-AVL-001 | Derived Equipment Availability | 🎯 TARGET |
+| EQ-AVL-001 | Derived Equipment Availability | ✅ IMPLEMENTED / VALIDATED in Core; location/custody evolution remains TARGET |
 | EQ-MNT-001 | Equipment Maintenance | 🎯 TARGET |
 
 Estos items no implican ejecución inmediata, versión ni fecha de entrega.
 
 17. Healthcare — Estado actual
 
-Estado: ✅ Case Foundation IMPLEMENTED / VALIDATED
-Prioridad: P1 estratégica después del cierre ERP Core V1
+Milestone: M-HC1 — Healthcare Operations Foundation
 
-Healthcare Case Foundation está implementado.
+Estado: 🎯 SELECTED / PLANNED
+
+Prioridad: P1 estratégica
+
+Healthcare Case Foundation está IMPLEMENTED / VALIDATED.
+
+EquipmentAsset / Equipment V1 está IMPLEMENTED / VALIDATED en ERP Core y
+constituye la identidad física que Healthcare consumirá sin duplicarla.
 
 Modelo actual:
 
@@ -1678,9 +1676,28 @@ Healthcare Case creation idempotency
 
 Un retry después de una respuesta exitosa perdida puede crear otro Case y consumir otro folio.
 
-18. Healthcare — Orden TARGET
+18. Healthcare — siguiente slice y orden TARGET
 
-Después del cierre del ERP Core V1:
+HC-NEXT-01 — Hospital / Doctor Domain Design
+
+Estado: READY / DESIGN
+
+Objetivo: definir el boundary de master data Healthcare para Hospital y Doctor
+antes de implementar persistencia.
+
+Decisión arquitectónica pendiente:
+
+```text
+Company-owned master data
+vs
+shared identity + tenant-specific relationship
+```
+
+La estrategia Prisma final no debe decidirse antes de resolver este boundary.
+HC-NEXT-01 es Documentation / Domain Design; Hospital y Doctor todavía no están
+implementados.
+
+Secuencia planeada de alto nivel para M-HC1:
 
 1. Hospital / Doctor
 
@@ -1690,17 +1707,25 @@ Después del cierre del ERP Core V1:
 
 4. Case Availability
 
-5. Dispatch / Custody
+5. Architecture gate for physical logistics
 
-6. Return
+6. Dispatch / Custody
 
-7. CaseKit / Maletín
+7. Return / Reconciliation
 
-8. Calendar
+8. CaseKit / Maletín
 
-9. Case 360
+9. Calendar
 
-10. Mobile technician experience
+10. Case 360
+
+11. Mobile technician experience
+
+El gate previo a Dispatch / Custody debe resolver physical positioning,
+custody, location y transfer semantics mediante diseño/ADR explícito si es
+necesario. No bloquea Hospital / Doctor, Requirements, Equipment Assignment ni
+Case Availability, y no implica ejecutar todo Advanced Inventory dentro de
+M-HC1 o del mismo slice.
 
 Principios:
 
@@ -1864,8 +1889,6 @@ Security / Release
 
 B3 security implementation — CLOSED / VALIDATED
 
-manual role QA
-
 real password-recovery email delivery/configuration
 
 OPS-RC-B5C staging acceptance — DEFERRED / READY WHEN NEEDED
@@ -1966,8 +1989,8 @@ B2 Authorization + Tenant Isolation V1
 B3 security implementation
 → CLOSED / VALIDATED
 
-remaining operational validation: real Resend delivery, manual role QA and
-staging acceptance when OPS-RC-B5C is reactivated
+remaining operational validation: real Resend delivery and staging acceptance
+when OPS-RC-B5C is reactivated
 
 passwordHash exposure ya no forma parte de este riesgo.
 
@@ -2143,73 +2166,25 @@ Future
 
 CURRENT
 
-ERP Core V1 integrated in canonical `main`
+ERP Core V1 CLOSED / ACCEPTED on canonical baseline `a4434a6`
 
-→ documentation baseline synchronization
+→ DEV-NEXT-03B COMPLETED / PASS
 
-→ local QA / hardening
+→ post-acceptance documentation synchronization
 
-NEXT LOCAL WORK
+NEXT STRATEGIC MILESTONE — SELECTED / PLANNED
 
-→ next functional initiative still to be approved
+→ M-HC1 — Healthcare Operations Foundation — P1
+
+FIRST ACTIONABLE SLICE
+
+→ HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
 
 DEFERRED
 
 → OPS-RC-B5C real staging acceptance — READY WHEN NEEDED
 
-Flujos principales a validar:
-
-Supplier
-↓
-Purchase
-↓
-Purchase Receipt
-↓
-Inventory IN
-
-Purchase
-↓
-ASSET Receipt
-↓
-Equipment
-↓
-Inspection
-↓
-Availability
-
-Customer
-↓
-Quote
-↓
-Sale
-↓
-Inventory OUT
-
-Además:
-
-folios
-
-statuses
-
-PDFs
-
-deep-links
-
-traceability
-
-tenant isolation
-
-lifecycle
-
-authorization
-
-idempotency replay / conflict
-
-OPCIÓN FUTURA — sujeta a aprobación como siguiente iniciativa
-
-Healthcare specialization
-
-Secuencia orientativa si se aprueba Healthcare:
+SECUENCIA ESTRATÉGICA M-HC1
 
 Hospital / Doctor
 ↓
@@ -2219,9 +2194,11 @@ Equipment Assignment
 ↓
 Case Availability
 ↓
+architecture gate for physical logistics
+↓
 Dispatch / Custody
 ↓
-Return
+Return / Reconciliation
 ↓
 CaseKit / Maletín
 ↓
@@ -2231,10 +2208,26 @@ Case 360
 ↓
 Mobile Technician
 
-27. Calidad post-merge y snapshot histórico
+27. Calidad post-acceptance y snapshot histórico
 
-Baseline vigente: gate pre-merge B5B.10 aprobado con hallazgos no bloqueantes
-y CI post-merge PASS. La aceptación operativa sigue pendiente según §0.
+Baseline vigente: `a4434a6`, merge de PR #3. DEV-NEXT-03B cerró la aceptación
+local ERP Core V1 con ADMIN, MANAGER, SALES y WAREHOUSE en PASS; QA-001 a
+QA-008 quedaron CLOSED / PASS. La evidencia detallada vive en
+`docs/project/ERP_CORE_V1_LOCAL_ACCEPTANCE.md`.
+
+Snapshot final DEV-NEXT-03B:
+
+```text
+API: 65 suites / 705 tests PASS
+Web: 57 files / 696 tests PASS — one worker
+API/Web lint, typecheck and production build: PASS
+Web production routes: 22 / 22
+Git diff checks: PASS
+```
+
+Esto no acredita staging ni producción. Real Resend, OPS-RC-B5C,
+backup/restore con proveedor real y la aceptación formal de piloto/release
+siguen como gates operativos separados.
 
 Snapshot histórico al cierre de ERP-V1-CLOSE-B2D:
 
@@ -2250,8 +2243,8 @@ Prisma validate/status: PASS
 
 Este snapshot es histórico de B2D y valida la regresión completa de autorización
 y tenant isolation de ese cierre. Los controles B3 y la corrección RC-DATA fueron
-integrados posteriormente; la validación operativa de Resend, roles y staging
-permanece separada.
+integrados posteriormente. La matriz manual de roles se completó en
+DEV-NEXT-03B; Resend real y staging permanecen separados.
 
 El full Vitest pool puede presentar agotamiento de workers/recursos en ejecución paralela.
 
@@ -2355,21 +2348,30 @@ Este documento debe poder responder siempre:
 Respuesta vigente:
 
 ERP Core V1
-→ INTEGRATED in canonical `main`
+→ CLOSED / ACCEPTED in canonical `main` at `a4434a6`
 
 OPS-RC-B5B
 → CLOSED
 
-Documentation synchronization
+DEV-NEXT-03B
+→ COMPLETED / PASS
+
+Post-acceptance documentation synchronization
 → CURRENT
 
-Local QA / hardening
-→ NEXT LOCAL WORK
+M-HC1 — Healthcare Operations Foundation
+→ SELECTED / PLANNED — P1
+
+HC-NEXT-01 — Hospital / Doctor Domain Design
+→ READY / DESIGN
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
 
-Next functional initiative
-→ decision pending; Healthcare and Advanced Inventory are not preselected
+Advanced Inventory
+→ DESIGNED / APPROVED TARGET — NOT IMPLEMENTED — P2
 
-No staging or production deployment is claimed by this baseline.
+No staging or production deployment is claimed by this baseline. ERP Core V1
+continúa abierto a evoluciones futuras como SalesOrder + Delivery, Commercial
+Returns, FEFO, Expiration, Audit, Permission-Based RBAC, Data Import, Advanced
+Inventory y Billing / CFDI, sin reabrir por ello su aceptación local V1.
