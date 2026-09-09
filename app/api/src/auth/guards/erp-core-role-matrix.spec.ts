@@ -345,11 +345,7 @@ describe('ERP Core role matrix', () => {
 
     expect(
       rolesGuard.canActivate(
-        buildRoleContext(
-          InventoryController,
-          'createMovement',
-          UserRole.SALES,
-        ),
+        buildRoleContext(InventoryController, 'createMovement', UserRole.SALES),
       ),
     ).toBe(false);
   });

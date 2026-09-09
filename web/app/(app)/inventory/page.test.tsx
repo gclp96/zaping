@@ -814,12 +814,11 @@ describe('InventoryPage', () => {
     });
 
     render(<InventoryPage />);
+    const movementsTab = await screen.findByRole('tab', {
+      name: 'Movimientos',
+    });
 
-    expect(
-      screen.getByRole('tab', { name: 'Movimientos' }).getAttribute(
-        'aria-selected',
-      ),
-    ).toBe('true');
+    expect(movementsTab.getAttribute('aria-selected')).toBe('true');
     expect(
       await screen.findByText('Movimientos de la recepción REC-000001'),
     ).toBeTruthy();

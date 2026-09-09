@@ -1,4 +1,8 @@
-import { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  INestApplication,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { InventoryMovementType, UserRole } from '@prisma/client';
 import request from 'supertest';
@@ -24,7 +28,10 @@ describe('InventoryController RBAC', () => {
 
   const authenticationGuard: CanActivate = {
     canActivate(context: ExecutionContext) {
-      context.switchToHttp().getRequest().user = {
+      const httpRequest = context.switchToHttp().getRequest<{
+        user: { companyId: string; role: UserRole };
+      }>();
+      httpRequest.user = {
         companyId,
         role: currentRole,
       };
@@ -82,9 +89,13 @@ describe('InventoryController RBAC', () => {
     async (role) => {
       currentRole = role;
 
-      await request(app.getHttpServer()).get('/inventory/movements').expect(200);
+      await request(app.getHttpServer())
+        .get('/inventory/movements')
+        .expect(200);
 
-      expect(inventoryServiceMock.findMovements).toHaveBeenCalledWith(companyId);
+      expect(inventoryServiceMock.findMovements).toHaveBeenCalledWith(
+        companyId,
+      );
     },
   );
 
