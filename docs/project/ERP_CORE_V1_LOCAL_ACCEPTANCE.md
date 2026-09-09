@@ -153,7 +153,6 @@ Sin token, cualquier ruta protegida pasa por AppShell y redirige a `/login`, sin
 
 Discrepancias observadas por código, pendientes de reproducción:
 
-- **P2 UX:** KPIs enlazan compras para S y cotizaciones para W, que después deniegan acceso.
 - **P2 UX:** detalle de recepción no tiene el mismo gate de rol que su lista; S obtiene error genérico/retry en vez de ForbiddenState específico. No expone el recurso por ese hecho.
 - **P2 accesibilidad potencial:** drawer implementa Escape/focus inicial/restauración/scroll lock, pero no se encontró trampa de Tab como la del componente Modal.
 - **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout. Su QA visual permanece NOT RUN.
@@ -164,6 +163,20 @@ Discrepancias observadas por código, pendientes de reproducción:
 - Hallazgo manual: el producto inactivo `QA-MGR-PROD-001` aparecía en Existencias, incrementaba Productos y Stock bajo del Dashboard y generaba una alerta en Requiere atención.
 - Causa: las consultas operativas de Inventory y Dashboard filtraban por `companyId`, pero no por `Product.isActive`; el historial usa consultas y relaciones independientes.
 - Corrección implementada: existencias actuales, total de productos, candidatos de stock bajo y valor de inventario ahora consideran sólo productos activos. Home recibe la misma lista corregida de Dashboard. Movimientos, recepciones, compras, cotizaciones y ventas históricas conservan sus referencias a productos inactivos.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+
+### QA-004 — SALES recibía y mostraba el agregado de Purchases
+
+- Hallazgo manual: SALES no tiene acceso al dominio Compras, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían su agregado.
+- Causa: Dashboard componía todas las métricas sin considerar el rol autenticado y las superficies frontend renderizaban Ventas, Cotizaciones y Compras incondicionalmente.
+- Corrección implementada: `/dashboard` omite la consulta y el campo `purchases` para SALES; Dashboard y Home reutilizan `WAREHOUSE_ROLES` para no renderizar Compras. SALES conserva inventario, stock bajo, productos, ventas y cotizaciones.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+
+### QA-006 — WAREHOUSE recibía y mostraba agregados comerciales
+
+- Hallazgo manual: WAREHOUSE no tiene acceso a Ventas ni Cotizaciones, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían ambos agregados.
+- Causa: el controller no pasaba el rol autenticado al servicio y el frontend no aplicaba la matriz de dominios a las tarjetas ni al resumen.
+- Corrección implementada: `/dashboard` omite las consultas y campos `sales` y `quotes` para WAREHOUSE; Dashboard y Home reutilizan `COMMERCIAL_ROLES` para ocultarlos. WAREHOUSE conserva inventario, stock bajo, productos y compras, y QA-008 sigue evitando `GET /sales`.
 - Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
 
 ### QA-005 — SALES podía consultar Inventory Movements

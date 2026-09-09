@@ -178,9 +178,56 @@ describe('DashboardPage', () => {
     expect(api.get).toHaveBeenCalledWith('/dashboard');
     expect(api.get).not.toHaveBeenCalledWith('/sales');
     expect(api.get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Compras')).toBeTruthy();
+    expect(screen.getByText('Productos')).toBeTruthy();
+    expect(screen.getByText('Stock bajo')).toBeTruthy();
+    expect(screen.queryByText('Ventas')).toBeNull();
+    expect(screen.queryByText('Cotizaciones')).toBeNull();
     expect(screen.queryByText('Ventas recientes')).toBeNull();
     expect(screen.queryByText('Ventas recientes no disponibles')).toBeNull();
     expect(screen.queryByText('Forbidden resource')).toBeNull();
+  });
+
+  it.each(['ADMIN', 'MANAGER'] as const)(
+    'renders every Dashboard metric for %s',
+    async (role) => {
+      dashboardRole = role;
+      clearAuthenticatedSessionCache();
+      mockDashboardSuccess();
+
+      render(<DashboardPage />);
+
+      const summary = await screen.findByLabelText('Resumen operacional');
+
+      for (const label of [
+        'Valor de inventario',
+        'Stock bajo',
+        'Ventas',
+        'Compras',
+        'Cotizaciones',
+        'Productos',
+      ]) {
+        expect(within(summary).getByText(label)).toBeTruthy();
+      }
+    },
+  );
+
+  it('renders commercial metrics but not Purchases for SALES', async () => {
+    dashboardRole = 'SALES';
+    clearAuthenticatedSessionCache();
+    mockDashboardSuccess();
+
+    render(<DashboardPage />);
+
+    const summary = await screen.findByLabelText('Resumen operacional');
+
+    expect(within(summary).getByText('Valor de inventario')).toBeTruthy();
+    expect(within(summary).getByText('Stock bajo')).toBeTruthy();
+    expect(within(summary).getByText('Productos')).toBeTruthy();
+    expect(within(summary).getByText('Ventas')).toBeTruthy();
+    expect(within(summary).getByText('Cotizaciones')).toBeTruthy();
+    expect(within(summary).queryByText('Compras')).toBeNull();
+    expect(await screen.findByText('Ventas recientes')).toBeTruthy();
   });
 
   it('renders real KPI values from the Dashboard response', async () => {

@@ -112,6 +112,27 @@ export default function HomePage() {
     : quickActions.filter((action) =>
         hasRole(currentUserRole, action.visibleForRoles),
       );
+  const visibleOperationalMetrics = [
+    {
+      label: 'Cotizaciones',
+      value: dashboardState.data?.totals.quotes,
+      visibleForRoles: COMMERCIAL_ROLES,
+    },
+    {
+      label: 'Compras',
+      value: dashboardState.data?.totals.purchases,
+      visibleForRoles: WAREHOUSE_ROLES,
+    },
+    {
+      label: 'Ventas',
+      value: dashboardState.data?.totals.sales,
+      visibleForRoles: COMMERCIAL_ROLES,
+    },
+  ].filter(
+    (metric) =>
+      metric.value !== undefined &&
+      hasRole(currentUserRole, metric.visibleForRoles),
+  );
 
   return (
     <PageContainer size="wide">
@@ -189,13 +210,9 @@ export default function HomePage() {
               {dashboardState.data ? (
                 <Card className="border border-border shadow-subtle">
                   <dl className="divide-y divide-border">
-                    {[
-                      ['Cotizaciones', dashboardState.data.totals.quotes],
-                      ['Compras', dashboardState.data.totals.purchases],
-                      ['Ventas', dashboardState.data.totals.sales],
-                    ].map(([label, value]) => (
+                    {visibleOperationalMetrics.map(({ label, value }) => (
                       <div
-                        key={String(label)}
+                        key={label}
                         className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                       >
                         <dt className="text-sm text-text-muted">{label}</dt>

@@ -1,4 +1,6 @@
 import { PrismaService } from '../prisma/prisma.service';
+import { UserRole } from '@prisma/client';
+
 import { DashboardService } from './dashboard.service';
 
 type ProductRecord = {
@@ -59,6 +61,94 @@ describe('DashboardService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it.each([
+    {
+      role: UserRole.ADMIN,
+      commercialMetrics: true,
+      purchaseMetrics: true,
+    },
+    {
+      role: UserRole.MANAGER,
+      commercialMetrics: true,
+      purchaseMetrics: true,
+    },
+    {
+      role: UserRole.SALES,
+      commercialMetrics: true,
+      purchaseMetrics: false,
+    },
+    {
+      role: UserRole.WAREHOUSE,
+      commercialMetrics: false,
+      purchaseMetrics: true,
+    },
+  ])(
+    'returns only domain metrics allowed for $role while preserving common metrics',
+    async ({ role, commercialMetrics, purchaseMetrics }) => {
+      prisma.product.count.mockResolvedValue(4);
+      prisma.quote.count.mockResolvedValue(7);
+      prisma.purchase.count.mockResolvedValue(5);
+      prisma.sale.count.mockResolvedValue(6);
+
+      const result = await service.get(companyId, role);
+
+      expect(result.totals.products).toBe(4);
+      expect(result.inventoryValue).toBe(0);
+      expect(result.lowStockProducts).toBe(0);
+      expect(result.lowStock).toEqual([]);
+      if (commercialMetrics) {
+        expect(result.totals).toHaveProperty('quotes', 7);
+        expect(result.totals).toHaveProperty('sales', 6);
+      } else {
+        expect(result.totals).not.toHaveProperty('quotes');
+        expect(result.totals).not.toHaveProperty('sales');
+      }
+
+      if (purchaseMetrics) {
+        expect(result.totals).toHaveProperty('purchases', 5);
+      } else {
+        expect(result.totals).not.toHaveProperty('purchases');
+      }
+      expect(result.totals.quotes).toBe(commercialMetrics ? 7 : undefined);
+      expect(result.totals.sales).toBe(commercialMetrics ? 6 : undefined);
+      expect(result.totals.purchases).toBe(purchaseMetrics ? 5 : undefined);
+
+      expect(prisma.quote.count).toHaveBeenCalledTimes(
+        commercialMetrics ? 1 : 0,
+      );
+      expect(prisma.sale.count).toHaveBeenCalledTimes(
+        commercialMetrics ? 1 : 0,
+      );
+      expect(prisma.purchase.count).toHaveBeenCalledTimes(
+        purchaseMetrics ? 1 : 0,
+      );
+      expect(prisma.customer.count).toHaveBeenCalledWith({
+        where: { companyId },
+      });
+      expect(prisma.supplier.count).toHaveBeenCalledWith({
+        where: { companyId },
+      });
+      expect(prisma.product.count).toHaveBeenCalledWith({
+        where: { companyId, isActive: true },
+      });
+
+      if (commercialMetrics) {
+        expect(prisma.quote.count).toHaveBeenCalledWith({
+          where: { companyId },
+        });
+        expect(prisma.sale.count).toHaveBeenCalledWith({
+          where: { companyId },
+        });
+      }
+
+      if (purchaseMetrics) {
+        expect(prisma.purchase.count).toHaveBeenCalledWith({
+          where: { companyId },
+        });
+      }
+    },
+  );
 
   it('excludes inactive products from totals, stock alerts, and inventory value', async () => {
     const products: ProductRecord[] = [
@@ -124,7 +214,7 @@ describe('DashboardService', () => {
       }));
     });
 
-    const result = await service.get(companyId);
+    const result = await service.get(companyId, UserRole.ADMIN);
 
     expect(result.totals.products).toBe(2);
     expect(result.lowStockProducts).toBe(1);

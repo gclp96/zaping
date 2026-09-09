@@ -1,11 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async get(companyId: string) {
+  async get(companyId: string, role: UserRole) {
+    const canReadCommercialMetrics = role !== UserRole.WAREHOUSE;
+    const canReadPurchaseMetrics = role !== UserRole.SALES;
     const [
       totalCustomers,
       totalSuppliers,
@@ -26,17 +30,23 @@ export class DashboardService {
         where: { companyId, isActive: true },
       }),
 
-      this.prisma.quote.count({
-        where: { companyId },
-      }),
+      canReadCommercialMetrics
+        ? this.prisma.quote.count({
+            where: { companyId },
+          })
+        : Promise.resolve(undefined),
 
-      this.prisma.purchase.count({
-        where: { companyId },
-      }),
+      canReadPurchaseMetrics
+        ? this.prisma.purchase.count({
+            where: { companyId },
+          })
+        : Promise.resolve(undefined),
 
-      this.prisma.sale.count({
-        where: { companyId },
-      }),
+      canReadCommercialMetrics
+        ? this.prisma.sale.count({
+            where: { companyId },
+          })
+        : Promise.resolve(undefined),
     ]);
 
     const lowStockProducts = await this.prisma.product.findMany({
@@ -74,9 +84,9 @@ export class DashboardService {
         customers: totalCustomers,
         suppliers: totalSuppliers,
         products: totalProducts,
-        quotes: totalQuotes,
-        purchases: totalPurchases,
-        sales: totalSales,
+        ...(totalQuotes === undefined ? {} : { quotes: totalQuotes }),
+        ...(totalPurchases === undefined ? {} : { purchases: totalPurchases }),
+        ...(totalSales === undefined ? {} : { sales: totalSales }),
       },
       inventoryValue,
       lowStockProducts: lowStock.length,

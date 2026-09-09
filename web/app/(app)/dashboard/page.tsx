@@ -12,7 +12,11 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
-import { COMMERCIAL_ROLES, hasRole } from '@/app/erp-role-access';
+import {
+  COMMERCIAL_ROLES,
+  hasRole,
+  WAREHOUSE_ROLES,
+} from '@/app/erp-role-access';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -28,9 +32,9 @@ type DashboardData = {
     customers: number;
     suppliers: number;
     products: number;
-    quotes: number;
-    purchases: number;
-    sales: number;
+    quotes?: number;
+    purchases?: number;
+    sales?: number;
   };
   inventoryValue: number;
   lowStockProducts: number;
@@ -142,7 +146,12 @@ export default function DashboardPage() {
   const sessionState = useAuthenticatedSession();
   const currentUserRole =
     sessionState.status === 'success' ? sessionState.user.role : null;
-  const canViewRecentSales = hasRole(currentUserRole, COMMERCIAL_ROLES);
+  const canViewCommercialMetrics = hasRole(
+    currentUserRole,
+    COMMERCIAL_ROLES,
+  );
+  const canViewPurchaseMetrics = hasRole(currentUserRole, WAREHOUSE_ROLES);
+  const canViewRecentSales = canViewCommercialMetrics;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -311,20 +320,23 @@ export default function DashboardPage() {
           value={formatNumber(data.lowStockProducts)}
           href="/inventory"
         />
-        <KpiCard
-          label="Ventas"
-          value={formatNumber(data.totals.sales)}
-        />
-        <KpiCard
-          label="Compras"
-          value={formatNumber(data.totals.purchases)}
-          href="/purchases"
-        />
-        <KpiCard
-          label="Cotizaciones"
-          value={formatNumber(data.totals.quotes)}
-          href="/quotes"
-        />
+        {canViewCommercialMetrics && data.totals.sales !== undefined ? (
+          <KpiCard label="Ventas" value={formatNumber(data.totals.sales)} />
+        ) : null}
+        {canViewPurchaseMetrics && data.totals.purchases !== undefined ? (
+          <KpiCard
+            label="Compras"
+            value={formatNumber(data.totals.purchases)}
+            href="/purchases"
+          />
+        ) : null}
+        {canViewCommercialMetrics && data.totals.quotes !== undefined ? (
+          <KpiCard
+            label="Cotizaciones"
+            value={formatNumber(data.totals.quotes)}
+            href="/quotes"
+          />
+        ) : null}
         <KpiCard
           label="Productos"
           value={formatNumber(data.totals.products)}
