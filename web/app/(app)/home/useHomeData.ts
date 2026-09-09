@@ -10,9 +10,9 @@ import { getApiErrorMessage } from '@/services/errors';
 
 export type DashboardData = {
   totals: {
-    quotes: number;
-    purchases: number;
-    sales: number;
+    quotes?: number;
+    purchases?: number;
+    sales?: number;
   };
   lowStock: Array<{
     id: string;

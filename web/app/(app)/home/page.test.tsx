@@ -165,6 +165,12 @@ describe('HomePage', () => {
     expect(api.get).toHaveBeenCalledWith('/equipment');
     expect(api.get).toHaveBeenCalledWith('/purchases');
     expect(api.get).toHaveBeenCalledTimes(4);
+    const operationalSummary = screen
+      .getByRole('heading', { level: 2, name: 'Resumen operativo' })
+      .closest('section') as HTMLElement;
+    expect(within(operationalSummary).getByText('Cotizaciones')).toBeTruthy();
+    expect(within(operationalSummary).getByText('Compras')).toBeTruthy();
+    expect(within(operationalSummary).getByText('Ventas')).toBeTruthy();
     expect(screen.queryByText('Valor de inventario')).toBeNull();
     expect(screen.queryByText('Ventas recientes')).toBeNull();
     expect(screen.queryByText('Productos')).toBeNull();
@@ -190,6 +196,12 @@ describe('HomePage', () => {
     ).toBeNull();
     expect(screen.queryByText('Inspecciones pendientes')).toBeNull();
     expect(screen.queryByText('Compras por recibir')).toBeNull();
+    const operationalSummary = screen
+      .getByRole('heading', { level: 2, name: 'Resumen operativo' })
+      .closest('section') as HTMLElement;
+    expect(within(operationalSummary).getByText('Cotizaciones')).toBeTruthy();
+    expect(within(operationalSummary).getByText('Ventas')).toBeTruthy();
+    expect(within(operationalSummary).queryByText('Compras')).toBeNull();
   });
 
   it('keeps WAREHOUSE operational attention and warehouse actions available', async () => {
@@ -210,6 +222,29 @@ describe('HomePage', () => {
     ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Nueva cotización' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Nueva venta' })).toBeNull();
+    const operationalSummary = screen
+      .getByRole('heading', { level: 2, name: 'Resumen operativo' })
+      .closest('section') as HTMLElement;
+    expect(within(operationalSummary).getByText('Compras')).toBeTruthy();
+    expect(within(operationalSummary).queryByText('Cotizaciones')).toBeNull();
+    expect(within(operationalSummary).queryByText('Ventas')).toBeNull();
+  });
+
+  it('keeps the complete operational summary for MANAGER', async () => {
+    homeRole = 'MANAGER';
+    clearAuthenticatedSessionCache();
+    mockHomeSuccess();
+
+    render(<HomePage />);
+
+    await screen.findByText('Productos sin stock');
+
+    const operationalSummary = screen
+      .getByRole('heading', { level: 2, name: 'Resumen operativo' })
+      .closest('section') as HTMLElement;
+    expect(within(operationalSummary).getByText('Cotizaciones')).toBeTruthy();
+    expect(within(operationalSummary).getByText('Compras')).toBeTruthy();
+    expect(within(operationalSummary).getByText('Ventas')).toBeTruthy();
   });
 
   it('navigates every quick action to an existing workflow route', async () => {

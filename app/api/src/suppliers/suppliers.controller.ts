@@ -39,14 +39,14 @@ export class SuppliersController {
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   create(@Req() req: any, @Body() body: CreateSupplierDto) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
     return this.suppliersService.create(req.user.companyId, body);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   update(
     @Req() req: any,
     @Param('id') id: string,
@@ -57,7 +57,7 @@ export class SuppliersController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
   remove(@Req() req: any, @Param('id') id: string) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
     return this.suppliersService.remove(req.user.companyId, id);

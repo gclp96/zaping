@@ -221,22 +221,49 @@ describe('SuppliersPage', () => {
     expect(screen.getByText(medicalSupplier.name)).toBeTruthy();
   });
 
-  it('mantiene proveedores en solo lectura para WAREHOUSE', async () => {
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'] as const)(
+    'muestra las acciones de proveedores a %s',
+    async (role) => {
+      const user = userEvent.setup();
+      clearAuthenticatedSessionCache();
+      configureApiMocks(suppliers, role);
+
+      render(<SuppliersPage />);
+
+      await screen.findByText(medicalSupplier.name);
+      expect(
+        screen.getByRole('button', { name: 'Nuevo proveedor' }),
+      ).toBeTruthy();
+
+      const row = screen.getByText(medicalSupplier.name).closest('tr');
+      expect(row).toBeTruthy();
+      await user.click(
+        within(row as HTMLTableRowElement).getByRole('button', {
+          name: `Acciones del proveedor ${medicalSupplier.name}`,
+        }),
+      );
+      expect(screen.getByRole('menuitem', { name: 'Editar' })).toBeTruthy();
+      expect(
+        screen.getByRole('menuitem', {
+          name: 'Acción destructiva: Desactivar',
+        }),
+      ).toBeTruthy();
+    },
+  );
+
+  it('deniega Suppliers a SALES sin solicitar el listado ni mostrar acciones', async () => {
     clearAuthenticatedSessionCache();
-    configureApiMocks(suppliers, 'WAREHOUSE');
+    configureApiMocks(suppliers, 'SALES');
 
     render(<SuppliersPage />);
 
-    await screen.findByText(medicalSupplier.name);
-    expect(screen.queryByRole('button', { name: 'Nuevo proveedor' })).toBeNull();
-
-    const row = screen.getByText(medicalSupplier.name).closest('tr');
-    expect(row).toBeTruthy();
     expect(
-      within(row as HTMLTableRowElement).queryByRole('button', {
-        name: `Acciones del proveedor ${medicalSupplier.name}`,
-      }),
-    ).toBeNull();
+      await screen.findByRole('heading', { name: 'Sin permisos' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Nuevo proveedor' })).toBeNull();
+    expect(screen.queryByText(medicalSupplier.name)).toBeNull();
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledWith('/auth/me');
   });
 
   it('ordena columnas claras con el ciclo ascendente, descendente y neutral', async () => {

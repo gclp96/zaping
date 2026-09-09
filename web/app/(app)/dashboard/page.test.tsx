@@ -1,7 +1,12 @@
 import {
+  clearAuthenticatedSessionCache,
+  type UserRole,
+} from '@/app/auth-session';
+import {
   cleanup,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -82,6 +87,20 @@ const recentSales = [
   },
 ];
 
+let dashboardRole: UserRole = 'ADMIN';
+
+function getAuthenticatedSession() {
+  return {
+    id: 'user-1',
+    companyId: 'company-1',
+    email: 'dashboard@test.test',
+    firstName: 'Dashboard',
+    lastName: 'Test',
+    role: dashboardRole,
+    companyTimezone: 'America/Hermosillo',
+  };
+}
+
 function mockDashboardSuccess({
   dashboard = dashboardData,
   sales = recentSales,
@@ -91,6 +110,12 @@ function mockDashboardSuccess({
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: getAuthenticatedSession(),
+      } as never;
+    }
 
     if (endpoint === '/dashboard') {
       return {
@@ -110,6 +135,9 @@ function mockDashboardSuccess({
 
 describe('DashboardPage', () => {
   beforeEach(() => {
+    dashboardRole = 'ADMIN';
+    clearAuthenticatedSessionCache();
+    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockDashboardSuccess();
   });
@@ -119,22 +147,93 @@ describe('DashboardPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('requests Dashboard and Sales data only', async () => {
+  it.each(['ADMIN', 'MANAGER', 'SALES'] as const)(
+    'requests Dashboard and Sales data for %s',
+    async (role) => {
+      dashboardRole = role;
+      clearAuthenticatedSessionCache();
+      mockDashboardSuccess();
+
+      render(<DashboardPage />);
+
+      await screen.findByText('V-2001');
+
+      expect(api.get).toHaveBeenCalledWith('/auth/me');
+      expect(api.get).toHaveBeenCalledWith('/dashboard');
+      expect(api.get).toHaveBeenCalledWith('/sales');
+      expect(api.get).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it('loads Dashboard without requesting or rendering Sales for WAREHOUSE', async () => {
+    dashboardRole = 'WAREHOUSE';
+    clearAuthenticatedSessionCache();
+    mockDashboardSuccess();
+
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
+    expect(api.get).toHaveBeenCalledWith('/auth/me');
     expect(api.get).toHaveBeenCalledWith('/dashboard');
-    expect(api.get).toHaveBeenCalledWith('/sales');
+    expect(api.get).not.toHaveBeenCalledWith('/sales');
     expect(api.get).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Compras')).toBeTruthy();
+    expect(screen.getByText('Productos')).toBeTruthy();
+    expect(screen.getByText('Stock bajo')).toBeTruthy();
+    expect(screen.queryByText('Ventas')).toBeNull();
+    expect(screen.queryByText('Cotizaciones')).toBeNull();
+    expect(screen.queryByText('Ventas recientes')).toBeNull();
+    expect(screen.queryByText('Ventas recientes no disponibles')).toBeNull();
+    expect(screen.queryByText('Forbidden resource')).toBeNull();
+  });
+
+  it.each(['ADMIN', 'MANAGER'] as const)(
+    'renders every Dashboard metric for %s',
+    async (role) => {
+      dashboardRole = role;
+      clearAuthenticatedSessionCache();
+      mockDashboardSuccess();
+
+      render(<DashboardPage />);
+
+      const summary = await screen.findByLabelText('Resumen operacional');
+
+      for (const label of [
+        'Valor de inventario',
+        'Stock bajo',
+        'Ventas',
+        'Compras',
+        'Cotizaciones',
+        'Productos',
+      ]) {
+        expect(within(summary).getByText(label)).toBeTruthy();
+      }
+    },
+  );
+
+  it('renders commercial metrics but not Purchases for SALES', async () => {
+    dashboardRole = 'SALES';
+    clearAuthenticatedSessionCache();
+    mockDashboardSuccess();
+
+    render(<DashboardPage />);
+
+    const summary = await screen.findByLabelText('Resumen operacional');
+
+    expect(within(summary).getByText('Valor de inventario')).toBeTruthy();
+    expect(within(summary).getByText('Stock bajo')).toBeTruthy();
+    expect(within(summary).getByText('Productos')).toBeTruthy();
+    expect(within(summary).getByText('Ventas')).toBeTruthy();
+    expect(within(summary).getByText('Cotizaciones')).toBeTruthy();
+    expect(within(summary).queryByText('Compras')).toBeNull();
+    expect(await screen.findByText('Ventas recientes')).toBeTruthy();
   });
 
   it('renders real KPI values from the Dashboard response', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
-
-    expect(screen.getByText('Valor de inventario')).toBeTruthy();
+    expect(await screen.findByText('Valor de inventario')).toBeTruthy();
     expect(screen.getByText('$98,765.43')).toBeTruthy();
     expect(screen.getByText('Stock bajo')).toBeTruthy();
     expect(screen.getByText('2')).toBeTruthy();
@@ -146,6 +245,40 @@ describe('DashboardPage', () => {
     expect(screen.getByText('7')).toBeTruthy();
     expect(screen.getByText('Productos')).toBeTruthy();
     expect(screen.getByText('34')).toBeTruthy();
+  });
+
+  it('renders corrected active-product metrics without inactive stock alerts', async () => {
+    mockDashboardSuccess({
+      dashboard: {
+        ...dashboardData,
+        totals: {
+          ...dashboardData.totals,
+          products: 4,
+        },
+        inventoryValue: 500,
+        lowStockProducts: 1,
+        lowStock: [
+          {
+            id: 'qa-a-low',
+            name: 'QA A low',
+            stock: 1,
+            minStock: 3,
+          },
+        ],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    const summary = await screen.findByLabelText('Resumen operacional');
+    const productsCard = within(summary).getByText('Productos').parentElement;
+    const lowStockCard = within(summary).getByText('Stock bajo').parentElement;
+
+    expect(productsCard?.textContent).toContain('4');
+    expect(lowStockCard?.textContent).toContain('1');
+    expect(within(summary).getByText('$500.00')).toBeTruthy();
+    expect(await screen.findByText('QA A low')).toBeTruthy();
+    expect(screen.queryByText('QA Manager Product')).toBeNull();
   });
 
   it('renders low-stock products with current and minimum quantities', async () => {
@@ -216,7 +349,7 @@ describe('DashboardPage', () => {
   it('does not render hardcoded recent sales records', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
     expect(screen.queryByText('V-1001')).toBeNull();
     expect(screen.queryByText('Hospital San José')).toBeNull();
@@ -250,6 +383,11 @@ describe('DashboardPage', () => {
 
     vi.mocked(api.get)
       .mockImplementationOnce(async () => {
+        return {
+          data: getAuthenticatedSession(),
+        } as never;
+      })
+      .mockImplementationOnce(async () => {
         throw new Error('Dashboard unavailable');
       })
       .mockResolvedValueOnce({
@@ -271,13 +409,18 @@ describe('DashboardPage', () => {
 
     await user.click(screen.getByText('Reintentar'));
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Guantes quirúrgicos')).toBeTruthy();
+    expect(await screen.findByText('Guantes quirúrgicos')).toBeTruthy();
   });
 
   it('keeps Dashboard usable when only Sales fails', async () => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: getAuthenticatedSession(),
+        } as never;
+      }
 
       if (endpoint === '/dashboard') {
         return {
@@ -294,8 +437,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Guantes quirúrgicos')).toBeTruthy();
+    expect(await screen.findByText('Guantes quirúrgicos')).toBeTruthy();
     expect(
       screen.getByText('Ventas recientes no disponibles'),
     ).toBeTruthy();
@@ -307,6 +449,9 @@ describe('DashboardPage', () => {
     const user = userEvent.setup();
 
     vi.mocked(api.get)
+      .mockImplementationOnce(async () => ({
+        data: getAuthenticatedSession(),
+      }) as never)
       .mockImplementationOnce(async () => ({
         data: dashboardData,
       }) as never)
@@ -331,7 +476,7 @@ describe('DashboardPage', () => {
   it('does not introduce a link to the missing Sales route', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
     const salesLinks = screen
       .getAllByRole('link')
@@ -343,7 +488,9 @@ describe('DashboardPage', () => {
   it('uses the approved local Dashboard heading', async () => {
     render(<DashboardPage />);
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Estado actual de tu operación.')).toBeTruthy();
+    expect(
+      await screen.findByText('Estado actual de tu operación.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Resumen operativo')).toBeTruthy();
   });
 });

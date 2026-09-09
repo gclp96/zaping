@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
@@ -17,6 +18,7 @@ import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
+import { hasRole, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 import { getPurchaseReceiptHref } from '../purchase-receipts/receipt-navigation';
@@ -294,6 +296,11 @@ export default function InventoryPage() {
 function InventoryPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const serializedSearchParams = searchParams.toString();
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success' ? sessionState.user.role : null;
+  const canViewMovements = hasRole(currentUserRole, WAREHOUSE_ROLES);
   const requestedReferenceType =
     searchParams.get('referenceType')?.trim() || null;
   const requestedReferenceId =
@@ -308,9 +315,11 @@ function InventoryPageContent() {
       ? requestedReferenceId
       : null;
   const [selectedView, setSelectedView] = useState<InventoryView>('stock');
-  const activeView: InventoryView = queryRequestsMovements
-    ? 'movements'
-    : selectedView;
+  const activeView: InventoryView = canViewMovements
+    ? queryRequestsMovements
+      ? 'movements'
+      : selectedView
+    : 'stock';
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(true);
   const [inventoryError, setInventoryError] = useState('');
@@ -452,7 +461,7 @@ function InventoryPageContent() {
     replaceInventoryQuery(params);
   }
 
-  async function loadInventory() {
+  const loadInventory = useCallback(async () => {
     try {
       setInventoryLoading(true);
       setInventoryError('');
@@ -471,9 +480,9 @@ function InventoryPageContent() {
     } finally {
       setInventoryLoading(false);
     }
-  }
+  }, []);
 
-  async function loadMovements() {
+  const loadMovements = useCallback(async () => {
     try {
       setMovementsLoading(true);
       setMovementsError('');
@@ -494,12 +503,45 @@ function InventoryPageContent() {
     } finally {
       setMovementsLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    void Promise.all([loadInventory(), loadMovements()]);
-  }, []);
+    void loadInventory();
+  }, [loadInventory]);
+
+  useEffect(() => {
+    if (sessionState.status !== 'success') {
+      return;
+    }
+
+    if (canViewMovements) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void loadMovements();
+      return;
+    }
+
+    if (!queryRequestsMovements && !traceabilityFilterActive) {
+      return;
+    }
+
+    const params = new URLSearchParams(serializedSearchParams);
+    params.delete('tab');
+    params.delete('referenceType');
+    params.delete('referenceId');
+    params.delete('receiptFolio');
+    const query = params.toString();
+
+    router.replace(query ? `/inventory?${query}` : '/inventory');
+  }, [
+    canViewMovements,
+    loadMovements,
+    queryRequestsMovements,
+    router,
+    serializedSearchParams,
+    sessionState.status,
+    traceabilityFilterActive,
+  ]);
 
   function renderInventoryView() {
     if (inventoryLoading) {
@@ -680,22 +722,24 @@ function InventoryPageContent() {
         >
           Existencias
         </button>
-        <button
-          id="inventory-movements-tab"
-          type="button"
-          role="tab"
-          aria-selected={activeView === 'movements'}
-          aria-controls="inventory-movements-panel"
-          tabIndex={activeView === 'movements' ? 0 : -1}
-          onClick={() => handleViewChange('movements')}
-          className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
-            activeView === 'movements'
-              ? 'border-blue-600 text-blue-700'
-              : 'border-transparent text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          Movimientos
-        </button>
+        {canViewMovements ? (
+          <button
+            id="inventory-movements-tab"
+            type="button"
+            role="tab"
+            aria-selected={activeView === 'movements'}
+            aria-controls="inventory-movements-panel"
+            tabIndex={activeView === 'movements' ? 0 : -1}
+            onClick={() => handleViewChange('movements')}
+            className={`border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+              activeView === 'movements'
+                ? 'border-blue-600 text-blue-700'
+                : 'border-transparent text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Movimientos
+          </button>
+        ) : null}
       </div>
 
       {activeView === 'stock' ? (

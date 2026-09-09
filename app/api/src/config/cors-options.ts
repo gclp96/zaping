@@ -28,6 +28,6 @@ export function buildCorsOptions({ nodeEnv, frontendOrigin }: CorsConfig) {
     },
     credentials: false,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
   };
 }

@@ -35,7 +35,7 @@ export function canManageCustomers(role: UserRole | null | undefined): boolean {
 }
 
 export function canManageSuppliers(role: UserRole | null | undefined): boolean {
-  return hasRole(role, MANAGEMENT_ROLES);
+  return hasRole(role, WAREHOUSE_ROLES);
 }
 
 export function canEditPurchases(role: UserRole | null | undefined): boolean {
