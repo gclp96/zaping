@@ -1,16 +1,24 @@
-# DEV-NEXT-03A — Local Core QA preparation
+# DEV-NEXT-03B — ERP Core V1 local acceptance
 
 Baseline inspeccionado: `b36d237fae73e44d7e1c03c03a99ad4dc6a0dc5a` (2026-09-06).
 Enablement DEV-NEXT-03A1 verificado: 2026-09-07.
-Este documento prepara DEV-NEXT-03B; no certifica ejecución manual ni aceptación funcional.
-Todos los casos manuales permanecen **NOT RUN**. DEV-NEXT-03A1 sólo habilitó y verificó técnicamente el entorno QA aislado, sus fixtures y autenticación local.
+Implementación validada manualmente en `b9a6db22b16fae9a8be6210bc5bcf8658ae84fdd` (2026-09-09).
+
+**DEV-NEXT-03B FINAL RESULT = PASS.** La matriz manual ERP Core V1 terminó satisfactoriamente para ADMIN, MANAGER, SALES y WAREHOUSE. Las secciones de preparación se conservan como trazabilidad; la evidencia automatizada final, la ejecución manual confirmada y los seguimientos no bloqueantes se distinguen explícitamente más adelante.
+
+| Rol | Resultado manual final |
+| --- | --- |
+| ADMIN | **PASS** |
+| MANAGER | **PASS** |
+| SALES | **PASS** |
+| WAREHOUSE | **PASS** |
 
 ## A. Branch / preflight
 
 - Preflight original: `main`, working tree limpio, HEAD igual a `origin/main` y al baseline indicado.
 - Rama creada desde ese baseline: `qa/erp-core-v1-local-acceptance`.
-- HEAD y `origin/main` siguen en el baseline.
-- Cambios acotados de 03A1: harness Docker/fixtures QA, logout frontend, pruebas y este documento. Sin commit/push/deploy.
+- HEAD de implementación aceptado: `b9a6db22b16fae9a8be6210bc5bcf8658ae84fdd` en `qa/erp-core-v1-local-acceptance`.
+- El cierre permanece local: sin push, PR ni deploy al momento de documentar esta aceptación.
 
 ## B. Local startup procedure
 
@@ -155,50 +163,80 @@ Discrepancias observadas por código, pendientes de reproducción:
 
 - **P2 UX:** detalle de recepción no tiene el mismo gate de rol que su lista; S obtiene error genérico/retry en vez de ForbiddenState específico. No expone el recurso por ese hecho.
 - **P2 accesibilidad potencial:** drawer implementa Escape/focus inicial/restauración/scroll lock, pero no se encontró trampa de Tab como la del componente Modal.
-- **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout. Su QA visual permanece NOT RUN.
+- **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Las pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout; la verificación manual de logout/deep links también cerró satisfactoriamente.
 - No se confirmó bypass de autorización en esta revisión focal. Cualquier reproducción de autorización incorrecta o acceso cross-tenant se clasifica **P1/HIGH como mínimo**, aunque el botón estuviera oculto.
+
+### QA-001 — Next dev rechazaba el origen local de QA
+
+- Hallazgo: el navegador de QA local accedía por `127.0.0.1`, origen que Next dev no tenía permitido explícitamente.
+- Causa: `allowedDevOrigins` no incluía el host local usado por el entorno QA.
+- Corrección: se añadió `127.0.0.1` a la configuración de desarrollo sin relajar orígenes de producción.
+- Evidencia manual: el origen local fue revalidado y el caso se cerró durante la preparación de la matriz.
+- Commit: `3555d45` (`fix(qa): allow local QA origin in Next dev server`).
+- Estado: **CLOSED / PASS**.
+
+### QA-002 — CORS bloqueaba Idempotency-Key en recepciones
+
+- Hallazgo: el preflight del flujo local de recepción no admitía `Idempotency-Key`.
+- Causa: la lista explícita `allowedHeaders` sólo contenía `Content-Type` y `Authorization`.
+- Corrección: CORS admite `Idempotency-Key` manteniendo origen, métodos y headers explícitos, sin wildcard.
+- Evidencia manual: recepción, idempotencia y trazabilidad de inventario se completaron satisfactoriamente.
+- Commit: `5ab720b` (`fix(qa): allow idempotency header through CORS`).
+- Estado: **CLOSED / PASS**.
 
 ### QA-003 — Productos inactivos afectaban superficies operativas
 
-- Hallazgo manual: el producto inactivo `QA-MGR-PROD-001` aparecía en Existencias, incrementaba Productos y Stock bajo del Dashboard y generaba una alerta en Requiere atención.
+- Hallazgo: el producto inactivo `QA-MGR-PROD-001` aparecía en Existencias, incrementaba Productos y Stock bajo del Dashboard y generaba una alerta en Requiere atención.
 - Causa: las consultas operativas de Inventory y Dashboard filtraban por `companyId`, pero no por `Product.isActive`; el historial usa consultas y relaciones independientes.
-- Corrección implementada: existencias actuales, total de productos, candidatos de stock bajo y valor de inventario ahora consideran sólo productos activos. Home recibe la misma lista corregida de Dashboard. Movimientos, recepciones, compras, cotizaciones y ventas históricas conservan sus referencias a productos inactivos.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+- Corrección: existencias actuales, total de productos, candidatos de stock bajo y valor de inventario consideran sólo productos activos. El historial conserva referencias a productos inactivos.
+- Evidencia manual: el producto inactivo dejó de aparecer en inventario operativo, métricas y alertas actuales.
+- Commit: `6d1d05f` (`fix(qa): exclude inactive products from operations`).
+- Estado: **CLOSED / PASS**.
 
 ### QA-004 — SALES recibía y mostraba el agregado de Purchases
 
-- Hallazgo manual: SALES no tiene acceso al dominio Compras, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían su agregado.
-- Causa: Dashboard componía todas las métricas sin considerar el rol autenticado y las superficies frontend renderizaban Ventas, Cotizaciones y Compras incondicionalmente.
-- Corrección implementada: `/dashboard` omite la consulta y el campo `purchases` para SALES; Dashboard y Home reutilizan `WAREHOUSE_ROLES` para no renderizar Compras. SALES conserva inventario, stock bajo, productos, ventas y cotizaciones.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
-
-### QA-006 — WAREHOUSE recibía y mostraba agregados comerciales
-
-- Hallazgo manual: WAREHOUSE no tiene acceso a Ventas ni Cotizaciones, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían ambos agregados.
-- Causa: el controller no pasaba el rol autenticado al servicio y el frontend no aplicaba la matriz de dominios a las tarjetas ni al resumen.
-- Corrección implementada: `/dashboard` omite las consultas y campos `sales` y `quotes` para WAREHOUSE; Dashboard y Home reutilizan `COMMERCIAL_ROLES` para ocultarlos. WAREHOUSE conserva inventario, stock bajo, productos y compras, y QA-008 sigue evitando `GET /sales`.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+- Hallazgo: SALES no tiene acceso al dominio Compras, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían su agregado.
+- Causa: Dashboard componía todas las métricas sin considerar el rol autenticado y las superficies frontend las renderizaban incondicionalmente.
+- Corrección: `/dashboard` omite la consulta y el campo `purchases` para SALES; Dashboard y Home no renderizan Compras. SALES conserva inventario, stock bajo, productos, ventas y cotizaciones.
+- Evidencia manual: con SALES, Dashboard y Home ya no muestran el agregado de Compras.
+- Commit: `b9a6db2` (`fix(qa): align dashboard metrics with role access`).
+- Estado: **CLOSED / PASS**.
 
 ### QA-005 — SALES podía consultar Inventory Movements
 
-- Hallazgo manual: SALES veía `Inventario -> Movimientos` y el ledger seguía cargando después de Ctrl+F5.
+- Hallazgo: SALES veía `Inventario -> Movimientos` y el ledger seguía cargando después de Ctrl+F5.
 - Causa: `GET /inventory/movements` incluía SALES en `@Roles(...)`, mientras la página siempre mostraba la pestaña y solicitaba el ledger sin consultar el rol autenticado.
-- Corrección implementada: el backend limita la lectura del ledger a ADMIN/MANAGER/WAREHOUSE y conserva las restricciones vigentes de sus mutaciones; el frontend mantiene Existencias para SALES, oculta Movimientos, evita su request y normaliza deep links de Movimientos a `/inventory`.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+- Corrección: el backend limita el ledger y sus mutaciones a ADMIN/MANAGER/WAREHOUSE; el frontend mantiene Existencias para SALES, oculta Movimientos, evita su request y normaliza deep links.
+- Evidencia manual: SALES no ve Movimientos y el acceso API directo responde 403 sin destruir la sesión.
+- Commit: `486505a` (`fix(qa): enforce inventory movement RBAC`).
+- Estado: **CLOSED / PASS**.
+
+### QA-006 — WAREHOUSE recibía y mostraba agregados comerciales
+
+- Hallazgo: WAREHOUSE no tiene acceso a Ventas ni Cotizaciones, pero `/dashboard`, Dashboard y el Resumen operativo de Home exponían ambos agregados.
+- Causa: el controller no pasaba el rol autenticado al servicio y el frontend no aplicaba la matriz de dominios a las tarjetas ni al resumen.
+- Corrección: `/dashboard` omite las consultas y campos `sales` y `quotes` para WAREHOUSE; Dashboard y Home ocultan ambos agregados y conservan Compras.
+- Evidencia manual: WAREHOUSE ya no recibe ni muestra Ventas/Cotizaciones; ADMIN/MANAGER conservan el resumen completo.
+- Commit: `b9a6db2` (`fix(qa): align dashboard metrics with role access`).
+- Estado: **CLOSED / PASS**.
 
 ### QA-007 — WAREHOUSE no podía administrar Suppliers
 
-- Hallazgo manual: WAREHOUSE podía leer Proveedores, pero no veía Nuevo proveedor, Editar ni Desactivar; `POST /suppliers` respondía 403.
-- Causa: las lecturas admitían WAREHOUSE, pero los decorators de POST/PATCH/DELETE y el helper frontend de gestión de Suppliers sólo admitían ADMIN/MANAGER.
-- Corrección implementada: las mutaciones API y las acciones frontend de Suppliers ahora admiten ADMIN/MANAGER/WAREHOUSE; SALES conserva la denegación del módulo y las operaciones siguen acotadas por `companyId`.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+- Hallazgo: WAREHOUSE podía leer Proveedores, pero no veía Nuevo proveedor, Editar ni Desactivar; `POST /suppliers` respondía 403.
+- Causa: las lecturas admitían WAREHOUSE, pero los decorators de POST/PATCH/DELETE y el helper frontend sólo admitían ADMIN/MANAGER.
+- Corrección: las mutaciones API y acciones frontend admiten ADMIN/MANAGER/WAREHOUSE; SALES conserva la denegación y `companyId` mantiene el tenant scope.
+- Evidencia manual: WAREHOUSE pudo crear, editar y desactivar Suppliers; la cobertura RBAC backend pasó.
+- Commit: `91769e5` (`fix(qa): align warehouse supplier RBAC`).
+- Estado: **CLOSED / PASS**.
 
 ### QA-008 — Dashboard de WAREHOUSE solicitaba Sales sin autorización
 
-- Hallazgo manual: Dashboard cargaba para WAREHOUSE, pero además ejecutaba `GET /sales`; el backend respondía 403 y la UI mostraba “Ventas recientes no disponibles” con “Forbidden resource”.
-- Causa: Dashboard cargaba `/dashboard` y `/sales` incondicionalmente y siempre renderizaba Ventas recientes, sin consultar el rol de la sesión.
-- Corrección implementada: Dashboard reutiliza la sesión autenticada y `COMMERCIAL_ROLES`; WAREHOUSE conserva las métricas generales sin solicitar `/sales` ni renderizar Ventas recientes, mientras ADMIN/MANAGER/SALES conservan la sección y sus estados.
-- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+- Hallazgo: Dashboard cargaba para WAREHOUSE, pero también ejecutaba `GET /sales`; la API respondía 403 y la UI mostraba “Forbidden resource”.
+- Causa: Dashboard cargaba `/dashboard` y `/sales` y renderizaba Ventas recientes sin consultar el rol.
+- Corrección: Dashboard reutiliza la sesión y `COMMERCIAL_ROLES`; WAREHOUSE no solicita `/sales` ni renderiza Ventas recientes.
+- Evidencia manual: Network confirmó ausencia de `/sales`, sin error 403 y con la sesión intacta.
+- Commit: `71f3c6b` (`fix(qa): make warehouse dashboard role-aware`).
+- Estado: **CLOSED / PASS**.
 
 ## F. Action matrix
 
@@ -244,7 +282,7 @@ Usar perfiles de navegador separados por cuenta, identificando A/B sin copiar to
 5. Relaciones cruzadas: customer B en quote/sale A, supplier B en purchase A, product/batch B en movimiento/recepción/equipo A. Según validación el rechazo puede ser 400/404; no tratar cualquier 400 como prueba suficiente: verificar invariantes.
 6. Inyectar `companyId` en payload DTO no permitido debe rechazarse por whitelist/forbidNonWhitelisted, no cambiar tenant. Nunca sustituir el JWT por uno de B y llamar eso aislamiento A.
 
-Detener inmediatamente la rama afectada ante lectura ajena, mutación inesperada o stock/ledger corrupto. Guardar evidencia sanitizada, no continuar pruebas destructivas. La matriz bidireccional completa queda pendiente de fixtures B y credenciales.
+Detener inmediatamente la rama afectada ante lectura ajena, mutación inesperada o stock/ledger corrupto. Guardar evidencia sanitizada y no continuar pruebas destructivas. Los fixtures A/B quedaron disponibles y la suite automatizada final conserva la cobertura tenant; la extensión manual bidireccional T01–T05 queda documentada como seguimiento no bloqueante, sin atribuirle PASS manual.
 
 ## I. Responsive matrix
 
@@ -264,7 +302,7 @@ Login correcto/incorrecto, ausencia/invalidación/expiración de token, logout, 
 
 Reset captura query token en memoria y ejecuta `router.replace('/reset-password')`. Refresh/missing pasa a invalid-link. Éxito limpia token/passwords; inválido/expirado elimina token; same-password y network/5xx lo conservan para retry. POST contiene sólo `{ token, newPassword }`.
 
-**REAL RESEND FLOW = DEFERRED.** No se creó transport falso ni endpoint de debug. `tokens.cjs` reproduce exactamente token raw aleatorio de 32 bytes en base64url y hash SHA-256 hex, guarda sólo los raw en `.qa/reset-tokens.local.json` y crea variantes válida, expirada y usada en la DB QA. El smoke verificó expirado/usado 400, same-password 400 conservando token, válido 201, reutilizado 400, JWT anterior 401 y login con password nueva; luego restauró credenciales y regeneró tokens. La ejecución manual sigue NOT RUN.
+**REAL RESEND FLOW = DEFERRED / NON-BLOCKING.** No se creó transport falso ni endpoint de debug. `tokens.cjs` reproduce exactamente token raw aleatorio de 32 bytes en base64url y hash SHA-256 hex, guarda sólo los raw en `.qa/reset-tokens.local.json` y crea variantes válida, expirada y usada en la DB QA. El smoke verificó expirado/usado 400, same-password 400 conservando token, válido 201, reutilizado 400, JWT anterior 401 y login con password nueva; luego restauró credenciales y regeneró tokens. No se afirma entrega real de email.
 
 Planificar límites por IP: login 10/60s; register 5/60min; forgot 5/15min; reset 10/15min; change-password 5/15min. No cambiar rate limits ni reiniciar para ocultar fallos.
 
@@ -282,83 +320,114 @@ Todo se ejecutó con Node 24.20.0 / npm 11.19.0 en Docker:
 
 El primer intento focal se lanzó mientras `npm ci` del reinicio aún trabajaba y `npx` intentó resolver una versión externa; fue interrumpido antes de instalarla. Los quality gates efectivos usaron después `./node_modules/.bin/vitest` 4.1.10 fijado por el lockfile. El startup exige que `/app` sea un mount aislado, elimina allí sólo artefactos/copia anteriores (preserva `node_modules`), copia el checkout read-only y reutiliza dependencias únicamente cuando el hash de package+lock coincide.
 
-## K. Executable manual QA cases
+### DEV-NEXT-03B final automated evidence
 
-Convenciones: Q=fixtures descartables previamente autorizadas; API=cliente local autorizado, no cambios de código. Registrar resultado real después con evidencia sanitizada y ID de defecto. Prioridad indica impacto si falla, no un fallo confirmado. Casos parametrizados se registran una vez por rol/recurso indicado, sin marcar PASS global por ejecutar sólo uno.
+Ejecutado desde el HEAD funcional aceptado más el cambio exclusivamente documental de cierre:
+
+- API tests: 65 suites / 705 tests PASS.
+- API lint no mutante: PASS.
+- API typecheck: PASS.
+- API production build: PASS.
+- Web tests, estrategia estable de un worker: 57 files / 696 tests PASS.
+- Web lint: PASS.
+- Web typecheck: PASS.
+- Web production build: PASS; 22/22 rutas generadas con `NEXT_PUBLIC_API_URL=https://api.example.test`.
+- Integridad Git: `git diff --check` y `git diff --cached --check` PASS.
+
+### Commits de habilitación y corrección incluidos
+
+Todos fueron confirmados como ancestors del HEAD funcional aceptado; no se reescribió ni compactó historia.
+
+| Commit | Propósito |
+| --- | --- |
+| `3555d45` | `fix(qa): allow local QA origin in Next dev server` |
+| `5ab720b` | `fix(qa): allow idempotency header through CORS` |
+| `486505a` | `fix(qa): enforce inventory movement RBAC` |
+| `e794eef` | `fix(qa): repair inherited inventory quality gates` |
+| `91769e5` | `fix(qa): align warehouse supplier RBAC` |
+| `71f3c6b` | `fix(qa): make warehouse dashboard role-aware` |
+| `6d1d05f` | `fix(qa): exclude inactive products from operations` |
+| `b9a6db2` | `fix(qa): align dashboard metrics with role access` |
+
+## K. Manual QA execution
+
+Convenciones: Q=fixtures descartables previamente autorizadas; API=cliente local autorizado, no cambios de código. Los resultados por rol reflejan la confirmación manual de cierre; prioridad indica el impacto que habría tenido un fallo. Los seguimientos posteriores permanecen separados y no heredan PASS por pertenecer a un rol aceptado.
 
 ### ADMIN
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| A01 | ADMIN | Login/Home | Runtime ready, cuenta A usable | Login válido; observar URL y requests | /home, sesión actual, sin /dashboard intermedio | P1 | NOT RUN |
-| A02 | ADMIN | Navigation | Sesión A | Recorrer rutas de E, refrescar detalle permitido | Todas las entradas ADMIN; conserva ruta; sin flash protegido | P1 | NOT RUN |
-| A03 | ADMIN | Users | Usuarios Q, no último admin real | Crear rol explícito; editar rol; desactivar/reactivar Q | Cambios persistentes; cuenta inactiva no autentica | P1 | NOT RUN |
-| A04 | ADMIN | Users safeguards | Company Q aislada | Intentar autodesactivar y degradar último ADMIN activo vía API | Rechazo; sigue existiendo admin activo; no lockout | P1 | NOT RUN |
-| A05 | ADMIN | Catalog | Categoría/producto Q | Crear, editar, desactivar producto; eliminar categoría libre y otra relacionada | Persistencia; DELETE relacionado rechazado; stock no alterado por catálogo | P1 | NOT RUN |
-| A06 | ADMIN | Customers/Suppliers | Registros Q | Crear, editar y desactivar uno de cada tipo | Datos del tenant; desactivación sin afectar ajenos | P1 | NOT RUN |
-| A07 | ADMIN | Purchases | Supplier/product Q | Crear DRAFT; editar; confirmar; intentar editar/cancelar confirmado | Confirmación sin IN; sólo DRAFT editable/cancelable | P1 | NOT RUN |
-| A08 | ADMIN | Receipts | Compra Q confirmada con pendientes | Recibir parcial; luego resto; revisar inventario | PARTIALLY_RECEIVED -> RECEIVED; IN exacto; trazabilidad de recepción | P1 | NOT RUN |
-| A09 | ADMIN | Inventory | Producto Q, stock conocido | API IN, OUT, ADJUSTMENT; intentar OUT mayor a stock | Deltas exactos; ajuste fija stock; insuficiente rechazado sin efectos | P1 | NOT RUN |
-| A10 | ADMIN | Equipment | Producto ASSET Q | Crear equipo; inspeccionar; retirar; intentar operación posterior | Sólo ACTIVE operable; retiro persistente; no doble stock por alta/retiro manual | P1 | NOT RUN |
+| A01 | ADMIN | Login/Home | Runtime ready, cuenta A usable | Login válido; observar URL y requests | /home, sesión actual, sin /dashboard intermedio | P1 | PASS |
+| A02 | ADMIN | Navigation | Sesión A | Recorrer rutas de E, refrescar detalle permitido | Todas las entradas ADMIN; conserva ruta; sin flash protegido | P1 | PASS |
+| A03 | ADMIN | Users | Usuarios Q, no último admin real | Crear rol explícito; editar rol; desactivar/reactivar Q | Cambios persistentes; cuenta inactiva no autentica | P1 | PASS |
+| A04 | ADMIN | Users safeguards | Company Q aislada | Intentar autodesactivar y degradar último ADMIN activo vía API | Rechazo; sigue existiendo admin activo; no lockout | P1 | PASS |
+| A05 | ADMIN | Catalog | Categoría/producto Q | Crear, editar, desactivar producto; eliminar categoría libre y otra relacionada | Persistencia; DELETE relacionado rechazado; stock no alterado por catálogo | P1 | PASS |
+| A06 | ADMIN | Customers/Suppliers | Registros Q | Crear, editar y desactivar uno de cada tipo | Datos del tenant; desactivación sin afectar ajenos | P1 | PASS |
+| A07 | ADMIN | Purchases | Supplier/product Q | Crear DRAFT; editar; confirmar; intentar editar/cancelar confirmado | Confirmación sin IN; sólo DRAFT editable/cancelable | P1 | PASS |
+| A08 | ADMIN | Receipts | Compra Q confirmada con pendientes | Recibir parcial; luego resto; revisar inventario | PARTIALLY_RECEIVED -> RECEIVED; IN exacto; trazabilidad de recepción | P1 | PASS |
+| A09 | ADMIN | Inventory | Producto Q, stock conocido | API IN, OUT, ADJUSTMENT; intentar OUT mayor a stock | Deltas exactos; ajuste fija stock; insuficiente rechazado sin efectos | P1 | PASS |
+| A10 | ADMIN | Equipment | Producto ASSET Q | Crear equipo; inspeccionar; retirar; intentar operación posterior | Sólo ACTIVE operable; retiro persistente; no doble stock por alta/retiro manual | P1 | PASS |
 
 ### MANAGER
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| M01 | MANAGER | Navigation/Users | Cuenta M | Login; abrir /users directamente y GET /users | /home; sin Users; UI deniega/API403, sesión intacta | P1 | NOT RUN |
-| M02 | MANAGER | Catalog | Fixtures Q | Crear/editar catálogos, customer y supplier | Permisos equivalentes a ADMIN en estos módulos, tenant correcto | P1 | NOT RUN |
-| M03 | MANAGER | Purchases | Dos DRAFT Q | Editar/confirmar uno; cancelar otro | Acciones disponibles; estados correctos; sin stock por confirmar | P1 | NOT RUN |
-| M04 | MANAGER | Receipts | Compra Q pendiente | Recibir con key; repetir mismo payload/key; repetir key con payload diferente | Una sola recepción/IN; replay seguro; conflicto distinto payload | P1 | NOT RUN |
-| M05 | MANAGER | Inventory | Producto Q | Ajuste API a objetivo conocido; releer stock/movimientos | Ajuste permitido y coherente; sin UI inventada de ajuste | P1 | NOT RUN |
-| M06 | MANAGER | Commercial/Equipment | Q con stock y ASSET | Crear venta DRAFT y confirmar; inspeccionar equipo Q | Ambas familias permitidas; stock OUT exacto y condición persistente | P1 | NOT RUN |
+| M01 | MANAGER | Navigation/Users | Cuenta M | Login; abrir /users directamente y GET /users | /home; sin Users; UI deniega/API403, sesión intacta | P1 | PASS |
+| M02 | MANAGER | Catalog | Fixtures Q | Crear/editar catálogos, customer y supplier | Permisos equivalentes a ADMIN en estos módulos, tenant correcto | P1 | PASS |
+| M03 | MANAGER | Purchases | Dos DRAFT Q | Editar/confirmar uno; cancelar otro | Acciones disponibles; estados correctos; sin stock por confirmar | P1 | PASS |
+| M04 | MANAGER | Receipts | Compra Q pendiente | Recibir con key; repetir mismo payload/key; repetir key con payload diferente | Una sola recepción/IN; replay seguro; conflicto distinto payload | P1 | PASS |
+| M05 | MANAGER | Inventory | Producto Q | Ajuste API a objetivo conocido; releer stock/movimientos | Ajuste permitido y coherente; sin UI inventada de ajuste | P1 | PASS |
+| M06 | MANAGER | Commercial/Equipment | Q con stock y ASSET | Crear venta DRAFT y confirmar; inspeccionar equipo Q | Ambas familias permitidas; stock OUT exacto y condición persistente | P1 | PASS |
 
 ### SALES
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| S01 | SALES | Navigation | Cuenta S | Login; recorrer sidebar y rutas permitidas | Home, Dashboard, password, catálogos/inventory, customers/quotes/sales; no compras/equipos/users | P1 | NOT RUN |
-| S02 | SALES | Catalog | Producto/categoría Q | Ver listas; buscar botones gestión; API POST/PATCH/DELETE con DTO válido | Lectura permitida; botones ocultos; escrituras403 sin efectos | P1 | NOT RUN |
-| S03 | SALES | Customers | Customer Q | Crear, editar, desactivar | Acciones disponibles y tenant-scoped | P1 | NOT RUN |
-| S04 | SALES | Quotes | Customer/product Q con stock | Crear DRAFT; confirmar; convertir; repetir intento | Una venta confirmada, OUT exacto, sin duplicación | P1 | NOT RUN |
-| S05 | SALES | Sales | Dos ventas DRAFT Q | Confirmar una; cancelar otra; intentar cancelar confirmada | OUT sólo al confirmar; cancelación sólo DRAFT | P1 | NOT RUN |
-| S06 | SALES | Forbidden routes | IDs propios de purchase/receipt/equipment | Abrir rutas E y API equivalentes; revisar token | Sin acceso; API403; receipt detail puede dar alerta genérica; no logout | P1 | NOT RUN |
-| S07 | SALES | Dashboard | Sesión S | Abrir Dashboard; seguir KPI compras | Dashboard permitido; link conduce a denegación; registrar UX P2, no autorización concedida | P2 | NOT RUN |
+| S01 | SALES | Navigation | Cuenta S | Login; recorrer sidebar y rutas permitidas | Home, Dashboard, password, catálogos/inventory, customers/quotes/sales; no suppliers/compras/equipos/users | P1 | PASS |
+| S02 | SALES | Catalog | Producto/categoría Q | Ver listas; buscar botones gestión; API POST/PATCH/DELETE con DTO válido | Lectura permitida; botones ocultos; escrituras403 sin efectos | P1 | PASS |
+| S03 | SALES | Customers | Customer Q | Crear, editar, desactivar | Acciones disponibles y tenant-scoped | P1 | PASS |
+| S04 | SALES | Quotes | Customer/product Q con stock | Crear DRAFT; confirmar; convertir; repetir intento | Una venta confirmada, OUT exacto, sin duplicación | P1 | PASS |
+| S05 | SALES | Sales | Dos ventas DRAFT Q | Confirmar una; cancelar otra; intentar cancelar confirmada | OUT sólo al confirmar; cancelación sólo DRAFT | P1 | PASS |
+| S06 | SALES | Forbidden routes | IDs propios de purchase/receipt/equipment | Abrir rutas E y API equivalentes; revisar token | Sin acceso; API403; receipt detail puede dar alerta genérica; no logout | P1 | PASS |
+| S07 | SALES | Dashboard | Sesión S | Abrir Dashboard y Home; revisar métricas | Inventario/stock/productos/ventas/cotizaciones visibles; Compras ausente | P2 | PASS |
 
 ### WAREHOUSE
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| W01 | WAREHOUSE | Navigation/catalog | Cuenta W, catálogos Q | Login; administrar suppliers; leer products/categories; intentar gestionar esos dos catálogos | Suppliers permite crear/editar/desactivar; products/categories permanecen sólo lectura y su gestión responde 403 | P1 | NOT RUN |
-| W02 | WAREHOUSE | Purchases | DRAFT Q | Crear/editar; buscar approve/cancel; intentar ambos por API | Crear/editar permitido; approve/cancel403 | P1 | NOT RUN |
-| W03 | WAREHOUSE | Receipts | Compra confirmada por A/M | Recibir parcial/resto; releer detalle/movimientos | Recepción permitida, cierre automático sin botón complete | P1 | NOT RUN |
-| W04 | WAREHOUSE | Inventory | Producto Q | API IN/OUT; intentar ADJUSTMENT válido | IN/OUT permitidos; ajuste403 sin cambio de stock | P1 | NOT RUN |
-| W05 | WAREHOUSE | Equipment | Equipo Q ACTIVE | Crear/inspeccionar/retirar fixtures; releer detalle | Acciones permitidas, lifecycle consistente | P1 | NOT RUN |
-| W06 | WAREHOUSE | Commercial/Users | Sesión W | Abrir customers/quotes/sales/users y API; luego Dashboard | Rutas denegadas; Dashboard permite resumen sin solicitar Sales ni cerrar sesión | P1 | NOT RUN |
+| W01 | WAREHOUSE | Navigation/catalog | Cuenta W, catálogos Q | Login; administrar suppliers; leer products/categories; intentar gestionar esos dos catálogos | Suppliers permite crear/editar/desactivar; products/categories permanecen sólo lectura y su gestión responde 403 | P1 | PASS |
+| W02 | WAREHOUSE | Purchases | DRAFT Q | Crear/editar; buscar approve/cancel; intentar ambos por API | Crear/editar permitido; approve/cancel403 | P1 | PASS |
+| W03 | WAREHOUSE | Receipts | Compra confirmada por A/M | Recibir parcial/resto; releer detalle/movimientos | Recepción permitida, cierre automático sin botón complete | P1 | PASS |
+| W04 | WAREHOUSE | Inventory | Producto Q | API IN/OUT; intentar ADJUSTMENT válido | IN/OUT permitidos; ajuste403 sin cambio de stock | P1 | PASS |
+| W05 | WAREHOUSE | Equipment | Equipo Q ACTIVE | Crear/inspeccionar/retirar fixtures; releer detalle | Acciones permitidas, lifecycle consistente | P1 | PASS |
+| W06 | WAREHOUSE | Commercial/Users | Sesión W | Abrir customers/quotes/sales/users y API; luego Dashboard | Rutas denegadas; Dashboard sólo muestra dominios permitidos, no solicita `/sales` y conserva la sesión | P1 | PASS |
 
-### Cross-role / auth / tenant / responsive
+### Seguimientos cross-role / auth / tenant / responsive
+
+Estos escenarios no forman parte de la declaración global PASS por rol salvo donde se indica evidencia manual explícita. Los demás conservan cobertura automatizada cuando se especifica o permanecen como extensión manual no bloqueante; no se presentan como pruebas manuales realizadas.
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| X01 | A/M/S/W | Login failure | Runtime ready; intentos bajo límite | Password incorrecta; observar URL/token; después válida | Sin redirect incorrecto; válida /home | P1 | NOT RUN |
-| X02 | A/M/S/W | Session missing | Perfil limpio sin token | Abrir /inventory y una ruta restringida directamente | /login; sin children ni requests prematuros | P1 | NOT RUN |
-| X03 | A/M/S/W | Session401 | Token Q inválido/expirado preparado sin exponerlo | Refrescar ruta; observar auth/me; repetir401 en petición de página | Token eliminado, login, sin contenido protegido | P1 | NOT RUN |
-| X04 | A/M/S/W | Network/5xx | Sesión válida; fallo simulado sólo en cliente local | Fallar bootstrap; retry tras restauración | Token conservado, children bloqueados, ruta recuperada | P1 | NOT RUN |
-| X05 | M/S/W | Authorization403 | Sesión válida | API /users sin permiso; seguir a /home; repetir bootstrap403 con mock local | Token conservado; no logout; bootstrap error no libera contenido | P1 | NOT RUN |
-| X06 | A/M/S/W | Logout | Sesión válida | Pulsar Cerrar sesión en desktop y drawer; usar Back/refrescar | Token/caché eliminados, contenido retirado, /login; Back no restaura sesión | P1 | NOT RUN |
-| X07 | A/M/S/W | Change password | Cuenta Q descartable, secretos privados | Actual incorrecta; nueva igual; cambio válido; probar password/JWT anteriores | Fallos conservan sesión; éxito login; credenciales/JWT anteriores inválidos | P1 | NOT RUN |
-| X08 | Público | Forgot | Cuenta Q e email inexistente, proveedor omitido | Enviar ambos requests; observar respuesta sanitizada | Respuesta genérica, sin enumeración; no afirmar entrega | P1 | NOT RUN |
-| X09 | Público | Reset missing | Sin token de recuperación | Abrir /reset-password; refrescar | Invalid-link, sin token persistido | P1 | NOT RUN |
-| X10 | Público | Reset valid/retry | Fixture token local aprobada, aún pendiente | Capturar query; probar mismatch, same-password y network/5xx; retry válido | URL limpia; sólo token/newPassword en POST; token retenido para retries; éxito limpia todo | P1 | NOT RUN |
-| X11 | Público | Reset expired/used | Fixtures locales aprobadas, aún pendientes | Usar expirado/usado; refrescar una captura válida | Rechazo y token eliminado; refresh invalid-link | P1 | NOT RUN |
-| T01 | ADMIN A/B | Tenant lists | Cuentas utilizables; recursos conocidos ambos tenants | Listar cada módulo/summary por separado | Sin registros/agrupaciones del otro tenant | P1 | NOT RUN |
-| T02 | ADMIN A/B | Tenant detail/PDF | Propietario confirma acceso primero | Abrir ID ajeno en detalle existente y PDF | No datos ajenos; normalmente404 scoped; sesión intacta | P1 | NOT RUN |
-| T03 | ADMIN A/B | Tenant edit/delete | Sólo fixtures Q autorizadas | PATCH/DELETE ID ajeno en módulos con esos endpoints; releer como dueño | Rechazo, recurso/actividad intactos; no falsa prueba sobre endpoint inexistente | P1 | NOT RUN |
-| T04 | ADMIN A/B | Tenant operations | Documentos/equipos Q en estado elegible | Aprobar/cancelar/recibir/convertir/inspeccionar/retirar ajenos | Rechazo; stock, movimientos y estado sin cambios | P1 | NOT RUN |
-| T05 | ADMIN A/B | Tenant relations | IDs Q de ambos tenants | Cruzar customer/supplier/product/batch; enviar companyId extra | Validación rechaza, ninguna relación o documento creado | P1 | NOT RUN |
-| R01 | A/M/S/W | Sidebar/header | Cinco viewports I | Abrir/cerrar drawer; colapsar desktop; navegar; Tab/Escape | Links por rol, foco usable y sin scroll global atrapado; registrar defecto Tab si reproduce | P2 | NOT RUN |
-| R02 | A/S/W | DataTable | Datos suficientes, viewports I | Filtros/paginación/scroll; cambiar anchos sm/md; menú acciones | Datos/acciones alcanzables, sin overflow global ni permisos extra | P2 | NOT RUN |
-| R03 | A/M/S/W | Modals/forms | Formulario permitido por rol | Abrir modal; teclado/Tab/ShiftTab/Escape; validaciones; pantalla baja | Foco contenido/restaurado, campos y submit visibles, no fondo interactivo | P2 | NOT RUN |
-| R04 | S/W | Responsive forbidden | Mobile/tablet | Abrir deep links prohibidas y estados error/loading | Mensaje legible, sesión preservada, sin flash de datos | P1 | NOT RUN |
+| X01 | A/M/S/W | Login failure | Runtime ready; intentos bajo límite | Password incorrecta; observar URL/token; después válida | Sin redirect incorrecto; válida /home | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| X02 | A/M/S/W | Session missing | Perfil limpio sin token | Abrir /inventory y una ruta restringida directamente | /login; sin children ni requests prematuros | P1 | MANUAL PASS |
+| X03 | A/M/S/W | Session401 | Token Q inválido/expirado preparado sin exponerlo | Refrescar ruta; observar auth/me; repetir401 en petición de página | Token eliminado, login, sin contenido protegido | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| X04 | A/M/S/W | Network/5xx | Sesión válida; fallo simulado sólo en cliente local | Fallar bootstrap; retry tras restauración | Token conservado, children bloqueados, ruta recuperada | P1 | DEFERRED / NON-BLOCKING |
+| X05 | M/S/W | Authorization403 | Sesión válida | API /users sin permiso; seguir a /home; repetir bootstrap403 con mock local | Token conservado; no logout; bootstrap error no libera contenido | P1 | MANUAL PASS |
+| X06 | A/M/S/W | Logout | Sesión válida | Pulsar Cerrar sesión en desktop y drawer; usar Back/refrescar | Token/caché eliminados, contenido retirado, /login; Back no restaura sesión | P1 | MANUAL PASS |
+| X07 | A/M/S/W | Change password | Cuenta Q descartable, secretos privados | Actual incorrecta; nueva igual; cambio válido; probar password/JWT anteriores | Fallos conservan sesión; éxito login; credenciales/JWT anteriores inválidos | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| X08 | Público | Forgot | Cuenta Q e email inexistente, proveedor omitido | Enviar ambos requests; observar respuesta sanitizada | Respuesta genérica, sin enumeración; no afirmar entrega | P1 | AUTOMATED PASS / REAL EMAIL DEFERRED |
+| X09 | Público | Reset missing | Sin token de recuperación | Abrir /reset-password; refrescar | Invalid-link, sin token persistido | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| X10 | Público | Reset valid/retry | Fixture token local aprobada | Capturar query; probar mismatch, same-password y network/5xx; retry válido | URL limpia; sólo token/newPassword en POST; token retenido para retries; éxito limpia todo | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| X11 | Público | Reset expired/used | Fixtures locales aprobadas | Usar expirado/usado; refrescar una captura válida | Rechazo y token eliminado; refresh invalid-link | P1 | AUTOMATED PASS / MANUAL DEFERRED |
+| T01 | ADMIN A/B | Tenant lists | Cuentas utilizables; recursos conocidos ambos tenants | Listar cada módulo/summary por separado | Sin registros/agrupaciones del otro tenant | P1 | AUTOMATED PASS / MANUAL EXTENSION DEFERRED |
+| T02 | ADMIN A/B | Tenant detail/PDF | Propietario confirma acceso primero | Abrir ID ajeno en detalle existente y PDF | No datos ajenos; normalmente404 scoped; sesión intacta | P1 | AUTOMATED PASS / MANUAL EXTENSION DEFERRED |
+| T03 | ADMIN A/B | Tenant edit/delete | Sólo fixtures Q autorizadas | PATCH/DELETE ID ajeno en módulos con esos endpoints; releer como dueño | Rechazo, recurso/actividad intactos; no falsa prueba sobre endpoint inexistente | P1 | AUTOMATED PASS / MANUAL EXTENSION DEFERRED |
+| T04 | ADMIN A/B | Tenant operations | Documentos/equipos Q en estado elegible | Aprobar/cancelar/recibir/convertir/inspeccionar/retirar ajenos | Rechazo; stock, movimientos y estado sin cambios | P1 | AUTOMATED PASS / MANUAL EXTENSION DEFERRED |
+| T05 | ADMIN A/B | Tenant relations | IDs Q de ambos tenants | Cruzar customer/supplier/product/batch; enviar companyId extra | Validación rechaza, ninguna relación o documento creado | P1 | AUTOMATED PASS / MANUAL EXTENSION DEFERRED |
+| R01 | A/M/S/W | Sidebar/header | Cinco viewports I | Abrir/cerrar drawer; colapsar desktop; navegar; Tab/Escape | Links por rol, foco usable y sin scroll global atrapado; registrar defecto Tab si reproduce | P2 | DEFERRED / NON-BLOCKING |
+| R02 | A/S/W | DataTable | Datos suficientes, viewports I | Filtros/paginación/scroll; cambiar anchos sm/md; menú acciones | Datos/acciones alcanzables, sin overflow global ni permisos extra | P2 | DEFERRED / NON-BLOCKING |
+| R03 | A/M/S/W | Modals/forms | Formulario permitido por rol | Abrir modal; teclado/Tab/ShiftTab/Escape; validaciones; pantalla baja | Foco contenido/restaurado, campos y submit visibles, no fondo interactivo | P2 | DEFERRED / NON-BLOCKING |
+| R04 | S/W | Responsive forbidden | Mobile/tablet | Abrir deep links prohibidas y estados error/loading | Mensaje legible, sesión preservada, sin flash de datos | P1 | DEFERRED / NON-BLOCKING |
 
 ## L. Severity / stop rules
 
@@ -382,7 +451,7 @@ No confundir un fallo del harness/runtime con un defecto funcional reproducido. 
 
 Usar perfiles separados de navegador para mantener evidencia por rol; probar además el logout real en cada uno.
 
-## N. Blockers before manual QA
+## N. Cierre de blockers y seguimientos
 
 | Condición | Estado / siguiente acción propuesta |
 | --- | --- |
@@ -391,12 +460,14 @@ Usar perfiles separados de navegador para mantener evidencia por rol; probar ade
 | Configuración QA privada | Resuelto: secrets aleatorios sólo en `.qa/`, validator normal intacto |
 | Credenciales de roles | Resuelto: A (4 roles) y B ADMIN verificados por API |
 | Seguridad de fixtures | Resuelto: DB/volumen exclusivos, guards URL+identidad, datos sintéticos mínimos |
-| Tenant bidireccional | Preparado: ambos tenants contienen IDs reales por tipo; ejecución T01–T05 sigue NOT RUN |
-| Logout | Resuelto en código y tests; ejecución visual X06 sigue NOT RUN |
-| Reset válido/expirado/usado | Preparado y smoke verificado sin Resend; ejecución manual sigue NOT RUN |
+| Tenant bidireccional | Cobertura automatizada PASS; extensión manual T01–T05 diferida y no bloqueante |
+| Logout | Código/tests PASS y validación manual de logout/deep links PASS |
+| Reset válido/expirado/usado | Smoke automatizado PASS; extensión manual y Resend real diferidos, no bloqueantes |
 
 ## O. Decision
 
-**DEV-NEXT-03A1: PASS — READY para iniciar DEV-NEXT-03B.**
+**DEV-NEXT-03B FINAL RESULT = PASS.**
 
-Esto no es aceptación de la aplicación: todos los casos K permanecen NOT RUN y los P2 ya observados deben registrarse si se reproducen. El entorno, accounts, fixtures, tokens y logout necesarios para comenzar están habilitados. Resend real continúa DEFERRED. No commit, push, PR ni deploy.
+La matriz manual cerró ADMIN, MANAGER, SALES y WAREHOUSE en PASS. QA-001 a QA-008 están CLOSED / PASS y la evidencia automatizada final está verde. El único trabajo diferido es no bloqueante y permanece explícito: entrega real por Resend, fault injection manual adicional, extensión tenant bidireccional y revisión responsive/accesibilidad ampliada.
+
+**Recomendación: READY FOR PUSH + PR.** El push y la apertura del PR quedan fuera de este cierre y no se realizaron.
