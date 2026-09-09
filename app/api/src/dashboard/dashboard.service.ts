@@ -23,7 +23,7 @@ export class DashboardService {
       }),
 
       this.prisma.product.count({
-        where: { companyId },
+        where: { companyId, isActive: true },
       }),
 
       this.prisma.quote.count({
@@ -42,6 +42,7 @@ export class DashboardService {
     const lowStockProducts = await this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
       },
       select: {
         id: true,
@@ -56,7 +57,7 @@ export class DashboardService {
     );
 
     const inventory = await this.prisma.product.findMany({
-      where: { companyId },
+      where: { companyId, isActive: true },
       select: {
         stock: true,
         cost: true,

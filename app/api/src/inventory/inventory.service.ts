@@ -16,6 +16,7 @@ export class InventoryService {
     return this.prisma.product.findMany({
       where: {
         companyId,
+        isActive: true,
       },
       select: {
         id: true,

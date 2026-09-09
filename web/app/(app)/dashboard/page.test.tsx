@@ -6,6 +6,7 @@ import {
   cleanup,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -197,6 +198,40 @@ describe('DashboardPage', () => {
     expect(screen.getByText('7')).toBeTruthy();
     expect(screen.getByText('Productos')).toBeTruthy();
     expect(screen.getByText('34')).toBeTruthy();
+  });
+
+  it('renders corrected active-product metrics without inactive stock alerts', async () => {
+    mockDashboardSuccess({
+      dashboard: {
+        ...dashboardData,
+        totals: {
+          ...dashboardData.totals,
+          products: 4,
+        },
+        inventoryValue: 500,
+        lowStockProducts: 1,
+        lowStock: [
+          {
+            id: 'qa-a-low',
+            name: 'QA A low',
+            stock: 1,
+            minStock: 3,
+          },
+        ],
+      },
+    });
+
+    render(<DashboardPage />);
+
+    const summary = await screen.findByLabelText('Resumen operacional');
+    const productsCard = within(summary).getByText('Productos').parentElement;
+    const lowStockCard = within(summary).getByText('Stock bajo').parentElement;
+
+    expect(productsCard?.textContent).toContain('4');
+    expect(lowStockCard?.textContent).toContain('1');
+    expect(within(summary).getByText('$500.00')).toBeTruthy();
+    expect(await screen.findByText('QA A low')).toBeTruthy();
+    expect(screen.queryByText('QA Manager Product')).toBeNull();
   });
 
   it('renders low-stock products with current and minimum quantities', async () => {

@@ -175,6 +175,19 @@ const adjustmentMovement: InventoryMovement = {
   }),
 };
 
+const inactiveProductMovement: InventoryMovement = {
+  ...purchaseReceiptMovement,
+  id: 'movement-inactive-product',
+  productId: 'product-inactive',
+  notes: 'Movimiento histórico de producto inactivo',
+  product: buildProduct({
+    id: 'product-inactive',
+    sku: 'QA-MGR-PROD-001',
+    name: 'QA Manager Product',
+    isActive: false,
+  }),
+};
+
 const movements = [
   purchaseReceiptMovement,
   saleMovement,
@@ -341,6 +354,26 @@ describe('InventoryPage', () => {
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /ajustar stock/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /nuevo movimiento/i })).toBeNull();
+  });
+
+  it('omits an inactive product from current stock while preserving its historical movement', async () => {
+    const user = userEvent.setup();
+    configureApiMocks({
+      inventoryData: [inventory[0]],
+      movementData: [inactiveProductMovement],
+    });
+
+    render(<InventoryPage />);
+
+    expect(await screen.findByText('MED-001')).toBeTruthy();
+    expect(screen.queryByText('QA Manager Product')).toBeNull();
+
+    await user.click(screen.getByRole('tab', { name: 'Movimientos' }));
+
+    expect(await screen.findByText('QA Manager Product')).toBeTruthy();
+    expect(
+      screen.getByText('Movimiento histórico de producto inactivo'),
+    ).toBeTruthy();
   });
 
   it('keeps SALES on Existencias without rendering or requesting Movimientos', async () => {

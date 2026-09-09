@@ -19,6 +19,7 @@ type PrismaServiceMock = {
   $transaction: jest.Mock;
   product: {
     findFirst: jest.Mock;
+    findMany: jest.Mock;
   };
   inventoryMovement: {
     findMany: jest.Mock;
@@ -51,6 +52,7 @@ describe('InventoryService', () => {
       ),
       product: {
         findFirst: jest.fn(),
+        findMany: jest.fn(),
       },
       inventoryMovement: {
         findMany: jest.fn(),
@@ -101,10 +103,57 @@ describe('InventoryService', () => {
     expect(service).toBeDefined();
   });
 
-  it('keeps movement reads scoped to the authenticated company', async () => {
-    prisma.inventoryMovement.findMany.mockResolvedValue([]);
+  it('returns only active products from current inventory within the authenticated company', async () => {
+    const activeProduct = {
+      id: productId,
+      sku: 'ACTIVE-001',
+      name: 'Producto activo',
+      stock: 4,
+      minStock: 2,
+      price: 25,
+    };
+    prisma.product.findMany.mockResolvedValue([activeProduct]);
 
-    await expect(service.findMovements(companyId)).resolves.toEqual([]);
+    await expect(service.findInventory(companyId)).resolves.toEqual([
+      activeProduct,
+    ]);
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        sku: true,
+        name: true,
+        stock: true,
+        minStock: true,
+        price: true,
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
+  });
+
+  it('keeps inactive product movement history scoped and identifiable', async () => {
+    const historicMovement = {
+      id: 'movement-inactive-product',
+      companyId,
+      productId,
+      product: {
+        id: productId,
+        sku: 'INACTIVE-001',
+        name: 'Producto inactivo histórico',
+        isActive: false,
+      },
+    };
+    prisma.inventoryMovement.findMany.mockResolvedValue([historicMovement]);
+
+    await expect(service.findMovements(companyId)).resolves.toEqual([
+      historicMovement,
+    ]);
 
     expect(prisma.inventoryMovement.findMany).toHaveBeenCalledWith({
       where: {

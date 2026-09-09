@@ -159,6 +159,13 @@ Discrepancias observadas por código, pendientes de reproducción:
 - **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout. Su QA visual permanece NOT RUN.
 - No se confirmó bypass de autorización en esta revisión focal. Cualquier reproducción de autorización incorrecta o acceso cross-tenant se clasifica **P1/HIGH como mínimo**, aunque el botón estuviera oculto.
 
+### QA-003 — Productos inactivos afectaban superficies operativas
+
+- Hallazgo manual: el producto inactivo `QA-MGR-PROD-001` aparecía en Existencias, incrementaba Productos y Stock bajo del Dashboard y generaba una alerta en Requiere atención.
+- Causa: las consultas operativas de Inventory y Dashboard filtraban por `companyId`, pero no por `Product.isActive`; el historial usa consultas y relaciones independientes.
+- Corrección implementada: existencias actuales, total de productos, candidatos de stock bajo y valor de inventario ahora consideran sólo productos activos. Home recibe la misma lista corregida de Dashboard. Movimientos, recepciones, compras, cotizaciones y ventas históricas conservan sus referencias a productos inactivos.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+
 ### QA-005 — SALES podía consultar Inventory Movements
 
 - Hallazgo manual: SALES veía `Inventario -> Movimientos` y el ledger seguía cargando después de Ctrl+F5.
