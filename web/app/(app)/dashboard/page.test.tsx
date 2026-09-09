@@ -1,4 +1,8 @@
 import {
+  clearAuthenticatedSessionCache,
+  type UserRole,
+} from '@/app/auth-session';
+import {
   cleanup,
   render,
   screen,
@@ -82,6 +86,20 @@ const recentSales = [
   },
 ];
 
+let dashboardRole: UserRole = 'ADMIN';
+
+function getAuthenticatedSession() {
+  return {
+    id: 'user-1',
+    companyId: 'company-1',
+    email: 'dashboard@test.test',
+    firstName: 'Dashboard',
+    lastName: 'Test',
+    role: dashboardRole,
+    companyTimezone: 'America/Hermosillo',
+  };
+}
+
 function mockDashboardSuccess({
   dashboard = dashboardData,
   sales = recentSales,
@@ -91,6 +109,12 @@ function mockDashboardSuccess({
 } = {}) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
+
+    if (endpoint === '/auth/me') {
+      return {
+        data: getAuthenticatedSession(),
+      } as never;
+    }
 
     if (endpoint === '/dashboard') {
       return {
@@ -110,6 +134,9 @@ function mockDashboardSuccess({
 
 describe('DashboardPage', () => {
   beforeEach(() => {
+    dashboardRole = 'ADMIN';
+    clearAuthenticatedSessionCache();
+    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockDashboardSuccess();
   });
@@ -119,22 +146,46 @@ describe('DashboardPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('requests Dashboard and Sales data only', async () => {
+  it.each(['ADMIN', 'MANAGER', 'SALES'] as const)(
+    'requests Dashboard and Sales data for %s',
+    async (role) => {
+      dashboardRole = role;
+      clearAuthenticatedSessionCache();
+      mockDashboardSuccess();
+
+      render(<DashboardPage />);
+
+      await screen.findByText('V-2001');
+
+      expect(api.get).toHaveBeenCalledWith('/auth/me');
+      expect(api.get).toHaveBeenCalledWith('/dashboard');
+      expect(api.get).toHaveBeenCalledWith('/sales');
+      expect(api.get).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it('loads Dashboard without requesting or rendering Sales for WAREHOUSE', async () => {
+    dashboardRole = 'WAREHOUSE';
+    clearAuthenticatedSessionCache();
+    mockDashboardSuccess();
+
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
+    expect(api.get).toHaveBeenCalledWith('/auth/me');
     expect(api.get).toHaveBeenCalledWith('/dashboard');
-    expect(api.get).toHaveBeenCalledWith('/sales');
+    expect(api.get).not.toHaveBeenCalledWith('/sales');
     expect(api.get).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('Ventas recientes')).toBeNull();
+    expect(screen.queryByText('Ventas recientes no disponibles')).toBeNull();
+    expect(screen.queryByText('Forbidden resource')).toBeNull();
   });
 
   it('renders real KPI values from the Dashboard response', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
-
-    expect(screen.getByText('Valor de inventario')).toBeTruthy();
+    expect(await screen.findByText('Valor de inventario')).toBeTruthy();
     expect(screen.getByText('$98,765.43')).toBeTruthy();
     expect(screen.getByText('Stock bajo')).toBeTruthy();
     expect(screen.getByText('2')).toBeTruthy();
@@ -216,7 +267,7 @@ describe('DashboardPage', () => {
   it('does not render hardcoded recent sales records', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
     expect(screen.queryByText('V-1001')).toBeNull();
     expect(screen.queryByText('Hospital San José')).toBeNull();
@@ -250,6 +301,11 @@ describe('DashboardPage', () => {
 
     vi.mocked(api.get)
       .mockImplementationOnce(async () => {
+        return {
+          data: getAuthenticatedSession(),
+        } as never;
+      })
+      .mockImplementationOnce(async () => {
         throw new Error('Dashboard unavailable');
       })
       .mockResolvedValueOnce({
@@ -271,13 +327,18 @@ describe('DashboardPage', () => {
 
     await user.click(screen.getByText('Reintentar'));
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Guantes quirúrgicos')).toBeTruthy();
+    expect(await screen.findByText('Guantes quirúrgicos')).toBeTruthy();
   });
 
   it('keeps Dashboard usable when only Sales fails', async () => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
+
+      if (endpoint === '/auth/me') {
+        return {
+          data: getAuthenticatedSession(),
+        } as never;
+      }
 
       if (endpoint === '/dashboard') {
         return {
@@ -294,8 +355,7 @@ describe('DashboardPage', () => {
 
     render(<DashboardPage />);
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Guantes quirúrgicos')).toBeTruthy();
+    expect(await screen.findByText('Guantes quirúrgicos')).toBeTruthy();
     expect(
       screen.getByText('Ventas recientes no disponibles'),
     ).toBeTruthy();
@@ -307,6 +367,9 @@ describe('DashboardPage', () => {
     const user = userEvent.setup();
 
     vi.mocked(api.get)
+      .mockImplementationOnce(async () => ({
+        data: getAuthenticatedSession(),
+      }) as never)
       .mockImplementationOnce(async () => ({
         data: dashboardData,
       }) as never)
@@ -331,7 +394,7 @@ describe('DashboardPage', () => {
   it('does not introduce a link to the missing Sales route', async () => {
     render(<DashboardPage />);
 
-    await screen.findByText('Resumen operativo');
+    await screen.findByText('Valor de inventario');
 
     const salesLinks = screen
       .getAllByRole('link')
@@ -343,7 +406,9 @@ describe('DashboardPage', () => {
   it('uses the approved local Dashboard heading', async () => {
     render(<DashboardPage />);
 
-    expect(await screen.findByText('Resumen operativo')).toBeTruthy();
-    expect(screen.getByText('Estado actual de tu operación.')).toBeTruthy();
+    expect(
+      await screen.findByText('Estado actual de tu operación.'),
+    ).toBeTruthy();
+    expect(screen.getByText('Resumen operativo')).toBeTruthy();
   });
 });

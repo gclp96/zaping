@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import { useAuthenticatedSession } from '@/app/auth-session';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import Card from '@/app/components/ui/Card';
@@ -11,6 +12,7 @@ import Loading from '@/app/components/ui/Loading';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { COMMERCIAL_ROLES, hasRole } from '@/app/erp-role-access';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -137,6 +139,10 @@ function KpiCard({
 }
 
 export default function DashboardPage() {
+  const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success' ? sessionState.user.role : null;
+  const canViewRecentSales = hasRole(currentUserRole, COMMERCIAL_ROLES);
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -152,6 +158,10 @@ export default function DashboardPage() {
   );
 
   const loadSales = useCallback(async () => {
+    if (!canViewRecentSales) {
+      return;
+    }
+
     setSalesState((current) => ({
       ...current,
       loading: true,
@@ -176,20 +186,28 @@ export default function DashboardPage() {
         items: [],
       });
     }
-  }, []);
+  }, [canViewRecentSales]);
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
     setError('');
-    setSalesState((current) => ({
-      ...current,
-      loading: true,
-      error: '',
-    }));
+    setSalesState((current) =>
+      canViewRecentSales
+        ? {
+            ...current,
+            loading: true,
+            error: '',
+          }
+        : {
+            loading: false,
+            error: '',
+            items: [],
+          },
+    );
 
     const [dashboardResult, salesResult] = await Promise.allSettled([
       api.get<DashboardData>('/dashboard'),
-      api.get<Sale[]>('/sales'),
+      canViewRecentSales ? api.get<Sale[]>('/sales') : undefined,
     ]);
 
     if (dashboardResult.status === 'fulfilled') {
@@ -205,13 +223,19 @@ export default function DashboardPage() {
       );
     }
 
-    if (salesResult.status === 'fulfilled') {
+    if (!canViewRecentSales) {
+      setSalesState({
+        loading: false,
+        error: '',
+        items: [],
+      });
+    } else if (salesResult.status === 'fulfilled' && salesResult.value) {
       setSalesState({
         loading: false,
         error: '',
         items: salesResult.value.data,
       });
-    } else {
+    } else if (salesResult.status === 'rejected') {
       setSalesState({
         loading: false,
         error: getApiErrorMessage(
@@ -223,11 +247,15 @@ export default function DashboardPage() {
     }
 
     setLoading(false);
-  }, []);
+  }, [canViewRecentSales]);
 
   useEffect(() => {
+    if (sessionState.status !== 'success') {
+      return;
+    }
+
     void Promise.resolve().then(loadDashboard);
-  }, [loadDashboard]);
+  }, [loadDashboard, sessionState.status]);
 
   if (loading) {
     return (
@@ -338,75 +366,77 @@ export default function DashboardPage() {
           )}
         </Section>
 
-        <Section
-          title="Ventas recientes"
-          description="Últimas ventas registradas en la operación."
-        >
-          {salesState.loading ? (
-            <Loading message="Cargando ventas recientes..." />
-          ) : salesState.error ? (
-            <Card className="border border-yellow-100">
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Ventas recientes no disponibles
-                  </h2>
-                  <p className="mt-2 text-sm text-slate-600">
-                    {salesState.error}
-                  </p>
+        {canViewRecentSales ? (
+          <Section
+            title="Ventas recientes"
+            description="Últimas ventas registradas en la operación."
+          >
+            {salesState.loading ? (
+              <Loading message="Cargando ventas recientes..." />
+            ) : salesState.error ? (
+              <Card className="border border-yellow-100">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Ventas recientes no disponibles
+                    </h2>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {salesState.error}
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void loadSales()}
+                  >
+                    Reintentar ventas
+                  </Button>
                 </div>
+              </Card>
+            ) : recentSales.length === 0 ? (
+              <EmptyState
+                title="No hay ventas registradas"
+                description="Cuando existan ventas, aparecerán aquí."
+              />
+            ) : (
+              <div className="space-y-3">
+                {recentSales.map((sale) => {
+                  const status = getSaleStatusDescriptor(sale.status);
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => void loadSales()}
-                >
-                  Reintentar ventas
-                </Button>
+                  return (
+                    <Card key={sale.id} className="p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">
+                            {sale.folio}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {sale.customer?.name || 'Cliente no especificado'}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-400">
+                            {formatDate(sale.createdAt)}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+                          <StatusBadge
+                            label={status.label}
+                            tone={status.tone}
+                            ariaLabel={`Estado de la venta: ${status.label}`}
+                          />
+                          <p className="font-semibold text-slate-900">
+                            {formatMoney(sale.total)}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
-            </Card>
-          ) : recentSales.length === 0 ? (
-            <EmptyState
-              title="No hay ventas registradas"
-              description="Cuando existan ventas, aparecerán aquí."
-            />
-          ) : (
-            <div className="space-y-3">
-              {recentSales.map((sale) => {
-                const status = getSaleStatusDescriptor(sale.status);
-
-                return (
-                  <Card key={sale.id} className="p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-semibold text-slate-900">
-                          {sale.folio}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          {sale.customer?.name || 'Cliente no especificado'}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {formatDate(sale.createdAt)}
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                        <StatusBadge
-                          label={status.label}
-                          tone={status.tone}
-                          ariaLabel={`Estado de la venta: ${status.label}`}
-                        />
-                        <p className="font-semibold text-slate-900">
-                          {formatMoney(sale.total)}
-                        </p>
-                      </div>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </Section>
+            )}
+          </Section>
+        ) : null}
       </div>
     </PageContainer>
   );

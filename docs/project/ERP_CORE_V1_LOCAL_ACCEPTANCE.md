@@ -153,7 +153,7 @@ Sin token, cualquier ruta protegida pasa por AppShell y redirige a `/login`, sin
 
 Discrepancias observadas por código, pendientes de reproducción:
 
-- **P2 UX:** Dashboard hace GET `/sales` también para W: backend devuelve 403, muestra ventas no disponibles y mantiene sesión. KPIs enlazan compras para S y cotizaciones para W, que después deniegan acceso.
+- **P2 UX:** KPIs enlazan compras para S y cotizaciones para W, que después deniegan acceso.
 - **P2 UX:** detalle de recepción no tiene el mismo gate de rol que su lista; S obtiene error genérico/retry en vez de ForbiddenState específico. No expone el recurso por ese hecho.
 - **P2 accesibilidad potencial:** drawer implementa Escape/focus inicial/restauración/scroll lock, pero no se encontró trampa de Tab como la del componente Modal.
 - **Logout resuelto en 03A1:** Sidebar desktop/drawer ofrece `Cerrar sesión` a todos los roles, elimina token y caché, retira inmediatamente el contenido protegido y usa `router.replace('/login')`. Pruebas automatizadas cubren los cuatro roles, drawer móvil y una request anterior que resuelve después del logout. Su QA visual permanece NOT RUN.
@@ -171,6 +171,13 @@ Discrepancias observadas por código, pendientes de reproducción:
 - Hallazgo manual: WAREHOUSE podía leer Proveedores, pero no veía Nuevo proveedor, Editar ni Desactivar; `POST /suppliers` respondía 403.
 - Causa: las lecturas admitían WAREHOUSE, pero los decorators de POST/PATCH/DELETE y el helper frontend de gestión de Suppliers sólo admitían ADMIN/MANAGER.
 - Corrección implementada: las mutaciones API y las acciones frontend de Suppliers ahora admiten ADMIN/MANAGER/WAREHOUSE; SALES conserva la denegación del módulo y las operaciones siguen acotadas por `companyId`.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+
+### QA-008 — Dashboard de WAREHOUSE solicitaba Sales sin autorización
+
+- Hallazgo manual: Dashboard cargaba para WAREHOUSE, pero además ejecutaba `GET /sales`; el backend respondía 403 y la UI mostraba “Ventas recientes no disponibles” con “Forbidden resource”.
+- Causa: Dashboard cargaba `/dashboard` y `/sales` incondicionalmente y siempre renderizaba Ventas recientes, sin consultar el rol de la sesión.
+- Corrección implementada: Dashboard reutiliza la sesión autenticada y `COMMERCIAL_ROLES`; WAREHOUSE conserva las métricas generales sin solicitar `/sales` ni renderizar Ventas recientes, mientras ADMIN/MANAGER/SALES conservan la sección y sus estados.
 - Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
 
 ## F. Action matrix
@@ -306,7 +313,7 @@ Convenciones: Q=fixtures descartables previamente autorizadas; API=cliente local
 | W03 | WAREHOUSE | Receipts | Compra confirmada por A/M | Recibir parcial/resto; releer detalle/movimientos | Recepción permitida, cierre automático sin botón complete | P1 | NOT RUN |
 | W04 | WAREHOUSE | Inventory | Producto Q | API IN/OUT; intentar ADJUSTMENT válido | IN/OUT permitidos; ajuste403 sin cambio de stock | P1 | NOT RUN |
 | W05 | WAREHOUSE | Equipment | Equipo Q ACTIVE | Crear/inspeccionar/retirar fixtures; releer detalle | Acciones permitidas, lifecycle consistente | P1 | NOT RUN |
-| W06 | WAREHOUSE | Commercial/Users | Sesión W | Abrir customers/quotes/sales/users y API; luego Dashboard | Rutas denegadas; Dashboard permite resumen y maneja sales403 sin logout | P1 | NOT RUN |
+| W06 | WAREHOUSE | Commercial/Users | Sesión W | Abrir customers/quotes/sales/users y API; luego Dashboard | Rutas denegadas; Dashboard permite resumen sin solicitar Sales ni cerrar sesión | P1 | NOT RUN |
 
 ### Cross-role / auth / tenant / responsive
 
