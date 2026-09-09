@@ -120,7 +120,7 @@ Fuente: controllers y `@Roles`, `RolesGuard`, `web/app/erp-role-access.ts`, nave
 | Dashboard | V | V | V | V | GET dashboard admite todos; ver discrepancias E |
 | Users | V C E D | — | — | — | D=desactivar vía PATCH; no DELETE |
 | Customers | V C E D | V C E D | V C E D | — | Desactivación |
-| Suppliers | V C E D | V C E D | — | V | W sólo lectura |
+| Suppliers | V C E D | V C E D | — | V C E D | S sin acceso |
 | Products | V C E D | V C E D | V | V | Desactivación; tracking no editable |
 | Categories | V C E D | V C E D | V | V | DELETE real sólo sin productos relacionados |
 | Inventory | V X | V X | V | V X | S sólo Existencias; Movimientos A/M/W; escrituras sólo API; W no ADJUSTMENT |
@@ -166,12 +166,19 @@ Discrepancias observadas por código, pendientes de reproducción:
 - Corrección implementada: el backend limita la lectura del ledger a ADMIN/MANAGER/WAREHOUSE y conserva las restricciones vigentes de sus mutaciones; el frontend mantiene Existencias para SALES, oculta Movimientos, evita su request y normaliza deep links de Movimientos a `/inventory`.
 - Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
 
+### QA-007 — WAREHOUSE no podía administrar Suppliers
+
+- Hallazgo manual: WAREHOUSE podía leer Proveedores, pero no veía Nuevo proveedor, Editar ni Desactivar; `POST /suppliers` respondía 403.
+- Causa: las lecturas admitían WAREHOUSE, pero los decorators de POST/PATCH/DELETE y el helper frontend de gestión de Suppliers sólo admitían ADMIN/MANAGER.
+- Corrección implementada: las mutaciones API y las acciones frontend de Suppliers ahora admiten ADMIN/MANAGER/WAREHOUSE; SALES conserva la denegación del módulo y las operaciones siguen acotadas por `companyId`.
+- Estado: **FIX IMPLEMENTED / MANUAL RETEST REQUIRED**. No marcar PASS hasta completar la nueva prueba manual en navegador.
+
 ## F. Action matrix
 
 | Acción / contrato | Roles | Condición / efecto esperado |
 | --- | --- | --- |
 | Users crear/editar/activar/desactivar, POST/PATCH `/users` | A | No desactivar propio usuario; no eliminar último ADMIN activo; sin editar password aquí |
-| Customers CRUD; suppliers CRUD | A M S; A M | DELETE desactiva; W lee suppliers |
+| Customers CRUD; suppliers CRUD | A M S; A M W | DELETE desactiva; S no accede a suppliers |
 | Products/categories crear/editar | A M | S/W sin botones de gestión; categorías permiten actividad; tracking producto inmutable |
 | Categories eliminar | A M | Hard delete sólo fixture sin productos; relación existente rechaza |
 | Inventory POST `/inventory/movements` IN/OUT | A M W | API-only; sin botón de alta en UI Inventory |
@@ -294,7 +301,7 @@ Convenciones: Q=fixtures descartables previamente autorizadas; API=cliente local
 
 | ID | Role | Module | Precondition | Steps | Expected Result | Priority | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| W01 | WAREHOUSE | Navigation/read-only | Cuenta W, catálogos Q | Login; leer suppliers/products/categories; intentar gestión API | Lecturas permitidas; gestión403 y sin botones | P1 | NOT RUN |
+| W01 | WAREHOUSE | Navigation/catalog | Cuenta W, catálogos Q | Login; administrar suppliers; leer products/categories; intentar gestionar esos dos catálogos | Suppliers permite crear/editar/desactivar; products/categories permanecen sólo lectura y su gestión responde 403 | P1 | NOT RUN |
 | W02 | WAREHOUSE | Purchases | DRAFT Q | Crear/editar; buscar approve/cancel; intentar ambos por API | Crear/editar permitido; approve/cancel403 | P1 | NOT RUN |
 | W03 | WAREHOUSE | Receipts | Compra confirmada por A/M | Recibir parcial/resto; releer detalle/movimientos | Recepción permitida, cierre automático sin botón complete | P1 | NOT RUN |
 | W04 | WAREHOUSE | Inventory | Producto Q | API IN/OUT; intentar ADJUSTMENT válido | IN/OUT permitidos; ajuste403 sin cambio de stock | P1 | NOT RUN |

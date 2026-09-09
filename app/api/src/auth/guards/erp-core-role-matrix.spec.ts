@@ -60,9 +60,9 @@ const roleMatrix: RoleMatrix[] = [
     methods: {
       findAll: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findOne: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
-      create: [UserRole.ADMIN, UserRole.MANAGER],
-      update: [UserRole.ADMIN, UserRole.MANAGER],
-      remove: [UserRole.ADMIN, UserRole.MANAGER],
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      remove: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
     },
   },
   {
