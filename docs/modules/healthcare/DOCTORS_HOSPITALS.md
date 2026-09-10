@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN / NOT IMPLEMENTED
-**Última actualización:** 2026-08-20
+**Estado de implementación:** TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+**Última actualización:** 2026-09-09
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -30,6 +30,50 @@ sin convertir esas relaciones en equivalencias incorrectas.
 
 ---
 
+# 1.1 Scope y límites de decisión
+
+Este documento corresponde a:
+
+```text
+HC-NEXT-01 — Hospital / Doctor Domain Design
+CURRENT / DESIGN
+```
+
+Define dominio y comportamiento conceptual. No implementa ni aprueba:
+
+```text
+Prisma models
+migrations
+database constraints
+backend / API / DTOs
+frontend
+RBAC
+enums
+seeds
+tests
+```
+
+Los field names son conceptuales; no constituyen nombres Prisma ni contratos
+API aprobados.
+
+Estado por concepto:
+
+```text
+Doctor
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+Hospital
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+Doctor / Hospital affiliation
+→ TARGET V1 — DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
+
+HealthcareCase Doctor / Hospital relationships
+→ TARGET — NOT IMPLEMENTED
+```
+
+---
+
 # 2. Principio fundamental
 
 Zaping debe mantener separados:
@@ -43,6 +87,20 @@ Technician
 ```
 
 porque representan responsabilidades distintas.
+
+Debe mantenerse además:
+
+```text
+HealthcareCase ≠ Clinical Record
+Doctor ≠ Customer
+Doctor ≠ User
+Doctor ≠ Technician identity
+Doctor ≠ clinical record
+Hospital ≠ Customer
+Hospital ≠ Company
+Affiliation ≠ HealthcareCase
+Technician → User acting operationally in Healthcare
+```
 
 ---
 
@@ -109,6 +167,14 @@ Debe mantenerse:
 Doctor
 ≠
 Customer
+```
+
+```text
+Doctor
+≠
+User
+≠
+Technician identity
 ```
 
 ---
@@ -214,25 +280,25 @@ sin identidad común ni historial confiable.
 
 # 13. Identidad del Doctor
 
-Una futura entidad podría representar conceptualmente:
+Doctor V1 representa conceptualmente:
 
 ```text
-HealthcareDoctor
+Doctor
 ├── id
 ├── companyId
 ├── firstName
 ├── lastName
-├── professionalName?
-├── specialty?
+├── specialty
 ├── phone?
 ├── email?
 ├── notes?
-├── isActive
+├── active / inactive
 ├── createdAt
 └── updatedAt
 ```
 
-No constituye todavía schema Prisma aprobado.
+`firstName`, `lastName` y `specialty` son requeridos. Los demás datos de
+contacto y operación son opcionales. No constituye schema Prisma aprobado.
 
 ---
 
@@ -249,12 +315,16 @@ HealthcareDoctor.id
 
 # 15. Company ownership
 
-En la primera versión, la recomendación es:
+La decisión V1 es:
 
 ```text
 Doctor
-→ Company-owned Healthcare Master Data
+→ Company-scoped Healthcare Master Data
 ```
+
+`companyId` representa tenant ownership/context derivado de la Company
+autenticada. Nunca se selecciona manualmente y no representa employer,
+Hospital affiliation ni un campo empresarial visible.
 
 ---
 
@@ -286,9 +356,9 @@ como registros tenant-isolated independientes.
 
 ---
 
-# 18. No identidad global inicialmente
+# 18. No identidad global en V1
 
-No necesitamos construir todavía un:
+V1 no construye un:
 
 ```text
 Global Doctor Registry
@@ -328,11 +398,13 @@ Dr. Juan Pérez
 
 sin guardar obligatoriamente `"Dr."` como parte del nombre legal.
 
+Puede derivarse para display; no añade un campo requerido a Doctor V1.
+
 ---
 
 # 22. Specialty
 
-`specialty` puede aportar contexto operacional/comercial.
+`specialty` es requerido en Doctor V1 y aporta contexto operacional/comercial.
 
 Ejemplos:
 
@@ -351,15 +423,15 @@ Especialidad profesional no representa información clínica de paciente.
 
 ---
 
-# 24. Specialty catalog futuro
+# 24. Specialty V1 y catálogo futuro
 
-Puede comenzar como:
+V1 utiliza:
 
 ```text
-text
+normalized text / string
 ```
 
-si el negocio no necesita un catálogo formal.
+No utiliza Prisma enum. Un catálogo formal `MedicalSpecialty` permanece FUTURE.
 
 ---
 
@@ -381,7 +453,7 @@ salvo necesidad real.
 
 # 26. Professional License
 
-Puede surgir la necesidad de almacenar:
+Puede surgir en el futuro la necesidad de almacenar:
 
 ```text
 professional license / cédula
@@ -389,7 +461,8 @@ professional license / cédula
 
 para identificación.
 
-No debe hacerse obligatorio sin requisito operacional.
+No forma parte de Doctor V1 y no debe hacerse obligatorio sin requisito
+operacional documentado.
 
 ---
 
@@ -441,14 +514,26 @@ clinical histories
 medical observations about patients
 ```
 
+Doctor V1 tampoco introduce por defecto:
+
+```text
+RFC
+CURP
+date of birth
+private address
+patient information
+clinical information
+mandatory professional license
+```
+
 ---
 
 # 32. Doctor Status
 
-Como Master Data, una estrategia simple puede ser:
+Doctor V1 utiliza lifecycle:
 
 ```text
-isActive
+active / inactive
 ```
 
 siguiendo ADR-012.
@@ -476,6 +561,8 @@ Si un Doctor tiene Cases históricos:
 ```
 
 como comportamiento normal.
+
+No existe normal hard delete en V1.
 
 ---
 
@@ -607,6 +694,12 @@ Hospital
 Customer
 ```
 
+```text
+Hospital
+≠
+Company
+```
+
 ---
 
 # 47. Ejemplo
@@ -654,35 +747,41 @@ Hospital.name == Customer.name
 
 # 50. Hospital como Master Data Healthcare
 
-La recomendación inicial es:
+La decisión V1 es:
 
 ```text
 Hospital
-→ Company-owned Healthcare Master Data
+→ Company-scoped Healthcare Master Data
 ```
+
+`companyId` tiene la misma semántica interna de tenant ownership/context que en
+Doctor. Hospital no representa Company.
 
 ---
 
 # 51. Hospital entity conceptual
 
-Una futura entidad puede necesitar:
+Hospital V1 representa conceptualmente:
 
 ```text
-HealthcareHospital
+Hospital
 ├── id
 ├── companyId
 ├── name
-├── shortName?
+├── city
+├── state
+├── address?
 ├── phone?
 ├── email?
-├── address fields?
+├── contactName?
 ├── notes?
-├── isActive
+├── active / inactive
 ├── createdAt
 └── updatedAt
 ```
 
-No constituye schema aprobado.
+`name`, `city` y `state` son requeridos. Los demás datos de ubicación, contacto
+y operación son opcionales. No constituye schema Prisma aprobado.
 
 ---
 
@@ -761,9 +860,10 @@ Dispatch
 
 ---
 
-# 59. Dirección estructurada
+# 59. Dirección V1 y estructura futura
 
-Cuando se implemente, puede ser preferible estructurar:
+V1 conserva `address` como dato conceptual opcional y requiere `city` y
+`state`. Una estructura posterior puede evaluar:
 
 ```text
 street
@@ -790,7 +890,8 @@ address = "..."
 
 puede ser suficiente inicialmente, pero limita búsquedas y futuras integraciones.
 
-La decisión deberá alinearse con otros módulos.
+La implementación y normalización exactas deberán alinearse con otros módulos;
+este documento no aprueba persistencia de búsqueda o dirección.
 
 ---
 
@@ -821,7 +922,13 @@ Calendar no necesita mapas para funcionar en primera versión.
 
 # 63. Hospital contacts
 
-Puede existir uno o varios contactos relacionados con el Hospital.
+Hospital V1 puede conservar como datos opcionales:
+
+```text
+phone
+email
+contactName
+```
 
 ---
 
@@ -849,19 +956,21 @@ Contact
 
 o relaciones específicas.
 
+Un dominio `HospitalContact` permanece FUTURE.
+
 ---
 
 # 66. Primera versión
 
-Hospital puede comenzar con:
+Hospital V1 requiere:
 
 ```text
-mainPhone
-mainEmail
-notes
+name
+city
+state
 ```
 
-si es suficiente.
+y permite `address`, `phone`, `email`, `contactName` y `notes` opcionales.
 
 ---
 
@@ -882,6 +991,10 @@ parking/loading instructions
 # 68. Hospital Notes
 
 Estos datos pueden almacenarse inicialmente como contexto operativo.
+
+Ejemplos incluyen access instructions, material delivery location, technician
+registration requirements y logistics constraints. No deben contener
+información clínica o de pacientes innecesaria.
 
 ---
 
@@ -921,10 +1034,10 @@ Para este procedimiento ingresar por quirófano 3.
 
 # 71. Hospital Status
 
-Como Master Data:
+Hospital V1 utiliza lifecycle:
 
 ```text
-isActive
+active / inactive
 ```
 
 es una estrategia razonable.
@@ -936,6 +1049,8 @@ es una estrategia razonable.
 Permanece disponible para historia.
 
 No debería seleccionarse normalmente para nuevos Cases.
+
+No existe normal hard delete en V1.
 
 ---
 
@@ -995,6 +1110,9 @@ y un Hospital puede relacionarse con:
 multiple Doctors
 ```
 
+Ambas entidades pueden existir sin affiliations. La relación es opcional en
+ambos sentidos.
+
 ---
 
 # 77. Anti-patrón crítico
@@ -1036,15 +1154,16 @@ DoctorHospitalAffiliation
 
 ```text
 DoctorHospitalAffiliation
-├── id
-├── companyId
-├── doctorId
-├── hospitalId
-├── isActive?
+├── Doctor
+├── Hospital
+├── active / inactive
 ├── notes?
 ├── createdAt
 └── updatedAt
 ```
+
+No duplica `Doctor.specialty` en V1. Los identificadores y nombres técnicos
+permanecen deliberadamente pendientes.
 
 ---
 
@@ -1076,7 +1195,7 @@ Un Doctor puede realizar procedimientos ocasionales en un Hospital sin ser emple
 
 ---
 
-# 84. Unique relationship
+# 84. Affiliation duplicate handling
 
 Conceptualmente debería evitarse duplicar:
 
@@ -1090,16 +1209,11 @@ sin necesidad.
 
 ---
 
-# 85. Candidate uniqueness
+# 85. Duplicate relationship handling
 
-Probablemente:
-
-```text
-companyId + doctorId + hospitalId
-→ unique active relationship
-```
-
-o equivalente.
+El dominio debe evitar relaciones activas duplicadas, pero este documento no
+aprueba un unique constraint. La estrategia técnica se decidirá con Prisma y
+concurrency behavior en un slice posterior.
 
 ---
 
@@ -1115,10 +1229,10 @@ Doctor worked at Hospital A previously
 
 # 87. Primera versión
 
-Puede utilizarse:
+V1 utiliza conceptualmente:
 
 ```text
-isActive
+active / inactive
 ```
 
 en la relación.
@@ -1144,7 +1258,7 @@ No son prioridad inicial.
 
 Una regla importante:
 
-> **La ausencia de una afiliación previa no debe impedir necesariamente crear un Case.**
+> **La ausencia de una affiliation activa no debe bloquear por sí sola un Case.**
 
 ---
 
@@ -1163,6 +1277,9 @@ Zaping puede permitir el Case y ofrecer:
 ```text
 Agregar Hospital a relaciones del Doctor
 ```
+
+Esto puede generar un warning y una acción explícita. No debe crear affiliation
+automáticamente ni como side effect invisible de guardar HealthcareCase.
 
 ---
 
@@ -1275,14 +1392,25 @@ puede sugerirse registrar la relación si no existe.
 
 # 100. Case relationship
 
-Case puede vincular:
+HealthcareCase permanece como operational root. TARGET V1 puede vincular:
 
 ```text
-Doctor
-Hospital
+HealthcareCase
+├── doctorId? — optional primary Doctor
+├── hospitalId? — optional procedure Hospital
+└── responsibleUserId? — existing Company User
 ```
 
-como contexto de esa ocurrencia concreta.
+Los nombres son conceptuales y no aprueban fields Prisma o DTOs. Doctor y
+Hospital son opcionales; multiple Doctors per HealthcareCase permanece FUTURE.
+
+Un Case puede estar `SCHEDULED` sin Doctor y/o Hospital. Debe mantenerse:
+
+```text
+Case Status
+≠
+Case Readiness
+```
 
 ---
 
@@ -1296,6 +1424,9 @@ CASE-0145
 
 debe continuar indicando que ocurrió allí.
 
+La desactivación posterior de Doctor u Hospital tampoco elimina ni null la
+relación histórica del Case.
+
 ---
 
 # 102. Master Data changes
@@ -1307,6 +1438,34 @@ Doctor X ↔ Hospital A
 ```
 
 no debe eliminar ni modificar Cases históricos.
+
+---
+
+# 102A. Master identity y snapshots V1
+
+Un master record no debe reutilizarse para representar otra entidad real.
+
+Cambiar la misma identidad de:
+
+```text
+Hospital CIMA
+→ Hospital San José
+```
+
+no es una corrección cuando son organizaciones distintas. Debe desactivarse el
+registro anterior cuando corresponda y crearse una nueva entidad. Correcciones
+simples de ortografía o contacto sí pueden actualizar la misma identidad.
+
+V1 utiliza master-data references y no requiere:
+
+```text
+doctorNameSnapshot
+hospitalNameSnapshot
+```
+
+Las correcciones simples se reflejan en display. Snapshots inmutables permanecen
+FUTURE para documentos operacionales o legales confirmados —por ejemplo
+Dispatch, signed records o PDFs— cuando el dominio dueño los justifique.
 
 ---
 
@@ -1355,6 +1514,9 @@ Equipment
 CaseKit
 warehouse instructions
 ```
+
+Reschedule del mismo Case preserva Doctor y Hospital salvo que el usuario los
+cambie explícitamente. Un cambio de schedule no crea por sí solo un nuevo Case.
 
 ---
 
@@ -1680,14 +1842,19 @@ Crear Doctors duplicados destruiría historial.
 
 # 138. Duplicate detection
 
-La UI debería detectar posibles coincidencias por:
+Un probable duplicate de Doctor puede considerar:
 
 ```text
-name
-phone
-email
-professional license future
+normalized firstName
++
+normalized lastName
++
+specialty
 ```
+
+Debe advertir, permitir revisar el registro existente y permitir creación
+deliberada cuando corresponda. No aprueba rigid uniqueness ni un database
+constraint.
 
 ---
 
@@ -1713,13 +1880,18 @@ No forma parte de primera versión.
 
 # 141. Hospital deduplication
 
-También deben detectarse posibles duplicados por:
+Un probable duplicate de Hospital puede considerar:
 
 ```text
-name
-address
-phone
+normalized name
++
+city
++
+state
 ```
+
+Debe advertir, permitir revisar el registro existente y permitir creación
+deliberada cuando corresponda. No aprueba rigid uniqueness por Hospital name.
 
 ---
 
@@ -1748,13 +1920,14 @@ Debe requerirse revisión humana.
 Doctor debe poder buscarse por:
 
 ```text
-name
+first name
+last name
 specialty
-phone
-email
 ```
 
-cuando corresponda.
+Search debe ser case-insensitive y preferiblemente accent-tolerant donde sea
+técnicamente práctico. La implementación de persistencia/búsqueda permanece
+pendiente.
 
 ---
 
@@ -1765,10 +1938,10 @@ Por:
 ```text
 name
 city
-address
+state
 ```
 
-cuando exista estructura suficiente.
+con las mismas expectativas de case-insensitive y accent-tolerant search.
 
 ---
 
@@ -1836,13 +2009,15 @@ Las listas deben priorizar información útil para identificar y actuar.
 
 Primera captura debe ser rápida.
 
-Podría requerir únicamente:
+Doctor V1 debe requerir:
 
 ```text
-Name
+firstName
+lastName
+specialty
 ```
 
-y después permitir enriquecer.
+como datos requeridos de V1, y después permitir enriquecer phone, email y notes.
 
 ---
 
@@ -1862,13 +2037,15 @@ Enrich over time
 
 # 154. Create Hospital UX
 
-Mínimo probable:
+Hospital V1 debe requerir:
 
 ```text
-Name
+name
+city
+state
 ```
 
-con ubicación/contactos agregables posteriormente.
+con address, phone, email, contactName y notes opcionales.
 
 ---
 
@@ -1884,9 +2061,34 @@ puede convertirse en un readiness warning/blocker según Company policy.
 
 ---
 
-# 156. No exigir dirección universal al crear Hospital
+# 156. Address optional
 
-Podría existir un registro comercial temprano antes de conocerla.
+`address` no es requerido para crear Hospital V1. `city` y `state` sí son
+requeridos como contexto mínimo de ubicación.
+
+---
+
+# 156A. HealthcareCase selector UX
+
+Los selectors TARGET deben:
+
+```text
+show only active same-Company master data for new selection
+be searchable
+be clearable
+preserve inactive historical values when viewing existing Cases
+```
+
+Quick creation puede ofrecerse como una acción explícita:
+
+```text
++ Create Doctor
++ Create Hospital
+```
+
+Después de una creación explícita exitosa, la nueva entidad puede seleccionarse
+en el Case. Nunca debe crearse master data como side effect invisible de guardar
+HealthcareCase o escribir una etiqueta.
 
 ---
 
@@ -2020,58 +2222,49 @@ Frontend no debe decidir arbitrariamente tenant ownership.
 
 # 169. Authorization — Doctors
 
-Permisos conceptuales:
-
-```text
-healthcare.doctors.read
-healthcare.doctors.create
-healthcare.doctors.update
-healthcare.doctors.deactivate
-```
+Toda operación futura requiere autenticación, tenant isolation y autorización
+server-side. Los permission names y la matriz RBAC se decidirán en el slice de
+implementación; este documento no los aprueba.
 
 ---
 
 # 170. Authorization — Hospitals
 
-```text
-healthcare.hospitals.read
-healthcare.hospitals.create
-healthcare.hospitals.update
-healthcare.hospitals.deactivate
-```
+Aplica el mismo boundary server-side. Los permisos exactos permanecen
+deliberadamente pendientes.
 
 ---
 
 # 171. Relationship permissions
 
-Puede utilizarse el permiso de actualización correspondiente o una acción específica.
-
-No sobrefragmentar RBAC inicialmente.
+Link/unlink o activate/deactivate affiliation requiere autorización explícita.
+La acción y su granularidad no se definen aquí.
 
 ---
 
 # 172. Technician access
 
-Technicians probablemente necesitan leer:
+Technicians pueden necesitar leer:
 
 ```text
 Doctors
 Hospitals
 ```
 
-asociados a sus Cases.
+asociados a sus Cases, sujeto a la futura matriz autorizada.
 
 ---
 
 # 173. Commercial access
 
-Sales/Manager pueden necesitar crear y actualizar relaciones.
+Los actores comerciales pueden necesitar administrar master data, sujeto a la
+futura matriz autorizada.
 
 ---
 
 # 174. Warehouse access
 
-Warehouse necesita leer contexto suficiente:
+Warehouse puede necesitar leer contexto suficiente:
 
 ```text
 Doctor
@@ -2080,7 +2273,8 @@ Address
 Operational Instructions
 ```
 
-sin necesariamente modificar Master Data.
+sin necesariamente modificar Master Data. Esto no aprueba todavía acceso por
+rol.
 
 ---
 
@@ -2131,7 +2325,8 @@ noise
 
 # 179. API
 
-Actualmente no existen endpoints Healthcare implementados.
+Actualmente no existen endpoints Doctor/Hospital implementados. HealthcareCase
+Foundation sí conserva su API CURRENT separada.
 
 ---
 
@@ -2219,17 +2414,11 @@ scheduledStart
 
 ---
 
-# 187. Index candidates
+# 187. Index decisions deferred
 
-Durante Prisma design probablemente deberán evaluarse índices sobre:
-
-```text
-companyId + doctorId
-companyId + hospitalId
-companyId + scheduledStart
-```
-
-en entidades correspondientes.
+Los índices, constraints, normalized keys, collation y estrategia de búsqueda
+se evaluarán durante Prisma/API design. Este documento no aprueba una solución
+de persistencia.
 
 ---
 
@@ -2238,30 +2427,35 @@ en entidades correspondientes.
 Actualmente:
 
 ```text
-Doctor
-Hospital
-Doctor-Hospital relationship
+HealthcareCase Foundation
+→ IMPLEMENTED / VALIDATED
+
+EquipmentAsset / Equipment V1
+→ IMPLEMENTED / VALIDATED in ERP Core
+
+HC-NEXT-01
+→ CURRENT / DESIGN
 ```
 
-son conceptos de dominio documentados.
-
-No existe evidencia de:
+No están implementados:
 
 ```text
-Prisma models
-migrations
-backend modules
-API
-frontend
-Doctor 360
-Hospital 360
-```
+Doctor
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
 
-implementados.
+Hospital
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+Doctor-Hospital relationship
+→ DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
+
+HealthcareCase Doctor/Hospital relationships
+→ TARGET — NOT IMPLEMENTED
+```
 
 ---
 
-# 189. TARGET — Fase 1
+# 189. TARGET V1
 
 La primera implementación debería resolver:
 
@@ -2272,18 +2466,18 @@ Create Hospital
 ↓
 Link Doctor ↔ Hospital
 ↓
-Use both in Opportunity
-↓
 Use both in Case
 ↓
 Search / Filter
+↓
+Duplicate warning / review
 ↓
 View history
 ```
 
 ---
 
-# 190. TARGET — Fase 2
+# 190. FUTURE enrichment
 
 Después:
 
@@ -2291,7 +2485,6 @@ Después:
 Doctor 360
 Hospital 360
 Operational instructions
-Duplicate detection
 Import
 Commercial insights
 ```
@@ -2313,6 +2506,30 @@ external integrations
 maps
 advanced analytics
 AI relationship summaries
+```
+
+---
+
+# 191A. Out of scope V1
+
+Este slice no incluye:
+
+```text
+global Doctor directory
+global Hospital directory
+Patient model / PHI
+Payer / Insurance
+multiple Doctors per HealthcareCase
+MedicalSpecialty catalog
+HospitalContact domain
+Procedure catalog
+clinical record
+Doctor employment management
+hospital credentialing
+detailed Doctor scheduling
+Prisma implementation
+API implementation
+frontend implementation
 ```
 
 ---
@@ -2568,12 +2785,39 @@ Inactive Doctor/Hospital
 
 ```text
 Doctor/Hospital
-→ Company-scoped in first implementation
+→ Company-scoped master data in V1
 ```
 
 ```text
 Cross-tenant relationships
 → forbidden
+```
+
+```text
+Affiliation
+≠
+HealthcareCase
+```
+
+```text
+HealthcareCase Doctor / Hospital
+→ optional TARGET relationships
+```
+
+```text
+Case Status
+≠
+Case Readiness
+```
+
+```text
+new selection
+→ active Doctor / Hospital only
+```
+
+```text
+master-data deactivation
+→ preserves historical Case relationships
 ```
 
 ---
@@ -2625,13 +2869,33 @@ Guardar texto libre sin Master Data reutilizable.
 
 ## Global Doctor database prematurely
 
-Compartir Doctors entre tenants sin modelo de ownership adecuado.
+Compartir Doctors entre tenants en V1.
 
 ---
 
 ## Auto-merge by name
 
 Fusionar dos personas únicamente porque tienen nombres similares.
+
+---
+
+## Rigid uniqueness by name
+
+Bloquear Doctors u Hospitals legítimos mediante uniqueness rígida de nombre.
+
+---
+
+## Case creates affiliation silently
+
+Crear affiliation como side effect invisible de seleccionar Doctor + Hospital
+o guardar HealthcareCase.
+
+---
+
+## Master identity repurposing
+
+Renombrar una identidad para convertirla en otra entidad real en lugar de
+desactivar y crear el master data correcto.
 
 ---
 
@@ -2773,7 +3037,9 @@ engineering/API_GUIDELINES.md
 
 ```text
 DOCTORS_HOSPITALS.md
-→ Doctor / Hospital identity and relationship
+→ canonical Doctor / Hospital V1 domain specification
+→ Company-scoped ownership and tenant invariants
+→ lifecycle, affiliation and HealthcareCase integration
 
 OPPORTUNITIES.md
 → early commercial relationship
@@ -2794,7 +3060,7 @@ PROJECT_BOARD.md
 → implementation status
 
 schema.prisma
-→ technical implementation only after approval
+→ CURRENT persistence only; no Doctor/Hospital models yet
 ```
 
 ---
@@ -2809,52 +3075,51 @@ HealthcareHospital
 DoctorHospitalAffiliation
 ```
 
-debemos resolver:
+permanecen deliberadamente pendientes:
 
 ```text
-final naming conventions
-minimum Doctor fields
-minimum Hospital fields
-address strategy
-specialty representation
-Doctor professional license requirement
-Hospital organization vs facility scope
-affiliation lifecycle
-duplicate detection strategy
-Hospital ↔ Customer relationship
-Doctor commercial ownership future
-import requirements
+Prisma model and field names
+relation and onDelete behavior
+exact affiliation persistence model
+indexes and database constraints
+normalization storage strategy
+duplicate-detection implementation
+search implementation and collation
+API routes and DTO shapes
+RBAC matrix and permission names
+frontend routes and components
+audit and concurrency behavior
+immutable snapshots for confirmed operational/legal documents
 ```
+
+Los datos conceptuales mínimos, Company-scoped ownership, cardinalidad N ↔ N,
+lifecycle y Case integration ya están aprobados como dominio V1.
 
 ---
 
-# 222. Recomendación preliminar de modelo
+# 222. Dirección conceptual — no schema approval
 
-La dirección más limpia actualmente es:
+La relación conceptual aprobada es:
 
 ```text
 Company
 │
-├── HealthcareDoctor
-│
-├── HealthcareHospital
-│
-└── DoctorHospitalAffiliation
+├── Doctor
+└── Hospital
 ```
-
-con:
 
 ```text
-HealthcareDoctor
-↔
-HealthcareHospital
+Doctor
+N ↔ N
+Hospital
 ```
 
-mediante una relación explícita many-to-many.
+Una entidad de affiliation es candidato técnico razonable. Este diagrama no
+aprueba modelos, tablas o nombres Prisma.
 
 ---
 
-# 223. Opportunity
+# 223. Opportunity FUTURE
 
 ```text
 HealthcareOpportunity
@@ -2870,23 +3135,23 @@ conceptualmente.
 
 ```text
 HealthcareCase
-├── doctorId?
-├── hospitalId?
-├── customerId?
-└── payer relationship/context?
+├── doctorId? — optional primary Doctor
+├── hospitalId? — optional procedure Hospital
+└── responsibleUserId? — existing Company User
 ```
 
-manteniendo cada dimensión separada.
+Son nombres conceptuales TARGET, no fields Prisma aprobados. Customer/Payer y
+multiple Doctors per Case permanecen fuera de este slice.
 
 ---
 
-# 225. Primera decisión crítica
+# 225. Primera decisión crítica — resuelta para V1
 
-Antes de Prisma debemos confirmar:
+Decisión de dominio:
 
 > **¿Hospital representa inicialmente la sede física operacional donde ocurre un Case, aunque más adelante pueda existir una Organization que agrupe varias sedes?**
 
-La recomendación actual es:
+La decisión V1 es:
 
 ```text
 YES
@@ -2896,17 +3161,19 @@ para mantener el MVP simple y operacionalmente útil.
 
 ---
 
-# 226. Segunda decisión crítica
+# 226. Segunda decisión crítica — resuelta para V1
 
 > **¿Doctor y Hospital deben pertenecer al tenant en lugar de formar parte de un directorio global?**
 
-La recomendación inicial es:
+La decisión de dominio V1 es:
 
 ```text
 YES
 ```
 
 porque protege aislamiento, simplifica ownership y evita complejidad prematura.
+
+Una identidad compartida con relación tenant-specific permanece FUTURE.
 
 ---
 
