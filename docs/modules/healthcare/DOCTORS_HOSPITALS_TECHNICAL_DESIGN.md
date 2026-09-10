@@ -914,16 +914,10 @@ Estas decisiones no bloquean la migración V1 descrita.
 
 ## 24. Implementation sequence
 
-Slices posteriores recomendados:
-
-1. Prisma schema + migration + migration-level integrity tests.
-2. Normalization utility y persistence Services de Doctor/Hospital.
-3. Affiliation persistence.
-4. HealthcareCase persistence integration.
-5. Implementar el contrato API/DTO/RBAC aprobado de la Sección 28, incluidos
-   PATCH semantics, tenant tests y manejo de concurrencia/error.
-6. Frontend master-data workflows y Case selectors.
-7. Search/duplicate-warning UX y observabilidad de volumen/query cost.
+La dirección de dependencia aprobada se formaliza en el plan ejecutable de la
+Sección 29: `HC-NEXT-01C1 -> C2 -> C3 -> C4 -> C5 -> C6 -> C7 -> C8`. Cada
+slice tiene alcance, tests, quality gates, stop conditions y estrategia de
+recuperación propios. Esta sección ya no funciona como backlog independiente.
 
 Cada slice debe conservar los límites del Modular Monolith: Healthcare posee
 estas reglas; ERP Core no recibe campos médicos específicos.
@@ -1984,3 +1978,779 @@ affiliation API, HealthcareCase API integration, fixed-role RBAC, tenant-safe
 404 y stable error codes son diseño aprobado, propuesto y todavía no
 implementado. La implementación/presentación frontend y permission-based RBAC
 permanecen diferidos.
+
+---
+
+## 29. Implementation Plan & Quality Gates
+
+> **APPROVED IMPLEMENTATION PLAN / NOT STARTED.** Esta sección descompone el
+> diseño aprobado en slices implementables. No afirma que schema, migraciones,
+> API, frontend o tests existan. El estado general del documento permanece
+> `PROPOSED / NOT IMPLEMENTED` hasta que un slice se integre y su evidencia se
+> documente.
+
+### 29.1 Planning rules and gate model
+
+La implementación avanza en ocho slices secuenciales y revisables. Cada slice
+parte del predecessor merged y green, limita su diff al alcance declarado y
+puede revertirse sin arrastrar trabajo no relacionado. Un gate verde de un
+slice anterior no sustituye los gates focales ni de regresión del siguiente.
+
+El modelo obligatorio para cada slice es:
+
+| Gate | Requirement |
+| --- | --- |
+| ENTRY | Dependencias merged; branch limpia; contrato aplicable todavía vigente; herramientas y entorno requeridos disponibles. |
+| IMPLEMENT | Sólo el comportamiento aprobado para el slice; ningún capability futuro incidental. |
+| FOCAL TESTS | Tests nuevos o ajustados prueban el comportamiento cambiado y fallarían si se elimina la implementación. |
+| REGRESSION | Suites de módulos afectados y contratos preexistentes permanecen verdes. |
+| QUALITY | Lint sin autofix, typecheck, tests y build según las capas tocadas. |
+| SECURITY | Tenant isolation, roles y campos protegidos se verifican en el boundary real, no sólo leyendo metadata. |
+| REVIEW | `git diff --check`, revisión del diff completo, migraciones y generated artifacts cuando apliquen. |
+| COMMIT | Sólo después de PASS; un commit/PR no debe mezclar el siguiente slice. |
+| NEXT | El siguiente slice no inicia con findings bloqueantes, gates rojos o evidencia incompleta. |
+
+Los comandos se ejecutan desde `app/api` o `web`, no desde el package raíz. En
+API se usa `npm run lint:check`; `npm run lint` contiene `--fix` y no es un gate
+read-only. Para Web, la suite completa usa un worker para mantener la estrategia
+estable del repositorio.
+
+Comandos base, además de los focales de cada slice:
+
+```text
+# app/api
+npm run lint:check
+npm run typecheck
+npm test -- --runInBand
+npm run build
+
+# web
+npm run lint
+npm run typecheck
+npm test -- --maxWorkers=1
+npm run build
+
+# repository
+git diff --check
+```
+
+Los tests E2E o de migración que requieren PostgreSQL sólo se ejecutan contra
+una base explícitamente disposable. Ningún slice autoriza reset, limpieza o
+pruebas destructivas sobre datos locales compartidos, QA o producción.
+
+### 29.2 Dependency chain and review units
+
+```text
+HC-NEXT-01C1
+  -> HC-NEXT-01C2
+    -> HC-NEXT-01C3
+      -> HC-NEXT-01C4
+        -> HC-NEXT-01C5
+          -> HC-NEXT-01C6
+            -> HC-NEXT-01C7
+              -> HC-NEXT-01C8
+```
+
+| Slice | Reviewable outcome | Direct dependency |
+| --- | --- | --- |
+| HC-NEXT-01C1 | Schema, migration and database integrity | Approved Sections 1-28 |
+| HC-NEXT-01C2 | Doctor/Hospital backend | C1 merged and green |
+| HC-NEXT-01C3 | Affiliation backend | C2 merged and green |
+| HC-NEXT-01C4 | HealthcareCase integration | C3 merged and green |
+| HC-NEXT-01C5 | Backend hardening/regression | C4 merged and green |
+| HC-NEXT-01C6 | Doctor/Hospital master-data frontend | C5 merged and green |
+| HC-NEXT-01C7 | Case selectors and duplicate-review UX | C6 merged and green |
+| HC-NEXT-01C8 | Integrated automated/manual acceptance | C7 merged and green |
+
+No se omiten dependencias por comodidad. Puede prepararse un branch apilado
+mientras el predecessor está en review, pero no se mezcla ni se declara green
+fuera de orden.
+
+### 29.3 HC-NEXT-01C1 — Prisma Schema, Migration & Relational Integrity
+
+#### Objective, dependencies and scope
+
+Implementar exclusivamente la persistencia aprobada. ENTRY exige Sections
+1-28 aprobadas, schema CURRENT verificado, working tree limpio y una
+`DATABASE_URL` disposable identificada inequívocamente.
+
+Expected code areas:
+
+- `app/api/prisma/schema.prisma`;
+- una nueva carpeta en `app/api/prisma/migrations/` con SQL revisable;
+- tests de integración/migración en `app/api/test/` y utilidades estrictamente
+  necesarias para ejecutarlos;
+- Prisma Client generado sólo por el comando de generación; generated output
+  se versiona únicamente si ya es convención del repositorio.
+
+IMPLEMENT incluye:
+
+- `HealthcareDoctor`, `HealthcareHospital` y
+  `HealthcareDoctorHospitalAffiliation`;
+- inverse relations en Company;
+- `doctorId`/`hospitalId` nullable e inverse relations en HealthcareCase;
+- UUID, `companyId`, `@@unique([id, companyId])`, `searchKey`, `isActive` y
+  timestamps de Doctor/Hospital;
+- unique `[companyId, doctorId, hospitalId]`, las dos FKs compuestas tenant-safe
+  y `ON DELETE RESTRICT` de affiliation;
+- FKs compuestas nullable e índices aprobados de HealthcareCase;
+- CHECK SQL con `btrim(...) <> ''` para campos required y `searchKey`;
+- migración aditiva sin backfill.
+
+Forbidden scope:
+
+- módulos NestJS, DTOs, controllers, Services o permisos;
+- endpoints o frontend;
+- seeds/fixtures productivos;
+- backfill especulativo, hard delete, extensión PostgreSQL o cambio de
+  HealthcareCaseStatus.
+
+#### Tests and gates
+
+FOCAL TESTS deben demostrar en PostgreSQL real:
+
+- create válido de Doctor y Hospital con UUID/companyId;
+- rechazo de required strings blank por CHECK, incluso fuera de la API;
+- affiliation same-tenant válida y exact pair duplicado rechazado;
+- cada FK cross-tenant de affiliation rechazada;
+- Case nullable válido y rows preexistentes válidas sin backfill;
+- Case same-tenant Doctor/Hospital válido y cada FK cross-tenant rechazada;
+- `RESTRICT` impide hard delete de masters referenciados;
+- índices, uniques y FK names/acciones coinciden con el SQL revisado.
+
+REGRESSION/QUALITY:
+
+```text
+npx prisma format
+npx prisma validate
+npx prisma generate
+npm run lint:check
+npm run typecheck
+npm test -- --runInBand
+npm run build
+```
+
+Además, en bases desechables separadas:
+
+1. confirmar de forma explícita la `DATABASE_URL` desechable y ejecutar
+   `npx prisma migrate reset --force` para desplegar la chain desde vacío;
+2. crear otra base con el schema CURRENT y HealthcareCases existentes, luego
+   ejecutar `npm run prisma:migrate:deploy` para aplicar la nueva migración;
+3. ejecutar los tests de integridad;
+4. revisar `migration.sql` manualmente antes de merge.
+
+SECURITY pasa sólo si la base, no únicamente Prisma Service, impide relaciones
+cross-company. REVIEW incluye diff de schema + SQL, ausencia de cambios
+destructivos y `git diff --check`.
+
+#### Completion, recovery and STOP
+
+Complete cuando la cadena limpia y el upgrade con datos CURRENT pasan, Prisma
+validate/generate y API regression están verdes, y toda invariant tenant-safe
+tiene test positivo y negativo. El commit contiene sólo persistencia y tests de
+integridad.
+
+Recovery: antes de merge puede corregirse/recrearse la nueva migración en la DB
+disposable. Una vez aplicada en un entorno compartido, no se reescribe historia:
+se usa una migración forward corrective. Revertir código no debe asumir que
+pueden eliminarse tablas/columnas con datos; el schema es aditivo y tolerado por
+el backend anterior.
+
+**C1 STOP** si Prisma validate/generate falla, la chain no parte desde main,
+aparece SQL destructivo inesperado, se requiere backfill no aprobado, una FK
+cross-tenant puede persistirse, una row CURRENT queda inválida o el target de
+reset no es demostrablemente disposable.
+
+### 29.4 HC-NEXT-01C2 — Normalization + Doctor/Hospital Backend
+
+#### Objective, dependencies and scope
+
+Implementar el backend independiente de ambos masters sobre C1. ENTRY exige C1
+merged, Prisma Client actualizado, migration gate verde y el contrato de
+Sections 28.2-28.9 sin contradicciones abiertas.
+
+Expected code areas:
+
+- `app/api/src/healthcare/doctors/**`;
+- `app/api/src/healthcare/hospitals/**`;
+- utility de normalización/searchKey bajo `app/api/src/healthcare/**`;
+- registro de modules en el composition root Healthcare/API;
+- DTO/controller/service specs y `erp-core-role-matrix.spec.ts`.
+
+IMPLEMENT incluye DTOs, controllers y Services para list, detail, create,
+update, duplicate review, confirm, deactivate y reactivate; normalización y
+searchKey; filtros/paginación/orden estable; response mappers y códigos de error
+de la Section 28.
+
+Forbidden scope:
+
+- mutations o nested lists de affiliation;
+- cambios funcionales a HealthcareCase;
+- frontend, import/merge de duplicados, fuzzy ranking o permission-based RBAC;
+- aceptar `companyId`, `searchKey` o `isActive` del cliente.
+
+#### Tests and gates
+
+Doctor y Hospital requieren grupos focales separados para create, DTO
+validation, normalization, list/detail, search, filters, pagination, stable
+sorting, duplicate review sin write, explicit confirmation, update semantics,
+lifecycle idempotente, responses y stable errors.
+
+Golden normalization cubre como mínimo:
+
+- `José`/`Jose` y `Muñoz`/`Munoz`;
+- uppercase/lowercase;
+- whitespace repetido y leading/trailing;
+- city/state con acentos;
+- optional blank convertido a `null`;
+- `searchKey` calculado y nunca aceptado/devuelto públicamente.
+
+SECURITY requiere tests efectivos por request/guard y Service:
+
+- ADMIN/MANAGER/SALES leen, crean y editan; WAREHOUSE sólo lee;
+- sólo ADMIN/MANAGER ejecutan lifecycle;
+- Company A no lista, busca, obtiene, muta ni recibe duplicate candidates de B;
+- ID foreign e inexistente son 404 indistinguible;
+- body/query no controlan companyId y unknown fields producen 400;
+- un 403 no destruye la sesión.
+
+REGRESSION incluye HealthcareCase y la matriz de roles CURRENT. QUALITY ejecuta
+los focales, `npm run lint:check`, `npm run typecheck`, todos los API tests con
+`--runInBand`, `npm run build` y `git diff --check`.
+
+#### Completion, recovery and STOP
+
+Complete cuando ambos resources cumplen el contrato completo de C2, sus tests
+fallan si se omite tenant predicate o un role, y ningún raw Prisma error cruza
+el boundary HTTP. El commit no contiene affiliation, Case ni frontend.
+
+Recovery consiste en revertir módulos/API de C2 sin retirar el schema aditivo
+de C1. Los datos creados permanecen inaccesibles al backend anterior pero no se
+eliminan. Un cambio de contrato descubierto vuelve a diseño explícito; no se
+parchea silenciosamente en el mismo review.
+
+**C2 STOP** si companyId es controlable por cliente, existe tenant leakage,
+duplicate review escribe antes de confirmación, nombres required aceptan blank,
+lifecycle elimina historia, raw Prisma escapa, la matriz fija no se cumple o un
+gate API completo queda rojo.
+
+### 29.5 HC-NEXT-01C3 — Doctor-Hospital Affiliation Backend
+
+#### Objective, dependencies and scope
+
+Implementar la relación explícita N:N una vez estables ambos masters. ENTRY
+exige C2 merged/green y lifecycle/duplicate contracts de Doctor/Hospital
+cerrados.
+
+Expected code areas:
+
+- `app/api/src/healthcare/doctor-hospital-affiliations/**`;
+- extensiones narrowly scoped de Doctor/Hospital para los dos nested GET;
+- module registration, DTOs, mappers y tests;
+- test E2E/concurrency con PostgreSQL para el race P2002.
+
+IMPLEMENT incluye link/create, PATCH de notes, deactivate, reactivate,
+Doctor-to-Hospitals list, Hospital-to-Doctors list, effective-active status,
+exact-pair P2002 mapping y los códigos 409 aprobados.
+
+Forbidden scope:
+
+- DELETE o nueva fila al reactivar;
+- cambiar la pareja por PATCH;
+- creación/reactivación silenciosa desde Case;
+- mutation con master inactivo;
+- Case DTO/response, frontend o nuevos roles.
+
+#### Tests and gates
+
+FOCAL TESTS cubren:
+
+- link same-tenant con ambos masters activos;
+- active pair repetido -> `AFFILIATION_ALREADY_ACTIVE` 409;
+- inactive pair en create -> `AFFILIATION_INACTIVE` 409 y reactivación sólo por
+  command explícito;
+- notes PATCH sin alterar pair/lifecycle;
+- deactivate/reactivate idempotentes sobre la misma row;
+- reactivate rechazado si cualquier endpoint está inactivo;
+- listas direccionales paginadas, status y effective-active correctos;
+- dos creates concurrentes dejan una row y el loser recibe error estable;
+- deactivate no modifica HealthcareCase.
+
+SECURITY verifica read para los cuatro roles, link/edit notes para
+ADMIN/MANAGER/SALES, lifecycle sólo ADMIN/MANAGER y WAREHOUSE read-only. Todos
+los master, pair, list y candidate lookups usan authenticated companyId;
+combinaciones A/B no revelan ni enlazan foreign IDs.
+
+REGRESSION incluye C2 y HealthcareCase existente. QUALITY usa focal unit/E2E,
+full API tests in-band, API lint:check/typecheck/build y diff check.
+
+#### Completion, recovery and STOP
+
+Complete cuando sólo una row persistente representa cada pair, todas las rutas
+de 28.2.3/28.5 existen, P2002 real está probado y no hay DELETE. El commit/PR es
+independiente de Case y frontend.
+
+Recovery revierte la superficie API conservando rows. Si un race aparece tras
+merge se corrige forward manteniendo la unique; nunca se borra la row winner ni
+se relaja tenant integrity para desbloquear un test.
+
+**C3 STOP** si se puede enlazar cross-tenant, create reactiva silenciosamente,
+se duplica una pareja, raw P2002 escapa, lifecycle de SALES/WAREHOUSE queda
+permitido, una deactivation toca Case o cualquier gate de C2 regresa.
+
+### 29.6 HC-NEXT-01C4 — HealthcareCase Doctor/Hospital Integration
+
+#### Objective, dependencies and scope
+
+Agregar el contrato aditivo de Sections 28.10-28.11 al Case CURRENT. ENTRY
+exige C3 green, Services de master disponibles para validación scoped y baseline
+de HealthcareCase registrado antes de editar.
+
+Expected code areas:
+
+- `app/api/src/healthcare/cases/dto/create-healthcare-case.dto.ts`;
+- `app/api/src/healthcare/cases/dto/update-healthcare-case.dto.ts`;
+- `healthcare-case.service.ts`, controller sólo si response wiring lo exige;
+- specs de DTO, Service y Controller de HealthcareCase;
+- role-matrix y tests E2E tenant/cross-relation cuando corresponda.
+
+IMPLEMENT incluye `doctorId?`/`hospitalId?`, property-presence semantics,
+validation de nuevos/replacement IDs activos same-tenant y responses con IDs y
+compact relations sin N+1.
+
+Forbidden scope:
+
+- exigir o crear affiliation;
+- cambiar HealthcareCaseStatus, Readiness, folio, schedule, responsibleUser o
+  cancel behavior;
+- ocultar una relation histórica porque su master se desactivó;
+- frontend, snapshots o múltiples Doctors.
+
+#### Tests and gates
+
+FOCAL TESTS cubren create omitido/null/non-null; PATCH omitido preserva, null
+limpia, ID distinto exige active same-tenant y mismo ID es no-op permitido aun
+si quedó inactivo. También fijan response IDs/compact objects en create, update,
+detail y list, con bounded selects y sin carga implícita de notes/contact data.
+
+SECURITY prueba cada campo por separado y combinado:
+
+- foreign Doctor/Hospital y nonexistent ID devuelven 404 indistinguible;
+- inactive same-tenant new/replacement devuelve stable 409;
+- WAREHOUSE no adquiere Case mutation; ADMIN/MANAGER/SALES conservan el permiso
+  CURRENT para assign/change/clear;
+- companyId sigue derivado de auth y no aparece como authority del payload.
+
+REGRESSION debe preservar create/list/detail/update/cancel, DRAFT/SCHEDULED/
+CANCELLED, folio, reschedule, responsibleUser, tenant tests y consumidores que
+ignoran fields aditivos. QUALITY ejecuta DTO/Service/Controller focales, matriz
+RBAC, full API tests in-band, lint:check, typecheck, build y diff check.
+
+#### Completion, recovery and STOP
+
+Complete cuando todas las truth tables de create/PATCH están cubiertas,
+responses son aditivas y los flows CURRENT son idénticos salvo los nuevos
+fields. El commit no contiene UI ni crea dependencia de affiliation.
+
+Recovery revierte DTO/Service/mapper dejando columnas nullable sin uso. No se
+limpian relaciones ya escritas; si se requiere deshabilitar temporalmente la
+feature, el backend anterior puede seguir leyendo Cases porque los fields son
+aditivos.
+
+**C4 STOP** si omitted se convierte en null, el mismo inactive ID falla, una
+relation nueva acepta master inactive/foreign, desaparece contexto histórico,
+se auto-crea affiliation, cambia Status/Readiness o cualquier regression de
+HealthcareCase falla.
+
+### 29.7 HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
+
+#### Objective, dependencies and scope
+
+Cerrar riesgos de integración backend después de C4 sin agregar capability.
+ENTRY exige C1-C4 merged, todos sus focales verdes y una lista de findings de
+hardening reproducibles.
+
+Expected code areas:
+
+- specs de Doctors, Hospitals, affiliations y HealthcareCase;
+- `app/api/src/auth/guards/erp-core-role-matrix.spec.ts`;
+- E2E/concurrency tests bajo `app/api/test/`;
+- mappers/Services/DTOs existentes sólo para corregir incumplimientos probados.
+
+Forbidden scope:
+
+- nuevas rutas, filters, roles o UX;
+- cambios de schema/migration salvo que se detenga C5 y vuelva formalmente a C1;
+- relajar assertions, transformar 404 en leak-friendly 403 o capturar todos los
+  errores Prisma como un mismo conflicto.
+
+#### Tests and gates
+
+FOCAL/SECURITY amplía cobertura para:
+
+- role matrix completa por método real, incluyendo allowed y denied;
+- isolation A/B en list/detail/search/duplicate/lifecycle/affiliation/Case;
+- P2002 exact pair, FK race y P2025/update-count race;
+- master deactivate concurrente con Case assignment o affiliation reactivate;
+- unknown DTO fields y malformed UUID;
+- rechazo de `companyId`, `searchKey`, `isActive` y pair mutation;
+- raw Prisma errors nunca expuestos y cross-tenant existence nunca observable;
+- repeated lifecycle target state idempotente.
+
+REGRESSION/QUALITY es el gate backend completo:
+
+```text
+npm run lint:check
+npm run typecheck
+npm test -- --runInBand
+npm run test:e2e -- --runInBand
+npm run build
+git diff --check
+```
+
+`test:e2e` requiere el entorno PostgreSQL documentado y disposable. Si el
+runner actual no aísla datos, C5 debe corregir el harness antes de aceptar la
+evidencia; no puede sustituirlo con mocks para los races.
+
+#### Completion, recovery and STOP
+
+Complete con full API green, races relevantes probados contra DB real, matriz
+RBAC ejecutada y un audit del diff confirmando que no se añadió producto. Este
+slice es la baseline backend que consume C6.
+
+Recovery revierte cada hardening fix junto con su test sólo si el predecessor
+contract permanece green; preferiblemente cada finding tiene un commit pequeño
+dentro del mismo PR C5. No se revierte la migration ni se borran datos.
+
+**C5 STOP** si cualquier full gate falla, un race queda flaky/no reproducible,
+el test environment no es disposable, un fix exige rediseñar Section 28, hay
+leak/role bypass o el diff agrega capability no aprobado.
+
+### 29.8 HC-NEXT-01C6 — Doctors/Hospitals Frontend
+
+#### Objective, dependencies and scope
+
+Implementar master-data UX consumiendo la baseline backend C5. ENTRY exige C5
+merged/green, respuestas reales disponibles y lectura de las guías relevantes
+de la versión instalada en `node_modules/next/dist/docs/` antes de escribir
+Next.js code.
+
+Expected code areas:
+
+- `web/app/(app)/doctors/**` y `web/app/(app)/hospitals/**`;
+- componentes/forms/hooks/types narrowly scoped bajo esas features o
+  `web/app/components/business/**` cuando sean genuinamente compartidos;
+- `web/app/erp-role-access.ts`, navigation/sidebar y sus tests;
+- API client/session/error handling CURRENT, extendido sin sistema paralelo.
+
+IMPLEMENT incluye list, search, status filter, stable pagination, create, edit,
+detail si el workflow lo necesita, deactivate/reactivate por role, specialty
+prominente y city/state context. ADMIN/MANAGER tienen full UX, SALES read/create/
+edit sin lifecycle y WAREHOUSE read-only.
+
+La frontera con C7 es explícita: C6 reconoce
+`DUPLICATE_REVIEW_REQUIRED` como resultado **sin escritura**, nunca muestra
+éxito ni reintenta con confirmación implícita. La presentación de candidates y
+el retry confirmado pertenecen a C7.
+
+Forbidden scope:
+
+- Case selectors, quick-create desde Case o affiliation mutation UI;
+- 360 views, advanced filters/ranking, new design system o refactor de
+  navegación no requerido;
+- permisos inventados en componentes en lugar de helpers RBAC compartidos.
+
+#### Tests and gates
+
+FOCAL TESTS por role cubren visibilidad y requests: ADMIN/MANAGER ven todas las
+acciones; SALES no ve ni dispara lifecycle; WAREHOUSE no ve ni dispara create,
+edit o lifecycle; todos leen list/detail. Search/filter/pagination y estados
+loading/empty/error/retry deben mantener sesión ante 403.
+
+También se prueba que protected fields nunca entran al payload, que una
+duplicate review no se trata como created/updated y que un usuario sin acción
+visible tampoco puede dispararla por estado/ruta directa del frontend.
+
+SECURITY frontend es defense-in-depth: no reemplaza los guards C5. No se envía
+companyId, no se mezclan caches entre sesiones/companies y los IDs proceden de
+responses autenticadas.
+
+REGRESSION incluye layout, sidebar, navigation, authenticated session y
+componentes compartidos tocados. QUALITY:
+
+```text
+npm run lint
+npm run typecheck
+npm test -- --maxWorkers=1
+npm run build
+git diff --check
+```
+
+#### Completion, recovery and STOP
+
+Complete cuando ambos masters son utilizables para operaciones no duplicadas,
+la matriz visual/request-level coincide con backend, duplicate review queda en
+estado seguro no confirmado y los full Web gates pasan. El commit no contiene
+Case selector/confirmation UX.
+
+Recovery revierte rutas, nav y role helpers de C6; el backend sigue siendo
+compatible y no se borran masters. Si un shared helper causa regresión, se
+restaura el comportamiento anterior para módulos no Healthcare y se corrige de
+forma focal.
+
+**C6 STOP** si una acción forbidden aparece o dispara request, un 403 destruye
+sesión, duplicate warning se interpreta como éxito, protected fields salen del
+browser, Home/Sidebar/navigation regresan o cualquier Web gate/build falla.
+
+### 29.9 HC-NEXT-01C7 — HealthcareCase Selectors + Duplicate Review UX
+
+#### Objective, dependencies and scope
+
+Completar la integración de usuario con selectors y confirmación explícita.
+ENTRY exige C6 green, la superficie Web de HealthcareCase identificada y las
+guías Next.js instaladas revisadas. Si aún no existe Case UI, su ubicación de
+navegación se decide dentro del frontend scope sin cambiar el contrato API.
+
+Expected code areas:
+
+- pantalla/form/hooks/types de HealthcareCase bajo `web/app/(app)/**`;
+- Doctor/Hospital selector components compartidos;
+- quick-create modals/forms que reutilizan los contratos C6;
+- API response/result types y tests de los workflows integrados;
+- role-access helpers existentes, sin permission engine paralelo.
+
+IMPLEMENT incluye searchable selectors, clear relation, compact Case context,
+display histórico de master inactivo, explicit quick-create, candidates de
+duplicate review, confirmación visible antes del retry y warning no bloqueante
+por falta de affiliation.
+
+Doctor options muestran name + specialty; Hospital options name + city/state.
+Sólo masters activos pueden ser selección nueva. Un master inactivo ya ligado
+permanece visible y reenviar el mismo ID no fuerza reemplazo. Missing
+affiliation no bloquea Case ni crea una relación.
+
+Forbidden scope:
+
+- creación implícita de Doctor/Hospital o affiliation;
+- selección de inactive como nueva relation;
+- convertir warning en error bloqueante sin opción de confirmación;
+- múltiples Doctors, Patient/Payer, 360/history avanzada o lifecycle de Case
+  adicional.
+
+#### Tests and gates
+
+FOCAL TESTS cubren:
+
+- search/debounce/result rendering sin requests cross-session;
+- select Doctor/Hospital, clear, omitted edit preserve y reschedule preserve;
+- historical inactive relation visible pero ausente de opciones nuevas;
+- quick-create requiere acción explícita y respeta roles;
+- duplicate candidates se muestran, cancel no escribe y confirm hace un único
+  retry con `confirmPossibleDuplicate: true`;
+- missing affiliation presenta warning contextual y permite continuar;
+- no request de affiliation creation ocurre desde Case;
+- WAREHOUSE read-only; ADMIN/MANAGER/SALES assign/change/clear según Section 28.
+
+SECURITY verifica que selectors sólo consumen endpoints tenant-scoped, nunca
+envían companyId y descartan resultados stale después de session/company
+change. Un ID manipulado recibe el 404/409 backend sin revelar foreign details
+ni destruir sesión.
+
+REGRESSION incluye todos los HealthcareCase Web flows existentes, C6 master
+pages, session/layout/sidebar y API C4/C5 tests si cambia algún shared contract.
+QUALITY ejecuta focal Web, full Web one-worker, lint/typecheck/build, y full API
+gates si se toca cualquier archivo/API contract backend.
+
+#### Completion, recovery and STOP
+
+Complete cuando Case create/edit soporta seleccionar, conservar y limpiar;
+historical inactive se muestra; quick-create/duplicate confirmation son
+explícitos; missing affiliation no bloquea; y full Web está green.
+
+Recovery desactiva/revierte sólo selectors y quick-create UI; los optional API
+fields mantienen compatibilidad y las relaciones persistidas permanecen. No se
+limpian IDs válidos ni se reactiva un master como rollback de UX.
+
+**C7 STOP** si una confirmación puede ocurrir implícitamente, cancel crea o
+edita, el selector ofrece inactive/foreign, desaparece una relación histórica,
+se requiere affiliation, se crea affiliation silenciosa, roles se amplían o
+Web/API regression queda rojo.
+
+### 29.10 HC-NEXT-01C8 — Integrated Acceptance & Regression Gate
+
+#### Objective, dependencies and scope
+
+Cerrar HC-NEXT-01 mediante evidencia integrada; C8 no agrega producto. ENTRY
+exige C1-C7 merged, automated gates verdes, migration aplicada en ambiente QA
+controlado y datos/manual accounts identificados por company y role.
+
+Expected code areas se limitan a tests automatizados/E2E estrictamente faltantes
+para acceptance y sus harnesses; las demás áreas esperadas son evidencia manual
+y documentos de status enumerados en 29.13. Cualquier fix funcional descubierto
+se realiza en un commit/PR focal que vuelve al slice propietario; C8 se reanuda
+después de reejecutar sus gates.
+
+Forbidden scope:
+
+- corregir findings dentro de un mega acceptance commit;
+- relajar asserts o marcar PASS con evidencia parcial;
+- reset de QA/producción, datos artificiales no trazables o mezcla de otro
+  milestone Healthcare.
+
+#### Automated and manual gates
+
+Automated completion requiere:
+
+- migration chain limpia y upgrade CURRENT en PostgreSQL disposable;
+- todos los focales C1-C7;
+- full API lint:check, typecheck, unit tests, E2E y build;
+- full Web lint, typecheck, one-worker tests y production build;
+- role matrix y tenant isolation A/B;
+- `git diff --check` y scope review final.
+
+Manual acceptance registra actor, company, role, acción, expected/actual y
+evidencia para ADMIN, MANAGER, SALES y WAREHOUSE:
+
+- Doctor create/search/edit y lifecycle permitido/denegado;
+- Hospital create/search/edit y lifecycle permitido/denegado;
+- affiliation link/read/deactivate/reactivate según role;
+- Case assign Doctor/Hospital, clear y reschedule preserving relations;
+- inactive historical relation visible y no selectable como nueva;
+- Case sin affiliation válido y sin auto-create;
+- duplicate review cancel/confirm explícitos;
+- Company A incapaz de leer, buscar, mutar o enlazar resources de Company B;
+- 401/403/404/409 esperados no destruyen la sesión;
+- ERP Core navigation y workflows aceptados permanecen operativos.
+
+#### Completion, recovery and STOP
+
+Complete sólo con evidencia reproducible, cero finding bloqueante, todos los
+gates verdes y documentación sincronizada. Un failure se clasifica, asigna al
+slice originador y deja C8 abierto; tras el fix se reejecuta al menos el focal,
+la capa completa y el escenario manual afectado.
+
+Recovery en C8 es revertir el slice defectuoso o desplegar un forward fix
+reviewed. Migration/data rollback nunca se improvisa durante acceptance.
+
+**C8 STOP** si falla cualquier API/Web/DB gate, hay role-matrix o tenant leak,
+surge regresión ERP Core/HealthcareCase, falta evidencia manual de algún role,
+existe P0 abierto o un finding contradice el contrato aprobado.
+
+### 29.11 Cross-slice evidence and review requirements
+
+Cada PR debe adjuntar:
+
+- branch/base y dependencia satisfechas;
+- lista exacta de archivos y migrations;
+- matriz de tests con comando, resultado y conteo cuando la herramienta lo da;
+- evidencia tenant/role positiva y negativa;
+- `git diff --check` y status final;
+- riesgos, findings diferidos y recovery path;
+- confirmación de forbidden scope no tocado.
+
+Un test que sólo inspecciona `@Roles` metadata no basta cuando puede probarse el
+request real. Las invariants DB requieren PostgreSQL; mocks son útiles para
+branches de Service pero no prueban FKs, unique races ni migration safety. Un
+build verde no sustituye tests, y tests focales no sustituyen la suite completa
+en C5/C8.
+
+### 29.12 Branch, commit and PR strategy
+
+La estrategia recomendada es **ocho branches/PRs cortos y secuenciales**, uno
+por C1-C8, cada uno basado en el predecessor ya merged. C1-C4 separan cambios
+con distinto recovery profile; C5 estabiliza una API completa antes de que Web
+la consuma; C6/C7 separan master UX de integración Case; C8 mantiene acceptance
+sin ocultar fixes funcionales.
+
+Cada PR puede contener más de un commit sólo si siguen siendo atómicos dentro
+del mismo slice (por ejemplo implementation + tests), pero debe quedar
+reviewable y revertible como unidad. No se prescriben SHAs ni nombres exactos.
+
+Stacked branches pueden reducir espera, pero deben rebasearse/actualizarse tras
+merge del predecessor y sus CI results no autorizan merge fuera de orden. Un
+único branch largo con C1-C8 se desaconseja: mezcla migration, backend y Web,
+dificulta rollback/review y acumula drift. Tampoco se agrupan automáticamente
+todos los slices en un único PR.
+
+### 29.13 Documentation synchronization plan
+
+Este task sólo modifica el technical design. Durante implementación, cada doc
+se actualiza en el slice indicado, dentro del PR que vuelve verdadera la nueva
+afirmación:
+
+| Document | Update point |
+| --- | --- |
+| `DOCTORS_HOSPITALS_TECHNICAL_DESIGN.md` | Cada C1-C7 registra implemented surface y evidencia; C8 registra VALIDATED. |
+| `DOCTORS_HOSPITALS.md` | C2/C3 si implementation descubre una precisión no contradictoria; C7/C8 sincroniza experiencia y estado final. |
+| `HEALTHCARE.md` | C4 al integrar Case backend; C7 al habilitar workflow Web; C8 al cerrar capability. |
+| `DOMAIN_MODEL.md` | C1 cuando existen modelos/relaciones reales; C4 cuando Case relations quedan implementadas. |
+| `CASES.md` | C4 para API/semantics CURRENT; C7 para selectors/UX CURRENT; C8 para validation evidence. |
+| `PROJECT_BOARD.md` | Al iniciar/completar cada C-slice según governance; cierre HC-NEXT-01 sólo en C8. |
+| `ROADMAP.md` | Cuando el milestone cambia de planned a active y, después, a validated/closed; no por trabajo local sin merge. |
+| `CHANGELOG.md` | En los PRs que vuelven user-visible/API-visible el capability, consolidado en C8 según convención del release. |
+
+No se reescribe un contrato aprobado para hacer coincidir accidentalmente una
+implementación divergente. La divergencia bloquea el slice o requiere una
+decisión de diseño explícita y revisión documental antes de continuar.
+
+### 29.14 Status transitions
+
+Status del technical design/capability:
+
+| Milestone | Allowed status |
+| --- | --- |
+| Ahora / plan aprobado | `PROPOSED / NOT IMPLEMENTED` y Section 29 `APPROVED IMPLEMENTATION PLAN / NOT STARTED` |
+| C1 merged | `PARTIALLY IMPLEMENTED — PERSISTENCE` |
+| C2-C4 merged | `PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS` con slices exactos enumerados |
+| C5 merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
+| C6 merged | `PARTIALLY IMPLEMENTED — MASTER-DATA WEB` |
+| C7 merged y automated gates green | `IMPLEMENTED / INTEGRATED ACCEPTANCE REQUIRED` |
+| C8 completo | `IMPLEMENTED / VALIDATED` y HC-NEXT-01 eligible para cierre |
+
+Un status sólo cambia después de merge y evidencia del gate correspondiente.
+No se usa `IMPLEMENTED` mientras falte C7 ni `VALIDATED` antes de manual role
+acceptance C8.
+
+### 29.15 Final HC-NEXT-01 exit criteria
+
+HC-NEXT-01 puede cerrarse únicamente cuando todos son verdaderos:
+
+- el contrato de dominio sigue válido o toda enmienda fue aprobada y trazada;
+- schema/persistence y migration aditiva están implementados y validados;
+- migration chain desde vacío y upgrade con rows CURRENT pasan;
+- Doctor y Hospital API/backend implementan DTO, search, duplicate, lifecycle,
+  errors y responses aprobados;
+- affiliation API conserva una row por pair y lifecycle explícito;
+- HealthcareCase integration implementa create/PATCH/response sin alterar
+  Status, Readiness, folio, schedule, responsibleUser o cancel;
+- Doctors/Hospitals master-data frontend está implementado;
+- Case selectors, historical inactive display, quick-create y duplicate-review
+  confirmation explícita están implementados;
+- tenant isolation está validado en DB, Service, HTTP y frontend workflows;
+- fixed-role RBAC está validado para ADMIN, MANAGER, SALES y WAREHOUSE;
+- full API lint/typecheck/unit/E2E/build pasan;
+- full Web lint/typecheck/one-worker tests/production build pasan;
+- manual role acceptance y A/B tenant scenarios pasan con evidencia;
+- ERP Core y HealthcareCase regression pasan;
+- documentación, board, roadmap y changelog aplicables están sincronizados;
+- no existe P0 abierto ni otro finding que viole un criterio de aceptación;
+- diffs finales pasan whitespace/scope review y no contienen scope forbidden.
+
+### 29.16 Plan decision summary
+
+| Decision | Approved plan |
+| --- | --- |
+| Delivery model | Eight dependency-ordered, independently reviewed slices |
+| First implementation | C1 persistence/migration only |
+| Backend readiness | C2-C4 capability; C5 full hardening baseline |
+| Frontend boundary | C6 master data; C7 Case selectors + duplicate confirmation |
+| Final gate | C8 automated + manual four-role and two-tenant acceptance |
+| Merge policy | No slice merges or advances with blocking red gates |
+| PR strategy | Separate sequential PRs; stacked preparation allowed, merge order fixed |
+| Recovery | Revert code by slice; forward migrations after shared application; never delete QA/production data casually |
+| Status now | APPROVED IMPLEMENTATION PLAN / NOT STARTED |
+
+Las decisiones API/RBAC no se reabren en implementación por defecto. Un
+conflicto real con el repositorio, migration safety o seguridad tenant obliga a
+STOP, documentar evidencia y obtener una decisión revisada antes de ampliar o
+debilitar el contrato.
