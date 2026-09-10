@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-05
+Última actualización: 2026-09-09
 Responsable: Zaping Team
 
 1. Propósito
@@ -81,19 +81,23 @@ La normalización funcional H7 del ERP Core está completada.
 
 La posición actual es:
 
-CURRENT — ERP Core V1 integrated in canonical `main`
+ERP Core V1 — CLOSED / ACCEPTED on canonical baseline `a4434a6`
 ↓
-NEXT LOCAL WORK — documentation sync + local QA / hardening
+CURRENT — post-acceptance documentation synchronization
 ↓
-DECISION PENDING — next functional initiative still to be approved
+M-HC1 — Healthcare Operations Foundation — SELECTED / PLANNED — P1
+↓
+HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
 
-PR #1 is merged at `f17f88123da9ed0c96dbf6a0c7ef0ec9f3df8c6d` and post-merge CI
-passed. OPS-RC-B5B is closed. Healthcare and Advanced Inventory remain future
-options; neither is preselected as the next initiative.
-Healthcare Case Foundation ya existe en backend.
+PR #3 is merged at `a4434a6`. DEV-NEXT-03B terminó en PASS con la matriz manual
+ADMIN / MANAGER / SALES / WAREHOUSE y QA-001 a QA-008 CLOSED / PASS. Esto
+representa aceptación local del ERP Core V1, no staging ni producción.
+
+Healthcare Case Foundation y EquipmentAsset / Equipment V1 ya están
+IMPLEMENTED / VALIDATED.
 
 Permanecen como TARGET Healthcare:
 
@@ -116,8 +120,9 @@ Calendar
 Case 360
 
 Mobile Technician
-Después del cierre del ERP Core V1, Healthcare queda disponible como workstream
-estratégico candidato, sujeto a aprobación explícita.
+Healthcare es el siguiente workstream estratégico seleccionado. Hospital /
+Doctor inicia como diseño de dominio; el resto de la secuencia conserva sus
+dependencias y no pertenece necesariamente al mismo slice.
 
 4. Visión de evolución
 La dirección general es:
@@ -214,10 +219,13 @@ Esta distribución no es contractual.
 
 Después del cierre del ERP Core V1:
 
-Healthcare o Advanced Inventory
-→ opciones estratégicas sujetas a aprobación; ninguna está preseleccionada
+Healthcare Operations Foundation
+→ siguiente milestone estratégico seleccionado — P1
+
+Advanced Inventory
+→ diseño objetivo aprobado, no implementado — P2
 7. Etapa 0 — Documentation & Architecture Baseline
-Estado: En cierre
+Estado: CURRENT — post-acceptance synchronization
 
 Objetivo:
 
@@ -300,11 +308,14 @@ credential / .env backup review
 8. Etapa 1 — ERP Core Release Readiness
 Prioridad: P0
 
+Estado local: CLOSED / ACCEPTED; los gates operativos pre-piloto permanecen.
+
 Objetivo:
 
-transformar el ERP Core funcional actual en una base suficientemente segura, consistente y verificable para comenzar pilotos reales.
+La baseline local ya es segura, consistente y verificable. Antes de comenzar
+pilotos reales permanecen las validaciones operativas indicadas en esta etapa.
 
-Esta etapa comprende:
+La secuencia cerrada para la baseline local comprendió:
 
 H8A
 ↓
@@ -566,8 +577,9 @@ La validación de variables no verifica el sender/domain ni la entrega real.
 B2D completó la regresión automatizada de autorización y tenant isolation.
 
 La implementación B3 y el gate técnico pre-merge OPS-RC-B5B quedaron
-integrados; la aceptación operativa de roles, email real y staging permanece
-separada.
+integrados. DEV-NEXT-03B completó después la matriz manual de roles y la
+aceptación local ERP Core V1. Email real y staging permanecen como validaciones
+operativas separadas.
 
 La validación B2D incluyó:
 
@@ -596,7 +608,7 @@ application test failure
 y la suite completa puede ejecutarse de forma serial para obtener un resultado confiable.
 
 8.11 Operational Reliability
-UX-B.6 debe validar los workflows V1 principales:
+DEV-NEXT-03B validó localmente los workflows V1 principales:
 
 Supplier
 ↓
@@ -641,7 +653,15 @@ idempotency replay/conflict where implemented
 
 historical deactivation behavior
 8.12 ERP Core V1 Closure
-La salida de esta etapa debe significar:
+Estado: CLOSED / ACCEPTED — local V1 baseline
+
+DEV-NEXT-03B terminó en PASS. La matriz manual de roles cerró ADMIN, MANAGER,
+SALES y WAREHOUSE en PASS; QA-001 a QA-008 quedaron CLOSED / PASS. La evidencia
+automatizada final registró 65 suites / 705 tests API y 57 files / 696 tests
+Web con un worker, además de lint, typecheck, production builds, 22/22 rutas y
+Git diff checks en PASS.
+
+La salida de esta etapa significa:
 
 ERP Core
 → functionally closed for V1
@@ -655,14 +675,15 @@ ERP Core
 → security P0 resolved or formally closed
 
 → known debt explicitly recorded
-Estos son criterios del cierre formal; la integración en `main` no acredita
-por sí sola QA manual de roles, Resend real ni aceptación de staging.
+El cierre local no acredita entrega real por Resend, aceptación de staging ni
+despliegue de producción. Esos gates pre-piloto/pre-producción permanecen
+separados.
 No significa que el ERP esté terminado para siempre.
 
 Significa que la base V1 es suficientemente estable para dejar de abrir nuevas funcionalidades Core de manera indiscriminada.
 
-9. Etapa 2 — Zaping Healthcare
-Prioridad: P1 estratégica futura; no seleccionada como siguiente iniciativa
+9. Etapa 2 — M-HC1 — Healthcare Operations Foundation
+Prioridad: P1 estratégica — SELECTED / PLANNED
 
 Objetivo:
 
@@ -704,11 +725,13 @@ DRAFT
 SCHEDULED
 
 CANCELLED
-También existe en ERP Core:
+También está IMPLEMENTED / VALIDATED en ERP Core:
 
 EquipmentAsset
 
 EquipmentInspection
+
+Equipment V1
 Permanecen fuera de Foundation:
 
 Hospital
@@ -745,18 +768,26 @@ Mobile Technician
 
 4. Case Availability
 
-5. Dispatch / Custody
+5. Architecture gate for physical logistics
 
-6. Return
+6. Dispatch / Custody
 
-7. CaseKit / Maletín
+7. Return / Reconciliation
 
-8. Case Calendar
+8. CaseKit / Maletín
 
-9. Case 360
+9. Case Calendar
 
-10. Mobile Technician
+10. Case 360
+
+11. Mobile Technician
 El orden puede ajustarse cuando aparezca evidencia operacional real, pero deben respetarse las dependencias.
+
+El gate anterior a Dispatch / Custody debe resolver, mediante diseño/ADR
+explícito si es necesario, physical positioning, custody, location y transfer
+semantics. No bloquea Hospital / Doctor, Requirements, Equipment Assignment o
+Case Availability, ni exige implementar todo Advanced Inventory como parte de
+M-HC1.
 
 9.3 Healthcare Actors
 Mantener conceptualmente separados:
@@ -808,6 +839,13 @@ PHI repository
 9.5 Hospital / Doctor
 Hospital y Doctor serán master data Healthcare TARGET.
 
+HC-NEXT-01 — Hospital / Doctor Domain Design
+
+Estado: READY / DESIGN
+
+Objetivo: definir el boundary de master data Healthcare para Hospital y Doctor
+antes de elegir o implementar la persistencia.
+
 Debe mantenerse:
 
 Doctor
@@ -825,6 +863,9 @@ shared identity
 +
 tenant-specific relation
 No debe asumirse todavía una estrategia definitiva en Prisma.
+
+HC-NEXT-01 es primero Documentation / Domain Design. No marca Hospital, Doctor
+ni los workflows posteriores como implementados.
 
 9.6 Requirements
 Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
@@ -1203,9 +1244,9 @@ Objetivo:
 
 reducir fricción y convertir módulos funcionales en una experiencia ERP más eficiente.
 
-Healthcare y Advanced Inventory permanecen como workstreams candidatos después
-del Core. Cualquier prioridad futura requiere aprobación explícita; mejoras UX
-seleccionadas pueden ejecutarse en paralelo si no crean dependencias nuevas.
+Healthcare ya fue seleccionado como siguiente workstream P1. Advanced Inventory
+permanece como target P2 aprobado y no implementado; mejoras UX seleccionadas
+pueden ejecutarse en paralelo si no crean dependencias nuevas.
 
 10.1 360 Views
 Prioridad:
@@ -1747,6 +1788,8 @@ basados en Permissions.
 15. Etapa 8 — Multi-Warehouse & Advanced Inventory
 Prioridad: P2 / architectural evolution
 
+Estado: DESIGNED / APPROVED TARGET — NOT IMPLEMENTED
+
 Objetivo:
 
 soportar empresas con mayor complejidad logística.
@@ -1754,6 +1797,15 @@ soportar empresas con mayor complejidad logística.
 El diseño objetivo está aprobado por ADR-014 y consolidado en
 `docs/modules/erp/ADVANCED_INVENTORY.md`. La implementación y el diseño técnico
 de schema permanecen pendientes.
+
+El target preserva Branch / Warehouse, Storage Locations, Inventory by
+Location, Internal Transfers, Reservations, Physical Counts, QR / Barcode e
+Inventory Ledger V2. No es el milestone principal actual.
+
+Healthcare puede avanzar con Hospital / Doctor, Requirements, Equipment
+Assignment y Case Availability sin esta etapa completa. Antes de Dispatch /
+Custody real puede requerirse un gate de diseño/ADR sobre posición física,
+custodia, ubicación y transferencias.
 
 15.1 Warehouses
 La fundación Branch / Warehouse es una capacidad TARGET aprobada para empresas
@@ -2553,11 +2605,15 @@ Authorization + Tenant Isolation V1
 
 Role-based authorization V1
 
+DEV-NEXT-03B ERP Core V1 Local Acceptance — PASS
+
+Manual role matrix — ADMIN / MANAGER / SALES / WAREHOUSE PASS
+
+QA-001 through QA-008 — CLOSED / PASS
+
 Remaining operational validation:
 
 real email delivery/configuration and forgot → email → reset → login E2E
-
-manual role QA
 
 OPS-RC-B5C real staging acceptance — DEFERRED / READY WHEN NEEDED
 
@@ -2566,8 +2622,10 @@ backup / restore provider validation before pilot / production
 Formal release-candidate acceptance remains a later decision.
 Commercial Returns Backend no es P0.
 
-P1 estratégica futura — decisión pendiente
-Zaping Healthcare
+P1 estratégica seleccionada
+M-HC1 — Healthcare Operations Foundation
+
+HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
 
 Hospital / Doctor
 
@@ -2588,6 +2646,9 @@ Calendar
 Case 360
 
 Mobile Technician
+
+Los elementos posteriores a HC-NEXT-01 no pertenecen necesariamente al mismo
+slice de implementación.
 P1 posterior / paralelo
 UX / 360
 
@@ -2693,13 +2754,17 @@ External Intelligence
 AI
 La prioridad inmediata es:
 
-ERP Core V1 integrado en `main`
+ERP Core V1 CLOSED / ACCEPTED en `main` (`a4434a6`)
 ↓
-documentación sincronizada
+sincronización documental post-acceptance
 ↓
-QA local / hardening
+M-HC1 — Healthcare Operations Foundation — SELECTED / PLANNED — P1
 ↓
-siguiente iniciativa funcional — decisión pendiente
+HC-NEXT-01 Hospital / Doctor Domain Design — READY / DESIGN
 
-Healthcare y Advanced Inventory permanecen como opciones futuras no
-preseleccionadas. No se afirma despliegue de staging o producción.
+Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
+P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
+Returns evolution, FEFO, Expiration, Audit, Permission-Based RBAC, Data Import,
+Advanced Inventory y Billing / CFDI continúan como evoluciones futuras; no
+mantienen ERP Core V1 artificialmente abierto. No se afirma despliegue de
+staging o producción.
