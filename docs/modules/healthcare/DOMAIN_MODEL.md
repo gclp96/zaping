@@ -2,10 +2,10 @@ Healthcare Domain Model — Zaping
 
 Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
-Versión: 1.2.0
+Versión: 1.3.0
 Estado: Aprobado
 Estado de implementación: HEALTHCARE CASE FOUNDATION IMPLEMENTED / VALIDATED — BROADER DOMAIN TARGET / FUTURE
-Última actualización: 2026-08-27
+Última actualización: 2026-09-09
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -475,7 +475,9 @@ Customer
 Actualmente:
 
 Doctor persistence/API
-→ NOT IMPLEMENTED
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+La especificación canónica vive en `DOCTORS_HOSPITALS.md`.
 
 22. Hospital TARGET
 
@@ -490,7 +492,9 @@ Customer
 Actualmente:
 
 Hospital persistence/API
-→ NOT IMPLEMENTED
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+La especificación canónica vive en `DOCTORS_HOSPITALS.md`.
 
 23. Doctor ↔ Hospital relationship
 
@@ -510,33 +514,34 @@ DoctorHospitalAffiliation
 
 es un candidato técnico razonable.
 
-No es todavía una tabla Prisma aprobada.
+La relación de dominio N ↔ N está aprobada; el modelo técnico y la tabla Prisma
+permanecen pendientes.
 
-24. Doctor / Hospital tenant ownership
+24. Doctor / Hospital tenant ownership V1
 
-La estrategia de ownership todavía debe decidirse antes de implementación.
+La decisión de dominio V1 es:
 
-Opciones conceptuales:
+Doctor / Hospital
+→ Company-scoped master data
 
-Company-owned master data
+`companyId` representa tenant ownership/context, se deriva de la Company
+autenticada y nunca es seleccionado manualmente. No representa employer,
+affiliation ni un campo empresarial visible.
 
-o:
+Dos Companies pueden mantener registros independientes de la misma entidad
+real. Toda relación Doctor/Hospital/HealthcareCase cross-tenant está prohibida.
 
-shared identity
-+
-Company-specific relationship
+25. No global Doctor/Hospital directory in V1
 
-No debe cerrarse esta decisión prematuramente.
-
-25. No global Doctor/Hospital directory yet
-
-No existe actualmente un requerimiento aprobado para crear:
+V1 no crea:
 
 global Doctor directory
 
 global Hospital directory
 
-compartido automáticamente entre tenants.
+compartido automáticamente entre tenants. Una identidad global o una relación
+tenant-specific sobre identidad compartida permanece FUTURE y requeriría una
+nueva decisión de dominio.
 
 26. Customer boundary
 
@@ -2004,9 +2009,11 @@ Equipment Assignment
 ↓
 Case Availability
 ↓
+architecture gate for physical logistics
+↓
 Dispatch / Custody
 ↓
-Return
+Return / Reconciliation
 ↓
 CaseKit / Maletín
 ↓
@@ -2015,6 +2022,10 @@ Calendar
 Case 360
 ↓
 Mobile technician experience
+
+Los elementos no pertenecen necesariamente al mismo slice. El gate de logística
+física no bloquea Hospital / Doctor, Requirements, Equipment Assignment o Case
+Availability.
 
 127. Existing foundations must not be reimplemented
 
@@ -2044,9 +2055,10 @@ double-use prevention
 
 No puede permitirse que la UI marque material como preparado/custodiado mientras Inventory todavía lo considere libre para otra operación.
 
-129. No Prisma Healthcare expansion during H8
+129. Domain approval does not approve Prisma
 
-Este documento no autoriza actualmente:
+HC-NEXT-01 es un slice de documentación y diseño de dominio. Este documento no
+autoriza:
 
 new Healthcare Prisma models
 
@@ -2060,32 +2072,22 @@ CaseDispatch schema
 
 CaseReturn schema
 
-durante H8.
+La persistencia requiere un slice técnico posterior.
 
 130. Global project sequence
 
-Debe mantenerse:
+La progresión vigente es:
 
-H8A
-Documentation Synchronization
+ERP Core V1
+→ CLOSED / ACCEPTED
 
-↓
+M-HC1 — Healthcare Operations Foundation
+→ SELECTED / PLANNED — P1
 
-H8B
-Full Automated Regression / Technical Health
+HC-NEXT-01 — Hospital / Doctor Domain Design
+→ CURRENT / DESIGN
 
-↓
-
-UX-B.6
-Full ERP End-to-End QA
-
-↓
-
-ERP Core V1 Closure
-
-↓
-
-Healthcare specialization
+Los workflows posteriores no pertenecen necesariamente al mismo slice.
 
 131. CURRENT consolidated model
 
@@ -2139,6 +2141,12 @@ Doctor
 Hospital
 
 Doctor ↔ Hospital relationship
+
+Doctor / Hospital
+→ TARGET V1 DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+Doctor ↔ Hospital
+→ DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
 
 Case Requirements
 
@@ -2581,6 +2589,8 @@ docs/modules/healthcare/HEALTHCARE.md
 
 docs/modules/healthcare/CASES.md
 
+docs/modules/healthcare/DOCTORS_HOSPITALS.md
+
 docs/modules/erp/PRODUCTS.md
 
 docs/modules/erp/INVENTORY.md
@@ -2602,8 +2612,6 @@ docs/project/PROJECT_BOARD.md
 docs/project/ROADMAP.md
 
 Documentos especializados futuros pueden incluir:
-
-DOCTORS_HOSPITALS.md
 
 CASE_REQUIREMENTS.md
 
@@ -2627,6 +2635,11 @@ HEALTHCARE.md
 
 CASES.md
 → HealthcareCase CURRENT y lifecycle
+
+DOCTORS_HOSPITALS.md
+→ Doctor / Hospital V1 domain boundary
+→ tenant ownership and isolation
+→ affiliation and Case relationship invariants
 
 EQUIPMENT.md
 → EquipmentAsset / EquipmentInspection CURRENT
@@ -2726,18 +2739,13 @@ pero el modelo técnico sigue pendiente de ADR.
 
 146. Próximo paso de dominio
 
-La ejecución inmediata del proyecto continúa:
+ERP Core V1 está CLOSED / ACCEPTED. M-HC1 — Healthcare Operations Foundation
+es el milestone P1 seleccionado.
 
-H8A
-↓
-H8B
-↓
-UX-B.6
-↓
-ERP Core V1 Closure
+El trabajo CURRENT es:
 
-Cuando Healthcare specialization se retome, deberán priorizarse:
-
+HC-NEXT-01 — Hospital / Doctor Domain Design
+↓
 Hospital / Doctor
 ↓
 Requirements

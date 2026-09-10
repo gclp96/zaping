@@ -2,10 +2,10 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.1.0
+Versión: 1.2.0
 Estado: Aprobado
 Estado de implementación: CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL CASE WORKFLOWS TARGET
-Última actualización: 2026-08-27
+Última actualización: 2026-09-09
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -728,6 +728,9 @@ same operational occurrence
 
 No debe crearse un nuevo Case solamente porque cambió la fecha.
 
+Cuando las relaciones TARGET existan, reschedule deberá preservar Doctor y
+Hospital salvo que el usuario los cambie explícitamente.
+
 38. Reschedule history TARGET
 
 Actualmente no existe un historial formal de reprogramaciones.
@@ -1056,7 +1059,7 @@ HealthcareCase podrá relacionarse con Doctor cuando Doctor master data exista.
 Actualmente:
 
 doctorId
-→ DEFERRED
+→ optional TARGET V1 conceptual relationship — NOT IMPLEMENTED
 
 65. Doctor ≠ Customer
 
@@ -1073,7 +1076,7 @@ HealthcareCase podrá relacionarse con Hospital cuando Hospital master data exis
 Actualmente:
 
 hospitalId
-→ DEFERRED
+→ optional TARGET V1 conceptual relationship — NOT IMPLEMENTED
 
 67. Hospital ≠ Customer
 
@@ -1083,15 +1086,20 @@ Hospital
 ≠
 Customer
 
-68. Doctor / Hospital ownership TBD
+68. Doctor / Hospital ownership V1
 
-La estrategia tenant de Doctor/Hospital debe decidirse antes de implementación.
+Doctor y Hospital son Company-scoped master data en V1. `companyId` se deriva
+de la Company autenticada y toda relación cross-tenant está prohibida.
 
-No debe asumirse todavía un modelo global o Company-owned definitivo sin esa decisión.
+No existe global Doctor/Hospital directory en V1. La persistencia técnica
+permanece pendiente y se gobierna por `DOCTORS_HOSPITALS.md`.
 
-69. Do not persist Doctor/Hospital as permanent text truth
+Ambas relaciones son opcionales. Un Case puede permanecer SCHEDULED sin Doctor
+y/o Hospital porque Case Status ≠ Case Readiness.
 
-No debe reemplazarse master data futuro mediante campos permanentes como:
+69. Doctor / Hospital references and snapshots V1
+
+No debe reemplazarse master data mediante campos permanentes como:
 
 doctorName
 
@@ -1100,6 +1108,11 @@ hospitalName
 dentro del Case.
 
 El title continúa siendo únicamente resumen operacional.
+
+V1 utiliza referencias a master data y no requiere `doctorNameSnapshot` ni
+`hospitalNameSnapshot`. Las correcciones simples al master data deben reflejarse
+en display. Snapshots inmutables permanecen FUTURE para documentos operacionales
+o legales confirmados cuando el dominio correspondiente los justifique.
 
 70. Customer TARGET
 
@@ -2097,9 +2110,11 @@ Equipment Assignment
 ↓
 Case Availability
 ↓
+architecture gate for physical logistics
+↓
 Dispatch / Custody
 ↓
-Return
+Return / Reconciliation
 ↓
 CaseKit / Maletín
 ↓
@@ -2113,34 +2128,28 @@ Este es un orden de implementación.
 
 No representa necesariamente el orden temporal de cada Case real.
 
+El architecture gate de logística física no bloquea Hospital / Doctor,
+Requirements, Equipment Assignment o Case Availability. Los workflows
+posteriores requieren slices propios.
+
 139. Project sequence global
 
-Healthcare specialization se expande después de:
+La progresión vigente es:
 
-H8A
-Documentation Synchronization
+ERP Core V1
+→ CLOSED / ACCEPTED
 
-↓
+M-HC1 — Healthcare Operations Foundation
+→ SELECTED / PLANNED — P1
 
-H8B
-Full Automated Regression / Technical Health
+HC-NEXT-01 — Hospital / Doctor Domain Design
+→ CURRENT / DESIGN
 
-↓
+Los workflows posteriores requieren slices propios.
 
-UX-B.6
-Full ERP End-to-End QA
+140. Domain design does not approve Prisma
 
-↓
-
-ERP Core V1 Closure
-
-↓
-
-Healthcare specialization
-
-140. No Prisma expansion during H8
-
-Este documento no autoriza durante H8:
+HC-NEXT-01 es documentación/diseño. Este documento no autoriza:
 
 Doctor / Hospital models
 
@@ -2157,6 +2166,8 @@ Return models
 Reconciliation models
 
 advanced Case statuses
+
+Cada implementación requiere su propio diseño técnico y gate.
 
 141. Estado consolidado CURRENT
 
@@ -2376,6 +2387,15 @@ same physical inventory
 cross-tenant Case relationships
 → forbidden
 
+Doctor / Hospital
+→ Company-scoped master data in V1
+
+Doctor / Hospital relations
+→ optional TARGET — NOT IMPLEMENTED
+
+inactive Doctor / Hospital
+→ historical Case relationship preserved
+
 145. Anti-patrones
 
 Case for every lead
@@ -2572,6 +2592,8 @@ docs/modules/healthcare/HEALTHCARE.md
 
 docs/modules/healthcare/DOMAIN_MODEL.md
 
+docs/modules/healthcare/DOCTORS_HOSPITALS.md
+
 docs/modules/erp/CUSTOMERS.md
 
 docs/modules/erp/PRODUCTS.md
@@ -2600,8 +2622,6 @@ docs/project/CHANGELOG.md
 
 Documentos especializados futuros pueden incluir:
 
-DOCTORS_HOSPITALS.md
-
 CASE_REQUIREMENTS.md
 
 EQUIPMENT_ASSIGNMENT.md
@@ -2626,6 +2646,11 @@ HEALTHCARE.md
 
 DOMAIN_MODEL.md
 → cross-domain ownership / relationships
+
+DOCTORS_HOSPITALS.md
+→ Doctor / Hospital V1 domain specification
+→ tenant ownership, lifecycle and affiliation
+→ HealthcareCase relationship invariants
 
 schema.prisma
 → CURRENT persistence only

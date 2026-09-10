@@ -2,10 +2,10 @@ Zaping Healthcare
 
 Producto: Zaping Healthcare
 Plataforma: Zaping
-Versión: 1.2.0
+Versión: 1.3.0
 Estado: Aprobado
 Estado de implementación: HEALTHCARE CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL LOGISTICS TARGET
-Última actualización: 2026-08-27
+Última actualización: 2026-09-09
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -72,6 +72,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 Incluyen:
 
 Doctor / Hospital
+→ TARGET V1 DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
 
 Case Requirements
 
@@ -500,7 +501,11 @@ relacionarse con múltiples Cases.
 Actualmente:
 
 Doctor model
-→ NOT IMPLEMENTED
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+La especificación canónica vive en:
+
+docs/modules/healthcare/DOCTORS_HOSPITALS.md
 
 21. Doctor ≠ Customer
 
@@ -541,7 +546,11 @@ schedule constraints
 Actualmente:
 
 Hospital model
-→ NOT IMPLEMENTED
+→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+
+La especificación canónica vive en:
+
+docs/modules/healthcare/DOCTORS_HOSPITALS.md
 
 24. Hospital ≠ Customer
 
@@ -561,19 +570,23 @@ Hospital
 Customer
 → commercial counterpart
 
-25. Doctor / Hospital tenancy decision
+25. Doctor / Hospital tenancy V1
 
-Antes de diseñar Prisma debe resolverse si Doctor y Hospital serán:
+La decisión de dominio V1 es:
 
-Company-owned master data
+Doctor / Hospital
+→ Company-scoped master data
 
-o:
+`companyId` representa tenant ownership/context derivado de la Company
+autenticada. No representa employer, affiliation ni un campo empresarial
+visible y nunca debe seleccionarse manualmente.
 
-shared identity
-+
-Company-specific relationship
+No existe global Doctor/Hospital directory en V1. Dos Companies pueden mantener
+registros independientes de la misma entidad real y toda relación cross-tenant
+está prohibida.
 
-Este documento no toma todavía esa decisión.
+La persistencia técnica permanece pendiente y no está aprobada por este
+documento.
 
 26. Technician / responsible User
 
@@ -1982,9 +1995,11 @@ Equipment Assignment
 ↓
 Case Availability
 ↓
+architecture gate for physical logistics
+↓
 Dispatch / Custody
 ↓
-Return
+Return / Reconciliation
 ↓
 CaseKit / Maletín
 ↓
@@ -1996,32 +2011,25 @@ Mobile technician experience
 
 Este es un orden de implementación, no el orden temporal de una operación real.
 
+El gate de logística física no bloquea Hospital / Doctor, Requirements,
+Equipment Assignment o Case Availability. Los elementos posteriores requieren
+slices propios y no forman una sola implementación.
+
 120. Project sequence
 
-Healthcare specialization se expande después de:
+La progresión vigente es:
 
-H8A
-Documentation Synchronization
+ERP Core V1
+→ CLOSED / ACCEPTED
 
-↓
+M-HC1 — Healthcare Operations Foundation
+→ SELECTED / PLANNED — P1
 
-H8B
-Full Automated Regression / Technical Health
+HC-NEXT-01 — Hospital / Doctor Domain Design
+→ CURRENT / DESIGN
 
-↓
-
-UX-B.6
-Full ERP End-to-End QA
-
-↓
-
-ERP Core V1 Closure
-
-↓
-
-Healthcare specialization
-
-La existencia de diseño Healthcare no autoriza a introducir nuevos modelos Prisma durante H8.
+La aprobación de dominio no autoriza modelos Prisma, API o frontend. Cada
+capacidad posterior requiere su propio slice y gate técnico.
 
 121. CURRENT
 
@@ -2063,8 +2071,11 @@ EquipmentInspection ERP Core
 Healthcare Case create idempotency
 ⏳
 
-Doctor / Hospital tenancy model decision
-⏳ before implementation
+Doctor / Hospital tenancy V1 decision
+✅ DOMAIN APPROVED
+
+Doctor / Hospital persistence / API
+→ TARGET implementation deliberately deferred; not CURRENT technical debt
 
 No deben confundirse con workflows TARGET todavía inexistentes.
 
@@ -2421,9 +2432,9 @@ docs/modules/healthcare/DOMAIN_MODEL.md
 
 docs/modules/healthcare/CASES.md
 
-Documentos especializados futuros pueden incluir:
+docs/modules/healthcare/DOCTORS_HOSPITALS.md
 
-DOCTORS_HOSPITALS.md
+Documentos especializados futuros pueden incluir:
 
 CASE_REQUIREMENTS.md
 
@@ -2452,6 +2463,11 @@ CASES.md
 
 DOMAIN_MODEL.md
 → Healthcare entity boundaries
+
+DOCTORS_HOSPITALS.md
+→ Doctor / Hospital V1 domain boundary
+→ Company-scoped ownership
+→ affiliation and HealthcareCase integration invariants
 
 EQUIPMENT.md
 → ERP Core EquipmentAsset identity / lifecycle / condition
