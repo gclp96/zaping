@@ -45,17 +45,21 @@ describe('Healthcare Doctor/Hospital affiliation DTOs', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it.each(['id', 'companyId', 'isActive', 'createdAt', 'updatedAt'])(
-    'rejects protected create field %s',
-    async (field) => {
-      await expect(
-        transformBody(
-          { doctorId, hospitalId, [field]: 'protected' },
-          CreateHealthcareDoctorHospitalAffiliationDto,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    },
-  );
+  it.each([
+    'id',
+    'companyId',
+    'searchKey',
+    'isActive',
+    'createdAt',
+    'updatedAt',
+  ])('rejects protected create field %s', async (field) => {
+    await expect(
+      transformBody(
+        { doctorId, hospitalId, [field]: 'protected' },
+        CreateHealthcareDoctorHospitalAffiliationDto,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 
   it('supports omitted PATCH notes and explicit null/blank clears', async () => {
     await expect(
@@ -75,17 +79,23 @@ describe('Healthcare Doctor/Hospital affiliation DTOs', () => {
     ).resolves.toMatchObject({ notes: null });
   });
 
-  it.each(['doctorId', 'hospitalId', 'companyId', 'isActive'])(
-    'rejects protected PATCH field %s',
-    async (field) => {
-      await expect(
-        transformBody(
-          { [field]: doctorId },
-          UpdateHealthcareDoctorHospitalAffiliationDto,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-    },
-  );
+  it.each([
+    'id',
+    'doctorId',
+    'hospitalId',
+    'companyId',
+    'searchKey',
+    'isActive',
+    'createdAt',
+    'updatedAt',
+  ])('rejects protected PATCH field %s', async (field) => {
+    await expect(
+      transformBody(
+        { [field]: doctorId },
+        UpdateHealthcareDoctorHospitalAffiliationDto,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
 
   it('reuses strict common nested-list query validation', async () => {
     await expect(

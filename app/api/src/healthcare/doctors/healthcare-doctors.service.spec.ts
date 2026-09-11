@@ -340,6 +340,43 @@ describe('HealthcareDoctorsService', () => {
     });
   });
 
+  it('maps a lost PATCH race to RESOURCE_STATE_CHANGED after a tenant-scoped re-read', async () => {
+    doctor.updateMany.mockResolvedValueOnce({ count: 0 });
+    doctor.findFirst
+      .mockResolvedValueOnce(doctorRecord)
+      .mockResolvedValueOnce(doctorRecord);
+
+    await service
+      .update('company-a', 'doctor-1', { phone: '+52 662 123' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as ConflictException).getResponse()).toMatchObject({
+          code: 'RESOURCE_STATE_CHANGED',
+        });
+      });
+
+    expect(doctor.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { id: 'doctor-1', companyId: 'company-a' },
+      select: { id: true },
+    });
+  });
+
+  it('keeps a lost PATCH row indistinguishable from a foreign Doctor', async () => {
+    doctor.updateMany.mockResolvedValueOnce({ count: 0 });
+    doctor.findFirst
+      .mockResolvedValueOnce(doctorRecord)
+      .mockResolvedValueOnce(null);
+
+    await service
+      .update('company-a', 'doctor-1', { phone: '+52 662 123' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(NotFoundException);
+        expect((error as NotFoundException).getResponse()).toMatchObject({
+          code: 'DOCTOR_NOT_FOUND',
+        });
+      });
+  });
+
   it('keeps lifecycle commands idempotent in the requested state', async () => {
     await service.reactivate('company-a', 'doctor-1');
 

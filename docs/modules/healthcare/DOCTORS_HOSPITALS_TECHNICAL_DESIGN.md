@@ -4,7 +4,7 @@
 
 **Producto:** Zaping Healthcare
 
-**Estado:** PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS (C1-C3 MERGED; C4 GATES PASS / PRE-COMMIT)
+**Estado:** PARTIALLY IMPLEMENTED — BACKEND VALIDATED (C1-C4 MERGED; C5 GATES PASS / PRE-COMMIT)
 
 **Tipo de documento:** Persistence, relational-integrity, API and authorization design
 
@@ -26,10 +26,11 @@ errores, RBAC de roles fijos e integración API con HealthcareCase. Su objetivo
 es permitir que slices posteriores implementen el diseño aprobado sin reabrir
 decisiones básicas de arquitectura o contrato.
 
-El documento no implementa por sí mismo el capability. C1-C3 ya materializaron
-la persistencia, los backends de Doctor/Hospital y las affiliations en `main`;
-C4 implementa en su branch la integración API de HealthcareCase descrita en
-Sections 28.10-28.11. Frontend y acceptance permanecen pendientes.
+El documento no implementa por sí mismo el capability. C1-C4 ya materializaron
+en `main` la persistencia, los backends de Doctor/Hospital y affiliations, y
+la integración API de HealthcareCase descrita en Sections 28.10-28.11. C5
+completó sus gates de hardening en el branch actual y permanece PRE-COMMIT.
+Frontend y acceptance permanecen pendientes.
 
 ---
 
@@ -1135,9 +1136,10 @@ API/DTO/RBAC aprobado se resume separadamente en la Sección 28.21.
 
 ## 28. API / DTO / Authorization Contract
 
-> **APPROVED DESIGN / IMPLEMENTED THROUGH C4.** C2 implementó Doctors/Hospitals,
-> C3 affiliations y C4 la integración API de HealthcareCase. C5 conserva un
-> gate posterior de hardening/regression y C6-C8 cubren Web/acceptance.
+> **APPROVED DESIGN / BACKEND VALIDATED THROUGH C5.** C2 implementó
+> Doctors/Hospitals, C3 affiliations y C4 la integración API de HealthcareCase.
+> C1-C4 están merged; C5 completó sus gates en el branch actual y permanece
+> PRE-COMMIT. C6-C8 cubren Web/acceptance.
 
 ### 28.1 Scope and status
 
@@ -1953,7 +1955,7 @@ Permanecen fuera de V1:
 
 | Topic | V1 contract |
 | --- | --- |
-| Contract status | APPROVED DESIGN; backend implemented through C4, C5 hardening pending |
+| Contract status | APPROVED DESIGN; C1-C4 merged, C5 hardening gates pass/pre-commit |
 | Base routes | `/healthcare/doctors`, `/healthcare/hospitals`, `/healthcare/doctor-hospital-affiliations` |
 | IDs | UUID; ParseUUIDPipe/path and IsUUID/body |
 | Lists | page/pageSize, status, search; fixed stable order |
@@ -1983,22 +1985,22 @@ Permanecen fuera de V1:
 
 Este contrato conserva los permisos CURRENT de HealthcareCase, permite que
 SALES capture el contexto médico-operacional sin concederle lifecycle y da a
-WAREHOUSE el contexto necesario sin ampliar sus mutaciones. C1-C3 ya
+WAREHOUSE el contexto necesario sin ampliar sus mutaciones. C1-C4 ya
 implementaron y fusionaron persistencia, Doctors/Hospitals, duplicate review,
-lifecycle, fixed-role RBAC y affiliation backend. C4 implementa y valida en el
-branch actual la integración backend de HealthcareCase; permanece PRE-COMMIT y
-todavía no está merged. C5 mantiene pendiente el hardening/regression backend;
-C6 implementará frontend master data, C7 selectors/duplicate-review UX y C8 la
-acceptance integrada. Permission-based RBAC permanece diferido.
+lifecycle, fixed-role RBAC, affiliation backend e integración de HealthcareCase.
+C5 completó el hardening/regression backend y sus gates en el branch actual;
+permanece PRE-COMMIT. C6 implementará frontend master data, C7
+selectors/duplicate-review UX y C8 la acceptance integrada. Permission-based
+RBAC permanece diferido.
 
 ---
 
 ## 29. Implementation Plan & Quality Gates
 
-> **APPROVED IMPLEMENTATION PLAN / C4 GATES PASS — PRE-COMMIT.** Esta sección descompone el
-> diseño aprobado en slices implementables. C1-C3 están integrados en `main` y
-> C4 implementa la integración API de HealthcareCase en su branch, pendiente
-> de commit/review/merge. C5-C8 permanecen sin implementar.
+> **APPROVED IMPLEMENTATION PLAN / C5 GATES PASS — PRE-COMMIT.** Esta sección
+> descompone el diseño aprobado en slices implementables. C1-C4 están
+> integrados en `main`; C5 completa el hardening backend en el branch actual,
+> pendiente de commit/review/merge. C6-C8 permanecen sin implementar.
 
 ### 29.1 Planning rules and gate model
 
@@ -2080,8 +2082,8 @@ Estado de ejecución al 2026-09-11:
 | HC-NEXT-01C1 | COMPLETED / MERGED |
 | HC-NEXT-01C2 | COMPLETED / MERGED |
 | HC-NEXT-01C3 | COMPLETED / MERGED |
-| HC-NEXT-01C4 | IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged |
-| HC-NEXT-01C5 | NEXT |
+| HC-NEXT-01C4 | COMPLETED / MERGED |
+| HC-NEXT-01C5 | IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged |
 | HC-NEXT-01C6 | NOT STARTED / NOT IMPLEMENTED |
 | HC-NEXT-01C7 | NOT STARTED / NOT IMPLEMENTED |
 | HC-NEXT-01C8 | NOT STARTED / NOT IMPLEMENTED |
@@ -2469,6 +2471,15 @@ dentro del mismo PR C5. No se revierte la migration ni se borran datos.
 el test environment no es disposable, un fix exige rediseñar Section 28, hay
 leak/role bypass o el diff agrega capability no aprobado.
 
+Estado del slice: `IMPLEMENTED / VALIDATED / PRE-COMMIT`.
+
+Evidencia C5: focales Healthcare/RBAC PASS; PostgreSQL disposable 18/18; API
+completa 75 suites / 1053 tests; Prisma validate/generate, lint, typecheck,
+build y diff-check PASS. El hardening traduce errores Prisma conocidos de
+Case, distingue 404 tenant-safe de 409 `RESOURCE_STATE_CHANGED` después de un
+`updateMany` perdido y amplía regresión de DTOs/carreras sin agregar
+capability.
+
 ### 29.8 HC-NEXT-01C6 — Doctors/Hospitals Frontend
 
 #### Objective, dependencies and scope
@@ -2791,7 +2802,7 @@ HC-NEXT-01 puede cerrarse únicamente cuando todos son verdaderos:
 | Merge policy | No slice merges or advances with blocking red gates |
 | PR strategy | Separate sequential PRs; stacked preparation allowed, merge order fixed |
 | Recovery | Revert code by slice; forward migrations after shared application; never delete QA/production data casually |
-| Status now | PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS; C1-C3 merged, C4 gates pass/pre-commit |
+| Status now | PARTIALLY IMPLEMENTED — BACKEND VALIDATED; C1-C4 merged, C5 gates pass/pre-commit |
 
 Las decisiones API/RBAC no se reabren en implementación por defecto. Un
 conflicto real con el repositorio, migration safety o seguridad tenant obliga a
