@@ -20,6 +20,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guards';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import { HealthcareMasterListQueryDto } from '../common/dto/healthcare-master-list-query.dto';
+import { HealthcareDoctorHospitalAffiliationsService } from '../doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.service';
 import { CreateHealthcareDoctorDto } from './dto/create-healthcare-doctor.dto';
 import { UpdateHealthcareDoctorDto } from './dto/update-healthcare-doctor.dto';
 import { HealthcareDoctorsService } from './healthcare-doctors.service';
@@ -29,6 +30,7 @@ import { HealthcareDoctorsService } from './healthcare-doctors.service';
 export class HealthcareDoctorsController {
   constructor(
     private readonly healthcareDoctorsService: HealthcareDoctorsService,
+    private readonly healthcareDoctorHospitalAffiliationsService: HealthcareDoctorHospitalAffiliationsService,
   ) {}
 
   @Get()
@@ -68,6 +70,20 @@ export class HealthcareDoctorsController {
     return this.healthcareDoctorsService.findOne(
       request.user.companyId,
       doctorId,
+    );
+  }
+
+  @Get(':doctorId/hospitals')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
+  findHospitals(
+    @Req() request: AuthenticatedRequest,
+    @Param('doctorId', ParseUUIDPipe) doctorId: string,
+    @Query() query: HealthcareMasterListQueryDto,
+  ) {
+    return this.healthcareDoctorHospitalAffiliationsService.findHospitalsForDoctor(
+      request.user.companyId,
+      doctorId,
+      query,
     );
   }
 

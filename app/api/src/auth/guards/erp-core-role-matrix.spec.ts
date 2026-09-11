@@ -15,6 +15,7 @@ import { CustomersController } from '../../customers/customers.controller';
 import { DashboardController } from '../../dashboard/dashboard.controller';
 import { EquipmentController } from '../../equipment/equipment.controller';
 import { InventoryController } from '../../inventory/inventory.controller';
+import { HealthcareDoctorHospitalAffiliationsController } from '../../healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.controller';
 import { HealthcareDoctorsController } from '../../healthcare/doctors/healthcare-doctors.controller';
 import { HealthcareHospitalsController } from '../../healthcare/hospitals/healthcare-hospitals.controller';
 import { ProductsController } from '../../products/products.controller';
@@ -163,11 +164,21 @@ const roleMatrix: RoleMatrix[] = [
     },
   },
   {
+    controller: HealthcareDoctorHospitalAffiliationsController,
+    methods: {
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      deactivate: [UserRole.ADMIN, UserRole.MANAGER],
+      reactivate: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+  },
+  {
     controller: HealthcareDoctorsController,
     methods: {
       findAll: allRoles,
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       findOne: allRoles,
+      findHospitals: allRoles,
       update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       deactivate: [UserRole.ADMIN, UserRole.MANAGER],
       reactivate: [UserRole.ADMIN, UserRole.MANAGER],
@@ -179,6 +190,7 @@ const roleMatrix: RoleMatrix[] = [
       findAll: allRoles,
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       findOne: allRoles,
+      findDoctors: allRoles,
       update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       deactivate: [UserRole.ADMIN, UserRole.MANAGER],
       reactivate: [UserRole.ADMIN, UserRole.MANAGER],
@@ -440,6 +452,110 @@ describe('ERP Core role matrix', () => {
       },
     });
   });
+
+  it.each([
+    [UserRole.ADMIN, true, true],
+    [UserRole.MANAGER, true, true],
+    [UserRole.SALES, true, false],
+    [UserRole.WAREHOUSE, false, false],
+  ])(
+    'enforces Healthcare affiliation mutation access for %s',
+    (role, canEdit, canManageLifecycle) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareDoctorHospitalAffiliationsController,
+            'create',
+            role,
+          ),
+        ),
+      ).toBe(canEdit);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareDoctorHospitalAffiliationsController,
+            'update',
+            role,
+          ),
+        ),
+      ).toBe(canEdit);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareDoctorHospitalAffiliationsController,
+            'deactivate',
+            role,
+          ),
+        ),
+      ).toBe(canManageLifecycle);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareDoctorHospitalAffiliationsController,
+            'reactivate',
+            role,
+          ),
+        ),
+      ).toBe(canManageLifecycle);
+    },
+  );
+
+  it.each(allRoles)(
+    'allows %s to read both Healthcare affiliation directions',
+    (role) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareDoctorsController, 'findHospitals', role),
+        ),
+      ).toBe(true);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareHospitalsController, 'findDoctors', role),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    [UserRole.WAREHOUSE, 'create'],
+    [UserRole.WAREHOUSE, 'update'],
+    [UserRole.SALES, 'deactivate'],
+    [UserRole.SALES, 'reactivate'],
+  ] as const)(
+    'denies %s on affiliation %s without mutating auth context',
+    (role, methodName) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+      const request = {
+        user: {
+          id: 'user-1',
+          companyId: 'company-1',
+          role,
+        },
+      };
+      const context = {
+        getHandler: () =>
+          getHandler(
+            HealthcareDoctorHospitalAffiliationsController,
+            methodName,
+          ),
+        getClass: () => HealthcareDoctorHospitalAffiliationsController,
+        switchToHttp: () => ({
+          getRequest: () => request,
+        }),
+      } as unknown as ExecutionContext;
+
+      expect(rolesGuard.canActivate(context)).toBe(false);
+      expect(request.user).toEqual({
+        id: 'user-1',
+        companyId: 'company-1',
+        role,
+      });
+    },
+  );
 });
 
 describe('public route regressions', () => {

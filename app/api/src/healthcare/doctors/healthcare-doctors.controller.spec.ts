@@ -22,7 +22,13 @@ describe('HealthcareDoctorsController', () => {
     deactivate: jest.fn(),
     reactivate: jest.fn(),
   };
-  const controller = new HealthcareDoctorsController(service as never);
+  const affiliationsService = {
+    findHospitalsForDoctor: jest.fn(),
+  };
+  const controller = new HealthcareDoctorsController(
+    service as never,
+    affiliationsService as never,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -93,6 +99,41 @@ describe('HealthcareDoctorsController', () => {
       expect(idParam?.pipes).toContain(ParseUUIDPipe);
     },
   );
+
+  it('lists affiliated Hospitals using the authenticated tenant and query', async () => {
+    const query = {
+      page: 2,
+      pageSize: 10,
+      status: HealthcareMasterStatus.ALL,
+      search: 'central',
+    };
+    affiliationsService.findHospitalsForDoctor.mockResolvedValue({ items: [] });
+
+    await controller.findHospitals(
+      request as Parameters<HealthcareDoctorsController['findHospitals']>[0],
+      doctorId,
+      query,
+    );
+
+    expect(affiliationsService.findHospitalsForDoctor).toHaveBeenCalledWith(
+      companyId,
+      doctorId,
+      query,
+    );
+  });
+
+  it('validates nested-list doctorId with ParseUUIDPipe', () => {
+    const metadata = Reflect.getMetadata(
+      ROUTE_ARGS_METADATA,
+      HealthcareDoctorsController,
+      'findHospitals',
+    ) as Record<string, { data?: string; pipes?: unknown[] }>;
+    const idParam = Object.values(metadata).find(
+      (value) => value.data === 'doctorId',
+    );
+
+    expect(idParam?.pipes).toContain(ParseUUIDPipe);
+  });
 
   it.each([
     ['CREATED', HttpStatus.CREATED],

@@ -2,8 +2,10 @@ import 'dotenv/config';
 
 import { randomUUID } from 'node:crypto';
 
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
+import { HttpException } from '@nestjs/common';
 
+import { HealthcareDoctorHospitalAffiliationsService } from '../src/healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 type Fixture = {
@@ -16,6 +18,223 @@ type Fixture = {
   userAId: string;
   userBId: string;
 };
+
+type AffiliationPair = {
+  companyId: string;
+  doctorId: string;
+  hospitalId: string;
+};
+
+type P2002RaceObservation = {
+  transactionAttempts: number;
+  passedPrechecks: number;
+  insertAttempts: number;
+  p2002Targets: unknown[];
+};
+
+type InteractiveTransactionOptions = {
+  maxWait?: number;
+  timeout?: number;
+  isolationLevel?: Prisma.TransactionIsolationLevel;
+};
+
+class AsyncBarrier {
+  arrivals = 0;
+
+  private release!: () => void;
+  private readonly released: Promise<void>;
+
+  constructor(private readonly expectedArrivals: number) {
+    this.released = new Promise<void>((resolve) => {
+      this.release = resolve;
+    });
+  }
+
+  async arrive(): Promise<void> {
+    this.arrivals += 1;
+
+    if (this.arrivals > this.expectedArrivals) {
+      throw new Error('The P2002 test barrier received too many arrivals.');
+    }
+
+    if (this.arrivals === this.expectedArrivals) {
+      this.release();
+    }
+
+    await this.released;
+  }
+}
+
+class P2002RacePrismaFacade {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pair: AffiliationPair,
+    private readonly barrier: AsyncBarrier,
+    private readonly observation: P2002RaceObservation,
+  ) {}
+
+  get healthcareDoctor() {
+    return this.prisma.healthcareDoctor;
+  }
+
+  get healthcareHospital() {
+    return this.prisma.healthcareHospital;
+  }
+
+  get healthcareDoctorHospitalAffiliation() {
+    return this.prisma.healthcareDoctorHospitalAffiliation;
+  }
+
+  $transaction<T>(
+    callback: (transaction: Prisma.TransactionClient) => Promise<T>,
+    options?: InteractiveTransactionOptions,
+  ): Promise<T> {
+    this.observation.transactionAttempts += 1;
+
+    return this.prisma.$transaction(
+      async (transaction) => callback(this.instrumentTransaction(transaction)),
+      options,
+    );
+  }
+
+  private instrumentTransaction(
+    transaction: Prisma.TransactionClient,
+  ): Prisma.TransactionClient {
+    const affiliationDelegate = transaction.healthcareDoctorHospitalAffiliation;
+    const instrumentedAffiliationDelegate = new Proxy(affiliationDelegate, {
+      get: (target, property, receiver): unknown => {
+        if (property === 'findUnique') {
+          return async (
+            args: Prisma.HealthcareDoctorHospitalAffiliationFindUniqueArgs,
+          ) => {
+            const result = await affiliationDelegate.findUnique(args);
+            const pair = args.where.companyId_doctorId_hospitalId;
+
+            if (result === null && this.matchesPair(pair)) {
+              this.observation.passedPrechecks += 1;
+              await this.barrier.arrive();
+            }
+
+            return result;
+          };
+        }
+
+        if (property === 'create') {
+          return async (
+            args: Prisma.HealthcareDoctorHospitalAffiliationCreateArgs,
+          ) => {
+            this.observation.insertAttempts += 1;
+
+            try {
+              return await affiliationDelegate.create(args);
+            } catch (error) {
+              if (
+                error instanceof Prisma.PrismaClientKnownRequestError &&
+                error.code === 'P2002'
+              ) {
+                this.observation.p2002Targets.push(error.meta?.target);
+              }
+
+              throw error;
+            }
+          };
+        }
+
+        return Reflect.get(target, property, receiver) as unknown;
+      },
+    });
+
+    return new Proxy(transaction, {
+      get: (target, property, receiver): unknown =>
+        property === 'healthcareDoctorHospitalAffiliation'
+          ? instrumentedAffiliationDelegate
+          : (Reflect.get(target, property, receiver) as unknown),
+    });
+  }
+
+  private matchesPair(
+    pair:
+      | Prisma.HealthcareDoctorHospitalAffiliationCompanyIdDoctorIdHospitalIdCompoundUniqueInput
+      | undefined,
+  ): boolean {
+    return (
+      pair?.companyId === this.pair.companyId &&
+      pair.doctorId === this.pair.doctorId &&
+      pair.hospitalId === this.pair.hospitalId
+    );
+  }
+}
+
+function buildFixture(): Fixture {
+  return {
+    companyAId: randomUUID(),
+    companyBId: randomUUID(),
+    doctorAId: randomUUID(),
+    doctorBId: randomUUID(),
+    hospitalAId: randomUUID(),
+    hospitalBId: randomUUID(),
+    userAId: randomUUID(),
+    userBId: randomUUID(),
+  };
+}
+
+async function cleanupFixture(
+  prisma: PrismaService,
+  fixture: Fixture,
+): Promise<void> {
+  const companyIds = [fixture.companyAId, fixture.companyBId];
+  const cleanupOperations: Array<() => Promise<unknown>> = [
+    () =>
+      prisma.healthcareCase.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.healthcareDoctorHospitalAffiliation.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.healthcareDoctor.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.healthcareHospital.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.user.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.company.deleteMany({
+        where: { id: { in: companyIds } },
+      }),
+  ];
+  const cleanupErrors: unknown[] = [];
+
+  for (const cleanup of cleanupOperations) {
+    try {
+      await cleanup();
+    } catch (error) {
+      if (!isMissingCleanupTable(error)) {
+        cleanupErrors.push(error);
+      }
+    }
+  }
+
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(
+      cleanupErrors,
+      'Healthcare persistence fixture cleanup failed.',
+    );
+  }
+}
+
+function isMissingCleanupTable(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2021'
+  );
+}
 
 const safeDatabaseNamePattern =
   /(?:^|[_-])(?:test|testing|integration|ci|qa|ephemeral)(?:[_-]|$)/i;
@@ -85,20 +304,27 @@ if (runDbIntegrityTests) {
   'Doctors/Hospitals PostgreSQL persistence integrity',
   () => {
     const prisma = new PrismaService();
-    let fixture: Fixture;
+    const affiliationsService = new HealthcareDoctorHospitalAffiliationsService(
+      prisma,
+    );
+    const fixture = buildFixture();
+    let databaseConnected = false;
 
     beforeAll(async () => {
       await prisma.$connect();
+      databaseConnected = true;
 
       const suffix = randomUUID();
-      const companyAId = randomUUID();
-      const companyBId = randomUUID();
-      const userAId = randomUUID();
-      const userBId = randomUUID();
-      const doctorAId = randomUUID();
-      const doctorBId = randomUUID();
-      const hospitalAId = randomUUID();
-      const hospitalBId = randomUUID();
+      const {
+        companyAId,
+        companyBId,
+        userAId,
+        userBId,
+        doctorAId,
+        doctorBId,
+        hospitalAId,
+        hospitalBId,
+      } = fixture;
 
       await prisma.company.createMany({
         data: [
@@ -212,44 +438,16 @@ if (runDbIntegrityTests) {
           },
         ],
       });
-
-      fixture = {
-        companyAId,
-        companyBId,
-        doctorAId,
-        doctorBId,
-        hospitalAId,
-        hospitalBId,
-        userAId,
-        userBId,
-      };
     });
 
     afterAll(async () => {
-      if (fixture) {
-        const companyIds = [fixture.companyAId, fixture.companyBId];
-
-        await prisma.healthcareCase.deleteMany({
-          where: { companyId: { in: companyIds } },
-        });
-        await prisma.healthcareDoctorHospitalAffiliation.deleteMany({
-          where: { companyId: { in: companyIds } },
-        });
-        await prisma.healthcareDoctor.deleteMany({
-          where: { companyId: { in: companyIds } },
-        });
-        await prisma.healthcareHospital.deleteMany({
-          where: { companyId: { in: companyIds } },
-        });
-        await prisma.user.deleteMany({
-          where: { companyId: { in: companyIds } },
-        });
-        await prisma.company.deleteMany({
-          where: { id: { in: companyIds } },
-        });
+      try {
+        if (databaseConnected) {
+          await cleanupFixture(prisma, fixture);
+        }
+      } finally {
+        await prisma.$disconnect();
       }
-
-      await prisma.$disconnect();
     });
 
     it('persiste masters, affiliation y Cases same-tenant/null', async () => {
@@ -339,6 +537,151 @@ if (runDbIntegrityTests) {
           },
         }),
       ).rejects.toMatchObject({ code: 'P2002' });
+    });
+
+    it('serializa dos links concurrentes como una row y un conflicto estable', async () => {
+      const doctorId = randomUUID();
+      const hospitalId = randomUUID();
+
+      await prisma.healthcareDoctor.create({
+        data: {
+          id: doctorId,
+          companyId: fixture.companyAId,
+          firstName: 'Concurrent',
+          lastName: 'Doctor',
+          specialty: 'Cardiology',
+          searchKey: `concurrent doctor ${doctorId}`,
+        },
+      });
+      await prisma.healthcareHospital.create({
+        data: {
+          id: hospitalId,
+          companyId: fixture.companyAId,
+          name: 'Concurrent Hospital',
+          city: 'Hermosillo',
+          state: 'Sonora',
+          searchKey: `concurrent hospital ${hospitalId}`,
+        },
+      });
+
+      const pair = {
+        companyId: fixture.companyAId,
+        doctorId,
+        hospitalId,
+      };
+      const barrier = new AsyncBarrier(2);
+      const observation: P2002RaceObservation = {
+        transactionAttempts: 0,
+        passedPrechecks: 0,
+        insertAttempts: 0,
+        p2002Targets: [],
+      };
+      const racePrisma = new P2002RacePrismaFacade(
+        prisma,
+        pair,
+        barrier,
+        observation,
+      );
+      const raceService = new HealthcareDoctorHospitalAffiliationsService(
+        racePrisma as unknown as PrismaService,
+      );
+      const results = await Promise.allSettled([
+        raceService.create(fixture.companyAId, {
+          doctorId,
+          hospitalId,
+        }),
+        raceService.create(fixture.companyAId, {
+          doctorId,
+          hospitalId,
+        }),
+      ]);
+      const winner = results.find((result) => result.status === 'fulfilled');
+      const loser = results.find((result) => result.status === 'rejected');
+      const persistedRows =
+        await prisma.healthcareDoctorHospitalAffiliation.findMany({
+          where: pair,
+        });
+
+      expect(results).toHaveLength(2);
+      expect(observation).toMatchObject({
+        transactionAttempts: 2,
+        passedPrechecks: 2,
+        insertAttempts: 2,
+      });
+      expect(barrier.arrivals).toBe(2);
+      expect(observation.p2002Targets).toEqual([
+        ['companyId', 'doctorId', 'hospitalId'],
+      ]);
+      expect(persistedRows).toHaveLength(1);
+
+      if (
+        !winner ||
+        winner.status !== 'fulfilled' ||
+        !loser ||
+        loser.status !== 'rejected' ||
+        !persistedRows[0]
+      ) {
+        throw new Error('Expected one create winner and one P2002 loser.');
+      }
+
+      const persistedWinner = persistedRows[0];
+      const loserError: unknown = loser.reason;
+      const expectedCode = persistedWinner.isActive
+        ? 'AFFILIATION_ALREADY_ACTIVE'
+        : 'AFFILIATION_INACTIVE';
+      const expectedMessage = persistedWinner.isActive
+        ? 'La afiliación ya está activa'
+        : 'La afiliación existe pero está inactiva';
+
+      expect(winner.value.id).toBe(persistedWinner.id);
+      expect(loserError).toBeInstanceOf(HttpException);
+      expect((loserError as HttpException).getResponse()).toEqual({
+        statusCode: 409,
+        error: 'Conflict',
+        code: expectedCode,
+        message: expectedMessage,
+        details: {
+          affiliationId: persistedWinner.id,
+        },
+      });
+      expect(
+        Object.keys((loserError as HttpException).getResponse()).sort(),
+      ).toEqual(['statusCode', 'error', 'code', 'message', 'details'].sort());
+    });
+
+    it('deactivate/reactivate conserva la misma row y no modifica Cases', async () => {
+      const affiliation =
+        await prisma.healthcareDoctorHospitalAffiliation.findFirstOrThrow({
+          where: {
+            companyId: fixture.companyAId,
+            doctorId: fixture.doctorAId,
+            hospitalId: fixture.hospitalAId,
+          },
+        });
+      const casesBefore = await prisma.healthcareCase.findMany({
+        where: { companyId: fixture.companyAId },
+        select: { id: true, doctorId: true, hospitalId: true },
+        orderBy: { id: 'asc' },
+      });
+
+      await affiliationsService.deactivate(fixture.companyAId, affiliation.id);
+      await affiliationsService.reactivate(fixture.companyAId, affiliation.id);
+
+      await expect(
+        prisma.healthcareDoctorHospitalAffiliation.findFirstOrThrow({
+          where: {
+            id: affiliation.id,
+            companyId: fixture.companyAId,
+          },
+        }),
+      ).resolves.toMatchObject({ id: affiliation.id, isActive: true });
+      await expect(
+        prisma.healthcareCase.findMany({
+          where: { companyId: fixture.companyAId },
+          select: { id: true, doctorId: true, hospitalId: true },
+          orderBy: { id: 'asc' },
+        }),
+      ).resolves.toEqual(casesBefore);
     });
 
     it.each(['firstName', 'lastName', 'specialty', 'searchKey'] as const)(
