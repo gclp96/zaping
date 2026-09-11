@@ -17,6 +17,8 @@ const expectedNavigation = [
   ["Productos", "/products"],
   ["Inventario", "/inventory"],
   ["Equipos", "/equipment"],
+  ["Médicos", "/doctors"],
+  ["Hospitales", "/hospitals"],
   ["Usuarios", "/users"],
   ["Categorías", "/categories"],
 ] as const;
@@ -34,6 +36,7 @@ describe("Sidebar", () => {
       "COMERCIAL",
       "COMPRAS",
       "INVENTARIO",
+      "SALUD",
       "ADMINISTRACIÓN",
     ]) {
       expect(screen.getByText(group)).toBeTruthy();
@@ -71,6 +74,8 @@ describe("Sidebar", () => {
           'Ventas',
           'Productos',
           'Inventario',
+          'Médicos',
+          'Hospitales',
           'Categorías',
         ],
         hidden: [
@@ -93,6 +98,8 @@ describe("Sidebar", () => {
           'Productos',
           'Inventario',
           'Equipos',
+          'Médicos',
+          'Hospitales',
           'Categorías',
         ],
         hidden: ['Clientes', 'Cotizaciones', 'Ventas', 'Usuarios'],
