@@ -18,6 +18,8 @@ export const WAREHOUSE_ROLES: readonly UserRole[] = [
   'MANAGER',
   'WAREHOUSE',
 ];
+export const HEALTHCARE_MASTER_EDIT_ROLES = COMMERCIAL_ROLES;
+export const HEALTHCARE_MASTER_LIFECYCLE_ROLES = MANAGEMENT_ROLES;
 
 export function hasRole(
   role: UserRole | null | undefined,
@@ -62,4 +64,16 @@ export function canManageCommercial(
 
 export function canManageEquipment(role: UserRole | null | undefined): boolean {
   return hasRole(role, WAREHOUSE_ROLES);
+}
+
+export function canEditHealthcareMasters(
+  role: UserRole | null | undefined,
+): boolean {
+  return hasRole(role, HEALTHCARE_MASTER_EDIT_ROLES);
+}
+
+export function canManageHealthcareMasterLifecycle(
+  role: UserRole | null | undefined,
+): boolean {
+  return hasRole(role, HEALTHCARE_MASTER_LIFECYCLE_ROLES);
 }
