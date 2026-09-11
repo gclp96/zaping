@@ -127,6 +127,11 @@ export const navigationGroups: NavigationGroup[] = [
     label: "SALUD",
     items: [
       {
+        label: "Casos de salud",
+        href: "/healthcare-cases",
+        icon: ClipboardList,
+      },
+      {
         label: "Médicos",
         href: "/doctors",
         icon: Stethoscope,

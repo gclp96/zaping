@@ -8,6 +8,9 @@ import {
   canEditHealthcareMasters,
   canManageHealthcareMasterLifecycle,
 } from '@/app/erp-role-access';
+import HealthcareDuplicateReviewDialog, {
+  type HealthcareDoctorDuplicateCandidate,
+} from '@/app/components/business/HealthcareDuplicateReviewDialog';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
@@ -64,7 +67,7 @@ type DoctorMutationResponse =
   | {
       outcome: 'DUPLICATE_REVIEW_REQUIRED';
       resourceType: 'DOCTOR';
-      candidates: unknown[];
+      candidates: HealthcareDoctorDuplicateCandidate[];
     }
   | {
       outcome: 'CREATED' | 'UPDATED';
@@ -83,12 +86,15 @@ type PaginatedDoctors = {
 
 type ModalMode = 'create' | 'view' | 'edit';
 
+type PendingDoctorDuplicate = {
+  payload: Record<string, string | null>;
+  isEditing: boolean;
+  candidates: HealthcareDoctorDuplicateCandidate[];
+};
+
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 const SEARCH_DELAY_MS = 300;
-const DUPLICATE_REVIEW_MESSAGE =
-  'Se encontraron posibles duplicados. No se guardaron cambios. La revisión y confirmación se completarán en el flujo correspondiente.';
-
 const emptyDoctorForm: DoctorForm = {
   firstName: '',
   lastName: '',
@@ -225,6 +231,9 @@ export default function DoctorsPage() {
   const [form, setForm] = useState<DoctorForm>(emptyDoctorForm);
   const [formErrors, setFormErrors] = useState<DoctorFormErrors>({});
   const [saving, setSaving] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] =
+    useState<PendingDoctorDuplicate | null>(null);
+  const [duplicateError, setDuplicateError] = useState('');
   const [lifecycleDoctor, setLifecycleDoctor] = useState<Doctor | null>(null);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
   const [lifecycleError, setLifecycleError] = useState('');
@@ -308,6 +317,8 @@ export default function DoctorsPage() {
     setDoctorDetail(null);
     setModalError('');
     setFormErrors({});
+    setPendingDuplicate(null);
+    setDuplicateError('');
   }
 
   function openCreateModal() {
@@ -402,7 +413,12 @@ export default function DoctorsPage() {
           );
 
       if (response.data.outcome === 'DUPLICATE_REVIEW_REQUIRED') {
-        setModalError(DUPLICATE_REVIEW_MESSAGE);
+        setPendingDuplicate({
+          payload,
+          isEditing,
+          candidates: response.data.candidates,
+        });
+        setDuplicateError('');
         return;
       }
 
@@ -420,6 +436,58 @@ export default function DoctorsPage() {
           isEditing
             ? 'No fue posible actualizar el médico.'
             : 'No fue posible registrar el médico.',
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmDoctorDuplicate() {
+    if (!canEdit || !pendingDuplicate || saving) {
+      return;
+    }
+
+    const { payload, isEditing } = pendingDuplicate;
+
+    try {
+      setSaving(true);
+      setDuplicateError('');
+      const confirmedPayload = {
+        ...payload,
+        confirmPossibleDuplicate: true,
+      };
+      const response = isEditing
+        ? await api.patch<DoctorMutationResponse>(
+            `/healthcare/doctors/${selectedDoctor?.id}`,
+            confirmedPayload,
+          )
+        : await api.post<DoctorMutationResponse>(
+            '/healthcare/doctors',
+            confirmedPayload,
+          );
+
+      if (response.data.outcome === 'DUPLICATE_REVIEW_REQUIRED') {
+        setDuplicateError(
+          'La confirmación no pudo completarse. Revisa los datos e intenta nuevamente.',
+        );
+        return;
+      }
+
+      closeModal(true);
+      setNotice(
+        isEditing
+          ? 'Médico actualizado correctamente.'
+          : 'Médico registrado correctamente.',
+      );
+      await loadDoctors();
+    } catch (error: unknown) {
+      setDuplicateError(
+        getApiErrorMessage(
+          error,
+          isEditing
+            ? 'No fue posible confirmar la actualización del médico.'
+            : 'No fue posible confirmar el registro del médico.',
         ),
       );
     } finally {
@@ -743,6 +811,26 @@ export default function DoctorsPage() {
           </form>
         ) : null}
       </Modal>
+
+      <HealthcareDuplicateReviewDialog
+        isOpen={pendingDuplicate !== null}
+        resourceType="DOCTOR"
+        candidates={pendingDuplicate?.candidates ?? []}
+        loading={saving}
+        actionLabel={
+          pendingDuplicate?.isEditing
+            ? 'Guardar de todos modos'
+            : 'Crear de todos modos'
+        }
+        error={duplicateError}
+        onCancel={() => {
+          if (!saving) {
+            setPendingDuplicate(null);
+            setDuplicateError('');
+          }
+        }}
+        onConfirm={() => void confirmDoctorDuplicate()}
+      />
 
       <ConfirmDialog
         isOpen={lifecycleDoctor !== null}

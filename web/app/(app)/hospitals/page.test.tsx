@@ -344,14 +344,23 @@ describe('HospitalsPage', () => {
     expect(payload).not.toHaveProperty('companyId');
   });
 
-  it('mantiene el formulario abierto y sin success ante duplicate review', async () => {
+  it('revisa y confirma explícitamente un posible hospital duplicado', async () => {
     const user = userEvent.setup();
     await renderHospitals();
     vi.mocked(api.post).mockResolvedValueOnce({
       data: {
         outcome: 'DUPLICATE_REVIEW_REQUIRED',
         resourceType: 'HOSPITAL',
-        candidates: [{ id: 'candidate-1' }],
+        candidates: [
+          {
+            id: 'candidate-1',
+            name: 'Hospital Central',
+            city: 'Hermosillo',
+            state: 'Sonora',
+            address: 'Centro',
+            isActive: true,
+          },
+        ],
       },
     } as never);
 
@@ -361,7 +370,12 @@ describe('HospitalsPage', () => {
     await user.type(screen.getByRole('textbox', { name: 'Estado' }), 'Sonora');
     await user.click(screen.getByRole('button', { name: 'Registrar hospital' }));
 
-    expect(await screen.findByText(/No se guardaron cambios/)).toBeTruthy();
+    const duplicateDialog = await screen.findByRole('dialog', {
+      name: 'Revisar posible duplicado',
+    });
+    expect(within(duplicateDialog).getByText('Hospital Central')).toBeTruthy();
+    expect(within(duplicateDialog).getByText(/Aún no se ha creado/)).toBeTruthy();
+    expect(api.post).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('heading', { name: 'Nuevo hospital' }),
     ).toBeTruthy();
@@ -371,6 +385,26 @@ describe('HospitalsPage', () => {
       unknown
     >;
     expect(payload).not.toHaveProperty('confirmPossibleDuplicate');
+
+    await user.click(
+      within(duplicateDialog).getByRole('button', {
+        name: 'Crear de todos modos',
+      }),
+    );
+    await waitFor(() =>
+      expect(api.post).toHaveBeenLastCalledWith('/healthcare/hospitals', {
+        name: 'Central',
+        city: 'Hermosillo',
+        state: 'Sonora',
+        address: null,
+        phone: null,
+        email: null,
+        contactName: null,
+        notes: null,
+        confirmPossibleDuplicate: true,
+      }),
+    );
+    expect(api.post).toHaveBeenCalledTimes(2);
   });
 
   it('usa el endpoint lifecycle explícito', async () => {

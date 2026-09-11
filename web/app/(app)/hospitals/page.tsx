@@ -8,6 +8,9 @@ import {
   canEditHealthcareMasters,
   canManageHealthcareMasterLifecycle,
 } from '@/app/erp-role-access';
+import HealthcareDuplicateReviewDialog, {
+  type HealthcareHospitalDuplicateCandidate,
+} from '@/app/components/business/HealthcareDuplicateReviewDialog';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
@@ -68,7 +71,7 @@ type HospitalMutationResponse =
   | {
       outcome: 'DUPLICATE_REVIEW_REQUIRED';
       resourceType: 'HOSPITAL';
-      candidates: unknown[];
+      candidates: HealthcareHospitalDuplicateCandidate[];
     }
   | {
       outcome: 'CREATED' | 'UPDATED';
@@ -87,12 +90,15 @@ type PaginatedHospitals = {
 
 type ModalMode = 'create' | 'view' | 'edit';
 
+type PendingHospitalDuplicate = {
+  payload: Record<string, string | null>;
+  isEditing: boolean;
+  candidates: HealthcareHospitalDuplicateCandidate[];
+};
+
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
 const SEARCH_DELAY_MS = 300;
-const DUPLICATE_REVIEW_MESSAGE =
-  'Se encontraron posibles duplicados. No se guardaron cambios. La revisión y confirmación se completarán en el flujo correspondiente.';
-
 const emptyHospitalForm: HospitalForm = {
   name: '',
   city: '',
@@ -230,6 +236,9 @@ export default function HospitalsPage() {
   const [form, setForm] = useState<HospitalForm>(emptyHospitalForm);
   const [formErrors, setFormErrors] = useState<HospitalFormErrors>({});
   const [saving, setSaving] = useState(false);
+  const [pendingDuplicate, setPendingDuplicate] =
+    useState<PendingHospitalDuplicate | null>(null);
+  const [duplicateError, setDuplicateError] = useState('');
   const [lifecycleHospital, setLifecycleHospital] = useState<Hospital | null>(null);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
   const [lifecycleError, setLifecycleError] = useState('');
@@ -320,6 +329,8 @@ export default function HospitalsPage() {
     setHospitalDetail(null);
     setModalError('');
     setFormErrors({});
+    setPendingDuplicate(null);
+    setDuplicateError('');
   }
 
   function openCreateModal() {
@@ -419,7 +430,12 @@ export default function HospitalsPage() {
           );
 
       if (response.data.outcome === 'DUPLICATE_REVIEW_REQUIRED') {
-        setModalError(DUPLICATE_REVIEW_MESSAGE);
+        setPendingDuplicate({
+          payload,
+          isEditing,
+          candidates: response.data.candidates,
+        });
+        setDuplicateError('');
         return;
       }
 
@@ -437,6 +453,58 @@ export default function HospitalsPage() {
           isEditing
             ? 'No fue posible actualizar el hospital.'
             : 'No fue posible registrar el hospital.',
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function confirmHospitalDuplicate() {
+    if (!canEdit || !pendingDuplicate || saving) {
+      return;
+    }
+
+    const { payload, isEditing } = pendingDuplicate;
+
+    try {
+      setSaving(true);
+      setDuplicateError('');
+      const confirmedPayload = {
+        ...payload,
+        confirmPossibleDuplicate: true,
+      };
+      const response = isEditing
+        ? await api.patch<HospitalMutationResponse>(
+            `/healthcare/hospitals/${selectedHospital?.id}`,
+            confirmedPayload,
+          )
+        : await api.post<HospitalMutationResponse>(
+            '/healthcare/hospitals',
+            confirmedPayload,
+          );
+
+      if (response.data.outcome === 'DUPLICATE_REVIEW_REQUIRED') {
+        setDuplicateError(
+          'La confirmación no pudo completarse. Revisa los datos e intenta nuevamente.',
+        );
+        return;
+      }
+
+      closeModal(true);
+      setNotice(
+        isEditing
+          ? 'Hospital actualizado correctamente.'
+          : 'Hospital registrado correctamente.',
+      );
+      await loadHospitals();
+    } catch (error: unknown) {
+      setDuplicateError(
+        getApiErrorMessage(
+          error,
+          isEditing
+            ? 'No fue posible confirmar la actualización del hospital.'
+            : 'No fue posible confirmar el registro del hospital.',
         ),
       );
     } finally {
@@ -807,6 +875,26 @@ export default function HospitalsPage() {
           </form>
         ) : null}
       </Modal>
+
+      <HealthcareDuplicateReviewDialog
+        isOpen={pendingDuplicate !== null}
+        resourceType="HOSPITAL"
+        candidates={pendingDuplicate?.candidates ?? []}
+        loading={saving}
+        actionLabel={
+          pendingDuplicate?.isEditing
+            ? 'Guardar de todos modos'
+            : 'Crear de todos modos'
+        }
+        error={duplicateError}
+        onCancel={() => {
+          if (!saving) {
+            setPendingDuplicate(null);
+            setDuplicateError('');
+          }
+        }}
+        onConfirm={() => void confirmHospitalDuplicate()}
+      />
 
       <ConfirmDialog
         isOpen={lifecycleHospital !== null}
