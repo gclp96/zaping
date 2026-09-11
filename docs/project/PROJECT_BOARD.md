@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: Post-acceptance ERP Core V1 — sincronización documental y preparación de Healthcare
-Última actualización: 2026-09-09
+Fase actual: M-HC1 Healthcare Operations Foundation — C4 backend integration
+Última actualización: 2026-09-11
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -100,11 +100,10 @@ ERP Core
 
 CURRENT
 
-Post-acceptance documentation synchronization
+M-HC1 — Healthcare Operations Foundation
 
-├── reconcile Board / Roadmap / Changelog with DEV-NEXT-03B
-│
-└── preserve local acceptance evidence separately from operational release gates
+└── HC-NEXT-01C4 — HealthcareCase Doctor/Hospital Integration
+    └── IMPLEMENTED / GATES PASS — PRE-COMMIT
 
 Frontend UX workstream
 
@@ -118,11 +117,8 @@ Frontend UX workstream
 
 NEXT
 
-M-HC1 — Healthcare Operations Foundation
-        → SELECTED / PLANNED — P1
-        ↓
-HC-NEXT-01 — Hospital / Doctor Domain Design
-        → READY / DESIGN
+HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
+        → READY AFTER C4 MERGE
 
 DEFERRED
 
@@ -1676,26 +1672,16 @@ Healthcare Case creation idempotency
 
 Un retry después de una respuesta exitosa perdida puede crear otro Case y consumir otro folio.
 
-18. Healthcare — siguiente slice y orden TARGET
+18. Healthcare — slice activo y orden TARGET
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
+HC-NEXT-01C1 a C3 están integrados en `main`: persistencia, masters
+Doctor/Hospital y affiliations backend. HC-NEXT-01C4 implementa actualmente la
+integración HealthcareCase en branch, pendiente de commit/review/merge.
 
-Estado: READY / DESIGN
+Estado: `IMPLEMENTED / GATES PASS — PRE-COMMIT`
 
-Objetivo: definir el boundary de master data Healthcare para Hospital y Doctor
-antes de implementar persistencia.
-
-Decisión arquitectónica pendiente:
-
-```text
-Company-owned master data
-vs
-shared identity + tenant-specific relationship
-```
-
-La estrategia Prisma final no debe decidirse antes de resolver este boundary.
-HC-NEXT-01 es Documentation / Domain Design; Hospital y Doctor todavía no están
-implementados.
+El siguiente slice es HC-NEXT-01C5, API/RBAC regression y backend hardening,
+únicamente después de merge verde de C4.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2166,19 +2152,15 @@ Future
 
 CURRENT
 
-ERP Core V1 CLOSED / ACCEPTED on canonical baseline `a4434a6`
+ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
-→ DEV-NEXT-03B COMPLETED / PASS
+→ HC-NEXT-01C1-C3 MERGED
 
-→ post-acceptance documentation synchronization
+→ HC-NEXT-01C4 HealthcareCase Doctor/Hospital Integration — GATES PASS / PRE-COMMIT
 
-NEXT STRATEGIC MILESTONE — SELECTED / PLANNED
+NEXT ACTIONABLE SLICE AFTER MERGE
 
-→ M-HC1 — Healthcare Operations Foundation — P1
-
-FIRST ACTIONABLE SLICE
-
-→ HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
+→ HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
 
 DEFERRED
 
@@ -2356,14 +2338,14 @@ OPS-RC-B5B
 DEV-NEXT-03B
 → COMPLETED / PASS
 
-Post-acceptance documentation synchronization
-→ CURRENT
-
 M-HC1 — Healthcare Operations Foundation
-→ SELECTED / PLANNED — P1
+→ ACTIVE — P1
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
-→ READY / DESIGN
+HC-NEXT-01C4 — HealthcareCase Doctor/Hospital Integration
+→ IMPLEMENTED / GATES PASS — PRE-COMMIT
+
+HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
+→ NEXT AFTER C4 MERGE
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

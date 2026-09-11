@@ -96,6 +96,8 @@ export class HealthcareCasesController {
       scheduledStart: this.toOptionalDate(dto.scheduledStart),
       scheduledEnd: this.toOptionalDate(dto.scheduledEnd),
       responsibleUserId: dto.responsibleUserId,
+      doctorId: dto.doctorId,
+      hospitalId: dto.hospitalId,
     };
   }
 
@@ -124,6 +126,14 @@ export class HealthcareCasesController {
       input.responsibleUserId = dto.responsibleUserId;
     }
 
+    if (this.hasDefinedOwn(dto, 'doctorId')) {
+      input.doctorId = dto.doctorId;
+    }
+
+    if (this.hasDefinedOwn(dto, 'hospitalId')) {
+      input.hospitalId = dto.hospitalId;
+    }
+
     return input;
   }
 
@@ -140,5 +150,12 @@ export class HealthcareCasesController {
     key: PropertyKey,
   ): key is keyof T {
     return Boolean(Object.prototype.hasOwnProperty.call(object, key));
+  }
+
+  private hasDefinedOwn<T extends object, K extends keyof T>(
+    object: T,
+    key: K,
+  ): object is T & Record<K, Exclude<T[K], undefined>> {
+    return this.hasOwn(object, key) && object[key] !== undefined;
   }
 }
