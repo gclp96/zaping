@@ -104,12 +104,18 @@ describe('UpdateHealthcareCaseDto', () => {
     },
   );
 
-  it('should reject unexpected status and companyId fields', async () => {
+  it.each([
+    'companyId',
+    'status',
+    'searchKey',
+    'isActive',
+    'cancelledAt',
+    'cancelledById',
+  ])('should reject protected field %s', async (field) => {
     await expect(
       transformDto({
         title: 'Caso actualizado',
-        status: 'CANCELLED',
-        companyId: '699baaae-2718-4d96-8683-8a2cf12bfe55',
+        [field]: 'protected',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

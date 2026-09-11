@@ -4,7 +4,7 @@ Módulo: Healthcare Cases
 Producto: Zaping Healthcare
 Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION VALIDATED — DOCTOR/HOSPITAL BACKEND INTEGRATION GATES PASS / PRE-COMMIT
+Estado de implementación: CASE FOUNDATION VALIDATED — DOCTOR/HOSPITAL C1-C4 MERGED; C5 GATES PASS / PRE-COMMIT
 Última actualización: 2026-09-11
 Responsable: Zaping Healthcare Team
 
@@ -2116,7 +2116,7 @@ AI assistance
 138. Roadmap Healthcare aprobado
 
 La secuencia de implementación de referencia, cuyo tramo backend Hospital /
-Doctor C1-C4 ya está implementado o validado PRE-COMMIT, es:
+Doctor C1-C4 ya está merged y cuyo hardening C5 está validado PRE-COMMIT, es:
 
 Hospital / Doctor
 ↓
@@ -2168,10 +2168,10 @@ HC-NEXT-01C3
 → COMPLETED / MERGED
 
 HC-NEXT-01C4
-→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
+→ COMPLETED / MERGED
 
 HC-NEXT-01C5
-→ NEXT
+→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
 
 HC-NEXT-01C6 / C7 / C8
 → NOT IMPLEMENTED / FUTURE

@@ -313,6 +313,12 @@ describe('HealthcareCaseService', () => {
     throw new Error('Expected operation to reject with HttpException');
   };
 
+  const knownPrismaError = (code: string) =>
+    new Prisma.PrismaClientKnownRequestError('sensitive persistence detail', {
+      code,
+      clientVersion: '6.19.3',
+    });
+
   it('should create an unscheduled case as DRAFT', async () => {
     const result = await service.create(companyId, createdById, {
       title: 'Cirugía programada',
@@ -867,6 +873,24 @@ describe('HealthcareCaseService', () => {
       message: 'Un recurso relacionado cambió. Recarga e intenta nuevamente',
     });
     expect(JSON.stringify(error.getResponse())).not.toContain('constraint');
+  });
+
+  it('should map other known create failures to the stable persistence error', async () => {
+    healthcareCaseCreateMock.mockRejectedValueOnce(knownPrismaError('P2002'));
+
+    const error = await captureHttpException(
+      service.create(companyId, createdById, {
+        title: 'Cirugía programada',
+      }),
+    );
+
+    expect(error.getResponse()).toEqual({
+      statusCode: 500,
+      error: 'Internal Server Error',
+      code: 'HEALTHCARE_PERSISTENCE_ERROR',
+      message: 'No fue posible completar la operación',
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain('persistence');
   });
 
   it('should list cases scoped by companyId with deterministic ordering', async () => {
@@ -1517,6 +1541,50 @@ describe('HealthcareCaseService', () => {
     expect(JSON.stringify(error.getResponse())).not.toContain('foreign key');
   });
 
+  it('should map an update state race to RESOURCE_STATE_CHANGED after a scoped re-read', async () => {
+    healthcareCaseUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+
+    const error = await captureHttpException(
+      service.update(companyId, caseId, { title: 'Caso actualizado' }),
+    );
+
+    expect(error.getResponse()).toMatchObject({
+      statusCode: 409,
+      code: 'RESOURCE_STATE_CHANGED',
+    });
+    expect(txHealthcareCaseFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: caseId, companyId },
+      select: { id: true },
+    });
+  });
+
+  it('should preserve missing/foreign 404 semantics when an update loses its row', async () => {
+    healthcareCaseUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    txHealthcareCaseFindFirstMock
+      .mockResolvedValueOnce(baseCase)
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      service.update(companyId, caseId, { title: 'Caso actualizado' }),
+    ).rejects.toEqual(new NotFoundException('Caso no encontrado'));
+  });
+
+  it('should map other known update failures to the stable persistence error', async () => {
+    healthcareCaseUpdateManyMock.mockRejectedValueOnce(
+      knownPrismaError('P2002'),
+    );
+
+    const error = await captureHttpException(
+      service.update(companyId, caseId, { title: 'Caso actualizado' }),
+    );
+
+    expect(error.getResponse()).toMatchObject({
+      statusCode: 500,
+      code: 'HEALTHCARE_PERSISTENCE_ERROR',
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain('persistence');
+  });
+
   it('should ignore status supplied through application input on update', async () => {
     await service.update(companyId, caseId, {
       status: HealthcareCaseStatus.CANCELLED,
@@ -1780,13 +1848,60 @@ describe('HealthcareCaseService', () => {
     );
   });
 
-  it('should report a concurrency conflict when cancellation update count is zero', async () => {
+  it('should report RESOURCE_STATE_CHANGED when cancellation loses a state race', async () => {
     healthcareCaseUpdateManyMock.mockResolvedValueOnce({
       count: 0,
     });
 
+    const error = await captureHttpException(
+      service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
+    );
+
+    expect(error.getResponse()).toMatchObject({
+      statusCode: 409,
+      code: 'RESOURCE_STATE_CHANGED',
+    });
+    expect(txHealthcareCaseFindFirstMock).toHaveBeenNthCalledWith(2, {
+      where: { id: caseId, companyId },
+      select: { id: true },
+    });
+  });
+
+  it('should preserve missing/foreign 404 semantics when cancellation loses its row', async () => {
+    healthcareCaseUpdateManyMock.mockResolvedValueOnce({ count: 0 });
+    txHealthcareCaseFindFirstMock
+      .mockResolvedValueOnce(baseCase)
+      .mockResolvedValueOnce(null);
+
     await expect(
       service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toEqual(new NotFoundException('Caso no encontrado'));
   });
+
+  it.each([
+    ['P2003', 'RELATED_RESOURCE_CHANGED', 409],
+    ['P2002', 'HEALTHCARE_PERSISTENCE_ERROR', 500],
+  ])(
+    'should translate cancellation %s without exposing persistence details',
+    async (prismaCode, expectedCode, statusCode) => {
+      healthcareCaseUpdateManyMock.mockRejectedValueOnce(
+        knownPrismaError(prismaCode),
+      );
+
+      const error = await captureHttpException(
+        service.cancel(
+          companyId,
+          caseId,
+          createdById,
+          'Cancelación operacional',
+        ),
+      );
+
+      expect(error.getResponse()).toMatchObject({
+        statusCode,
+        code: expectedCode,
+      });
+      expect(JSON.stringify(error.getResponse())).not.toContain('persistence');
+    },
+  );
 });

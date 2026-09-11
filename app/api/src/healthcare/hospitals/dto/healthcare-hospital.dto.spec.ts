@@ -115,6 +115,19 @@ describe('Healthcare Hospital DTOs', () => {
     },
   );
 
+  it.each([
+    'id',
+    'companyId',
+    'searchKey',
+    'isActive',
+    'createdAt',
+    'updatedAt',
+  ])('rejects protected update field %s', async (field) => {
+    await expect(
+      transformBody({ [field]: 'protected' }, UpdateHealthcareHospitalDto),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('normalizes hospital location filters', async () => {
     await expect(
       transformQuery({ city: '  San   Luis  ', state: ' SONORA ' }),

@@ -125,12 +125,22 @@ describe('CreateHealthcareCaseDto', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('should reject unexpected companyId through global ValidationPipe behavior', async () => {
-    await expect(
-      transformDto({
-        title: 'Cirugía programada',
-        companyId: '699baaae-2718-4d96-8683-8a2cf12bfe55',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-  });
+  it.each([
+    'companyId',
+    'status',
+    'searchKey',
+    'isActive',
+    'cancelledAt',
+    'cancelledById',
+  ])(
+    'should reject protected field %s through global ValidationPipe behavior',
+    async (field) => {
+      await expect(
+        transformDto({
+          title: 'Cirugía programada',
+          [field]: 'protected',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
 });

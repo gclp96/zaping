@@ -10,9 +10,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   doctorInactiveException,
   doctorNotFoundException,
+  healthcarePersistenceException,
   hospitalInactiveException,
   hospitalNotFoundException,
   relatedResourceChangedException,
+  resourceStateChangedException,
 } from '../common/healthcare-errors';
 
 import { HealthcareCaseFolioService } from './healthcare-case-folio.service';
@@ -285,9 +287,7 @@ export class HealthcareCaseService {
         });
 
         if (updateResult.count !== 1) {
-          throw new ConflictException(
-            'El caso cambió de estado durante la actualización. Intenta nuevamente',
-          );
+          await this.resolveLostCaseMutation(tx, companyId, caseId);
         }
 
         return this.findOneInTransaction(tx, companyId, caseId);
@@ -309,51 +309,53 @@ export class HealthcareCaseService {
       this.normalizeCancellationReason(cancellationReason);
     const cancelledAt = new Date();
 
-    const cancelledCase = await this.prisma.$transaction(async (tx) => {
-      const healthcareCase = await tx.healthcareCase.findFirst({
-        where: {
-          id: caseId,
-          companyId,
-        },
-        select: healthcareCaseResponseSelect,
-      });
-
-      if (!healthcareCase) {
-        throw new NotFoundException('Caso no encontrado');
-      }
-
-      if (healthcareCase.status === HealthcareCaseStatus.CANCELLED) {
-        throw new ConflictException('El caso ya está cancelado');
-      }
-
-      await this.validateCancellationActor(tx, companyId, cancelledById);
-
-      const updateResult = await tx.healthcareCase.updateMany({
-        where: {
-          id: caseId,
-          companyId,
-          status: {
-            in: [HealthcareCaseStatus.DRAFT, HealthcareCaseStatus.SCHEDULED],
+    try {
+      const cancelledCase = await this.prisma.$transaction(async (tx) => {
+        const healthcareCase = await tx.healthcareCase.findFirst({
+          where: {
+            id: caseId,
+            companyId,
           },
-        },
-        data: {
-          status: HealthcareCaseStatus.CANCELLED,
-          cancelledAt,
-          cancelledById,
-          cancellationReason: normalizedReason,
-        },
+          select: healthcareCaseResponseSelect,
+        });
+
+        if (!healthcareCase) {
+          throw new NotFoundException('Caso no encontrado');
+        }
+
+        if (healthcareCase.status === HealthcareCaseStatus.CANCELLED) {
+          throw new ConflictException('El caso ya está cancelado');
+        }
+
+        await this.validateCancellationActor(tx, companyId, cancelledById);
+
+        const updateResult = await tx.healthcareCase.updateMany({
+          where: {
+            id: caseId,
+            companyId,
+            status: {
+              in: [HealthcareCaseStatus.DRAFT, HealthcareCaseStatus.SCHEDULED],
+            },
+          },
+          data: {
+            status: HealthcareCaseStatus.CANCELLED,
+            cancelledAt,
+            cancelledById,
+            cancellationReason: normalizedReason,
+          },
+        });
+
+        if (updateResult.count !== 1) {
+          await this.resolveLostCaseMutation(tx, companyId, caseId);
+        }
+
+        return this.findOneInTransaction(tx, companyId, caseId);
       });
 
-      if (updateResult.count !== 1) {
-        throw new ConflictException(
-          'El caso cambió de estado durante la cancelación. Intenta nuevamente',
-        );
-      }
-
-      return this.findOneInTransaction(tx, companyId, caseId);
-    });
-
-    return this.mapResponse(cancelledCase);
+      return this.mapResponse(cancelledCase);
+    } catch (error) {
+      this.rethrowWriteError(error);
+    }
   }
 
   private normalizeCreateInput(
@@ -627,11 +629,35 @@ export class HealthcareCaseService {
     return healthcareCase;
   }
 
+  private async resolveLostCaseMutation(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    caseId: string,
+  ): Promise<never> {
+    const healthcareCase = await tx.healthcareCase.findFirst({
+      where: {
+        id: caseId,
+        companyId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!healthcareCase) {
+      throw new NotFoundException('Caso no encontrado');
+    }
+
+    throw resourceStateChangedException();
+  }
+
   private rethrowWriteError(error: unknown): never {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
       if (error.code === 'P2003') {
         throw relatedResourceChangedException();
       }
+
+      throw healthcarePersistenceException();
     }
 
     throw error;

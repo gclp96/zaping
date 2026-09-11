@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
-**Última actualización:** 2026-09-09
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1-C4 MERGED; C5 GATES PASS / PRE-COMMIT
+**Última actualización:** 2026-09-11
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -36,10 +36,11 @@ Este documento corresponde a:
 
 ```text
 HC-NEXT-01 — Hospital / Doctor Domain Design
-CURRENT / DESIGN
+APPROVED DOMAIN DESIGN
 ```
 
-Define dominio y comportamiento conceptual. No implementa ni aprueba:
+Define dominio y comportamiento conceptual. Durante la fase HC-NEXT-01A no
+implementó ni aprobó por sí solo:
 
 ```text
 Prisma models
@@ -53,23 +54,29 @@ seeds
 tests
 ```
 
-Los field names son conceptuales; no constituyen nombres Prisma ni contratos
-API aprobados.
+El technical design y los slices C1-C5 posteriores son la autoridad para los
+nombres Prisma, contratos API y estado de implementación.
 
-Estado por concepto:
+Estado CURRENT por concepto:
 
 ```text
 Doctor
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ BACKEND IMPLEMENTED
 
 Hospital
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ BACKEND IMPLEMENTED
 
 Doctor / Hospital affiliation
-→ TARGET V1 — DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
+→ BACKEND IMPLEMENTED
 
 HealthcareCase Doctor / Hospital relationships
-→ TARGET — NOT IMPLEMENTED
+→ BACKEND IMPLEMENTED
+
+Backend hardening
+→ C5 GATES PASS / PRE-COMMIT
+
+Frontend master data, Case selectors and duplicate-review UX
+→ NOT IMPLEMENTED / FUTURE
 ```
 
 ---
@@ -2414,11 +2421,13 @@ scheduledStart
 
 ---
 
-# 187. Index decisions deferred
+# 187. Historical index-design boundary
 
-Los índices, constraints, normalized keys, collation y estrategia de búsqueda
-se evaluarán durante Prisma/API design. Este documento no aprueba una solución
-de persistencia.
+Durante la fase de domain design, índices, constraints, normalized keys,
+collation y estrategia de búsqueda quedaron diferidos a Prisma/API design. Las
+decisiones implementadas y su evidencia CURRENT están en
+`DOCTORS_HOSPITALS_TECHNICAL_DESIGN.md`; este documento de dominio no las
+redefine.
 
 ---
 
@@ -2434,30 +2443,34 @@ EquipmentAsset / Equipment V1
 → IMPLEMENTED / VALIDATED in ERP Core
 
 HC-NEXT-01
-→ CURRENT / DESIGN
+→ BACKEND VALIDATED THROUGH C5 / PRE-COMMIT
 ```
 
-No están implementados:
+Backend CURRENT:
 
 ```text
 Doctor
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ PERSISTENCE + API IMPLEMENTED
 
 Hospital
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ PERSISTENCE + API IMPLEMENTED
 
 Doctor-Hospital relationship
-→ DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
+→ PERSISTENCE + API IMPLEMENTED
 
 HealthcareCase Doctor/Hospital relationships
-→ TARGET — NOT IMPLEMENTED
+→ BACKEND INTEGRATION IMPLEMENTED
+
+Frontend master-data workflows, Case selectors and duplicate-review UX
+→ NOT IMPLEMENTED / FUTURE
 ```
 
 ---
 
-# 189. TARGET V1
+# 189. TARGET V1 workflow
 
-La primera implementación debería resolver:
+El backend C1-C5 ya soporta la base técnica de este flujo. C6-C8 deben completar
+la experiencia frontend y acceptance:
 
 ```text
 Create Doctor

@@ -111,6 +111,19 @@ describe('Healthcare Doctor DTOs', () => {
     },
   );
 
+  it.each([
+    'id',
+    'companyId',
+    'searchKey',
+    'isActive',
+    'createdAt',
+    'updatedAt',
+  ])('rejects protected update field %s', async (field) => {
+    await expect(
+      transformBody({ [field]: 'protected' }, UpdateHealthcareDoctorDto),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('applies list defaults and transforms numeric pagination', async () => {
     await expect(transformQuery({})).resolves.toMatchObject({
       page: 1,

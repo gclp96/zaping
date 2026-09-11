@@ -1,8 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { HealthcareMasterStatus } from '../common/dto/healthcare-master-list-query.dto';
@@ -350,6 +352,43 @@ describe('HealthcareHospitalsService', () => {
     });
   });
 
+  it('maps a lost PATCH race to RESOURCE_STATE_CHANGED after a tenant-scoped re-read', async () => {
+    hospital.updateMany.mockResolvedValueOnce({ count: 0 });
+    hospital.findFirst
+      .mockResolvedValueOnce(hospitalRecord)
+      .mockResolvedValueOnce(hospitalRecord);
+
+    await service
+      .update('company-a', 'hospital-1', { phone: '+52 662 123' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(ConflictException);
+        expect((error as ConflictException).getResponse()).toMatchObject({
+          code: 'RESOURCE_STATE_CHANGED',
+        });
+      });
+
+    expect(hospital.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { id: 'hospital-1', companyId: 'company-a' },
+      select: { id: true },
+    });
+  });
+
+  it('keeps a lost PATCH row indistinguishable from a foreign Hospital', async () => {
+    hospital.updateMany.mockResolvedValueOnce({ count: 0 });
+    hospital.findFirst
+      .mockResolvedValueOnce(hospitalRecord)
+      .mockResolvedValueOnce(null);
+
+    await service
+      .update('company-a', 'hospital-1', { phone: '+52 662 123' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(NotFoundException);
+        expect((error as NotFoundException).getResponse()).toMatchObject({
+          code: 'HOSPITAL_NOT_FOUND',
+        });
+      });
+  });
+
   it('keeps lifecycle commands idempotent in the requested state', async () => {
     await service.reactivate('company-a', 'hospital-1');
 
@@ -395,6 +434,31 @@ describe('HealthcareHospitalsService', () => {
         expect(error).toBeInstanceOf(ConflictException);
         expect((error as ConflictException).getResponse()).toMatchObject({
           code: 'RESOURCE_STATE_CHANGED',
+        });
+      });
+  });
+
+  it('maps known Prisma write errors without exposing their raw message', async () => {
+    hospital.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('raw constraint detail', {
+        code: 'P2002',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    await service
+      .create('company-a', {
+        name: 'Hospital San José',
+        city: 'Hermosillo',
+        state: 'Sonora',
+      })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(InternalServerErrorException);
+        expect((error as InternalServerErrorException).getResponse()).toEqual({
+          statusCode: 500,
+          error: 'Internal Server Error',
+          code: 'HEALTHCARE_PERSISTENCE_ERROR',
+          message: 'No fue posible completar la operación',
         });
       });
   });

@@ -405,6 +405,55 @@ describe('HealthcareDoctorHospitalAffiliationsService', () => {
     expect(affiliation.updateMany).not.toHaveBeenCalled();
   });
 
+  it('maps a lost PATCH race to RESOURCE_STATE_CHANGED after a tenant-scoped re-read', async () => {
+    affiliation.updateMany.mockResolvedValueOnce({ count: 0 });
+    affiliation.findFirst
+      .mockResolvedValueOnce(affiliationRecord)
+      .mockResolvedValueOnce(affiliationRecord);
+
+    await service
+      .update('company-a', 'affiliation-a', { notes: 'Actualizada' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(ConflictException);
+        expectStableCode(error, 'RESOURCE_STATE_CHANGED');
+      });
+
+    expect(affiliation.findFirst).toHaveBeenNthCalledWith(2, {
+      where: { id: 'affiliation-a', companyId: 'company-a' },
+      select: { id: true },
+    });
+  });
+
+  it('keeps a lost PATCH row indistinguishable from a foreign affiliation', async () => {
+    affiliation.updateMany.mockResolvedValueOnce({ count: 0 });
+    affiliation.findFirst
+      .mockResolvedValueOnce(affiliationRecord)
+      .mockResolvedValueOnce(null);
+
+    await service
+      .update('company-a', 'affiliation-a', { notes: 'Actualizada' })
+      .catch((error: unknown) => {
+        expect(error).toBeInstanceOf(NotFoundException);
+        expectStableCode(error, 'AFFILIATION_NOT_FOUND');
+      });
+  });
+
+  it.each([
+    ['P2003', 'RELATED_RESOURCE_CHANGED'],
+    ['P2002', 'HEALTHCARE_PERSISTENCE_ERROR'],
+  ])('maps PATCH %s to %s without raw details', async (prismaCode, code) => {
+    affiliation.updateMany.mockRejectedValueOnce(knownPrismaError(prismaCode));
+
+    await service
+      .update('company-a', 'affiliation-a', { notes: 'Actualizada' })
+      .catch((error: unknown) => {
+        expectStableCode(error, code);
+        expect(
+          JSON.stringify((error as HttpException).getResponse()),
+        ).not.toContain('raw database detail');
+      });
+  });
+
   it.each([
     ['deactivate', true, false],
     ['reactivate', false, true],
