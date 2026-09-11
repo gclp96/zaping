@@ -15,6 +15,8 @@ import { CustomersController } from '../../customers/customers.controller';
 import { DashboardController } from '../../dashboard/dashboard.controller';
 import { EquipmentController } from '../../equipment/equipment.controller';
 import { InventoryController } from '../../inventory/inventory.controller';
+import { HealthcareDoctorsController } from '../../healthcare/doctors/healthcare-doctors.controller';
+import { HealthcareHospitalsController } from '../../healthcare/hospitals/healthcare-hospitals.controller';
 import { ProductsController } from '../../products/products.controller';
 import { PurchaseReceiptsController } from '../../purchases-receipts/purchases-receipts.controller';
 import { PurchasesController } from '../../purchases/purchases.controller';
@@ -158,6 +160,28 @@ const roleMatrix: RoleMatrix[] = [
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       createInspection: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       retire: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+    },
+  },
+  {
+    controller: HealthcareDoctorsController,
+    methods: {
+      findAll: allRoles,
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      findOne: allRoles,
+      update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      deactivate: [UserRole.ADMIN, UserRole.MANAGER],
+      reactivate: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+  },
+  {
+    controller: HealthcareHospitalsController,
+    methods: {
+      findAll: allRoles,
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      findOne: allRoles,
+      update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      deactivate: [UserRole.ADMIN, UserRole.MANAGER],
+      reactivate: [UserRole.ADMIN, UserRole.MANAGER],
     },
   },
 ];
@@ -348,6 +372,73 @@ describe('ERP Core role matrix', () => {
         buildRoleContext(InventoryController, 'createMovement', UserRole.SALES),
       ),
     ).toBe(false);
+  });
+
+  it.each([
+    [UserRole.ADMIN, true, true, true],
+    [UserRole.MANAGER, true, true, true],
+    [UserRole.SALES, true, true, false],
+    [UserRole.WAREHOUSE, true, false, false],
+  ])(
+    'enforces Healthcare master-data access for %s',
+    (role, canRead, canEdit, canManageLifecycle) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      for (const controller of [
+        HealthcareDoctorsController,
+        HealthcareHospitalsController,
+      ]) {
+        expect(
+          rolesGuard.canActivate(buildRoleContext(controller, 'findAll', role)),
+        ).toBe(canRead);
+        expect(
+          rolesGuard.canActivate(buildRoleContext(controller, 'findOne', role)),
+        ).toBe(canRead);
+        expect(
+          rolesGuard.canActivate(buildRoleContext(controller, 'create', role)),
+        ).toBe(canEdit);
+        expect(
+          rolesGuard.canActivate(buildRoleContext(controller, 'update', role)),
+        ).toBe(canEdit);
+        expect(
+          rolesGuard.canActivate(
+            buildRoleContext(controller, 'deactivate', role),
+          ),
+        ).toBe(canManageLifecycle);
+        expect(
+          rolesGuard.canActivate(
+            buildRoleContext(controller, 'reactivate', role),
+          ),
+        ).toBe(canManageLifecycle);
+      }
+    },
+  );
+
+  it('keeps the authenticated context intact after a denied Healthcare mutation', () => {
+    const rolesGuard = new RolesGuard(new Reflector());
+    const request = {
+      user: {
+        id: 'user-1',
+        companyId: 'company-1',
+        role: UserRole.WAREHOUSE,
+      },
+    };
+    const context = {
+      getHandler: () => getHandler(HealthcareDoctorsController, 'create'),
+      getClass: () => HealthcareDoctorsController,
+      switchToHttp: () => ({
+        getRequest: () => request,
+      }),
+    } as unknown as ExecutionContext;
+
+    expect(rolesGuard.canActivate(context)).toBe(false);
+    expect(request).toEqual({
+      user: {
+        id: 'user-1',
+        companyId: 'company-1',
+        role: UserRole.WAREHOUSE,
+      },
+    });
   });
 });
 
