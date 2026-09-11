@@ -4,7 +4,7 @@
 
 **Producto:** Zaping Healthcare
 
-**Estado:** PROPOSED / NOT IMPLEMENTED
+**Estado:** PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS (C1-C3 MERGED; C4 GATES PASS / PRE-COMMIT)
 
 **Tipo de documento:** Persistence, relational-integrity, API and authorization design
 
@@ -26,7 +26,10 @@ errores, RBAC de roles fijos e integración API con HealthcareCase. Su objetivo
 es permitir que slices posteriores implementen el diseño aprobado sin reabrir
 decisiones básicas de arquitectura o contrato.
 
-Nada descrito aquí está implementado por este documento.
+El documento no implementa por sí mismo el capability. C1-C3 ya materializaron
+la persistencia, los backends de Doctor/Hospital y las affiliations en `main`;
+C4 implementa en su branch la integración API de HealthcareCase descrita en
+Sections 28.10-28.11. Frontend y acceptance permanecen pendientes.
 
 ---
 
@@ -69,8 +72,8 @@ Fuentes de dominio:
 - `docs/modules/healthcare/DOCTORS_HOSPITALS.md` — contrato canónico V1;
 - `docs/modules/healthcare/HEALTHCARE.md` — límites de la vertical;
 - `docs/modules/healthcare/DOMAIN_MODEL.md` — ownership entre dominios;
-- `docs/modules/healthcare/CASES.md` — comportamiento CURRENT de Case y
-  relaciones TARGET.
+- `docs/modules/healthcare/CASES.md` — comportamiento CURRENT de Case,
+  incluyendo sus relaciones backend con Doctor/Hospital, y UX TARGET.
 
 Fuentes arquitectónicas:
 
@@ -94,13 +97,15 @@ actual.
 
 ---
 
-## 4. Current persistence baseline
+## 4. Current implementation baseline
 
-El schema CURRENT usa PostgreSQL mediante Prisma 6.19.3. No contiene modelos
-Doctor, Hospital o affiliation, ni `doctorId`/`hospitalId` en
-`HealthcareCase`.
+El schema CURRENT usa PostgreSQL mediante Prisma 6.19.3. C1 ya incorporó
+`HealthcareDoctor`, `HealthcareHospital`,
+`HealthcareDoctorHospitalAffiliation`, los scalar FK nullable
+`HealthcareCase.doctorId`/`hospitalId` y sus FKs compuestas tenant-safe. C2 y
+C3 ya implementaron los backends de master data y affiliations.
 
-`HealthcareCase` ya contiene:
+Antes de C4, `HealthcareCase` ya contenía:
 
 - UUID técnico;
 - `companyId` obligatorio;
@@ -137,6 +142,11 @@ Patrones observados en el repositorio:
 10. HealthcareCase usa Prisma directamente desde su Service; no existe un
     Repository obligatorio. Esto es coherente con ADR-005 mientras las
     responsabilidades sigan claras.
+
+C4 agrega el uso API de las relaciones ya persistidas: create/PATCH aceptan
+IDs opcionales, todos los reads/mutations existentes devuelven contexto compacto
+y las validaciones same-tenant/active ocurren dentro de la transacción de Case.
+No se consulta ni modifica affiliation.
 
 Hay relaciones CURRENT a User y otras entidades que aún dependen de validación
 tenant del Service y de FKs por ID simple. Ese precedente no debe copiarse para
@@ -926,7 +936,9 @@ estas reglas; ERP Core no recibe campos médicos específicos.
 
 ## 25. Validation strategy
 
-La implementación futura debe verificar como mínimo:
+La implementación por slices debe verificar como mínimo. C1-C4 ya aportan la
+evidencia correspondiente a persistencia, backends y Case integration; C5
+consolida el hardening/regression restante:
 
 ### Schema/migration
 
@@ -974,9 +986,9 @@ La implementación futura debe verificar como mínimo:
 
 ## 26. Final proposed schema shape
 
-> **PROPOSED / NOT IMPLEMENTED.** Este pseudo-Prisma documenta la forma
-> recomendada. `app/api/prisma/schema.prisma` no fue modificado. Los CHECK de
-> strings no vacíos requieren SQL explícito en la migración futura.
+> **IMPLEMENTED BY C1.** Este pseudo-Prisma conserva la forma aprobada como
+> referencia; `schema.prisma` y la migración C1 son la fuente ejecutable. Los
+> CHECK de strings no vacíos se implementaron en SQL explícito.
 
 ```prisma
 model Company {
@@ -1123,10 +1135,9 @@ API/DTO/RBAC aprobado se resume separadamente en la Sección 28.21.
 
 ## 28. API / DTO / Authorization Contract
 
-> **PROPOSED / NOT IMPLEMENTED; APPROVED DESIGN.** Las rutas, DTOs, respuestas,
-> reglas de Service y permisos de esta sección son el contrato obligatorio para
-> un slice posterior. Ningún endpoint descrito aquí existe por efecto de este
-> documento.
+> **APPROVED DESIGN / IMPLEMENTED THROUGH C4.** C2 implementó Doctors/Hospitals,
+> C3 affiliations y C4 la integración API de HealthcareCase. C5 conserva un
+> gate posterior de hardening/regression y C6-C8 cubren Web/acceptance.
 
 ### 28.1 Scope and status
 
@@ -1696,10 +1707,11 @@ Cuando existen relaciones, se usan objetos compactos:
 }
 ```
 
-Create, update, detail y list usan explicit Prisma `select/include` compartido
-para producir esta forma sin N+1. No incluyen contact data, notes,
+Create, list, detail, update y cancel usan explicit Prisma `select/include`
+compartido para producir esta forma sin N+1. No incluyen contact data, notes,
 affiliations, Cases inversos ni searchKey. Mostrar `isActive` permite distinguir
-una referencia histórica.
+una referencia histórica. Cancel conserva sin cambios su DTO, validaciones,
+lifecycle y audit; únicamente devuelve la misma forma Case enriquecida.
 
 ### 28.12 Tenant isolation
 
@@ -1941,7 +1953,7 @@ Permanecen fuera de V1:
 
 | Topic | V1 contract |
 | --- | --- |
-| Contract status | PROPOSED / NOT IMPLEMENTED; APPROVED DESIGN |
+| Contract status | APPROVED DESIGN; backend implemented through C4, C5 hardening pending |
 | Base routes | `/healthcare/doctors`, `/healthcare/hospitals`, `/healthcare/doctor-hospital-affiliations` |
 | IDs | UUID; ParseUUIDPipe/path and IsUUID/body |
 | Lists | page/pageSize, status, search; fixed stable order |
@@ -1971,23 +1983,22 @@ Permanecen fuera de V1:
 
 Este contrato conserva los permisos CURRENT de HealthcareCase, permite que
 SALES capture el contexto médico-operacional sin concederle lifecycle y da a
-WAREHOUSE el contexto necesario sin ampliar sus mutaciones. La implementación
-posterior debe mantener estos límites en Controller, Service, persistencia y
-tests. REST routes, DTO semantics, duplicate review, lifecycle commands,
-affiliation API, HealthcareCase API integration, fixed-role RBAC, tenant-safe
-404 y stable error codes son diseño aprobado, propuesto y todavía no
-implementado. La implementación/presentación frontend y permission-based RBAC
-permanecen diferidos.
+WAREHOUSE el contexto necesario sin ampliar sus mutaciones. C1-C3 ya
+implementaron y fusionaron persistencia, Doctors/Hospitals, duplicate review,
+lifecycle, fixed-role RBAC y affiliation backend. C4 implementa y valida en el
+branch actual la integración backend de HealthcareCase; permanece PRE-COMMIT y
+todavía no está merged. C5 mantiene pendiente el hardening/regression backend;
+C6 implementará frontend master data, C7 selectors/duplicate-review UX y C8 la
+acceptance integrada. Permission-based RBAC permanece diferido.
 
 ---
 
 ## 29. Implementation Plan & Quality Gates
 
-> **APPROVED IMPLEMENTATION PLAN / NOT STARTED.** Esta sección descompone el
-> diseño aprobado en slices implementables. No afirma que schema, migraciones,
-> API, frontend o tests existan. El estado general del documento permanece
-> `PROPOSED / NOT IMPLEMENTED` hasta que un slice se integre y su evidencia se
-> documente.
+> **APPROVED IMPLEMENTATION PLAN / C4 GATES PASS — PRE-COMMIT.** Esta sección descompone el
+> diseño aprobado en slices implementables. C1-C3 están integrados en `main` y
+> C4 implementa la integración API de HealthcareCase en su branch, pendiente
+> de commit/review/merge. C5-C8 permanecen sin implementar.
 
 ### 29.1 Planning rules and gate model
 
@@ -2061,6 +2072,19 @@ HC-NEXT-01C1
 | HC-NEXT-01C6 | Doctor/Hospital master-data frontend | C5 merged and green |
 | HC-NEXT-01C7 | Case selectors and duplicate-review UX | C6 merged and green |
 | HC-NEXT-01C8 | Integrated automated/manual acceptance | C7 merged and green |
+
+Estado de ejecución al 2026-09-11:
+
+| Slice | Current status |
+| --- | --- |
+| HC-NEXT-01C1 | COMPLETED / MERGED |
+| HC-NEXT-01C2 | COMPLETED / MERGED |
+| HC-NEXT-01C3 | COMPLETED / MERGED |
+| HC-NEXT-01C4 | IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged |
+| HC-NEXT-01C5 | NEXT |
+| HC-NEXT-01C6 | NOT STARTED / NOT IMPLEMENTED |
+| HC-NEXT-01C7 | NOT STARTED / NOT IMPLEMENTED |
+| HC-NEXT-01C8 | NOT STARTED / NOT IMPLEMENTED |
 
 No se omiten dependencias por comodidad. Puede prepararse un branch apilado
 mientras el predecessor está en review, pero no se mezcla ni se declara green
@@ -2361,6 +2385,25 @@ aditivos.
 relation nueva acepta master inactive/foreign, desaparece contexto histórico,
 se auto-crea affiliation, cambia Status/Readiness o cualquier regression de
 HealthcareCase falla.
+
+#### Implemented surface and evidence — 2026-09-11
+
+Estado del slice: `IMPLEMENTED / GATES PASS — PRE-COMMIT`.
+
+- create y PATCH aceptan `doctorId?`/`hospitalId?` nullable y conservan la
+  distinción omitted/null/same/replacement;
+- Doctor se valida antes que Hospital mediante lookups `id + companyId` dentro
+  de la transacción existente; un mismo ID histórico no se revalida por active;
+- create/list/detail/update/cancel usan un select compartido bounded y exponen
+  IDs más objetos compactos sin N+1 ni datos de affiliation;
+- missing/foreign, inactive y P2003 usan los errores estables de Section 28;
+- la matriz real de `RolesGuard` cubre HealthcareCasesController sin cambiar
+  permisos;
+- tests focales y PostgreSQL cubren asignación nullable/same-tenant, ausencia de
+  dependencia de affiliation y conservación de masters inactivos;
+- evidencia C4: Cases focal 153/153, RBAC 63/63, regresión de masters/
+  affiliations 199/199, PostgreSQL 18/18 y API completa 75 suites / 1010 tests;
+  Prisma validate/generate, lint, typecheck, build y diff-check PASS.
 
 ### 29.7 HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
 
@@ -2699,7 +2742,7 @@ Status del technical design/capability:
 
 | Milestone | Allowed status |
 | --- | --- |
-| Ahora / plan aprobado | `PROPOSED / NOT IMPLEMENTED` y Section 29 `APPROVED IMPLEMENTATION PLAN / NOT STARTED` |
+| Estado inicial — sólo plan aprobado | `PROPOSED / NOT IMPLEMENTED` y Section 29 `APPROVED IMPLEMENTATION PLAN / NOT STARTED` |
 | C1 merged | `PARTIALLY IMPLEMENTED — PERSISTENCE` |
 | C2-C4 merged | `PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS` con slices exactos enumerados |
 | C5 merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
@@ -2748,7 +2791,7 @@ HC-NEXT-01 puede cerrarse únicamente cuando todos son verdaderos:
 | Merge policy | No slice merges or advances with blocking red gates |
 | PR strategy | Separate sequential PRs; stacked preparation allowed, merge order fixed |
 | Recovery | Revert code by slice; forward migrations after shared application; never delete QA/production data casually |
-| Status now | APPROVED IMPLEMENTATION PLAN / NOT STARTED |
+| Status now | PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS; C1-C3 merged, C4 gates pass/pre-commit |
 
 Las decisiones API/RBAC no se reabren en implementación por defecto. Un
 conflicto real con el repositorio, migration safety o seguridad tenant obliga a

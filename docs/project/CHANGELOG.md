@@ -1,10 +1,41 @@
 # Changelog — Zaping
 
 **Documento:** Historial consolidado del proyecto
-**Versión:** 1.3.0
+**Versión:** 1.4.0
 **Estado:** Activo
-**Última actualización:** 2026-09-09
+**Última actualización:** 2026-09-11
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-11 — HealthcareCase Doctor/Hospital backend integration — HC-NEXT-01C4
+
+**Estado:** IMPLEMENTED / GATES PASS — PRE-COMMIT
+
+HealthcareCase incorpora de forma aditiva `doctorId?` y `hospitalId?` en
+create/PATCH. Omitted preserva la relación, `null` la limpia, el mismo ID se
+conserva aunque el master haya quedado inactivo y un replacement exige master
+activo del tenant autenticado. Doctor se valida antes que Hospital dentro de la
+transacción existente.
+
+Create, list, detail, update y cancel devuelven todos los campos Case previos
+más ambos IDs y objetos compactos Doctor/Hospital. Los reads usan un select
+acotado sin N+1; no exponen notes, contactos, search keys ni affiliations. No se
+requiere, crea ni reactiva affiliation al guardar un Case.
+
+La matriz RBAC de HealthcareCase no cambia: los cuatro roles leen;
+ADMIN/MANAGER/SALES crean y actualizan; sólo ADMIN/MANAGER cancelan. Lookups de
+Case/Doctor/Hospital permanecen tenant-scoped y los races P2003 relevantes se
+traducen a `RELATED_RESOURCE_CHANGED` sin detalles de Prisma.
+
+Alcance excluido: schema/migrations, frontend/selectors, enforcement de
+affiliation, snapshots/history, fuzzy search, permission-based RBAC y cambios de
+lifecycle.
+
+Evidencia C4: Cases focal 153/153, matriz RBAC 63/63, regresión
+Doctors/Hospitals/Affiliations 199/199, PostgreSQL 18/18 y API completa 75
+suites / 1010 tests. Prisma validate/generate, lint, typecheck, build y
+`git diff --check` pasan.
 
 ---
 

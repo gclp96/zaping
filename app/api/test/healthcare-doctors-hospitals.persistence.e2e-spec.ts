@@ -6,6 +6,8 @@ import { Prisma, UserRole } from '@prisma/client';
 import { HttpException } from '@nestjs/common';
 
 import { HealthcareDoctorHospitalAffiliationsService } from '../src/healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.service';
+import { HealthcareCaseFolioService } from '../src/healthcare/cases/healthcare-case-folio.service';
+import { HealthcareCaseService } from '../src/healthcare/cases/healthcare-case.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 type Fixture = {
@@ -307,6 +309,10 @@ if (runDbIntegrityTests) {
     const affiliationsService = new HealthcareDoctorHospitalAffiliationsService(
       prisma,
     );
+    const healthcareCaseService = new HealthcareCaseService(prisma, {
+      allocateNextAvailableFolio: () =>
+        Promise.resolve(`HC-C4-${randomUUID()}`),
+    } as HealthcareCaseFolioService);
     const fixture = buildFixture();
     let databaseConnected = false;
 
@@ -477,6 +483,101 @@ if (runDbIntegrityTests) {
           where: { companyId: fixture.companyAId },
         }),
       ).resolves.toBe(3);
+    });
+
+    it('integra Cases nullable/same-tenant y conserva referencias históricas inactivas', async () => {
+      const nullableCase = await healthcareCaseService.create(
+        fixture.companyAId,
+        fixture.userAId,
+        { title: 'C4 nullable relations' },
+      );
+
+      expect(nullableCase).toMatchObject({
+        doctorId: null,
+        hospitalId: null,
+        doctor: null,
+        hospital: null,
+      });
+
+      const doctorId = randomUUID();
+      const hospitalId = randomUUID();
+
+      await prisma.healthcareDoctor.create({
+        data: {
+          id: doctorId,
+          companyId: fixture.companyAId,
+          firstName: 'Historical',
+          lastName: 'Doctor',
+          specialty: 'Cardiology',
+          searchKey: `historical doctor ${doctorId}`,
+        },
+      });
+      await prisma.healthcareHospital.create({
+        data: {
+          id: hospitalId,
+          companyId: fixture.companyAId,
+          name: 'Historical Hospital',
+          city: 'Hermosillo',
+          state: 'Sonora',
+          searchKey: `historical hospital ${hospitalId}`,
+        },
+      });
+
+      const linkedCase = await healthcareCaseService.create(
+        fixture.companyAId,
+        fixture.userAId,
+        {
+          title: 'C4 linked relations without affiliation',
+          doctorId,
+          hospitalId,
+        },
+      );
+
+      expect(linkedCase).toMatchObject({
+        doctorId,
+        hospitalId,
+        doctor: {
+          id: doctorId,
+          firstName: 'Historical',
+          lastName: 'Doctor',
+          specialty: 'Cardiology',
+          isActive: true,
+        },
+        hospital: {
+          id: hospitalId,
+          name: 'Historical Hospital',
+          city: 'Hermosillo',
+          state: 'Sonora',
+          isActive: true,
+        },
+      });
+      await expect(
+        prisma.healthcareDoctorHospitalAffiliation.count({
+          where: {
+            companyId: fixture.companyAId,
+            doctorId,
+            hospitalId,
+          },
+        }),
+      ).resolves.toBe(0);
+
+      await prisma.healthcareDoctor.update({
+        where: { id: doctorId },
+        data: { isActive: false },
+      });
+      await prisma.healthcareHospital.update({
+        where: { id: hospitalId },
+        data: { isActive: false },
+      });
+
+      await expect(
+        healthcareCaseService.findOne(fixture.companyAId, linkedCase.id),
+      ).resolves.toMatchObject({
+        doctorId,
+        hospitalId,
+        doctor: { id: doctorId, isActive: false },
+        hospital: { id: hospitalId, isActive: false },
+      });
     });
 
     it('rechaza affiliation Doctor A + Hospital B mediante FK compuesta', async () => {

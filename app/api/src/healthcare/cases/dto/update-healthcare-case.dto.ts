@@ -31,4 +31,12 @@ export class UpdateHealthcareCaseDto {
   @IsOptional()
   @IsUUID()
   responsibleUserId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  doctorId?: string | null;
+
+  @IsOptional()
+  @IsUUID()
+  hospitalId?: string | null;
 }

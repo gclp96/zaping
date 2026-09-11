@@ -2,10 +2,10 @@ Healthcare Domain Model — Zaping
 
 Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
-Versión: 1.3.0
+Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: HEALTHCARE CASE FOUNDATION IMPLEMENTED / VALIDATED — BROADER DOMAIN TARGET / FUTURE
-Última actualización: 2026-09-09
+Estado de implementación: DOCTORS/HOSPITALS PERSISTENCE + BACKEND + CASE RELATIONS GATES PASS / PRE-COMMIT — BROADER DOMAIN TARGET / FUTURE
+Última actualización: 2026-09-11
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -462,7 +462,7 @@ User
 
 sin duplicar la identidad principal.
 
-21. Doctor TARGET
+21. Doctor CURRENT backend
 
 Healthcare necesita representar Doctor como master data especializado.
 
@@ -472,14 +472,12 @@ Doctor
 ≠
 Customer
 
-Actualmente:
-
 Doctor persistence/API
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ CURRENT company-scoped master data and fixed-role API
 
 La especificación canónica vive en `DOCTORS_HOSPITALS.md`.
 
-22. Hospital TARGET
+22. Hospital CURRENT backend
 
 Healthcare necesita representar Hospital como contexto operacional del procedimiento.
 
@@ -489,10 +487,8 @@ Hospital
 ≠
 Customer
 
-Actualmente:
-
 Hospital persistence/API
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ CURRENT company-scoped master data and fixed-role API
 
 La especificación canónica vive en `DOCTORS_HOSPITALS.md`.
 
@@ -508,14 +504,9 @@ Doctor
 N ↔ N
 Hospital
 
-Una entidad como:
-
-DoctorHospitalAffiliation
-
-es un candidato técnico razonable.
-
-La relación de dominio N ↔ N está aprobada; el modelo técnico y la tabla Prisma
-permanecen pendientes.
+La relación se implementa mediante
+`HealthcareDoctorHospitalAffiliation`, una fila persistente por pareja y
+Company, con lifecycle explícito.
 
 24. Doctor / Hospital tenant ownership V1
 
@@ -633,6 +624,12 @@ Debe mantenerse:
 Opportunity
 ≠
 HealthcareCase
+
+HealthcareDoctor
+
+HealthcareHospital
+
+HealthcareDoctorHospitalAffiliation
 
 Opportunity representa una posibilidad.
 
@@ -2055,12 +2052,25 @@ double-use prevention
 
 No puede permitirse que la UI marque material como preparado/custodiado mientras Inventory todavía lo considere libre para otra operación.
 
-129. Domain approval does not approve Prisma
+129. Domain approval and subsequent implementation authority
 
-HC-NEXT-01 es un slice de documentación y diseño de dominio. Este documento no
-autoriza:
+Durante HC-NEXT-01A/B, la aprobación de dominio era únicamente documentación y
+diseño: no autorizaba por sí sola nuevos modelos Prisma y la persistencia
+requería un slice técnico posterior.
 
-new Healthcare Prisma models
+CURRENT, el technical design aprobado y C1-C4 ya implementaron:
+
+HealthcareDoctor
+
+HealthcareHospital
+
+HealthcareDoctorHospitalAffiliation
+
+HealthcareCase doctorId? / hospitalId?
+
+tenant-safe composite database integrity para esas relaciones
+
+Ese avance no autoriza todavía:
 
 InventoryLocation implementation
 
@@ -2072,7 +2082,7 @@ CaseDispatch schema
 
 CaseReturn schema
 
-La persistencia requiere un slice técnico posterior.
+frontend Healthcare o selectors
 
 130. Global project sequence
 
@@ -2082,10 +2092,25 @@ ERP Core V1
 → CLOSED / ACCEPTED
 
 M-HC1 — Healthcare Operations Foundation
-→ SELECTED / PLANNED — P1
+→ IN PROGRESS — P1
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
-→ CURRENT / DESIGN
+HC-NEXT-01C1
+→ COMPLETED / MERGED
+
+HC-NEXT-01C2
+→ COMPLETED / MERGED
+
+HC-NEXT-01C3
+→ COMPLETED / MERGED
+
+HC-NEXT-01C4
+→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
+
+HC-NEXT-01C5
+→ NEXT
+
+HC-NEXT-01C6 / C7 / C8
+→ NOT IMPLEMENTED / FUTURE
 
 Los workflows posteriores no pertenecen necesariamente al mismo slice.
 
@@ -2130,23 +2155,13 @@ Case schedule context
 
 responsible User
 
+optional HealthcareCase doctorId / hospitalId relations
+
 tenant-scoped API / RBAC
 
 132. TARGET Healthcare model
 
 Conceptos funcionales objetivo:
-
-Doctor
-
-Hospital
-
-Doctor ↔ Hospital relationship
-
-Doctor / Hospital
-→ TARGET V1 DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
-
-Doctor ↔ Hospital
-→ DOMAIN RELATIONSHIP APPROVED — TECHNICAL MODEL TBD
 
 Case Requirements
 
@@ -2238,7 +2253,7 @@ AI
         ┌───────────────┼────────────────────┐
         │               │                    │
      Doctor          Hospital          Requirements
-     TARGET          TARGET             TARGET
+     CURRENT         CURRENT            TARGET
         │               │                    │
         └─────── relationship ───────────────┘
                         │
@@ -2499,11 +2514,6 @@ en una única tabla.
 Target documented as Current
 
 No presentar como CURRENT:
-
-Doctor
-
-Hospital
-
 Requirements
 
 Assignment
@@ -2683,6 +2693,12 @@ RBAC
 
 Case scheduling foundation
 
+HealthcareDoctor / HealthcareHospital master data
+
+HealthcareDoctorHospitalAffiliation
+
+optional HealthcareCase doctorId / hospitalId relations with compact API context
+
 También existe en ERP Core:
 
 EquipmentAsset
@@ -2694,8 +2710,6 @@ EquipmentInspection
 Permanece sin implementar:
 
 Healthcare frontend
-
-Doctor / Hospital
 
 Case Requirements
 
@@ -2742,11 +2756,11 @@ pero el modelo técnico sigue pendiente de ADR.
 ERP Core V1 está CLOSED / ACCEPTED. M-HC1 — Healthcare Operations Foundation
 es el milestone P1 seleccionado.
 
-El trabajo CURRENT es:
+El trabajo CURRENT es HC-NEXT-01C4, integración backend de Doctor/Hospital en
+HealthcareCase, con gates verdes en branch y pendiente de commit/review. Después de
+merge, la secuencia continúa:
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
-↓
-Hospital / Doctor
+HC-NEXT-01C5 — backend hardening/regression
 ↓
 Requirements
 ↓

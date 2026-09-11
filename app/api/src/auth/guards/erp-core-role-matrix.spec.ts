@@ -15,6 +15,7 @@ import { CustomersController } from '../../customers/customers.controller';
 import { DashboardController } from '../../dashboard/dashboard.controller';
 import { EquipmentController } from '../../equipment/equipment.controller';
 import { InventoryController } from '../../inventory/inventory.controller';
+import { HealthcareCasesController } from '../../healthcare/cases/healthcare-cases.controller';
 import { HealthcareDoctorHospitalAffiliationsController } from '../../healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.controller';
 import { HealthcareDoctorsController } from '../../healthcare/doctors/healthcare-doctors.controller';
 import { HealthcareHospitalsController } from '../../healthcare/hospitals/healthcare-hospitals.controller';
@@ -161,6 +162,16 @@ const roleMatrix: RoleMatrix[] = [
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       createInspection: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       retire: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+    },
+  },
+  {
+    controller: HealthcareCasesController,
+    methods: {
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      findAll: allRoles,
+      update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
+      cancel: [UserRole.ADMIN, UserRole.MANAGER],
+      findOne: allRoles,
     },
   },
   {
@@ -517,6 +528,75 @@ describe('ERP Core role matrix', () => {
           buildRoleContext(HealthcareHospitalsController, 'findDoctors', role),
         ),
       ).toBe(true);
+    },
+  );
+
+  it.each([
+    [UserRole.ADMIN, true, true, true],
+    [UserRole.MANAGER, true, true, true],
+    [UserRole.SALES, true, true, false],
+    [UserRole.WAREHOUSE, true, false, false],
+  ])(
+    'enforces Healthcare Case access for %s',
+    (role, canRead, canEdit, canCancel) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareCasesController, 'findAll', role),
+        ),
+      ).toBe(canRead);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareCasesController, 'findOne', role),
+        ),
+      ).toBe(canRead);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareCasesController, 'create', role),
+        ),
+      ).toBe(canEdit);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareCasesController, 'update', role),
+        ),
+      ).toBe(canEdit);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(HealthcareCasesController, 'cancel', role),
+        ),
+      ).toBe(canCancel);
+    },
+  );
+
+  it.each(['create', 'update'] as const)(
+    'denies WAREHOUSE Healthcare Case %s before business lookup',
+    (methodName) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+      const request = {
+        user: {
+          id: 'user-1',
+          companyId: 'company-1',
+          role: UserRole.WAREHOUSE,
+        },
+      };
+      const businessLookup = jest.fn();
+      const context = {
+        getHandler: () => getHandler(HealthcareCasesController, methodName),
+        getClass: () => HealthcareCasesController,
+        switchToHttp: () => ({ getRequest: () => request }),
+      } as unknown as ExecutionContext;
+
+      if (rolesGuard.canActivate(context)) {
+        businessLookup();
+      }
+
+      expect(businessLookup).not.toHaveBeenCalled();
+      expect(request.user).toEqual({
+        id: 'user-1',
+        companyId: 'company-1',
+        role: UserRole.WAREHOUSE,
+      });
     },
   );
 

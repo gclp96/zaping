@@ -2,10 +2,10 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.2.0
+Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL CASE WORKFLOWS TARGET
-Última actualización: 2026-09-09
+Estado de implementación: CASE FOUNDATION VALIDATED — DOCTOR/HOSPITAL BACKEND INTEGRATION GATES PASS / PRE-COMMIT
+Última actualización: 2026-09-11
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -30,9 +30,8 @@ minimal lifecycle
 
 creation / cancellation audit facts
 
-La evolución TARGET permitirá que el Case coordine además:
-
-Doctor / Hospital
+La integración backend CURRENT permite que el Case coordine Doctor y Hospital
+como referencias opcionales. La evolución TARGET permitirá coordinar además:
 
 Requirements
 
@@ -125,6 +124,8 @@ planning schedule
 
 responsible User
 
+optional Doctor / Hospital references and compact API context
+
 DRAFT / SCHEDULED / CANCELLED
 
 createdBy audit fact
@@ -148,10 +149,6 @@ RBAC
 5. Fuera de CURRENT Foundation
 
 No existen todavía como parte implementada de HealthcareCase:
-
-Doctor relation
-
-Hospital relation
 
 Customer relation
 
@@ -588,7 +585,8 @@ Representa:
 
 operational title / summary
 
-Ejemplos válidos pueden describir la operación sin convertirse en sustituto permanente de relaciones estructuradas futuras.
+Ejemplos válidos pueden describir la operación sin convertirse en sustituto
+permanente de relaciones estructuradas CURRENT o futuras.
 
 28. Title ≠ Doctor / Hospital relation
 
@@ -596,7 +594,7 @@ No debe utilizarse únicamente:
 
 "Cirugía Dr. X Hospital ABC"
 
-como sustituto definitivo de futuras relaciones con Doctor y Hospital.
+como sustituto definitivo de las relaciones CURRENT con Doctor y Hospital.
 
 29. procedureDescription CURRENT
 
@@ -728,8 +726,8 @@ same operational occurrence
 
 No debe crearse un nuevo Case solamente porque cambió la fecha.
 
-Cuando las relaciones TARGET existan, reschedule deberá preservar Doctor y
-Hospital salvo que el usuario los cambie explícitamente.
+Reschedule preserva Doctor y Hospital salvo que el usuario cambie explícitamente
+esas relaciones mediante PATCH.
 
 38. Reschedule history TARGET
 
@@ -845,6 +843,12 @@ Estos campos no deben establecerse mediante generic PATCH.
 Existe:
 
 POST /healthcare/cases/:caseId/cancel
+
+Create y PATCH aceptan `doctorId?`/`hospitalId?` nullable. Las cinco respuestas
+conservan todos los campos Case y añaden ambos IDs más objetos compactos
+`doctor`/`hospital`; ausencia se representa como ID y objeto `null`. Cancel
+preserva las relaciones y devuelve la misma forma enriquecida sin cambiar su
+DTO, validaciones, transición de estado ni audit de cancelación.
 
 48. Cancellation source states CURRENT
 
@@ -1052,14 +1056,12 @@ invoiceTotal
 
 si esos valores pertenecen a documentos ERP.
 
-64. Doctor TARGET
+64. Doctor CURRENT backend relation
 
-HealthcareCase podrá relacionarse con Doctor cuando Doctor master data exista.
-
-Actualmente:
-
-doctorId
-→ optional TARGET V1 conceptual relationship — NOT IMPLEMENTED
+HealthcareCase puede relacionarse opcionalmente con Doctor mediante
+`doctorId`. Create/PATCH validan el master activo con `id + companyId`; list,
+detail, create, update y cancel devuelven contexto compacto. Un master que se
+desactiva después permanece visible como referencia histórica.
 
 65. Doctor ≠ Customer
 
@@ -1069,14 +1071,10 @@ Doctor
 ≠
 Customer
 
-66. Hospital TARGET
+66. Hospital CURRENT backend relation
 
-HealthcareCase podrá relacionarse con Hospital cuando Hospital master data exista.
-
-Actualmente:
-
-hospitalId
-→ optional TARGET V1 conceptual relationship — NOT IMPLEMENTED
+HealthcareCase puede relacionarse opcionalmente con Hospital mediante
+`hospitalId`, con la misma validación tenant-safe/active y response compacta.
 
 67. Hospital ≠ Customer
 
@@ -1091,8 +1089,10 @@ Customer
 Doctor y Hospital son Company-scoped master data en V1. `companyId` se deriva
 de la Company autenticada y toda relación cross-tenant está prohibida.
 
-No existe global Doctor/Hospital directory en V1. La persistencia técnica
-permanece pendiente y se gobierna por `DOCTORS_HOSPITALS.md`.
+No existe global Doctor/Hospital directory en V1. La persistencia, API de
+masters/affiliation y la integración backend de Case se gobiernan por
+`DOCTORS_HOSPITALS.md` y `DOCTORS_HOSPITALS_TECHNICAL_DESIGN.md` y están
+implementadas hasta C4.
 
 Ambas relaciones son opcionales. Un Case puede permanecer SCHEDULED sin Doctor
 y/o Hospital porque Case Status ≠ Case Readiness.
@@ -1539,6 +1539,10 @@ PATCH /healthcare/cases/:caseId
 
 POST /healthcare/cases/:caseId/cancel
 
+Create/PATCH aceptan IDs nullable; todas las respuestas incluyen los IDs y el
+contexto compacto Doctor/Hospital. La validación de replacements ocurre dentro
+de la transacción, Doctor antes que Hospital, y no consulta affiliation.
+
 105. API NOT CURRENT
 
 No existe:
@@ -1567,6 +1571,10 @@ creator validation
 
 responsible User validation when supplied
 
+selected Doctor validation by id + companyId + active, when supplied
+
+selected Hospital validation by id + companyId + active, when supplied
+
 CompanySequence folio allocation
 
 HealthcareCase create
@@ -1579,6 +1587,9 @@ GET /healthcare/cases
 
 GET /healthcare/cases/:caseId
 → id + companyId
+
+Las relaciones Doctor/Hospital se cargan en el mismo query mediante selects
+acotados; no hay N+1 ni exposición de notes, contactos, searchKey o affiliation.
 
 Missing o cross-tenant devuelve:
 
@@ -1642,7 +1653,7 @@ schedule
 
 responsible User
 
-future relationships
+Doctor / Hospital relationships
 
 future logistics invariants
 
@@ -1717,6 +1728,10 @@ folio allocation
 tenant-scoped access
 
 planning updates
+
+Doctor/Hospital assign/change/clear y preserve-on-omission
+
+tenant-safe active-master validation y contexto histórico inactivo
 
 cancellation lifecycle
 
@@ -1887,7 +1902,8 @@ Hospital
 
 responsible User
 
-cuando esas relaciones existan.
+cuando ese Global Search se implemente, reutilizando las relaciones CURRENT ya
+disponibles.
 
 125. Notifications FUTURE
 
@@ -2054,9 +2070,8 @@ formal reschedule history / audit
 
 136. TARGET Healthcare Case capabilities
 
-Después del cierre ERP Core V1, Healthcare evolucionará progresivamente hacia:
-
-Doctor / Hospital
+Después de C4, Doctor/Hospital ya es CURRENT en backend; sus selectors frontend
+permanecen TARGET. Healthcare evolucionará además hacia:
 
 Requirements
 
@@ -2100,7 +2115,8 @@ AI assistance
 
 138. Roadmap Healthcare aprobado
 
-La secuencia de implementación de referencia es:
+La secuencia de implementación de referencia, cuyo tramo backend Hospital /
+Doctor C1-C4 ya está implementado o validado PRE-COMMIT, es:
 
 Hospital / Doctor
 ↓
@@ -2140,18 +2156,34 @@ ERP Core V1
 → CLOSED / ACCEPTED
 
 M-HC1 — Healthcare Operations Foundation
-→ SELECTED / PLANNED — P1
+→ IN PROGRESS — P1
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
-→ CURRENT / DESIGN
+HC-NEXT-01C1
+→ COMPLETED / MERGED
+
+HC-NEXT-01C2
+→ COMPLETED / MERGED
+
+HC-NEXT-01C3
+→ COMPLETED / MERGED
+
+HC-NEXT-01C4
+→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
+
+HC-NEXT-01C5
+→ NEXT
+
+HC-NEXT-01C6 / C7 / C8
+→ NOT IMPLEMENTED / FUTURE
 
 Los workflows posteriores requieren slices propios.
 
-140. Domain design does not approve Prisma
+140. Implementation authority boundary
 
-HC-NEXT-01 es documentación/diseño. Este documento no autoriza:
-
-Doctor / Hospital models
+El diseño de dominio original no autorizó Prisma por sí solo. El technical
+design aprobado y los slices C1-C4 posteriores sí implementaron los modelos,
+APIs y relaciones Case de Doctor/Hospital. Este documento continúa sin
+autorizar por sí solo:
 
 Requirements models
 
@@ -2202,6 +2234,12 @@ scheduledEnd?
 responsibleUserId?
 ✅
 
+doctorId? / hospitalId?
+✅
+
+compact Doctor / Hospital context in create/list/detail/update/cancel
+✅
+
 createdById
 ✅
 
@@ -2230,8 +2268,6 @@ no clinical/patient fields
 ✅
 
 142. Estado consolidado TARGET
-
-Doctor / Hospital relationships
 
 Case Requirements
 
@@ -2391,7 +2427,7 @@ Doctor / Hospital
 → Company-scoped master data in V1
 
 Doctor / Hospital relations
-→ optional TARGET — NOT IMPLEMENTED
+→ optional CURRENT backend integration; frontend selectors remain TARGET
 
 inactive Doctor / Hospital
 → historical Case relationship preserved
@@ -2420,7 +2456,8 @@ No bloquear la operación porque todavía no se sabe quién será facturado.
 
 Doctor/Hospital as free-text permanent truth
 
-No usar doctorName / hospitalName permanentes como sustituto de master data futuro.
+No usar doctorName / hospitalName permanentes como sustituto del master data
+CURRENT de Doctor/Hospital.
 
 One giant Case table
 

@@ -1,9 +1,10 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   NotFoundException,
 } from '@nestjs/common';
-import { HealthcareCase, HealthcareCaseStatus } from '@prisma/client';
+import { HealthcareCase, HealthcareCaseStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -13,6 +14,31 @@ import { HealthcareCaseService } from './healthcare-case.service';
 type UserLookupResult = {
   id: string;
 } | null;
+
+type MasterLookupResult = {
+  isActive: boolean;
+} | null;
+
+type CompactDoctor = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  specialty: string;
+  isActive: boolean;
+};
+
+type CompactHospital = {
+  id: string;
+  name: string;
+  city: string;
+  state: string;
+  isActive: boolean;
+};
+
+type HealthcareCasePersistenceRecord = HealthcareCase & {
+  healthcareDoctor: CompactDoctor | null;
+  healthcareHospital: CompactHospital | null;
+};
 
 type HealthcareCaseCreateData = Omit<
   HealthcareCase,
@@ -36,29 +62,53 @@ type UpdateManyResult = {
 
 describe('HealthcareCaseService', () => {
   let service: HealthcareCaseService;
-  let persistedCase: HealthcareCase;
+  let persistedCase: HealthcareCasePersistenceRecord;
 
   const companyId = '699baaae-2718-4d96-8683-8a2cf12bfe55';
   const otherCompanyId = '64af248f-8081-4407-91f5-8d545749d7f4';
   const createdById = 'created-by-user-id';
   const responsibleUserId = 'responsible-user-id';
   const caseId = 'healthcare-case-id';
+  const doctorId = 'doctor-id';
+  const replacementDoctorId = 'replacement-doctor-id';
+  const hospitalId = 'hospital-id';
+  const replacementHospitalId = 'replacement-hospital-id';
+
+  const compactDoctor: CompactDoctor = {
+    id: doctorId,
+    firstName: 'Ana',
+    lastName: 'Torres',
+    specialty: 'Cardiología',
+    isActive: true,
+  };
+  const compactHospital: CompactHospital = {
+    id: hospitalId,
+    name: 'Hospital Central',
+    city: 'Hermosillo',
+    state: 'Sonora',
+    isActive: true,
+  };
 
   const userFindFirstMock = jest.fn<Promise<UserLookupResult>, [unknown]>();
+  const doctorFindFirstMock = jest.fn<Promise<MasterLookupResult>, [unknown]>();
+  const hospitalFindFirstMock = jest.fn<
+    Promise<MasterLookupResult>,
+    [unknown]
+  >();
   const healthcareCaseCreateMock = jest.fn<
-    Promise<HealthcareCase>,
+    Promise<HealthcareCasePersistenceRecord>,
     [HealthcareCaseCreateArgs]
   >();
   const healthcareCaseFindManyMock = jest.fn<
-    Promise<HealthcareCase[]>,
+    Promise<HealthcareCasePersistenceRecord[]>,
     [unknown]
   >();
   const healthcareCaseFindFirstMock = jest.fn<
-    Promise<HealthcareCase | null>,
+    Promise<HealthcareCasePersistenceRecord | null>,
     [unknown]
   >();
   const txHealthcareCaseFindFirstMock = jest.fn<
-    Promise<HealthcareCase | null>,
+    Promise<HealthcareCasePersistenceRecord | null>,
     [unknown]
   >();
   const healthcareCaseUpdateManyMock = jest.fn<
@@ -75,6 +125,12 @@ describe('HealthcareCaseService', () => {
       create: healthcareCaseCreateMock,
       findFirst: txHealthcareCaseFindFirstMock,
       updateMany: healthcareCaseUpdateManyMock,
+    },
+    healthcareDoctor: {
+      findFirst: doctorFindFirstMock,
+    },
+    healthcareHospital: {
+      findFirst: hospitalFindFirstMock,
     },
   };
 
@@ -93,9 +149,11 @@ describe('HealthcareCaseService', () => {
   const createdAt = new Date('2026-08-24T10:00:00.000Z');
   const updatedAt = new Date('2026-08-24T10:00:00.000Z');
 
-  const baseCase: HealthcareCase = {
+  const baseCase: HealthcareCasePersistenceRecord = {
     id: caseId,
     companyId,
+    doctorId: null,
+    hospitalId: null,
     folio: 'CASE-000001',
     title: 'Cirugía programada',
     procedureDescription: null,
@@ -109,6 +167,8 @@ describe('HealthcareCaseService', () => {
     cancellationReason: null,
     createdAt,
     updatedAt,
+    healthcareDoctor: null,
+    healthcareHospital: null,
   };
 
   beforeEach(() => {
@@ -125,6 +185,8 @@ describe('HealthcareCaseService', () => {
     userFindFirstMock.mockResolvedValue({
       id: createdById,
     });
+    doctorFindFirstMock.mockResolvedValue({ isActive: true });
+    hospitalFindFirstMock.mockResolvedValue({ isActive: true });
 
     healthcareCaseFolioServiceMock.allocateNextAvailableFolio.mockResolvedValue(
       'CASE-000001',
@@ -134,6 +196,18 @@ describe('HealthcareCaseService', () => {
       Promise.resolve({
         ...baseCase,
         ...data,
+        healthcareDoctor: data.doctorId
+          ? {
+              ...compactDoctor,
+              id: data.doctorId,
+            }
+          : null,
+        healthcareHospital: data.hospitalId
+          ? {
+              ...compactHospital,
+              id: data.hospitalId,
+            }
+          : null,
       }),
     );
 
@@ -142,9 +216,32 @@ describe('HealthcareCaseService', () => {
     );
 
     healthcareCaseUpdateManyMock.mockImplementation(({ data }) => {
+      const doctorChanged = Boolean(
+        Object.prototype.hasOwnProperty.call(data, 'doctorId') &&
+        data.doctorId !== persistedCase.doctorId,
+      );
+      const hospitalChanged = Boolean(
+        Object.prototype.hasOwnProperty.call(data, 'hospitalId') &&
+        data.hospitalId !== persistedCase.hospitalId,
+      );
+
       persistedCase = {
         ...persistedCase,
         ...data,
+        ...(doctorChanged
+          ? {
+              healthcareDoctor: data.doctorId
+                ? { ...compactDoctor, id: data.doctorId }
+                : null,
+            }
+          : {}),
+        ...(hospitalChanged
+          ? {
+              healthcareHospital: data.hospitalId
+                ? { ...compactHospital, id: data.hospitalId }
+                : null,
+            }
+          : {}),
       };
 
       return Promise.resolve({
@@ -188,6 +285,32 @@ describe('HealthcareCaseService', () => {
     expected: Partial<HealthcareCaseUpdateData>,
   ) => {
     expect(getLastUpdateData()).toEqual(expect.objectContaining(expected));
+  };
+
+  const toResponse = (record: HealthcareCasePersistenceRecord) => {
+    const { healthcareDoctor, healthcareHospital, ...data } = record;
+
+    return {
+      ...data,
+      doctor: healthcareDoctor,
+      hospital: healthcareHospital,
+    };
+  };
+
+  const captureHttpException = async (
+    operation: Promise<unknown>,
+  ): Promise<HttpException> => {
+    try {
+      await operation;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        return error;
+      }
+
+      throw error;
+    }
+
+    throw new Error('Expected operation to reject with HttpException');
   };
 
   it('should create an unscheduled case as DRAFT', async () => {
@@ -516,32 +639,298 @@ describe('HealthcareCaseService', () => {
     expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
   });
 
+  it('should create without Doctor or Hospital relations', async () => {
+    const result = await service.create(companyId, createdById, {
+      title: 'Cirugía programada',
+    });
+
+    expectLastCreateData({ doctorId: null, hospitalId: null });
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      doctorId: null,
+      hospitalId: null,
+      doctor: null,
+      hospital: null,
+    });
+  });
+
+  it('should create with only a same-tenant active Doctor', async () => {
+    const result = await service.create(companyId, createdById, {
+      title: 'Cirugía programada',
+      doctorId,
+    });
+
+    expect(doctorFindFirstMock).toHaveBeenCalledWith({
+      where: { id: doctorId, companyId },
+      select: { isActive: true },
+    });
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+    expectLastCreateData({ doctorId, hospitalId: null });
+    expect(result.doctor).toEqual(compactDoctor);
+    expect(result.hospital).toBeNull();
+  });
+
+  it('should create with only a same-tenant active Hospital', async () => {
+    const result = await service.create(companyId, createdById, {
+      title: 'Cirugía programada',
+      hospitalId,
+    });
+
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).toHaveBeenCalledWith({
+      where: { id: hospitalId, companyId },
+      select: { isActive: true },
+    });
+    expectLastCreateData({ doctorId: null, hospitalId });
+    expect(result.doctor).toBeNull();
+    expect(result.hospital).toEqual(compactHospital);
+  });
+
+  it('should validate Doctor before Hospital and persist both active relations', async () => {
+    const result = await service.create(companyId, createdById, {
+      title: 'Cirugía programada',
+      doctorId,
+      hospitalId,
+    });
+
+    expect(doctorFindFirstMock).toHaveBeenCalledWith({
+      where: { id: doctorId, companyId },
+      select: { isActive: true },
+    });
+    expect(hospitalFindFirstMock).toHaveBeenCalledWith({
+      where: { id: hospitalId, companyId },
+      select: { isActive: true },
+    });
+    expect(doctorFindFirstMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hospitalFindFirstMock.mock.invocationCallOrder[0] ?? 0,
+    );
+    expectLastCreateData({ doctorId, hospitalId });
+    expect(result).toMatchObject({
+      doctorId,
+      hospitalId,
+      doctor: compactDoctor,
+      hospital: compactHospital,
+    });
+    expect(Object.keys(result).sort()).toEqual(
+      [
+        'id',
+        'companyId',
+        'doctorId',
+        'hospitalId',
+        'folio',
+        'title',
+        'procedureDescription',
+        'status',
+        'scheduledStart',
+        'scheduledEnd',
+        'responsibleUserId',
+        'createdById',
+        'cancelledAt',
+        'cancelledById',
+        'cancellationReason',
+        'createdAt',
+        'updatedAt',
+        'doctor',
+        'hospital',
+      ].sort(),
+    );
+    expect(Object.keys(result.doctor ?? {}).sort()).toEqual(
+      ['id', 'firstName', 'lastName', 'specialty', 'isActive'].sort(),
+    );
+    expect(Object.keys(result.hospital ?? {}).sort()).toEqual(
+      ['id', 'name', 'city', 'state', 'isActive'].sort(),
+    );
+  });
+
+  it.each(['missing', 'foreign'])(
+    'should return tenant-safe DOCTOR_NOT_FOUND for a %s Doctor on create',
+    async () => {
+      doctorFindFirstMock.mockResolvedValueOnce(null);
+
+      const error = await captureHttpException(
+        service.create(companyId, createdById, {
+          title: 'Cirugía programada',
+          doctorId,
+        }),
+      );
+
+      expect(error.getStatus()).toBe(404);
+      expect(error.getResponse()).toMatchObject({ code: 'DOCTOR_NOT_FOUND' });
+      expect(doctorFindFirstMock).toHaveBeenCalledWith({
+        where: { id: doctorId, companyId },
+        select: { isActive: true },
+      });
+      expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('should return DOCTOR_INACTIVE for an inactive Doctor on create', async () => {
+    doctorFindFirstMock.mockResolvedValueOnce({ isActive: false });
+
+    const error = await captureHttpException(
+      service.create(companyId, createdById, {
+        title: 'Cirugía programada',
+        doctorId,
+      }),
+    );
+
+    expect(error.getStatus()).toBe(409);
+    expect(error.getResponse()).toMatchObject({ code: 'DOCTOR_INACTIVE' });
+    expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'foreign'])(
+    'should return tenant-safe HOSPITAL_NOT_FOUND for a %s Hospital on create',
+    async () => {
+      hospitalFindFirstMock.mockResolvedValueOnce(null);
+
+      const error = await captureHttpException(
+        service.create(companyId, createdById, {
+          title: 'Cirugía programada',
+          hospitalId,
+        }),
+      );
+
+      expect(error.getStatus()).toBe(404);
+      expect(error.getResponse()).toMatchObject({
+        code: 'HOSPITAL_NOT_FOUND',
+      });
+      expect(hospitalFindFirstMock).toHaveBeenCalledWith({
+        where: { id: hospitalId, companyId },
+        select: { isActive: true },
+      });
+      expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('should return HOSPITAL_INACTIVE for an inactive Hospital on create', async () => {
+    hospitalFindFirstMock.mockResolvedValueOnce({ isActive: false });
+
+    const error = await captureHttpException(
+      service.create(companyId, createdById, {
+        title: 'Cirugía programada',
+        hospitalId,
+      }),
+    );
+
+    expect(error.getStatus()).toBe(409);
+    expect(error.getResponse()).toMatchObject({ code: 'HOSPITAL_INACTIVE' });
+    expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing Doctor', null],
+    ['inactive Doctor', { isActive: false }],
+  ] as const)(
+    'should let %s win over an invalid Hospital on create',
+    async (_scenario, doctorResult) => {
+      doctorFindFirstMock.mockResolvedValueOnce(doctorResult);
+      hospitalFindFirstMock.mockResolvedValueOnce(null);
+
+      const error = await captureHttpException(
+        service.create(companyId, createdById, {
+          title: 'Cirugía programada',
+          doctorId,
+          hospitalId,
+        }),
+      );
+
+      expect(error.getResponse()).toMatchObject({
+        code: doctorResult ? 'DOCTOR_INACTIVE' : 'DOCTOR_NOT_FOUND',
+      });
+      expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+      expect(healthcareCaseCreateMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('should translate a relationship P2003 race without leaking persistence details', async () => {
+    healthcareCaseCreateMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('sensitive constraint detail', {
+        code: 'P2003',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    const error = await captureHttpException(
+      service.create(companyId, createdById, {
+        title: 'Cirugía programada',
+        doctorId,
+      }),
+    );
+
+    expect(error.getStatus()).toBe(409);
+    expect(error.getResponse()).toEqual({
+      statusCode: 409,
+      error: 'Conflict',
+      code: 'RELATED_RESOURCE_CHANGED',
+      message: 'Un recurso relacionado cambió. Recarga e intenta nuevamente',
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain('constraint');
+  });
+
   it('should list cases scoped by companyId with deterministic ordering', async () => {
     healthcareCaseFindManyMock.mockResolvedValueOnce([baseCase]);
 
-    await expect(service.findAll(companyId)).resolves.toEqual([baseCase]);
+    await expect(service.findAll(companyId)).resolves.toEqual([
+      toResponse(baseCase),
+    ]);
 
-    expect(healthcareCaseFindManyMock).toHaveBeenCalledWith({
-      where: {
-        companyId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+    const listArgs = healthcareCaseFindManyMock.mock.lastCall?.[0] as {
+      where: unknown;
+      select: Record<string, unknown>;
+      orderBy: unknown;
+    };
+
+    expect(listArgs.where).toEqual({
+      companyId,
     });
+    expect(listArgs.select).toEqual(
+      expect.objectContaining({
+        doctorId: true,
+        hospitalId: true,
+        healthcareDoctor: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            specialty: true,
+            isActive: true,
+          },
+        },
+        healthcareHospital: {
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            state: true,
+            isActive: true,
+          },
+        },
+      }),
+    );
+    expect(listArgs.orderBy).toEqual({
+      createdAt: 'desc',
+    });
+    expect(healthcareCaseFindManyMock).toHaveBeenCalledTimes(1);
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
   });
 
   it('should find one case using id and companyId', async () => {
     healthcareCaseFindFirstMock.mockResolvedValueOnce(baseCase);
 
-    await expect(service.findOne(companyId, caseId)).resolves.toEqual(baseCase);
+    await expect(service.findOne(companyId, caseId)).resolves.toEqual(
+      toResponse(baseCase),
+    );
 
-    expect(healthcareCaseFindFirstMock).toHaveBeenCalledWith({
-      where: {
-        id: caseId,
-        companyId,
-      },
-    });
+    const detailArgs = healthcareCaseFindFirstMock.mock.lastCall?.[0] as {
+      where: unknown;
+      select: unknown;
+    };
+
+    expect(detailArgs.where).toEqual({ id: caseId, companyId });
+    expect(detailArgs.select).toBeDefined();
   });
 
   it('should throw NotFound when a case does not exist', async () => {
@@ -559,12 +948,16 @@ describe('HealthcareCaseService', () => {
       service.findOne(otherCompanyId, caseId),
     ).rejects.toBeInstanceOf(NotFoundException);
 
-    expect(healthcareCaseFindFirstMock).toHaveBeenCalledWith({
-      where: {
-        id: caseId,
-        companyId: otherCompanyId,
-      },
+    const detailArgs = healthcareCaseFindFirstMock.mock.lastCall?.[0] as {
+      where: unknown;
+      select: unknown;
+    };
+
+    expect(detailArgs.where).toEqual({
+      id: caseId,
+      companyId: otherCompanyId,
     });
+    expect(detailArgs.select).toBeDefined();
   });
 
   it('should keep a DRAFT case as DRAFT on title-only update', async () => {
@@ -844,6 +1237,286 @@ describe('HealthcareCaseService', () => {
     expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
   });
 
+  it('should preserve Doctor and Hospital when relationship fields are omitted', async () => {
+    persistedCase = {
+      ...baseCase,
+      doctorId,
+      hospitalId,
+      healthcareDoctor: compactDoctor,
+      healthcareHospital: compactHospital,
+    };
+
+    const result = await service.update(companyId, caseId, {
+      title: 'Caso actualizado',
+    });
+
+    expectLastUpdateData({ doctorId, hospitalId });
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      doctorId,
+      hospitalId,
+      doctor: compactDoctor,
+      hospital: compactHospital,
+    });
+  });
+
+  it('should return enriched historical relations even after both masters become inactive', async () => {
+    const historicalCase: HealthcareCasePersistenceRecord = {
+      ...baseCase,
+      doctorId,
+      hospitalId,
+      healthcareDoctor: { ...compactDoctor, isActive: false },
+      healthcareHospital: { ...compactHospital, isActive: false },
+    };
+    healthcareCaseFindManyMock.mockResolvedValueOnce([historicalCase]);
+    healthcareCaseFindFirstMock.mockResolvedValueOnce(historicalCase);
+
+    await expect(service.findAll(companyId)).resolves.toEqual([
+      {
+        ...toResponse(historicalCase),
+        doctor: { ...compactDoctor, isActive: false },
+        hospital: { ...compactHospital, isActive: false },
+      },
+    ]);
+    await expect(service.findOne(companyId, caseId)).resolves.toEqual({
+      ...toResponse(historicalCase),
+      doctor: { ...compactDoctor, isActive: false },
+      hospital: { ...compactHospital, isActive: false },
+    });
+  });
+
+  it('should clear Doctor and Hospital only when explicit nulls are supplied', async () => {
+    persistedCase = {
+      ...baseCase,
+      doctorId,
+      hospitalId,
+      healthcareDoctor: compactDoctor,
+      healthcareHospital: compactHospital,
+    };
+
+    const result = await service.update(companyId, caseId, {
+      doctorId: null,
+      hospitalId: null,
+    });
+
+    expectLastUpdateData({ doctorId: null, hospitalId: null });
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      doctorId: null,
+      hospitalId: null,
+      doctor: null,
+      hospital: null,
+    });
+  });
+
+  it('should validate and replace a different Doctor', async () => {
+    persistedCase = {
+      ...baseCase,
+      doctorId,
+      healthcareDoctor: compactDoctor,
+    };
+
+    const result = await service.update(companyId, caseId, {
+      doctorId: replacementDoctorId,
+    });
+
+    expect(doctorFindFirstMock).toHaveBeenCalledWith({
+      where: { id: replacementDoctorId, companyId },
+      select: { isActive: true },
+    });
+    expectLastUpdateData({ doctorId: replacementDoctorId });
+    expect(result.doctor).toEqual({
+      ...compactDoctor,
+      id: replacementDoctorId,
+    });
+  });
+
+  it('should validate and replace a different Hospital', async () => {
+    persistedCase = {
+      ...baseCase,
+      hospitalId,
+      healthcareHospital: compactHospital,
+    };
+
+    const result = await service.update(companyId, caseId, {
+      hospitalId: replacementHospitalId,
+    });
+
+    expect(hospitalFindFirstMock).toHaveBeenCalledWith({
+      where: { id: replacementHospitalId, companyId },
+      select: { isActive: true },
+    });
+    expectLastUpdateData({ hospitalId: replacementHospitalId });
+    expect(result.hospital).toEqual({
+      ...compactHospital,
+      id: replacementHospitalId,
+    });
+  });
+
+  it('should validate Doctor before Hospital when replacing both', async () => {
+    await service.update(companyId, caseId, {
+      doctorId: replacementDoctorId,
+      hospitalId: replacementHospitalId,
+    });
+
+    expect(doctorFindFirstMock.mock.invocationCallOrder[0]).toBeLessThan(
+      hospitalFindFirstMock.mock.invocationCallOrder[0] ?? 0,
+    );
+    expectLastUpdateData({
+      doctorId: replacementDoctorId,
+      hospitalId: replacementHospitalId,
+    });
+  });
+
+  it.each([
+    ['Doctor', 'doctorId', doctorId, 'healthcareDoctor'],
+    ['Hospital', 'hospitalId', hospitalId, 'healthcareHospital'],
+  ] as const)(
+    'should keep the same inactive %s without active revalidation',
+    async (_label, idField, currentId, relationField) => {
+      persistedCase = {
+        ...baseCase,
+        [idField]: currentId,
+        [relationField]: {
+          ...(relationField === 'healthcareDoctor'
+            ? compactDoctor
+            : compactHospital),
+          isActive: false,
+        },
+      };
+
+      const result = await service.update(companyId, caseId, {
+        [idField]: currentId,
+      });
+
+      expect(doctorFindFirstMock).not.toHaveBeenCalled();
+      expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+      expect(getLastUpdateData()).toMatchObject({ [idField]: currentId });
+      expect(
+        idField === 'doctorId' ? result.doctor : result.hospital,
+      ).toMatchObject({ id: currentId, isActive: false });
+    },
+  );
+
+  it.each([
+    [
+      'Doctor',
+      'doctorId',
+      replacementDoctorId,
+      doctorFindFirstMock,
+      'DOCTOR_NOT_FOUND',
+    ],
+    [
+      'Hospital',
+      'hospitalId',
+      replacementHospitalId,
+      hospitalFindFirstMock,
+      'HOSPITAL_NOT_FOUND',
+    ],
+  ] as const)(
+    'should return tenant-safe not-found for a missing or foreign replacement %s',
+    async (_label, field, replacementId, lookup, code) => {
+      lookup.mockResolvedValueOnce(null);
+
+      const error = await captureHttpException(
+        service.update(companyId, caseId, { [field]: replacementId }),
+      );
+
+      expect(error.getStatus()).toBe(404);
+      expect(error.getResponse()).toMatchObject({ code });
+      expect(lookup).toHaveBeenCalledWith({
+        where: { id: replacementId, companyId },
+        select: { isActive: true },
+      });
+      expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [
+      'Doctor',
+      'doctorId',
+      replacementDoctorId,
+      doctorFindFirstMock,
+      'DOCTOR_INACTIVE',
+    ],
+    [
+      'Hospital',
+      'hospitalId',
+      replacementHospitalId,
+      hospitalFindFirstMock,
+      'HOSPITAL_INACTIVE',
+    ],
+  ] as const)(
+    'should reject an inactive replacement %s',
+    async (_label, field, replacementId, lookup, code) => {
+      lookup.mockResolvedValueOnce({ isActive: false });
+
+      const error = await captureHttpException(
+        service.update(companyId, caseId, { [field]: replacementId }),
+      );
+
+      expect(error.getStatus()).toBe(409);
+      expect(error.getResponse()).toMatchObject({ code });
+      expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it('should return the Doctor error first when both replacements are invalid', async () => {
+    doctorFindFirstMock.mockResolvedValueOnce(null);
+    hospitalFindFirstMock.mockResolvedValueOnce(null);
+
+    const error = await captureHttpException(
+      service.update(companyId, caseId, {
+        doctorId: replacementDoctorId,
+        hospitalId: replacementHospitalId,
+      }),
+    );
+
+    expect(error.getResponse()).toMatchObject({ code: 'DOCTOR_NOT_FOUND' });
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+    expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it('should preserve Doctor and Hospital while rescheduling', async () => {
+    persistedCase = {
+      ...baseCase,
+      doctorId,
+      hospitalId,
+      healthcareDoctor: compactDoctor,
+      healthcareHospital: compactHospital,
+    };
+    const scheduledStart = new Date('2026-09-01T10:00:00.000Z');
+
+    await service.update(companyId, caseId, { scheduledStart });
+
+    expectLastUpdateData({ doctorId, hospitalId, scheduledStart });
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
+  });
+
+  it('should translate update P2003 without exposing persistence details', async () => {
+    healthcareCaseUpdateManyMock.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('sensitive foreign key detail', {
+        code: 'P2003',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    const error = await captureHttpException(
+      service.update(companyId, caseId, {
+        doctorId: replacementDoctorId,
+      }),
+    );
+
+    expect(error.getResponse()).toMatchObject({
+      code: 'RELATED_RESOURCE_CHANGED',
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain('foreign key');
+  });
+
   it('should ignore status supplied through application input on update', async () => {
     await service.update(companyId, caseId, {
       status: HealthcareCaseStatus.CANCELLED,
@@ -878,9 +1551,13 @@ describe('HealthcareCaseService', () => {
     await expect(
       service.update(companyId, caseId, {
         title: 'Caso actualizado',
+        doctorId: replacementDoctorId,
+        hospitalId: replacementHospitalId,
       }),
     ).rejects.toBeInstanceOf(ConflictException);
 
+    expect(doctorFindFirstMock).not.toHaveBeenCalled();
+    expect(hospitalFindFirstMock).not.toHaveBeenCalled();
     expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
   });
 
@@ -1010,6 +1687,32 @@ describe('HealthcareCaseService', () => {
     expect(getLastUpdateData()).not.toHaveProperty('scheduledEnd');
     expect(getLastUpdateData()).not.toHaveProperty('title');
     expect(getLastUpdateData()).not.toHaveProperty('procedureDescription');
+  });
+
+  it('should preserve and enrich Doctor and Hospital in the cancel response', async () => {
+    persistedCase = {
+      ...baseCase,
+      doctorId,
+      hospitalId,
+      healthcareDoctor: { ...compactDoctor, isActive: false },
+      healthcareHospital: { ...compactHospital, isActive: false },
+    };
+
+    const result = await service.cancel(
+      companyId,
+      caseId,
+      createdById,
+      'Cancelación operacional',
+    );
+
+    expect(result).toMatchObject({
+      doctorId,
+      hospitalId,
+      doctor: { ...compactDoctor, isActive: false },
+      hospital: { ...compactHospital, isActive: false },
+    });
+    expect(getLastUpdateData()).not.toHaveProperty('doctorId');
+    expect(getLastUpdateData()).not.toHaveProperty('hospitalId');
   });
 
   it('should reject cancelling an already cancelled case', async () => {

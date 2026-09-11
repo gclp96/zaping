@@ -1,10 +1,11 @@
 import { NotFoundException } from '@nestjs/common';
 import { PATH_METADATA } from '@nestjs/common/constants';
 import { Test, TestingModule } from '@nestjs/testing';
-import { HealthcareCase, HealthcareCaseStatus, UserRole } from '@prisma/client';
+import { HealthcareCaseStatus, UserRole } from '@prisma/client';
 
 import {
   CreateHealthcareCaseInput,
+  HealthcareCaseResponse,
   HealthcareCaseService,
 } from './healthcare-case.service';
 import { HealthcareCasesController } from './healthcare-cases.controller';
@@ -18,16 +19,19 @@ describe('HealthcareCasesController', () => {
 
   const healthcareCaseServiceMock = {
     create: jest.fn<
-      Promise<HealthcareCase>,
+      Promise<HealthcareCaseResponse>,
       [string, string, CreateHealthcareCaseInput]
     >(),
-    update: jest.fn<Promise<HealthcareCase>, [string, string, unknown]>(),
+    update: jest.fn<
+      Promise<HealthcareCaseResponse>,
+      [string, string, unknown]
+    >(),
     cancel: jest.fn<
-      Promise<HealthcareCase>,
+      Promise<HealthcareCaseResponse>,
       [string, string, string, string]
     >(),
-    findAll: jest.fn<Promise<HealthcareCase[]>, [string]>(),
-    findOne: jest.fn<Promise<HealthcareCase>, [string, string]>(),
+    findAll: jest.fn<Promise<HealthcareCaseResponse[]>, [string]>(),
+    findOne: jest.fn<Promise<HealthcareCaseResponse>, [string, string]>(),
   };
 
   const request = {
@@ -41,9 +45,11 @@ describe('HealthcareCasesController', () => {
     },
   };
 
-  const healthcareCase: HealthcareCase = {
+  const healthcareCase: HealthcareCaseResponse = {
     id: caseId,
     companyId,
+    doctorId: null,
+    hospitalId: null,
     folio: 'CASE-000001',
     title: 'Cirugía programada',
     procedureDescription: null,
@@ -57,6 +63,8 @@ describe('HealthcareCasesController', () => {
     cancellationReason: null,
     createdAt: new Date('2026-08-24T10:00:00.000Z'),
     updatedAt: new Date('2026-08-24T10:00:00.000Z'),
+    doctor: null,
+    hospital: null,
   };
 
   beforeEach(async () => {
@@ -137,9 +145,14 @@ describe('HealthcareCasesController', () => {
       scheduledStart: '2026-09-01T10:00:00.000Z',
       scheduledEnd: '2026-09-01T11:00:00.000Z',
       responsibleUserId: '953a950f-b33a-4ff5-85ac-4ff35b8f3017',
+      doctorId: 'c29155e1-cd97-4dda-b938-b6a73c0f86f6',
+      hospitalId: 'e227970f-8327-40fb-aa73-a802c9fc8096',
       companyId: 'client-company-id',
       createdById: 'client-user-id',
       status: HealthcareCaseStatus.CANCELLED,
+      doctor: { id: 'nested-doctor' },
+      hospital: { id: 'nested-hospital' },
+      affiliationId: 'client-affiliation-id',
     } as never);
 
     expect(healthcareCaseServiceMock.create).toHaveBeenCalledWith(
@@ -151,6 +164,8 @@ describe('HealthcareCasesController', () => {
         scheduledStart: new Date('2026-09-01T10:00:00.000Z'),
         scheduledEnd: new Date('2026-09-01T11:00:00.000Z'),
         responsibleUserId: '953a950f-b33a-4ff5-85ac-4ff35b8f3017',
+        doctorId: 'c29155e1-cd97-4dda-b938-b6a73c0f86f6',
+        hospitalId: 'e227970f-8327-40fb-aa73-a802c9fc8096',
       },
     );
   });
@@ -277,6 +292,8 @@ describe('HealthcareCasesController', () => {
       scheduledStart: '2026-09-01T10:00:00.000Z',
       scheduledEnd: null,
       responsibleUserId: null,
+      doctorId: null,
+      hospitalId: null,
     });
 
     expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
@@ -288,6 +305,8 @@ describe('HealthcareCasesController', () => {
         scheduledStart: new Date('2026-09-01T10:00:00.000Z'),
         scheduledEnd: null,
         responsibleUserId: null,
+        doctorId: null,
+        hospitalId: null,
       },
     );
   });
@@ -305,6 +324,54 @@ describe('HealthcareCasesController', () => {
       {
         title: 'Caso actualizado',
       },
+    );
+  });
+
+  it('should preserve explicit null separately from omitted relationship fields', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    await controller.update(request, caseId, {
+      doctorId: null,
+    });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      {
+        doctorId: null,
+      },
+    );
+    expect(
+      healthcareCaseServiceMock.update.mock.calls[0][2],
+    ).not.toHaveProperty('hospitalId');
+  });
+
+  it('should treat undefined relationship fields as omitted', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+
+    await controller.update(request, caseId, {
+      doctorId: undefined,
+      hospitalId: undefined,
+    });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      {},
+    );
+  });
+
+  it('should map Doctor and Hospital UUID replacements unchanged', async () => {
+    healthcareCaseServiceMock.update.mockResolvedValue(healthcareCase);
+    const doctorId = 'c29155e1-cd97-4dda-b938-b6a73c0f86f6';
+    const hospitalId = 'e227970f-8327-40fb-aa73-a802c9fc8096';
+
+    await controller.update(request, caseId, { doctorId, hospitalId });
+
+    expect(healthcareCaseServiceMock.update).toHaveBeenCalledWith(
+      companyId,
+      caseId,
+      { doctorId, hospitalId },
     );
   });
 
@@ -381,6 +448,9 @@ describe('HealthcareCasesController', () => {
       companyId: 'client-company-id',
       createdById: 'client-user-id',
       status: HealthcareCaseStatus.CANCELLED,
+      doctor: { id: 'nested-doctor' },
+      hospital: { id: 'nested-hospital' },
+      affiliationId: 'client-affiliation-id',
     } as never);
 
     const createInput = healthcareCaseServiceMock.create.mock.calls[0][2];
@@ -388,6 +458,9 @@ describe('HealthcareCasesController', () => {
     expect(createInput).not.toHaveProperty('companyId');
     expect(createInput).not.toHaveProperty('createdById');
     expect(createInput).not.toHaveProperty('status');
+    expect(createInput).not.toHaveProperty('doctor');
+    expect(createInput).not.toHaveProperty('hospital');
+    expect(createInput).not.toHaveProperty('affiliationId');
   });
 
   it('should allow ADMIN, MANAGER, and SALES to create cases', () => {

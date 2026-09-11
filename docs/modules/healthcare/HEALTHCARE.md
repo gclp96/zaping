@@ -2,10 +2,10 @@ Zaping Healthcare
 
 Producto: Zaping Healthcare
 Plataforma: Zaping
-Versión: 1.3.0
+Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: HEALTHCARE CASE FOUNDATION IMPLEMENTED / VALIDATED — OPERATIONAL LOGISTICS TARGET
-Última actualización: 2026-09-09
+Estado de implementación: DOCTORS/HOSPITALS BACKEND + CASE INTEGRATION GATES PASS / PRE-COMMIT — OPERATIONAL LOGISTICS TARGET
+Última actualización: 2026-09-11
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -59,6 +59,9 @@ Actualmente:
 HealthcareCase Foundation
 ✅
 
+Doctor / Hospital master data, affiliation and Case backend integration
+✅ C1-C4 BACKEND
+
 EquipmentAsset ERP Core
 ✅
 
@@ -70,9 +73,6 @@ TARGET
 Capacidades Healthcare aprobadas como dirección funcional, pero todavía no implementadas.
 
 Incluyen:
-
-Doctor / Hospital
-→ TARGET V1 DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
 
 Case Requirements
 
@@ -165,6 +165,10 @@ Case update
 
 Case cancellation
 
+optional Doctor / Hospital assignment in Case API
+
+compact Doctor / Hospital context in every Case response
+
 No existe todavía una vertical Healthcare operacional completa.
 
 5. API CURRENT
@@ -180,6 +184,11 @@ GET   /healthcare/cases/:caseId
 PATCH /healthcare/cases/:caseId
 
 POST  /healthcare/cases/:caseId/cancel
+
+Create/PATCH aceptan `doctorId?`/`hospitalId?` nullable. Create, list, detail,
+update y cancel devuelven los IDs y objetos compactos actuales. Las asignaciones
+nuevas validan Doctor antes que Hospital, por `id + companyId` y active, dentro
+de la transacción de Case; no requieren affiliation.
 
 Los endpoints utilizan:
 
@@ -373,9 +382,9 @@ schedule
 
 responsible User
 
-future Doctor
+Doctor — CURRENT backend relation
 
-future Hospital
+Hospital — CURRENT backend relation
 
 future operational requirements
 
@@ -484,7 +493,7 @@ Technician / responsible User
 
 aunque algunas relaciones puedan coincidir en una operación concreta.
 
-20. Doctor TARGET
+20. Doctor CURRENT backend
 
 Doctor representa al profesional relacionado con el procedimiento o la oportunidad operacional.
 
@@ -498,10 +507,8 @@ relacionarse con múltiples Hospitals;
 
 relacionarse con múltiples Cases.
 
-Actualmente:
-
 Doctor model
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ CURRENT backend master data with tenant-scoped API
 
 La especificación canónica vive en:
 
@@ -527,7 +534,7 @@ Doctor.hospitalId
 
 sin diseñar primero la cardinalidad correcta.
 
-23. Hospital TARGET
+23. Hospital CURRENT backend
 
 Hospital representa el lugar u organización donde puede realizarse un procedimiento.
 
@@ -543,10 +550,8 @@ contacts
 
 schedule constraints
 
-Actualmente:
-
 Hospital model
-→ TARGET V1 — DOMAIN DESIGN APPROVED — NOT IMPLEMENTED
+→ CURRENT backend master data with tenant-scoped API
 
 La especificación canónica vive en:
 
@@ -585,8 +590,9 @@ No existe global Doctor/Hospital directory en V1. Dos Companies pueden mantener
 registros independientes de la misma entidad real y toda relación cross-tenant
 está prohibida.
 
-La persistencia técnica permanece pendiente y no está aprobada por este
-documento.
+La persistencia y las APIs tenant-safe de Doctor/Hospital/affiliation están
+implementadas. HealthcareCase acepta referencias opcionales y devuelve contexto
+compacto; frontend y selectors permanecen TARGET.
 
 26. Technician / responsible User
 
@@ -2023,13 +2029,33 @@ ERP Core V1
 → CLOSED / ACCEPTED
 
 M-HC1 — Healthcare Operations Foundation
-→ SELECTED / PLANNED — P1
+→ IN PROGRESS — P1
 
-HC-NEXT-01 — Hospital / Doctor Domain Design
-→ CURRENT / DESIGN
+HC-NEXT-01
+→ IMPLEMENTATION IN PROGRESS
 
-La aprobación de dominio no autoriza modelos Prisma, API o frontend. Cada
-capacidad posterior requiere su propio slice y gate técnico.
+HC-NEXT-01C1
+→ COMPLETED / MERGED
+
+HC-NEXT-01C2
+→ COMPLETED / MERGED
+
+HC-NEXT-01C3
+→ COMPLETED / MERGED
+
+HC-NEXT-01C4
+→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
+
+HC-NEXT-01C5
+→ NEXT
+
+HC-NEXT-01C6 / C7 / C8
+→ NOT IMPLEMENTED / FUTURE
+
+La aprobación de dominio original no autorizó por sí sola modelos Prisma, API
+o frontend. El technical design y C1-C4 autorizaron e implementaron el backend
+por slices; frontend/selectors y cada capacidad posterior conservan su propio
+slice y gate técnico.
 
 121. CURRENT
 
@@ -2060,6 +2086,15 @@ RBAC
 Case cancellation
 ✅
 
+Doctor / Hospital company-scoped master data and fixed-role API
+✅
+
+Doctor ↔ Hospital affiliation backend
+✅
+
+HealthcareCase optional doctorId / hospitalId and compact responses
+✅ C4 BACKEND
+
 EquipmentAsset ERP Core
 ✅
 
@@ -2075,15 +2110,13 @@ Doctor / Hospital tenancy V1 decision
 ✅ DOMAIN APPROVED
 
 Doctor / Hospital persistence / API
-→ TARGET implementation deliberately deferred; not CURRENT technical debt
+✅ CURRENT backend through C4; frontend workflow remains TARGET
 
 No deben confundirse con workflows TARGET todavía inexistentes.
 
 123. TARGET
 
 Capacidades Healthcare objetivo:
-
-Doctor / Hospital
 
 Case Requirements
 
