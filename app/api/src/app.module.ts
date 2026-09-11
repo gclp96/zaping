@@ -16,6 +16,7 @@ import { UsersModule } from './users/users.module';
 import { PurchaseReceiptsModule } from './purchases-receipts/purchases-receipts.module';
 import { EquipmentModule } from './equipment/equipment.module';
 import { HealthcareCasesModule } from './healthcare/cases/healthcare-cases.module';
+import { HealthcareDoctorHospitalAffiliationsModule } from './healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.module';
 import { HealthcareDoctorsModule } from './healthcare/doctors/healthcare-doctors.module';
 import { HealthcareHospitalsModule } from './healthcare/hospitals/healthcare-hospitals.module';
 import { HealthModule } from './health/health.module';
@@ -45,6 +46,7 @@ import { validateEnvironment } from './config/env.validation';
     UsersModule,
     EquipmentModule,
     HealthcareCasesModule,
+    HealthcareDoctorHospitalAffiliationsModule,
     HealthcareDoctorsModule,
     HealthcareHospitalsModule,
   ],
