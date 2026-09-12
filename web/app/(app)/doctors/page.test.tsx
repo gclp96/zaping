@@ -322,14 +322,24 @@ describe('DoctorsPage', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('envía create sin campos protegidos y no trata duplicate review como éxito', async () => {
+  it('muestra candidatos y cancelar duplicate review no realiza confirmación', async () => {
     const user = userEvent.setup();
     await renderDoctors();
     vi.mocked(api.post).mockResolvedValueOnce({
       data: {
         outcome: 'DUPLICATE_REVIEW_REQUIRED',
         resourceType: 'DOCTOR',
-        candidates: [{ id: 'candidate-1' }],
+        candidates: [
+          {
+            id: 'candidate-1',
+            firstName: 'Julia',
+            lastName: 'Mora',
+            specialty: 'Pediatría',
+            phone: null,
+            email: 'julia@test.test',
+            isActive: true,
+          },
+        ],
       },
     } as never);
 
@@ -352,7 +362,16 @@ describe('DoctorsPage', () => {
         notes: null,
       }),
     );
-    expect(await screen.findByText(/No se guardaron cambios/)).toBeTruthy();
+    const duplicateDialog = await screen.findByRole('dialog', {
+      name: 'Revisar posible duplicado',
+    });
+    expect(within(duplicateDialog).getByText('Julia Mora')).toBeTruthy();
+    expect(within(duplicateDialog).getByText(/Aún no se ha creado/)).toBeTruthy();
+    expect(api.post).toHaveBeenCalledTimes(1);
+    await user.click(
+      within(duplicateDialog).getByRole('button', { name: 'Cancelar' }),
+    );
+    expect(api.post).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('heading', { name: 'Nuevo médico' }),
     ).toBeTruthy();
@@ -366,6 +385,60 @@ describe('DoctorsPage', () => {
     expect(payload).not.toHaveProperty('isActive');
     expect(payload).not.toHaveProperty('searchKey');
     expect(payload).not.toHaveProperty('confirmPossibleDuplicate');
+  });
+
+  it('confirma duplicate review sólo después de una acción explícita', async () => {
+    const user = userEvent.setup();
+    await renderDoctors();
+    vi.mocked(api.post).mockResolvedValueOnce({
+      data: {
+        outcome: 'DUPLICATE_REVIEW_REQUIRED',
+        resourceType: 'DOCTOR',
+        candidates: [
+          {
+            id: 'candidate-1',
+            firstName: 'Julia',
+            lastName: 'Mora',
+            specialty: 'Pediatría',
+            phone: null,
+            email: null,
+            isActive: true,
+          },
+        ],
+      },
+    } as never);
+
+    await user.click(screen.getByRole('button', { name: 'Nuevo médico' }));
+    await user.type(screen.getByRole('textbox', { name: 'Nombre' }), 'Julia');
+    await user.type(screen.getByRole('textbox', { name: 'Apellido' }), 'Mora');
+    await user.type(
+      screen.getByRole('textbox', { name: 'Especialidad' }),
+      'Pediatría',
+    );
+    await user.click(screen.getByRole('button', { name: 'Registrar médico' }));
+
+    const duplicateDialog = await screen.findByRole('dialog', {
+      name: 'Revisar posible duplicado',
+    });
+    expect(api.post).toHaveBeenCalledTimes(1);
+    await user.click(
+      within(duplicateDialog).getByRole('button', {
+        name: 'Crear de todos modos',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenLastCalledWith('/healthcare/doctors', {
+        firstName: 'Julia',
+        lastName: 'Mora',
+        specialty: 'Pediatría',
+        phone: null,
+        email: null,
+        notes: null,
+        confirmPossibleDuplicate: true,
+      }),
+    );
+    expect(api.post).toHaveBeenCalledTimes(2);
   });
 
   it('edita sólo valores intencionalmente cambiados y permite limpiar nullable', async () => {
