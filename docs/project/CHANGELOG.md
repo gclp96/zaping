@@ -10,12 +10,12 @@
 
 # 2026-09-13 — Doctors/Hospitals integrated acceptance — HC-NEXT-01C8
 
-**Estado:** AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+**Estado:** CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS
 
-HC-NEXT-01C1 a C7 están CLOSED / MERGED. C8 validó de forma integrada la
-persistencia, API, tenant isolation, fixed-role RBAC, affiliations, relaciones
-Doctor/Hospital de HealthcareCase y los workflows Web de masters, selectors,
-quick-create y duplicate review explícito.
+HC-NEXT-01C1 a C7 están CLOSED / MERGED. PR #14 integró C8, que validó de forma
+integrada la persistencia, API, tenant isolation, fixed-role RBAC, affiliations,
+relaciones Doctor/Hospital de HealthcareCase y los workflows Web de masters,
+selectors, quick-create y duplicate review explícito.
 
 Evidencia automatizada:
 
@@ -51,8 +51,7 @@ Docker QA `zaping_qa`. La migration se aplicó con `prisma migrate deploy`; fue
 drift del ambiente, no un defecto de producto, y QA continuó satisfactoriamente.
 
 No se agregaron capacidades de producto ni cambios Prisma/migration. C8 está
-listo para commit/pre-merge. HC-NEXT-01 tiene acceptance PASS, pero permanece
-pendiente del commit, PR y merge de C8; aún no está CLOSED / MERGED.
+CLOSED / MERGED / ACCEPTED y HC-NEXT-01 está CLOSED / ACCEPTED.
 
 ---
 

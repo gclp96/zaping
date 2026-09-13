@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS C1-C7 CLOSED / MERGED — C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE — BROADER DOMAIN TARGET / FUTURE
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED — BROADER DOMAIN TARGET / FUTURE
 Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
@@ -2100,10 +2100,10 @@ HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
 → CLOSED / MERGED
 
 HC-NEXT-01C8
-→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+→ CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS
 
 HC-NEXT-01
-→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
+→ CLOSED / ACCEPTED
 
 Los workflows posteriores no pertenecen necesariamente al mismo slice.
 
@@ -2749,10 +2749,9 @@ pero el modelo técnico sigue pendiente de ADR.
 ERP Core V1 está CLOSED / ACCEPTED. M-HC1 — Healthcare Operations Foundation
 es el milestone P1 seleccionado.
 
-El trabajo CURRENT es HC-NEXT-01C8, acceptance integrada de Doctor/Hospital y
-HealthcareCase, con C1-C7 CLOSED / MERGED. Sus gates automatizados y la
-aceptación manual de cuatro roles están PASS en branch; quedan pendientes el
-commit, PR y merge de C8. Después:
+HC-NEXT-01 está CLOSED / ACCEPTED: C1-C7 están CLOSED / MERGED y C8 está CLOSED /
+MERGED / ACCEPTED, con gates automatizados y aceptación manual de cuatro roles
+en PASS. El siguiente elemento de la secuencia Healthcare documentada es:
 
 Requirements
 ↓

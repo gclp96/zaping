@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS C1-C7 CLOSED / MERGED — C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE — OPERATIONAL LOGISTICS TARGET
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED — OPERATIONAL LOGISTICS TARGET
 Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
@@ -2032,13 +2032,13 @@ M-HC1 — Healthcare Operations Foundation
 → IN PROGRESS — P1
 
 HC-NEXT-01
-→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE — NOT CLOSED / MERGED
+→ CLOSED / ACCEPTED
 
 HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
 → CLOSED / MERGED
 
 HC-NEXT-01C8
-→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+→ CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS
 
 La aprobación de dominio original no autorizó por sí sola modelos Prisma, API
 o frontend. El technical design y C1-C7 autorizaron e implementaron por slices
@@ -2101,7 +2101,7 @@ Doctor / Hospital tenancy V1 decision
 ✅ DOMAIN APPROVED
 
 Doctor / Hospital persistence / API
-✅ CURRENT through C7; C8 automated + manual acceptance PASS, pre-merge
+✅ CURRENT through C7; C8 CLOSED / MERGED / ACCEPTED with automated + manual PASS
 
 No deben confundirse con workflows TARGET todavía inexistentes.
 

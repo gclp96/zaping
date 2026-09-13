@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** IMPLEMENTED / ACCEPTANCE PASS — C1-C7 CLOSED / MERGED; C8 READY TO COMMIT / PRE-MERGE
+**Estado de implementación:** IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED
 **Última actualización:** 2026-09-13
 **Responsable:** Zaping Healthcare Team
 
@@ -79,7 +79,7 @@ Frontend master data, Case selectors and duplicate-review UX
 → CLOSED / MERGED
 
 Integrated acceptance
-→ C8 AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+→ C8 CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL PASS
 ```
 
 ---
@@ -2446,7 +2446,7 @@ EquipmentAsset / Equipment V1
 → IMPLEMENTED / VALIDATED in ERP Core
 
 HC-NEXT-01
-→ ACCEPTANCE PASS / PENDING C8 COMMIT / PR / MERGE
+→ CLOSED / ACCEPTED
 ```
 
 Backend CURRENT:
@@ -2473,7 +2473,7 @@ Frontend master-data workflows, Case selectors and duplicate-review UX
 # 189. TARGET V1 workflow
 
 C1-C7 ya soportan la base técnica y la experiencia frontend de este flujo. C8
-completó la acceptance automatizada y manual y está listo para commit/pre-merge:
+completó la acceptance automatizada y manual y está CLOSED / MERGED / ACCEPTED:
 
 ```text
 Create Doctor
@@ -3110,9 +3110,8 @@ immutable snapshots for confirmed operational/legal documents
 
 C1-C7 resolvieron e implementaron las decisiones V1 de persistencia, API,
 RBAC fijo y frontend descritas arriba. Los snapshots inmutables y cualquier
-capacidad avanzada conservan su alcance FUTURE; HC-NEXT-01 permanece abierto
-hasta completar el commit, PR y merge de C8. El PASS de acceptance no lo marca
-todavía CLOSED / MERGED.
+capacidad avanzada conservan su alcance FUTURE. C8 está CLOSED / MERGED /
+ACCEPTED y HC-NEXT-01 está CLOSED / ACCEPTED.
 
 Los datos conceptuales mínimos, Company-scoped ownership, cardinalidad N ↔ N,
 lifecycle y Case integration ya están aprobados como dominio V1.

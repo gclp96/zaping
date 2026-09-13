@@ -4,7 +4,7 @@ Módulo: Healthcare Cases
 Producto: Zaping Healthcare
 Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED — C1-C7 CLOSED / MERGED; C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C8 CLOSED / MERGED / ACCEPTED
 Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
@@ -2117,7 +2117,7 @@ AI assistance
 
 La secuencia de implementación de referencia, cuyo tramo Hospital/Doctor C1-C7
 ya está CLOSED / MERGED y cuya acceptance automatizada y manual C8 está PASS y
-lista para commit/pre-merge, es:
+CLOSED / MERGED / ACCEPTED, es:
 
 Hospital / Doctor
 ↓
@@ -2163,10 +2163,10 @@ HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
 → CLOSED / MERGED
 
 HC-NEXT-01C8
-→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+→ CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS
 
 HC-NEXT-01
-→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
+→ CLOSED / ACCEPTED
 
 Los workflows posteriores requieren slices propios.
 
