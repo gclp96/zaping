@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS PERSISTENCE + BACKEND + CASE RELATIONS GATES PASS / PRE-COMMIT — BROADER DOMAIN TARGET / FUTURE
-Última actualización: 2026-09-11
+Estado de implementación: DOCTORS/HOSPITALS C1-C7 CLOSED / MERGED — C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE — BROADER DOMAIN TARGET / FUTURE
+Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -2058,7 +2058,7 @@ Durante HC-NEXT-01A/B, la aprobación de dominio era únicamente documentación 
 diseño: no autorizaba por sí sola nuevos modelos Prisma y la persistencia
 requería un slice técnico posterior.
 
-CURRENT, el technical design aprobado y C1-C4 ya implementaron:
+CURRENT, el technical design aprobado y C1-C7 ya implementaron:
 
 HealthcareDoctor
 
@@ -2069,6 +2069,8 @@ HealthcareDoctorHospitalAffiliation
 HealthcareCase doctorId? / hospitalId?
 
 tenant-safe composite database integrity para esas relaciones
+
+Doctors/Hospitals master-data Web y HealthcareCase selectors/quick-create
 
 Ese avance no autoriza todavía:
 
@@ -2082,7 +2084,7 @@ CaseDispatch schema
 
 CaseReturn schema
 
-frontend Healthcare o selectors
+frontend Healthcare avanzado fuera de Doctors/Hospitals y Case selectors
 
 130. Global project sequence
 
@@ -2094,23 +2096,14 @@ ERP Core V1
 M-HC1 — Healthcare Operations Foundation
 → IN PROGRESS — P1
 
-HC-NEXT-01C1
-→ COMPLETED / MERGED
+HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
+→ CLOSED / MERGED
 
-HC-NEXT-01C2
-→ COMPLETED / MERGED
+HC-NEXT-01C8
+→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
 
-HC-NEXT-01C3
-→ COMPLETED / MERGED
-
-HC-NEXT-01C4
-→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
-
-HC-NEXT-01C5
-→ NEXT
-
-HC-NEXT-01C6 / C7 / C8
-→ NOT IMPLEMENTED / FUTURE
+HC-NEXT-01
+→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
 
 Los workflows posteriores no pertenecen necesariamente al mismo slice.
 
@@ -2709,7 +2702,7 @@ EquipmentInspection
 
 Permanece sin implementar:
 
-Healthcare frontend
+Healthcare frontend beyond Doctors/Hospitals and Case selectors
 
 Case Requirements
 
@@ -2756,12 +2749,11 @@ pero el modelo técnico sigue pendiente de ADR.
 ERP Core V1 está CLOSED / ACCEPTED. M-HC1 — Healthcare Operations Foundation
 es el milestone P1 seleccionado.
 
-El trabajo CURRENT es HC-NEXT-01C4, integración backend de Doctor/Hospital en
-HealthcareCase, con gates verdes en branch y pendiente de commit/review. Después de
-merge, la secuencia continúa:
+El trabajo CURRENT es HC-NEXT-01C8, acceptance integrada de Doctor/Hospital y
+HealthcareCase, con C1-C7 CLOSED / MERGED. Sus gates automatizados y la
+aceptación manual de cuatro roles están PASS en branch; quedan pendientes el
+commit, PR y merge de C8. Después:
 
-HC-NEXT-01C5 — backend hardening/regression
-↓
 Requirements
 ↓
 Equipment Assignment

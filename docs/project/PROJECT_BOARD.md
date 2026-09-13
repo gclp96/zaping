@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — C4 backend integration
-Última actualización: 2026-09-11
+Fase actual: M-HC1 Healthcare Operations Foundation — C8 acceptance PASS / pre-merge
+Última actualización: 2026-09-13
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -36,7 +36,7 @@ POST-ACCEPTANCE BASELINE
 
 Canonical branch: `main`
 
-Canonical baseline: `a4434a6`
+Canonical baseline: `1ee9801`
 
 PR #3: MERGED
 
@@ -49,6 +49,8 @@ DEV-NEXT-03B — ERP Core V1 Local Acceptance: COMPLETED / PASS
 Manual role matrix: ADMIN / MANAGER / SALES / WAREHOUSE — PASS
 
 QA-001 through QA-008: CLOSED / PASS
+
+HC-NEXT-01C1 through C7: CLOSED / MERGED
 
 OPS-RC-B5B: CLOSED
 
@@ -102,8 +104,8 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
-└── HC-NEXT-01C4 — HealthcareCase Doctor/Hospital Integration
-    └── IMPLEMENTED / GATES PASS — PRE-COMMIT
+└── HC-NEXT-01C8 — Integrated Acceptance & Regression Gate
+    └── AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
 
 Frontend UX workstream
 
@@ -117,8 +119,8 @@ Frontend UX workstream
 
 NEXT
 
-HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
-        → READY AFTER C4 MERGE
+HC-NEXT-01C8 commit, PR and merge
+        → REQUIRED BEFORE HC-NEXT-01 CLOSURE
 
 DEFERRED
 
@@ -1674,14 +1676,20 @@ Un retry después de una respuesta exitosa perdida puede crear otro Case y consu
 
 18. Healthcare — slice activo y orden TARGET
 
-HC-NEXT-01C1 a C3 están integrados en `main`: persistencia, masters
-Doctor/Hospital y affiliations backend. HC-NEXT-01C4 implementa actualmente la
-integración HealthcareCase en branch, pendiente de commit/review/merge.
+HC-NEXT-01C1 a C7 están CLOSED / MERGED en `main`: persistencia, masters,
+affiliations, integración HealthcareCase, hardening backend, frontend de masters
+y selectors/duplicate-review UX. HC-NEXT-01C8 completó la acceptance automatizada
+y manual en branch.
 
-Estado: `IMPLEMENTED / GATES PASS — PRE-COMMIT`
+Estado: `AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE`
 
-El siguiente slice es HC-NEXT-01C5, API/RBAC regression y backend hardening,
-únicamente después de merge verde de C4.
+ADMIN, MANAGER, SALES y WAREHOUSE están PASS. El commit, PR y merge de C8 son
+obligatorios antes de cerrar HC-NEXT-01.
+
+Durante QA, el 500 inicial de Healthcare Case correspondió a la migration
+pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base Docker QA
+`zaping_qa`. `prisma migrate deploy` corrigió ese drift de ambiente; no fue un
+defecto de producto y QA continuó satisfactoriamente.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2154,13 +2162,13 @@ CURRENT
 
 ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
-→ HC-NEXT-01C1-C3 MERGED
+→ HC-NEXT-01C1-C7 CLOSED / MERGED
 
-→ HC-NEXT-01C4 HealthcareCase Doctor/Hospital Integration — GATES PASS / PRE-COMMIT
+→ HC-NEXT-01C8 Integrated Acceptance — AUTOMATED + MANUAL PASS / PRE-MERGE
 
-NEXT ACTIONABLE SLICE AFTER MERGE
+NEXT ACTIONABLE GATE
 
-→ HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
+→ C8 commit, PR and merge
 
 DEFERRED
 
@@ -2341,11 +2349,14 @@ DEV-NEXT-03B
 M-HC1 — Healthcare Operations Foundation
 → ACTIVE — P1
 
-HC-NEXT-01C4 — HealthcareCase Doctor/Hospital Integration
-→ IMPLEMENTED / GATES PASS — PRE-COMMIT
+HC-NEXT-01C1-C7 — Doctors/Hospitals capability slices
+→ CLOSED / MERGED
 
-HC-NEXT-01C5 — API/RBAC Regression & Backend Hardening
-→ NEXT AFTER C4 MERGE
+HC-NEXT-01C8 — Integrated Acceptance & Regression Gate
+→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+
+HC-NEXT-01
+→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

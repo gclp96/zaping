@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS BACKEND + CASE INTEGRATION GATES PASS / PRE-COMMIT — OPERATIONAL LOGISTICS TARGET
-Última actualización: 2026-09-11
+Estado de implementación: DOCTORS/HOSPITALS C1-C7 CLOSED / MERGED — C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE — OPERATIONAL LOGISTICS TARGET
+Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -59,8 +59,8 @@ Actualmente:
 HealthcareCase Foundation
 ✅
 
-Doctor / Hospital master data, affiliation and Case backend integration
-✅ C1-C4 BACKEND
+Doctor / Hospital master data, affiliation, Case integration and Web workflow
+✅ C1-C7
 
 EquipmentAsset ERP Core
 ✅
@@ -2032,30 +2032,18 @@ M-HC1 — Healthcare Operations Foundation
 → IN PROGRESS — P1
 
 HC-NEXT-01
-→ IMPLEMENTATION IN PROGRESS
+→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE — NOT CLOSED / MERGED
 
-HC-NEXT-01C1
-→ COMPLETED / MERGED
+HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
+→ CLOSED / MERGED
 
-HC-NEXT-01C2
-→ COMPLETED / MERGED
-
-HC-NEXT-01C3
-→ COMPLETED / MERGED
-
-HC-NEXT-01C4
-→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
-
-HC-NEXT-01C5
-→ NEXT
-
-HC-NEXT-01C6 / C7 / C8
-→ NOT IMPLEMENTED / FUTURE
+HC-NEXT-01C8
+→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
 
 La aprobación de dominio original no autorizó por sí sola modelos Prisma, API
-o frontend. El technical design y C1-C4 autorizaron e implementaron el backend
-por slices; frontend/selectors y cada capacidad posterior conservan su propio
-slice y gate técnico.
+o frontend. El technical design y C1-C7 autorizaron e implementaron por slices
+el backend y los workflows Web de Doctors/Hospitals/Case. Cada capacidad
+posterior conserva su propio slice y gate técnico.
 
 121. CURRENT
 
@@ -2095,6 +2083,9 @@ Doctor ↔ Hospital affiliation backend
 HealthcareCase optional doctorId / hospitalId and compact responses
 ✅ C4 BACKEND
 
+Doctors/Hospitals master-data Web and HealthcareCase selectors/quick-create
+✅ C6-C7 WEB
+
 EquipmentAsset ERP Core
 ✅
 
@@ -2110,7 +2101,7 @@ Doctor / Hospital tenancy V1 decision
 ✅ DOMAIN APPROVED
 
 Doctor / Hospital persistence / API
-✅ CURRENT backend through C4; frontend workflow remains TARGET
+✅ CURRENT through C7; C8 automated + manual acceptance PASS, pre-merge
 
 No deben confundirse con workflows TARGET todavía inexistentes.
 

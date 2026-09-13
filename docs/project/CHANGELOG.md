@@ -3,8 +3,56 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.4.0
 **Estado:** Activo
-**Última actualización:** 2026-09-11
+**Última actualización:** 2026-09-13
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-13 — Doctors/Hospitals integrated acceptance — HC-NEXT-01C8
+
+**Estado:** AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+
+HC-NEXT-01C1 a C7 están CLOSED / MERGED. C8 validó de forma integrada la
+persistencia, API, tenant isolation, fixed-role RBAC, affiliations, relaciones
+Doctor/Hospital de HealthcareCase y los workflows Web de masters, selectors,
+quick-create y duplicate review explícito.
+
+Evidencia automatizada:
+
+```text
+Prisma validate/generate: PASS
+PostgreSQL disposable migration chain: 26/26 PASS
+PostgreSQL integrity E2E: 18/18 PASS
+API: 75 suites / 1053 tests PASS
+API lint/typecheck/build: PASS
+Web: 61 files / 735 tests PASS — one worker
+Web lint/typecheck/production build: PASS
+Web production routes: 25 / 25
+```
+
+Evidencia manual final:
+
+```text
+ADMIN     PASS
+MANAGER   PASS
+SALES     PASS
+WAREHOUSE PASS
+```
+
+Se validaron navegación; masters de Doctors/Hospitals; restricciones lifecycle
+por role; Doctor/Hospital en Case con create/preserve/clear/replace;
+quick-create; duplicate review cancel/confirm; relaciones históricas inactivas;
+selecciones nuevas sólo activas; affiliation no bloqueante; sesión preservada
+ante 403; y responsive smoke.
+
+Incidente de ambiente: el 500 inicial de Healthcare Case se debió a que
+`20260910194524_add_healthcare_doctors_hospitals` estaba pendiente en la base
+Docker QA `zaping_qa`. La migration se aplicó con `prisma migrate deploy`; fue
+drift del ambiente, no un defecto de producto, y QA continuó satisfactoriamente.
+
+No se agregaron capacidades de producto ni cambios Prisma/migration. C8 está
+listo para commit/pre-merge. HC-NEXT-01 tiene acceptance PASS, pero permanece
+pendiente del commit, PR y merge de C8; aún no está CLOSED / MERGED.
 
 ---
 
