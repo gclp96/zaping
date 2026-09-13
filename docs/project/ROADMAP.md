@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-09
+Última actualización: 2026-09-13
 Responsable: Zaping Team
 
 1. Propósito
@@ -83,11 +83,11 @@ La posición actual es:
 
 ERP Core V1 — CLOSED / ACCEPTED on canonical baseline `a4434a6`
 ↓
-CURRENT — post-acceptance documentation synchronization
+M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
-M-HC1 — Healthcare Operations Foundation — SELECTED / PLANNED — P1
+HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED on current main baseline `fbf29b6`
 ↓
-HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
+NEXT — Requirements — TARGET
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -99,11 +99,15 @@ representa aceptación local del ERP Core V1, no staging ni producción.
 Healthcare Case Foundation y EquipmentAsset / Equipment V1 ya están
 IMPLEMENTED / VALIDATED.
 
-Permanecen como TARGET Healthcare:
+HC-NEXT-01C1-C8 están completos; C8 está CLOSED / MERGED / ACCEPTED. La
+acceptance automatizada y la QA manual de ADMIN, MANAGER, SALES y WAREHOUSE
+están PASS. PR #14 está merged.
 
-Hospital / Doctor
+El siguiente item documentado de M-HC1 es:
 
-Requirements
+Requirements — NEXT / TARGET
+
+También permanecen como TARGET Healthcare:
 
 Equipment Assignment
 
@@ -683,7 +687,7 @@ No significa que el ERP esté terminado para siempre.
 Significa que la base V1 es suficientemente estable para dejar de abrir nuevas funcionalidades Core de manera indiscriminada.
 
 9. Etapa 2 — M-HC1 — Healthcare Operations Foundation
-Prioridad: P1 estratégica — SELECTED / PLANNED
+Prioridad: P1 estratégica — ACTIVE
 
 Objetivo:
 
@@ -732,7 +736,7 @@ EquipmentAsset
 EquipmentInspection
 
 Equipment V1
-Permanecen fuera de Foundation:
+En este baseline original permanecían fuera de Foundation:
 
 Hospital
 
@@ -837,16 +841,22 @@ patient record
 
 PHI repository
 9.5 Hospital / Doctor
-Hospital y Doctor serán master data Healthcare TARGET.
+Hospital y Doctor son master data Healthcare CURRENT.
 
 HC-NEXT-01 — Hospital / Doctor Domain Design
 
-Estado: READY / DESIGN
+Estado: CLOSED / ACCEPTED
 
-Objetivo: definir el boundary de master data Healthcare para Hospital y Doctor
-antes de elegir o implementar la persistencia.
+C1-C8 están completos. C8 está CLOSED / MERGED / ACCEPTED, con acceptance
+automatizada PASS y QA manual PASS para ADMIN, MANAGER, SALES y WAREHOUSE. PR
+#14 está merged en el baseline canónico `fbf29b6`.
 
-Debe mantenerse:
+Contexto histórico de diseño:
+
+El objetivo original fue definir el boundary de master data Healthcare para
+Hospital y Doctor antes de elegir o implementar la persistencia.
+
+Debía mantenerse:
 
 Doctor
 ≠
@@ -854,7 +864,7 @@ Customer
 Hospital
 ≠
 Customer
-La estrategia exacta de tenant ownership debe decidirse antes de implementación:
+La estrategia exacta de tenant ownership debía decidirse antes de implementación:
 
 Company-owned master data
 vs:
@@ -862,10 +872,10 @@ vs:
 shared identity
 +
 tenant-specific relation
-No debe asumirse todavía una estrategia definitiva en Prisma.
+En esa fase no debía asumirse todavía una estrategia definitiva en Prisma.
 
-HC-NEXT-01 es primero Documentation / Domain Design. No marca Hospital, Doctor
-ni los workflows posteriores como implementados.
+HC-NEXT-01 comenzó como Documentation / Domain Design. Esa fase inicial no
+marcaba Hospital, Doctor ni los workflows posteriores como implementados.
 
 9.6 Requirements
 Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
@@ -2622,14 +2632,14 @@ backup / restore provider validation before pilot / production
 Formal release-candidate acceptance remains a later decision.
 Commercial Returns Backend no es P0.
 
-P1 estratégica seleccionada
+P1 estratégica activa
 M-HC1 — Healthcare Operations Foundation
 
-HC-NEXT-01 — Hospital / Doctor Domain Design — READY / DESIGN
+HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED
 
-Hospital / Doctor
+Hospital / Doctor — CLOSED / ACCEPTED
 
-Requirements
+Requirements — NEXT / TARGET
 
 Equipment Assignment
 
@@ -2756,11 +2766,11 @@ La prioridad inmediata es:
 
 ERP Core V1 CLOSED / ACCEPTED en `main` (`a4434a6`)
 ↓
-sincronización documental post-acceptance
+M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
-M-HC1 — Healthcare Operations Foundation — SELECTED / PLANNED — P1
+HC-NEXT-01 Hospital / Doctor — CLOSED / ACCEPTED en el baseline canónico `fbf29b6`
 ↓
-HC-NEXT-01 Hospital / Doctor Domain Design — READY / DESIGN
+Requirements — NEXT / TARGET
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

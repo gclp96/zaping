@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — C8 acceptance PASS / pre-merge
+Fase actual: M-HC1 Healthcare Operations Foundation — Requirements next roadmap item / TARGET
 Última actualización: 2026-09-13
 Responsable: Zaping Team
 
@@ -36,7 +36,7 @@ POST-ACCEPTANCE BASELINE
 
 Canonical branch: `main`
 
-Canonical baseline: `1ee9801`
+Canonical baseline: `fbf29b6`
 
 PR #3: MERGED
 
@@ -51,6 +51,12 @@ Manual role matrix: ADMIN / MANAGER / SALES / WAREHOUSE — PASS
 QA-001 through QA-008: CLOSED / PASS
 
 HC-NEXT-01C1 through C7: CLOSED / MERGED
+
+HC-NEXT-01C8: CLOSED / MERGED / ACCEPTED
+
+HC-NEXT-01: CLOSED / ACCEPTED
+
+PR #14 / HC-NEXT-01C8: MERGED
 
 OPS-RC-B5B: CLOSED
 
@@ -104,8 +110,7 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
-└── HC-NEXT-01C8 — Integrated Acceptance & Regression Gate
-    └── AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+└── No active Healthcare implementation slice assigned
 
 Frontend UX workstream
 
@@ -119,8 +124,8 @@ Frontend UX workstream
 
 NEXT
 
-HC-NEXT-01C8 commit, PR and merge
-        → REQUIRED BEFORE HC-NEXT-01 CLOSURE
+Requirements
+        → NEXT ITEM IN THE DOCUMENTED M-HC1 SEQUENCE / TARGET
 
 DEFERRED
 
@@ -1549,7 +1554,7 @@ Estos items no implican ejecución inmediata, versión ni fecha de entrega.
 
 Milestone: M-HC1 — Healthcare Operations Foundation
 
-Estado: 🎯 SELECTED / PLANNED
+Estado: ACTIVE — P1
 
 Prioridad: P1 estratégica
 
@@ -1674,17 +1679,16 @@ Healthcare Case creation idempotency
 
 Un retry después de una respuesta exitosa perdida puede crear otro Case y consumir otro folio.
 
-18. Healthcare — slice activo y orden TARGET
+18. Healthcare — capability cerrado y orden TARGET
 
 HC-NEXT-01C1 a C7 están CLOSED / MERGED en `main`: persistencia, masters,
 affiliations, integración HealthcareCase, hardening backend, frontend de masters
 y selectors/duplicate-review UX. HC-NEXT-01C8 completó la acceptance automatizada
-y manual en branch.
+y manual y está CLOSED / MERGED / ACCEPTED.
 
-Estado: `AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE`
+Estado HC-NEXT-01: `CLOSED / ACCEPTED`
 
-ADMIN, MANAGER, SALES y WAREHOUSE están PASS. El commit, PR y merge de C8 son
-obligatorios antes de cerrar HC-NEXT-01.
+ADMIN, MANAGER, SALES y WAREHOUSE están PASS.
 
 Durante QA, el 500 inicial de Healthcare Case correspondió a la migration
 pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base Docker QA
@@ -2164,11 +2168,13 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 → HC-NEXT-01C1-C7 CLOSED / MERGED
 
-→ HC-NEXT-01C8 Integrated Acceptance — AUTOMATED + MANUAL PASS / PRE-MERGE
+→ HC-NEXT-01C8 CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL PASS
 
-NEXT ACTIONABLE GATE
+→ HC-NEXT-01 CLOSED / ACCEPTED
 
-→ C8 commit, PR and merge
+NEXT ROADMAP ITEM
+
+→ Requirements — TARGET
 
 DEFERRED
 
@@ -2353,10 +2359,13 @@ HC-NEXT-01C1-C7 — Doctors/Hospitals capability slices
 → CLOSED / MERGED
 
 HC-NEXT-01C8 — Integrated Acceptance & Regression Gate
-→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
+→ CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS
 
 HC-NEXT-01
-→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
+→ CLOSED / ACCEPTED
+
+Requirements
+→ NEXT ITEM IN THE DOCUMENTED M-HC1 SEQUENCE / TARGET
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

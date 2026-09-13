@@ -4,7 +4,7 @@
 
 **Producto:** Zaping Healthcare
 
-**Estado:** IMPLEMENTED / ACCEPTANCE PASS — C1-C7 CLOSED / MERGED; C8 READY TO COMMIT / PRE-MERGE
+**Estado:** IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED
 
 **Tipo de documento:** Persistence, relational-integrity, API and authorization design
 
@@ -30,8 +30,8 @@ El documento no implementa por sí mismo el capability. C1-C7 ya materializaron
 en `main` la persistencia, los backends de Doctor/Hospital y affiliations, la
 integración API de HealthcareCase descrita en Sections 28.10-28.11 y los
 workflows Web de masters/selectors/duplicate review. C8 completó la acceptance
-automatizada y manual en el branch actual y está listo para commit/pre-merge;
-HC-NEXT-01 sigue pendiente del commit, PR y merge de C8.
+automatizada y manual y está CLOSED / MERGED / ACCEPTED; HC-NEXT-01 está
+CLOSED / ACCEPTED.
 
 ---
 
@@ -1140,8 +1140,8 @@ API/DTO/RBAC aprobado se resume separadamente en la Sección 28.21.
 > **APPROVED DESIGN / IMPLEMENTED THROUGH C7.** C2 implementó
 > Doctors/Hospitals, C3 affiliations y C4 la integración API de HealthcareCase.
 > C1-C7 están CLOSED / MERGED; C5 completó el hardening y C6-C7 los workflows
-> Web. C8 completó la acceptance automatizada y manual y está listo para
-> commit/pre-merge.
+> Web. C8 completó la acceptance automatizada y manual y está CLOSED / MERGED /
+> ACCEPTED.
 
 ### 28.1 Scope and status
 
@@ -1957,7 +1957,7 @@ Permanecen fuera de V1:
 
 | Topic | V1 contract |
 | --- | --- |
-| Contract status | APPROVED DESIGN; C1-C7 closed/merged, C8 automated + manual acceptance PASS and ready to commit/pre-merge |
+| Contract status | APPROVED DESIGN / IMPLEMENTED; C1-C7 closed/merged, C8 closed/merged/accepted with automated + manual acceptance PASS |
 | Base routes | `/healthcare/doctors`, `/healthcare/hospitals`, `/healthcare/doctor-hospital-affiliations` |
 | IDs | UUID; ParseUUIDPipe/path and IsUUID/body |
 | Lists | page/pageSize, status, search; fixed stable order |
@@ -1991,17 +1991,17 @@ WAREHOUSE el contexto necesario sin ampliar sus mutaciones. C1-C7 ya
 implementaron y fusionaron persistencia, Doctors/Hospitals, duplicate review,
 lifecycle, fixed-role RBAC, affiliation backend, integración de HealthcareCase
 y los workflows Web de masters/selectors/confirmación explícita. C8 completó la
-acceptance automatizada y manual en el branch actual. Permission-based RBAC
-permanece diferido.
+acceptance automatizada y manual y está CLOSED / MERGED / ACCEPTED.
+Permission-based RBAC permanece diferido.
 
 ---
 
 ## 29. Implementation Plan & Quality Gates
 
-> **APPROVED IMPLEMENTATION PLAN / C8 AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE.**
+> **APPROVED IMPLEMENTATION PLAN / C8 CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS.**
 > Esta sección descompone el diseño aprobado en slices implementables. C1-C7
-> están CLOSED / MERGED; C8 completó la acceptance integrada y permanece
-> pendiente de commit/PR/merge.
+> están CLOSED / MERGED; C8 también está CLOSED / MERGED / ACCEPTED y
+> HC-NEXT-01 está CLOSED / ACCEPTED.
 
 ### 29.1 Planning rules and gate model
 
@@ -2087,7 +2087,7 @@ Estado de ejecución al 2026-09-13:
 | HC-NEXT-01C5 | CLOSED / MERGED |
 | HC-NEXT-01C6 | CLOSED / MERGED |
 | HC-NEXT-01C7 | CLOSED / MERGED |
-| HC-NEXT-01C8 | AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE |
+| HC-NEXT-01C8 | CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS |
 
 No se omiten dependencias por comodidad. Puede prepararse un branch apilado
 mientras el predecessor está en review, pero no se mezcla ni se declara green
@@ -2695,7 +2695,7 @@ reviewed. Migration/data rollback nunca se improvisa durante acceptance.
 surge regresión ERP Core/HealthcareCase, falta evidencia manual de algún role,
 existe P0 abierto o un finding contradice el contrato aprobado.
 
-Estado del slice: `AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE`.
+Estado del slice: `CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS`.
 
 Evidencia automatizada C8: Prisma validate/generate PASS; API lint/typecheck/
 build PASS y 75 suites / 1053 tests PASS; migration chain PostgreSQL disposable
@@ -2722,8 +2722,7 @@ migration pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base
 Docker QA `zaping_qa`. Se aplicó con `prisma migrate deploy`; era drift del
 ambiente, no un defecto de producto, y QA continuó satisfactoriamente.
 
-HC-NEXT-01 tiene acceptance PASS, pero permanece pendiente del commit, PR y
-merge de C8; todavía no está CLOSED / MERGED.
+PR #14 integró C8. HC-NEXT-01 está CLOSED / ACCEPTED.
 
 ### 29.11 Cross-slice evidence and review requirements
 
@@ -2837,7 +2836,7 @@ HC-NEXT-01 puede cerrarse únicamente cuando todos son verdaderos:
 | Merge policy | No slice merges or advances with blocking red gates |
 | PR strategy | Separate sequential PRs; stacked preparation allowed, merge order fixed |
 | Recovery | Revert code by slice; forward migrations after shared application; never delete QA/production data casually |
-| Status now | IMPLEMENTED / ACCEPTANCE PASS — C1-C7 closed/merged; C8 ready to commit/pre-merge; HC-NEXT-01 pending C8 commit/PR/merge |
+| Status now | IMPLEMENTED / VALIDATED — C1-C7 closed/merged; C8 closed/merged/accepted; HC-NEXT-01 closed/accepted |
 
 Las decisiones API/RBAC no se reabren en implementación por defecto. Un
 conflicto real con el repositorio, migration safety o seguridad tenant obliga a
