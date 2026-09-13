@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Aprobado
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1-C4 MERGED; C5 GATES PASS / PRE-COMMIT
-**Última actualización:** 2026-09-11
+**Estado de implementación:** IMPLEMENTED / ACCEPTANCE PASS — C1-C7 CLOSED / MERGED; C8 READY TO COMMIT / PRE-MERGE
+**Última actualización:** 2026-09-13
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -54,7 +54,7 @@ seeds
 tests
 ```
 
-El technical design y los slices C1-C5 posteriores son la autoridad para los
+El technical design y los slices C1-C8 posteriores son la autoridad para los
 nombres Prisma, contratos API y estado de implementación.
 
 Estado CURRENT por concepto:
@@ -73,10 +73,13 @@ HealthcareCase Doctor / Hospital relationships
 → BACKEND IMPLEMENTED
 
 Backend hardening
-→ C5 GATES PASS / PRE-COMMIT
+→ CLOSED / MERGED
 
 Frontend master data, Case selectors and duplicate-review UX
-→ NOT IMPLEMENTED / FUTURE
+→ CLOSED / MERGED
+
+Integrated acceptance
+→ C8 AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
 ```
 
 ---
@@ -2443,7 +2446,7 @@ EquipmentAsset / Equipment V1
 → IMPLEMENTED / VALIDATED in ERP Core
 
 HC-NEXT-01
-→ BACKEND VALIDATED THROUGH C5 / PRE-COMMIT
+→ ACCEPTANCE PASS / PENDING C8 COMMIT / PR / MERGE
 ```
 
 Backend CURRENT:
@@ -2462,15 +2465,15 @@ HealthcareCase Doctor/Hospital relationships
 → BACKEND INTEGRATION IMPLEMENTED
 
 Frontend master-data workflows, Case selectors and duplicate-review UX
-→ NOT IMPLEMENTED / FUTURE
+→ IMPLEMENTED / MERGED
 ```
 
 ---
 
 # 189. TARGET V1 workflow
 
-El backend C1-C5 ya soporta la base técnica de este flujo. C6-C8 deben completar
-la experiencia frontend y acceptance:
+C1-C7 ya soportan la base técnica y la experiencia frontend de este flujo. C8
+completó la acceptance automatizada y manual y está listo para commit/pre-merge:
 
 ```text
 Create Doctor
@@ -3073,14 +3076,14 @@ PROJECT_BOARD.md
 → implementation status
 
 schema.prisma
-→ CURRENT persistence only; no Doctor/Hospital models yet
+→ CURRENT persistence, including Doctor/Hospital, affiliations and optional Case relations
 ```
 
 ---
 
-# 221. Decisiones pendientes antes de Prisma
+# 221. Historial de decisiones previas a Prisma
 
-Antes de crear modelos como:
+Antes de C1, al evaluar modelos como:
 
 ```text
 HealthcareDoctor
@@ -3088,7 +3091,7 @@ HealthcareHospital
 DoctorHospitalAffiliation
 ```
 
-permanecen deliberadamente pendientes:
+las siguientes decisiones permanecían deliberadamente pendientes:
 
 ```text
 Prisma model and field names
@@ -3104,6 +3107,12 @@ frontend routes and components
 audit and concurrency behavior
 immutable snapshots for confirmed operational/legal documents
 ```
+
+C1-C7 resolvieron e implementaron las decisiones V1 de persistencia, API,
+RBAC fijo y frontend descritas arriba. Los snapshots inmutables y cualquier
+capacidad avanzada conservan su alcance FUTURE; HC-NEXT-01 permanece abierto
+hasta completar el commit, PR y merge de C8. El PASS de acceptance no lo marca
+todavía CLOSED / MERGED.
 
 Los datos conceptuales mínimos, Company-scoped ownership, cardinalidad N ↔ N,
 lifecycle y Case integration ya están aprobados como dominio V1.

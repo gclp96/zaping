@@ -4,8 +4,8 @@ Módulo: Healthcare Cases
 Producto: Zaping Healthcare
 Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION VALIDATED — DOCTOR/HOSPITAL C1-C4 MERGED; C5 GATES PASS / PRE-COMMIT
-Última actualización: 2026-09-11
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED — C1-C7 CLOSED / MERGED; C8 AUTOMATED + MANUAL ACCEPTANCE PASS / PRE-MERGE
+Última actualización: 2026-09-13
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -1092,7 +1092,7 @@ de la Company autenticada y toda relación cross-tenant está prohibida.
 No existe global Doctor/Hospital directory en V1. La persistencia, API de
 masters/affiliation y la integración backend de Case se gobiernan por
 `DOCTORS_HOSPITALS.md` y `DOCTORS_HOSPITALS_TECHNICAL_DESIGN.md` y están
-implementadas hasta C4.
+implementadas en backend y frontend hasta C7.
 
 Ambas relaciones son opcionales. Un Case puede permanecer SCHEDULED sin Doctor
 y/o Hospital porque Case Status ≠ Case Readiness.
@@ -2070,8 +2070,8 @@ formal reschedule history / audit
 
 136. TARGET Healthcare Case capabilities
 
-Después de C4, Doctor/Hospital ya es CURRENT en backend; sus selectors frontend
-permanecen TARGET. Healthcare evolucionará además hacia:
+Después de C7, Doctor/Hospital y sus selectors son CURRENT en backend/frontend.
+Healthcare evolucionará además hacia:
 
 Requirements
 
@@ -2115,8 +2115,9 @@ AI assistance
 
 138. Roadmap Healthcare aprobado
 
-La secuencia de implementación de referencia, cuyo tramo backend Hospital /
-Doctor C1-C4 ya está merged y cuyo hardening C5 está validado PRE-COMMIT, es:
+La secuencia de implementación de referencia, cuyo tramo Hospital/Doctor C1-C7
+ya está CLOSED / MERGED y cuya acceptance automatizada y manual C8 está PASS y
+lista para commit/pre-merge, es:
 
 Hospital / Doctor
 ↓
@@ -2158,23 +2159,14 @@ ERP Core V1
 M-HC1 — Healthcare Operations Foundation
 → IN PROGRESS — P1
 
-HC-NEXT-01C1
-→ COMPLETED / MERGED
+HC-NEXT-01C1 / C2 / C3 / C4 / C5 / C6 / C7
+→ CLOSED / MERGED
 
-HC-NEXT-01C2
-→ COMPLETED / MERGED
+HC-NEXT-01C8
+→ AUTOMATED + MANUAL ACCEPTANCE PASS — READY TO COMMIT / PRE-MERGE
 
-HC-NEXT-01C3
-→ COMPLETED / MERGED
-
-HC-NEXT-01C4
-→ COMPLETED / MERGED
-
-HC-NEXT-01C5
-→ IMPLEMENTED / VALIDATED / PRE-COMMIT — current branch, not merged
-
-HC-NEXT-01C6 / C7 / C8
-→ NOT IMPLEMENTED / FUTURE
+HC-NEXT-01
+→ ACCEPTANCE PASS — PENDING C8 COMMIT / PR / MERGE; NOT CLOSED / MERGED
 
 Los workflows posteriores requieren slices propios.
 
@@ -2239,6 +2231,9 @@ doctorId? / hospitalId?
 
 compact Doctor / Hospital context in create/list/detail/update/cancel
 ✅
+
+Case Doctor/Hospital selectors, quick-create and duplicate-review confirmation
+✅ C7 WEB
 
 createdById
 ✅
