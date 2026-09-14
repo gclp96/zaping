@@ -19,6 +19,7 @@ import { HealthcareCasesController } from '../../healthcare/cases/healthcare-cas
 import { HealthcareDoctorHospitalAffiliationsController } from '../../healthcare/doctor-hospital-affiliations/healthcare-doctor-hospital-affiliations.controller';
 import { HealthcareDoctorsController } from '../../healthcare/doctors/healthcare-doctors.controller';
 import { HealthcareHospitalsController } from '../../healthcare/hospitals/healthcare-hospitals.controller';
+import { HealthcareRequirementsController } from '../../healthcare/requirements/healthcare-requirements.controller';
 import { ProductsController } from '../../products/products.controller';
 import { PurchaseReceiptsController } from '../../purchases-receipts/purchases-receipts.controller';
 import { PurchasesController } from '../../purchases/purchases.controller';
@@ -205,6 +206,18 @@ const roleMatrix: RoleMatrix[] = [
       update: [UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES],
       deactivate: [UserRole.ADMIN, UserRole.MANAGER],
       reactivate: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+  },
+  {
+    controller: HealthcareRequirementsController,
+    methods: {
+      findAllForCase: allRoles,
+      create: allRoles,
+      reorder: allRoles,
+      findOne: allRoles,
+      update: allRoles,
+      retire: allRoles,
+      reactivate: allRoles,
     },
   },
 ];
@@ -528,6 +541,33 @@ describe('ERP Core role matrix', () => {
           buildRoleContext(HealthcareHospitalsController, 'findDoctors', role),
         ),
       ).toBe(true);
+    },
+  );
+
+  it.each(allRoles)(
+    'allows %s to use every Healthcare Requirements route',
+    (role) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      for (const methodName of [
+        'findAllForCase',
+        'create',
+        'reorder',
+        'findOne',
+        'update',
+        'retire',
+        'reactivate',
+      ]) {
+        expect(
+          rolesGuard.canActivate(
+            buildRoleContext(
+              HealthcareRequirementsController,
+              methodName,
+              role,
+            ),
+          ),
+        ).toBe(true);
+      }
     },
   );
 
