@@ -87,7 +87,7 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED on current main baseline `fbf29b6`
 ↓
-NEXT — Requirements — TARGET
+NEXT — Requirements — DOMAIN DISCOVERY COMPLETE / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -105,7 +105,7 @@ están PASS. PR #14 está merged.
 
 El siguiente item documentado de M-HC1 es:
 
-Requirements — NEXT / TARGET
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
 
 También permanecen como TARGET Healthcare:
 
@@ -878,6 +878,13 @@ HC-NEXT-01 comenzó como Documentation / Domain Design. Esa fase inicial no
 marcaba Hospital, Doctor ni los workflows posteriores como implementados.
 
 9.6 Requirements
+Estado: DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED /
+NOT APPROVED — NOT IMPLEMENTED.
+
+El contrato aprobado de dominio V1 se documenta en
+`docs/modules/healthcare/REQUIREMENTS.md`. No existe todavía un identificador de
+implementación.
+
 Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
 
 Conceptualmente:
@@ -886,9 +893,10 @@ Case
 ↓
 Requirements
 
-├── Products / Materials
+└── existing Product lines with integer requestedQty > 0
 
-└── Equipment needs
+Equipment needs y support material se expresan mediante Products existentes.
+No existe un Requirement V1 libre de Product.
 Debe mantenerse:
 
 Requirements
@@ -2639,7 +2647,7 @@ HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED
 
 Hospital / Doctor — CLOSED / ACCEPTED
 
-Requirements — NEXT / TARGET
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — IMPLEMENTATION NOT STARTED
 
 Equipment Assignment
 
@@ -2770,7 +2778,7 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 Hospital / Doctor — CLOSED / ACCEPTED en el baseline canónico `fbf29b6`
 ↓
-Requirements — NEXT / TARGET
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — IMPLEMENTATION NOT STARTED
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

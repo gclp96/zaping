@@ -684,28 +684,43 @@ referenceId
 
 si sacrifica integridad referencial sin una necesidad clara.
 
-35. Case Requirements TARGET
+35. Case Requirements — DOMAIN DISCOVERY COMPLETE / TARGET / NOT IMPLEMENTED
 
 Requirements representa:
 
 what the Case needs
 
-Puede incluir conceptualmente:
+Cada línea V1 incluye conceptualmente:
 
-Product
+existing Product
 
-quantity
+integer requestedQty > 0
 
-Equipment need
+REQUIRED / BACKUP classification
 
-support material
+optional line notes
 
-special logistics context
+manual sortOrder
 
-Actualmente:
+Equipment needs y support material sólo se expresan mediante Products
+existentes; no se crea un Requirement type adicional.
 
-Case Requirements
+Estado actual:
+
+```text
+Domain discovery
+→ COMPLETE / DOCUMENTED
+
+Technical design
+→ NOT STARTED / NOT APPROVED
+
+Implementation
 → NOT IMPLEMENTED
+```
+
+El contrato canónico de dominio se encuentra en `REQUIREMENTS.md`. Requirement
+es Company-scoped, pertenece a un Healthcare Case y referencia un Product de la
+misma Company. La forma Prisma y las relaciones concretas no están aprobadas.
 
 36. Requirements ≠ Preparation
 
@@ -2156,7 +2171,7 @@ tenant-scoped API / RBAC
 
 Conceptos funcionales objetivo:
 
-Case Requirements
+Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
 
 Preparation
 
@@ -2325,7 +2340,7 @@ Readiness
 Case Calendar
 → Read Model
 
-Requirements
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET; TECHNICAL DESIGN AND IMPLEMENTATION NOT STARTED
 ≠
 Preparation
 
@@ -2614,9 +2629,9 @@ docs/project/PROJECT_BOARD.md
 
 docs/project/ROADMAP.md
 
-Documentos especializados futuros pueden incluir:
+docs/modules/healthcare/REQUIREMENTS.md
 
-CASE_REQUIREMENTS.md
+Documentos especializados futuros pueden incluir:
 
 EQUIPMENT_ASSIGNMENT.md
 

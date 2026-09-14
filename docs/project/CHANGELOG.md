@@ -8,6 +8,37 @@
 
 ---
 
+# 2026-09-13 — Healthcare Requirements V1 domain discovery
+
+**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED / NOT APPROVED — NOT IMPLEMENTED
+
+Se documentó el contrato canónico de Requirements V1 en
+`docs/modules/healthcare/REQUIREMENTS.md`, sin crear un identificador de
+implementación ni modificar runtime.
+
+Decisiones principales:
+
+- cada línea pertenece a un Healthcare Case y referencia un Product de la misma
+  Company;
+- existe una sola línea Case + Product, incluso retirada;
+- `requestedQty` es integer > 0 y usa la unidad implícita actual del Product;
+- REQUIRED/BACKUP clasifica necesidad, no fulfillment ni prioridad;
+- Product inactivo bloquea selección nueva pero conserva historia;
+- DRAFT/SCHEDULED permiten edición hasta existir fulfillment operacional real;
+- CANCELLED y fulfillment real protegen la historia;
+- retirement es lógico, exige razón y permite reactivation explícita de la
+  misma línea;
+- ADMIN, MANAGER, SALES y WAREHOUSE pueden leer/crear/editar sujetos a reglas;
+- Requirements no reserva stock, no calcula Availability y no modifica
+  Inventory.
+
+Units of Measure, decimals, Product unit fields y conversions permanecen
+FUTURE. Equipment Assignment, Case Availability, Preparation, Dispatch/Custody,
+Return/Reconciliation y CaseKit continúan diferidos. Prisma, migrations, API,
+frontend y tests no fueron implementados por este discovery.
+
+---
+
 # 2026-09-13 — Doctors/Hospitals integrated acceptance — HC-NEXT-01C8
 
 **Estado:** CLOSED / MERGED / ACCEPTED — AUTOMATED + MANUAL ACCEPTANCE PASS

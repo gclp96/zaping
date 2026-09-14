@@ -74,7 +74,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Case Requirements
+Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
 
 Equipment Assignment
 
@@ -771,28 +771,44 @@ Este es un workflow operativo conceptual.
 
 No debe confundirse con el orden técnico de implementación del roadmap.
 
-37. Case Requirements TARGET
+37. Case Requirements — DOMAIN DISCOVERY COMPLETE / TARGET / NOT IMPLEMENTED
 
 Requirements representa:
 
 what the Case needs
 
-Puede incluir conceptualmente:
+Cada línea V1 incluye conceptualmente:
 
-Products
+existing Product
 
-quantities
+integer requestedQty > 0
 
-Equipment needs
+REQUIRED / BACKUP classification
 
-support material
+optional line notes
 
-special logistics requirements
+manual sortOrder
 
-Actualmente:
+Equipment needs y support material sólo se expresan mediante Products
+existentes; no existen líneas libres de logística fuera de Product.
 
-Case Requirements
+Estado actual:
+
+```text
+Domain discovery
+→ COMPLETE / DOCUMENTED
+
+Technical design
+→ NOT STARTED / NOT APPROVED
+
+Implementation
 → NOT IMPLEMENTED
+```
+
+El contrato de dominio V1 vive en `REQUIREMENTS.md`. Cada línea referencia un
+Product existente, expresa `requestedQty` entero en la unidad implícita actual
+del Product y permanece separada de Availability, Preparation, Assignment,
+Dispatch, Inventory y Return.
 
 38. Requirements ≠ Preparation
 
@@ -1612,7 +1628,7 @@ Puede coordinar progresivamente:
 
 Purchase Receipts
 
-Case Requirements
+Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
 
 Preparation
 
@@ -2109,7 +2125,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Case Requirements
+Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
 
 Equipment Assignment
 
@@ -2458,9 +2474,9 @@ docs/modules/healthcare/CASES.md
 
 docs/modules/healthcare/DOCTORS_HOSPITALS.md
 
-Documentos especializados futuros pueden incluir:
+docs/modules/healthcare/REQUIREMENTS.md
 
-CASE_REQUIREMENTS.md
+Documentos especializados futuros pueden incluir:
 
 EQUIPMENT_ASSIGNMENT.md
 
