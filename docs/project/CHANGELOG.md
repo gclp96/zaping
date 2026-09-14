@@ -8,9 +8,51 @@
 
 ---
 
+# 2026-09-13 — Healthcare Requirements V1 technical design approved
+
+**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT IMPLEMENTED / NOT STARTED
+
+La revisión del technical design de Requirements V1 concluyó y las decisiones
+`TD-RQ-001` a `TD-RQ-014` quedaron aprobadas. La aprobación es exclusivamente
+documental: no implementa Prisma, migrations, backend, frontend, tests ni
+acceptance, y no crea un identificador de milestone o slice.
+
+RQ-006 conserva su límite explícito: el operational evidence policy está
+diseñado, pero su integración no puede probarse plenamente contra fulfillment
+Healthcare real hasta que exista el primer productor.
+
+---
+
+# 2026-09-13 — Healthcare Requirements V1 technical design
+
+**Estado histórico al documentar la propuesta:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN PROPOSED / UNDER REVIEW — NOT IMPLEMENTED
+
+Se documentó en
+`docs/modules/healthcare/REQUIREMENTS_TECHNICAL_DESIGN.md` el target propuesto
+de persistencia, integridad PostgreSQL, API/DTOs, fixed-role RBAC, errores,
+response shaping, frontend y concurrencia de Requirements V1.
+
+El diseño propone `HealthcareCaseRequirement`, lifecycle ACTIVE/RETIRED,
+auditoría del último retirement/reactivation, FKs compuestos tenant-safe,
+unicidad Company + Case + Product, rutas anidadas por Case y comandos explícitos
+de lifecycle. Todas las acciones Requirements corresponden a ADMIN, MANAGER,
+SALES y WAREHOUSE, sujetas a Case/Product, tenant isolation y RQ-006.
+
+RQ-006 queda representado por un operational evidence policy. Como todavía no
+existe un productor real Healthcare de fulfillment, esa integración no se
+declara implementada ni probada y no usa referencias informales de
+InventoryMovement. Units of Measure, cantidades decimales y los workflows
+Healthcare posteriores permanecen fuera de alcance.
+
+No se creó identificador de implementación ni se modificaron Prisma, migrations,
+API, frontend, tests o runtime. El technical design continúa bajo revisión y no
+está aprobado.
+
+---
+
 # 2026-09-13 — Healthcare Requirements V1 domain discovery
 
-**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED / NOT APPROVED — NOT IMPLEMENTED
+**Estado histórico al cerrar discovery:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED / NOT APPROVED — NOT IMPLEMENTED
 
 Se documentó el contrato canónico de Requirements V1 en
 `docs/modules/healthcare/REQUIREMENTS.md`, sin crear un identificador de

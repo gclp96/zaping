@@ -684,7 +684,7 @@ referenceId
 
 si sacrifica integridad referencial sin una necesidad clara.
 
-35. Case Requirements — DOMAIN DISCOVERY COMPLETE / TARGET / NOT IMPLEMENTED
+35. Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / TARGET / NOT IMPLEMENTED / NOT STARTED
 
 Requirements representa:
 
@@ -712,15 +712,16 @@ Domain discovery
 → COMPLETE / DOCUMENTED
 
 Technical design
-→ NOT STARTED / NOT APPROVED
+→ APPROVED
 
 Implementation
-→ NOT IMPLEMENTED
+→ NOT IMPLEMENTED / NOT STARTED
 ```
 
 El contrato canónico de dominio se encuentra en `REQUIREMENTS.md`. Requirement
 es Company-scoped, pertenece a un Healthcare Case y referencia un Product de la
-misma Company. La forma Prisma y las relaciones concretas no están aprobadas.
+misma Company. `REQUIREMENTS_TECHNICAL_DESIGN.md` documenta la forma Prisma y
+las relaciones concretas aprobadas; todavía no están implementadas.
 
 36. Requirements ≠ Preparation
 
@@ -750,15 +751,14 @@ Prepared Product A: 8
 
 Esto permite evaluar readiness sin reescribir el requerimiento original.
 
-38. Requirement model name TBD
+38. Requirement technical model — APPROVED
 
-Un modelo como:
+El technical design aprobado define:
 
-CaseRequirement
+HealthcareCaseRequirement
 
-o equivalente es conceptualmente razonable.
-
-El nombre y estructura Prisma no están aprobados todavía.
+como modelo target Company-scoped. El nombre y la estructura Prisma están
+aprobados y no implementados.
 
 39. Preparation TARGET
 
@@ -2171,7 +2171,7 @@ tenant-scoped API / RBAC
 
 Conceptos funcionales objetivo:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
+Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
 
 Preparation
 
@@ -2340,7 +2340,7 @@ Readiness
 Case Calendar
 → Read Model
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET; TECHNICAL DESIGN AND IMPLEMENTATION NOT STARTED
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET; TECHNICAL DESIGN APPROVED; IMPLEMENTATION NOT STARTED
 ≠
 Preparation
 

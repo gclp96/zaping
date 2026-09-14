@@ -87,7 +87,7 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED on current main baseline `fbf29b6`
 ↓
-NEXT — Requirements — DOMAIN DISCOVERY COMPLETE / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
+NEXT — Requirements — DOMAIN DISCOVERY COMPLETE / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -105,7 +105,7 @@ están PASS. PR #14 está merged.
 
 El siguiente item documentado de M-HC1 es:
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
 
 También permanecen como TARGET Healthcare:
 
@@ -878,12 +878,16 @@ HC-NEXT-01 comenzó como Documentation / Domain Design. Esa fase inicial no
 marcaba Hospital, Doctor ni los workflows posteriores como implementados.
 
 9.6 Requirements
-Estado: DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED /
-NOT APPROVED — NOT IMPLEMENTED.
+Estado: DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT
+IMPLEMENTED / NOT STARTED.
 
 El contrato aprobado de dominio V1 se documenta en
 `docs/modules/healthcare/REQUIREMENTS.md`. No existe todavía un identificador de
 implementación.
+
+El diseño técnico target se documenta en
+`docs/modules/healthcare/REQUIREMENTS_TECHNICAL_DESIGN.md`. Está `APPROVED` y
+permanece `NOT IMPLEMENTED / NOT STARTED`.
 
 Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
 
@@ -2647,7 +2651,7 @@ HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED
 
 Hospital / Doctor — CLOSED / ACCEPTED
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — IMPLEMENTATION NOT STARTED
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
 
 Equipment Assignment
 
@@ -2778,7 +2782,7 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 Hospital / Doctor — CLOSED / ACCEPTED en el baseline canónico `fbf29b6`
 ↓
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — IMPLEMENTATION NOT STARTED
+Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
