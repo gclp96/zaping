@@ -21,6 +21,7 @@ export const WAREHOUSE_ROLES: readonly UserRole[] = [
 export const HEALTHCARE_MASTER_EDIT_ROLES = COMMERCIAL_ROLES;
 export const HEALTHCARE_MASTER_LIFECYCLE_ROLES = MANAGEMENT_ROLES;
 export const HEALTHCARE_CASE_EDIT_ROLES = COMMERCIAL_ROLES;
+export const HEALTHCARE_REQUIREMENT_ROLES = ALL_ROLES;
 
 export function hasRole(
   role: UserRole | null | undefined,
@@ -83,4 +84,10 @@ export function canEditHealthcareCases(
   role: UserRole | null | undefined,
 ): boolean {
   return hasRole(role, HEALTHCARE_CASE_EDIT_ROLES);
+}
+
+export function canManageHealthcareRequirements(
+  role: UserRole | null | undefined,
+): boolean {
+  return hasRole(role, HEALTHCARE_REQUIREMENT_ROLES);
 }

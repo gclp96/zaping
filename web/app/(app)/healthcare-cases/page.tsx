@@ -3,7 +3,10 @@
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { useAuthenticatedSession } from '@/app/auth-session';
+import {
+  useAuthenticatedSession,
+  type UserRole,
+} from '@/app/auth-session';
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
@@ -21,6 +24,7 @@ import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
 import HealthcareCaseFormModal from './components/HealthcareCaseFormModal';
+import HealthcareRequirementsSection from './components/HealthcareRequirementsSection';
 import type { HealthcareCase, HealthcareCaseStatus } from './types';
 
 const statusLabels: Record<HealthcareCaseStatus, string> = {
@@ -91,6 +95,8 @@ export default function HealthcareCasesPage() {
   const canEdit = canEditHealthcareCases(
     sessionState.status === 'success' ? sessionState.user.role : null,
   );
+  const currentUserRole =
+    sessionState.status === 'success' ? sessionState.user.role : null;
   const [cases, setCases] = useState<HealthcareCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -284,7 +290,12 @@ export default function HealthcareCasesPage() {
         title="Detalle del caso"
         onClose={() => setViewCase(null)}
       >
-        {viewCase ? <HealthcareCaseDetail healthcareCase={viewCase} /> : null}
+        {viewCase ? (
+          <HealthcareCaseDetail
+            healthcareCase={viewCase}
+            role={currentUserRole}
+          />
+        ) : null}
       </Modal>
 
       {formCase !== undefined ? (
@@ -307,8 +318,10 @@ export default function HealthcareCasesPage() {
 
 function HealthcareCaseDetail({
   healthcareCase,
+  role,
 }: {
   healthcareCase: HealthcareCase;
+  role: UserRole | null;
 }) {
   return (
     <div className="space-y-5">
@@ -347,6 +360,12 @@ function HealthcareCaseDetail({
         <p className="whitespace-pre-wrap text-gray-900">
           {healthcareCase.procedureDescription || 'Sin descripción'}
         </p>
+      </div>
+      <div className="border-t border-gray-200 pt-5">
+        <HealthcareRequirementsSection
+          healthcareCase={healthcareCase}
+          role={role}
+        />
       </div>
     </div>
   );
