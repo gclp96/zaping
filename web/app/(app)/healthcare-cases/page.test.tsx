@@ -126,6 +126,9 @@ function configureApi(
     const path = String(url);
     if (path === '/auth/me') return authResponse(role);
     if (path === '/healthcare/cases') return { data: cases } as never;
+    if (path === '/healthcare/cases/case-1/requirements') {
+      return { data: { items: [] } } as never;
+    }
     if (path === '/healthcare/doctors') {
       return pageResponse([doctor, replacementDoctor, inactiveDoctor]);
     }
@@ -513,6 +516,27 @@ describe('HealthcareCasesPage', () => {
         String(url).match(/^\/healthcare\/(doctors|hospitals)\//),
       ),
     ).toBe(false);
+  });
+
+  it('permite a WAREHOUSE administrar Requirements sin habilitar edición general del Case', async () => {
+    const user = userEvent.setup();
+    await renderCases('WAREHOUSE');
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+    );
+    expect(screen.queryByRole('menuitem', { name: 'Editar' })).toBeNull();
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Requerimientos' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Nuevo requerimiento' }),
+    ).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith(
+      '/healthcare/cases/case-1/requirements',
+      { params: { status: 'ACTIVE' } },
+    );
   });
 
   it('presenta un 403 sin borrar la sesión', async () => {
