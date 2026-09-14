@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — Requirements domain discovery complete / implementation not started
+Fase actual: M-HC1 Healthcare Operations Foundation — Requirements technical design approved / implementation not started
 Última actualización: 2026-09-13
 Responsable: Zaping Team
 
@@ -110,9 +110,10 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
-└── Requirements Domain Discovery
-    ├── COMPLETE / DOCUMENTED
-    └── TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
+└── Requirements
+    ├── DOMAIN DISCOVERY COMPLETE / DOCUMENTED
+    ├── TECHNICAL DESIGN APPROVED
+    └── IMPLEMENTATION NOT STARTED
 
 Frontend UX workstream
 
@@ -127,7 +128,7 @@ Frontend UX workstream
 NEXT
 
 Requirements
-        → NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
+        → NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
 
 DEFERRED
 
@@ -1697,9 +1698,9 @@ pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base Docker QA
 `zaping_qa`. `prisma migrate deploy` corrigió ese drift de ambiente; no fue un
 defecto de producto y QA continuó satisfactoriamente.
 
-Requirements domain discovery está COMPLETE / DOCUMENTED. El technical design,
-Prisma/API/Web y la implementación no han iniciado ni están aprobados. No se
-asignó un identificador nuevo.
+Requirements domain discovery está COMPLETE / DOCUMENTED. El technical design
+está APPROVED; la implementación Prisma/API/Web no ha iniciado.
+No se asignó un identificador nuevo.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2180,9 +2181,12 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 → Requirements Domain Discovery COMPLETE / DOCUMENTED
 
+→ Requirements Technical Design APPROVED
+
 NEXT ROADMAP ITEM
 
-→ Requirements — NEXT / TARGET; technical design + implementation NOT STARTED
+→ Requirements — NEXT / TARGET; technical design APPROVED;
+  implementation NOT STARTED
 
 DEFERRED
 
@@ -2374,7 +2378,8 @@ HC-NEXT-01
 
 Requirements
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-→ NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
+→ TECHNICAL DESIGN APPROVED
+→ NEXT / TARGET — IMPLEMENTATION NOT STARTED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

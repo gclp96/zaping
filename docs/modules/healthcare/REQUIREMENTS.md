@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** APPROVED DOMAIN DISCOVERY
-**Estado de implementación:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NOT STARTED / NOT APPROVED — NOT IMPLEMENTED
+**Estado de implementación:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-13
 **Responsable:** Zaping Healthcare Team
 
@@ -33,7 +33,7 @@ Debe responder:
 Este documento cierra únicamente el **domain discovery** de Requirements V1.
 Aprueba las decisiones RQ-001 a RQ-030 y sus límites conceptuales.
 
-No aprueba ni implementa:
+Este documento de discovery no aprueba ni implementa:
 
 ```text
 Prisma schema
@@ -50,6 +50,10 @@ runtime behavior
 
 No existe todavía un identificador de implementación para Requirements. No se
 crea uno desde este documento.
+
+El diseño técnico target se encuentra en
+`REQUIREMENTS_TECHNICAL_DESIGN.md` con estado `APPROVED`. Su aprobación no
+modifica el estado `NOT IMPLEMENTED / NOT STARTED`.
 
 ---
 
@@ -116,7 +120,8 @@ El discovery aprueba los siguientes hechos conceptuales:
 | `retirementReason?` | Razón obligatoria cuando la línea se retira. |
 
 La forma concreta de persistencia, nombres técnicos adicionales, defaults y
-constraints pertenece al technical design posterior.
+constraints está aprobada en `REQUIREMENTS_TECHNICAL_DESIGN.md`; permanece no
+implementada.
 
 No se aprueba un campo `isActive` ni otra representación técnica de lifecycle
 en este discovery.
@@ -230,7 +235,8 @@ editables bajo las reglas normales y sin duplicación. Reopening no pertenece a
 Requirements V1.
 
 La representación persistente del lifecycle y los contratos de comandos se
-definirán en technical design.
+definen en el diseño aprobado `REQUIREMENTS_TECHNICAL_DESIGN.md` y permanecen no
+implementados.
 
 ---
 
@@ -249,9 +255,9 @@ WAREHOUSE puede ajustar Requirements cuando sea operacionalmente necesario.
 Esto no le permite omitir la protección de RQ-006 ni alterar Inventory mediante
 la Requirement.
 
-El discovery no asigna todavía retirement/reactivation a roles concretos ni
-define rutas o guards. Esa matriz por acción debe resolverse en technical design
-sin contradecir RQ-010.
+El discovery no asignó retirement/reactivation a roles concretos ni definió
+rutas o guards. El technical design aprobado completa esa matriz por acción sin
+contradecir RQ-010; todavía no está implementado.
 
 ---
 
@@ -291,8 +297,9 @@ no puede elegir ni sobrescribir `companyId`; el contexto autenticado es la
 autoridad.
 
 No puede persistirse una relación cross-tenant. La forma exacta de composite
-keys, predicates, not-found semantics y errores pertenece al technical design,
-que deberá conservar las convenciones de aislamiento existentes.
+keys, predicates, not-found semantics y errores está definida en el diseño
+aprobado `REQUIREMENTS_TECHNICAL_DESIGN.md`, preservando las convenciones de
+aislamiento existentes.
 
 ---
 
@@ -345,9 +352,12 @@ capacidades posteriores.
 
 # 15. Scope explícitamente diferido
 
-Permanecen fuera de este discovery y de Requirements V1:
+Prisma, migrations, API, DTOs, errors, services, frontend y tests no fueron
+implementados por este discovery. Su diseño target está `APPROVED` en
+`REQUIREMENTS_TECHNICAL_DESIGN.md`.
 
-- Prisma, migrations, API, DTOs, errors, services, frontend y tests;
+Permanecen fuera de Requirements V1:
+
 - Equipment Assignment;
 - Case Availability, shortage calculation y reservation;
 - Preparation;
@@ -404,9 +414,10 @@ Permanecen fuera de este discovery y de Requirements V1:
 
 ---
 
-# 17. Decisiones reservadas para technical design
+# 17. Decisiones trasladadas al technical design aprobado
 
-El siguiente paso debe decidir, sin reabrir este dominio salvo conflicto real:
+`REQUIREMENTS_TECHNICAL_DESIGN.md` define, sin reabrir este dominio salvo
+conflicto real:
 
 - modelo Prisma, constraints y relaciones tenant-safe;
 - rutas, DTOs, response shapes y stable error codes;
@@ -419,7 +430,7 @@ El siguiente paso debe decidir, sin reabrir este dominio salvo conflicto real:
 - tests unitarios, integración PostgreSQL, HTTP y frontend;
 - UX de líneas activas/históricas y protección operacional.
 
-Estado de esas decisiones: `NOT STARTED / NOT APPROVED`.
+Estado de esas decisiones: `APPROVED — NOT IMPLEMENTED / NOT STARTED`.
 
 ---
 
@@ -430,10 +441,10 @@ Requirements domain discovery
 → COMPLETE / DOCUMENTED
 
 Requirements technical design
-→ NOT STARTED / NOT APPROVED
+→ APPROVED
 
 Requirements implementation
-→ NOT IMPLEMENTED
+→ NOT IMPLEMENTED / NOT STARTED
 ```
 
 Requirement permanece como el siguiente item `NEXT / TARGET` de M-HC1, sin un

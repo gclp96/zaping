@@ -74,7 +74,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
+Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
 
 Equipment Assignment
 
@@ -771,7 +771,7 @@ Este es un workflow operativo conceptual.
 
 No debe confundirse con el orden técnico de implementación del roadmap.
 
-37. Case Requirements — DOMAIN DISCOVERY COMPLETE / TARGET / NOT IMPLEMENTED
+37. Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / TARGET / NOT IMPLEMENTED / NOT STARTED
 
 Requirements representa:
 
@@ -799,16 +799,17 @@ Domain discovery
 → COMPLETE / DOCUMENTED
 
 Technical design
-→ NOT STARTED / NOT APPROVED
+→ APPROVED
 
 Implementation
-→ NOT IMPLEMENTED
+→ NOT IMPLEMENTED / NOT STARTED
 ```
 
-El contrato de dominio V1 vive en `REQUIREMENTS.md`. Cada línea referencia un
-Product existente, expresa `requestedQty` entero en la unidad implícita actual
-del Product y permanece separada de Availability, Preparation, Assignment,
-Dispatch, Inventory y Return.
+El contrato de dominio V1 vive en `REQUIREMENTS.md`; el target técnico aprobado
+y no implementado se documenta en `REQUIREMENTS_TECHNICAL_DESIGN.md`. Cada línea
+referencia un Product existente, expresa `requestedQty` entero en la unidad
+implícita actual del Product y permanece separada de Availability, Preparation,
+Assignment, Dispatch, Inventory y Return.
 
 38. Requirements ≠ Preparation
 
@@ -1628,7 +1629,7 @@ Puede coordinar progresivamente:
 
 Purchase Receipts
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
+Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
 
 Preparation
 
@@ -2125,7 +2126,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
+Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
 
 Equipment Assignment
 
