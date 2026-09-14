@@ -1144,28 +1144,43 @@ y:
 Payer
 → FUTURE
 
-73. Case Requirements TARGET
+73. Case Requirements — DOMAIN DISCOVERY COMPLETE / TARGET / NOT IMPLEMENTED
 
 Case Requirements representa:
 
 what the Case needs
 
-Puede incluir conceptualmente:
+Cada línea V1 incluye conceptualmente:
 
-material
+existing Product
 
-quantity
+integer requestedQty > 0
 
-Equipment need
+REQUIRED / BACKUP classification
 
-support material
+optional line notes
 
-special logistics context
+manual sortOrder
 
-Actualmente:
+Equipment needs y support material sólo se expresan mediante Products
+existentes; notes conserva el contexto específico de la línea.
 
-Requirements
+Estado actual:
+
+```text
+Domain discovery
+→ COMPLETE / DOCUMENTED
+
+Technical design
+→ NOT STARTED / NOT APPROVED
+
+Implementation
 → NOT IMPLEMENTED
+```
+
+`REQUIREMENTS.md` es la autoridad del dominio V1. Requirements expresa la
+necesidad planeada de Products del Case; no reserva stock, no selecciona
+Inventory/Equipment y no produce fulfillment por sí misma.
 
 74. Requirements ≠ Preparation
 
@@ -2264,7 +2279,7 @@ no clinical/patient fields
 
 142. Estado consolidado TARGET
 
-Case Requirements
+Case Requirements — DOMAIN DISCOVERY COMPLETE / NOT IMPLEMENTED
 
 Equipment Assignment
 
@@ -2652,9 +2667,9 @@ docs/project/ROADMAP.md
 
 docs/project/CHANGELOG.md
 
-Documentos especializados futuros pueden incluir:
+docs/modules/healthcare/REQUIREMENTS.md
 
-CASE_REQUIREMENTS.md
+Documentos especializados futuros pueden incluir:
 
 EQUIPMENT_ASSIGNMENT.md
 

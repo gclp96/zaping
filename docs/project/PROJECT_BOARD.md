@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — Requirements next roadmap item / TARGET
+Fase actual: M-HC1 Healthcare Operations Foundation — Requirements domain discovery complete / implementation not started
 Última actualización: 2026-09-13
 Responsable: Zaping Team
 
@@ -110,7 +110,9 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
-└── No active Healthcare implementation slice assigned
+└── Requirements Domain Discovery
+    ├── COMPLETE / DOCUMENTED
+    └── TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
 
 Frontend UX workstream
 
@@ -125,7 +127,7 @@ Frontend UX workstream
 NEXT
 
 Requirements
-        → NEXT ITEM IN THE DOCUMENTED M-HC1 SEQUENCE / TARGET
+        → NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
 
 DEFERRED
 
@@ -1695,6 +1697,10 @@ pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base Docker QA
 `zaping_qa`. `prisma migrate deploy` corrigió ese drift de ambiente; no fue un
 defecto de producto y QA continuó satisfactoriamente.
 
+Requirements domain discovery está COMPLETE / DOCUMENTED. El technical design,
+Prisma/API/Web y la implementación no han iniciado ni están aprobados. No se
+asignó un identificador nuevo.
+
 Secuencia planeada de alto nivel para M-HC1:
 
 1. Hospital / Doctor
@@ -2172,9 +2178,11 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 → HC-NEXT-01 CLOSED / ACCEPTED
 
+→ Requirements Domain Discovery COMPLETE / DOCUMENTED
+
 NEXT ROADMAP ITEM
 
-→ Requirements — TARGET
+→ Requirements — NEXT / TARGET; technical design + implementation NOT STARTED
 
 DEFERRED
 
@@ -2365,7 +2373,8 @@ HC-NEXT-01
 → CLOSED / ACCEPTED
 
 Requirements
-→ NEXT ITEM IN THE DOCUMENTED M-HC1 SEQUENCE / TARGET
+→ DOMAIN DISCOVERY COMPLETE / DOCUMENTED
+→ NEXT / TARGET — TECHNICAL DESIGN + IMPLEMENTATION NOT STARTED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
