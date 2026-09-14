@@ -34,25 +34,26 @@ model Product {
   brand       String?
   categoryId  String?
 
-  category             Category?                @relation(fields: [categoryId], references: [id])
-  barcode              String?
-  cost                 Float                    @default(0)
-  price                Float                    @default(0)
-  stock                Int                      @default(0)
-  minStock             Int                      @default(0)
-  isActive             Boolean                  @default(true)
-  inventoryTracking    ProductInventoryTracking @default(QUANTITY)
-  lotTracking          ProductLotTracking       @default(OPTIONAL)
-  createdAt            DateTime                 @default(now())
-  updatedAt            DateTime                 @updatedAt
-  inventoryMovements   InventoryMovement[]
-  inventoryBatches     InventoryBatch[]
-  purchaseReceiptItems PurchaseReceiptItem[]
-  equipmentAssets      EquipmentAsset[]
-  company              Company                  @relation(fields: [companyId], references: [id])
-  purchaseItems        PurchaseItem[]
-  quoteItems           QuoteItem[]
-  saleItems            SaleItem[]
+  category                   Category?                   @relation(fields: [categoryId], references: [id])
+  barcode                    String?
+  cost                       Float                       @default(0)
+  price                      Float                       @default(0)
+  stock                      Int                         @default(0)
+  minStock                   Int                         @default(0)
+  isActive                   Boolean                     @default(true)
+  inventoryTracking          ProductInventoryTracking    @default(QUANTITY)
+  lotTracking                ProductLotTracking          @default(OPTIONAL)
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  inventoryMovements         InventoryMovement[]
+  inventoryBatches           InventoryBatch[]
+  purchaseReceiptItems       PurchaseReceiptItem[]
+  equipmentAssets            EquipmentAsset[]
+  healthcareCaseRequirements HealthcareCaseRequirement[]
+  company                    Company                     @relation(fields: [companyId], references: [id])
+  purchaseItems              PurchaseItem[]
+  quoteItems                 QuoteItem[]
+  saleItems                  SaleItem[]
 
   @@unique([id, companyId])
   @@unique([companyId, sku])
@@ -350,6 +351,7 @@ model Company {
   healthcareDoctors                    HealthcareDoctor[]
   healthcareHospitals                  HealthcareHospital[]
   healthcareDoctorHospitalAffiliations HealthcareDoctorHospitalAffiliation[]
+  healthcareCaseRequirements           HealthcareCaseRequirement[]
   inventoryMovements                   InventoryMovement[]
   inventoryBatches                     InventoryBatch[]
   equipmentAssets                      EquipmentAsset[]
@@ -406,6 +408,16 @@ enum HealthcareCaseStatus {
   CANCELLED
 }
 
+enum HealthcareRequirementType {
+  REQUIRED
+  BACKUP
+}
+
+enum HealthcareRequirementLifecycle {
+  ACTIVE
+  RETIRED
+}
+
 model User {
   id           String   @id @default(uuid())
   companyId    String
@@ -431,11 +443,17 @@ model User {
   createdHealthcareCases     HealthcareCase[] @relation("HealthcareCaseCreatedBy")
   cancelledHealthcareCases   HealthcareCase[] @relation("HealthcareCaseCancelledBy")
 
+  createdHealthcareCaseRequirements     HealthcareCaseRequirement[] @relation("HealthcareRequirementCreatedBy")
+  retiredHealthcareCaseRequirements     HealthcareCaseRequirement[] @relation("HealthcareRequirementRetiredBy")
+  reactivatedHealthcareCaseRequirements HealthcareCaseRequirement[] @relation("HealthcareRequirementReactivatedBy")
+
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
   cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
 
   passwordResetTokens PasswordResetToken[]
+
+  @@unique([id, companyId])
 }
 
 model PasswordResetToken {
@@ -568,6 +586,8 @@ model HealthcareCase {
   createdBy       User  @relation("HealthcareCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   cancelledBy     User? @relation("HealthcareCaseCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
 
+  requirements HealthcareCaseRequirement[]
+
   @@unique([companyId, folio])
   @@unique([id, companyId])
   @@index([companyId, status])
@@ -575,6 +595,45 @@ model HealthcareCase {
   @@index([companyId, responsibleUserId])
   @@index([companyId, doctorId, scheduledStart])
   @@index([companyId, hospitalId, scheduledStart])
+}
+
+model HealthcareCaseRequirement {
+  id        String @id @default(uuid())
+  companyId String
+  caseId    String
+  productId String
+
+  requestedQty Int
+  type         HealthcareRequirementType
+  notes        String?
+  sortOrder    Int
+
+  lifecycle HealthcareRequirementLifecycle @default(ACTIVE)
+
+  createdById String
+
+  retiredAt        DateTime?
+  retiredById      String?
+  retirementReason String?
+
+  reactivatedAt   DateTime?
+  reactivatedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  healthcareCase HealthcareCase @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
+  product        Product        @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict)
+
+  createdBy     User  @relation("HealthcareRequirementCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict)
+  retiredBy     User? @relation("HealthcareRequirementRetiredBy", fields: [retiredById, companyId], references: [id, companyId], onDelete: Restrict)
+  reactivatedBy User? @relation("HealthcareRequirementReactivatedBy", fields: [reactivatedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@unique([companyId, caseId, productId])
+  @@index([companyId, caseId, lifecycle, sortOrder])
+  @@index([companyId, productId])
 }
 
 model EquipmentAsset {
