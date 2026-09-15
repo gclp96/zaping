@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -378,7 +378,7 @@ Doctor
 
 Hospital
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 
 Case Availability
 
@@ -988,14 +988,17 @@ HC-NEXT-03B.1 se documenta en `EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`: cada a
 una fila histórica con lifecycle `RESERVED` / `RELEASED` / `REPLACED`; el origen
 es `REQUIREMENT` o `DIRECT`; Availability y coverage son derivados; buffers
 pre/post Case viven en configuración Healthcare Company-scoped; las relaciones
-usan composite FKs tenant-safe. No existe implementación todavía.
+usan composite FKs tenant-safe. HC-NEXT-03C1 materializa esta persistencia; la
+Availability y el runtime de servicio permanecen sin implementar.
 
 HC-NEXT-03B.2 aprueba rutas, DTOs, fixed-role RBAC, review/fingerprint,
 responses, errores, idempotencia y atomicidad sin implementar runtime.
 
 HC-NEXT-03B.3 aprueba la secuencia C1–C7, scope/gates por slice y acceptance
 A–P. El technical design queda COMPLETE / APPROVED, pero la implementación no
-ha iniciado; HC-NEXT-03C1 Persistence / Migration es NEXT / READY.
+ha iniciado más allá de persistencia; HC-NEXT-03C1 Persistence / Migration está
+COMPLETE / READY FOR REVIEW y HC-NEXT-03C2 Assignment Backend Base es NEXT /
+BLOCKED UNTIL C1 MERGED.
 
 Un nombre conceptual previo fue:
 
@@ -1009,8 +1012,9 @@ Equipment Assignment
 → HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
 → HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
 → HC-NEXT-03B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT APPROVED / DOCUMENTED
-→ HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY
-→ IMPLEMENTATION NOT STARTED
+→ HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW
+→ HC-NEXT-03C2 ASSIGNMENT BACKEND BASE NEXT / BLOCKED UNTIL C1 MERGED
+→ PARTIALLY IMPLEMENTED — PERSISTENCE ONLY; BACKEND NOT IMPLEMENTED
 
 55. Assignment ownership
 
@@ -2808,7 +2812,9 @@ dominio de Equipment Assignment. HC-NEXT-03B.1, HC-NEXT-03B.2 y HC-NEXT-03B.3
 están APPROVED / DOCUMENTED; HC-NEXT-03B está COMPLETE / APPROVED. El siguiente
 trabajo es:
 
-HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
+HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — COMPLETE / READY FOR REVIEW
+↓
+HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
 ↓
 Case Availability
 

@@ -8,9 +8,35 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03C1 Equipment Assignment persistence and migration
+
+**Estado:** HC-NEXT-03C1 COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 ASSIGNMENT BACKEND BASE NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
+
+Se agregó persistencia aditiva para Equipment Assignment: Assignment histórica
+por EquipmentAsset, origins/lifecycle/release causes, replacement lineage,
+ConflictOverride con snapshots, Requirement CoverageNote y settings
+Company-scoped. Las relaciones a Case, EquipmentAsset, Requirement, actores,
+lineage y auditoría usan candidate keys/composite FKs tenant-safe.
+
+La migration incorpora CHECKs de origin, lifecycle/audit, reasons, ventanas,
+resolución de notas y buffers no negativos; partial unique indexes protegen una
+reserva vigente por Company/Case/EquipmentAsset y una nota abierta por
+Requirement/kind. Overlap, elegibilidad, compatibilidad y over-coverage
+permanecen correctamente fuera de SQL para C2/C3.
+
+La cadena completa de 28 migrations se desplegó en PostgreSQL aislado; el diff
+database/datamodel quedó vacío. El E2E focal pasó 27/27, la regresión de
+persistencia Healthcare 76/76 y la API completa 78 suites / 1154 tests. Prisma
+format/validate/generate, lint, typecheck, build y diff-check quedaron verdes.
+
+No se implementaron módulos, repositories, services, controllers, DTOs ni
+frontend de Equipment Assignment.
+
+---
+
 # 2026-09-15 — HC-NEXT-03B.3 Equipment Assignment implementation slicing and acceptance contract
 
-**Estado:** HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado histórico al aprobar B.3:** HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY — IMPLEMENTATION NOT STARTED
 
 Se aprobó la secuencia estricta C1 Persistence/Migration → C2 Backend Base → C3
 Availability/Conflict Review/Concurrency → C4 Replace/Release/Parent
@@ -87,7 +113,7 @@ frontend, source y tests no fueron modificados ni implementados.
 
 # 2026-09-15 — HC-NEXT-03A Equipment Assignment domain discovery
 
-**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado histórico al completar Discovery:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
 
 Se creó `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md` como contrato canónico
 del dominio. El discovery distingue Requirement — qué se necesita — de Equipment

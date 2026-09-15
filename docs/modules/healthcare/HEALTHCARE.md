@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 
 Case Availability
 
@@ -1130,10 +1130,14 @@ HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract
 → APPROVED / DOCUMENTED
 
 Next
-→ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — NEXT / READY
+→ HC-NEXT-03C2 Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
+
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration
+→ COMPLETE / READY FOR REVIEW
 
 Equipment Assignment implementation
-→ NOT IMPLEMENTED / NOT STARTED
+→ PARTIALLY IMPLEMENTED — PERSISTENCE ONLY
+→ BACKEND NOT IMPLEMENTED
 ```
 
 53. Equipment Assignment must not contaminate EquipmentAsset
@@ -2191,7 +2195,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED; HC-NEXT-03C1 NEXT / READY; implementation NOT STARTED
+Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03C1 persistence/migration COMPLETE / READY FOR REVIEW; HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED; backend NOT IMPLEMENTED
 
 Case Availability
 

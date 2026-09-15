@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 Equipment Assignment Persistence / Migration NEXT / READY
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 Assignment Backend Base NEXT / BLOCKED UNTIL C1 MERGED
 Última actualización: 2026-09-15
 Responsable: Zaping Team
 
@@ -118,6 +118,9 @@ M-HC1 — Healthcare Operations Foundation
     ├── HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
     └── HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUMENTED
 
+HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
+└── COMPLETE / READY FOR REVIEW
+
 RECENTLY COMPLETED
 
 └── Requirements
@@ -138,8 +141,8 @@ Frontend UX workstream
 
 NEXT
 
-HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
-        → NEXT / READY
+HC-NEXT-03C2 — Assignment Backend Base
+        → NEXT / BLOCKED UNTIL C1 MERGED
 
 DEFERRED
 
@@ -1724,8 +1727,8 @@ Assignment normalmente resuelve una Requirement de equipo, admite asignación
 directa urgente trazable y mantiene separados Assignment, Dispatch, Custody,
 Inventory Movement y lifecycle/condition. Cobertura y Availability son
 derivadas; los conflictos se muestran como warnings y cualquier override exige
-autorización, justificación y auditoría. La implementación permanece NOT
-STARTED.
+autorización, justificación y auditoría. HC-NEXT-03C1 Persistence / Migration
+está COMPLETE / READY FOR REVIEW; el backend permanece NOT IMPLEMENTED.
 
 HC-NEXT-03B está COMPLETE / APPROVED. HC-NEXT-03B.1 Persistence & Availability Design está
 APPROVED / DOCUMENTED en
@@ -1740,8 +1743,9 @@ recurso top-level, DTOs allowlisted, review 200/no-write con fingerprint,
 Create/Replace/Release, fixed-role RBAC, errores estables, idempotencia y
 atomicidad. HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract está
 APPROVED / DOCUMENTED con la secuencia C1–C7, gates por slice y acceptance A–P.
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration queda NEXT / READY;
-la implementación sigue NOT STARTED.
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration está COMPLETE / READY
+FOR REVIEW. HC-NEXT-03C2 Assignment Backend Base queda NEXT / BLOCKED UNTIL C1
+MERGED; el backend sigue NOT IMPLEMENTED.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2231,7 +2235,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 NEXT ROADMAP ITEM
 
-→ HC-NEXT-03C1 Healthcare Equipment Assignment Persistence / Migration — NEXT / READY
+→ HC-NEXT-03C2 Healthcare Equipment Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
 
 DEFERRED
 
@@ -2443,10 +2447,14 @@ HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract
 → APPROVED / DOCUMENTED
 
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration
-→ NEXT / READY
+→ COMPLETE / READY FOR REVIEW
+
+HC-NEXT-03C2 Assignment Backend Base
+→ NEXT / BLOCKED UNTIL C1 MERGED
 
 Healthcare Equipment Assignment implementation
-→ NOT IMPLEMENTED / NOT STARTED
+→ PARTIALLY IMPLEMENTED — PERSISTENCE ONLY
+→ BACKEND NOT IMPLEMENTED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
