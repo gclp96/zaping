@@ -8,8 +8,9 @@
 **Estado HC-NEXT-03B.2:** APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.3:** APPROVED / DOCUMENTED
 **Estado de HC-NEXT-03B:** COMPLETE / APPROVED
-**Estado siguiente:** HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
-**Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
+**Estado HC-NEXT-03C1:** COMPLETE / READY FOR REVIEW
+**Estado siguiente:** HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION; BACKEND NOT IMPLEMENTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
 
@@ -1897,8 +1898,12 @@ HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
 → APPROVED / DOCUMENTED
 
 Next
-→ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
+→ HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
+
+HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
+→ COMPLETE / READY FOR REVIEW
 
 Equipment Assignment implementation
-→ NOT IMPLEMENTED / NOT STARTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION
+→ BACKEND NOT IMPLEMENTED
 ```

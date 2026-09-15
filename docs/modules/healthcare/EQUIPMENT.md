@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Approved
-**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
 
@@ -1514,8 +1514,9 @@ Healthcare Equipment Assignment
 → HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
 → HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
 → HC-NEXT-03B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT APPROVED / DOCUMENTED
-→ HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY
-→ NOT IMPLEMENTED / NOT STARTED
+→ HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / READY FOR REVIEW
+→ HC-NEXT-03C2 ASSIGNMENT BACKEND BASE NEXT / BLOCKED UNTIL C1 MERGED
+→ PARTIALLY IMPLEMENTED — PERSISTENCE ONLY; BACKEND NOT IMPLEMENTED
 
 Healthcare Availability for Case
 → NOT IMPLEMENTED
@@ -1553,18 +1554,19 @@ Orden recomendado:
 3. Equipment Assignment persistence & availability design — APPROVED / DOCUMENTED
 4. Equipment Assignment API / DTO / authorization contract — APPROVED / DOCUMENTED
 5. Equipment Assignment implementation slicing / acceptance contract — APPROVED / DOCUMENTED
-6. Equipment Assignment persistence / migration — NEXT / READY
-7. Remaining Equipment Assignment implementation slices
-8. Availability for Case
-9. Preparation integration
-10. Dispatch
-11. Custody
-12. Return
-13. Inspection workflow
-14. Case 360 integration
-15. Warehouse Operations UI
-16. Calendar integration
-17. Technician mobile integration
+6. Equipment Assignment persistence / migration — COMPLETE / READY FOR REVIEW
+7. Assignment backend base — NEXT / BLOCKED UNTIL C1 MERGED
+8. Remaining Equipment Assignment implementation slices
+9. Availability for Case
+10. Preparation integration
+11. Dispatch
+12. Custody
+13. Return
+14. Inspection workflow
+15. Case 360 integration
+16. Warehouse Operations UI
+17. Calendar integration
+18. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:

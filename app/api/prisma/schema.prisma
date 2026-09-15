@@ -140,6 +140,9 @@ enum ProductLotTracking {
 
 enum IdempotencyScope {
   PURCHASE_RECEIPT_CREATE
+  HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
+  HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
+  HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE
 }
 
 enum EquipmentLifecycle {
@@ -336,34 +339,38 @@ model PurchaseReceiptItem {
 }
 
 model Company {
-  id                                   String                                @id @default(uuid())
-  name                                 String
-  tradeName                            String?
-  rfc                                  String                                @unique
-  email                                String?
-  phone                                String?
-  language                             String                                @default("es")
-  timezone                             String                                @default("America/Hermosillo")
-  createdAt                            DateTime                              @default(now())
-  updatedAt                            DateTime                              @updatedAt
-  customers                            Customer[]
-  healthcareCases                      HealthcareCase[]
-  healthcareDoctors                    HealthcareDoctor[]
-  healthcareHospitals                  HealthcareHospital[]
-  healthcareDoctorHospitalAffiliations HealthcareDoctorHospitalAffiliation[]
-  healthcareCaseRequirements           HealthcareCaseRequirement[]
-  inventoryMovements                   InventoryMovement[]
-  inventoryBatches                     InventoryBatch[]
-  equipmentAssets                      EquipmentAsset[]
-  equipmentInspections                 EquipmentInspection[]
-  companySequences                     CompanySequence[]
-  idempotencyRecords                   IdempotencyRecord[]
-  purchaseReceipts                     PurchaseReceipt[]
-  purchaseReceiptItems                 PurchaseReceiptItem[]
-  products                             Product[]
-  purchases                            Purchase[]
-  quotes                               Quote[]
-  users                                User[]
+  id                                    String                                          @id @default(uuid())
+  name                                  String
+  tradeName                             String?
+  rfc                                   String                                          @unique
+  email                                 String?
+  phone                                 String?
+  language                              String                                          @default("es")
+  timezone                              String                                          @default("America/Hermosillo")
+  createdAt                             DateTime                                        @default(now())
+  updatedAt                             DateTime                                        @updatedAt
+  customers                             Customer[]
+  healthcareCases                       HealthcareCase[]
+  healthcareDoctors                     HealthcareDoctor[]
+  healthcareHospitals                   HealthcareHospital[]
+  healthcareDoctorHospitalAffiliations  HealthcareDoctorHospitalAffiliation[]
+  healthcareCaseRequirements            HealthcareCaseRequirement[]
+  healthcareEquipmentAssignments        HealthcareEquipmentAssignment[]
+  healthcareEquipmentConflictOverrides  HealthcareEquipmentAssignmentConflictOverride[]
+  healthcareEquipmentCoverageNotes      HealthcareEquipmentRequirementCoverageNote[]
+  healthcareEquipmentAssignmentSettings HealthcareEquipmentAssignmentSettings?
+  inventoryMovements                    InventoryMovement[]
+  inventoryBatches                      InventoryBatch[]
+  equipmentAssets                       EquipmentAsset[]
+  equipmentInspections                  EquipmentInspection[]
+  companySequences                      CompanySequence[]
+  idempotencyRecords                    IdempotencyRecord[]
+  purchaseReceipts                      PurchaseReceipt[]
+  purchaseReceiptItems                  PurchaseReceiptItem[]
+  products                              Product[]
+  purchases                             Purchase[]
+  quotes                                Quote[]
+  users                                 User[]
 
   sales Sale[]
 
@@ -418,6 +425,28 @@ enum HealthcareRequirementLifecycle {
   RETIRED
 }
 
+enum HealthcareEquipmentAssignmentOrigin {
+  REQUIREMENT
+  DIRECT
+}
+
+enum HealthcareEquipmentAssignmentLifecycle {
+  RESERVED
+  RELEASED
+  REPLACED
+}
+
+enum HealthcareEquipmentAssignmentReleaseCause {
+  MANUAL
+  CASE_CANCELLED
+  REQUIREMENT_WITHDRAWN
+}
+
+enum HealthcareEquipmentRequirementCoverageNoteKind {
+  UNAVAILABLE
+  PARTIAL_CONTEXT
+}
+
 model User {
   id           String   @id @default(uuid())
   companyId    String
@@ -446,6 +475,13 @@ model User {
   createdHealthcareCaseRequirements     HealthcareCaseRequirement[] @relation("HealthcareRequirementCreatedBy")
   retiredHealthcareCaseRequirements     HealthcareCaseRequirement[] @relation("HealthcareRequirementRetiredBy")
   reactivatedHealthcareCaseRequirements HealthcareCaseRequirement[] @relation("HealthcareRequirementReactivatedBy")
+
+  createdHealthcareEquipmentAssignments  HealthcareEquipmentAssignment[]                 @relation("HealthcareEquipmentAssignmentCreatedBy")
+  releasedHealthcareEquipmentAssignments HealthcareEquipmentAssignment[]                 @relation("HealthcareEquipmentAssignmentReleasedBy")
+  replacedHealthcareEquipmentAssignments HealthcareEquipmentAssignment[]                 @relation("HealthcareEquipmentAssignmentReplacedBy")
+  approvedHealthcareEquipmentOverrides   HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentAssignmentOverrideApprovedBy")
+  recordedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteRecordedBy")
+  resolvedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteResolvedBy")
 
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
@@ -586,7 +622,8 @@ model HealthcareCase {
   createdBy       User  @relation("HealthcareCaseCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   cancelledBy     User? @relation("HealthcareCaseCancelledBy", fields: [cancelledById], references: [id], onDelete: Restrict)
 
-  requirements HealthcareCaseRequirement[]
+  requirements         HealthcareCaseRequirement[]
+  equipmentAssignments HealthcareEquipmentAssignment[]
 
   @@unique([companyId, folio])
   @@unique([id, companyId])
@@ -630,7 +667,11 @@ model HealthcareCaseRequirement {
   retiredBy     User? @relation("HealthcareRequirementRetiredBy", fields: [retiredById, companyId], references: [id, companyId], onDelete: Restrict)
   reactivatedBy User? @relation("HealthcareRequirementReactivatedBy", fields: [reactivatedById, companyId], references: [id, companyId], onDelete: Restrict)
 
+  equipmentAssignments   HealthcareEquipmentAssignment[]
+  equipmentCoverageNotes HealthcareEquipmentRequirementCoverageNote[]
+
   @@unique([id, companyId])
+  @@unique([id, companyId, caseId])
   @@unique([companyId, caseId, productId])
   @@index([companyId, caseId, lifecycle, sortOrder])
   @@index([companyId, productId])
@@ -672,7 +713,8 @@ model EquipmentAsset {
 
   retiredBy User? @relation("EquipmentRetiredBy", fields: [retiredById], references: [id], onDelete: Restrict)
 
-  inspections EquipmentInspection[]
+  inspections                    EquipmentInspection[]
+  healthcareEquipmentAssignments HealthcareEquipmentAssignment[]
 
   @@unique([id, companyId])
   @@unique([companyId, assetCode])
@@ -684,6 +726,110 @@ model EquipmentAsset {
   @@index([batchId])
   @@index([purchaseReceiptItemId])
   @@index([retiredById])
+}
+
+model HealthcareEquipmentAssignment {
+  id               String  @id @default(uuid())
+  companyId        String
+  caseId           String
+  equipmentAssetId String
+  requirementId    String?
+
+  origin    HealthcareEquipmentAssignmentOrigin
+  lifecycle HealthcareEquipmentAssignmentLifecycle @default(RESERVED)
+
+  replacesAssignmentId   String?
+  directAssignmentReason String?
+
+  createdById String
+
+  releasedAt    DateTime?
+  releasedById  String?
+  releaseCause  HealthcareEquipmentAssignmentReleaseCause?
+  releaseReason String?
+
+  replacedAt        DateTime?
+  replacedById      String?
+  replacementReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company        Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  healthcareCase HealthcareCase             @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
+  equipmentAsset EquipmentAsset             @relation(fields: [equipmentAssetId, companyId], references: [id, companyId], onDelete: Restrict)
+  requirement    HealthcareCaseRequirement? @relation(fields: [requirementId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+
+  createdBy  User  @relation("HealthcareEquipmentAssignmentCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict)
+  releasedBy User? @relation("HealthcareEquipmentAssignmentReleasedBy", fields: [releasedById, companyId], references: [id, companyId], onDelete: Restrict)
+  replacedBy User? @relation("HealthcareEquipmentAssignmentReplacedBy", fields: [replacedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  replacesAssignment     HealthcareEquipmentAssignment?  @relation("HealthcareEquipmentAssignmentReplacement", fields: [replacesAssignmentId, companyId], references: [id, companyId], onDelete: Restrict)
+  replacementAssignments HealthcareEquipmentAssignment[] @relation("HealthcareEquipmentAssignmentReplacement")
+
+  conflictOverrides            HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentAssignmentOverride")
+  conflictingAssignmentReviews HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentConflictingAssignmentOverride")
+
+  @@unique([id, companyId])
+  @@unique([companyId, replacesAssignmentId])
+  @@index([companyId, caseId, lifecycle])
+  @@index([companyId, equipmentAssetId, lifecycle])
+  @@index([companyId, requirementId, lifecycle])
+}
+
+model HealthcareEquipmentAssignmentConflictOverride {
+  id                      String @id @default(uuid())
+  companyId               String
+  assignmentId            String
+  conflictingAssignmentId String
+
+  assignmentWindowStart  DateTime
+  assignmentWindowEnd    DateTime
+  conflictingWindowStart DateTime
+  conflictingWindowEnd   DateTime
+
+  approvedById String
+  reason       String
+  createdAt    DateTime @default(now())
+
+  company               Company                       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  assignment            HealthcareEquipmentAssignment @relation("HealthcareEquipmentAssignmentOverride", fields: [assignmentId, companyId], references: [id, companyId], onDelete: Restrict)
+  conflictingAssignment HealthcareEquipmentAssignment @relation("HealthcareEquipmentConflictingAssignmentOverride", fields: [conflictingAssignmentId, companyId], references: [id, companyId], onDelete: Restrict)
+  approvedBy            User                          @relation("HealthcareEquipmentAssignmentOverrideApprovedBy", fields: [approvedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@index([companyId, assignmentId, createdAt])
+  @@index([companyId, conflictingAssignmentId, createdAt])
+}
+
+model HealthcareEquipmentRequirementCoverageNote {
+  id            String                                         @id @default(uuid())
+  companyId     String
+  requirementId String
+  kind          HealthcareEquipmentRequirementCoverageNoteKind
+  comment       String
+  recordedById  String
+  createdAt     DateTime                                       @default(now())
+  resolvedAt    DateTime?
+  resolvedById  String?
+
+  company     Company                   @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  requirement HealthcareCaseRequirement @relation(fields: [requirementId, companyId], references: [id, companyId], onDelete: Restrict)
+  recordedBy  User                      @relation("HealthcareEquipmentCoverageNoteRecordedBy", fields: [recordedById, companyId], references: [id, companyId], onDelete: Restrict)
+  resolvedBy  User?                     @relation("HealthcareEquipmentCoverageNoteResolvedBy", fields: [resolvedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@index([companyId, requirementId, createdAt])
+}
+
+model HealthcareEquipmentAssignmentSettings {
+  companyId             String   @id
+  preCaseBufferMinutes  Int
+  postCaseBufferMinutes Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 }
 
 model EquipmentInspection {
