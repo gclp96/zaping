@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -378,7 +378,7 @@ Doctor
 
 Hospital
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
 
 Case Availability
 
@@ -984,6 +984,12 @@ ventana operacional y un overlap del mismo activo produce un warning visible,
 no un hard block; cualquier override exige autorización, justificación y
 auditoría.
 
+B.1 se documenta en `EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`: cada activo usa
+una fila histórica con lifecycle `RESERVED` / `RELEASED` / `REPLACED`; el origen
+es `REQUIREMENT` o `DIRECT`; Availability y coverage son derivados; buffers
+pre/post Case viven en configuración Healthcare Company-scoped; las relaciones
+usan composite FKs tenant-safe. No existe implementación todavía.
+
 Un nombre conceptual previo fue:
 
 CaseEquipmentAssignment
@@ -992,7 +998,9 @@ Estado:
 
 Equipment Assignment
 → HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-→ HC-NEXT-03B TECHNICAL DESIGN NEXT / READY
+→ HC-NEXT-03B TECHNICAL DESIGN IN PROGRESS
+→ B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
+→ B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY
 → IMPLEMENTATION NOT STARTED
 
 55. Assignment ownership
@@ -2789,7 +2797,7 @@ MERGED / ACCEPTED, con gates automatizados y aceptación manual de cuatro roles
 en PASS. Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A documentó el
 dominio de Equipment Assignment. El siguiente trabajo es:
 
-HC-NEXT-03B Equipment Assignment Technical Design
+HC-NEXT-03B — B.2 Equipment Assignment API / DTO / Authorization Contract
 ↓
 Case Availability
 

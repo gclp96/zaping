@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
 
 Case Availability
 
@@ -1098,12 +1098,24 @@ ventana operacional. Un overlap del mismo activo produce warning visible, no
 hard block; ADMIN, MANAGER o WAREHOUSE pueden realizar un override con
 justificación obligatoria y auditoría. SALES conserva sólo lectura/contexto.
 
+`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` aprueba B.1: una fila histórica por
+EquipmentAsset, lifecycle `RESERVED` / `RELEASED` / `REPLACED`, origins
+`REQUIREMENT` / `DIRECT`, lineage, buffers Company-scoped, coverage/ventanas
+derivadas, composite FKs tenant-safe y revalidación concurrente. No implementa
+Prisma ni runtime.
+
 ```text
 HC-NEXT-03A Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B Technical Design
-→ NEXT / READY
+→ IN PROGRESS
+
+B.1 Persistence & Availability Design
+→ APPROVED / DOCUMENTED
+
+Next
+→ B.2 API / DTO / Authorization Contract
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED
@@ -2164,7 +2176,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B NEXT / READY; implementation NOT STARTED
+Equipment Assignment Technical Design — HC-NEXT-03B IN PROGRESS; B.1 APPROVED / DOCUMENTED; B.2 NEXT / READY; implementation NOT STARTED
 
 Case Availability
 

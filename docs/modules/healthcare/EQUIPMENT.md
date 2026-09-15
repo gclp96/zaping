@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Approved
-**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — IMPLEMENTATION NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
 
@@ -1510,7 +1510,9 @@ EquipmentAsset identity
 
 Healthcare Equipment Assignment
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-→ TECHNICAL DESIGN HC-NEXT-03B NEXT / READY
+→ TECHNICAL DESIGN HC-NEXT-03B IN PROGRESS
+→ B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
+→ B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY
 → NOT IMPLEMENTED / NOT STARTED
 
 Healthcare Availability for Case
@@ -1546,18 +1548,19 @@ Orden recomendado:
 ```text
 1. Healthcare Requirements V1 — COMPLETE / ACCEPTED
 2. Equipment Assignment domain discovery — COMPLETE / DOCUMENTED
-3. Equipment Assignment technical design — NEXT / READY
-4. Equipment Assignment implementation
-5. Availability for Case
-6. Preparation integration
-7. Dispatch
-8. Custody
-9. Return
-10. Inspection workflow
-11. Case 360 integration
-12. Warehouse Operations UI
-13. Calendar integration
-14. Technician mobile integration
+3. Equipment Assignment persistence & availability design — APPROVED / DOCUMENTED
+4. Equipment Assignment API / DTO / authorization contract — NEXT / READY
+5. Equipment Assignment implementation
+6. Availability for Case
+7. Preparation integration
+8. Dispatch
+9. Custody
+10. Return
+11. Inspection workflow
+12. Case 360 integration
+13. Warehouse Operations UI
+14. Calendar integration
+15. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:

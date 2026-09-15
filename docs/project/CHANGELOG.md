@@ -8,6 +8,34 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03B.1 Equipment Assignment persistence and availability design
+
+**Estado:** HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se creó `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` con el
+diseño de persistencia e Availability. Cada EquipmentAsset reservado usa una
+fila histórica; el lifecycle mínimo es `RESERVED` / `RELEASED` / `REPLACED`, el
+origin es `REQUIREMENT` / `DIRECT` y replacement conserva lineage en lugar de
+sobrescribir identidad.
+
+Coverage continúa derivado desde `requestedQty` y Assignments válidas. Los
+comentarios `UNAVAILABLE`/parciales se preservan como notas operacionales, no
+como un coverage status automático. Los buffers V1
+`preCaseBufferMinutes`/`postCaseBufferMinutes` se recomiendan en configuración
+Healthcare 1:1 por Company; sus valores default exactos siguen TBD.
+
+Los conflictos se calculan sobre ventanas half-open y otra Assignment
+`RESERVED` del mismo activo. El primer request no escribe; la confirmación
+explícita revalida el review y persiste override con actor, razón, timestamp y
+snapshots de ventanas. No se diseña una DB constraint que prohíba overlaps.
+
+Composite FKs protegen Case, EquipmentAsset, Requirement, lineage y overrides.
+La concurrencia combina review optimista con un lock final estrecho por activo,
+evitando `Serializable` o locks Company-wide. Prisma, migrations, API, DTOs,
+frontend, source y tests no fueron modificados ni implementados.
+
+---
+
 # 2026-09-15 — HC-NEXT-03A Equipment Assignment domain discovery
 
 **Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED

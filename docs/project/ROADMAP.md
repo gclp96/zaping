@@ -91,7 +91,9 @@ Requirements V1 — COMPLETE / ACCEPTED
 ↓
 HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
 ↓
-NEXT — HC-NEXT-03B Healthcare Equipment Assignment Technical Design — READY
+HC-NEXT-03B Equipment Assignment Technical Design — IN PROGRESS
+↓
+NEXT — HC-NEXT-03B.2 API / DTO / Authorization Contract — READY
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -110,7 +112,9 @@ están PASS. PR #14 está merged.
 Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A Equipment Assignment
 Domain Discovery está COMPLETE / DOCUMENTED. El siguiente item de M-HC1 es:
 
-HC-NEXT-03B Healthcare Equipment Assignment Technical Design — NEXT / READY
+HC-NEXT-03B — IN PROGRESS; HC-NEXT-03B.1 Persistence & Availability Design
+APPROVED / DOCUMENTED; HC-NEXT-03B.2 API / DTO / Authorization Contract NEXT /
+READY
 
 También permanecen como TARGET Healthcare:
 
@@ -925,10 +929,14 @@ Estos conceptos no deben confundirse.
 
 9.7 Equipment Assignment
 Estado: HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B
-TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED.
+TECHNICAL DESIGN IN PROGRESS — HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN
+APPROVED / DOCUMENTED — IMPLEMENTATION NOT STARTED.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
+
+El diseño HC-NEXT-03B.1 se documenta en
+`docs/modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`.
 
 Debe relacionar:
 
@@ -966,9 +974,19 @@ Intención RBAC: ADMIN, MANAGER y WAREHOUSE pueden leer y mutar; SALES conserva
 sólo lectura/contexto. API, DTOs, guards y permission-based RBAC no se diseñan en
 HC-NEXT-03A.
 
-El lifecycle/status de Assignment, ventana y buffers, persistencia de historia,
-origen directo, concurrencia, relación quantity/rows, API/DTO/RBAC y frontend UX
-quedan para HC-NEXT-03B.
+HC-NEXT-03B.1 define una fila histórica por EquipmentAsset, lifecycle `RESERVED` /
+`RELEASED` / `REPLACED`, origins `REQUIREMENT` / `DIRECT`, lineage, override
+auditable, notas operacionales de coverage, configuración 1:1 Company-scoped,
+ventana half-open, composite FKs y revalidación concurrente con lock estrecho por
+activo. Coverage permanece derivado y no existe DB prohibition de overlaps.
+
+El diseño permite Assignment con schedule incompleto como disponibilidad
+pendiente, libera reservas `REQUIREMENT` al retirar/cancelar la Requirement y
+evita over-coverage mediante validación de dominio, usando `DIRECT` para extras.
+
+HC-NEXT-03B.2 debe cerrar rutas, DTOs, HTTP/stable errors, response shaping,
+pagination/filtering, guards/decorators y confirmación del review. Frontend UX y
+la implementación permanecen posteriores.
 
 Debe mantenerse:
 
@@ -2695,7 +2713,11 @@ Requirements — COMPLETE / ACCEPTED
 
 HC-NEXT-03A Healthcare Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
 
-HC-NEXT-03B Healthcare Equipment Assignment Technical Design — NEXT / READY
+HC-NEXT-03B Healthcare Equipment Assignment Technical Design — IN PROGRESS
+
+HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
+
+HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
 
 Case Availability
 
@@ -2828,7 +2850,9 @@ Requirements V1 — COMPLETE / ACCEPTED
 ↓
 HC-NEXT-03A Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
 ↓
-HC-NEXT-03B Equipment Assignment Technical Design — NEXT / READY
+HC-NEXT-03B Equipment Assignment Technical Design — IN PROGRESS
+↓
+HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
