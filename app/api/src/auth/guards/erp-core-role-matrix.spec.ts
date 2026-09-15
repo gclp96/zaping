@@ -20,6 +20,7 @@ import { HealthcareDoctorHospitalAffiliationsController } from '../../healthcare
 import { HealthcareDoctorsController } from '../../healthcare/doctors/healthcare-doctors.controller';
 import { HealthcareHospitalsController } from '../../healthcare/hospitals/healthcare-hospitals.controller';
 import { HealthcareRequirementsController } from '../../healthcare/requirements/healthcare-requirements.controller';
+import { HealthcareEquipmentAssignmentsController } from '../../healthcare/equipment-assignments/healthcare-equipment-assignments.controller';
 import { ProductsController } from '../../products/products.controller';
 import { PurchaseReceiptsController } from '../../purchases-receipts/purchases-receipts.controller';
 import { PurchasesController } from '../../purchases/purchases.controller';
@@ -218,6 +219,14 @@ const roleMatrix: RoleMatrix[] = [
       update: allRoles,
       retire: allRoles,
       reactivate: allRoles,
+    },
+  },
+  {
+    controller: HealthcareEquipmentAssignmentsController,
+    methods: {
+      findAll: allRoles,
+      findOne: allRoles,
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
     },
   },
 ];
@@ -543,6 +552,70 @@ describe('ERP Core role matrix', () => {
       ).toBe(true);
     },
   );
+
+  it.each([
+    [UserRole.ADMIN, true],
+    [UserRole.MANAGER, true],
+    [UserRole.WAREHOUSE, true],
+    [UserRole.SALES, false],
+  ])(
+    'enforces Equipment Assignment create access for %s',
+    (role, canCreate) => {
+      const rolesGuard = new RolesGuard(new Reflector());
+
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareEquipmentAssignmentsController,
+            'create',
+            role,
+          ),
+        ),
+      ).toBe(canCreate);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareEquipmentAssignmentsController,
+            'findAll',
+            role,
+          ),
+        ),
+      ).toBe(true);
+      expect(
+        rolesGuard.canActivate(
+          buildRoleContext(
+            HealthcareEquipmentAssignmentsController,
+            'findOne',
+            role,
+          ),
+        ),
+      ).toBe(true);
+    },
+  );
+
+  it('denies SALES Equipment Assignment create without mutating auth context', () => {
+    const rolesGuard = new RolesGuard(new Reflector());
+    const request = {
+      user: {
+        id: 'user-1',
+        companyId: 'company-1',
+        role: UserRole.SALES,
+      },
+    };
+    const context = {
+      getHandler: () =>
+        getHandler(HealthcareEquipmentAssignmentsController, 'create'),
+      getClass: () => HealthcareEquipmentAssignmentsController,
+      switchToHttp: () => ({ getRequest: () => request }),
+    } as unknown as ExecutionContext;
+
+    expect(rolesGuard.canActivate(context)).toBe(false);
+    expect(request.user).toEqual({
+      id: 'user-1',
+      companyId: 'company-1',
+      role: UserRole.SALES,
+    });
+  });
 
   it.each(allRoles)(
     'allows %s to use every Healthcare Requirements route',

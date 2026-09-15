@@ -466,7 +466,9 @@ HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery está COMPLETE 
 DOCUMENTED. HC-NEXT-03B está COMPLETE / APPROVED: HC-NEXT-03B.1 Persistence &
 Availability Design, HC-NEXT-03B.2 API / DTO / Authorization Contract y
 HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract están APPROVED /
-DOCUMENTED. HC-NEXT-03C1 Persistence / Migration está COMPLETE / READY FOR
-REVIEW; HC-NEXT-03C2 Assignment Backend Base queda NEXT / BLOCKED UNTIL C1
-MERGED. Assignment está parcialmente implementado sólo en persistencia; su
-backend permanece NOT IMPLEMENTED.
+DOCUMENTED. HC-NEXT-03C1 Persistence / Migration está COMPLETE / MERGED y
+HC-NEXT-03C2 Assignment Backend Base está COMPLETE / READY FOR REVIEW.
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda NEXT / BLOCKED
+UNTIL C2 MERGED. Assignment está parcialmente implementado con persistencia y
+backend base; Availability/conflict review, replace/release y frontend siguen
+sin implementar.

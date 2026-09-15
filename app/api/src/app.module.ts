@@ -20,6 +20,7 @@ import { HealthcareDoctorHospitalAffiliationsModule } from './healthcare/doctor-
 import { HealthcareDoctorsModule } from './healthcare/doctors/healthcare-doctors.module';
 import { HealthcareHospitalsModule } from './healthcare/hospitals/healthcare-hospitals.module';
 import { HealthcareRequirementsModule } from './healthcare/requirements/healthcare-requirements.module';
+import { HealthcareEquipmentAssignmentsModule } from './healthcare/equipment-assignments/healthcare-equipment-assignments.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { validateEnvironment } from './config/env.validation';
@@ -51,6 +52,7 @@ import { validateEnvironment } from './config/env.validation';
     HealthcareDoctorsModule,
     HealthcareHospitalsModule,
     HealthcareRequirementsModule,
+    HealthcareEquipmentAssignmentsModule,
   ],
 })
 export class AppModule {}

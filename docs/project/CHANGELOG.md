@@ -8,9 +8,35 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03C2 Equipment Assignment backend base
+
+**Estado:** HC-NEXT-03C2 COMPLETE / READY FOR REVIEW — HC-NEXT-03C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY NEXT / BLOCKED UNTIL C2 MERGED — PARTIALLY IMPLEMENTED
+
+Se agregó el backend base de Equipment Assignment con módulo, controller,
+service y repository; list/detail/Create; DTOs y filtros paginados; response
+shaping compacto; tenant isolation; fixed-role RBAC; validación de origins
+`REQUIREMENT` / `DIRECT`, elegibilidad, compatibilidad y over-coverage
+secuencial; errores estables e idempotencia atómica de Create.
+
+Mientras C3 no ejecute el motor de Availability, toda reserva informa
+`fullyVerifiable: false` y `conflictFree: null`; el schedule incompleto agrega
+`INCOMPLETE_CASE_SCHEDULE`. No se afirma ausencia de conflictos para schedules
+completos.
+
+Los tests focales pasaron 6 suites / 156 tests y el PostgreSQL E2E 1 suite / 6
+tests. La regresión relevante pasó 23 suites / 517 tests y la API completa 83
+suites / 1241 tests. Prisma validate/generate, lint, typecheck, build y
+diff-check quedaron verdes.
+
+Availability/conflict review/concurrency, ConflictOverride writes,
+replace/release, integraciones parent, frontend y acceptance permanecen fuera
+de C2.
+
+---
+
 # 2026-09-15 — HC-NEXT-03C1 Equipment Assignment persistence and migration
 
-**Estado:** HC-NEXT-03C1 COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 ASSIGNMENT BACKEND BASE NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
+**Estado histórico al completar C1:** HC-NEXT-03C1 COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 ASSIGNMENT BACKEND BASE NEXT / BLOCKED UNTIL C1 MERGED — BACKEND NOT IMPLEMENTED
 
 Se agregó persistencia aditiva para Equipment Assignment: Assignment histórica
 por EquipmentAsset, origins/lifecycle/release causes, replacement lineage,

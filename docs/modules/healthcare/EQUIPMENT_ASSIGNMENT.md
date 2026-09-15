@@ -10,9 +10,10 @@
 **Estado HC-NEXT-03B.1:** PERSISTENCE & AVAILABILITY DESIGN — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.2:** API / DTO / AUTHORIZATION CONTRACT — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.3:** IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT — APPROVED / DOCUMENTED
-**Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / READY FOR REVIEW
-**Siguiente:** HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION; BACKEND NOT IMPLEMENTED
+**Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
+**Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / READY FOR REVIEW
+**Siguiente:** HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE; AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
 
@@ -398,8 +399,9 @@ conserva lectura. Frontend UX continúa diferido.
 
 Los valores numéricos default de buffers y la implementación concreta del guard
 futuro con Dispatch/Custody permanecen diferidos. HC-NEXT-03C1 implementa la
-persistencia; los slices C2-C7, el runtime backend y el frontend permanecen sin
-implementar.
+persistencia y HC-NEXT-03C2 el backend base de lectura y creación; los slices
+C3-C7, Availability/conflict review, replace/release y el frontend permanecen
+sin implementar.
 
 ---
 
@@ -421,15 +423,18 @@ HC-NEXT-03B.2 — API / DTO / Authorization Contract
 HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
 → APPROVED / DOCUMENTED
 
-Next
-→ HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
-
 HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
+→ COMPLETE / MERGED
+
+HC-NEXT-03C2 — Assignment Backend Base
 → COMPLETE / READY FOR REVIEW
 
+Next
+→ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION
-→ BACKEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
+→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 ```
 
 El contrato aprobado mantiene la secuencia:

@@ -8,9 +8,10 @@
 **Estado HC-NEXT-03B.2:** APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.3:** APPROVED / DOCUMENTED
 **Estado de HC-NEXT-03B:** COMPLETE / APPROVED
-**Estado HC-NEXT-03C1:** COMPLETE / READY FOR REVIEW
-**Estado siguiente:** HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION; BACKEND NOT IMPLEMENTED
+**Estado HC-NEXT-03C1:** COMPLETE / MERGED
+**Estado HC-NEXT-03C2:** COMPLETE / READY FOR REVIEW
+**Estado siguiente:** HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE; AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
 
@@ -1897,13 +1898,16 @@ HC-NEXT-03B.2 — API / DTO / Authorization Contract
 HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
 → APPROVED / DOCUMENTED
 
-Next
-→ HC-NEXT-03C2 — Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
-
 HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
+→ COMPLETE / MERGED
+
+HC-NEXT-03C2 — Assignment Backend Base
 → COMPLETE / READY FOR REVIEW
 
+Next
+→ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION
-→ BACKEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
+→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 ```
