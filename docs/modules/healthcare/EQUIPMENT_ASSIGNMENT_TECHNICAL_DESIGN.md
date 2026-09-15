@@ -2,12 +2,13 @@
 
 **Módulo:** Healthcare Equipment Assignment
 **Producto:** Zaping Healthcare
-**Slices aprobados:** HC-NEXT-03B.1 — Persistence & Availability Design; HC-NEXT-03B.2 — API / DTO / Authorization Contract
-**Versión:** 1.1.0
+**Slices aprobados:** HC-NEXT-03B.1 — Persistence & Availability Design; HC-NEXT-03B.2 — API / DTO / Authorization Contract; HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
+**Versión:** 1.2.0
 **Estado HC-NEXT-03B.1:** APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.2:** APPROVED / DOCUMENTED
-**Estado de HC-NEXT-03B:** IN PROGRESS
-**Estado siguiente:** B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+**Estado HC-NEXT-03B.3:** APPROVED / DOCUMENTED
+**Estado de HC-NEXT-03B:** COMPLETE / APPROVED
+**Estado siguiente:** HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 **Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
@@ -17,8 +18,8 @@
 # 1. Propósito y autoridad
 
 Este documento define el diseño técnico aprobado de persistencia, integridad,
-Availability, concurrencia, API, DTOs, autorización y errores para Equipment
-Assignment.
+Availability, concurrencia, API, DTOs, autorización, errores, slices de
+implementación y acceptance para Equipment Assignment.
 
 Parte del contrato de dominio cerrado en `EQUIPMENT_ASSIGNMENT.md` y no lo
 reabre. B.1 y B.2 no modifican Prisma, no crean migrations y no implementan
@@ -36,7 +37,8 @@ Quedan fuera de B.1:
   retiro/cancelación de Requirement.
 
 Esos contratos, salvo frontend, quedan resueltos por HC-NEXT-03B.2 en las
-secciones 21 a 33. Frontend e implementación pertenecen a slices posteriores.
+secciones 21 a 33. HC-NEXT-03B.3 descompone la implementación y fija su
+acceptance en las secciones 34 a 39; no implementa ninguno de esos slices.
 
 ---
 
@@ -1436,10 +1438,12 @@ Assignment/predecessor when applicable
 → write or review
 ```
 
-La implementación debe evitar estado parcialmente visible. Si la composición
-actual de servicios no permite compartir una transacción directamente, B.3 debe
-seleccionar una coordinación equivalente y probarla; no puede degradar el
-contrato a best-effort silencioso.
+La implementación debe evitar estado parcialmente visible. C4 debe incorporar
+una coordinación interna transaction-bound que permita al servicio padre
+ejecutar su cambio y los releases con el mismo Prisma transaction client, o una
+frontera atómica equivalente demostrable. No usa llamadas HTTP internas ni
+degrada el contrato a best-effort silencioso; si la arquitectura CURRENT no
+puede sostener esa frontera, C4 se detiene para una decisión explícita.
 
 ---
 
@@ -1455,28 +1459,433 @@ Permanecen diferidos sin reabrir B.1/B.2:
 5. endpoint general de Case Availability;
 6. frontend components, notifications y mobile workflows;
 7. permission-based RBAC;
-8. Prisma, migrations, services, controllers, tests y acceptance de
-   implementación.
+8. Prisma, migrations, services, controllers, tests y ejecución de acceptance,
+   que comienzan sólo en HC-NEXT-03C1 y slices posteriores.
 
 B.2 no diseña fuzzy search, nested mutations, DELETE ni hard delete. La
 integración real de `RequirementOperationalEvidencePolicy` con futuros
 fulfillment producers continúa bajo el contrato de Requirements y no se declara
 resuelta por este diseño.
 
-B.3 debe convertir el diseño aprobado en slices de implementación y contrato de
-acceptance; no necesita rediseñar rutas, DTOs, fixed-role RBAC, review,
-idempotencia ni errores.
+B.3 convierte el diseño aprobado en slices de implementación y contrato de
+acceptance en las secciones siguientes. No rediseña rutas, DTOs, fixed-role
+RBAC, review, idempotencia ni errores.
 
 ---
 
-# 34. Estado final
+# 34. HC-NEXT-03B.3 — slicing y reglas de entrega
+
+HC-NEXT-03B.3 es diseño y planificación aprobados. No crea schema, migrations,
+runtime, frontend ni tests. El documento de ejecución de acceptance se abrirá
+en C7, cuando exista un build integrado verificable; crear uno ahora sugeriría
+evidencia que todavía no existe.
+
+La secuencia obligatoria es:
+
+```text
+HC-NEXT-03C1 Persistence / Migration
+→ HC-NEXT-03C2 Assignment Backend Base
+→ HC-NEXT-03C3 Availability / Conflict Review / Concurrency
+→ HC-NEXT-03C4 Replace / Release / Parent Integrations
+→ HC-NEXT-03C5 Backend Hardening / Integrated E2E
+→ HC-NEXT-03C6 Frontend Equipment Assignment
+→ HC-NEXT-03C7 Integrated Acceptance
+```
+
+Cada slice parte de `main` después de que su predecesor esté merged y green.
+Sólo puede prepararse trabajo paralelo que no dependa de código o contratos aún
+inestables; no se implementa frontend antes de la baseline backend C5. Un PR no
+mezcla el scope de su sucesor para ahorrar una integración.
+
+Reglas comunes de entrada y salida:
+
+| Gate | Regla |
+| --- | --- |
+| Entry | Predecesor merged; branch limpia desde el `main` vigente; B.1/B.2/B.3 todavía consistentes con el código CURRENT. |
+| Scope | Sólo el capability del slice; sin refactors o dominios futuros no requeridos. |
+| Security | Tenant scoping y fixed-role RBAC se prueban en el punto donde aparecen y permanecen en regresión. |
+| Quality | Focales, regresiones afectadas, lint, typecheck, build y `git diff --check` verdes. |
+| Delivery | Un branch y PR enfocados; CI green; merge antes de iniciar la dependencia siguiente. |
+| Status | Ningún slice intermedio marca Equipment Assignment como aceptado. |
+
+## 34.1 HC-NEXT-03C1 — Persistence / Migration
+
+**Scope:**
+
+- `HealthcareEquipmentAssignment`, lifecycle `RESERVED` / `RELEASED` /
+  `REPLACED`, origin `REQUIREMENT` / `DIRECT` y replacement lineage;
+- metadata de actor, timestamp, reason y cause aprobada en B.1;
+- persistencia de `HealthcareEquipmentAssignmentConflictOverride`;
+- `HealthcareEquipmentRequirementCoverageNote`, mientras el review de
+  implementación no descubra una contradicción con B.1;
+- settings Company-scoped de Equipment Assignment;
+- composite foreign keys tenant-safe, CHECK/unique constraints e índices de
+  lookups/conflict evaluation aprobados;
+- extensión estrecha de los scopes del mecanismo idempotente existente para
+  Create/Replace/Release, sin crear un subsistema paralelo.
+
+**Out of scope:** repositories, services, controllers, Availability de negocio,
+conflict review runtime, commands, frontend y acceptance.
+
+**Gates:**
+
+- `prisma format`, `prisma validate` y `prisma generate`;
+- revisión manual del SQL y de toda operación destructiva;
+- deploy completo en PostgreSQL disposable desde cero y, si aplica, upgrade
+  desde la migration baseline anterior;
+- schema/migration diff sin drift;
+- pruebas PostgreSQL de CHECK, unique, partial unique, lineage, composite FKs e
+  índices críticos;
+- pruebas negativas de caminos relacionales cross-tenant;
+- harness de integridad con opt-in, acknowledgement y nombre de DB disposable;
+- API lint/typecheck/build y `git diff --check`.
+
+**STOP:** migration destructiva no aprobada, FK no tenant-safe, constraint que
+impida historia válida, drift, o tests capaces de apuntar a una DB no
+demostrablemente disposable.
+
+## 34.2 HC-NEXT-03C2 — Assignment Backend Base
+
+**Scope:** módulo/repository/service/controller; GET list/detail; POST Create sin
+override de conflictos; derivación `REQUIREMENT` versus `DIRECT`; validación de
+Requirement/Product/EquipmentAsset, elegibilidad y over-coverage; warning de
+schedule incompleto; selects/response shaping, filtros/paginación, RBAC,
+tenant isolation, stable errors e `Idempotency-Key` mediante el mecanismo
+existente.
+
+Create mantiene el orden conceptual: cargar recursos tenant-scoped, validar
+eligibilidad/compatibilidad/capacity, detectar schedule incompleto y persistir
+atómicamente. Un schedule incompleto permite crear y devuelve
+`fullyVerifiable=false` y `conflictFree=null`; no declara disponibilidad.
+
+**Out of scope:** conflict override/fingerprint completo, Replace, Release,
+integraciones de cancelación/retiro, frontend y Case Availability general.
+
+**Gates:** focales DTO/controller/service/repository; tests reales de
+`JwtAuthGuard` + `RolesGuard` + `@Roles`; Company A/B; foreign igual a missing;
+Create 201 y warning incompleto; Requirement/DIRECT, incompatibilidad,
+elegibilidad, over-coverage, campos protegidos, error mapping e idempotency
+base; regresión Healthcare/Requirements/Equipment afectada; API full suite,
+lint, typecheck, build y `git diff --check`.
+
+**STOP:** `companyId` controlable por cliente, lookup global, SALES con write,
+WAREHOUSE sin write, raw Prisma errors, write ante validación fallida o claim
+idempotente fuera de la misma frontera que la mutación.
+
+## 34.3 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
+
+**Entry adicional obligatorio:** antes de iniciar C3 deben estar aprobados los
+valores numéricos de `preCaseBufferMinutes` y `postCaseBufferMinutes`. C3 no los
+inventa ni avanza con defaults ambiguos.
+
+**Scope:** resolución de settings Company-scoped, derivación de ventana
+operacional, overlap detection, outcome `CONFLICT_REVIEW_REQUIRED` sin write,
+fingerprint canónico, stale review regeneration, confirmación explícita con
+reason, auditoría ConflictOverride, locks estrechos de EquipmentAsset y
+Requirement, revalidación y atomicidad de Create.
+
+**Out of scope:** Case Availability general, Replace/Release, parent release
+integrations, Dispatch/Custody y frontend.
+
+**Gates:** focales de buffers/ventanas/overlaps/fingerprint; review inicial y
+stale con cero writes y cero claims; override confirmado con Assignment y todas
+sus auditorías atómicas; revalidación dentro de transacción; PostgreSQL E2E
+determinista para dos usuarios sobre el mismo EquipmentAsset y sobre capacidad
+de una Requirement; replay/mismatch idempotente; regresión C2 y API completa;
+lint, typecheck, build y `git diff --check`.
+
+**STOP:** defaults sin decisión, doble reserva silenciosa, over-coverage por
+race, fingerprint que omite contexto determinante, review que escribe o consume
+claim, confirmación implícita o auditoría parcial.
+
+## 34.4 HC-NEXT-03C4 — Replace / Release / Parent Integrations
+
+**Scope:** POST `/:assignmentId/replace`; POST `/:assignmentId/release`;
+lineage/historia de replacement; audit de release; reutilización del conflict
+review para el activo sucesor; idempotency/atomicity de commands; integración
+interna que libera reservas por Case cancellation; integración que libera sólo
+Assignments `REQUIREMENT` por Requirement withdrawal/cancellation y preserva
+los `DIRECT`.
+
+Las integraciones padre usan la coordinación interna transaction-bound de la
+sección 32: el cambio de Case/Requirement y sus releases comparten transaction
+client y commit/rollback. No invocan rutas HTTP ni una cadena best-effort.
+
+Toda liberación es lógica. No representa devolución física, movimiento de
+Inventory ni terminación de Custody. El guard concreto Dispatch/Custody queda
+futuro hasta que exista ese producer domain.
+
+**Out of scope:** DELETE/hard delete, nested mutations públicas, frontend,
+Dispatch/Custody runtime y Case Availability general.
+
+**Gates:** focales Replace/Release e integraciones padre; lineage único;
+conflict review del sucesor; auditoría inmutable; repeated Release idempotente;
+replay/mismatch de las tres scopes; rollback completo ante cualquier fallo;
+Case cancellation libera las reservas aplicables; Requirement withdrawal
+libera sólo `REQUIREMENT`; historial legible; regresiones Cases/Requirements/
+C3, API completa, lint, typecheck, build y `git diff --check`.
+
+**STOP:** estado parcialmente visible, sucesores múltiples, history overwrite,
+release de un DIRECT por retiro de Requirement, semántica de devolución física
+fabricada o parent command degradado a best-effort silencioso.
+
+## 34.5 HC-NEXT-03C5 — Backend Hardening / Integrated E2E
+
+**Scope:** cerrar findings del backend integrado sin agregar capability:
+regresión completa de API, tenant isolation, matriz de roles, replay/mismatch,
+stale review, races, historical reads, lifecycle inválido, persistence error
+mapping, Case cancellation, Requirement withdrawal y schedule incompleto.
+
+**Out of scope:** frontend, nuevas rutas, fuzzy search, permission-based RBAC,
+Dispatch/Custody y cambios funcionales no respaldados por B.1/B.2.
+
+**Gates:** todos los focales C1–C4; PostgreSQL disposable integrity/concurrency
+E2E; tests integrados de Company A/B y los cuatro roles; full API estable;
+Prisma validate/generate; API lint/typecheck/build; `git diff --check`; cero
+flakiness no explicada y cero información Prisma/PostgreSQL expuesta.
+
+**STOP:** cualquier full gate rojo, race no determinista, tenant/RBAC gap,
+unsafe DB harness, error interno expuesto o divergencia entre schema, API y
+contrato.
+
+## 34.6 HC-NEXT-03C6 — Frontend Equipment Assignment
+
+**Scope:** UX centrada en Case para ver Requirements de equipo y coverage,
+asignar EquipmentAsset concreto, crear Assignment DIRECT con reason, mostrar
+contexto `PENDING` / `PARTIAL` / `UNAVAILABLE` / `CONFLICT`, advertir schedule
+incompleto, revisar conflictos, confirmar override con reason obligatorio,
+Replace, Release e historia. SALES tiene UI read-only; ADMIN, MANAGER y
+WAREHOUSE conservan controles de mutación.
+
+La UI representa estados derivados y respuestas aprobadas; no inventa prioridad,
+availability persistida ni reglas paralelas. Un 403 no destruye la sesión.
+
+**Out of scope:** screens de Dispatch/Custody, Case Availability general,
+rediseño backend, permission-based RBAC y nuevos workflows de Equipment Core.
+
+**Gates:** focales de section/page/forms/conflict review/history; tests de los
+cuatro roles, ausencia de requests forbidden y sesión preservada; validación de
+reason, retry con fingerprint vigente, stale review, schedule incompleto y
+errores estables; regresión Healthcare Case y navigation/layout; full Web con
+estrategia estable, Web lint/typecheck/build y `git diff --check`.
+
+**STOP:** frontend antes de C5 green, mutación visible/solicitada por SALES,
+override implícito, warning que afirma disponibilidad, raw internal fields o
+regresión de Case/Requirements.
+
+## 34.7 HC-NEXT-03C7 — Integrated Acceptance
+
+**Scope:** preflight automatizado y acceptance manual con ADMIN, MANAGER,
+WAREHOUSE y SALES sobre PostgreSQL/API/Web reales y datos deterministas de dos
+Companies. C7 crea el documento de evidencia con estado inicial `IN PROGRESS /
+PENDING MANUAL QA`; sólo lo promueve cuando pasan todos los escenarios de la
+sección 36.
+
+**Out of scope:** corregir findings dentro de un cambio QA no enfocado, ampliar
+capability, inventar Dispatch/Custody, permission-based RBAC o marcar aceptación
+parcial como completa.
+
+**Gates:** migration deploy en QA; Prisma validate/generate; focales y
+regresiones C1–C6; full API y full Web; PostgreSQL integrity/concurrency E2E;
+API/Web lint, typecheck y build; runtime smoke real; tenant A/B; matriz manual
+de cuatro roles; `git diff --check`; documento de acceptance con expected,
+actual y evidencia de cada escenario.
+
+**STOP:** migration drift, fixture inseguro, API/Web sin conexión real, cualquier
+gate rojo, escenario A–P no ejecutable, finding funcional abierto o evidencia
+manual incompleta.
+
+---
+
+# 35. Delivery y branches recomendados
+
+| Slice | Branch recomendado |
+| --- | --- |
+| C1 | `feat/healthcare-equipment-assignment-persistence` |
+| C2 | `feat/healthcare-equipment-assignment-backend` |
+| C3 | `feat/healthcare-equipment-assignment-availability` |
+| C4 | `feat/healthcare-equipment-assignment-commands` |
+| C5 | `test/healthcare-equipment-assignment-backend-hardening` |
+| C6 | `feat/healthcare-equipment-assignment-frontend` |
+| C7 | `qa/healthcare-equipment-assignment-acceptance` |
+
+Cada branch se crea desde el `main` actualizado después del merge anterior,
+produce un PR enfocado, obtiene CI green y se integra antes de abrir el trabajo
+dependiente. Un branch apilado puede usarse sólo para preparación segura; debe
+actualizarse al predecessor merged y no altera el orden de aceptación.
+
+---
+
+# 36. Contrato de acceptance integrado
+
+## A. Tenant isolation
+
+- Company A no puede leer una Assignment de Company B.
+- Company A no puede asignar un EquipmentAsset de Company B ni usar una
+  Requirement o Case de Company B.
+- Un ID foreign y uno inexistente producen la misma semántica 404 tenant-safe.
+
+## B. RBAC
+
+| Rol | Read | Create | Replace | Release | Conflict override |
+| --- | --- | --- | --- | --- | --- |
+| ADMIN | Sí | Sí | Sí | Sí | Sí |
+| MANAGER | Sí | Sí | Sí | Sí | Sí |
+| WAREHOUSE | Sí | Sí | Sí | Sí | Sí |
+| SALES | Sí | No | No | No | No |
+
+Las mutaciones SALES responden 403 sin logout ni destrucción de sesión. Los
+guards de API siguen siendo la autoridad; role-aware frontend es defensa en
+profundidad.
+
+## C. Assignment origin REQUIREMENT y over-coverage
+
+Con `requestedQty = 2`, el primer y segundo EquipmentAsset compatible se
+reservan; un tercero con origin `REQUIREMENT` se rechaza por over-coverage. Un
+equipo adicional puede registrarse como `DIRECT` con
+`directAssignmentReason`, pero no aumenta la coverage de la Requirement.
+
+## D. Assignment origin DIRECT
+
+`requirementId` se omite y `directAssignmentReason` es obligatorio. El
+EquipmentAsset y su Product continúan catalog-backed. Una Assignment `DIRECT`
+no cuenta para coverage de Requirements.
+
+## E. Eligibility
+
+Una nueva reserva se rechaza para EquipmentAsset `RETIRED`,
+`INSPECTION_PENDING`, `DAMAGED` u `OUT_OF_SERVICE`. Un activo `GOOD` y elegible
+continúa hacia la evaluación de Availability.
+
+## F. Schedule completo sin conflicto
+
+Create devuelve 201, la Assignment queda `RESERVED` y el summary de
+Availability es conflict-free para el contexto actualmente evaluado.
+
+## G. Schedule incompleto
+
+La Assignment se permite y devuelve 201 con `fullyVerifiable=false` y
+`conflictFree=null` o el equivalente aprobado. API y UI muestran warning y no
+afirman disponibilidad. Al completar o reprogramar el Case, la disponibilidad
+se reevalúa automáticamente contra la nueva ventana y puede resultar en
+`CONFLICT`.
+
+## H. Conflict review
+
+- Primer overlap: 200 `CONFLICT_REVIEW_REQUIRED`, cero Assignment writes, cero
+  mutation claims, fingerprint y contexto conflictivo.
+- Confirmación: explícita, fingerprint vigente y reason obligatorio; el server
+  revalida antes del write y persiste Assignment + ConflictOverride
+  atómicamente; devuelve 201.
+- Fingerprint stale: cero writes y outcome de review nuevo con fingerprint y
+  contexto actuales.
+
+## I. Concurrency
+
+Dos usuarios que intentan reservar el mismo EquipmentAsset no pueden obtener
+dos éxitos silenciosamente conflict-free. La decisión final bloquea/revalida el
+estado de reservas vigente y cualquier override requiere review y justificación
+explícitos. Dos intentos concurrentes sobre la capacidad de una Requirement no
+pueden exceder silenciosamente `requestedQty`.
+
+## J. Replacement
+
+Al reemplazar una Assignment `RESERVED` del activo A por B, B queda en una fila
+nueva `RESERVED`, A queda `REPLACED`, lineage y actor/time/reason se conservan,
+A queda lógicamente disponible sujeto a las demás condiciones de dominio, y el
+conflict review aplica a B. Toda la historia permanece legible.
+
+## K. Release
+
+Sólo `RESERVED` puede transicionar por release manual; reason es obligatorio y
+actor/time se preservan. El resultado es `RELEASED`. Repetir Release devuelve
+el resultado idempotente aprobado sin duplicar ni sobrescribir historia.
+
+## L. Case cancellation
+
+Cancelar el Case libera consistentemente sus Assignments lógicas `RESERVED`
+aplicables y retiene historia. No fabrica una devolución física.
+
+## M. Requirement withdrawal/cancellation
+
+Retirar/cancelar una Equipment Requirement libera sus Assignments activas
+`RESERVED` de origin `REQUIREMENT`. Las `DIRECT` permanecen sin cambio y toda la
+historia se conserva.
+
+## N. Idempotency
+
+Para Create, Replace y Release, misma key + mismo payload reejecuta/relee el
+outcome original; misma key + payload distinto produce el conflicto estable
+aprobado. No se duplican mutaciones ni historia. Los outcomes de review sin
+write no crean ni finalizan mutation claims, conforme a B.2.
+
+## O. History y reads
+
+Las filas `RELEASED` y `REPLACED` siguen legibles. Las respuestas incluyen las
+entidades relacionadas compactas y summaries de auditoría aprobados, sin
+exponer `companyId`, actor FKs internos, detalles Prisma/PostgreSQL ni nombres
+de constraints.
+
+## P. Error hardening
+
+Se verifica semántica estable para recursos missing/foreign, DTO inválido,
+payload DIRECT inválido, incompatibilidad Requirement/Product/Equipment,
+Requirement inactive/retired, EquipmentAsset inelegible, over-coverage,
+transición lifecycle inválida, reserva duplicada, idempotency mismatch y fallos
+de persistencia. Nunca se filtran errores raw de Prisma/PostgreSQL.
+
+---
+
+# 37. Decision gates y fronteras futuras
+
+## 37.1 Blocker antes de C3
+
+Los valores exactos de:
+
+```text
+preCaseBufferMinutes
+postCaseBufferMinutes
+```
+
+deben decidirse y quedar documentados antes de implementar Availability en C3.
+B.3 no inventa valores. C1 puede persistir la forma Company-scoped y C2 puede
+implementar el warning de schedule incompleto, pero C3 no inicia hasta cerrar
+este gate.
+
+## 37.2 Dispatch/Custody
+
+El guard concreto de Dispatch/Custody no bloquea C1–C7 mientras esos producer
+domains no estén implementados. La frontera sí es obligatoria: liberar una
+reserva lógica nunca implica que el activo volvió físicamente a Warehouse ni
+que está disponible si Dispatch/Custody llega a gobernar su posición.
+
+No se identifican otros blockers de diseño. Si la implementación descubre uno,
+el slice afectado se detiene y solicita una decisión; no inventa semántica.
+
+---
+
+# 38. Status promotion durante implementación
+
+| Hito | Estado documental permitido |
+| --- | --- |
+| B.3 aprobado | `HC-NEXT-03B COMPLETE / APPROVED — IMPLEMENTATION NOT STARTED` |
+| C1 merged | `PARTIALLY IMPLEMENTED — PERSISTENCE` |
+| C2–C4 merged | `PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS`, enumerando slices reales |
+| C5 merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
+| C6 merged | `IMPLEMENTED / INTEGRATED ACCEPTANCE REQUIRED` |
+| C7 automated green, manual pendiente | `IN PROGRESS / PENDING MANUAL QA / NOT ACCEPTED` |
+| C7 completo | `COMPLETE / ACCEPTED` sólo con escenarios A–P y matriz manual verdes |
+
+---
+
+# 39. Estado final
 
 ```text
 HC-NEXT-03A — Equipment Assignment Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B — Equipment Assignment Technical Design
-→ IN PROGRESS
+→ COMPLETE / APPROVED
 
 HC-NEXT-03B.1 — Persistence & Availability Design
 → APPROVED / DOCUMENTED
@@ -1484,8 +1893,11 @@ HC-NEXT-03B.1 — Persistence & Availability Design
 HC-NEXT-03B.2 — API / DTO / Authorization Contract
 → APPROVED / DOCUMENTED
 
+HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
 Next
-→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+→ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED

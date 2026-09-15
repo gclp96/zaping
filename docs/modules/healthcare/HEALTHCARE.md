@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
 
 Case Availability
 
@@ -1109,12 +1109,16 @@ conflictos 200/no-write con fingerprint, comandos Create/Replace/Release,
 response shaping, errores estables, `Idempotency-Key`, atomicidad y fixed-role
 RBAC. Tampoco implementa runtime.
 
+HC-NEXT-03B.3 aprueba los slices C1–C7, sus dependencias y gates, y el contrato
+de acceptance A–P. Los defaults numéricos de buffers deben decidirse antes de
+C3; el guard concreto Dispatch/Custody permanece futuro y no bloquea C1–C7.
+
 ```text
 HC-NEXT-03A Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B Technical Design
-→ IN PROGRESS
+→ COMPLETE / APPROVED
 
 HC-NEXT-03B.1 Persistence & Availability Design
 → APPROVED / DOCUMENTED
@@ -1122,8 +1126,11 @@ HC-NEXT-03B.1 Persistence & Availability Design
 HC-NEXT-03B.2 API / DTO / Authorization Contract
 → APPROVED / DOCUMENTED
 
+HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
 Next
-→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+→ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED
@@ -2184,7 +2191,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B IN PROGRESS; HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED; B.3 NEXT / READY; implementation NOT STARTED
+Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED; HC-NEXT-03C1 NEXT / READY; implementation NOT STARTED
 
 Case Availability
 

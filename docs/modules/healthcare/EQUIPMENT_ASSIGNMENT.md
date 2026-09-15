@@ -6,10 +6,11 @@
 **Versión:** 1.0.0
 **Estado de dominio:** APPROVED
 **Estado del discovery:** COMPLETE / DOCUMENTED
-**Estado del technical design:** HC-NEXT-03B — IN PROGRESS
+**Estado del technical design:** HC-NEXT-03B — COMPLETE / APPROVED
 **Estado HC-NEXT-03B.1:** PERSISTENCE & AVAILABILITY DESIGN — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.2:** API / DTO / AUTHORIZATION CONTRACT — APPROVED / DOCUMENTED
-**Siguiente:** B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+**Estado HC-NEXT-03B.3:** IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT — APPROVED / DOCUMENTED
+**Siguiente:** HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 **Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
@@ -407,7 +408,7 @@ HC-NEXT-03A — Equipment Assignment Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B — Equipment Assignment Technical Design
-→ IN PROGRESS
+→ COMPLETE / APPROVED
 
 HC-NEXT-03B.1 — Persistence & Availability Design
 → APPROVED / DOCUMENTED
@@ -415,8 +416,11 @@ HC-NEXT-03B.1 — Persistence & Availability Design
 HC-NEXT-03B.2 — API / DTO / Authorization Contract
 → APPROVED / DOCUMENTED
 
+HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
 Next
-→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+→ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED

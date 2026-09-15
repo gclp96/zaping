@@ -8,9 +8,34 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03B.3 Equipment Assignment implementation slicing and acceptance contract
+
+**Estado:** HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se aprobó la secuencia estricta C1 Persistence/Migration → C2 Backend Base → C3
+Availability/Conflict Review/Concurrency → C4 Replace/Release/Parent
+Integrations → C5 Backend Hardening/Integrated E2E → C6 Frontend → C7
+Integrated Acceptance. Cada slice tiene scope/out-of-scope, entry/stop
+conditions, quality gates y un branch/PR enfocado antes de su dependencia.
+
+El contrato final de acceptance cubre escenarios A–P: tenant isolation, matriz
+ADMIN/MANAGER/WAREHOUSE mutable y SALES read-only, origins REQUIREMENT/DIRECT,
+elegibilidad, schedules completos/incompletos, conflict review/fingerprint,
+concurrencia de activos y capacity, Replace/Release, integraciones de Case y
+Requirement, idempotencia, historia y errores estables.
+
+Los valores numéricos de `preCaseBufferMinutes` y `postCaseBufferMinutes` son un
+decision gate obligatorio antes de C3 y no se inventaron. El guard concreto de
+Dispatch/Custody permanece futuro y no bloquea C1–C7 mientras esos producer
+domains no existan; release lógico no equivale a retorno físico.
+
+No se implementaron Prisma, migrations, backend, frontend ni tests.
+
+---
+
 # 2026-09-15 — HC-NEXT-03B.2 Equipment Assignment API / DTO / Authorization Contract
 
-**Estado:** HC-NEXT-03B IN PROGRESS — HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED — B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado histórico al aprobar B.2:** HC-NEXT-03B IN PROGRESS — HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED — B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
 
 Se aprobó el recurso top-level `/healthcare/equipment-assignments` con list,
 detail, Create, Replace y Release. La lista usa filtros relacionales,

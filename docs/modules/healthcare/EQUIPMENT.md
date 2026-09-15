@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Approved
-**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — IMPLEMENTATION NOT STARTED
+**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — IMPLEMENTATION NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
 
@@ -1510,10 +1510,11 @@ EquipmentAsset identity
 
 Healthcare Equipment Assignment
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-→ TECHNICAL DESIGN HC-NEXT-03B IN PROGRESS
+→ TECHNICAL DESIGN HC-NEXT-03B COMPLETE / APPROVED
 → HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
 → HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
-→ B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY
+→ HC-NEXT-03B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT APPROVED / DOCUMENTED
+→ HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY
 → NOT IMPLEMENTED / NOT STARTED
 
 Healthcare Availability for Case
@@ -1551,18 +1552,19 @@ Orden recomendado:
 2. Equipment Assignment domain discovery — COMPLETE / DOCUMENTED
 3. Equipment Assignment persistence & availability design — APPROVED / DOCUMENTED
 4. Equipment Assignment API / DTO / authorization contract — APPROVED / DOCUMENTED
-5. Equipment Assignment implementation slicing / acceptance contract — NEXT / READY
-6. Equipment Assignment implementation
-7. Availability for Case
-8. Preparation integration
-9. Dispatch
-10. Custody
-11. Return
-12. Inspection workflow
-13. Case 360 integration
-14. Warehouse Operations UI
-15. Calendar integration
-16. Technician mobile integration
+5. Equipment Assignment implementation slicing / acceptance contract — APPROVED / DOCUMENTED
+6. Equipment Assignment persistence / migration — NEXT / READY
+7. Remaining Equipment Assignment implementation slices
+8. Availability for Case
+9. Preparation integration
+10. Dispatch
+11. Custody
+12. Return
+13. Inspection workflow
+14. Case 360 integration
+15. Warehouse Operations UI
+16. Calendar integration
+17. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:

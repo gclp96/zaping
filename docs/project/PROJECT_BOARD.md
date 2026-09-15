@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B IN PROGRESS — B.3 Implementation Slicing / Acceptance Contract NEXT / READY
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 Equipment Assignment Persistence / Migration NEXT / READY
 Última actualización: 2026-09-15
 Responsable: Zaping Team
 
@@ -113,10 +113,10 @@ M-HC1 — Healthcare Operations Foundation
 ├── HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery
 │   └── COMPLETE / DOCUMENTED
 └── HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
-    ├── IN PROGRESS
+    ├── COMPLETE / APPROVED
     ├── HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
     ├── HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
-    └── B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
+    └── HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUMENTED
 
 RECENTLY COMPLETED
 
@@ -138,7 +138,7 @@ Frontend UX workstream
 
 NEXT
 
-HC-NEXT-03B — B.3 Equipment Assignment Implementation Slicing / Acceptance Contract
+HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
         → NEXT / READY
 
 DEFERRED
@@ -1727,7 +1727,7 @@ derivadas; los conflictos se muestran como warnings y cualquier override exige
 autorización, justificación y auditoría. La implementación permanece NOT
 STARTED.
 
-HC-NEXT-03B está IN PROGRESS. HC-NEXT-03B.1 Persistence & Availability Design está
+HC-NEXT-03B está COMPLETE / APPROVED. HC-NEXT-03B.1 Persistence & Availability Design está
 APPROVED / DOCUMENTED en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`: una fila por
 activo, lifecycle mínimo, origin/lineage, buffers Company-scoped, overlap sin DB
@@ -1738,7 +1738,10 @@ over-coverage mediante validación de dominio, usando `DIRECT` para extras.
 HC-NEXT-03B.2 API / DTO / Authorization Contract está APPROVED / DOCUMENTED:
 recurso top-level, DTOs allowlisted, review 200/no-write con fingerprint,
 Create/Replace/Release, fixed-role RBAC, errores estables, idempotencia y
-atomicidad. B.3 Implementation Slicing / Acceptance Contract queda NEXT / READY.
+atomicidad. HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract está
+APPROVED / DOCUMENTED con la secuencia C1–C7, gates por slice y acceptance A–P.
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration queda NEXT / READY;
+la implementación sigue NOT STARTED.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2228,7 +2231,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 NEXT ROADMAP ITEM
 
-→ HC-NEXT-03B B.3 Healthcare Equipment Assignment Implementation Slicing / Acceptance Contract — NEXT / READY
+→ HC-NEXT-03C1 Healthcare Equipment Assignment Persistence / Migration — NEXT / READY
 
 DEFERRED
 
@@ -2428,7 +2431,7 @@ HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
-→ IN PROGRESS
+→ COMPLETE / APPROVED
 
 HC-NEXT-03B.1 Persistence & Availability Design
 → APPROVED / DOCUMENTED
@@ -2436,7 +2439,10 @@ HC-NEXT-03B.1 Persistence & Availability Design
 HC-NEXT-03B.2 API / DTO / Authorization Contract
 → APPROVED / DOCUMENTED
 
-B.3 Implementation Slicing / Acceptance Contract
+HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration
 → NEXT / READY
 
 Healthcare Equipment Assignment implementation
