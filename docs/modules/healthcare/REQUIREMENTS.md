@@ -338,6 +338,12 @@ FULFILLED
 Fulfillment se derivará posteriormente desde evidencia de Preparation,
 Assignment, Dispatch, Return y Reconciliation.
 
+HC-NEXT-03A documenta en `EQUIPMENT_ASSIGNMENT.md` que una Assignment de equipo
+normalmente resuelve una Requirement, pero permite una asignación directa y
+trazable de Warehouse para una necesidad urgente o de último minuto. Esa
+excepción no convierte Assignment en Requirement ni modifica el contrato de
+Requirements V1.
+
 ---
 
 # 14. Availability y stock
@@ -456,5 +462,6 @@ Requirements acceptance
 → COMPLETE / ACCEPTED
 ```
 
-El siguiente item documentado de M-HC1 es Healthcare Equipment Assignment
-Domain Discovery; este documento no inventa un identificador para ese trabajo.
+HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery está COMPLETE /
+DOCUMENTED. El siguiente item es HC-NEXT-03B — Equipment Assignment Technical
+Design, NEXT / READY; Assignment permanece NOT IMPLEMENTED.

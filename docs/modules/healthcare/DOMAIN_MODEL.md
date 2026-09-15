@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY NEXT
-Última actualización: 2026-09-14
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -378,7 +378,7 @@ Doctor
 
 Hospital
 
-Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
 
 Case Availability
 
@@ -967,7 +967,7 @@ IN_CUSTODY
 
 al lifecycle del activo.
 
-54. Equipment Assignment TARGET
+54. Equipment Assignment TARGET — DOMAIN CONTRACT DOCUMENTED
 
 Healthcare necesita una relación explícita entre:
 
@@ -975,14 +975,25 @@ HealthcareCase
 ↔
 EquipmentAsset
 
-Un candidato técnico razonable es:
+El contrato canónico se encuentra en `EQUIPMENT_ASSIGNMENT.md`. Assignment
+normalmente resuelve una Requirement de equipo vinculada a Product, aunque
+Warehouse puede crear una asignación directa urgente con origen trazable.
+
+La cobertura incompleta no bloquea el Case. Availability es derivada sobre la
+ventana operacional y un overlap del mismo activo produce un warning visible,
+no un hard block; cualquier override exige autorización, justificación y
+auditoría.
+
+Un nombre conceptual previo fue:
 
 CaseEquipmentAssignment
 
-Actualmente:
+Estado:
 
 Equipment Assignment
-→ NOT IMPLEMENTED
+→ HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED
+→ HC-NEXT-03B TECHNICAL DESIGN NEXT / READY
+→ IMPLEMENTATION NOT STARTED
 
 55. Assignment ownership
 
@@ -2728,11 +2739,9 @@ EquipmentInspection
 
 Permanece sin implementar:
 
-Healthcare frontend beyond Doctors/Hospitals and Case selectors
+Healthcare frontend beyond Doctors/Hospitals, Case selectors and Requirements
 
-Case Requirements
-
-Equipment Assignment
+Equipment Assignment implementation; HC-NEXT-03A domain discovery is complete
 
 Case Availability
 
@@ -2777,11 +2786,10 @@ es el milestone P1 seleccionado.
 
 HC-NEXT-01 está CLOSED / ACCEPTED: C1-C7 están CLOSED / MERGED y C8 está CLOSED /
 MERGED / ACCEPTED, con gates automatizados y aceptación manual de cuatro roles
-en PASS. El siguiente elemento de la secuencia Healthcare documentada es:
+en PASS. Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A documentó el
+dominio de Equipment Assignment. El siguiente trabajo es:
 
-Requirements
-↓
-Equipment Assignment
+HC-NEXT-03B Equipment Assignment Technical Design
 ↓
 Case Availability
 

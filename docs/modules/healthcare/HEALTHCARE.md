@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY NEXT
-Última actualización: 2026-09-14
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
 
 Case Availability
 
@@ -1063,7 +1063,7 @@ frente a:
 Equipment Assignment
 → Healthcare operational relationship
 
-52. Equipment Assignment TARGET
+52. Equipment Assignment TARGET — DOMAIN CONTRACT DOCUMENTED
 
 Equipment Assignment representará la relación entre:
 
@@ -1075,10 +1075,39 @@ EquipmentAsset
 
 cuando una unidad concreta sea destinada a un Case.
 
-Actualmente:
+El contrato canónico se encuentra en `EQUIPMENT_ASSIGNMENT.md`. Mantiene:
+
+```text
+Requirement
+→ what is needed
 
 Equipment Assignment
-→ NOT IMPLEMENTED
+→ which concrete EquipmentAsset is reserved/intended for the Case
+
+Dispatch / Custody
+→ physical movement / actual holder
+```
+
+Assignment normalmente resuelve una Requirement de equipo, pero Warehouse puede
+crear una asignación directa urgente con origen trazable. La cobertura incompleta
+no bloquea el Case; `PARTIAL` y `UNAVAILABLE` admiten explicación y
+`UNAVAILABLE` exige razón de Warehouse.
+
+Availability debe derivarse considerando lifecycle/condition, Assignments y la
+ventana operacional. Un overlap del mismo activo produce warning visible, no
+hard block; ADMIN, MANAGER o WAREHOUSE pueden realizar un override con
+justificación obligatoria y auditoría. SALES conserva sólo lectura/contexto.
+
+```text
+HC-NEXT-03A Domain Discovery
+→ COMPLETE / DOCUMENTED
+
+HC-NEXT-03B Technical Design
+→ NEXT / READY
+
+Equipment Assignment implementation
+→ NOT IMPLEMENTED / NOT STARTED
+```
 
 53. Equipment Assignment must not contaminate EquipmentAsset
 
@@ -2135,7 +2164,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+Equipment Assignment Technical Design — HC-NEXT-03B NEXT / READY; implementation NOT STARTED
 
 Case Availability
 

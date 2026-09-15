@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — Equipment Assignment Domain Discovery NEXT / READY
-Última actualización: 2026-09-14
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B Equipment Assignment Technical Design NEXT / READY
+Última actualización: 2026-09-15
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -110,7 +110,9 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
-└── Healthcare Equipment Assignment Domain Discovery
+├── HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery
+│   └── COMPLETE / DOCUMENTED
+└── HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
     └── NEXT / READY
 
 RECENTLY COMPLETED
@@ -133,7 +135,7 @@ Frontend UX workstream
 
 NEXT
 
-Healthcare Equipment Assignment Domain Discovery
+HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
         → NEXT / READY
 
 DEFERRED
@@ -1711,7 +1713,16 @@ MANAGER, SALES y WAREHOUSE quedó PASS.
 
 `RequirementOperationalEvidencePolicy` existe, pero la integración con un
 producer real de fulfillment permanece diferida hasta futuros dominios como
-Dispatch, Equipment Assignment o Custody. No se asignó un identificador nuevo.
+Dispatch, Equipment Assignment o Custody.
+
+HC-NEXT-03A — Equipment Assignment Domain Discovery está COMPLETE / DOCUMENTED.
+El contrato canónico vive en `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
+Assignment normalmente resuelve una Requirement de equipo, admite asignación
+directa urgente trazable y mantiene separados Assignment, Dispatch, Custody,
+Inventory Movement y lifecycle/condition. Cobertura y Availability son
+derivadas; los conflictos se muestran como warnings y cualquier override exige
+autorización, justificación y auditoría. La implementación permanece NOT
+STARTED.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2201,7 +2212,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 NEXT ROADMAP ITEM
 
-→ Healthcare Equipment Assignment Domain Discovery — NEXT / READY
+→ HC-NEXT-03B Healthcare Equipment Assignment Technical Design — NEXT / READY
 
 DEFERRED
 
@@ -2397,8 +2408,14 @@ Requirements
 → PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED
 → ACCEPTANCE COMPLETE / ACCEPTED
 
-Healthcare Equipment Assignment Domain Discovery
+HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery
+→ COMPLETE / DOCUMENTED
+
+HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
 → NEXT / READY
+
+Healthcare Equipment Assignment implementation
+→ NOT IMPLEMENTED / NOT STARTED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
