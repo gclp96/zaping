@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B IN PROGRESS — HC-NEXT-03B.2 API / DTO / Authorization Contract NEXT / READY
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03B IN PROGRESS — B.3 Implementation Slicing / Acceptance Contract NEXT / READY
 Última actualización: 2026-09-15
 Responsable: Zaping Team
 
@@ -115,7 +115,8 @@ M-HC1 — Healthcare Operations Foundation
 └── HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
     ├── IN PROGRESS
     ├── HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
-    └── HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+    ├── HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
+    └── B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 RECENTLY COMPLETED
 
@@ -137,7 +138,7 @@ Frontend UX workstream
 
 NEXT
 
-HC-NEXT-03B.2 — Equipment Assignment API / DTO / Authorization Contract
+HC-NEXT-03B — B.3 Equipment Assignment Implementation Slicing / Acceptance Contract
         → NEXT / READY
 
 DEFERRED
@@ -1734,7 +1735,10 @@ hard block, composite FKs y estrategia concurrente de revalidación. El diseño
 permite Assignment con schedule incompleto como disponibilidad pendiente,
 libera reservas `REQUIREMENT` al retirar/cancelar la Requirement y evita
 over-coverage mediante validación de dominio, usando `DIRECT` para extras.
-HC-NEXT-03B.2 API / DTO / Authorization Contract queda NEXT / READY.
+HC-NEXT-03B.2 API / DTO / Authorization Contract está APPROVED / DOCUMENTED:
+recurso top-level, DTOs allowlisted, review 200/no-write con fingerprint,
+Create/Replace/Release, fixed-role RBAC, errores estables, idempotencia y
+atomicidad. B.3 Implementation Slicing / Acceptance Contract queda NEXT / READY.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2224,7 +2228,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 NEXT ROADMAP ITEM
 
-→ HC-NEXT-03B.2 Healthcare Equipment Assignment API / DTO / Authorization Contract — NEXT / READY
+→ HC-NEXT-03B B.3 Healthcare Equipment Assignment Implementation Slicing / Acceptance Contract — NEXT / READY
 
 DEFERRED
 
@@ -2430,6 +2434,9 @@ HC-NEXT-03B.1 Persistence & Availability Design
 → APPROVED / DOCUMENTED
 
 HC-NEXT-03B.2 API / DTO / Authorization Contract
+→ APPROVED / DOCUMENTED
+
+B.3 Implementation Slicing / Acceptance Contract
 → NEXT / READY
 
 Healthcare Equipment Assignment implementation

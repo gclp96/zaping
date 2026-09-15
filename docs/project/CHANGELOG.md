@@ -8,9 +8,33 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03B.2 Equipment Assignment API / DTO / Authorization Contract
+
+**Estado:** HC-NEXT-03B IN PROGRESS — HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED — B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se aprobó el recurso top-level `/healthcare/equipment-assignments` con list,
+detail, Create, Replace y Release. La lista usa filtros relacionales,
+status/origin y paginación Healthcare 1/25/max 100; los DTOs derivan origin,
+rechazan campos de Company/actor/lifecycle y mantienen tenant-safe 404.
+
+Create y Replace usan review normal HTTP 200 sin write cuando hay conflicto. La
+confirmación exige fingerprint SHA-256 recomputado y razón; un review stale no
+escribe y devuelve el estado renovado. Los writes exitosos preservan lineage,
+auditoría y las fronteras atómicas aprobadas en B.1.
+
+ADMIN, MANAGER y WAREHOUSE pueden crear, reemplazar, liberar y confirmar
+overrides; SALES conserva read-only. Los comandos reutilizarán el mecanismo
+existente `Idempotency-Key` tenant-scoped, sin un subsistema paralelo.
+
+Permanecen diferidos los defaults numéricos de buffers, el guard concreto de
+Dispatch/Custody, el endpoint general de Case Availability, frontend y toda la
+implementación Prisma/backend/tests/acceptance.
+
+---
+
 # 2026-09-15 — HC-NEXT-03B.1 Equipment Assignment persistence and availability design
 
-**Estado:** HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado histórico al aprobar B.1:** HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
 
 Se creó `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` con el
 diseño de persistencia e Availability. Cada EquipmentAsset reservado usa una

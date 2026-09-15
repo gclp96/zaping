@@ -8,7 +8,8 @@
 **Estado del discovery:** COMPLETE / DOCUMENTED
 **Estado del technical design:** HC-NEXT-03B — IN PROGRESS
 **Estado HC-NEXT-03B.1:** PERSISTENCE & AVAILABILITY DESIGN — APPROVED / DOCUMENTED
-**Siguiente:** HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+**Estado HC-NEXT-03B.2:** API / DTO / AUTHORIZATION CONTRACT — APPROVED / DOCUMENTED
+**Siguiente:** B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 **Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
@@ -219,7 +220,9 @@ Un override de conflicto no marca el activo como globalmente disponible ni
 elimina el conflicto. Registra una decisión operacional explícita y auditable.
 
 B.1 define review sin write, confirmación explícita con revalidación y locks
-estrechos por EquipmentAsset. B.2 definirá el contrato HTTP/DTO/error.
+estrechos por EquipmentAsset. HC-NEXT-03B.2 aprueba el contrato
+HTTP/DTO/error/fingerprint: review normal 200 sin write y confirmación vigente
+con write atómico.
 
 ---
 
@@ -318,8 +321,9 @@ HealthcareCase.companyId
 ```
 
 No se permiten relaciones cross-tenant. B.1 propone composite foreign keys para
-Case, EquipmentAsset, Requirement, lineage y hechos de override. B.2 definirá
-lookups y errores tenant-safe de API.
+Case, EquipmentAsset, Requirement, lineage y hechos de override.
+HC-NEXT-03B.2 exige lookups `id + companyId`, IDs foreign indistinguibles de
+missing mediante 404 tenant-safe y actores derivados del principal autenticado.
 
 Deben ser auditables, como mínimo:
 
@@ -383,9 +387,12 @@ transferencias.
 - revalidación optimista con locks estrechos justificados;
 - separación entre invariantes DB y reglas de service.
 
-HC-NEXT-03B.2 debe cerrar rutas, DTOs, HTTP/stable errors, response shaping,
-pagination/filtering, guards/decorators, confirmación de review e integración de
-Case cancellation y Requirement withdrawal. Frontend UX continúa diferido.
+HC-NEXT-03B.2 aprueba el recurso
+`/healthcare/equipment-assignments`, list/detail, Create, Replace y Release;
+DTOs allowlisted, response shaping, paginación, stable errors, fingerprint de
+review, `Idempotency-Key`, fronteras atómicas y la matriz fixed-role. ADMIN,
+MANAGER y WAREHOUSE pueden crear/reemplazar/liberar/confirmar overrides; SALES
+conserva lectura. Frontend UX continúa diferido.
 
 Los valores numéricos default de buffers y la implementación concreta del guard
 futuro con Dispatch/Custody permanecen diferidos. Nada de este technical design
@@ -405,8 +412,11 @@ HC-NEXT-03B — Equipment Assignment Technical Design
 HC-NEXT-03B.1 — Persistence & Availability Design
 → APPROVED / DOCUMENTED
 
+HC-NEXT-03B.2 — API / DTO / Authorization Contract
+→ APPROVED / DOCUMENTED
+
 Next
-→ HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED

@@ -1311,8 +1311,8 @@ healthcare.equipment.return
 healthcare.equipment.inspect
 ```
 
-Los nombres definitivos, decorators, guards y autorización exacta deberán
-cerrarse en HC-NEXT-03B antes de implementación. Permission-based RBAC no forma
+HC-NEXT-03B.2 aprueba estos roles con `JwtAuthGuard`, `RolesGuard` y `@Roles`
+explícito por handler. SALES conserva read-only. Permission-based RBAC no forma
 parte de HC-NEXT-03.
 
 Healthcare no deberá otorgar mediante estos permisos capacidades Core como:
@@ -1511,8 +1511,9 @@ EquipmentAsset identity
 Healthcare Equipment Assignment
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
 → TECHNICAL DESIGN HC-NEXT-03B IN PROGRESS
-→ B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
-→ B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY
+→ HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
+→ HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
+→ B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY
 → NOT IMPLEMENTED / NOT STARTED
 
 Healthcare Availability for Case
@@ -1549,18 +1550,19 @@ Orden recomendado:
 1. Healthcare Requirements V1 — COMPLETE / ACCEPTED
 2. Equipment Assignment domain discovery — COMPLETE / DOCUMENTED
 3. Equipment Assignment persistence & availability design — APPROVED / DOCUMENTED
-4. Equipment Assignment API / DTO / authorization contract — NEXT / READY
-5. Equipment Assignment implementation
-6. Availability for Case
-7. Preparation integration
-8. Dispatch
-9. Custody
-10. Return
-11. Inspection workflow
-12. Case 360 integration
-13. Warehouse Operations UI
-14. Calendar integration
-15. Technician mobile integration
+4. Equipment Assignment API / DTO / authorization contract — APPROVED / DOCUMENTED
+5. Equipment Assignment implementation slicing / acceptance contract — NEXT / READY
+6. Equipment Assignment implementation
+7. Availability for Case
+8. Preparation integration
+9. Dispatch
+10. Custody
+11. Return
+12. Inspection workflow
+13. Case 360 integration
+14. Warehouse Operations UI
+15. Calendar integration
+16. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:

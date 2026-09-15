@@ -2,11 +2,12 @@
 
 **Módulo:** Healthcare Equipment Assignment
 **Producto:** Zaping Healthcare
-**Slice:** HC-NEXT-03B.1 — Persistence & Availability Design
-**Versión:** 1.0.0
-**Estado:** APPROVED / DOCUMENTED
+**Slices aprobados:** HC-NEXT-03B.1 — Persistence & Availability Design; HC-NEXT-03B.2 — API / DTO / Authorization Contract
+**Versión:** 1.1.0
+**Estado HC-NEXT-03B.1:** APPROVED / DOCUMENTED
+**Estado HC-NEXT-03B.2:** APPROVED / DOCUMENTED
 **Estado de HC-NEXT-03B:** IN PROGRESS
-**Estado siguiente:** HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+**Estado siguiente:** B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 **Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
@@ -16,11 +17,12 @@
 # 1. Propósito y autoridad
 
 Este documento define el diseño técnico aprobado de persistencia, integridad,
-Availability y concurrencia para Equipment Assignment.
+Availability, concurrencia, API, DTOs, autorización y errores para Equipment
+Assignment.
 
 Parte del contrato de dominio cerrado en `EQUIPMENT_ASSIGNMENT.md` y no lo
-reabre. B.1 no modifica Prisma, no crea migrations y no implementa backend,
-frontend ni tests.
+reabre. B.1 y B.2 no modifican Prisma, no crean migrations y no implementan
+backend, frontend ni tests.
 
 Quedan fuera de B.1:
 
@@ -33,7 +35,8 @@ Quedan fuera de B.1:
 - integración concreta con los comandos de cancelación del Case y
   retiro/cancelación de Requirement.
 
-Esos contratos pertenecen a B.2 o a slices posteriores según se indica al final.
+Esos contratos, salvo frontend, quedan resueltos por HC-NEXT-03B.2 en las
+secciones 21 a 33. Frontend e implementación pertenecen a slices posteriores.
 
 ---
 
@@ -94,7 +97,7 @@ Equipment Assignment.
 | `releasedAt` | timestamp nullable | Momento de transición a `RELEASED`. |
 | `releasedById` | UUID nullable | Actor del release manual o de la cancelación. |
 | `releaseCause` | enum nullable | `MANUAL`, `CASE_CANCELLED` o `REQUIREMENT_WITHDRAWN`. |
-| `releaseReason` | string nullable | Contexto opcional; B.2 decidirá cuándo exigirlo. |
+| `releaseReason` | string nullable | Obligatoria y no blank para release manual; opcional para releases internos con cause explícita. |
 | `replacedAt` | timestamp nullable | Momento de transición a `REPLACED`. |
 | `replacedById` | UUID nullable | Actor que ejecutó el reemplazo. |
 | `replacementReason` | string nullable | Obligatoria y no blank cuando lifecycle es `REPLACED`. |
@@ -467,9 +470,9 @@ explicit confirmation + mandatory reason
 → if review still matches: create Assignment + override rows atomically
 ```
 
-B.2 definirá cómo el cliente devuelve la confirmación y cómo se representa el
-fingerprint/revision del conjunto revisado. La garantía B.1 es que una
-confirmación vieja no autoriza conflictos nuevos o ventanas distintas.
+HC-NEXT-03B.2 define en la sección 25 cómo el cliente devuelve la confirmación y
+cómo se representa el fingerprint del conjunto revisado. Una confirmación vieja
+no autoriza conflictos nuevos ni ventanas distintas.
 
 No existe exclusion constraint ni unique temporal que impida overlaps entre
 Cases; el override aprobado debe poder persistirse.
@@ -658,15 +661,15 @@ Requirement.
 ## 18.3 Stale review
 
 La confirmación vuelve a calcular ventanas y conjunto de conflictos dentro del
-lock. Si difieren del review del cliente, no escribe y devuelve un resultado
-estable de review renovado. B.2 nombrará el error/outcome.
+lock. Si difieren del review del cliente, no escribe y devuelve el outcome
+estable `CONFLICT_REVIEW_REQUIRED` con un review renovado.
 
 ## 18.4 Replace y release
 
 Replace bloquea la Assignment original y los EquipmentAsset A/B en orden
 determinista por ID. Release bloquea o hace conditional update sobre la fila
-`RESERVED`. Si el count esperado es cero, re-lee estado tenant-scoped y devuelve
-el resultado estable que B.2 defina.
+`RESERVED`. Si el count esperado es cero, re-lee estado tenant-scoped y aplica
+la semántica idempotente o el error estable definido en las secciones 26 y 27.
 
 Case cancellation y Requirement withdrawal deben adquirir/actualizar sus filas
 `RESERVED` en orden determinista. La coordinación exacta con los comandos
@@ -754,37 +757,719 @@ la historia específica necesaria.
 
 ---
 
-# 21. Decisiones abiertas para B.2 o implementación
+# 21. HC-NEXT-03B.2 — autoridad y convenciones
 
-HC-NEXT-03B.2 debe definir:
+HC-NEXT-03B.2 aprueba el contrato público de API, DTO, response shaping,
+fixed-role RBAC, errores, idempotencia y atomicidad de Equipment Assignment.
+No implementa esas decisiones.
 
-- rutas y métodos;
-- DTOs y protected fields;
-- códigos HTTP y stable error codes;
-- response shaping;
-- pagination/filtering;
-- representación del review/fingerprint y confirmación explícita;
-- guards/decorators para la matriz fixed-role;
-- representación HTTP del warning/review-needed cuando falta una ventana
-  completa, sin reabrir que Assignment está permitida;
-- integración concreta con Case cancellation;
-- integración concreta con Requirement withdrawal/cancellation;
-- idempotency y outcomes exactos de release/replace;
-- frontend-facing semantics, sin diseñar todavía la UI.
+Se reutilizan las convenciones vigentes:
 
-Permanecen diferidos explícitamente y no deben resolverse por inferencia:
+- `JwtAuthGuard`, `RolesGuard` y `@Roles(...)` por handler;
+- `ValidationPipe` global con `whitelist`, `forbidNonWhitelisted` y
+  `transform`;
+- UUIDs de path mediante `ParseUUIDPipe`;
+- errores Healthcare con forma Nest y `code` estable cuando el cliente debe
+  decidir;
+- listas con `page`, `pageSize`, `items` y `pagination`;
+- comandos lifecycle como `POST`;
+- review advisory con HTTP 200 y cero writes;
+- `Idempotency-Key` tenant-scoped, request hash y replay para comandos
+  mutables.
 
-1. valores default exactos de `preCaseBufferMinutes` y
-   `postCaseBufferMinutes`;
-2. mecanismo concreto por el que un futuro Dispatch/Custody participa en el
-   guard de replace/release.
-
-Estas preguntas no contradicen B.1 y no autorizan defaults o comportamiento
-implícito.
+La matriz específica de este documento prevalece sobre referencias preliminares
+anteriores que intentaban heredar los writes de Assignment desde Case update.
+Equipment Assignment es un dominio independiente: WAREHOUSE muta Assignments y
+SALES sólo las lee.
 
 ---
 
-# 22. Estado final
+# 22. Recurso, rutas y lista
+
+El recurso primario es:
+
+```text
+/healthcare/equipment-assignments
+```
+
+No se crean nested mutation routes ni un endpoint general de Case Availability.
+
+| Método | Path | Propósito | Resultado normal | Roles |
+| --- | --- | --- | --- | --- |
+| GET | `/healthcare/equipment-assignments` | Lista tenant-scoped con filtros. | 200 paginado | ADMIN, MANAGER, SALES, WAREHOUSE |
+| GET | `/healthcare/equipment-assignments/:assignmentId` | Detail actual o histórico. | 200 | ADMIN, MANAGER, SALES, WAREHOUSE |
+| POST | `/healthcare/equipment-assignments` | Crear una reserva lógica. | 201 o review 200 | ADMIN, MANAGER, WAREHOUSE |
+| POST | `/healthcare/equipment-assignments/:assignmentId/replace` | Reemplazar una reserva preservando lineage. | 201 o review 200 | ADMIN, MANAGER, WAREHOUSE |
+| POST | `/healthcare/equipment-assignments/:assignmentId/release` | Liberación manual lógica. | 200 | ADMIN, MANAGER, WAREHOUSE |
+
+## 22.1 Query DTO
+
+```text
+caseId?          UUID
+requirementId?   UUID
+equipmentAssetId? UUID
+status?          RESERVED | RELEASED | REPLACED | ALL   default RESERVED
+origin?          REQUIREMENT | DIRECT
+page             integer >= 1                          default 1
+pageSize         integer 1..100                        default 25
+```
+
+Todos los filtros presentes se combinan con AND. Omitir `origin` incluye ambos
+orígenes. `status` es el nombre público del lifecycle persistente; no crea otro
+estado.
+
+Los filtros de relación se validan tenant-scoped. Un `caseId`,
+`requirementId` o `equipmentAssetId` inexistente o foreign produce el mismo 404
+que el recurso ausente correspondiente. Cuando se combinan IDs válidos pero
+incompatibles, se usa el error de mismatch aplicable.
+
+No existe sort arbitrario en V1. El orden es:
+
+```text
+createdAt DESC, id ASC
+```
+
+`createdAt` es también la fuente del alias semántico `assignedAt`. El ID final
+evita inestabilidad entre páginas. Una página posterior al total devuelve 200
+con `items: []`.
+
+Response:
+
+```json
+{
+  "items": [],
+  "pagination": {
+    "page": 1,
+    "pageSize": 25,
+    "totalItems": 0,
+    "totalPages": 0
+  }
+}
+```
+
+---
+
+# 23. DTOs y campos protegidos
+
+## 23.1 CreateEquipmentAssignmentDto
+
+| Campo | Tipo | Requerido | Validación |
+| --- | --- | --- | --- |
+| `caseId` | UUID | sí | UUID válido. |
+| `equipmentAssetId` | UUID | sí | UUID válido. |
+| `requirementId` | UUID/null | no | UUID no-null implica origin `REQUIREMENT`; omitted/null implica `DIRECT`. |
+| `directAssignmentReason` | string/null | condicional | Obligatoria, normalizada, no blank y máximo 1000 para `DIRECT`; omitted/null para `REQUIREMENT`. |
+| `conflictReviewFingerprint` | string | condicional | Fingerprint SHA-256 lowercase de 64 caracteres, sólo en confirmación. |
+| `confirmConflictOverride` | boolean | no | Default false; workflow-only. |
+| `conflictOverrideReason` | string | condicional | Obligatoria, normalizada, no blank y máximo 1000 cuando se confirma override. |
+
+Derivación server-side:
+
+```text
+requirementId is a non-null UUID → origin = REQUIREMENT
+requirementId omitted or null    → origin = DIRECT
+```
+
+Para `REQUIREMENT` el service valida, dentro de Company:
+
+- Requirement existente y `ACTIVE`;
+- mismo Case;
+- Product de la Requirement compatible con el Product del EquipmentAsset;
+- EquipmentAsset elegible;
+- capacity actual menor que `requestedQty`;
+- locks y revalidación definidos en B.1.
+
+Create y Replace se permiten sólo mientras el Case está `DRAFT` o `SCHEDULED`.
+Un Case `CANCELLED` conserva reads/history pero rechaza nuevas mutaciones con el
+error estable de read-only. Requirement debe estar `ACTIVE` para Create; Replace
+preserva la relación y revalida que continúe activa.
+
+Para `DIRECT` exige `directAssignmentReason` y no acepta
+`requirementId` no-null.
+
+`confirmConflictOverride = true` exige simultáneamente fingerprint y razón.
+Fingerprint/razón enviados sin confirmación, confirmación incompleta o campos de
+review con formato inválido producen 400. Ningún campo workflow-only se
+persiste dentro de Assignment.
+
+## 23.2 ReplaceEquipmentAssignmentDto
+
+| Campo | Tipo | Requerido | Validación |
+| --- | --- | --- | --- |
+| `replacementEquipmentAssetId` | UUID | sí | UUID válido y distinto del activo original. |
+| `reason` | string | sí | Normalizada, no blank, máximo 1000. |
+| `conflictReviewFingerprint` | string | condicional | Mismo contrato de Create. |
+| `confirmConflictOverride` | boolean | no | Default false. |
+| `conflictOverrideReason` | string | condicional | Mismo contrato de Create. |
+
+No acepta cambios a Case, Requirement, origin ni contexto DIRECT.
+
+## 23.3 ReleaseEquipmentAssignmentDto
+
+```text
+reason string required, normalized, non-blank, max 1000
+```
+
+## 23.4 Server-protected fields
+
+Los mutation bodies nunca aceptan:
+
+- `companyId`;
+- `origin`;
+- `status`/`lifecycle`;
+- `assignedById`/`createdById`;
+- `assignedAt`/`createdAt`;
+- `releasedById`, `releasedAt`, `releaseCause`;
+- `replacedById`, `replacedAt`, `replacesAssignmentId` o metadata de lineage;
+- metadata o snapshots de override;
+- `updatedAt`;
+- cualquier actor, timestamp o field de sistema.
+
+Actor y Company derivan exclusivamente del principal autenticado. Los DTOs
+declaran allowlists explícitas; las propiedades inesperadas se rechazan, no se
+ignoran silenciosamente. El list query acepta `status` y `origin` únicamente
+como filtros según la sección 22.1; nunca acepta `companyId`, actor IDs ni
+metadata de sistema.
+
+---
+
+# 24. Create y outcomes
+
+## 24.1 Sin conflicto
+
+```text
+POST /healthcare/equipment-assignments
+→ 201 Created
+→ Assignment RESERVED persistida
+```
+
+Response:
+
+```json
+{
+  "outcome": "CREATED",
+  "data": {}
+}
+```
+
+`data` usa `EquipmentAssignmentResponse` de la sección 28.
+
+## 24.2 Schedule incompleto
+
+La creación continúa permitida y devuelve 201 `CREATED`. La respuesta debe
+indicar:
+
+```json
+{
+  "availability": {
+    "fullyVerifiable": false,
+    "conflictFree": null,
+    "warnings": [
+      {
+        "code": "INCOMPLETE_CASE_SCHEDULE",
+        "message": "La disponibilidad requiere revisar el horario del caso"
+      }
+    ]
+  }
+}
+```
+
+No se afirma disponibilidad conflict-free. El warning es derivado y no agrega
+un enum persistente. Una alta o cambio posterior del schedule dispara la
+reevaluación definida en B.1.
+
+## 24.3 Primer conflicto
+
+La primera solicitud sin confirmación:
+
+```text
+conflict found
+→ NO WRITE
+→ 200 OK
+→ outcome = CONFLICT_REVIEW_REQUIRED
+```
+
+```json
+{
+  "outcome": "CONFLICT_REVIEW_REQUIRED",
+  "conflictReviewFingerprint": "64-char-lowercase-sha256",
+  "overrideRequired": true,
+  "conflicts": [
+    {
+      "assignmentId": "uuid",
+      "caseId": "uuid",
+      "caseFolio": "HC-000001",
+      "windowStart": "2026-09-15T15:00:00.000Z",
+      "windowEnd": "2026-09-15T18:00:00.000Z"
+    }
+  ],
+  "candidate": {
+    "caseId": "uuid",
+    "requirementId": null,
+    "origin": "DIRECT",
+    "equipmentAsset": {},
+    "operationalWindow": {
+      "start": "2026-09-15T16:00:00.000Z",
+      "end": "2026-09-15T19:00:00.000Z"
+    }
+  }
+}
+```
+
+Candidate y conflicts usan selects compactos y sólo contienen datos same-tenant
+necesarios para decidir. No incluyen Company, notas clínicas ni detalles
+internos.
+
+## 24.4 Confirmación
+
+El segundo request reenvía el comando completo con:
+
+```text
+confirmConflictOverride = true
+conflictReviewFingerprint = required
+conflictOverrideReason = required
+```
+
+Antes del write, dentro de los locks de B.1, el service revalida:
+
+- tenant relations;
+- Case y schedule;
+- settings Company-scoped;
+- lifecycle/condition y elegibilidad del EquipmentAsset;
+- Requirement activa, misma Case/Product y capacity;
+- ventana candidata;
+- conjunto completo de conflictos.
+
+Si el fingerprint coincide, Assignment y auditoría de override se persisten
+atómicamente y Create devuelve 201 `CREATED`.
+
+Si no coincide, no escribe y devuelve 200 `CONFLICT_REVIEW_REQUIRED` con la
+representación y fingerprint recién calculados. Si el conflicto desapareció,
+`conflicts` queda vacío y `overrideRequired = false`; el cliente descarta la
+confirmación anterior y reenvía el comando base sin campos de override. No se
+autoriza un write con una revisión stale.
+
+El review normal y el review renovado no son errores 409.
+
+---
+
+# 25. Conflict review fingerprint
+
+El fingerprint es un detector determinista de staleness, no autenticación, un
+capability token ni un sustituto de RBAC.
+
+El server construye una representación canónica versionada:
+
+```text
+contractVersion = equipment-assignment-conflict-review:v1
+companyId
+command = CREATE | REPLACE
+candidate caseId/equipmentAssetId/requirementId/origin
+candidate operational window in UTC ISO-8601
+candidate Case/EquipmentAsset/Requirement relevant updatedAt or version inputs
+Requirement lifecycle/requestedQty when applicable
+preCaseBufferMinutes/postCaseBufferMinutes
+conflicts sorted by assignmentId
+  assignmentId
+  caseId
+  operational window in UTC ISO-8601
+  relevant updatedAt/version inputs
+```
+
+Reglas:
+
+1. keys y arrays tienen orden canónico;
+2. null y ausencia no se intercambian fuera de la normalización DTO aprobada;
+3. timestamps usan UTC con precisión estable;
+4. el server serializa la forma canónica y calcula SHA-256;
+5. la API expone 64 caracteres hex lowercase;
+6. el server siempre recomputa inmediatamente antes del write.
+
+`companyId` participa en el hash para separar tenants, aunque no se expone en
+la respuesta. El fingerprint no contiene secretos; su posesión nunca concede
+permiso ni evita revalidaciones.
+
+---
+
+# 26. Replace command
+
+`POST /healthcare/equipment-assignments/:assignmentId/replace`:
+
+- carga la original por `assignmentId + companyId`;
+- exige lifecycle `RESERVED`;
+- exige un EquipmentAsset distinto, same-tenant y elegible;
+- preserva Case, Requirement, origin y `directAssignmentReason`;
+- aplica el mismo flujo de Availability, review, fingerprint y override al
+  nuevo activo;
+- para origin `REQUIREMENT`, calcula capacity sustituyendo a la predecesora, no
+  sumándola como una unidad adicional;
+- crea la sucesora `RESERVED` con `replacesAssignmentId`;
+- transiciona la original a `REPLACED`;
+- conserva actor, tiempo y `reason`.
+
+Sin conflicto:
+
+```text
+→ 201 Created
+→ outcome = REPLACED
+```
+
+```json
+{
+  "outcome": "REPLACED",
+  "data": {},
+  "replacedAssignmentId": "uuid"
+}
+```
+
+Con conflicto devuelve el mismo 200 `CONFLICT_REVIEW_REQUIRED` antes de
+cualquier write. La candidate identifica el comando `REPLACE` y la predecesora.
+
+Una original `RELEASED` o `REPLACED` no se vuelve a reemplazar con otra key:
+devuelve 409 `ASSIGNMENT_INVALID_LIFECYCLE`. Un replay con la misma
+`Idempotency-Key` y payload del reemplazo exitoso devuelve el resultado
+original. La unique de lineage y el lock de la original evitan múltiples
+sucesoras activas.
+
+El reemplazo no fabrica Return ni disponibilidad física. El guard futuro de
+Dispatch/Custody continúa diferido.
+
+---
+
+# 27. Release e integraciones internas
+
+## 27.1 Release manual
+
+`POST /healthcare/equipment-assignments/:assignmentId/release`:
+
+- carga por `assignmentId + companyId`;
+- exige `reason`;
+- `RESERVED → RELEASED` con `releaseCause = MANUAL`;
+- deriva actor y timestamp del principal/server;
+- termina sólo la reserva lógica;
+- no crea Inventory Movement, Return ni cambio de Custody.
+
+El release manual aplica mientras el Case está `DRAFT` o `SCHEDULED`. La
+cancelación usa exclusivamente la integración interna de 27.2; un Case
+`CANCELLED` no abre una superficie manual alternativa.
+
+Resultado:
+
+```text
+→ 200 OK
+→ outcome = RELEASED
+```
+
+Un release repetido sobre `RELEASED` devuelve 200 con el estado actual, no
+escribe, no cambia razón/actor/timestamp y no duplica historia. Release sobre
+`REPLACED` devuelve 409 `ASSIGNMENT_INVALID_LIFECYCLE`. Una pérdida de carrera
+que ya alcanzó `RELEASED` usa la misma semántica idempotente; cualquier otro
+estado inesperado devuelve `RESOURCE_STATE_CHANGED`.
+
+## 27.2 Case cancellation
+
+El comando público existente
+`POST /healthcare/cases/:caseId/cancel` mantiene su RBAC ADMIN/MANAGER. Dentro de
+esa operación, el dominio libera sus Assignments `RESERVED` con
+`releaseCause = CASE_CANCELLED` y el actor del comando. No se crea otro endpoint
+público de cancelación o bulk release en Assignment.
+
+## 27.3 Requirement withdrawal/cancellation
+
+El comando existente
+`POST /healthcare/requirements/:requirementId/retire` mantiene su RBAC
+ADMIN/MANAGER/SALES/WAREHOUSE y sus errores. “Withdrawal/cancellation” en este
+documento corresponde al retiro lógico vigente; no crea otro lifecycle ni otra
+ruta. Dentro de esa operación:
+
+- libera todas las Assignments `RESERVED` de origin `REQUIREMENT` para esa
+  Requirement;
+- usa `releaseCause = REQUIREMENT_WITHDRAWN` y el actor del comando;
+- no modifica Assignments `DIRECT`;
+- conserva todas las filas históricas.
+
+Esta mutación derivada se autoriza por el comando padre de Requirement; no
+concede a SALES acceso al endpoint manual de Assignment release.
+
+Ambas integraciones liberan reserva lógica únicamente. Cuando Dispatch/Custody
+exista, su guard deberá impedir que el release se presente como disponibilidad
+física falsa.
+
+---
+
+# 28. Response shaping
+
+`EquipmentAssignmentResponse`:
+
+```json
+{
+  "id": "uuid",
+  "caseId": "uuid",
+  "requirementId": null,
+  "origin": "DIRECT",
+  "status": "RESERVED",
+  "equipmentAsset": {
+    "id": "uuid",
+    "productId": "uuid",
+    "assetCode": "EQ-000001",
+    "serialNumber": null,
+    "lifecycle": "ACTIVE",
+    "condition": "GOOD",
+    "product": {
+      "id": "uuid",
+      "sku": "EQ-PRODUCT-01",
+      "name": "Equipo",
+      "isActive": true
+    }
+  },
+  "assignedAt": "2026-09-15T15:00:00.000Z",
+  "assignedBy": {
+    "id": "uuid",
+    "firstName": "Ana",
+    "lastName": "Pérez"
+  },
+  "directAssignmentReason": "Respaldo de último minuto",
+  "replacesAssignmentId": null,
+  "replacement": null,
+  "release": null,
+  "availability": {
+    "fullyVerifiable": true,
+    "conflictFree": true,
+    "warnings": []
+  },
+  "conflictOverrides": [],
+  "createdAt": "2026-09-15T15:00:00.000Z",
+  "updatedAt": "2026-09-15T15:00:00.000Z"
+}
+```
+
+Reglas:
+
+- `status` refleja `RESERVED`, `RELEASED` o `REPLACED`; no expone el nombre
+  interno `lifecycle` de Assignment;
+- `assignedAt` es el alias semántico de `createdAt` y `assignedBy` se obtiene de
+  `createdById`; no exige columnas duplicadas;
+- `directAssignmentReason` sólo se muestra para `DIRECT`;
+- `replacement` en la fila predecesora incluye `successorAssignmentId`,
+  `reason`, `replacedAt` y actor compacto;
+- `release` incluye `cause`, `reason`, `releasedAt` y actor compacto;
+- `availability` es null para filas terminales; para `RESERVED` es derivada del
+  contexto vigente;
+- `conflictFree` es null si falta una ventana completa, true si es verificable
+  sin conflicto y false si existe conflicto actual, incluso si fue overridden;
+- `warnings` usa códigos de presentación estables como
+  `INCOMPLETE_CASE_SCHEDULE`, `CURRENT_ASSIGNMENT_CONFLICT` y
+  `CONFLICT_OVERRIDE_CONFIRMED`, sin persistir un availability enum;
+- `conflictOverrides` contiene summaries
+  `{ conflictingAssignmentId, approvedAt, approvedBy, reason }`, sin snapshots
+  internos de cálculo;
+- reads preservan y devuelven filas históricas `RELEASED`/`REPLACED`.
+
+No se exponen `companyId`, FK de actores, search keys, constraint names,
+fingerprint inputs, snapshots internos completos ni detalles Prisma.
+
+---
+
+# 29. RBAC y tenant isolation
+
+Todos los handlers usan `@UseGuards(JwtAuthGuard, RolesGuard)` y `@Roles`
+explícito:
+
+| Capability | ADMIN | MANAGER | WAREHOUSE | SALES |
+| --- | --- | --- | --- | --- |
+| List/detail/history | allow | allow | allow | allow |
+| Create | allow | allow | allow | deny |
+| Replace | allow | allow | allow | deny |
+| Manual release | allow | allow | allow | deny |
+| Conflict override dentro de Create/Replace | allow | allow | allow | deny |
+
+SALES recibe 403 antes de cualquier lookup al intentar mutaciones. El
+fingerprint no modifica esta decisión. WAREHOUSE no obtiene por ello permisos
+generales de Case update, Requirement management, Inventory Movement,
+Dispatch/Custody ni otros módulos.
+
+Reglas obligatorias:
+
+- `companyId` proviene sólo de `request.user.companyId`;
+- actor proviene sólo de `request.user.id`;
+- lists/counts/conflicts/coverage/overrides se filtran por Company;
+- detail y comandos buscan `id + companyId`;
+- Case, Requirement y EquipmentAsset se validan con Company;
+- compact relations usan selects explícitos y no cruzan tenant;
+- foreign y missing producen el mismo 404;
+- no se realiza lookup global para revelar existencia;
+- composite FKs de B.1 son la defensa final.
+
+Un same-tenant resource con estado inválido puede producir 409 específico porque
+su existencia ya es visible al rol autorizado.
+
+---
+
+# 30. Validación, HTTP y errores estables
+
+Los errores con branching conservan la forma:
+
+```json
+{
+  "statusCode": 409,
+  "error": "Conflict",
+  "code": "EQUIPMENT_ASSET_NOT_ELIGIBLE",
+  "message": "El equipo no está disponible para una nueva asignación"
+}
+```
+
+| Escenario | HTTP | Stable code/behavior |
+| --- | --- | --- |
+| Malformed path UUID | 400 | `ParseUUIDPipe` |
+| Tipo, enum, length o propiedad inesperada | 400 | `ValidationPipe` |
+| Payload DIRECT/REQUIREMENT inconsistente | 400 | `INVALID_ASSIGNMENT_ORIGIN` |
+| Confirmación/fingerprint incompleto o malformado | 400 | `INVALID_CONFLICT_REVIEW_CONFIRMATION` |
+| Razón de conflict override ausente/blank | 400 | `CONFLICT_OVERRIDE_REASON_REQUIRED` |
+| Assignment missing/foreign | 404 | `EQUIPMENT_ASSIGNMENT_NOT_FOUND` |
+| Case missing/foreign | 404 | `CASE_NOT_FOUND` |
+| Requirement missing/foreign | 404 | `REQUIREMENT_NOT_FOUND` |
+| EquipmentAsset missing/foreign | 404 | `EQUIPMENT_ASSET_NOT_FOUND` |
+| Case no permite Assignment mutation | 409 | `CASE_EQUIPMENT_ASSIGNMENTS_READ_ONLY` |
+| Requirement retirada | 409 | Existing `REQUIREMENT_RETIRED` |
+| Requirement pertenece a otro Case same-tenant | 409 | `ASSIGNMENT_REQUIREMENT_CASE_MISMATCH` |
+| Requirement Product y EquipmentAsset Product difieren | 409 | `ASSIGNMENT_PRODUCT_MISMATCH` |
+| EquipmentAsset lifecycle/condition no elegible | 409 | `EQUIPMENT_ASSET_NOT_ELIGIBLE` |
+| Capacity `requestedQty` ya cubierta | 409 | `REQUIREMENT_OVER_COVERAGE` |
+| Mismo activo ya `RESERVED` en el mismo Case | 409 | `ASSIGNMENT_ALREADY_RESERVED` |
+| Replacement usa el mismo activo u otra relación inválida | 409 | `INVALID_ASSIGNMENT_REPLACEMENT` |
+| Lifecycle no permite replace/release | 409 | `ASSIGNMENT_INVALID_LIFECYCLE` |
+| Estado cambió durante conditional write | 409 | Existing `RESOURCE_STATE_CHANGED` |
+| FK/recurso relacionado cambió durante write | 409 | Existing `RELATED_RESOURCE_CHANGED` |
+| Misma idempotency key con payload distinto | 409 | `IDEMPOTENCY_KEY_REUSED` |
+| Persistence failure no clasificada | 500 | Existing `HEALTHCARE_PERSISTENCE_ERROR` |
+| Rol no autorizado | 403 | `RolesGuard`; no lookup |
+| Sesión ausente/inválida | 401 | `JwtAuthGuard` |
+
+`CONFLICT_REVIEW_REQUIRED` es un outcome HTTP 200, no error. Un fingerprint
+bien formado pero stale/mismatched produce un review renovado HTTP 200, no
+`INVALID_CONFLICT_REVIEW_CONFIRMATION`.
+
+Los mappers de persistencia capturan sólo constraints conocidas. P2002 de la
+partial unique de reserva se relee tenant-scoped y se traduce a
+`ASSIGNMENT_ALREADY_RESERVED`; P2003 se traduce a
+`RELATED_RESOURCE_CHANGED`. Nunca se exponen códigos Prisma/PostgreSQL,
+constraint names, SQL ni mensajes raw.
+
+---
+
+# 31. Idempotencia
+
+Existe un mecanismo reusable en Purchase Receipts:
+
+```text
+Idempotency-Key
+companyId + scope + key
+normalized request hash
+same payload replay
+different payload conflict
+transactional claim
+```
+
+B.2 lo adopta, sin crear otro subsistema, para los tres comandos mutables. El
+header es requerido, se trimmea, debe ser non-empty y tener máximo 128
+caracteres.
+
+Scopes conceptuales separados:
+
+```text
+HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
+HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
+HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE
+```
+
+El hash incluye path parameters y body normalizado. Identidad:
+
+```text
+companyId + scope + Idempotency-Key
+```
+
+Comportamiento:
+
+- same key + same normalized request → replay de la misma identidad/outcome sin
+  reejecutar la mutación; la representación se relee tenant-scoped en su estado
+  canónico vigente;
+- same key + different request → 409 `IDEMPOTENCY_KEY_REUSED`;
+- same key en otra Company o scope → identidad independiente;
+- claim, mutation y resource/result identity se confirman atómicamente;
+- recuperación de una colisión de claim relee fuera de la transacción abortada.
+
+Un resultado `CONFLICT_REVIEW_REQUIRED` no consume ni finaliza el claim porque
+no hubo write y el siguiente body agrega confirmación/fingerprint. Lo mismo
+aplica a un review stale. El claim sólo se persiste con una mutación exitosa.
+
+Protecciones naturales adicionales:
+
+- la partial unique impide dos `RESERVED` del mismo activo/Case;
+- Requirement lock + recount impide over-coverage;
+- unique lineage + lock de predecesora impide sucesores múltiples;
+- repeated release de `RELEASED` es no-op y no sobrescribe auditoría;
+- internal Case/Requirement bulk releases usan estado esperado y no duplican
+  historia.
+
+---
+
+# 32. Atomicidad y orden de locks
+
+| Operación | Frontera atómica |
+| --- | --- |
+| Create sin conflicto | Idempotency claim + Assignment `RESERVED`. |
+| Create con override | Claim + Assignment + todas las ConflictOverride rows. |
+| Review inicial/stale | Cero writes; no claim persistido. |
+| Replace | Claim + original `REPLACED` + sucesora `RESERVED` + lineage + override rows. |
+| Release | Claim + status `RELEASED` + actor/time/reason/cause. |
+| Case cancellation | Cambio de Case + releases lógicos aplicables, dentro de una frontera consistente soportada por la arquitectura. |
+| Requirement withdrawal | Cambio de Requirement + releases `REQUIREMENT` aplicables, dentro de una frontera consistente soportada por la arquitectura. |
+
+Los writes aplican el orden de B.1:
+
+```text
+Assignment/predecessor when applicable
+→ EquipmentAsset IDs in deterministic order
+→ Requirement when applicable
+→ re-read Case/settings/current reservations
+→ recompute eligibility/window/conflicts/capacity
+→ write or review
+```
+
+La implementación debe evitar estado parcialmente visible. Si la composición
+actual de servicios no permite compartir una transacción directamente, B.3 debe
+seleccionar una coordinación equivalente y probarla; no puede degradar el
+contrato a best-effort silencioso.
+
+---
+
+# 33. Scope diferido y siguiente etapa
+
+Permanecen diferidos sin reabrir B.1/B.2:
+
+1. valores numéricos default de `preCaseBufferMinutes` y
+   `postCaseBufferMinutes`;
+2. implementación concreta del guard cross-domain Dispatch/Custody;
+3. Dispatch/Custody API y physical positioning;
+4. Inventory Movement API;
+5. endpoint general de Case Availability;
+6. frontend components, notifications y mobile workflows;
+7. permission-based RBAC;
+8. Prisma, migrations, services, controllers, tests y acceptance de
+   implementación.
+
+B.2 no diseña fuzzy search, nested mutations, DELETE ni hard delete. La
+integración real de `RequirementOperationalEvidencePolicy` con futuros
+fulfillment producers continúa bajo el contrato de Requirements y no se declara
+resuelta por este diseño.
+
+B.3 debe convertir el diseño aprobado en slices de implementación y contrato de
+acceptance; no necesita rediseñar rutas, DTOs, fixed-role RBAC, review,
+idempotencia ni errores.
+
+---
+
+# 34. Estado final
 
 ```text
 HC-NEXT-03A — Equipment Assignment Domain Discovery
@@ -796,8 +1481,11 @@ HC-NEXT-03B — Equipment Assignment Technical Design
 HC-NEXT-03B.1 — Persistence & Availability Design
 → APPROVED / DOCUMENTED
 
+HC-NEXT-03B.2 — API / DTO / Authorization Contract
+→ APPROVED / DOCUMENTED
+
 Next
-→ HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED

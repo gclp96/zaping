@@ -93,7 +93,7 @@ HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery — COMPLETE / 
 ↓
 HC-NEXT-03B Equipment Assignment Technical Design — IN PROGRESS
 ↓
-NEXT — HC-NEXT-03B.2 API / DTO / Authorization Contract — READY
+NEXT — HC-NEXT-03B B.3 Implementation Slicing / Acceptance Contract — READY
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -112,9 +112,9 @@ están PASS. PR #14 está merged.
 Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A Equipment Assignment
 Domain Discovery está COMPLETE / DOCUMENTED. El siguiente item de M-HC1 es:
 
-HC-NEXT-03B — IN PROGRESS; HC-NEXT-03B.1 Persistence & Availability Design
-APPROVED / DOCUMENTED; HC-NEXT-03B.2 API / DTO / Authorization Contract NEXT /
-READY
+HC-NEXT-03B — IN PROGRESS; HC-NEXT-03B.1 Persistence & Availability Design y
+HC-NEXT-03B.2 API / DTO / Authorization Contract APPROVED / DOCUMENTED; B.3
+Implementation Slicing / Acceptance Contract NEXT / READY
 
 También permanecen como TARGET Healthcare:
 
@@ -929,8 +929,9 @@ Estos conceptos no deben confundirse.
 
 9.7 Equipment Assignment
 Estado: HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B
-TECHNICAL DESIGN IN PROGRESS — HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN
-APPROVED / DOCUMENTED — IMPLEMENTATION NOT STARTED.
+TECHNICAL DESIGN IN PROGRESS — HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN Y
+HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED —
+IMPLEMENTATION NOT STARTED.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -984,9 +985,11 @@ El diseño permite Assignment con schedule incompleto como disponibilidad
 pendiente, libera reservas `REQUIREMENT` al retirar/cancelar la Requirement y
 evita over-coverage mediante validación de dominio, usando `DIRECT` para extras.
 
-HC-NEXT-03B.2 debe cerrar rutas, DTOs, HTTP/stable errors, response shaping,
-pagination/filtering, guards/decorators y confirmación del review. Frontend UX y
-la implementación permanecen posteriores.
+HC-NEXT-03B.2 aprueba el recurso top-level, filtros/paginación, DTOs allowlisted,
+response shaping, guards/decorators, stable errors, review 200/no-write con
+fingerprint, `Idempotency-Key` y fronteras atómicas. ADMIN/MANAGER/WAREHOUSE
+mutan; SALES conserva read-only. Frontend UX y la implementación permanecen
+posteriores; B.3 Implementation Slicing / Acceptance Contract queda NEXT / READY.
 
 Debe mantenerse:
 
@@ -2717,7 +2720,9 @@ HC-NEXT-03B Healthcare Equipment Assignment Technical Design — IN PROGRESS
 
 HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
 
-HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
+
+B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 Case Availability
 
@@ -2852,7 +2857,7 @@ HC-NEXT-03A Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
 ↓
 HC-NEXT-03B Equipment Assignment Technical Design — IN PROGRESS
 ↓
-HC-NEXT-03B.2 API / DTO / Authorization Contract — NEXT / READY
+HC-NEXT-03B B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

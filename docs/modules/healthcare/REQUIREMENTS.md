@@ -463,6 +463,7 @@ Requirements acceptance
 ```
 
 HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery está COMPLETE /
-DOCUMENTED. HC-NEXT-03B está IN PROGRESS: B.1 Persistence & Availability Design
-está APPROVED / DOCUMENTED y B.2 API / DTO / Authorization Contract queda NEXT /
-READY. Assignment permanece NOT IMPLEMENTED.
+DOCUMENTED. HC-NEXT-03B está IN PROGRESS: HC-NEXT-03B.1 Persistence &
+Availability Design y HC-NEXT-03B.2 API / DTO / Authorization Contract están
+APPROVED / DOCUMENTED; B.3 Implementation Slicing / Acceptance Contract queda
+NEXT / READY. Assignment permanece NOT IMPLEMENTED.

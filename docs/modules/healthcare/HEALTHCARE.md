@@ -1098,11 +1098,16 @@ ventana operacional. Un overlap del mismo activo produce warning visible, no
 hard block; ADMIN, MANAGER o WAREHOUSE pueden realizar un override con
 justificación obligatoria y auditoría. SALES conserva sólo lectura/contexto.
 
-`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` aprueba B.1: una fila histórica por
+`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` aprueba HC-NEXT-03B.1: una fila histórica por
 EquipmentAsset, lifecycle `RESERVED` / `RELEASED` / `REPLACED`, origins
 `REQUIREMENT` / `DIRECT`, lineage, buffers Company-scoped, coverage/ventanas
 derivadas, composite FKs tenant-safe y revalidación concurrente. No implementa
 Prisma ni runtime.
+
+HC-NEXT-03B.2 aprueba el recurso API top-level, DTOs allowlisted, review de
+conflictos 200/no-write con fingerprint, comandos Create/Replace/Release,
+response shaping, errores estables, `Idempotency-Key`, atomicidad y fixed-role
+RBAC. Tampoco implementa runtime.
 
 ```text
 HC-NEXT-03A Domain Discovery
@@ -1111,11 +1116,14 @@ HC-NEXT-03A Domain Discovery
 HC-NEXT-03B Technical Design
 → IN PROGRESS
 
-B.1 Persistence & Availability Design
+HC-NEXT-03B.1 Persistence & Availability Design
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03B.2 API / DTO / Authorization Contract
 → APPROVED / DOCUMENTED
 
 Next
-→ B.2 API / DTO / Authorization Contract
+→ B.3 Implementation Slicing / Acceptance Contract — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED
@@ -2176,7 +2184,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B IN PROGRESS; B.1 APPROVED / DOCUMENTED; B.2 NEXT / READY; implementation NOT STARTED
+Equipment Assignment Technical Design — HC-NEXT-03B IN PROGRESS; HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED; B.3 NEXT / READY; implementation NOT STARTED
 
 Case Availability
 

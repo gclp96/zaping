@@ -984,11 +984,14 @@ ventana operacional y un overlap del mismo activo produce un warning visible,
 no un hard block; cualquier override exige autorización, justificación y
 auditoría.
 
-B.1 se documenta en `EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`: cada activo usa
+HC-NEXT-03B.1 se documenta en `EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`: cada activo usa
 una fila histórica con lifecycle `RESERVED` / `RELEASED` / `REPLACED`; el origen
 es `REQUIREMENT` o `DIRECT`; Availability y coverage son derivados; buffers
 pre/post Case viven en configuración Healthcare Company-scoped; las relaciones
 usan composite FKs tenant-safe. No existe implementación todavía.
+
+HC-NEXT-03B.2 aprueba rutas, DTOs, fixed-role RBAC, review/fingerprint,
+responses, errores, idempotencia y atomicidad sin implementar runtime.
 
 Un nombre conceptual previo fue:
 
@@ -999,8 +1002,9 @@ Estado:
 Equipment Assignment
 → HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED
 → HC-NEXT-03B TECHNICAL DESIGN IN PROGRESS
-→ B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
-→ B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY
+→ HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
+→ HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
+→ B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY
 → IMPLEMENTATION NOT STARTED
 
 55. Assignment ownership
@@ -2795,9 +2799,10 @@ es el milestone P1 seleccionado.
 HC-NEXT-01 está CLOSED / ACCEPTED: C1-C7 están CLOSED / MERGED y C8 está CLOSED /
 MERGED / ACCEPTED, con gates automatizados y aceptación manual de cuatro roles
 en PASS. Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A documentó el
-dominio de Equipment Assignment. El siguiente trabajo es:
+dominio de Equipment Assignment. HC-NEXT-03B.1 y HC-NEXT-03B.2 están APPROVED /
+DOCUMENTED. El siguiente trabajo es:
 
-HC-NEXT-03B — B.2 Equipment Assignment API / DTO / Authorization Contract
+HC-NEXT-03B — B.3 Equipment Assignment Implementation Slicing / Acceptance Contract
 ↓
 Case Availability
 
