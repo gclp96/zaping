@@ -6,7 +6,11 @@
 **Versión:** 1.0.0
 **Estado de dominio:** APPROVED
 **Estado del discovery:** COMPLETE / DOCUMENTED
-**Estado del technical design:** HC-NEXT-03B — NEXT / READY
+**Estado del technical design:** HC-NEXT-03B — COMPLETE / APPROVED
+**Estado HC-NEXT-03B.1:** PERSISTENCE & AVAILABILITY DESIGN — APPROVED / DOCUMENTED
+**Estado HC-NEXT-03B.2:** API / DTO / AUTHORIZATION CONTRACT — APPROVED / DOCUMENTED
+**Estado HC-NEXT-03B.3:** IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT — APPROVED / DOCUMENTED
+**Siguiente:** HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 **Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Healthcare Team
@@ -103,8 +107,16 @@ También se admite una asignación directa a un Case sin Requirement previa cuan
 Warehouse atiende una necesidad urgente o de último minuto. Esta asignación
 manual debe quedar identificada y ser claramente trazable.
 
-La representación exacta del origen directo y la cardinalidad técnica entre
-`requestedQty` y las filas de Assignment se definen en HC-NEXT-03B.
+B.1 define una fila de Assignment por EquipmentAsset concreto: tres unidades
+requeridas pueden cubrirse con tres filas. `REQUIREMENT` exige `requirementId` y
+`DIRECT` exige razón con `requirementId = null`. El detalle vive en
+`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`.
+
+Las Assignments activas con origin `REQUIREMENT` no pueden exceder
+`requestedQty` para esa Requirement. Una unidad adicional de respaldo o por una
+necesidad operacional de último momento debe usar origin `DIRECT`, exigir
+`directAssignmentReason` y no cuenta hacia la cobertura de la Requirement. Esta
+regla se valida en dominio/service; no se modela como un constraint SQL amplio.
 
 ---
 
@@ -144,8 +156,9 @@ Warehouse puede registrar que el equipo requerido no está disponible.
 `UNAVAILABLE` exige comentario o razón de Warehouse. `PARTIAL` debe admitir un
 comentario explicativo.
 
-El modelo exacto de cobertura, comentarios y readiness queda para Technical
-Design.
+B.1 mantiene coverage derivado y propone notas operacionales especializadas e
+históricas para `UNAVAILABLE`/contexto parcial, sin persistir coverage como
+status automático.
 
 ---
 
@@ -177,8 +190,17 @@ La evaluación debe considerar una ventana operacional, no sólo
 - limpieza o esterilización;
 - inspección cuando aplique.
 
-La representación exacta de la ventana y los buffers/configuración de cada etapa
-pertenecen a HC-NEXT-03B.
+B.1 define `preCaseBufferMinutes` y `postCaseBufferMinutes` Company-scoped en una
+configuración Healthcare 1:1. Los defaults exactos siguen TBD.
+
+Una Assignment puede registrarse aunque la ventana operacional del Case todavía
+no sea completamente derivable, por ejemplo cuando `scheduledEnd = null`. En
+ese estado la disponibilidad queda pendiente/no completamente verificable: no
+puede presentarse como libre de conflictos y la UI/API posterior debe mostrar
+warning o revisión necesaria. Este estado es derivado y no introduce un enum
+persistido. Cada alta o cambio del horario reevalúa automáticamente las
+Assignments activas: si el schedule sigue incompleto permanecen pendientes y,
+cuando permite derivar la nueva ventana completa, pueden pasar a `CONFLICT`.
 
 ---
 
@@ -198,8 +220,10 @@ Si el mismo EquipmentAsset se superpone con la ventana operacional de otro Case:
 Un override de conflicto no marca el activo como globalmente disponible ni
 elimina el conflicto. Registra una decisión operacional explícita y auditable.
 
-El algoritmo de detección, revalidación, locking, concurrencia y persistencia de
-la justificación queda para Technical Design.
+B.1 define review sin write, confirmación explícita con revalidación y locks
+estrechos por EquipmentAsset. HC-NEXT-03B.2 aprueba el contrato
+HTTP/DTO/error/fingerprint: review normal 200 sin write y confirmación vigente
+con write atómico.
 
 ---
 
@@ -214,9 +238,9 @@ debe preservar como mínimo la historia conceptual de:
 - fecha y hora;
 - razón.
 
-El estado actual no puede sobrescribir o borrar la historia anterior. La
-estrategia de persistencia para eventos, versiones o snapshots no se decide en
-este discovery.
+El estado actual no puede sobrescribir o borrar la historia anterior. B.1 define
+filas históricas con lifecycle `RESERVED` / `RELEASED` / `REPLACED` y una
+self-relation de lineage hacia la Assignment reemplazada.
 
 Si ya existe Dispatch o Custody, modificar la Assignment no reescribe la realidad
 física: cualquier cambio adicional debe coordinarse con los workflows futuros
@@ -224,7 +248,7 @@ correspondientes.
 
 ---
 
-# 9. Reschedule y cancelación
+# 9. Reschedule, cancelación y retiro de Requirement
 
 ## 9.1 Reschedule
 
@@ -252,6 +276,18 @@ condition y demás hechos operacionales lo permiten.
 La liberación de Assignment no revierte Dispatch ni Custody. Si el equipo ya
 salió físicamente de Warehouse, Return/Reconciliation sigue siendo necesario y
 la cancelación no debe falsear esa realidad.
+
+## 9.3 Retiro o cancelación de Requirement
+
+Cuando una Equipment Requirement se retira o cancela, sus Assignments activas
+con lifecycle `RESERVED` y origin `REQUIREMENT` se liberan automáticamente. Las
+filas históricas se conservan y las Assignments originadas como `DIRECT` no se
+liberan por esta regla.
+
+La liberación afecta sólo la reserva lógica. La integración futura con
+Dispatch/Custody debe impedir que esta transición presente como físicamente
+disponible un activo que ya salió de Warehouse o está gobernado por esos
+dominios. El guard concreto de esa integración permanece diferido.
 
 ---
 
@@ -285,8 +321,10 @@ HealthcareCase.companyId
 = Assignment company ownership
 ```
 
-No se permiten relaciones cross-tenant. La forma técnica de constraints,
-lookups y errores tenant-safe se decide en Technical Design.
+No se permiten relaciones cross-tenant. B.1 propone composite foreign keys para
+Case, EquipmentAsset, Requirement, lineage y hechos de override.
+HC-NEXT-03B.2 exige lookups `id + companyId`, IDs foreign indistinguibles de
+missing mediante 404 tenant-safe y actores derivados del principal autenticado.
 
 Deben ser auditables, como mínimo:
 
@@ -295,7 +333,8 @@ Deben ser auditables, como mínimo:
 - Replace;
 - Release;
 - conflict override;
-- liberación automática por cancelación.
+- liberación automática por cancelación de Case;
+- liberación automática por retiro/cancelación de Requirement.
 
 La auditoría debe poder explicar actor, momento, acción, razón cuando sea
 obligatoria y contexto relevante antes/después, sin definir todavía campos o
@@ -328,24 +367,37 @@ transferencias.
 
 ---
 
-# 13. Preguntas diferidas a HC-NEXT-03B
+# 13. Estado del technical design
 
-Technical Design debe cerrar, sin reabrir las decisiones funcionales anteriores:
+`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` aprueba en B.1:
 
-- lifecycle/status exacto de Assignment;
-- representación exacta de la ventana de disponibilidad;
-- buffers/configuración para preparación, transporte, retorno,
-  limpieza/esterilización e inspección;
-- estrategia de persistencia para historia y auditoría;
-- representación del origen de una asignación directa;
-- detección de conflictos, revalidación y concurrencia;
-- relación exacta entre cantidad de Requirement y filas de Assignment;
-- Prisma schema, constraints e índices;
-- API, DTOs, errores y RBAC implementable;
-- frontend UX y presentación de warnings, cobertura y override.
+- una fila histórica por EquipmentAsset;
+- lifecycle `RESERVED` / `RELEASED` / `REPLACED`;
+- origin `REQUIREMENT` / `DIRECT`;
+- lineage de reemplazo;
+- persistencia especializada de override y notas de cobertura;
+- configuración Company-scoped para buffers pre/post Case;
+- ventana y overlap derivados;
+- Assignment permitida con schedule incompleto, con disponibilidad pendiente y
+  revalidación automática al completar o cambiar la ventana;
+- liberación automática de reservas originadas por Requirement cuando ésta se
+  retira/cancela, preservando historia;
+- límite de cobertura por `requestedQty`, con extras originados como `DIRECT` y
+  validación de dominio/service;
+- composite foreign keys tenant-safe;
+- revalidación optimista con locks estrechos justificados;
+- separación entre invariantes DB y reglas de service.
 
-No se consideran aprobados aún modelos, enums persistidos, endpoints ni shapes de
-respuesta.
+HC-NEXT-03B.2 aprueba el recurso
+`/healthcare/equipment-assignments`, list/detail, Create, Replace y Release;
+DTOs allowlisted, response shaping, paginación, stable errors, fingerprint de
+review, `Idempotency-Key`, fronteras atómicas y la matriz fixed-role. ADMIN,
+MANAGER y WAREHOUSE pueden crear/reemplazar/liberar/confirmar overrides; SALES
+conserva lectura. Frontend UX continúa diferido.
+
+Los valores numéricos default de buffers y la implementación concreta del guard
+futuro con Dispatch/Custody permanecen diferidos. Nada de este technical design
+está implementado todavía.
 
 ---
 
@@ -356,7 +408,19 @@ HC-NEXT-03A — Equipment Assignment Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B — Equipment Assignment Technical Design
-→ NEXT / READY
+→ COMPLETE / APPROVED
+
+HC-NEXT-03B.1 — Persistence & Availability Design
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03B.2 — API / DTO / Authorization Contract
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03B.3 — Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
+Next
+→ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED

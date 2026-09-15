@@ -1766,8 +1766,9 @@ Justificación:
 - WAREHOUSE necesita leer contexto de Case, Doctor, Hospital y affiliations,
   pero sus writes CURRENT están concentrados en Suppliers, Purchases/Receipts,
   Inventory y Equipment. No recibe master-data Healthcare writes por defecto.
-- Assignment sigue el permiso CURRENT de Case update:
-  ADMIN/MANAGER/SALES. WAREHOUSE conserva read sin ampliar mutation.
+- Equipment Assignment no hereda el permiso de Case update. Su autorización
+  se rige exclusivamente por el contrato canónico aprobado en
+  `EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md`.
 
 Duplicate candidates requieren el mismo permiso de create/edit que inició la
 operación. No existe endpoint público de candidatos.

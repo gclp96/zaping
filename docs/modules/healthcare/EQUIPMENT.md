@@ -4,7 +4,7 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Approved
-**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
+**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — IMPLEMENTATION NOT STARTED
 **Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
 
@@ -1311,8 +1311,8 @@ healthcare.equipment.return
 healthcare.equipment.inspect
 ```
 
-Los nombres definitivos, decorators, guards y autorización exacta deberán
-cerrarse en HC-NEXT-03B antes de implementación. Permission-based RBAC no forma
+HC-NEXT-03B.2 aprueba estos roles con `JwtAuthGuard`, `RolesGuard` y `@Roles`
+explícito por handler. SALES conserva read-only. Permission-based RBAC no forma
 parte de HC-NEXT-03.
 
 Healthcare no deberá otorgar mediante estos permisos capacidades Core como:
@@ -1510,7 +1510,11 @@ EquipmentAsset identity
 
 Healthcare Equipment Assignment
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-→ TECHNICAL DESIGN HC-NEXT-03B NEXT / READY
+→ TECHNICAL DESIGN HC-NEXT-03B COMPLETE / APPROVED
+→ HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY DESIGN APPROVED / DOCUMENTED
+→ HC-NEXT-03B.2 API / DTO / AUTHORIZATION CONTRACT APPROVED / DOCUMENTED
+→ HC-NEXT-03B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT APPROVED / DOCUMENTED
+→ HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY
 → NOT IMPLEMENTED / NOT STARTED
 
 Healthcare Availability for Case
@@ -1546,18 +1550,21 @@ Orden recomendado:
 ```text
 1. Healthcare Requirements V1 — COMPLETE / ACCEPTED
 2. Equipment Assignment domain discovery — COMPLETE / DOCUMENTED
-3. Equipment Assignment technical design — NEXT / READY
-4. Equipment Assignment implementation
-5. Availability for Case
-6. Preparation integration
-7. Dispatch
-8. Custody
-9. Return
-10. Inspection workflow
-11. Case 360 integration
-12. Warehouse Operations UI
-13. Calendar integration
-14. Technician mobile integration
+3. Equipment Assignment persistence & availability design — APPROVED / DOCUMENTED
+4. Equipment Assignment API / DTO / authorization contract — APPROVED / DOCUMENTED
+5. Equipment Assignment implementation slicing / acceptance contract — APPROVED / DOCUMENTED
+6. Equipment Assignment persistence / migration — NEXT / READY
+7. Remaining Equipment Assignment implementation slices
+8. Availability for Case
+9. Preparation integration
+10. Dispatch
+11. Custody
+12. Return
+13. Inspection workflow
+14. Case 360 integration
+15. Warehouse Operations UI
+16. Calendar integration
+17. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:

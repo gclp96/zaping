@@ -4,7 +4,7 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
 Última actualización: 2026-09-15
 Responsable: Zaping Healthcare Team
 
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — NOT IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — B.1/B.2/B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 NEXT / READY — NOT IMPLEMENTED
 
 Case Availability
 
@@ -1098,12 +1098,39 @@ ventana operacional. Un overlap del mismo activo produce warning visible, no
 hard block; ADMIN, MANAGER o WAREHOUSE pueden realizar un override con
 justificación obligatoria y auditoría. SALES conserva sólo lectura/contexto.
 
+`EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` aprueba HC-NEXT-03B.1: una fila histórica por
+EquipmentAsset, lifecycle `RESERVED` / `RELEASED` / `REPLACED`, origins
+`REQUIREMENT` / `DIRECT`, lineage, buffers Company-scoped, coverage/ventanas
+derivadas, composite FKs tenant-safe y revalidación concurrente. No implementa
+Prisma ni runtime.
+
+HC-NEXT-03B.2 aprueba el recurso API top-level, DTOs allowlisted, review de
+conflictos 200/no-write con fingerprint, comandos Create/Replace/Release,
+response shaping, errores estables, `Idempotency-Key`, atomicidad y fixed-role
+RBAC. Tampoco implementa runtime.
+
+HC-NEXT-03B.3 aprueba los slices C1–C7, sus dependencias y gates, y el contrato
+de acceptance A–P. Los defaults numéricos de buffers deben decidirse antes de
+C3; el guard concreto Dispatch/Custody permanece futuro y no bloquea C1–C7.
+
 ```text
 HC-NEXT-03A Domain Discovery
 → COMPLETE / DOCUMENTED
 
 HC-NEXT-03B Technical Design
-→ NEXT / READY
+→ COMPLETE / APPROVED
+
+HC-NEXT-03B.1 Persistence & Availability Design
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03B.2 API / DTO / Authorization Contract
+→ APPROVED / DOCUMENTED
+
+HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract
+→ APPROVED / DOCUMENTED
+
+Next
+→ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — NEXT / READY
 
 Equipment Assignment implementation
 → NOT IMPLEMENTED / NOT STARTED
@@ -2164,7 +2191,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B NEXT / READY; implementation NOT STARTED
+Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED; HC-NEXT-03C1 NEXT / READY; implementation NOT STARTED
 
 Case Availability
 

@@ -8,6 +8,83 @@
 
 ---
 
+# 2026-09-15 — HC-NEXT-03B.3 Equipment Assignment implementation slicing and acceptance contract
+
+**Estado:** HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03B.1 + HC-NEXT-03B.2 + HC-NEXT-03B.3 APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se aprobó la secuencia estricta C1 Persistence/Migration → C2 Backend Base → C3
+Availability/Conflict Review/Concurrency → C4 Replace/Release/Parent
+Integrations → C5 Backend Hardening/Integrated E2E → C6 Frontend → C7
+Integrated Acceptance. Cada slice tiene scope/out-of-scope, entry/stop
+conditions, quality gates y un branch/PR enfocado antes de su dependencia.
+
+El contrato final de acceptance cubre escenarios A–P: tenant isolation, matriz
+ADMIN/MANAGER/WAREHOUSE mutable y SALES read-only, origins REQUIREMENT/DIRECT,
+elegibilidad, schedules completos/incompletos, conflict review/fingerprint,
+concurrencia de activos y capacity, Replace/Release, integraciones de Case y
+Requirement, idempotencia, historia y errores estables.
+
+Los valores numéricos de `preCaseBufferMinutes` y `postCaseBufferMinutes` son un
+decision gate obligatorio antes de C3 y no se inventaron. El guard concreto de
+Dispatch/Custody permanece futuro y no bloquea C1–C7 mientras esos producer
+domains no existan; release lógico no equivale a retorno físico.
+
+No se implementaron Prisma, migrations, backend, frontend ni tests.
+
+---
+
+# 2026-09-15 — HC-NEXT-03B.2 Equipment Assignment API / DTO / Authorization Contract
+
+**Estado histórico al aprobar B.2:** HC-NEXT-03B IN PROGRESS — HC-NEXT-03B.1 + HC-NEXT-03B.2 APPROVED / DOCUMENTED — B.3 IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se aprobó el recurso top-level `/healthcare/equipment-assignments` con list,
+detail, Create, Replace y Release. La lista usa filtros relacionales,
+status/origin y paginación Healthcare 1/25/max 100; los DTOs derivan origin,
+rechazan campos de Company/actor/lifecycle y mantienen tenant-safe 404.
+
+Create y Replace usan review normal HTTP 200 sin write cuando hay conflicto. La
+confirmación exige fingerprint SHA-256 recomputado y razón; un review stale no
+escribe y devuelve el estado renovado. Los writes exitosos preservan lineage,
+auditoría y las fronteras atómicas aprobadas en B.1.
+
+ADMIN, MANAGER y WAREHOUSE pueden crear, reemplazar, liberar y confirmar
+overrides; SALES conserva read-only. Los comandos reutilizarán el mecanismo
+existente `Idempotency-Key` tenant-scoped, sin un subsistema paralelo.
+
+Permanecen diferidos los defaults numéricos de buffers, el guard concreto de
+Dispatch/Custody, el endpoint general de Case Availability, frontend y toda la
+implementación Prisma/backend/tests/acceptance.
+
+---
+
+# 2026-09-15 — HC-NEXT-03B.1 Equipment Assignment persistence and availability design
+
+**Estado histórico al aprobar B.1:** HC-NEXT-03B IN PROGRESS — B.1 APPROVED / DOCUMENTED — B.2 API / DTO / AUTHORIZATION CONTRACT NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se creó `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md` con el
+diseño de persistencia e Availability. Cada EquipmentAsset reservado usa una
+fila histórica; el lifecycle mínimo es `RESERVED` / `RELEASED` / `REPLACED`, el
+origin es `REQUIREMENT` / `DIRECT` y replacement conserva lineage en lugar de
+sobrescribir identidad.
+
+Coverage continúa derivado desde `requestedQty` y Assignments válidas. Los
+comentarios `UNAVAILABLE`/parciales se preservan como notas operacionales, no
+como un coverage status automático. Los buffers V1
+`preCaseBufferMinutes`/`postCaseBufferMinutes` se recomiendan en configuración
+Healthcare 1:1 por Company; sus valores default exactos siguen TBD.
+
+Los conflictos se calculan sobre ventanas half-open y otra Assignment
+`RESERVED` del mismo activo. El primer request no escribe; la confirmación
+explícita revalida el review y persiste override con actor, razón, timestamp y
+snapshots de ventanas. No se diseña una DB constraint que prohíba overlaps.
+
+Composite FKs protegen Case, EquipmentAsset, Requirement, lineage y overrides.
+La concurrencia combina review optimista con un lock final estrecho por activo,
+evitando `Serializable` o locks Company-wide. Prisma, migrations, API, DTOs,
+frontend, source y tests no fueron modificados ni implementados.
+
+---
+
 # 2026-09-15 — HC-NEXT-03A Equipment Assignment domain discovery
 
 **Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
