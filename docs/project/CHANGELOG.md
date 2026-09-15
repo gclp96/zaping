@@ -3,8 +3,36 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.4.0
 **Estado:** Activo
-**Última actualización:** 2026-09-14
+**Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-15 — HC-NEXT-03A Equipment Assignment domain discovery
+
+**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
+
+Se creó `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md` como contrato canónico
+del dominio. El discovery distingue Requirement — qué se necesita — de Equipment
+Assignment — qué EquipmentAsset concreto se reserva o prevé — y de
+Dispatch/Custody, Inventory Movement y lifecycle/condition.
+
+Equipment Assignment normalmente resuelve una Requirement vinculada a Product y
+puede cubrir cantidades múltiples con cobertura parcial. Warehouse también puede
+crear una asignación directa urgente si su origen queda trazable. `UNAVAILABLE`
+exige razón de Warehouse y `PARTIAL` admite explicación; cobertura y Availability
+se describen como derivadas, no como enums o flags persistidos aprobados.
+
+La disponibilidad considera lifecycle/condition y una ventana operacional más
+amplia que el horario del Case. Los overlaps del mismo activo generan warnings
+visibles, no hard blocks; ADMIN, MANAGER o WAREHOUSE pueden realizar un override
+con justificación obligatoria y auditoría. SALES conserva lectura/contexto.
+Reassignment preserva historia; reschedule reevalúa sin descartar Assignments y
+`CANCELLED` libera las reservas activas sin reescribir Dispatch o Custody.
+
+Prisma, migrations, modelos persistidos, API/DTOs, frontend, locking y
+concurrencia no fueron diseñados ni implementados. HC-NEXT-03B queda NEXT / READY
+para cerrar esas decisiones técnicas.
 
 ---
 

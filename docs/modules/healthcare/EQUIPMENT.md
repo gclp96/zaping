@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** Approved
-**Estado de implementación:** DOMAIN DESIGN / NOT IMPLEMENTED
-**Última actualización:** 2026-08-21
+**Estado de implementación:** EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED
+**Última actualización:** 2026-09-15
 **Responsable:** Zaping Team
 
 ---
@@ -50,6 +50,10 @@ Inspection
 Case Availability
 Equipment history inside Cases
 ```
+
+El contrato de dominio canónico y más específico para Equipment Assignment se
+encuentra en `EQUIPMENT_ASSIGNMENT.md`. Ante una diferencia sobre Assignment,
+cobertura, conflicto o release, ese documento prevalece para HC-NEXT-03.
 
 ---
 
@@ -132,7 +136,8 @@ Snapshots históricos podrán almacenarse cuando sean necesarios para auditoría
 
 # 4. Equipment Requirement
 
-`Equipment Requirement` representa:
+En el baseline actual, una necesidad de equipo se expresa mediante Healthcare
+Requirements vinculadas a Product. Representa:
 
 > **Qué tipo de equipo necesita un Healthcare Case.**
 
@@ -169,7 +174,7 @@ Assignment
 
 # 5. Case Equipment Assignment
 
-`CaseEquipmentAssignment` representa:
+`Equipment Assignment` representa:
 
 > **La reserva operacional de un EquipmentAsset específico para un Healthcare Case.**
 
@@ -240,7 +245,7 @@ EquipmentAsset exists
 Lifecycle = ACTIVE
 Condition allows use
 no incompatible active custody
-no blocking assignment conflict
+conflicts are detected and surfaced for an authorized justified override
 target Case exists
 target Case belongs to same Company
 ```
@@ -251,7 +256,8 @@ Cuando exista calendario suficiente también deberán evaluarse conflictos tempo
 
 # 8. Assignment conflict
 
-Una misma unidad física no puede reservarse para Cases temporalmente incompatibles.
+Una misma unidad física puede producir un conflicto cuando sus ventanas
+operacionales se superponen.
 
 Ejemplo:
 
@@ -270,16 +276,21 @@ EQ-0041
 Resultado:
 
 ```text
-BLOCK
+VISIBLE CONFLICT WARNING
++
+AUTHORIZED OVERRIDE WITH MANDATORY JUSTIFICATION
 ```
 
-No:
+No debe resolverse silenciosamente ni presentarse como ausencia de conflicto.
+El conflicto por sí solo no debe producir:
 
 ```text
-WARNING
+AUTOMATIC HARD BLOCK
 ```
 
-La validación debe ejecutarse nuevamente al confirmar la operación.
+La validación debe ejecutarse nuevamente al confirmar la operación. El override
+debe conservar la justificación y una traza auditable. La estrategia de
+concurrencia y revalidación pertenece al Technical Design.
 
 ---
 
@@ -358,7 +369,8 @@ Reassign
 EQ-0042
 ```
 
-Debe conservarse historia de la sustitución.
+Debe conservarse historia del activo original, el reemplazo, quién realizó el
+cambio, cuándo y por qué.
 
 Después de Dispatch no puede reescribirse cuál unidad salió físicamente.
 
@@ -381,19 +393,23 @@ Antes de Dispatch:
 ```text
 Case cancelled
 ↓
-Release Assignment
+Release active/reserved Assignment automatically
 ```
 
-puede liberar la reserva operacional.
+libera la reserva operacional. El activo sólo vuelve a estar disponible si su
+lifecycle, condition y demás hechos operacionales lo permiten.
 
 Después de Dispatch:
 
 ```text
-Release Assignment alone
-→ forbidden
+Case cancellation
+→ release active/reserved Assignment
+→ preserve physical Dispatch / Custody reality
+→ Return or another authorized physical workflow remains required
 ```
 
-porque debe resolverse primero la realidad física mediante Return u otro flujo excepcional autorizado.
+Liberar la relación de reserva no significa que el activo esté físicamente
+devuelto ni disponible.
 
 ---
 
@@ -954,6 +970,11 @@ API
 
 Healthcare consume esa evaluación dentro del contexto del Case.
 
+Para Assignment, la evaluación debe cubrir una ventana operacional que puede
+incluir preparación, transporte, horario programado, retorno,
+limpieza/esterilización e inspección. Su cálculo y buffers exactos se difieren al
+Technical Design.
+
 ---
 
 # 32. Current Availability
@@ -999,7 +1020,9 @@ Current Availability
 Availability for Case
 ```
 
-Un Equipment actualmente libre puede no ser asignable a un Case futuro por conflicto temporal.
+Un Equipment actualmente libre puede presentar conflicto temporal para un Case
+futuro. Asignarlo requiere mostrar el conflicto y registrar un override
+autorizado, justificado y auditable; no se considera silenciosamente disponible.
 
 ---
 
@@ -1022,6 +1045,8 @@ reason: EXTERNAL_CUSTODY
 ```text
 available: false
 reason: CASE_CONFLICT
+overrideAllowed: true
+overrideRequiresJustification: true
 ```
 
 ```text
@@ -1053,7 +1078,7 @@ INSPECTION_PENDING
 
 ```text
 CASE_CONFLICT
-→ Reassign / Release Assignment
+→ Reassign / Release Assignment / authorized audited override
 ```
 
 ```text
@@ -1081,16 +1106,19 @@ Case scheduled
 
 ```text
 Case rescheduled
-→ assignment conflict must be re-evaluated
+→ keep Assignments
+→ re-evaluate conflict against the new operational window
+→ keep valid assignments, adjust/reassign, reschedule again or cancel
 ```
 
 ```text
 Case cancelled before Dispatch
-→ assignment may be released
+→ active/reserved Assignment is released automatically
 ```
 
 ```text
 Case cancelled after Dispatch
+→ Assignment release does not rewrite physical custody
 → physical Return still required
 ```
 
@@ -1261,7 +1289,17 @@ Reason when required
 
 # 43. Permissions
 
-Permisos conceptuales futuros:
+HC-NEXT-03A aprueba la intención fixed-role para Equipment Assignment:
+
+```text
+ADMIN / MANAGER / WAREHOUSE
+→ read + assign + replace + release + conflict override
+
+SALES
+→ read/context only
+```
+
+Los permisos conceptuales posteriores podrán expresarse como:
 
 ```text
 healthcare.equipment.read
@@ -1273,7 +1311,9 @@ healthcare.equipment.return
 healthcare.equipment.inspect
 ```
 
-Los nombres definitivos deberán alinearse con el RBAC general antes de implementación.
+Los nombres definitivos, decorators, guards y autorización exacta deberán
+cerrarse en HC-NEXT-03B antes de implementación. Permission-based RBAC no forma
+parte de HC-NEXT-03.
 
 Healthcare no deberá otorgar mediante estos permisos capacidades Core como:
 
@@ -1358,7 +1398,7 @@ Assigned Equipment unavailable before Dispatch
 
 ```text
 Case cancelled before Dispatch
-→ Release Assignment
+→ Release active/reserved Assignment automatically
 ```
 
 ```text
@@ -1469,7 +1509,9 @@ EquipmentAsset identity
 → IMPLEMENTED IN ERP
 
 Healthcare Equipment Assignment
-→ NOT IMPLEMENTED
+→ DOMAIN DISCOVERY COMPLETE / DOCUMENTED
+→ TECHNICAL DESIGN HC-NEXT-03B NEXT / READY
+→ NOT IMPLEMENTED / NOT STARTED
 
 Healthcare Availability for Case
 → NOT IMPLEMENTED
@@ -1502,18 +1544,20 @@ Healthcare deberá construir sobre Core Equipment y no volver a implementar su i
 Orden recomendado:
 
 ```text
-1. Equipment Requirement contract
-2. Case Equipment Assignment
-3. Availability for Case
-4. Preparation integration
-5. Dispatch
-6. Custody
-7. Return
-8. Inspection workflow
-9. Case 360 integration
-10. Warehouse Operations UI
-11. Calendar integration
-12. Technician mobile integration
+1. Healthcare Requirements V1 — COMPLETE / ACCEPTED
+2. Equipment Assignment domain discovery — COMPLETE / DOCUMENTED
+3. Equipment Assignment technical design — NEXT / READY
+4. Equipment Assignment implementation
+5. Availability for Case
+6. Preparation integration
+7. Dispatch
+8. Custody
+9. Return
+10. Inspection workflow
+11. Case 360 integration
+12. Warehouse Operations UI
+13. Calendar integration
+14. Technician mobile integration
 ```
 
 Cada bloque deberá seguir:
@@ -1547,7 +1591,7 @@ Healthcare Equipment deberá considerarse correcto únicamente cuando:
 ```text
 no duplicate Equipment identity exists
 no cross-tenant relationship is possible
-assignment conflicts are blocked
+assignment conflicts are visible and any override is authorized, justified and auditable
 physical Dispatch changes custody
 Return can be partial
 Returned does not imply Available

@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-14
+Última actualización: 2026-09-15
 Responsable: Zaping Team
 
 1. Propósito
@@ -89,7 +89,9 @@ HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED on current main baseline 
 ↓
 Requirements V1 — COMPLETE / ACCEPTED
 ↓
-NEXT — Healthcare Equipment Assignment — DOMAIN DISCOVERY READY
+HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
+↓
+NEXT — HC-NEXT-03B Healthcare Equipment Assignment Technical Design — READY
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -105,10 +107,10 @@ HC-NEXT-01C1-C8 están completos; C8 está CLOSED / MERGED / ACCEPTED. La
 acceptance automatizada y la QA manual de ADMIN, MANAGER, SALES y WAREHOUSE
 están PASS. PR #14 está merged.
 
-Requirements V1 está COMPLETE / ACCEPTED. El siguiente item documentado de
-M-HC1 es:
+Requirements V1 está COMPLETE / ACCEPTED y HC-NEXT-03A Equipment Assignment
+Domain Discovery está COMPLETE / DOCUMENTED. El siguiente item de M-HC1 es:
 
-Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+HC-NEXT-03B Healthcare Equipment Assignment Technical Design — NEXT / READY
 
 También permanecen como TARGET Healthcare:
 
@@ -922,6 +924,12 @@ CaseKit
 Estos conceptos no deben confundirse.
 
 9.7 Equipment Assignment
+Estado: HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B
+TECHNICAL DESIGN NEXT / READY — IMPLEMENTATION NOT STARTED.
+
+El contrato canónico aprobado se documenta en
+`docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
+
 Debe relacionar:
 
 HealthcareCase
@@ -938,7 +946,29 @@ ERP Core
 
 Healthcare
 → operational Assignment
-Assignment deberá considerar los hechos necesarios para evitar conflictos, pero el schema exacto se decidirá en su slice.
+
+Assignment normalmente resuelve una Requirement de equipo, pero Warehouse puede
+crear una asignación directa urgente si su origen permanece trazable. Una
+Requirement puede necesitar varias unidades y la cobertura puede permanecer
+parcial sin bloquear el Case.
+
+Availability se deriva sobre una ventana operacional que incluye más que el
+horario del procedimiento. `RETIRED`, `INSPECTION_PENDING`, `DAMAGED` y
+`OUT_OF_SERVICE` impiden una nueva Assignment. Un overlap del mismo activo genera
+un warning visible, no un hard block; un override autorizado exige justificación
+y auditoría.
+
+Reassignment debe preservar activo original, reemplazo, actor, momento y razón.
+Reschedule conserva Assignments y reevalúa conflictos. `CANCELLED` libera
+automáticamente Assignments activas/reservadas sin reescribir Dispatch o Custody.
+
+Intención RBAC: ADMIN, MANAGER y WAREHOUSE pueden leer y mutar; SALES conserva
+sólo lectura/contexto. API, DTOs, guards y permission-based RBAC no se diseñan en
+HC-NEXT-03A.
+
+El lifecycle/status de Assignment, ventana y buffers, persistencia de historia,
+origen directo, concurrencia, relación quantity/rows, API/DTO/RBAC y frontend UX
+quedan para HC-NEXT-03B.
 
 Debe mantenerse:
 
@@ -2663,7 +2693,9 @@ Hospital / Doctor — CLOSED / ACCEPTED
 
 Requirements — COMPLETE / ACCEPTED
 
-Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+HC-NEXT-03A Healthcare Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
+
+HC-NEXT-03B Healthcare Equipment Assignment Technical Design — NEXT / READY
 
 Case Availability
 
@@ -2794,7 +2826,9 @@ HC-NEXT-01 Hospital / Doctor — CLOSED / ACCEPTED en el baseline canónico `fbf
 ↓
 Requirements V1 — COMPLETE / ACCEPTED
 ↓
-Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
+HC-NEXT-03A Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
+↓
+HC-NEXT-03B Equipment Assignment Technical Design — NEXT / READY
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
