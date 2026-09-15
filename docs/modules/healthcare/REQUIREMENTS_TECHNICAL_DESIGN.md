@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 0.1.0
 **Estado:** APPROVED
-**Estado de implementación:** NOT IMPLEMENTED / NOT STARTED
-**Última actualización:** 2026-09-13
+**Estado de implementación:** PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED — ACCEPTANCE COMPLETE / ACCEPTED
+**Última actualización:** 2026-09-14
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -28,9 +28,10 @@ Define:
 - boundary para la protección RQ-006;
 - alcance frontend y secuencia de implementación.
 
-Este documento no implementa la capacidad. Constituye el diseño técnico
-aprobado, mientras el contrato de dominio RQ-001 a RQ-030 permanece bajo la
-autoridad de `REQUIREMENTS.md`.
+Este documento constituye el diseño técnico aprobado; no fue por sí mismo una
+implementación. Requirements V1 fue implementado y aceptado posteriormente,
+mientras el contrato de dominio RQ-001 a RQ-030 permanece bajo la autoridad de
+`REQUIREMENTS.md`.
 
 ---
 
@@ -43,15 +44,18 @@ Requirements Domain Discovery
 Requirements Technical Design
 → APPROVED
 
-Requirements Implementation
-→ NOT IMPLEMENTED / NOT STARTED
+Requirements Persistence / Backend / Frontend
+→ COMPLETE / MERGED
+
+Requirements Acceptance
+→ COMPLETE / ACCEPTED
 ```
 
-No existe todavía un identificador de milestone o slice para implementar
-Requirements. Este documento no crea uno.
+Este documento no creó un identificador de milestone o slice para implementar
+Requirements.
 
 Las decisiones `TD-RQ-001` a `TD-RQ-014` son el contrato técnico aprobado que
-debe implementarse como unidad mediante slices secuenciales.
+la implementación completada preserva.
 
 ---
 
@@ -74,7 +78,7 @@ prevalece el contrato de dominio aprobado de Requirements.
 
 ---
 
-## 4. Baseline técnico CURRENT
+## 4. Baseline técnico al aprobar el diseño — HISTÓRICO
 
 El runtime actual ya aporta las siguientes bases:
 
@@ -95,8 +99,9 @@ El runtime actual ya aporta las siguientes bases:
 8. El ValidationPipe global usa `whitelist`, `forbidNonWhitelisted` y
    `transform`.
 
-El baseline no contiene todavía Requirement, Preparation, Dispatch, Healthcare
-Inventory OUT/consumption, Equipment Assignment ni Custody relacionada con Case.
+En ese baseline todavía no existía Requirement. Preparation, Dispatch,
+Healthcare Inventory OUT/consumption, Equipment Assignment y Custody
+relacionada con Case continúan fuera de Requirements V1.
 
 ---
 
@@ -110,7 +115,7 @@ El diseño mantiene:
 - `caseId` y `productId` son inmutables;
 - `requestedQty` es `Int` y estrictamente mayor que cero;
 - `type` sólo puede ser `REQUIRED` o `BACKUP`;
-- `sortOrder` es requerido, manual y no unique;
+- `sortOrder` es requerido, interno de presentación y no unique;
 - no existe hard delete;
 - retirement y reactivation son comandos explícitos;
 - un Product inactivo no puede usarse en create o reactivate;
@@ -678,8 +683,8 @@ type HealthcareRequirementListResponse = {
 };
 ```
 
-No se pagina porque el query está acotado por Case y el cliente necesita la
-colección completa para el orden manual. Esta decisión puede revisarse con datos
+No se pagina porque el query está acotado por Case y la presentación consume la
+colección completa en orden estable. Esta decisión puede revisarse con datos
 medidos sin agregar paginación especulativa.
 
 ---
@@ -1014,20 +1019,21 @@ tampoco crea Inventory movement ni altera Preparation automáticamente.
 
 ---
 
-## 20. Frontend target
+## 20. Frontend V1 aceptado
 
 La experiencia V1 agrega una sección Requirements dentro del detail actual de
 HealthcareCase, sin exigir una nueva ruta standalone.
 
-Debe incluir:
+Incluye:
 
-- lista ACTIVE ordenada manualmente;
+- lista ACTIVE en el orden estable recibido del backend;
 - vista histórica RETIRED;
 - add/edit para los cuatro roles;
 - clasificación REQUIRED/BACKUP;
 - diálogo de retirement reason;
 - reactivation explícita;
-- reorder atómico;
+- asignación automática de `sortOrder` al crear, sin input ni controles
+  manuales de reorder;
 - Product histórico inactivo visible y etiquetado;
 - selector de Product activo para create;
 - helper RBAC específico de Requirements que incluya WAREHOUSE;
@@ -1093,14 +1099,14 @@ Frontend role-awareness es UX. El backend mantiene la autoridad.
 - selector active-only;
 - sin requests ni claims de availability/fulfillment.
 
-La aceptación inicial debe registrar expresamente que RQ-006 sólo cubre el
-contrato y el estado sin productores reales; no una integración real inexistente.
+La aceptación registra expresamente que RQ-006 sólo cubre el contrato y el
+estado sin productores reales; no una integración real inexistente.
 
 ---
 
-## 22. Implementation sequence
+## 22. Implementation sequence completada
 
-Sin asignar identificadores nuevos, la secuencia recomendada es:
+Sin asignar identificadores nuevos, la capacidad se completó en esta secuencia:
 
 1. persistence/migration;
 2. backend;
@@ -1108,9 +1114,9 @@ Sin asignar identificadores nuevos, la secuencia recomendada es:
 4. frontend;
 5. acceptance.
 
-Cada slice debe cerrar sus tests focales y gates antes del siguiente. La
-integración real de fulfillment queda diferida hasta el primer productor real y
-no se incluye artificialmente en Requirements V1.
+Cada etapa cerró sus tests focales y gates antes de la aceptación. La integración
+real de fulfillment queda diferida hasta el primer productor real y no se
+incluyó artificialmente en Requirements V1.
 
 ---
 
@@ -1133,8 +1139,6 @@ Este diseño no introduce:
 - global Requirements search/list;
 - fuzzy search;
 - permission-based RBAC;
-- frontend implementation;
-- runtime implementation, Prisma schema o migrations.
 
 ---
 
@@ -1159,7 +1163,8 @@ Este diseño no introduce:
 | Orden | sortOrder, createdAt, id |
 | Concurrencia | transaction + ordered row locks + conditional writes |
 | RQ-006 | port definido; fuente real diferida |
-| Implementación | NOT IMPLEMENTED / NOT STARTED |
+| Implementación | PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED |
+| Aceptación | COMPLETE / ACCEPTED |
 
 ```text
 Requirements Domain Discovery
@@ -1168,6 +1173,9 @@ Requirements Domain Discovery
 Requirements Technical Design
 → APPROVED
 
-Requirements Implementation
-→ NOT IMPLEMENTED / NOT STARTED
+Requirements Persistence / Backend / Frontend
+→ COMPLETE / MERGED
+
+Requirements Acceptance
+→ COMPLETE / ACCEPTED
 ```

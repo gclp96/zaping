@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-13
+Última actualización: 2026-09-14
 Responsable: Zaping Team
 
 1. Propósito
@@ -87,7 +87,9 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED on current main baseline `fbf29b6`
 ↓
-NEXT — Requirements — DOMAIN DISCOVERY COMPLETE / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
+Requirements V1 — COMPLETE / ACCEPTED
+↓
+NEXT — Healthcare Equipment Assignment — DOMAIN DISCOVERY READY
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -103,9 +105,10 @@ HC-NEXT-01C1-C8 están completos; C8 está CLOSED / MERGED / ACCEPTED. La
 acceptance automatizada y la QA manual de ADMIN, MANAGER, SALES y WAREHOUSE
 están PASS. PR #14 está merged.
 
-El siguiente item documentado de M-HC1 es:
+Requirements V1 está COMPLETE / ACCEPTED. El siguiente item documentado de
+M-HC1 es:
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
+Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 También permanecen como TARGET Healthcare:
 
@@ -878,16 +881,23 @@ HC-NEXT-01 comenzó como Documentation / Domain Design. Esa fase inicial no
 marcaba Hospital, Doctor ni los workflows posteriores como implementados.
 
 9.6 Requirements
-Estado: DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT
-IMPLEMENTED / NOT STARTED.
+Estado: DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED —
+PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED — ACCEPTANCE COMPLETE /
+ACCEPTED.
 
 El contrato aprobado de dominio V1 se documenta en
-`docs/modules/healthcare/REQUIREMENTS.md`. No existe todavía un identificador de
-implementación.
+`docs/modules/healthcare/REQUIREMENTS.md`. Ese discovery no creó un identificador
+de implementación.
 
-El diseño técnico target se documenta en
+El diseño técnico se documenta en
 `docs/modules/healthcare/REQUIREMENTS_TECHNICAL_DESIGN.md`. Está `APPROVED` y
-permanece `NOT IMPLEMENTED / NOT STARTED`.
+su implementación V1 está completa y aceptada.
+
+La UI no expone reorder manual: `sortOrder` permanece como orden interno de
+presentación asignado automáticamente. Una futura secuencia operacional
+pertenece a Preparation / CaseKit / Maletín. El contrato
+`RequirementOperationalEvidencePolicy` existe, pero su integración con
+evidencia real permanece diferida hasta que haya productores Healthcare.
 
 Un Case debe poder expresar qué necesita antes de seleccionar recursos físicos.
 
@@ -2651,9 +2661,9 @@ HC-NEXT-01 — Hospital / Doctor — CLOSED / ACCEPTED
 
 Hospital / Doctor — CLOSED / ACCEPTED
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
+Requirements — COMPLETE / ACCEPTED
 
-Equipment Assignment
+Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 Case Availability
 
@@ -2782,7 +2792,9 @@ M-HC1 — Healthcare Operations Foundation — ACTIVE — P1
 ↓
 HC-NEXT-01 Hospital / Doctor — CLOSED / ACCEPTED en el baseline canónico `fbf29b6`
 ↓
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
+Requirements V1 — COMPLETE / ACCEPTED
+↓
+Healthcare Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

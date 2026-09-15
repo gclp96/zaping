@@ -23,7 +23,9 @@ import { canEditHealthcareCases } from '@/app/erp-role-access';
 import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 
-import HealthcareCaseFormModal from './components/HealthcareCaseFormModal';
+import HealthcareCaseFormModal, {
+  type HealthcareCaseSaveIntent,
+} from './components/HealthcareCaseFormModal';
 import HealthcareRequirementsSection from './components/HealthcareRequirementsSection';
 import type { HealthcareCase, HealthcareCaseStatus } from './types';
 
@@ -104,6 +106,9 @@ export default function HealthcareCasesPage() {
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState('');
   const [viewCase, setViewCase] = useState<HealthcareCase | null>(null);
+  const [openRequirementForCaseId, setOpenRequirementForCaseId] = useState<
+    string | null
+  >(null);
   const [formCase, setFormCase] = useState<HealthcareCase | null | undefined>(
     undefined,
   );
@@ -160,7 +165,10 @@ export default function HealthcareCasesPage() {
       {
         id: 'view',
         label: 'Ver detalle',
-        onSelect: setViewCase,
+        onSelect: (healthcareCase: HealthcareCase) => {
+          setOpenRequirementForCaseId(null);
+          setViewCase(healthcareCase);
+        },
       },
       ...(canEdit
         ? [
@@ -177,17 +185,25 @@ export default function HealthcareCasesPage() {
     ],
   };
 
-  async function saveCase(payload: Record<string, string | null>) {
+  async function saveCase(
+    payload: Record<string, string | null>,
+    intent: HealthcareCaseSaveIntent,
+  ) {
     if (!canEdit || saving || formCase === undefined) return;
 
     const isEditing = formCase !== null;
+    let createdCase: HealthcareCase | null = null;
     try {
       setSaving(true);
       setFormError('');
       if (isEditing) {
         await api.patch(`/healthcare/cases/${formCase.id}`, payload);
       } else {
-        await api.post('/healthcare/cases', payload);
+        const response = await api.post<HealthcareCase>(
+          '/healthcare/cases',
+          payload,
+        );
+        createdCase = response.data;
       }
       setFormCase(undefined);
       setNotice(
@@ -196,6 +212,10 @@ export default function HealthcareCasesPage() {
           : 'Caso registrado correctamente.',
       );
       await loadCases();
+      if (createdCase && intent === 'SAVE_AND_ADD_REQUIREMENT') {
+        setOpenRequirementForCaseId(createdCase.id);
+        setViewCase(createdCase);
+      }
     } catch (requestError: unknown) {
       setFormError(
         getApiErrorMessage(
@@ -288,12 +308,17 @@ export default function HealthcareCasesPage() {
       <Modal
         isOpen={viewCase !== null}
         title="Detalle del caso"
-        onClose={() => setViewCase(null)}
+        onClose={() => {
+          setOpenRequirementForCaseId(null);
+          setViewCase(null);
+        }}
       >
         {viewCase ? (
           <HealthcareCaseDetail
             healthcareCase={viewCase}
             role={currentUserRole}
+            openRequirementCreate={openRequirementForCaseId === viewCase.id}
+            onRequirementCreateOpened={() => setOpenRequirementForCaseId(null)}
           />
         ) : null}
       </Modal>
@@ -309,7 +334,7 @@ export default function HealthcareCasesPage() {
           onClose={() => {
             if (!saving) setFormCase(undefined);
           }}
-          onSave={(payload) => void saveCase(payload)}
+          onSave={(payload, intent) => void saveCase(payload, intent)}
         />
       ) : null}
     </>
@@ -319,9 +344,13 @@ export default function HealthcareCasesPage() {
 function HealthcareCaseDetail({
   healthcareCase,
   role,
+  openRequirementCreate,
+  onRequirementCreateOpened,
 }: {
   healthcareCase: HealthcareCase;
   role: UserRole | null;
+  openRequirementCreate: boolean;
+  onRequirementCreateOpened: () => void;
 }) {
   return (
     <div className="space-y-5">
@@ -365,6 +394,8 @@ function HealthcareCaseDetail({
         <HealthcareRequirementsSection
           healthcareCase={healthcareCase}
           role={role}
+          openCreateOnMount={openRequirementCreate}
+          onCreateOpened={onRequirementCreateOpened}
         />
       </div>
     </div>

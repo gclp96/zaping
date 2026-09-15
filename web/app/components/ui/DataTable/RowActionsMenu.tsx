@@ -34,6 +34,7 @@ export default function RowActionsMenu<T>({
 }: RowActionsMenuProps<T>) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<MenuPosition | null>(null);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -48,6 +49,13 @@ export default function RowActionsMenu<T>({
 
   const hasEnabledActions = actions.some((action) => !isDisabled(action));
   const menuOpen = open && hasEnabledActions;
+
+  function openMenu(trigger: HTMLElement) {
+    setPortalTarget(
+      trigger.closest<HTMLElement>('[role="dialog"]') ?? document.body,
+    );
+    setOpen(true);
+  }
 
   function focusItem(index: number) {
     const enabledItems = itemRefs.current.filter(
@@ -186,25 +194,25 @@ export default function RowActionsMenu<T>({
         aria-controls={menuOpen ? menuId : undefined}
         title={label}
         className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-subtle hover:text-text focus:outline-none focus:ring-2 focus:ring-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
-        onClick={() => {
+        onClick={(event) => {
           if (open) {
             setOpen(false);
             setPosition(null);
           } else {
-            setOpen(true);
+            openMenu(event.currentTarget);
           }
         }}
         onKeyDown={(event) => {
           if (event.key === 'ArrowDown') {
             event.preventDefault();
-            setOpen(true);
+            openMenu(event.currentTarget);
           }
         }}
       >
         <MoreHorizontal aria-hidden="true" size={18} />
       </button>
 
-      {menuOpen && typeof document !== 'undefined'
+      {menuOpen && portalTarget
         ? createPortal(
             <div
               ref={menuRef}
@@ -268,7 +276,7 @@ export default function RowActionsMenu<T>({
                 );
               })}
             </div>,
-            document.body,
+            portalTarget,
           )
         : null}
     </div>

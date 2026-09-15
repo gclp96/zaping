@@ -22,7 +22,6 @@ import {
   getHealthcareRequirementErrorMessage,
   listHealthcareRequirements,
   reactivateHealthcareRequirement,
-  reorderHealthcareRequirements,
   retireHealthcareRequirement,
   updateHealthcareRequirement,
   type HealthcareRequirement,
@@ -38,12 +37,13 @@ type RequirementFormState = {
   requestedQty: string;
   type: HealthcareRequirementType;
   notes: string;
-  sortOrder: string;
 };
 
 type HealthcareRequirementsSectionProps = {
   healthcareCase: HealthcareCase;
   role: UserRole | null;
+  openCreateOnMount?: boolean;
+  onCreateOpened?: () => void;
 };
 
 const emptyForm: RequirementFormState = {
@@ -51,7 +51,6 @@ const emptyForm: RequirementFormState = {
   requestedQty: '1',
   type: 'REQUIRED',
   notes: '',
-  sortOrder: '0',
 };
 
 const statusOptions = [
@@ -82,6 +81,8 @@ function parseInteger(value: string) {
 export default function HealthcareRequirementsSection({
   healthcareCase,
   role,
+  openCreateOnMount = false,
+  onCreateOpened,
 }: HealthcareRequirementsSectionProps) {
   const canManage = canManageHealthcareRequirements(role);
   const caseIsReadOnly = healthcareCase.status === 'CANCELLED';
@@ -90,6 +91,7 @@ export default function HealthcareRequirementsSection({
     useState<HealthcareRequirementListStatus>('ACTIVE');
   const [requirements, setRequirements] = useState<HealthcareRequirement[]>([]);
   const requirementsRequestId = useRef(0);
+  const createOnMountHandled = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -177,7 +179,7 @@ export default function HealthcareRequirementsSection({
       : filteredProducts;
   }, [filteredProducts, form.productId, products]);
 
-  async function loadProducts() {
+  const loadProducts = useCallback(async () => {
     try {
       setProductsLoading(true);
       setProductsError('');
@@ -190,9 +192,9 @@ export default function HealthcareRequirementsSection({
     } finally {
       setProductsLoading(false);
     }
-  }
+  }, []);
 
-  function openCreateForm() {
+  const openCreateForm = useCallback(() => {
     if (!canMutate) return;
     setNotice('');
     setForm(emptyForm);
@@ -202,7 +204,17 @@ export default function HealthcareRequirementsSection({
     setProductsError('');
     setFormTarget(null);
     void loadProducts();
-  }
+  }, [canMutate, loadProducts]);
+
+  useEffect(() => {
+    if (!openCreateOnMount || !canMutate || createOnMountHandled.current) {
+      return;
+    }
+
+    createOnMountHandled.current = true;
+    openCreateForm();
+    onCreateOpened?.();
+  }, [canMutate, onCreateOpened, openCreateForm, openCreateOnMount]);
 
   function openEditForm(requirement: HealthcareRequirement) {
     if (!canMutate || requirement.lifecycle !== 'ACTIVE') return;
@@ -212,7 +224,6 @@ export default function HealthcareRequirementsSection({
       requestedQty: String(requirement.requestedQty),
       type: requirement.type,
       notes: requirement.notes ?? '',
-      sortOrder: String(requirement.sortOrder),
     });
     setFormError('');
     setFormTarget(requirement);
@@ -229,15 +240,9 @@ export default function HealthcareRequirementsSection({
     if (!canMutate || formTarget === undefined || pendingAction) return;
 
     const requestedQty = parseInteger(form.requestedQty);
-    const sortOrder = parseInteger(form.sortOrder);
 
     if (requestedQty === null || requestedQty < 1) {
       setFormError('La cantidad solicitada debe ser un entero mayor que cero.');
-      return;
-    }
-
-    if (sortOrder === null) {
-      setFormError('El orden debe ser un número entero.');
       return;
     }
 
@@ -251,7 +256,6 @@ export default function HealthcareRequirementsSection({
       requestedQty,
       type: form.type,
       notes: form.notes.trim() || null,
-      sortOrder,
     };
 
     try {
@@ -259,9 +263,19 @@ export default function HealthcareRequirementsSection({
       setFormError('');
 
       if (isCreate) {
+        const activeRequirements = await listHealthcareRequirements(
+          healthcareCase.id,
+          'ACTIVE',
+        );
+        const sortOrder =
+          activeRequirements.reduce(
+            (maximum, requirement) => Math.max(maximum, requirement.sortOrder),
+            0,
+          ) + 10;
         await createHealthcareRequirement(healthcareCase.id, {
           productId: form.productId,
           ...payload,
+          sortOrder,
         });
       } else {
         await updateHealthcareRequirement(formTarget.id, payload);
@@ -359,120 +373,80 @@ export default function HealthcareRequirementsSection({
     setReactivateTarget(requirement);
   }
 
-  async function moveRequirement(
-    requirement: HealthcareRequirement,
-    direction: -1 | 1,
-  ) {
-    if (!canMutate || status !== 'ACTIVE' || pendingAction) return;
+  const columns: DataTableColumn<HealthcareRequirement>[] = [
+    {
+      id: 'product',
+      header: 'Producto',
+      cell: (requirement) => (
+        <div>
+          <p className="font-semibold">{requirement.product.name}</p>
+          <p className="text-xs text-text-muted">{requirement.product.sku}</p>
+          {!requirement.product.isActive ? (
+            <p className="text-xs font-medium text-amber-800">
+              Producto inactivo (histórico)
+            </p>
+          ) : null}
+        </div>
+      ),
+      minWidth: 180,
+    },
+    {
+      id: 'quantity',
+      header: 'Cantidad',
+      cell: (requirement) => requirement.requestedQty,
+      align: 'end',
+      minWidth: 100,
+    },
+    {
+      id: 'type',
+      header: 'Tipo',
+      cell: (requirement) => typeLabels[requirement.type],
+      minWidth: 110,
+    },
+    {
+      id: 'notes',
+      header: 'Notas',
+      cell: (requirement) => requirement.notes || 'Sin notas',
+      minWidth: 180,
+    },
+    {
+      id: 'sortOrder',
+      header: 'Orden',
+      cell: (requirement) => {
+        const index = requirements.findIndex(
+          (item) => item.id === requirement.id,
+        );
+        const position = index + 1;
 
-    const currentIndex = requirements.findIndex(
-      (item) => item.id === requirement.id,
-    );
-    const targetIndex = currentIndex + direction;
-    if (
-      currentIndex < 0 ||
-      targetIndex < 0 ||
-      targetIndex >= requirements.length
-    ) {
-      return;
-    }
-
-    const ordered = [...requirements];
-    [ordered[currentIndex], ordered[targetIndex]] = [
-      ordered[targetIndex],
-      ordered[currentIndex],
-    ];
-
-    try {
-      setPendingAction(`reorder:${requirement.id}`);
-      setNotice('');
-      setActionError('');
-      await reorderHealthcareRequirements(healthcareCase.id, {
-        items: ordered.map((item, index) => ({
-          requirementId: item.id,
-          sortOrder: index,
-        })),
-      });
-      setNotice('Orden de requerimientos actualizado.');
-      await loadRequirements();
-    } catch (requestError: unknown) {
-      setActionError(
-        getHealthcareRequirementErrorMessage(
-          requestError,
-          'No fue posible actualizar el orden de los requerimientos.',
-        ),
-      );
-    } finally {
-      setPendingAction(null);
-    }
-  }
-
-  const columns = useMemo<DataTableColumn<HealthcareRequirement>[]>(
-    () => [
-      {
-        id: 'product',
-        header: 'Producto',
-        cell: (requirement) => (
-          <div>
-            <p className="font-semibold">{requirement.product.name}</p>
-            <p className="text-xs text-text-muted">{requirement.product.sku}</p>
-            {!requirement.product.isActive ? (
-              <p className="text-xs font-medium text-amber-800">
-                Producto inactivo (histórico)
-              </p>
-            ) : null}
-          </div>
-        ),
-        minWidth: 180,
+        return (
+          <span aria-label={`Posición ${position}`} className="font-medium">
+            {position}
+          </span>
+        );
       },
-      {
-        id: 'quantity',
-        header: 'Cantidad',
-        cell: (requirement) => requirement.requestedQty,
-        align: 'end',
-        minWidth: 100,
-      },
-      {
-        id: 'type',
-        header: 'Tipo',
-        cell: (requirement) => typeLabels[requirement.type],
-        minWidth: 110,
-      },
-      {
-        id: 'notes',
-        header: 'Notas',
-        cell: (requirement) => requirement.notes || 'Sin notas',
-        minWidth: 180,
-      },
-      {
-        id: 'sortOrder',
-        header: 'Orden',
-        cell: (requirement) => requirement.sortOrder,
-        align: 'end',
-        minWidth: 90,
-      },
-      {
-        id: 'lifecycle',
-        header: 'Vigencia',
-        cell: (requirement) => (
-          <div className="space-y-1">
-            <StatusBadge
-              label={requirement.lifecycle === 'ACTIVE' ? 'Activo' : 'Retirado'}
-              tone={requirement.lifecycle === 'ACTIVE' ? 'success' : 'neutral'}
-            />
-            {requirement.lifecycle === 'RETIRED' &&
-            requirement.retirementReason ? (
-              <p className="max-w-48 text-xs text-text-muted">
-                {requirement.retirementReason}
-              </p>
-            ) : null}
-          </div>
-        ),
-        minWidth: 120,
-      },
-    ],
-    [],
-  );
+      align: 'end',
+      minWidth: 90,
+    },
+    {
+      id: 'lifecycle',
+      header: 'Vigencia',
+      cell: (requirement) => (
+        <div className="space-y-1">
+          <StatusBadge
+            label={requirement.lifecycle === 'ACTIVE' ? 'Activo' : 'Retirado'}
+            tone={requirement.lifecycle === 'ACTIVE' ? 'success' : 'neutral'}
+          />
+          {requirement.lifecycle === 'RETIRED' &&
+          requirement.retirementReason ? (
+            <p className="max-w-48 text-xs text-text-muted">
+              {requirement.retirementReason}
+            </p>
+          ) : null}
+        </div>
+      ),
+      minWidth: 120,
+    },
+  ];
 
   const rowActions: DataTableRowActions<HealthcareRequirement> | undefined =
     canMutate
@@ -502,28 +476,6 @@ export default function HealthcareRequirementsSection({
                 Boolean(pendingAction) || requirement.lifecycle !== 'RETIRED',
               onSelect: openReactivate,
             },
-            ...(status === 'ACTIVE'
-              ? [
-                  {
-                    id: 'move-up',
-                    label: 'Mover arriba',
-                    disabled: (requirement: HealthcareRequirement) =>
-                      Boolean(pendingAction) ||
-                      requirements[0]?.id === requirement.id,
-                    onSelect: (requirement: HealthcareRequirement) =>
-                      void moveRequirement(requirement, -1),
-                  },
-                  {
-                    id: 'move-down',
-                    label: 'Mover abajo',
-                    disabled: (requirement: HealthcareRequirement) =>
-                      Boolean(pendingAction) ||
-                      requirements.at(-1)?.id === requirement.id,
-                    onSelect: (requirement: HealthcareRequirement) =>
-                      void moveRequirement(requirement, 1),
-                  },
-                ]
-              : []),
           ],
         }
       : undefined;
@@ -695,7 +647,7 @@ export default function HealthcareRequirementsSection({
             </p>
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Input
               label="Cantidad solicitada"
               type="number"
@@ -721,21 +673,6 @@ export default function HealthcareRequirementsSection({
                 setForm((current) => ({
                   ...current,
                   type: event.target.value as HealthcareRequirementType,
-                }))
-              }
-            />
-            <Input
-              label="Orden"
-              type="number"
-              step="1"
-              required
-              helperText="Controla la posición visual; no representa prioridad."
-              value={form.sortOrder}
-              disabled={Boolean(pendingAction)}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  sortOrder: event.target.value,
                 }))
               }
             />

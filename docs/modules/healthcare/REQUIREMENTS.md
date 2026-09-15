@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 1.0.0
 **Estado:** APPROVED DOMAIN DISCOVERY
-**Estado de implementación:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT IMPLEMENTED / NOT STARTED
-**Última actualización:** 2026-09-13
+**Estado de implementación:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED — ACCEPTANCE COMPLETE / ACCEPTED
+**Última actualización:** 2026-09-14
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -30,8 +30,9 @@ Debe responder:
 
 # 2. Autoridad y estado
 
-Este documento cierra únicamente el **domain discovery** de Requirements V1.
-Aprueba las decisiones RQ-001 a RQ-030 y sus límites conceptuales.
+Este documento cerró el **domain discovery** de Requirements V1 y aprobó las
+decisiones RQ-001 a RQ-030 y sus límites conceptuales. La implementación y la
+aceptación posteriores respetaron ese contrato.
 
 Este documento de discovery no aprueba ni implementa:
 
@@ -48,12 +49,12 @@ tests
 runtime behavior
 ```
 
-No existe todavía un identificador de implementación para Requirements. No se
-crea uno desde este documento.
+Este documento de discovery no creó un identificador de implementación para
+Requirements.
 
-El diseño técnico target se encuentra en
-`REQUIREMENTS_TECHNICAL_DESIGN.md` con estado `APPROVED`. Su aprobación no
-modifica el estado `NOT IMPLEMENTED / NOT STARTED`.
+El diseño técnico se encuentra en `REQUIREMENTS_TECHNICAL_DESIGN.md` con estado
+`APPROVED`; la evidencia automatizada, runtime y manual del resultado aceptado
+se registra en `REQUIREMENTS_ACCEPTANCE.md`.
 
 ---
 
@@ -111,7 +112,7 @@ El discovery aprueba los siguientes hechos conceptuales:
 | `requestedQty` | Cantidad planeada entera y estrictamente mayor que cero. |
 | classification | `REQUIRED` o `BACKUP`; no implica prioridad ni fulfillment. |
 | notes | Notas opcionales propias de la línea, independientes de las notas del Case. |
-| `sortOrder` | Orden manual requerido de presentación; no es prioridad operacional ni valor único. |
+| `sortOrder` | Orden interno de presentación; se asigna automáticamente y no es prioridad operacional ni valor único. |
 | `createdById` | Actor que creó la línea. |
 | `createdAt` | Momento de creación. |
 | `updatedAt` | Última actualización. |
@@ -120,8 +121,8 @@ El discovery aprueba los siguientes hechos conceptuales:
 | `retirementReason?` | Razón obligatoria cuando la línea se retira. |
 
 La forma concreta de persistencia, nombres técnicos adicionales, defaults y
-constraints está aprobada en `REQUIREMENTS_TECHNICAL_DESIGN.md`; permanece no
-implementada.
+constraints está aprobada en `REQUIREMENTS_TECHNICAL_DESIGN.md` e implementada
+en Requirements V1.
 
 No se aprueba un campo `isActive` ni otra representación técnica de lifecycle
 en este discovery.
@@ -177,9 +178,12 @@ Una línea BACKUP es una Requirement independiente. Puede explicar su uso en
 notes, pero no crea una relación formal de sustitución o equivalencia.
 
 `sortOrder` controla únicamente la presentación dentro del Case. Es requerido,
-pero no es unique. Valores repetidos pueden existir temporalmente durante un
-reorder. Espaciado como 10/20/30 puede ser una convención futura, no una
-invariante de dominio.
+pero no es unique. La UI V1 lo asigna automáticamente con espaciado estable y
+no presenta input ni controles manuales de reorder. No expresa prioridad,
+agrupación ni secuencia operacional.
+
+Preparation / CaseKit / Maletín podrá reconsiderar una secuencia operacional
+cuando esos dominios sean diseñados; Requirements V1 no la anticipa.
 
 ---
 
@@ -204,8 +208,10 @@ consumption, Inventory OUT o custody efectiva, la línea puede cambiar conforme
 a las demás reglas. Preparation deberá reconciliarse posteriormente con esos
 cambios sin crear movimientos de Inventory sólo porque cambió la Requirement.
 
-El mecanismo técnico para detectar evidencia operacional, resolver concurrencia
-y realizar ajustes controlados pertenece a slices posteriores.
+El contrato `RequirementOperationalEvidencePolicy` y su invocación desde las
+mutaciones reales existen. La integración con evidencia operacional real
+continúa diferida hasta que productores Healthcare como Dispatch, Equipment
+Assignment o Custody proporcionen relaciones estructurales tenant-safe.
 
 ---
 
@@ -234,9 +240,9 @@ Si Case reopening se agrega en el futuro, las mismas líneas podrán volver a se
 editables bajo las reglas normales y sin duplicación. Reopening no pertenece a
 Requirements V1.
 
-La representación persistente del lifecycle y los contratos de comandos se
-definen en el diseño aprobado `REQUIREMENTS_TECHNICAL_DESIGN.md` y permanecen no
-implementados.
+La representación persistente del lifecycle y los contratos de comandos están
+definidos en `REQUIREMENTS_TECHNICAL_DESIGN.md` e implementados en Requirements
+V1.
 
 ---
 
@@ -257,7 +263,7 @@ la Requirement.
 
 El discovery no asignó retirement/reactivation a roles concretos ni definió
 rutas o guards. El technical design aprobado completa esa matriz por acción sin
-contradecir RQ-010; todavía no está implementado.
+contradecir RQ-010; esa matriz está implementada y validada.
 
 ---
 
@@ -430,7 +436,7 @@ conflicto real:
 - tests unitarios, integración PostgreSQL, HTTP y frontend;
 - UX de líneas activas/históricas y protección operacional.
 
-Estado de esas decisiones: `APPROVED — NOT IMPLEMENTED / NOT STARTED`.
+Estado de esas decisiones: `APPROVED — IMPLEMENTED / ACCEPTED`.
 
 ---
 
@@ -443,9 +449,12 @@ Requirements domain discovery
 Requirements technical design
 → APPROVED
 
-Requirements implementation
-→ NOT IMPLEMENTED / NOT STARTED
+Requirements persistence / backend / frontend
+→ COMPLETE / MERGED
+
+Requirements acceptance
+→ COMPLETE / ACCEPTED
 ```
 
-Requirement permanece como el siguiente item `NEXT / TARGET` de M-HC1, sin un
-identificador de implementación inventado por este documento.
+El siguiente item documentado de M-HC1 es Healthcare Equipment Assignment
+Domain Discovery; este documento no inventa un identificador para ese trabajo.

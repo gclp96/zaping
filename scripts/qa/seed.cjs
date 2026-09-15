@@ -6,6 +6,67 @@ const appRequire = createRequire('/app/package.json');
 const { PrismaClient } = appRequire('@prisma/client');
 const bcrypt = appRequire('bcrypt');
 
+async function ensureRequirementsAcceptanceFixtures(tx, tenant) {
+  const companyId = id(tenant);
+  const createdById = id(`${tenant}-ADMIN`);
+  const productFixtures = tenant === 'A'
+    ? [
+        ['requirement-primary', 'QA-A-RQ-PRIMARY', 'QA A Requirement Primary'],
+        ['requirement-backup', 'QA-A-RQ-BACKUP', 'QA A Requirement Backup'],
+        ['requirement-historical', 'QA-A-RQ-HISTORICAL', 'QA A Requirement Historical'],
+        ['requirement-admin', 'QA-A-RQ-ADMIN', 'QA A Requirement ADMIN'],
+        ['requirement-manager', 'QA-A-RQ-MANAGER', 'QA A Requirement MANAGER'],
+        ['requirement-sales', 'QA-A-RQ-SALES', 'QA A Requirement SALES'],
+        ['requirement-warehouse', 'QA-A-RQ-WAREHOUSE', 'QA A Requirement WAREHOUSE'],
+      ]
+    : [['requirement-primary', 'QA-B-RQ-PRIMARY', 'QA B Requirement Primary']];
+  let historicalProductWasCreated = false;
+  for (const [key, sku, name] of productFixtures) {
+    const existing = await tx.product.findUnique({ where: { companyId_sku: { companyId, sku } }, select: { id: true } });
+    if (existing) continue;
+    await tx.product.create({ data: { id: id(`${tenant}-${key}`), companyId, sku, name, categoryId: id(`${tenant}-category`), cost: 15, price: 30, stock: 10, minStock: 2, inventoryTracking: 'QUANTITY', lotTracking: 'NONE' } });
+    if (key === 'requirement-historical') historicalProductWasCreated = true;
+  }
+
+  const caseFixtures = tenant === 'A'
+    ? [
+        { key: 'requirement-case-draft', folio: 'QA-A-HC-RQ-DRAFT', title: 'QA Requirements Draft Case', status: 'DRAFT' },
+        { key: 'requirement-case-scheduled', folio: 'QA-A-HC-RQ-SCHEDULED', title: 'QA Requirements Scheduled Case', status: 'SCHEDULED', scheduledStart: new Date('2026-09-15T16:00:00.000Z'), scheduledEnd: new Date('2026-09-15T18:00:00.000Z') },
+        { key: 'requirement-case-cancelled', folio: 'QA-A-HC-RQ-CANCELLED', title: 'QA Requirements Cancelled Case', status: 'CANCELLED', cancelledAt: new Date('2026-09-14T12:00:00.000Z'), cancelledById: createdById, cancellationReason: 'Synthetic local QA cancelled case' },
+      ]
+    : [{ key: 'requirement-case-draft', folio: 'QA-B-HC-RQ-DRAFT', title: 'QA B Requirements Tenant Isolation Case', status: 'DRAFT' }];
+  for (const fixture of caseFixtures) {
+    const existing = await tx.healthcareCase.findUnique({ where: { companyId_folio: { companyId, folio: fixture.folio } }, select: { id: true } });
+    if (existing) continue;
+    const { key, ...data } = fixture;
+    await tx.healthcareCase.create({ data: { id: id(`${tenant}-${key}`), companyId, createdById, ...data } });
+  }
+
+  const requirementFixtures = tenant === 'A'
+    ? [
+        ['requirement-draft-active', 'requirement-case-draft', 'requirement-primary', 2, 'REQUIRED', 10, 'ACTIVE'],
+        ['requirement-draft-retired', 'requirement-case-draft', 'requirement-backup', 1, 'BACKUP', 20, 'RETIRED'],
+        ['requirement-draft-inactive-retired', 'requirement-case-draft', 'requirement-historical', 3, 'REQUIRED', 30, 'RETIRED'],
+        ['requirement-scheduled-active', 'requirement-case-scheduled', 'requirement-backup', 4, 'REQUIRED', 10, 'ACTIVE'],
+        ['requirement-scheduled-inactive-active', 'requirement-case-scheduled', 'requirement-historical', 1, 'BACKUP', 20, 'ACTIVE'],
+        ['requirement-cancelled-active', 'requirement-case-cancelled', 'requirement-primary', 2, 'REQUIRED', 10, 'ACTIVE'],
+        ['requirement-cancelled-retired', 'requirement-case-cancelled', 'requirement-backup', 1, 'BACKUP', 20, 'RETIRED'],
+      ]
+    : [['requirement-draft-active', 'requirement-case-draft', 'requirement-primary', 1, 'REQUIRED', 10, 'ACTIVE']];
+  for (const [key, caseKey, productKey, requestedQty, type, sortOrder, lifecycle] of requirementFixtures) {
+    const caseId = id(`${tenant}-${caseKey}`);
+    const productId = id(`${tenant}-${productKey}`);
+    const existing = await tx.healthcareCaseRequirement.findUnique({ where: { companyId_caseId_productId: { companyId, caseId, productId } }, select: { id: true } });
+    if (existing) continue;
+    await tx.healthcareCaseRequirement.create({ data: { id: id(`${tenant}-${key}`), companyId, caseId, productId, requestedQty, type, notes: `Synthetic local QA ${lifecycle.toLowerCase()} requirement`, sortOrder, lifecycle, createdById, ...(lifecycle === 'RETIRED' ? { retiredAt: new Date('2026-09-14T12:30:00.000Z'), retiredById: createdById, retirementReason: 'Synthetic local QA retired requirement' } : {}) } });
+  }
+
+  // Establish a real historical reference before deactivating the dedicated Product.
+  if (historicalProductWasCreated) {
+    await tx.product.update({ where: { id: id(`${tenant}-requirement-historical`) }, data: { isActive: false } });
+  }
+}
+
 async function main() {
   assertQaEnvironment(process.env);
   const db = new PrismaClient();
@@ -55,13 +116,14 @@ async function main() {
           await tx.equipmentAsset.create({ data: { id: id(`${tenant}-equipment-${condition}`), companyId, productId: id(`${tenant}-asset`), assetCode: `QA-${tenant}-EQ-${condition}`, condition, origin: 'INITIAL_MIGRATION' } });
         }
       }
+      for (const tenant of ['A', 'B']) await ensureRequirementsAcceptanceFixtures(tx, tenant);
     }, { timeout: 30000 });
     const manifest = {};
     for (const tenant of ['A', 'B']) {
       const companyId = id(tenant);
       const users = await db.user.findMany({ where: { companyId }, select: { id: true, email: true, role: true, isActive: true } });
       const resources = {};
-      for (const model of ['category', 'customer', 'supplier', 'product', 'purchase', 'purchaseReceipt', 'quote', 'sale', 'equipmentAsset', 'inventoryMovement']) {
+      for (const model of ['category', 'customer', 'supplier', 'product', 'purchase', 'purchaseReceipt', 'quote', 'sale', 'equipmentAsset', 'inventoryMovement', 'healthcareCase', 'healthcareCaseRequirement']) {
         resources[model] = await db[model].findMany({ where: { companyId }, select: { id: true } });
         if (!resources[model].length) throw new Error('QA verification failed: missing resources');
       }
@@ -75,7 +137,8 @@ async function main() {
       const receipts = await db.purchaseReceipt.findMany({ where: { companyId }, include: { purchase: true, receivedByUser: true, items: { include: { product: true, purchaseItem: { include: { purchase: true } } } } } });
       const equipment = await db.equipmentAsset.findMany({ where: { companyId }, include: { product: true } });
       const movements = await db.inventoryMovement.findMany({ where: { companyId }, include: { product: true } });
-      const relations = [...products.map((p) => p.category), ...purchases.map((p) => p.supplier), ...sales.map((s) => s.customer), ...quotes.map((q) => q.customer), ...[...purchases, ...sales, ...quotes].flatMap((d) => d.items.map((i) => i.product)), ...receipts.flatMap((r) => [r.purchase, r.receivedByUser, ...r.items.flatMap((i) => [i, i.product, i.purchaseItem.purchase])]), ...equipment.map((e) => e.product), ...movements.map((m) => m.product)];
+      const requirements = await db.healthcareCaseRequirement.findMany({ where: { companyId }, include: { healthcareCase: true, product: true, createdBy: true, retiredBy: true, reactivatedBy: true } });
+      const relations = [...products.map((p) => p.category), ...purchases.map((p) => p.supplier), ...sales.map((s) => s.customer), ...quotes.map((q) => q.customer), ...[...purchases, ...sales, ...quotes].flatMap((d) => d.items.map((i) => i.product)), ...receipts.flatMap((r) => [r.purchase, r.receivedByUser, ...r.items.flatMap((i) => [i, i.product, i.purchaseItem.purchase])]), ...equipment.map((e) => e.product), ...movements.map((m) => m.product), ...requirements.flatMap((r) => [r.healthcareCase, r.product, r.createdBy, r.retiredBy, r.reactivatedBy]).filter(Boolean)];
       if (relations.some((r) => !r || r.companyId !== companyId)) throw new Error('QA verification failed: tenant relation');
       manifest[tenant] = { companyId, users, resources };
       console.log(`Company ${tenant}: roles ${users.map((u) => u.role).join(', ')}; resources and tenant relations verified`);

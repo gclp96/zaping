@@ -7,6 +7,7 @@ import {
   type UserRole,
 } from '@/app/auth-session';
 import { api } from '@/services/api';
+import type { HealthcareRequirement } from '@/services/healthcare-requirements';
 
 import HealthcareCasesPage from './page';
 import type { HealthcareCase } from './types';
@@ -90,6 +91,30 @@ const healthcareCase: HealthcareCase = {
   hospital,
 };
 
+const requirementProduct = {
+  id: 'product-1',
+  sku: 'SKU-001',
+  name: 'Implante principal',
+  isActive: true,
+  inventoryTracking: 'QUANTITY',
+} as const;
+
+const activeRequirement: HealthcareRequirement = {
+  id: 'requirement-1',
+  caseId: healthcareCase.id,
+  productId: requirementProduct.id,
+  requestedQty: 2,
+  type: 'REQUIRED',
+  notes: 'Medida principal',
+  sortOrder: 10,
+  lifecycle: 'ACTIVE',
+  retiredAt: null,
+  retirementReason: null,
+  createdAt: '2026-09-14T10:00:00.000Z',
+  updatedAt: '2026-09-14T10:00:00.000Z',
+  product: requirementProduct,
+};
+
 function authResponse(role: UserRole) {
   return {
     data: {
@@ -121,13 +146,17 @@ function pageResponse<T>(items: T[]) {
 function configureApi(
   role: UserRole = 'ADMIN',
   cases: HealthcareCase[] = [healthcareCase],
+  requirements: HealthcareRequirement[] = [],
 ) {
   vi.mocked(api.get).mockImplementation(async (url) => {
     const path = String(url);
     if (path === '/auth/me') return authResponse(role);
     if (path === '/healthcare/cases') return { data: cases } as never;
     if (path === '/healthcare/cases/case-1/requirements') {
-      return { data: { items: [] } } as never;
+      return { data: { items: requirements } } as never;
+    }
+    if (path === '/products') {
+      return { data: [requirementProduct] } as never;
     }
     if (path === '/healthcare/doctors') {
       return pageResponse([doctor, replacementDoctor, inactiveDoctor]);
@@ -155,8 +184,9 @@ function configureApi(
 async function renderCases(
   role: UserRole = 'ADMIN',
   cases: HealthcareCase[] = [healthcareCase],
+  requirements: HealthcareRequirement[] = [],
 ) {
-  configureApi(role, cases);
+  configureApi(role, cases, requirements);
   render(<HealthcareCasesPage />);
   if (cases.length) {
     await screen.findByText(cases[0].title);
@@ -261,6 +291,43 @@ describe('HealthcareCasesPage', () => {
         String(url).includes('doctor-hospital-affiliations'),
       ),
     ).toBe(false);
+    expect(
+      screen.queryByRole('dialog', { name: 'Nuevo requerimiento' }),
+    ).toBeNull();
+  });
+
+  it('guarda un caso y abre el alta de requerimiento sin cambiar el POST del caso', async () => {
+    const user = userEvent.setup();
+    await renderCases('ADMIN', []);
+    await openCreate(user);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Título' }),
+      'Caso con requerimientos',
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Guardar y agregar requerimientos',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith('/healthcare/cases', {
+        title: 'Caso con requerimientos',
+        procedureDescription: null,
+      }),
+    );
+    expect(casePostCalls()).toHaveLength(1);
+    expect(
+      await screen.findByRole('dialog', { name: 'Detalle del caso' }),
+    ).toBeTruthy();
+    expect(
+      await screen.findByRole('dialog', { name: 'Nuevo requerimiento' }),
+    ).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith(
+      '/healthcare/cases/case-1/requirements',
+      { params: { status: 'ACTIVE' } },
+    );
+    expect(api.get).toHaveBeenCalledWith('/products');
   });
 
   it('omite relaciones y campos de agenda al editar sin cambios', async () => {
@@ -494,6 +561,11 @@ describe('HealthcareCasesPage', () => {
       await renderCases(role);
       expect(screen.getByRole('button', { name: 'Nuevo caso' })).toBeTruthy();
       await openCreate(user);
+      expect(
+        screen.getByRole('button', {
+          name: 'Guardar y agregar requerimientos',
+        }),
+      ).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Crear médico' })).toBeTruthy();
       expect(screen.getByRole('button', { name: 'Crear hospital' })).toBeTruthy();
     },
@@ -537,6 +609,39 @@ describe('HealthcareCasesPage', () => {
       '/healthcare/cases/case-1/requirements',
       { params: { status: 'ACTIVE' } },
     );
+  });
+
+  it('abre las acciones de Requirement por encima del modal de detalle y entra a editar', async () => {
+    const user = userEvent.setup();
+    await renderCases('ADMIN', [healthcareCase], [activeRequirement]);
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+
+    const detailDialog = await screen.findByRole('dialog', {
+      name: 'Detalle del caso',
+    });
+    expect(within(detailDialog).getByText('Implante principal')).toBeTruthy();
+    await user.click(
+      within(detailDialog).getByRole('button', {
+        name: 'Acciones del requerimiento SKU-001',
+      }),
+    );
+
+    const menu = await within(detailDialog).findByRole('menu', {
+      name: 'Acciones del requerimiento SKU-001',
+    });
+    expect(within(menu).getByRole('menuitem', { name: 'Editar' })).toBeTruthy();
+    expect(
+      within(menu).getByRole('menuitem', {
+        name: 'Acción destructiva: Retirar',
+      }),
+    ).toBeTruthy();
+    await user.click(within(menu).getByRole('menuitem', { name: 'Editar' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Editar requerimiento' }),
+    ).toBeTruthy();
   });
 
   it('presenta un 403 sin borrar la sesión', async () => {

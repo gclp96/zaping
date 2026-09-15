@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED — BROADER DOMAIN TARGET / FUTURE
-Última actualización: 2026-09-13
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY NEXT
+Última actualización: 2026-09-14
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -365,6 +365,11 @@ lifecycle CURRENT
 
 tenant ownership
 
+HealthcareCaseRequirement
+
+junto con su relación tenant-scoped a Case/Product, cantidad solicitada,
+clasificación, orden interno de presentación y lifecycle ACTIVE/RETIRED.
+
 16. TARGET Healthcare concepts
 
 La dirección funcional Healthcare incluye:
@@ -373,9 +378,7 @@ Doctor
 
 Hospital
 
-Case Requirements
-
-Equipment Assignment
+Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 Case Availability
 
@@ -684,7 +687,7 @@ referenceId
 
 si sacrifica integridad referencial sin una necesidad clara.
 
-35. Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / TARGET / NOT IMPLEMENTED / NOT STARTED
+35. Case Requirements — COMPLETE / ACCEPTED
 
 Requirements representa:
 
@@ -700,7 +703,7 @@ REQUIRED / BACKUP classification
 
 optional line notes
 
-manual sortOrder
+internal presentation sortOrder assigned automatically
 
 Equipment needs y support material sólo se expresan mediante Products
 existentes; no se crea un Requirement type adicional.
@@ -714,14 +717,22 @@ Domain discovery
 Technical design
 → APPROVED
 
-Implementation
-→ NOT IMPLEMENTED / NOT STARTED
+Persistence / Backend / Frontend
+→ COMPLETE / MERGED
+
+Acceptance
+→ COMPLETE / ACCEPTED
 ```
 
 El contrato canónico de dominio se encuentra en `REQUIREMENTS.md`. Requirement
 es Company-scoped, pertenece a un Healthcare Case y referencia un Product de la
 misma Company. `REQUIREMENTS_TECHNICAL_DESIGN.md` documenta la forma Prisma y
-las relaciones concretas aprobadas; todavía no están implementadas.
+las relaciones concretas aprobadas e implementadas.
+
+Requirements V1 no presenta controles manuales de reorder. `sortOrder` es
+orden interno de presentación asignado automáticamente y no expresa prioridad
+ni secuencia operacional; esa semántica pertenece a futuros dominios de
+Preparation / CaseKit / Maletín.
 
 36. Requirements ≠ Preparation
 
@@ -757,8 +768,8 @@ El technical design aprobado define:
 
 HealthcareCaseRequirement
 
-como modelo target Company-scoped. El nombre y la estructura Prisma están
-aprobados y no implementados.
+como modelo Company-scoped. El nombre y la estructura Prisma están aprobados e
+implementados.
 
 39. Preparation TARGET
 
@@ -2171,7 +2182,7 @@ tenant-scoped API / RBAC
 
 Conceptos funcionales objetivo:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
+Case Requirements — COMPLETE / ACCEPTED
 
 Preparation
 
@@ -2340,7 +2351,7 @@ Readiness
 Case Calendar
 → Read Model
 
-Requirements — DOMAIN DISCOVERY COMPLETE / NEXT / TARGET; TECHNICAL DESIGN APPROVED; IMPLEMENTATION NOT STARTED
+Requirements — COMPLETE / ACCEPTED
 ≠
 Preparation
 
