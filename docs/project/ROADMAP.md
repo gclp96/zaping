@@ -93,9 +93,11 @@ HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery — COMPLETE / 
 ↓
 HC-NEXT-03B Equipment Assignment Technical Design — COMPLETE / APPROVED
 ↓
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
-NEXT — HC-NEXT-03C2 Assignment Backend Base — BLOCKED UNTIL C1 MERGED
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+↓
+NEXT — HC-NEXT-03C3 Availability / Conflict Review / Concurrency — BLOCKED UNTIL C2 MERGED
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -117,8 +119,10 @@ Domain Discovery está COMPLETE / DOCUMENTED. El siguiente item de M-HC1 es:
 HC-NEXT-03B — COMPLETE / APPROVED; HC-NEXT-03B.1 Persistence & Availability
 Design, HC-NEXT-03B.2 API / DTO / Authorization Contract y HC-NEXT-03B.3
 Implementation Slicing / Acceptance Contract APPROVED / DOCUMENTED;
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / READY FOR
-REVIEW; HC-NEXT-03C2 Assignment Backend Base NEXT / BLOCKED UNTIL C1 MERGED
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED;
+HC-NEXT-03C2 Assignment Backend Base COMPLETE / READY FOR REVIEW;
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency NEXT / BLOCKED UNTIL
+C2 MERGED
 
 También permanecen como TARGET Healthcare:
 
@@ -936,8 +940,8 @@ Estado: HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B
 TECHNICAL DESIGN COMPLETE / APPROVED — HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY,
 HC-NEXT-03B.2 API / DTO / AUTHORIZATION Y HC-NEXT-03B.3 IMPLEMENTATION SLICING /
 ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION
-COMPLETE / READY FOR REVIEW — HC-NEXT-03C2 NEXT / BLOCKED UNTIL C1 MERGED —
-BACKEND NOT IMPLEMENTED.
+COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / READY FOR REVIEW —
+HC-NEXT-03C3 NEXT / BLOCKED UNTIL C2 MERGED — PARTIALLY IMPLEMENTED.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -994,11 +998,12 @@ evita over-coverage mediante validación de dominio, usando `DIRECT` para extras
 HC-NEXT-03B.2 aprueba el recurso top-level, filtros/paginación, DTOs allowlisted,
 response shaping, guards/decorators, stable errors, review 200/no-write con
 fingerprint, `Idempotency-Key` y fronteras atómicas. ADMIN/MANAGER/WAREHOUSE
-mutan; SALES conserva read-only. Frontend UX y la implementación permanecen
-posteriores. HC-NEXT-03B.3 aprueba la secuencia C1–C7, sus dependencias/gates y
-el acceptance A–P. HC-NEXT-03C1 Persistence / Migration está COMPLETE / READY
-FOR REVIEW; HC-NEXT-03C2 Assignment Backend Base queda NEXT / BLOCKED UNTIL C1
-MERGED.
+mutan; SALES conserva read-only. Frontend UX y los slices posteriores
+permanecen diferidos. HC-NEXT-03B.3 aprueba la secuencia C1–C7, sus
+dependencias/gates y el acceptance A–P. HC-NEXT-03C1 Persistence / Migration
+está COMPLETE / MERGED y HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
+READY FOR REVIEW; HC-NEXT-03C3 Availability / Conflict Review / Concurrency
+queda NEXT / BLOCKED UNTIL C2 MERGED.
 
 Debe mantenerse:
 
@@ -2733,9 +2738,11 @@ HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
 
 HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUMENTED
 
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 
-HC-NEXT-03C2 Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
 
 Case Availability
 
@@ -2870,9 +2877,11 @@ HC-NEXT-03A Equipment Assignment Domain Discovery — COMPLETE / DOCUMENTED
 ↓
 HC-NEXT-03B Equipment Assignment Technical Design — COMPLETE / APPROVED
 ↓
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
-HC-NEXT-03C2 Assignment Backend Base — NEXT / BLOCKED UNTIL C1 MERGED
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+↓
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

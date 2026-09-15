@@ -24,6 +24,16 @@ export const HEALTHCARE_ERROR_CODES = {
   requirementRetired: 'REQUIREMENT_RETIRED',
   requirementFulfillmentLocked: 'REQUIREMENT_FULFILLMENT_LOCKED',
   invalidRequirementReorder: 'INVALID_REQUIREMENT_REORDER',
+  equipmentAssignmentNotFound: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+  equipmentAssetNotFound: 'EQUIPMENT_ASSET_NOT_FOUND',
+  invalidAssignmentOrigin: 'INVALID_ASSIGNMENT_ORIGIN',
+  caseEquipmentAssignmentsReadOnly: 'CASE_EQUIPMENT_ASSIGNMENTS_READ_ONLY',
+  assignmentRequirementCaseMismatch: 'ASSIGNMENT_REQUIREMENT_CASE_MISMATCH',
+  assignmentProductMismatch: 'ASSIGNMENT_PRODUCT_MISMATCH',
+  equipmentAssetNotEligible: 'EQUIPMENT_ASSET_NOT_ELIGIBLE',
+  requirementOverCoverage: 'REQUIREMENT_OVER_COVERAGE',
+  assignmentAlreadyReserved: 'ASSIGNMENT_ALREADY_RESERVED',
+  idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
   persistenceError: 'HEALTHCARE_PERSISTENCE_ERROR',
@@ -168,6 +178,82 @@ export function invalidRequirementReorderException(): BadRequestException {
   });
 }
 
+export function equipmentAssignmentNotFoundException(): NotFoundException {
+  return new NotFoundException({
+    statusCode: HttpStatus.NOT_FOUND,
+    error: 'Not Found',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssignmentNotFound,
+    message: 'Asignación de equipo no encontrada',
+  });
+}
+
+export function equipmentAssetNotFoundException(): NotFoundException {
+  return new NotFoundException({
+    statusCode: HttpStatus.NOT_FOUND,
+    error: 'Not Found',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssetNotFound,
+    message: 'Equipo no encontrado',
+  });
+}
+
+export function invalidAssignmentOriginException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.invalidAssignmentOrigin,
+    message: 'La relación entre Requirement, origen y razón no es válida',
+  });
+}
+
+export function caseEquipmentAssignmentsReadOnlyException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.caseEquipmentAssignmentsReadOnly,
+    'Las asignaciones de equipo del caso son de sólo lectura',
+  );
+}
+
+export function assignmentRequirementCaseMismatchException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.assignmentRequirementCaseMismatch,
+    'El requerimiento no pertenece al caso indicado',
+  );
+}
+
+export function assignmentProductMismatchException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.assignmentProductMismatch,
+    'El producto del equipo no coincide con el requerimiento',
+  );
+}
+
+export function equipmentAssetNotEligibleException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.equipmentAssetNotEligible,
+    'El equipo no está disponible para una nueva asignación',
+  );
+}
+
+export function requirementOverCoverageException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.requirementOverCoverage,
+    'La cantidad solicitada del requerimiento ya está cubierta',
+  );
+}
+
+export function assignmentAlreadyReservedException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.assignmentAlreadyReserved,
+    'El equipo ya está reservado para este caso',
+  );
+}
+
+export function idempotencyKeyReusedException(): ConflictException {
+  return equipmentAssignmentConflictException(
+    HEALTHCARE_ERROR_CODES.idempotencyKeyReused,
+    'La clave de idempotencia ya fue utilizada con una solicitud diferente',
+  );
+}
+
 export function resourceStateChangedException(): ConflictException {
   return new ConflictException({
     statusCode: HttpStatus.CONFLICT,
@@ -233,6 +319,25 @@ function healthcareConflictException(
     | typeof HEALTHCARE_ERROR_CODES.requirementAlreadyActive
     | typeof HEALTHCARE_ERROR_CODES.requirementRetired
     | typeof HEALTHCARE_ERROR_CODES.requirementFulfillmentLocked,
+  message: string,
+): ConflictException {
+  return new ConflictException({
+    statusCode: HttpStatus.CONFLICT,
+    error: 'Conflict',
+    code,
+    message,
+  });
+}
+
+function equipmentAssignmentConflictException(
+  code:
+    | typeof HEALTHCARE_ERROR_CODES.caseEquipmentAssignmentsReadOnly
+    | typeof HEALTHCARE_ERROR_CODES.assignmentRequirementCaseMismatch
+    | typeof HEALTHCARE_ERROR_CODES.assignmentProductMismatch
+    | typeof HEALTHCARE_ERROR_CODES.equipmentAssetNotEligible
+    | typeof HEALTHCARE_ERROR_CODES.requirementOverCoverage
+    | typeof HEALTHCARE_ERROR_CODES.assignmentAlreadyReserved
+    | typeof HEALTHCARE_ERROR_CODES.idempotencyKeyReused,
   message: string,
 ): ConflictException {
   return new ConflictException({
