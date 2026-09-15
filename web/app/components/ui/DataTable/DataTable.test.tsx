@@ -615,6 +615,33 @@ describe('RowActionsMenu', () => {
     expect(menu.style.visibility).toBe('visible');
   });
 
+  it('keeps a portaled actions panel inside its enclosing modal layer', async () => {
+    const user = userEvent.setup();
+    mockMenuGeometry({
+      trigger: { left: 200, top: 104, width: 36, height: 36 },
+      menu: { left: 0, top: 0, width: 176, height: 120 },
+    });
+
+    render(
+      <div role="dialog" aria-label="Detalle">
+        <RowActionsMenu
+          row={people[0]}
+          label="Acciones de Zoe"
+          actions={actions}
+        />
+      </div>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Acciones de Zoe' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Detalle' });
+    const menu = screen.getByRole('menu', { name: 'Acciones de Zoe' });
+    expect(menu.parentElement).toBe(dialog);
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole('menuitem', { name: 'Editar' }),
+    );
+  });
+
   it('opens above when needed and clamps the panel inside the viewport', async () => {
     const user = userEvent.setup();
     mockMenuGeometry({

@@ -3,14 +3,49 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.4.0
 **Estado:** Activo
-**Última actualización:** 2026-09-13
+**Última actualización:** 2026-09-14
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-14 — Healthcare Requirements V1 accepted
+
+**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED — ACCEPTANCE COMPLETE / ACCEPTED
+
+Healthcare Requirements V1 completó persistencia, backend, frontend y
+aceptación integrada. Los focales de Requirements, RBAC, regresiones Healthcare,
+integridad PostgreSQL, suites completas API/Web, lint, typecheck, builds y
+runtime smoke contra PostgreSQL/API/Web real quedaron PASS. Tenant isolation
+Company A/B quedó validado.
+
+La matriz manual final quedó:
+
+```text
+ADMIN     → PASS
+MANAGER   → PASS
+SALES     → PASS
+WAREHOUSE → PASS
+```
+
+Los findings de aceptación quedaron verificados: se corrigió el portal/z-index
+del menú Actions, se agregó la orquestación frontend **Guardar y agregar
+requerimientos** después del POST normal del Case y se retiró el reorder manual
+por carecer de significado operacional V1. `sortOrder` permanece interno y se
+asigna automáticamente; Preparation / CaseKit / Maletín podrá definir una
+secuencia operacional futura.
+
+El contrato `RequirementOperationalEvidencePolicy` existe, pero RQ-006 no se
+declara integrado contra fulfillment real. Ese cierre permanece diferido hasta
+futuros producers Healthcare como Dispatch, Equipment Assignment o Custody.
+
+El siguiente item documentado de M-HC1 es Healthcare Equipment Assignment
+Domain Discovery; no se inventó un identificador nuevo.
 
 ---
 
 # 2026-09-13 — Healthcare Requirements V1 technical design approved
 
-**Estado:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT IMPLEMENTED / NOT STARTED
+**Estado histórico al aprobar el diseño:** DOMAIN DISCOVERY COMPLETE / DOCUMENTED — TECHNICAL DESIGN APPROVED — NOT IMPLEMENTED / NOT STARTED
 
 La revisión del technical design de Requirements V1 concluyó y las decisiones
 `TD-RQ-001` a `TD-RQ-014` quedaron aprobadas. La aprobación es exclusivamente

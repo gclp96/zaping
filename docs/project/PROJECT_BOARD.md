@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — Requirements technical design approved / implementation not started
-Última actualización: 2026-09-13
+Fase actual: M-HC1 Healthcare Operations Foundation — Equipment Assignment Domain Discovery NEXT / READY
+Última actualización: 2026-09-14
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -110,10 +110,16 @@ CURRENT
 
 M-HC1 — Healthcare Operations Foundation
 
+└── Healthcare Equipment Assignment Domain Discovery
+    └── NEXT / READY
+
+RECENTLY COMPLETED
+
 └── Requirements
     ├── DOMAIN DISCOVERY COMPLETE / DOCUMENTED
     ├── TECHNICAL DESIGN APPROVED
-    └── IMPLEMENTATION NOT STARTED
+    ├── PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED
+    └── ACCEPTANCE COMPLETE / ACCEPTED
 
 Frontend UX workstream
 
@@ -127,8 +133,8 @@ Frontend UX workstream
 
 NEXT
 
-Requirements
-        → NEXT / TARGET — TECHNICAL DESIGN APPROVED — IMPLEMENTATION NOT STARTED
+Healthcare Equipment Assignment Domain Discovery
+        → NEXT / READY
 
 DEFERRED
 
@@ -1698,9 +1704,14 @@ pendiente `20260910194524_add_healthcare_doctors_hospitals` en la base Docker QA
 `zaping_qa`. `prisma migrate deploy` corrigió ese drift de ambiente; no fue un
 defecto de producto y QA continuó satisfactoriamente.
 
-Requirements domain discovery está COMPLETE / DOCUMENTED. El technical design
-está APPROVED; la implementación Prisma/API/Web no ha iniciado.
-No se asignó un identificador nuevo.
+Requirements domain discovery está COMPLETE / DOCUMENTED, el technical design
+está APPROVED, persistence/backend/frontend están COMPLETE / MERGED y la
+acceptance automatizada y manual está COMPLETE / ACCEPTED. La matriz ADMIN,
+MANAGER, SALES y WAREHOUSE quedó PASS.
+
+`RequirementOperationalEvidencePolicy` existe, pero la integración con un
+producer real de fulfillment permanece diferida hasta futuros dominios como
+Dispatch, Equipment Assignment o Custody. No se asignó un identificador nuevo.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2183,10 +2194,14 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 → Requirements Technical Design APPROVED
 
+→ Requirements Persistence / Backend / Frontend COMPLETE / MERGED
+
+→ Requirements Acceptance COMPLETE / ACCEPTED — ADMIN / MANAGER / SALES /
+  WAREHOUSE PASS
+
 NEXT ROADMAP ITEM
 
-→ Requirements — NEXT / TARGET; technical design APPROVED;
-  implementation NOT STARTED
+→ Healthcare Equipment Assignment Domain Discovery — NEXT / READY
 
 DEFERRED
 
@@ -2379,7 +2394,11 @@ HC-NEXT-01
 Requirements
 → DOMAIN DISCOVERY COMPLETE / DOCUMENTED
 → TECHNICAL DESIGN APPROVED
-→ NEXT / TARGET — IMPLEMENTATION NOT STARTED
+→ PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED
+→ ACCEPTANCE COMPLETE / ACCEPTED
+
+Healthcare Equipment Assignment Domain Discovery
+→ NEXT / READY
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

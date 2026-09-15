@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — C1-C7 CLOSED / MERGED; C8 CLOSED / MERGED / ACCEPTED — OPERATIONAL LOGISTICS TARGET
-Última actualización: 2026-09-13
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT DOMAIN DISCOVERY NEXT
+Última actualización: 2026-09-14
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -62,6 +62,9 @@ HealthcareCase Foundation
 Doctor / Hospital master data, affiliation, Case integration and Web workflow
 ✅ C1-C7
 
+Case Requirements V1
+✅ COMPLETE / ACCEPTED
+
 EquipmentAsset ERP Core
 ✅
 
@@ -74,9 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
-
-Equipment Assignment
+Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 Case Availability
 
@@ -771,7 +772,7 @@ Este es un workflow operativo conceptual.
 
 No debe confundirse con el orden técnico de implementación del roadmap.
 
-37. Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / TARGET / NOT IMPLEMENTED / NOT STARTED
+37. Case Requirements — COMPLETE / ACCEPTED
 
 Requirements representa:
 
@@ -787,7 +788,7 @@ REQUIRED / BACKUP classification
 
 optional line notes
 
-manual sortOrder
+internal presentation sortOrder assigned automatically
 
 Equipment needs y support material sólo se expresan mediante Products
 existentes; no existen líneas libres de logística fuera de Product.
@@ -801,15 +802,23 @@ Domain discovery
 Technical design
 → APPROVED
 
-Implementation
-→ NOT IMPLEMENTED / NOT STARTED
+Persistence / Backend / Frontend
+→ COMPLETE / MERGED
+
+Acceptance
+→ COMPLETE / ACCEPTED
 ```
 
-El contrato de dominio V1 vive en `REQUIREMENTS.md`; el target técnico aprobado
-y no implementado se documenta en `REQUIREMENTS_TECHNICAL_DESIGN.md`. Cada línea
+El contrato de dominio V1 vive en `REQUIREMENTS.md`; el diseño técnico aprobado
+e implementado se documenta en `REQUIREMENTS_TECHNICAL_DESIGN.md`. Cada línea
 referencia un Product existente, expresa `requestedQty` entero en la unidad
 implícita actual del Product y permanece separada de Availability, Preparation,
 Assignment, Dispatch, Inventory y Return.
+
+Requirements V1 no expone controles manuales de reorder. `sortOrder` permanece
+como orden interno de presentación asignado automáticamente; una secuencia
+operacional pertenece a Preparation / CaseKit / Maletín cuando esos dominios se
+diseñen.
 
 38. Requirements ≠ Preparation
 
@@ -1629,7 +1638,7 @@ Puede coordinar progresivamente:
 
 Purchase Receipts
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
+Case Requirements — COMPLETE / ACCEPTED
 
 Preparation
 
@@ -2126,9 +2135,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Case Requirements — DOMAIN DISCOVERY COMPLETE / TECHNICAL DESIGN APPROVED / NOT IMPLEMENTED / NOT STARTED
-
-Equipment Assignment
+Equipment Assignment — NEXT / READY FOR DOMAIN DISCOVERY
 
 Case Availability
 

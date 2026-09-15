@@ -274,6 +274,9 @@ describe('HealthcareRequirementsSection', () => {
     const dialog = await screen.findByRole('dialog', {
       name: 'Nuevo requerimiento',
     });
+    expect(
+      within(dialog).queryByRole('spinbutton', { name: 'Orden' }),
+    ).toBeNull();
     await waitFor(() =>
       expect(
         (
@@ -320,7 +323,7 @@ describe('HealthcareRequirementsSection', () => {
           requestedQty: 3,
           type: 'BACKUP',
           notes: 'Alternativa',
-          sortOrder: 0,
+          sortOrder: 20,
         },
       ),
     );
@@ -379,10 +382,24 @@ describe('HealthcareRequirementsSection', () => {
     const user = userEvent.setup();
     await renderSection();
     await openActions(user, product.sku);
+    const actions = screen.getByRole('menu', {
+      name: 'Acciones del requerimiento SKU-001',
+    });
+    expect(
+      within(actions).getByRole('menuitem', { name: 'Editar' }),
+    ).toBeTruthy();
+    expect(
+      within(actions).getByRole('menuitem', {
+        name: 'Acción destructiva: Retirar',
+      }),
+    ).toBeTruthy();
     await user.click(screen.getByRole('menuitem', { name: 'Editar' }));
     const dialog = await screen.findByRole('dialog', {
       name: 'Editar requerimiento',
     });
+    expect(
+      within(dialog).queryByRole('spinbutton', { name: 'Orden' }),
+    ).toBeNull();
     expect(
       within(dialog).queryByRole('combobox', { name: 'Producto' }),
     ).toBeNull();
@@ -404,7 +421,6 @@ describe('HealthcareRequirementsSection', () => {
           requestedQty: 4,
           type: 'REQUIRED',
           notes: 'Medida principal',
-          sortOrder: 10,
         },
       ),
     );
@@ -423,6 +439,9 @@ describe('HealthcareRequirementsSection', () => {
       { params: { status: 'RETIRED' } },
     );
     await openActions(user, 'SKU-OLD');
+    const actions = screen.getByRole('menu', {
+      name: 'Acciones del requerimiento SKU-OLD',
+    });
     expect(
       (screen.getByRole('menuitem', { name: 'Editar' }) as HTMLButtonElement)
         .disabled,
@@ -438,6 +457,10 @@ describe('HealthcareRequirementsSection', () => {
       (screen.getByRole('menuitem', { name: 'Reactivar' }) as HTMLButtonElement)
         .disabled,
     ).toBe(false);
+    expect(
+      within(actions).getByRole('menuitem', { name: 'Reactivar' }),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Mover SKU-OLD/ })).toBeNull();
   });
 
   it('muestra un cambio de estado estable al actualizar', async () => {
@@ -572,48 +595,21 @@ describe('HealthcareRequirementsSection', () => {
     ).toBeTruthy();
   });
 
-  it('persiste un orden explícito y refresca desde servidor', async () => {
+  it('muestra posiciones humanas sin controles manuales ni semántica de prioridad', async () => {
     const user = userEvent.setup();
     configureApi({ active: [activeRequirement, secondActiveRequirement] });
     await renderSection();
+
+    expect(screen.getByLabelText('Posición 1')).toBeTruthy();
+    expect(screen.getByLabelText('Posición 2')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Mover SKU-/ })).toBeNull();
+    expect(screen.queryByText('Subir')).toBeNull();
+    expect(screen.queryByText('Bajar')).toBeNull();
+    expect(screen.queryByText(/prioridad/i)).toBeNull();
+
     await openActions(user, product.sku);
-    await user.click(screen.getByRole('menuitem', { name: 'Mover abajo' }));
-
-    await waitFor(() =>
-      expect(api.patch).toHaveBeenCalledWith(
-        '/healthcare/cases/case-1/requirements/reorder',
-        {
-          items: [
-            { requirementId: 'requirement-2', sortOrder: 0 },
-            { requirementId: 'requirement-1', sortOrder: 1 },
-          ],
-        },
-      ),
-    );
-    expect(
-      vi
-        .mocked(api.get)
-        .mock.calls.filter(
-          ([url]) => String(url) === '/healthcare/cases/case-1/requirements',
-        ).length,
-    ).toBeGreaterThan(1);
-  });
-
-  it('muestra el error estable del backend al reordenar', async () => {
-    const user = userEvent.setup();
-    configureApi({ active: [activeRequirement, secondActiveRequirement] });
-    vi.mocked(api.patch).mockRejectedValueOnce(
-      apiError('INVALID_REQUIREMENT_REORDER'),
-    );
-    await renderSection();
-    await openActions(user, product.sku);
-    await user.click(screen.getByRole('menuitem', { name: 'Mover abajo' }));
-
-    expect(
-      await screen.findByText(
-        'No fue posible guardar el nuevo orden. Actualiza la lista e intenta nuevamente.',
-      ),
-    ).toBeTruthy();
+    expect(screen.queryByRole('menuitem', { name: 'Mover arriba' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: 'Mover abajo' })).toBeNull();
   });
 
   it('mantiene CANCELLED como historial visible sin controles de mutación', async () => {
@@ -631,6 +627,7 @@ describe('HealthcareRequirementsSection', () => {
         name: 'Acciones del requerimiento SKU-001',
       }),
     ).toBeNull();
+    expect(screen.queryByRole('button', { name: /Mover SKU-001/ })).toBeNull();
   });
 
   it('traduce REQUIREMENT_RETIRED con guía de reactivación', async () => {

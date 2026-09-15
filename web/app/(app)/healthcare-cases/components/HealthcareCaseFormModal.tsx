@@ -23,6 +23,8 @@ type AffiliationListResponse = {
   items: Array<{ hospitalId: string; isActive: boolean }>;
 };
 
+export type HealthcareCaseSaveIntent = 'SAVE' | 'SAVE_AND_ADD_REQUIREMENT';
+
 type HealthcareCaseFormModalProps = {
   isOpen: boolean;
   healthcareCase: HealthcareCase | null;
@@ -30,7 +32,10 @@ type HealthcareCaseFormModalProps = {
   saving: boolean;
   error: string;
   onClose: () => void;
-  onSave: (payload: Record<string, string | null>) => void;
+  onSave: (
+    payload: Record<string, string | null>,
+    intent: HealthcareCaseSaveIntent,
+  ) => void;
 };
 
 function createInitialForm(
@@ -137,13 +142,13 @@ export default function HealthcareCaseFormModal({
     };
   }, [form.doctorId, form.hospitalId]);
 
-  function submit() {
+  function submit(intent: HealthcareCaseSaveIntent) {
     if (!form.title.trim()) {
       setFormError('El título es obligatorio.');
       return;
     }
     setFormError('');
-    onSave(buildCasePayload(form, healthcareCase));
+    onSave(buildCasePayload(form, healthcareCase), intent);
   }
 
   function handleQuickCreated(
@@ -180,7 +185,7 @@ export default function HealthcareCaseFormModal({
           className="space-y-5"
           onSubmit={(event) => {
             event.preventDefault();
-            submit();
+            submit('SAVE');
           }}
         >
           <Input
@@ -283,6 +288,16 @@ export default function HealthcareCaseFormModal({
             >
               Cancelar
             </Button>
+            {!healthcareCase ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={saving}
+                onClick={() => submit('SAVE_AND_ADD_REQUIREMENT')}
+              >
+                Guardar y agregar requerimientos
+              </Button>
+            ) : null}
             <Button
               type="submit"
               loading={saving}
