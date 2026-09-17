@@ -14,6 +14,7 @@ const equipmentAssetId = '44444444-4444-4444-8444-444444444444';
 describe('HealthcareEquipmentAssignmentsRepository', () => {
   const prisma = {
     $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     idempotencyRecord: {
       findUnique: jest.fn(),
     },
@@ -26,10 +27,16 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     equipmentAsset: {
       findFirst: jest.fn(),
     },
+    healthcareEquipmentAssignmentSettings: {
+      findUnique: jest.fn(),
+    },
     healthcareEquipmentAssignment: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+    },
+    healthcareEquipmentAssignmentConflictOverride: {
+      createMany: jest.fn(),
     },
   };
   const repository = new HealthcareEquipmentAssignmentsRepository(
@@ -112,6 +119,98 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
         select: { id: true },
       },
     );
+  });
+
+  it('resolves Company settings without creating a settings row', async () => {
+    await repository.findSettings(companyId);
+
+    expect(
+      prisma.healthcareEquipmentAssignmentSettings.findUnique,
+    ).toHaveBeenCalledWith({
+      where: { companyId },
+      select: {
+        preCaseBufferMinutes: true,
+        postCaseBufferMinutes: true,
+      },
+    });
+  });
+
+  it('locks only the tenant-scoped EquipmentAsset and Requirement rows', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ id: equipmentAssetId }])
+      .mockResolvedValueOnce([{ id: requirementId }]);
+
+    await expect(
+      repository.lockEquipmentAsset(
+        prisma as never,
+        companyId,
+        equipmentAssetId,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      repository.lockRequirement(prisma as never, companyId, requirementId),
+    ).resolves.toBe(true);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads only same-tenant RESERVED reservations for authoritative availability', async () => {
+    await repository.findReservedAssignmentsForAsset(
+      companyId,
+      equipmentAssetId,
+      'excluded-assignment',
+    );
+
+    expect(prisma.healthcareEquipmentAssignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          companyId,
+          equipmentAssetId,
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          id: { not: 'excluded-assignment' },
+        },
+        orderBy: { id: 'asc' },
+      }),
+    );
+  });
+
+  it('bulk-loads RESERVED reservations for list availability without N+1 lookups', async () => {
+    await repository.findReservedAssignmentsForAssets(companyId, [
+      equipmentAssetId,
+      'other-asset',
+    ]);
+
+    expect(prisma.healthcareEquipmentAssignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          companyId,
+          equipmentAssetId: { in: [equipmentAssetId, 'other-asset'] },
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        },
+        orderBy: { id: 'asc' },
+      }),
+    );
+  });
+
+  it('creates one same-tenant override row per confirmed conflict', async () => {
+    const rows = [
+      {
+        companyId,
+        assignmentId: 'assignment-1',
+        conflictingAssignmentId: 'assignment-2',
+        assignmentWindowStart: new Date('2026-09-15T10:00:00.000Z'),
+        assignmentWindowEnd: new Date('2026-09-15T12:00:00.000Z'),
+        conflictingWindowStart: new Date('2026-09-15T11:00:00.000Z'),
+        conflictingWindowEnd: new Date('2026-09-15T13:00:00.000Z'),
+        approvedById: 'user-1',
+        reason: 'Riesgo controlado',
+      },
+    ];
+
+    await repository.createConflictOverrides(prisma as never, rows);
+
+    expect(
+      prisma.healthcareEquipmentAssignmentConflictOverride.createMany,
+    ).toHaveBeenCalledWith({ data: rows });
   });
 
   it('applies AND filters, deterministic ordering and pagination to list', async () => {

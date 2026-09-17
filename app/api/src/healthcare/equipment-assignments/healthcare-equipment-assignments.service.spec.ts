@@ -25,13 +25,16 @@ const requirementId = '66666666-6666-4666-8666-666666666666';
 const equipmentAssetId = '77777777-7777-4777-8777-777777777777';
 const productId = '88888888-8888-4888-8888-888888888888';
 const assignmentId = '99999999-9999-4999-8999-999999999999';
+const conflictingAssignmentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const createdAt = new Date('2026-09-15T15:00:00.000Z');
 const updatedAt = new Date('2026-09-15T15:05:00.000Z');
 const completeCase = {
   id: caseId,
+  folio: 'HC-000001',
   status: HealthcareCaseStatus.DRAFT,
   scheduledStart: new Date('2026-09-16T15:00:00.000Z'),
   scheduledEnd: new Date('2026-09-16T17:00:00.000Z'),
+  updatedAt,
 };
 const requirement = {
   id: requirementId,
@@ -39,6 +42,7 @@ const requirement = {
   productId,
   requestedQty: 2,
   lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+  updatedAt,
   product: {
     inventoryTracking: ProductInventoryTracking.ASSET,
   },
@@ -46,8 +50,17 @@ const requirement = {
 const equipmentAsset = {
   id: equipmentAssetId,
   productId,
+  assetCode: 'EQ-000001',
+  serialNumber: 'SN-001',
   lifecycle: EquipmentLifecycle.ACTIVE,
   condition: EquipmentCondition.GOOD,
+  updatedAt,
+  product: {
+    id: productId,
+    sku: 'EQ-PRODUCT-01',
+    name: 'Equipo clínico',
+    isActive: true,
+  },
 };
 const baseRecord = {
   id: assignmentId,
@@ -66,8 +79,10 @@ const baseRecord = {
   createdAt,
   updatedAt,
   healthcareCase: {
+    folio: completeCase.folio,
     scheduledStart: completeCase.scheduledStart,
     scheduledEnd: completeCase.scheduledEnd,
+    updatedAt,
   },
   equipmentAsset: {
     id: equipmentAssetId,
@@ -106,6 +121,32 @@ const directDto = {
   directAssignmentReason: '  Respaldo urgente  ',
 };
 
+const overlappingReservation = {
+  id: conflictingAssignmentId,
+  caseId: otherCaseId,
+  updatedAt,
+  healthcareCase: {
+    id: otherCaseId,
+    folio: 'HC-000002',
+    scheduledStart: new Date('2026-09-16T16:00:00.000Z'),
+    scheduledEnd: new Date('2026-09-16T18:00:00.000Z'),
+    updatedAt,
+  },
+};
+
+const unresolvedReservation = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  caseId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  updatedAt,
+  healthcareCase: {
+    id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    folio: 'HC-000003',
+    scheduledStart: new Date('2026-09-16T20:00:00.000Z'),
+    scheduledEnd: null,
+    updatedAt,
+  },
+};
+
 function knownPrismaError(code: string, target?: string | string[]) {
   return new Prisma.PrismaClientKnownRequestError('database error', {
     code,
@@ -124,9 +165,19 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     findCase: jest.fn(),
     findRequirement: jest.fn(),
     findEquipmentAsset: jest.fn(),
+    findSettings: jest.fn(),
+    findSettingsForShare: jest.fn(),
+    lockEquipmentAsset: jest.fn(),
+    lockRequirement: jest.fn(),
+    acquireSettingsSharedAdvisoryLock: jest.fn(),
+    lockHealthcareCasesForShare: jest.fn(),
     countRequirementCoverage: jest.fn(),
     findReservedAssignmentForCaseAsset: jest.fn(),
+    findReservedAssignmentCaseIdsForAsset: jest.fn(),
+    findReservedAssignmentsForAsset: jest.fn(),
+    findReservedAssignmentsForAssets: jest.fn(),
     createAssignment: jest.fn(),
+    createConflictOverrides: jest.fn(),
     findAssignment: jest.fn(),
     countAssignments: jest.fn(),
     findAssignments: jest.fn(),
@@ -145,9 +196,19 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.findCase.mockResolvedValue(completeCase);
     repository.findRequirement.mockResolvedValue(requirement);
     repository.findEquipmentAsset.mockResolvedValue(equipmentAsset);
+    repository.findSettings.mockResolvedValue(null);
+    repository.findSettingsForShare.mockResolvedValue(null);
+    repository.lockEquipmentAsset.mockResolvedValue(true);
+    repository.lockRequirement.mockResolvedValue(true);
+    repository.acquireSettingsSharedAdvisoryLock.mockResolvedValue(undefined);
+    repository.lockHealthcareCasesForShare.mockResolvedValue([caseId]);
     repository.countRequirementCoverage.mockResolvedValue(0);
     repository.findReservedAssignmentForCaseAsset.mockResolvedValue(null);
+    repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([]);
+    repository.findReservedAssignmentsForAsset.mockResolvedValue([]);
+    repository.findReservedAssignmentsForAssets.mockResolvedValue([]);
     repository.createAssignment.mockResolvedValue(baseRecord);
+    repository.createConflictOverrides.mockResolvedValue({ count: 0 });
     repository.findAssignment.mockResolvedValue(baseRecord);
     repository.countAssignments.mockResolvedValue(1);
     repository.findAssignments.mockResolvedValue([baseRecord]);
@@ -163,8 +224,8 @@ describe('HealthcareEquipmentAssignmentsService', () => {
             status: HealthcareEquipmentAssignmentLifecycle.RESERVED,
             assignedAt: createdAt,
             availability: {
-              fullyVerifiable: false,
-              conflictFree: null,
+              fullyVerifiable: true,
+              conflictFree: true,
               warnings: [],
             },
           }),
@@ -301,6 +362,40 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         assignmentId,
       );
     });
+
+    it('derives current conflict availability and recognizes only matching override snapshots', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+      repository.findAssignment.mockResolvedValue({
+        ...baseRecord,
+        conflictOverrides: [
+          {
+            conflictingAssignmentId,
+            assignmentWindowStart: new Date('2026-09-16T13:00:00.000Z'),
+            assignmentWindowEnd: new Date('2026-09-16T20:00:00.000Z'),
+            conflictingWindowStart: new Date('2026-09-16T14:00:00.000Z'),
+            conflictingWindowEnd: new Date('2026-09-16T21:00:00.000Z'),
+            createdAt,
+            reason: 'Riesgo controlado',
+            approvedBy: baseRecord.createdBy,
+          },
+        ],
+      });
+
+      await expect(service.findOne(companyId, assignmentId)).resolves.toEqual(
+        expect.objectContaining({
+          availability: {
+            fullyVerifiable: true,
+            conflictFree: false,
+            warnings: [
+              expect.objectContaining({ code: 'CURRENT_ASSIGNMENT_CONFLICT' }),
+              expect.objectContaining({ code: 'CONFLICT_OVERRIDE_CONFIRMED' }),
+            ],
+          },
+        }),
+      );
+    });
   });
 
   describe('create', () => {
@@ -313,6 +408,11 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       );
 
       expect(result.outcome).toBe('CREATED');
+
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
+
       expect(result.data).toMatchObject({
         id: assignmentId,
         origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
@@ -362,6 +462,11 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       );
 
       expect(result.outcome).toBe('CREATED');
+
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
+
       expect(result.data).toMatchObject({
         requirementId: null,
         origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
@@ -554,10 +659,16 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       repository.createAssignment.mockResolvedValueOnce({
         ...baseRecord,
         healthcareCase: {
+          folio: completeCase.folio,
           scheduledStart: completeCase.scheduledStart,
           scheduledEnd: null,
+          updatedAt,
         },
       });
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        overlappingReservation,
+        unresolvedReservation,
+      ]);
 
       const result = await service.create(
         companyId,
@@ -565,6 +676,10 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         'incomplete-key',
         requirementDto,
       );
+
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
 
       expect(result.data.availability).toEqual({
         fullyVerifiable: false,
@@ -578,7 +693,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       });
     });
 
-    it('does not falsely declare a complete schedule conflict-free before C3', async () => {
+    it('declares a complete fully evaluated schedule conflict-free', async () => {
       const result = await service.create(
         companyId,
         userId,
@@ -586,15 +701,431 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         requirementDto,
       );
 
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
+
+      expect(result.data.availability).toEqual({
+        fullyVerifiable: true,
+        conflictFree: true,
+        warnings: [],
+      });
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it('allows an unresolved related reservation without fabricating a conflict or override', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        unresolvedReservation,
+      ]);
+
+      const result = await service.create(
+        companyId,
+        userId,
+        'unresolved-key',
+        requirementDto,
+      );
+
+      expect(result.outcome).toBe('CREATED');
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
       expect(result.data.availability).toEqual({
         fullyVerifiable: false,
         conflictFree: null,
-        warnings: [],
+        warnings: [
+          {
+            code: 'RELATED_RESERVATION_SCHEDULE_INCOMPLETE',
+            message:
+              'Existe una reserva activa del mismo equipo con horario incompleto; la disponibilidad no puede verificarse completamente.',
+          },
+        ],
+      });
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it('returns a zero-write 200 review for a confirmed overlap', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        overlappingReservation,
+      ]);
+
+      const result = await service.create(
+        companyId,
+        userId,
+        'review-key',
+        requirementDto,
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        overrideRequired: true,
+        conflicts: [
+          {
+            assignmentId: conflictingAssignmentId,
+            caseId: otherCaseId,
+            caseFolio: 'HC-000002',
+          },
+        ],
+        availability: {
+          fullyVerifiable: true,
+          conflictFree: false,
+          warnings: [
+            expect.objectContaining({ code: 'CURRENT_ASSIGNMENT_CONFLICT' }),
+          ],
+        },
+      });
+      expect(result).toHaveProperty(
+        'conflictReviewFingerprint',
+        expect.stringMatching(/^[a-f0-9]{64}$/u),
+      );
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('reports confirmed overlaps and unresolved reservations together without auditing uncertainty', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        unresolvedReservation,
+        overlappingReservation,
+      ]);
+
+      const result = await service.create(
+        companyId,
+        userId,
+        'mixed-review-key',
+        requirementDto,
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        conflicts: [{ assignmentId: conflictingAssignmentId }],
+        unresolvedReservations: [
+          {
+            assignmentId: unresolvedReservation.id,
+            caseId: unresolvedReservation.caseId,
+          },
+        ],
+        availability: {
+          fullyVerifiable: false,
+          conflictFree: false,
+          warnings: [
+            expect.objectContaining({ code: 'CURRENT_ASSIGNMENT_CONFLICT' }),
+            expect.objectContaining({
+              code: 'RELATED_RESERVATION_SCHEDULE_INCOMPLETE',
+            }),
+          ],
+        },
+      });
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it('returns every confirmed overlap in deterministic assignment order', async () => {
+      const secondConflict = {
+        ...overlappingReservation,
+        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        caseId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        healthcareCase: {
+          ...overlappingReservation.healthcareCase,
+          id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          folio: 'HC-000004',
+        },
+      };
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        overlappingReservation,
+        secondConflict,
+      ]);
+
+      const result = await service.create(
+        companyId,
+        userId,
+        'multiple-conflicts-key',
+        requirementDto,
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        conflicts: [
+          { assignmentId: conflictingAssignmentId },
+          { assignmentId: secondConflict.id },
+        ],
       });
     });
 
-    it('replays a completed same-payload command without another transaction', async () => {
-      repository.findIdempotencyRecord.mockResolvedValueOnce({
+    it('returns a fresh zero-write review when a confirmation fingerprint is stale', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+      const initial = await service.create(
+        companyId,
+        userId,
+        'stale-review-key',
+        requirementDto,
+      );
+      if (initial.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected CONFLICT_REVIEW_REQUIRED');
+      }
+
+      repository.findCase.mockResolvedValue({
+        ...completeCase,
+        scheduledStart: new Date('2026-09-16T15:30:00.000Z'),
+        updatedAt: new Date('2026-09-15T15:06:00.000Z'),
+      });
+      jest.clearAllMocks();
+      repository.findIdempotencyRecord.mockResolvedValue(null);
+      repository.lockEquipmentAsset.mockResolvedValue(true);
+      repository.lockRequirement.mockResolvedValue(true);
+      repository.findCase.mockResolvedValue({
+        ...completeCase,
+        scheduledStart: new Date('2026-09-16T15:30:00.000Z'),
+        updatedAt: new Date('2026-09-15T15:06:00.000Z'),
+      });
+      repository.findEquipmentAsset.mockResolvedValue(equipmentAsset);
+      repository.findRequirement.mockResolvedValue(requirement);
+      repository.findReservedAssignmentForCaseAsset.mockResolvedValue(null);
+      repository.countRequirementCoverage.mockResolvedValue(0);
+      repository.findSettings.mockResolvedValue(null);
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+
+      const refreshed = await service.create(
+        companyId,
+        userId,
+        'stale-review-key',
+        {
+          ...requirementDto,
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: initial.conflictReviewFingerprint,
+          conflictOverrideReason: 'Riesgo controlado',
+        },
+      );
+
+      expect(refreshed).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        overrideRequired: true,
+      });
+      expect(refreshed).not.toHaveProperty(
+        'conflictReviewFingerprint',
+        initial.conflictReviewFingerprint,
+      );
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it('returns a fresh no-override review when the reviewed conflict disappears', async () => {
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([
+        overlappingReservation,
+      ]);
+      const initial = await service.create(
+        companyId,
+        userId,
+        'disappeared-review-key',
+        requirementDto,
+      );
+      if (initial.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected CONFLICT_REVIEW_REQUIRED');
+      }
+
+      repository.findReservedAssignmentsForAsset.mockResolvedValueOnce([]);
+      const refreshed = await service.create(
+        companyId,
+        userId,
+        'disappeared-review-key',
+        {
+          ...requirementDto,
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: initial.conflictReviewFingerprint,
+          conflictOverrideReason: 'Riesgo controlado',
+        },
+      );
+
+      expect(refreshed).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        overrideRequired: false,
+        conflicts: [],
+        availability: {
+          fullyVerifiable: true,
+          conflictFree: true,
+          warnings: [],
+        },
+      });
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+    });
+
+    it('persists Assignment, every confirmed override and idempotency completion atomically', async () => {
+      const override = {
+        conflictingAssignmentId,
+        assignmentWindowStart: new Date('2026-09-16T13:00:00.000Z'),
+        assignmentWindowEnd: new Date('2026-09-16T20:00:00.000Z'),
+        conflictingWindowStart: new Date('2026-09-16T14:00:00.000Z'),
+        conflictingWindowEnd: new Date('2026-09-16T21:00:00.000Z'),
+        createdAt,
+        reason: 'Riesgo controlado',
+        approvedBy: baseRecord.createdBy,
+      };
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+      const initial = await service.create(
+        companyId,
+        userId,
+        'override-key',
+        requirementDto,
+      );
+      if (initial.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected CONFLICT_REVIEW_REQUIRED');
+      }
+      repository.findAssignment.mockResolvedValue({
+        ...baseRecord,
+        conflictOverrides: [override],
+      });
+
+      const result = await service.create(companyId, userId, 'override-key', {
+        ...requirementDto,
+        confirmConflictOverride: true,
+        conflictReviewFingerprint: initial.conflictReviewFingerprint,
+        conflictOverrideReason: '  Riesgo controlado  ',
+      });
+
+      expect(result).toMatchObject({
+        outcome: 'CREATED',
+        data: {
+          conflictOverrides: [
+            {
+              conflictingAssignmentId,
+              reason: 'Riesgo controlado',
+            },
+          ],
+          availability: {
+            fullyVerifiable: true,
+            conflictFree: false,
+            warnings: [
+              expect.objectContaining({ code: 'CURRENT_ASSIGNMENT_CONFLICT' }),
+              expect.objectContaining({ code: 'CONFLICT_OVERRIDE_CONFIRMED' }),
+            ],
+          },
+        },
+      });
+      expect(repository.createConflictOverrides).toHaveBeenCalledWith(
+        transaction,
+        [
+          expect.objectContaining({
+            assignmentId,
+            conflictingAssignmentId,
+            reason: 'Riesgo controlado',
+          }),
+        ],
+      );
+      expect(repository.completeIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        'claim-1',
+        assignmentId,
+      );
+    });
+
+    it.each([
+      [
+        { conflictReviewFingerprint: 'a'.repeat(64) },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        { confirmConflictOverride: true, conflictOverrideReason: 'Riesgo' },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        {
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: 'invalid',
+          conflictOverrideReason: 'Riesgo',
+        },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        {
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: 'a'.repeat(64),
+          conflictOverrideReason: '   ',
+        },
+        'CONFLICT_OVERRIDE_REASON_REQUIRED',
+      ],
+    ])('rejects invalid conflict confirmation %#', async (review, code) => {
+      await expect(
+        service.create(companyId, userId, 'invalid-review-key', {
+          ...requirementDto,
+          ...review,
+        }),
+      ).rejects.toMatchObject({ response: { code } });
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects confirmation when the candidate schedule cannot produce an authoritative review', async () => {
+      repository.findCase.mockResolvedValue({
+        ...completeCase,
+        scheduledEnd: null,
+      });
+
+      await expect(
+        service.create(companyId, userId, 'incomplete-confirmation-key', {
+          ...requirementDto,
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: 'a'.repeat(64),
+          conflictOverrideReason: 'Riesgo controlado',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'INVALID_CONFLICT_REVIEW_CONFIRMATION' },
+      });
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+    });
+
+    it('uses the canonical asset, Requirement, settings and sorted Case lock order', async () => {
+      const calls: string[] = [];
+      repository.lockEquipmentAsset.mockImplementation(() => {
+        calls.push('asset');
+        return Promise.resolve(true);
+      });
+      repository.lockRequirement.mockImplementation(() => {
+        calls.push('requirement');
+        return Promise.resolve(true);
+      });
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+        { caseId },
+      ]);
+      repository.acquireSettingsSharedAdvisoryLock.mockImplementation(() => {
+        calls.push('settings-advisory');
+        return Promise.resolve();
+      });
+      repository.lockHealthcareCasesForShare.mockImplementation(
+        (_transaction, _companyId, caseIds: string[]) => {
+          calls.push(`cases:${caseIds.join(',')}`);
+          return Promise.resolve(caseIds);
+        },
+      );
+      repository.findSettingsForShare.mockImplementation(() => {
+        calls.push('settings-row');
+        return Promise.resolve(null);
+      });
+      repository.findCase.mockImplementation(() => {
+        calls.push('authoritative-case');
+        return Promise.resolve(completeCase);
+      });
+
+      await service.create(companyId, userId, 'lock-order-key', requirementDto);
+
+      expect(calls).toEqual([
+        'asset',
+        'requirement',
+        'settings-advisory',
+        `cases:${caseId},${otherCaseId}`,
+        'settings-row',
+        'authoritative-case',
+      ]);
+    });
+
+    it('replays a completed same-payload command under the protected transaction', async () => {
+      repository.findIdempotencyRecord.mockResolvedValue({
         requestHash:
           createHealthcareEquipmentAssignmentRequestHash(requirementDto),
         resourceId: assignmentId,
@@ -608,11 +1139,30 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       );
 
       expect(result.outcome).toBe('CREATED');
+
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
       expect(result.data).toMatchObject({ id: assignmentId });
-      expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.runInTransaction).toHaveBeenCalledTimes(1);
+      expect(repository.lockEquipmentAsset).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        equipmentAssetId,
+      );
+      expect(repository.acquireSettingsSharedAdvisoryLock).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+      );
+      expect(repository.lockHealthcareCasesForShare).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        [caseId],
+      );
       expect(repository.findAssignment).toHaveBeenCalledWith(
         companyId,
         assignmentId,
+        transaction,
       );
     });
 
@@ -646,6 +1196,9 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       );
 
       expect(result.outcome).toBe('CREATED');
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected CREATED');
+      }
       expect(result.data).toMatchObject({ id: assignmentId });
     });
 

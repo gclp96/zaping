@@ -1,9 +1,5 @@
 import { BadRequestException, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
-import {
-  HTTP_CODE_METADATA,
-  PATH_METADATA,
-  ROUTE_ARGS_METADATA,
-} from '@nestjs/common/constants';
+import { PATH_METADATA, ROUTE_ARGS_METADATA } from '@nestjs/common/constants';
 
 import { HealthcareEquipmentAssignmentListStatus } from './dto/healthcare-equipment-assignment-list-query.dto';
 import { HealthcareEquipmentAssignmentsController } from './healthcare-equipment-assignments.controller';
@@ -14,6 +10,7 @@ const assignmentId = '33333333-3333-4333-8333-333333333333';
 const caseId = '44444444-4444-4444-8444-444444444444';
 const equipmentAssetId = '55555555-5555-4555-8555-555555555555';
 const request = { user: { id: userId, companyId } };
+const response = { status: jest.fn() };
 
 describe('HealthcareEquipmentAssignmentsController', () => {
   const service = {
@@ -27,6 +24,7 @@ describe('HealthcareEquipmentAssignmentsController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    response.status.mockReturnValue(response);
   });
 
   it('registers only the canonical C2 resource routes', () => {
@@ -65,7 +63,12 @@ describe('HealthcareEquipmentAssignmentsController', () => {
     };
     service.create.mockResolvedValue({ outcome: 'CREATED' });
 
-    await controller.create(request as never, '  request-key  ', dto);
+    await controller.create(
+      request as never,
+      '  request-key  ',
+      dto,
+      response as never,
+    );
 
     expect(service.create).toHaveBeenCalledWith(
       companyId,
@@ -73,19 +76,39 @@ describe('HealthcareEquipmentAssignmentsController', () => {
       'request-key',
       dto,
     );
-    expect(getHttpCode('create')).toBe(HttpStatus.CREATED);
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+  });
+
+  it('returns 200 for conflict review without changing the route contract', async () => {
+    service.create.mockResolvedValue({
+      outcome: 'CONFLICT_REVIEW_REQUIRED',
+    });
+
+    await controller.create(
+      request as never,
+      'request-key',
+      { caseId, equipmentAssetId, directAssignmentReason: 'Urgente' },
+      response as never,
+    );
+
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.OK);
   });
 
   it.each([undefined, '', '   ', 'x'.repeat(129)])(
     'rejects invalid Idempotency-Key %p before service lookup',
-    (key) => {
-      expect(() =>
-        controller.create(request as never, key, {
-          caseId,
-          equipmentAssetId,
-          directAssignmentReason: 'Urgente',
-        }),
-      ).toThrow(BadRequestException);
+    async (key) => {
+      await expect(
+        controller.create(
+          request as never,
+          key,
+          {
+            caseId,
+            equipmentAssetId,
+            directAssignmentReason: 'Urgente',
+          },
+          response as never,
+        ),
+      ).rejects.toThrow(BadRequestException);
       expect(service.create).not.toHaveBeenCalled();
     },
   );
@@ -115,11 +138,4 @@ function getHandler(methodName: ControllerMethod): object {
 
 function getPath(methodName: ControllerMethod): string {
   return Reflect.getMetadata(PATH_METADATA, getHandler(methodName)) as string;
-}
-
-function getHttpCode(methodName: ControllerMethod): number {
-  return Reflect.getMetadata(
-    HTTP_CODE_METADATA,
-    getHandler(methodName),
-  ) as number;
 }

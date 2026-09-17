@@ -5,8 +5,22 @@ import {
   IdempotencyScope,
   Prisma,
 } from '@prisma/client';
+import { createHash } from 'node:crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
+
+export const EQUIPMENT_ASSIGNMENT_SETTINGS_LOCK_NAMESPACE =
+  'healthcare-equipment-assignment-settings:v1';
+
+export function equipmentAssignmentSettingsAdvisoryLockKey(
+  companyId: string,
+): bigint {
+  const digest = createHash('sha256')
+    .update(`${EQUIPMENT_ASSIGNMENT_SETTINGS_LOCK_NAMESPACE}:${companyId}`)
+    .digest();
+
+  return digest.readBigInt64BE(0);
+}
 
 export const healthcareEquipmentAssignmentResponseSelect = {
   id: true,
@@ -26,8 +40,10 @@ export const healthcareEquipmentAssignmentResponseSelect = {
   updatedAt: true,
   healthcareCase: {
     select: {
+      folio: true,
       scheduledStart: true,
       scheduledEnd: true,
+      updatedAt: true,
     },
   },
   equipmentAsset: {
@@ -78,6 +94,10 @@ export const healthcareEquipmentAssignmentResponseSelect = {
   conflictOverrides: {
     select: {
       conflictingAssignmentId: true,
+      assignmentWindowStart: true,
+      assignmentWindowEnd: true,
+      conflictingWindowStart: true,
+      conflictingWindowEnd: true,
       createdAt: true,
       reason: true,
       approvedBy: {
@@ -100,6 +120,26 @@ export type HealthcareEquipmentAssignmentRecord =
 type HealthcareEquipmentAssignmentDatabaseClient =
   Prisma.TransactionClient | PrismaService;
 
+export const healthcareEquipmentReservationAvailabilitySelect = {
+  id: true,
+  caseId: true,
+  updatedAt: true,
+  healthcareCase: {
+    select: {
+      id: true,
+      folio: true,
+      scheduledStart: true,
+      scheduledEnd: true,
+      updatedAt: true,
+    },
+  },
+} satisfies Prisma.HealthcareEquipmentAssignmentSelect;
+
+export type HealthcareEquipmentReservationAvailabilityRecord =
+  Prisma.HealthcareEquipmentAssignmentGetPayload<{
+    select: typeof healthcareEquipmentReservationAvailabilitySelect;
+  }>;
+
 @Injectable()
 export class HealthcareEquipmentAssignmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -114,8 +154,9 @@ export class HealthcareEquipmentAssignmentsRepository {
     companyId: string,
     key: string,
     scope: IdempotencyScope,
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
   ) {
-    return this.prisma.idempotencyRecord.findUnique({
+    return client.idempotencyRecord.findUnique({
       where: {
         companyId_scope_key: {
           companyId,
@@ -174,9 +215,11 @@ export class HealthcareEquipmentAssignmentsRepository {
       },
       select: {
         id: true,
+        folio: true,
         status: true,
         scheduledStart: true,
         scheduledEnd: true,
+        updatedAt: true,
       },
     });
   }
@@ -197,6 +240,7 @@ export class HealthcareEquipmentAssignmentsRepository {
         productId: true,
         requestedQty: true,
         lifecycle: true,
+        updatedAt: true,
         product: {
           select: {
             inventoryTracking: true,
@@ -219,10 +263,121 @@ export class HealthcareEquipmentAssignmentsRepository {
       select: {
         id: true,
         productId: true,
+        assetCode: true,
+        serialNumber: true,
         lifecycle: true,
         condition: true,
+        updatedAt: true,
+        product: {
+          select: {
+            id: true,
+            sku: true,
+            name: true,
+            isActive: true,
+          },
+        },
       },
     });
+  }
+
+  findSettings(
+    companyId: string,
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
+  ) {
+    return client.healthcareEquipmentAssignmentSettings.findUnique({
+      where: { companyId },
+      select: {
+        preCaseBufferMinutes: true,
+        postCaseBufferMinutes: true,
+      },
+    });
+  }
+
+  async lockEquipmentAsset(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    equipmentAssetId: string,
+  ): Promise<boolean> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM "EquipmentAsset"
+      WHERE "id" = ${equipmentAssetId} AND "companyId" = ${companyId}
+      FOR UPDATE
+    `);
+
+    return rows.length === 1;
+  }
+
+  async lockRequirement(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    requirementId: string,
+  ): Promise<boolean> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM "HealthcareCaseRequirement"
+      WHERE "id" = ${requirementId} AND "companyId" = ${companyId}
+      FOR UPDATE
+    `);
+
+    return rows.length === 1;
+  }
+
+  async acquireSettingsSharedAdvisoryLock(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+  ): Promise<void> {
+    const lockKey = equipmentAssignmentSettingsAdvisoryLockKey(companyId);
+
+    await transaction.$queryRaw<Array<{ lock: string }>>(Prisma.sql`
+      SELECT pg_advisory_xact_lock_shared(${lockKey})::text AS "lock"
+    `);
+  }
+
+  async lockHealthcareCasesForShare(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseIds: string[],
+  ): Promise<string[]> {
+    if (caseIds.length === 0) {
+      return [];
+    }
+
+    const sortedCaseIds = [...new Set(caseIds)].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM "HealthcareCase"
+      WHERE "companyId" = ${companyId}
+        AND "id" IN (${Prisma.join(sortedCaseIds)})
+      ORDER BY "id" ASC
+      FOR SHARE
+    `);
+
+    return rows.map((row) => row.id);
+  }
+
+  async findSettingsForShare(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+  ): Promise<{
+    preCaseBufferMinutes: number;
+    postCaseBufferMinutes: number;
+  } | null> {
+    const rows = await transaction.$queryRaw<
+      Array<{
+        preCaseBufferMinutes: number;
+        postCaseBufferMinutes: number;
+      }>
+    >(Prisma.sql`
+      SELECT "preCaseBufferMinutes", "postCaseBufferMinutes"
+      FROM "HealthcareEquipmentAssignmentSettings"
+      WHERE "companyId" = ${companyId}
+      FOR SHARE
+    `);
+
+    return rows[0] ?? null;
   }
 
   countRequirementCoverage(
@@ -257,6 +412,22 @@ export class HealthcareEquipmentAssignmentsRepository {
     });
   }
 
+  findReservedAssignmentCaseIdsForAsset(
+    companyId: string,
+    equipmentAssetId: string,
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
+  ) {
+    return client.healthcareEquipmentAssignment.findMany({
+      where: {
+        companyId,
+        equipmentAssetId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      select: { caseId: true },
+      orderBy: [{ caseId: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   createAssignment(
     transaction: Prisma.TransactionClient,
     data: {
@@ -272,6 +443,61 @@ export class HealthcareEquipmentAssignmentsRepository {
     return transaction.healthcareEquipmentAssignment.create({
       data,
       select: healthcareEquipmentAssignmentResponseSelect,
+    });
+  }
+
+  createConflictOverrides(
+    transaction: Prisma.TransactionClient,
+    rows: Array<{
+      companyId: string;
+      assignmentId: string;
+      conflictingAssignmentId: string;
+      assignmentWindowStart: Date;
+      assignmentWindowEnd: Date;
+      conflictingWindowStart: Date;
+      conflictingWindowEnd: Date;
+      approvedById: string;
+      reason: string;
+    }>,
+  ) {
+    return transaction.healthcareEquipmentAssignmentConflictOverride.createMany(
+      { data: rows },
+    );
+  }
+
+  findReservedAssignmentsForAsset(
+    companyId: string,
+    equipmentAssetId: string,
+    excludeAssignmentId?: string,
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
+  ) {
+    return client.healthcareEquipmentAssignment.findMany({
+      where: {
+        companyId,
+        equipmentAssetId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        ...(excludeAssignmentId ? { id: { not: excludeAssignmentId } } : {}),
+      },
+      select: healthcareEquipmentReservationAvailabilitySelect,
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  findReservedAssignmentsForAssets(
+    companyId: string,
+    equipmentAssetIds: string[],
+  ) {
+    return this.prisma.healthcareEquipmentAssignment.findMany({
+      where: {
+        companyId,
+        equipmentAssetId: { in: equipmentAssetIds },
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      select: {
+        ...healthcareEquipmentReservationAvailabilitySelect,
+        equipmentAssetId: true,
+      },
+      orderBy: { id: 'asc' },
     });
   }
 

@@ -3,10 +3,38 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.4.0
 **Estado:** Activo
-**Última actualización:** 2026-09-15
+**Última actualización:** 2026-09-17
 **Responsable:** Zaping Team
 
 ---
+
+# 2026-09-17 — HC-NEXT-03C3 Equipment Assignment availability and concurrency
+
+**Estado:** HC-NEXT-03C3 COMPLETE / READY FOR REVIEW — HC-NEXT-03C4 REPLACE / RELEASE / PARENT INTEGRATIONS NEXT / BLOCKED UNTIL C3 MERGED — PARTIALLY IMPLEMENTED
+
+Se implementaron los fallbacks de buffers 120/180 y settings Company-scoped,
+ventanas operacionales half-open, Availability autoritativa y el tratamiento
+explícito de reservas relacionadas con schedule incompleto. Create incorpora
+review de conflictos sin writes, fingerprint SHA-256 determinista, detección de
+review stale y confirmación explícita con auditoría por cada overlap confirmado.
+
+La frontera final de concurrencia usa un orden canónico de locks:
+EquipmentAsset `FOR UPDATE`, Requirement `FOR UPDATE` cuando aplica, advisory
+lock transaccional Company-scoped `SHARED` para settings, Cases relevantes
+`FOR SHARE` y la fila de settings `FOR SHARE` cuando existe. Después de adquirir
+esa frontera se realizan rereads autoritativos y toda la revalidación antes de
+review o write. Las futuras mutaciones de settings deberán usar el mismo
+advisory lock en modo `EXCLUSIVE`; C4 deberá mantener la misma convención de
+locking por EquipmentAsset al mutar reservas activas. Review inicial/stale no
+consume claim; Assignment, ConflictOverride e idempotency completion exitosos
+permanecen atómicos. Replace, Release, integraciones padre, Dispatch/Custody y
+frontend continúan fuera de C3.
+
+Evidencia final C3: PostgreSQL backend integration 16/16 PASS, incluyendo
+same-asset concurrency, Requirement capacity, Candidate/related Case `FOR SHARE`,
+settings existente, settings ausente protegido por advisory lock, authoritative
+reread, cancelación concurrente y rollback atómico. Regresión API completa:
+84 suites / 1273 tests PASS. Build PASS.
 
 # 2026-09-15 — HC-NEXT-03C2 Equipment Assignment backend base
 

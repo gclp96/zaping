@@ -35,7 +35,7 @@ describe('Healthcare Equipment Assignment DTOs', () => {
     ).resolves.toMatchObject({ caseId, equipmentAssetId, requirementId });
   });
 
-  it('normalizes the DIRECT reason without accepting workflow fields', async () => {
+  it('normalizes the DIRECT reason', async () => {
     await expect(
       transformBody({
         caseId,
@@ -51,6 +51,25 @@ describe('Healthcare Equipment Assignment DTOs', () => {
     });
   });
 
+  it('accepts and normalizes the C3 conflict-review workflow fields', async () => {
+    const fingerprint = 'a'.repeat(64);
+
+    await expect(
+      transformBody({
+        caseId,
+        equipmentAssetId,
+        directAssignmentReason: 'Urgencia',
+        confirmConflictOverride: true,
+        conflictReviewFingerprint: fingerprint,
+        conflictOverrideReason: '  Decisión   operativa  ',
+      }),
+    ).resolves.toMatchObject({
+      confirmConflictOverride: true,
+      conflictReviewFingerprint: fingerprint,
+      conflictOverrideReason: 'Decisión   operativa',
+    });
+  });
+
   it.each([
     {},
     { caseId: 'invalid', equipmentAssetId },
@@ -60,6 +79,18 @@ describe('Healthcare Equipment Assignment DTOs', () => {
       caseId,
       equipmentAssetId,
       directAssignmentReason: 'x'.repeat(1001),
+    },
+    {
+      caseId,
+      equipmentAssetId,
+      directAssignmentReason: 'Urgencia',
+      confirmConflictOverride: 'true',
+    },
+    {
+      caseId,
+      equipmentAssetId,
+      directAssignmentReason: 'Urgencia',
+      conflictOverrideReason: 'x'.repeat(1001),
     },
   ])('rejects malformed create payload %#', async (payload) => {
     await expect(transformBody(payload)).rejects.toBeInstanceOf(
@@ -77,10 +108,7 @@ describe('Healthcare Equipment Assignment DTOs', () => {
     'assignedAt',
     'releasedAt',
     'replacesAssignmentId',
-    'confirmConflictOverride',
-    'conflictReviewFingerprint',
-    'conflictOverrideReason',
-  ])('rejects protected or C3 create field %s', async (field) => {
+  ])('rejects protected create field %s', async (field) => {
     await expect(
       transformBody({
         caseId,

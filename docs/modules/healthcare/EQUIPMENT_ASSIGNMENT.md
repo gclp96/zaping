@@ -11,10 +11,11 @@
 **Estado HC-NEXT-03B.2:** API / DTO / AUTHORIZATION CONTRACT — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03B.3:** IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
-**Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / READY FOR REVIEW
-**Siguiente:** HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE; AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
-**Última actualización:** 2026-09-15
+**Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
+**Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / READY FOR REVIEW
+**Siguiente:** HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY; REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+**Última actualización:** 2026-09-17
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -193,7 +194,10 @@ La evaluación debe considerar una ventana operacional, no sólo
 - inspección cuando aplique.
 
 B.1 define `preCaseBufferMinutes` y `postCaseBufferMinutes` Company-scoped en una
-configuración Healthcare 1:1. Los defaults exactos siguen TBD.
+configuración Healthcare 1:1. Sin fila configurada se aplican los fallbacks de
+sistema `120` minutos antes y `180` minutos después. Una fila Company-scoped
+sustituye ambos valores, incluido cero; no se crea automáticamente ni usa
+defaults PostgreSQL.
 
 Una Assignment puede registrarse aunque la ventana operacional del Case todavía
 no sea completamente derivable, por ejemplo cuando `scheduledEnd = null`. En
@@ -203,6 +207,15 @@ warning o revisión necesaria. Este estado es derivado y no introduce un enum
 persistido. Cada alta o cambio del horario reevalúa automáticamente las
 Assignments activas: si el schedule sigue incompleto permanecen pendientes y,
 cuando permite derivar la nueva ventana completa, pueden pasar a `CONFLICT`.
+
+La misma cautela aplica cuando el candidato sí tiene ventana completa, pero otra
+Assignment `RESERVED` del mismo EquipmentAsset pertenece a un Case con schedule
+incompleto. Esa reserva no se ignora ni se declara overlap: Create sigue
+permitido, Availability devuelve `fullyVerifiable=false` y `conflictFree=null`,
+y expone el warning estable
+`RELATED_RESERVATION_SCHEDULE_INCOMPLETE`: “Existe una reserva activa del mismo
+equipo con horario incompleto; la disponibilidad no puede verificarse
+completamente.”
 
 ---
 
@@ -222,10 +235,21 @@ Si el mismo EquipmentAsset se superpone con la ventana operacional de otro Case:
 Un override de conflicto no marca el activo como globalmente disponible ni
 elimina el conflicto. Registra una decisión operacional explícita y auditable.
 
+Si coexisten overlaps confirmados y reservas same-asset no evaluables por
+schedule incompleto, la API devuelve `CONFLICT_REVIEW_REQUIRED` únicamente por
+los overlaps confirmados, conserva
+`RELATED_RESERVATION_SCHEDULE_INCOMPLETE`, reporta
+`fullyVerifiable=false` / `conflictFree=false` y crea auditoría de override sólo
+para los conflictos con ventanas conocidas. La incertidumbre por sí sola no
+crea `ConflictOverride`.
+
 B.1 define review sin write, confirmación explícita con revalidación y locks
 estrechos por EquipmentAsset. HC-NEXT-03B.2 aprueba el contrato
 HTTP/DTO/error/fingerprint: review normal 200 sin write y confirmación vigente
-con write atómico.
+con write atómico. El fingerprint incluye una firma determinista de las reservas
+same-asset no evaluables, con estado suficiente del Case/Assignment para quedar
+stale cuando el Case incompleto recibe o cambia su schedule; no inventa snapshots
+de ventana para esas reservas.
 
 ---
 
@@ -266,6 +290,10 @@ Según el resultado, el usuario puede:
 
 Los nuevos conflictos se presentan como alertas operacionales que requieren
 atención; no se ocultan ni borran la asignación histórica.
+
+La reevaluación también aplica cuando un Case relacionado que antes tenía
+schedule incompleto recibe o cambia su horario. C3 no requiere una notificación
+automática ni un background job para esta derivación.
 
 ## 9.2 Cancelación
 
@@ -397,11 +425,11 @@ review, `Idempotency-Key`, fronteras atómicas y la matriz fixed-role. ADMIN,
 MANAGER y WAREHOUSE pueden crear/reemplazar/liberar/confirmar overrides; SALES
 conserva lectura. Frontend UX continúa diferido.
 
-Los valores numéricos default de buffers y la implementación concreta del guard
-futuro con Dispatch/Custody permanecen diferidos. HC-NEXT-03C1 implementa la
-persistencia y HC-NEXT-03C2 el backend base de lectura y creación; los slices
-C3-C7, Availability/conflict review, replace/release y el frontend permanecen
-sin implementar.
+La implementación concreta del guard futuro con Dispatch/Custody permanece
+diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
+de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
+concurrencia de Create. Replace/release, integraciones padre y frontend
+permanecen sin implementar.
 
 ---
 
@@ -427,14 +455,17 @@ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
 → COMPLETE / MERGED
 
 HC-NEXT-03C2 — Assignment Backend Base
+→ COMPLETE / MERGED
+
+HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 → COMPLETE / READY FOR REVIEW
 
 Next
-→ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+→ HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
-→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
+→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 ```
 
 El contrato aprobado mantiene la secuencia:

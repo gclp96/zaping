@@ -12,6 +12,10 @@ export function createHealthcareEquipmentAssignmentRequestHash(
     requirementId: dto.requirementId ?? null,
     directAssignmentReason:
       normalizeHealthcareOptionalText(dto.directAssignmentReason) ?? null,
+    confirmConflictOverride: dto.confirmConflictOverride ?? false,
+    conflictReviewFingerprint: dto.conflictReviewFingerprint ?? null,
+    conflictOverrideReason:
+      normalizeHealthcareOptionalText(dto.conflictOverrideReason) ?? null,
   };
 
   return createHash('sha256')

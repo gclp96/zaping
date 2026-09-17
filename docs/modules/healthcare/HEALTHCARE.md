@@ -4,8 +4,8 @@ Producto: Zaping Healthcare
 Plataforma: Zaping
 Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / READY FOR REVIEW — HC-NEXT-03C3 NEXT / BLOCKED UNTIL C2 MERGED — PARTIALLY IMPLEMENTED
-Última actualización: 2026-09-15
+Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3 COMPLETE / READY FOR REVIEW — PARTIALLY IMPLEMENTED
+Última actualización: 2026-09-17
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -77,7 +77,7 @@ Capacidades Healthcare aprobadas como dirección funcional, pero todavía no imp
 
 Incluyen:
 
-Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / READY FOR REVIEW — HC-NEXT-03C3 NEXT / BLOCKED UNTIL C2 MERGED — PARTIALLY IMPLEMENTED
+Equipment Assignment — DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3 COMPLETE / READY FOR REVIEW — PARTIALLY IMPLEMENTED
 
 Case Availability
 
@@ -1110,8 +1110,9 @@ response shaping, errores estables, `Idempotency-Key`, atomicidad y fixed-role
 RBAC. Tampoco implementa runtime.
 
 HC-NEXT-03B.3 aprueba los slices C1–C7, sus dependencias y gates, y el contrato
-de acceptance A–P. Los defaults numéricos de buffers deben decidirse antes de
-C3; el guard concreto Dispatch/Custody permanece futuro y no bloquea C1–C7.
+de acceptance A–P. C3 fija los fallbacks de sistema en 120/180 minutos sin
+persistirlos como defaults; el guard concreto Dispatch/Custody permanece futuro
+y no bloquea C1–C7.
 
 ```text
 HC-NEXT-03A Domain Discovery
@@ -1133,14 +1134,17 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration
 → COMPLETE / MERGED
 
 HC-NEXT-03C2 Assignment Backend Base
+→ COMPLETE / MERGED
+
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency
 → COMPLETE / READY FOR REVIEW
 
 Next
-→ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+→ HC-NEXT-03C4 Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
-→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
+→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 ```
 
 53. Equipment Assignment must not contaminate EquipmentAsset
@@ -2198,7 +2202,7 @@ No deben confundirse con workflows TARGET todavía inexistentes.
 
 Capacidades Healthcare objetivo:
 
-Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03C1 persistence/migration COMPLETE / MERGED; HC-NEXT-03C2 backend base COMPLETE / READY FOR REVIEW; HC-NEXT-03C3 NEXT / BLOCKED UNTIL C2 MERGED; Availability/conflict review, replace/release y frontend NOT IMPLEMENTED
+Equipment Assignment Technical Design — HC-NEXT-03B COMPLETE / APPROVED; HC-NEXT-03C1 persistence/migration COMPLETE / MERGED; HC-NEXT-03C2 backend base COMPLETE / MERGED; HC-NEXT-03C3 Availability/conflict review/concurrency COMPLETE / READY FOR REVIEW; replace/release y frontend NOT IMPLEMENTED
 
 Case Availability
 
