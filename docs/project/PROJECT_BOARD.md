@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED — HC-NEXT-03C2 Assignment Backend Base COMPLETE / READY FOR REVIEW — HC-NEXT-03C3 Availability / Conflict Review / Concurrency NEXT / BLOCKED UNTIL C2 MERGED
-Última actualización: 2026-09-15
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED — HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED — HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / READY FOR REVIEW — HC-NEXT-03C4 Replace / Release / Parent Integrations NEXT / BLOCKED UNTIL C3 MERGED
+Última actualización: 2026-09-17
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -142,10 +142,15 @@ Frontend UX workstream
     ├── DataTable para listas operativas
     └── StaticTable para detalle/documentación
 
-NEXT
+CURRENT / READY FOR REVIEW
 
 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
-        → NEXT / BLOCKED UNTIL C2 MERGED
+        → COMPLETE / READY FOR REVIEW
+
+NEXT
+
+HC-NEXT-03C4 — Replace / Release / Parent Integrations
+        → NEXT / BLOCKED UNTIL C3 MERGED
 
 DEFERRED
 
@@ -1747,11 +1752,10 @@ recurso top-level, DTOs allowlisted, review 200/no-write con fingerprint,
 Create/Replace/Release, fixed-role RBAC, errores estables, idempotencia y
 atomicidad. HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract está
 APPROVED / DOCUMENTED con la secuencia C1–C7, gates por slice y acceptance A–P.
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration está COMPLETE /
-MERGED. HC-NEXT-03C2 Assignment Backend Base está COMPLETE / READY FOR REVIEW.
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda NEXT / BLOCKED
-UNTIL C2 MERGED; Availability/conflict review, replace/release y frontend siguen
-NOT IMPLEMENTED.
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration y HC-NEXT-03C2
+Assignment Backend Base están COMPLETE / MERGED. HC-NEXT-03C3 Availability /
+Conflict Review / Concurrency queda COMPLETE / READY FOR REVIEW; C4
+replace/release y frontend siguen NOT IMPLEMENTED.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2241,7 +2245,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 NEXT ROADMAP ITEM
 
-→ HC-NEXT-03C3 Healthcare Equipment Assignment Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 DEFERRED
 
@@ -2456,14 +2460,17 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration
 → COMPLETE / MERGED
 
 HC-NEXT-03C2 Assignment Backend Base
-→ COMPLETE / READY FOR REVIEW
+→ COMPLETE / MERGED
 
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency
-→ NEXT / BLOCKED UNTIL C2 MERGED
+→ COMPLETE / READY FOR REVIEW
+
+HC-NEXT-03C4 Replace / Release / Parent Integrations
+→ NEXT / BLOCKED UNTIL C3 MERGED
 
 Healthcare Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
-→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
+→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

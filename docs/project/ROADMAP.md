@@ -95,9 +95,11 @@ HC-NEXT-03B Equipment Assignment Technical Design — COMPLETE / APPROVED
 ↓
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
-HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
-NEXT — HC-NEXT-03C3 Availability / Conflict Review / Concurrency — BLOCKED UNTIL C2 MERGED
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+↓
+NEXT — HC-NEXT-03C4 Replace / Release / Parent Integrations — BLOCKED UNTIL C3 MERGED
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -120,9 +122,10 @@ HC-NEXT-03B — COMPLETE / APPROVED; HC-NEXT-03B.1 Persistence & Availability
 Design, HC-NEXT-03B.2 API / DTO / Authorization Contract y HC-NEXT-03B.3
 Implementation Slicing / Acceptance Contract APPROVED / DOCUMENTED;
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED;
-HC-NEXT-03C2 Assignment Backend Base COMPLETE / READY FOR REVIEW;
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency NEXT / BLOCKED UNTIL
-C2 MERGED
+HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED;
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / READY FOR
+REVIEW; HC-NEXT-03C4 Replace / Release / Parent Integrations NEXT / BLOCKED
+UNTIL C3 MERGED
 
 También permanecen como TARGET Healthcare:
 
@@ -940,8 +943,8 @@ Estado: HC-NEXT-03A DOMAIN DISCOVERY COMPLETE / DOCUMENTED — HC-NEXT-03B
 TECHNICAL DESIGN COMPLETE / APPROVED — HC-NEXT-03B.1 PERSISTENCE & AVAILABILITY,
 HC-NEXT-03B.2 API / DTO / AUTHORIZATION Y HC-NEXT-03B.3 IMPLEMENTATION SLICING /
 ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION
-COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / READY FOR REVIEW —
-HC-NEXT-03C3 NEXT / BLOCKED UNTIL C2 MERGED — PARTIALLY IMPLEMENTED.
+COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
+COMPLETE / READY FOR REVIEW — PARTIALLY IMPLEMENTED.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1001,9 +1004,10 @@ fingerprint, `Idempotency-Key` y fronteras atómicas. ADMIN/MANAGER/WAREHOUSE
 mutan; SALES conserva read-only. Frontend UX y los slices posteriores
 permanecen diferidos. HC-NEXT-03B.3 aprueba la secuencia C1–C7, sus
 dependencias/gates y el acceptance A–P. HC-NEXT-03C1 Persistence / Migration
-está COMPLETE / MERGED y HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
-READY FOR REVIEW; HC-NEXT-03C3 Availability / Conflict Review / Concurrency
-queda NEXT / BLOCKED UNTIL C2 MERGED.
+está COMPLETE / MERGED, HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
+MERGED y HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda
+COMPLETE / READY FOR REVIEW. HC-NEXT-03C4 Replace / Release / Parent
+Integrations queda NEXT / BLOCKED UNTIL C3 MERGED.
 
 Debe mantenerse:
 
@@ -2740,9 +2744,11 @@ HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUME
 
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 
-HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+
+HC-NEXT-03C4 Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 Case Availability
 
@@ -2879,9 +2885,11 @@ HC-NEXT-03B Equipment Assignment Technical Design — COMPLETE / APPROVED
 ↓
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
-HC-NEXT-03C2 Assignment Backend Base — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+↓
+HC-NEXT-03C4 Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

@@ -40,4 +40,31 @@ describe('createHealthcareEquipmentAssignmentRequestHash', () => {
       }),
     );
   });
+
+  it('includes normalized conflict confirmation fields', () => {
+    const fingerprint = 'a'.repeat(64);
+    const confirmed = createHealthcareEquipmentAssignmentRequestHash({
+      ...base,
+      directAssignmentReason: 'Urgente',
+      confirmConflictOverride: true,
+      conflictReviewFingerprint: fingerprint,
+      conflictOverrideReason: '  Riesgo aceptado  ',
+    });
+
+    expect(confirmed).toBe(
+      createHealthcareEquipmentAssignmentRequestHash({
+        ...base,
+        directAssignmentReason: 'Urgente',
+        confirmConflictOverride: true,
+        conflictReviewFingerprint: fingerprint,
+        conflictOverrideReason: 'Riesgo aceptado',
+      }),
+    );
+    expect(confirmed).not.toBe(
+      createHealthcareEquipmentAssignmentRequestHash({
+        ...base,
+        directAssignmentReason: 'Urgente',
+      }),
+    );
+  });
 });

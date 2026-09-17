@@ -33,6 +33,8 @@ export const HEALTHCARE_ERROR_CODES = {
   equipmentAssetNotEligible: 'EQUIPMENT_ASSET_NOT_ELIGIBLE',
   requirementOverCoverage: 'REQUIREMENT_OVER_COVERAGE',
   assignmentAlreadyReserved: 'ASSIGNMENT_ALREADY_RESERVED',
+  invalidConflictReviewConfirmation: 'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+  conflictOverrideReasonRequired: 'CONFLICT_OVERRIDE_REASON_REQUIRED',
   idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
@@ -245,6 +247,24 @@ export function assignmentAlreadyReservedException(): ConflictException {
     HEALTHCARE_ERROR_CODES.assignmentAlreadyReserved,
     'El equipo ya está reservado para este caso',
   );
+}
+
+export function invalidConflictReviewConfirmationException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.invalidConflictReviewConfirmation,
+    message: 'La confirmación de revisión de conflicto no es válida',
+  });
+}
+
+export function conflictOverrideReasonRequiredException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.conflictOverrideReasonRequired,
+    message: 'La justificación del override de conflicto es obligatoria',
+  });
 }
 
 export function idempotencyKeyReusedException(): ConflictException {

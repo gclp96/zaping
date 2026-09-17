@@ -1,5 +1,11 @@
 import { Transform } from 'class-transformer';
-import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 import { transformHealthcareOptionalText } from '../../common/healthcare-normalization';
 
@@ -19,4 +25,18 @@ export class CreateHealthcareEquipmentAssignmentDto {
   @IsString()
   @MaxLength(1000)
   directAssignmentReason?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  confirmConflictOverride?: boolean;
+
+  @IsOptional()
+  @IsString()
+  conflictReviewFingerprint?: string;
+
+  @Transform(({ value }) => transformHealthcareOptionalText(value))
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  conflictOverrideReason?: string | null;
 }

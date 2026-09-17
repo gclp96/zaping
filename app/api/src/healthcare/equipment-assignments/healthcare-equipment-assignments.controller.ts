@@ -4,16 +4,17 @@ import {
   Controller,
   Get,
   Headers,
-  HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
+import { Response } from 'express';
 
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -58,19 +59,25 @@ export class HealthcareEquipmentAssignmentsController {
   }
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @Roles(...mutationRoles)
-  create(
+  async create(
     @Req() request: AuthenticatedRequest,
     @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() dto: CreateHealthcareEquipmentAssignmentDto,
+    @Res({ passthrough: true }) response: Response,
   ) {
-    return this.service.create(
+    const result = await this.service.create(
       request.user.companyId,
       request.user.id,
       this.validateIdempotencyKey(idempotencyKeyHeader),
       dto,
     );
+
+    response.status(
+      result.outcome === 'CREATED' ? HttpStatus.CREATED : HttpStatus.OK,
+    );
+
+    return result;
   }
 
   private validateIdempotencyKey(value: string | undefined): string {

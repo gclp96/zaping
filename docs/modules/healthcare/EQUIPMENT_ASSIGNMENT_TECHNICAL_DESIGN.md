@@ -9,10 +9,11 @@
 **Estado HC-NEXT-03B.3:** APPROVED / DOCUMENTED
 **Estado de HC-NEXT-03B:** COMPLETE / APPROVED
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
-**Estado HC-NEXT-03C2:** COMPLETE / READY FOR REVIEW
-**Estado siguiente:** HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE; AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
-**Última actualización:** 2026-09-15
+**Estado HC-NEXT-03C2:** COMPLETE / MERGED
+**Estado HC-NEXT-03C3:** COMPLETE / READY FOR REVIEW
+**Estado siguiente:** HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY; REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+**Última actualización:** 2026-09-17
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -262,6 +263,12 @@ No se impone unique por par de Assignments: el mismo par puede requerir una nuev
 aprobación histórica tras cambiar su ventana. Sí se indexa para reconstruir la
 auditoría.
 
+Una reserva same-asset cuyo Case tiene schedule incompleto no es un conflicto
+confirmado porque no existe una ventana contra la cual demostrar overlap. No se
+crea `HealthcareEquipmentAssignmentConflictOverride` por esa incertidumbre. Las
+filas de override se crean únicamente para overlaps confirmados entre ventanas
+completas y conservan una fila por cada conflicto concretamente revisado.
+
 ---
 
 # 9. Coverage derivado y notas operacionales
@@ -367,9 +374,12 @@ Esta opción mantiene el scope Healthcare, es type-safe y permite incorporar
 posteriormente settings propios del mismo bounded context sin contaminar
 Company.
 
-Si no existe la fila, el evaluator usa defaults del sistema. Los valores exactos
-de esos defaults continúan TBD. Si existe, ambos valores deben estar definidos;
-no se mezclan defaults parciales con overrides parciales.
+Si no existe la fila, el evaluator usa los defaults de sistema aprobados:
+`preCaseBufferMinutes = 120` y `postCaseBufferMinutes = 180`. Estos valores son
+fallbacks de aplicación: no crean automáticamente una fila de settings ni se
+persisten como defaults PostgreSQL. Si existe una fila Company-scoped, ambos
+valores deben estar definidos y sustituyen el fallback completo; no se mezclan
+defaults parciales con overrides parciales. El valor cero es un override válido.
 
 ---
 
@@ -413,6 +423,33 @@ permanece pendiente; cuando permite derivar la nueva ventana completa, la
 reevaluación puede producir `CONFLICT` y exigir atención u override. No elimina
 ni reemplaza silenciosamente la Assignment.
 
+Si el Case candidato tiene ventana completa, pero otra Assignment `RESERVED` del
+mismo EquipmentAsset pertenece a un Case con schedule incompleto, esa reserva no
+se ignora ni se clasifica como overlap confirmado. Create continúa permitido y
+Availability devuelve:
+
+```json
+{
+  "fullyVerifiable": false,
+  "conflictFree": null,
+  "warnings": [
+    {
+      "code": "RELATED_RESERVATION_SCHEDULE_INCOMPLETE",
+      "message": "Existe una reserva activa del mismo equipo con horario incompleto; la disponibilidad no puede verificarse completamente."
+    }
+  ]
+}
+```
+
+Si además existen reservas evaluables con overlap confirmado, el resultado es
+`CONFLICT_REVIEW_REQUIRED` para esos overlaps, conserva el warning anterior y
+reporta `fullyVerifiable=false` y `conflictFree=false`: existe al menos un
+conflicto real, pero el conjunto completo todavía no es verificable.
+
+Cuando el Case relacionado incompleto recibe o cambia su schedule, Availability
+se deriva nuevamente con el estado vigente. C3 no requiere notificación
+automática ni background job para ejecutar esa reevaluación.
+
 ---
 
 # 12. Elegibilidad del EquipmentAsset
@@ -452,6 +489,19 @@ other.windowEnd > requested.windowStart
 
 La consulta excluye la Assignment que se está mutando y no considera filas
 `RELEASED` o `REPLACED`.
+
+Las reservas same-asset `RESERVED` se separan en dos conjuntos deterministas:
+
+- evaluables, con ventana completa, que participan en la fórmula de overlap;
+- no evaluables, con schedule incompleto, que no se ignoran ni se presentan como
+  conflicto confirmado y producen
+  `RELATED_RESERVATION_SCHEDULE_INCOMPLETE`.
+
+Sólo el primer conjunto genera `conflicts` y filas de override. La presencia del
+segundo conjunto fuerza `fullyVerifiable=false`; si no hay overlaps confirmados,
+`conflictFree=null`, y si también hay overlaps confirmados,
+`conflictFree=false` y el outcome continúa siendo
+`CONFLICT_REVIEW_REQUIRED`.
 
 ## 13.1 Primera solicitud
 
@@ -1078,6 +1128,11 @@ conflicts sorted by assignmentId
   caseId
   operational window in UTC ISO-8601
   relevant updatedAt/version inputs
+unresolvedReservations sorted by assignmentId
+  assignmentId
+  caseId
+  Assignment relevant updatedAt/version inputs
+  Case scheduledStart/scheduledEnd and relevant updatedAt/version inputs
 ```
 
 Reglas:
@@ -1088,6 +1143,11 @@ Reglas:
 4. el server serializa la forma canónica y calcula SHA-256;
 5. la API expone 64 caracteres hex lowercase;
 6. el server siempre recomputa inmediatamente antes del write.
+
+`unresolvedReservations` representa Assignments same-asset `RESERVED` sin
+ventana derivable. Su firma no contiene snapshots de ventana inexistentes, pero
+incluye suficiente estado del Case y Assignment para que completar o cambiar el
+schedule vuelva stale cualquier review anterior.
 
 `companyId` participa en el hash para separar tenants, aunque no se expone en
 la respuesta. El fingerprint no contiene secretos; su posesión nunca concede
@@ -1259,11 +1319,15 @@ Reglas:
 - `release` incluye `cause`, `reason`, `releasedAt` y actor compacto;
 - `availability` es null para filas terminales; para `RESERVED` es derivada del
   contexto vigente;
-- `conflictFree` es null si falta una ventana completa, true si es verificable
-  sin conflicto y false si existe conflicto actual, incluso si fue overridden;
+- `fullyVerifiable` es false cuando falta la ventana candidata o existe al menos
+  una reserva relacionada no evaluable por schedule incompleto;
+- `conflictFree` es null cuando no puede concluirse si hay conflicto, true sólo
+  si todo el conjunto relevante es verificable y no tiene overlap, y false si
+  existe al menos un conflicto actual, incluso si fue overridden;
 - `warnings` usa códigos de presentación estables como
-  `INCOMPLETE_CASE_SCHEDULE`, `CURRENT_ASSIGNMENT_CONFLICT` y
-  `CONFLICT_OVERRIDE_CONFIRMED`, sin persistir un availability enum;
+  `INCOMPLETE_CASE_SCHEDULE`, `RELATED_RESERVATION_SCHEDULE_INCOMPLETE`,
+  `CURRENT_ASSIGNMENT_CONFLICT` y `CONFLICT_OVERRIDE_CONFIRMED`, sin persistir
+  un availability enum;
 - `conflictOverrides` contiene summaries
   `{ conflictingAssignmentId, approvedAt, approvedBy, reason }`, sin snapshots
   internos de cálculo;
@@ -1453,15 +1517,13 @@ puede sostener esa frontera, C4 se detiene para una decisión explícita.
 
 Permanecen diferidos sin reabrir B.1/B.2:
 
-1. valores numéricos default de `preCaseBufferMinutes` y
-   `postCaseBufferMinutes`;
-2. implementación concreta del guard cross-domain Dispatch/Custody;
-3. Dispatch/Custody API y physical positioning;
-4. Inventory Movement API;
-5. endpoint general de Case Availability;
-6. frontend components, notifications y mobile workflows;
-7. permission-based RBAC;
-8. Prisma, migrations, services, controllers, tests y ejecución de acceptance,
+1. implementación concreta del guard cross-domain Dispatch/Custody;
+2. Dispatch/Custody API y physical positioning;
+3. Inventory Movement API;
+4. endpoint general de Case Availability;
+5. frontend components, notifications y mobile workflows;
+6. permission-based RBAC;
+7. Prisma, migrations, services, controllers, tests y ejecución de acceptance,
    que comienzan sólo en HC-NEXT-03C1 y slices posteriores.
 
 B.2 no diseña fuzzy search, nested mutations, DELETE ni hard delete. La
@@ -1576,9 +1638,10 @@ idempotente fuera de la misma frontera que la mutación.
 
 ## 34.3 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
-**Entry adicional obligatorio:** antes de iniciar C3 deben estar aprobados los
-valores numéricos de `preCaseBufferMinutes` y `postCaseBufferMinutes`. C3 no los
-inventa ni avanza con defaults ambiguos.
+**Entry resuelto:** `preCaseBufferMinutes = 120` y
+`postCaseBufferMinutes = 180` son los fallbacks de sistema aprobados; settings
+Company-scoped los sustituyen sin crear filas automáticamente ni usar defaults
+PostgreSQL.
 
 **Scope:** resolución de settings Company-scoped, derivación de ventana
 operacional, overlap detection, outcome `CONFLICT_REVIEW_REQUIRED` sin write,
@@ -1596,9 +1659,9 @@ determinista para dos usuarios sobre el mismo EquipmentAsset y sobre capacidad
 de una Requirement; replay/mismatch idempotente; regresión C2 y API completa;
 lint, typecheck, build y `git diff --check`.
 
-**STOP:** defaults sin decisión, doble reserva silenciosa, over-coverage por
-race, fingerprint que omite contexto determinante, review que escribe o consume
-claim, confirmación implícita o auditoría parcial.
+**STOP:** doble reserva silenciosa, over-coverage por race, fingerprint que
+omite contexto determinante, review que escribe o consume claim, confirmación
+implícita o auditoría parcial.
 
 ## 34.4 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
@@ -1772,6 +1835,13 @@ afirman disponibilidad. Al completar o reprogramar el Case, la disponibilidad
 se reevalúa automáticamente contra la nueva ventana y puede resultar en
 `CONFLICT`.
 
+Cuando el candidato tiene ventana completa pero una reserva same-asset vigente
+no puede evaluarse por schedule incompleto, Create sigue permitido, se emite
+`RELATED_RESERVATION_SCHEDULE_INCOMPLETE` y Availability devuelve
+`fullyVerifiable=false` / `conflictFree=null`. Si coexiste un overlap confirmado,
+el review incluye sólo los conflictos evaluables, conserva el warning y devuelve
+`fullyVerifiable=false` / `conflictFree=false`.
+
 ## H. Conflict review
 
 - Primer overlap: 200 `CONFLICT_REVIEW_REQUIRED`, cero Assignment writes, cero
@@ -1781,6 +1851,9 @@ se reevalúa automáticamente contra la nueva ventana y puede resultar en
   atómicamente; devuelve 201.
 - Fingerprint stale: cero writes y outcome de review nuevo con fingerprint y
   contexto actuales.
+- El fingerprint incluye una firma determinista de las reservas same-asset no
+  evaluables; completar o cambiar su schedule invalida el review. Esas reservas
+  no generan filas de override sin un overlap confirmado y ventanas conocidas.
 
 ## I. Concurrency
 
@@ -1789,6 +1862,38 @@ dos éxitos silenciosamente conflict-free. La decisión final bloquea/revalida e
 estado de reservas vigente y cualquier override requiere review y justificación
 explícitos. Dos intentos concurrentes sobre la capacidad de una Requirement no
 pueden exceder silenciosamente `requestedQty`.
+
+### Orden canónico de locks de Create
+
+HC-NEXT-03C3 protege la decisión final de Availability y la mutación contra
+TOCTOU mediante el siguiente orden determinista dentro de la misma transacción:
+
+1. `EquipmentAsset` tenant-scoped con `FOR UPDATE`.
+2. `HealthcareCaseRequirement` con `FOR UPDATE` cuando el origen es REQUIREMENT.
+3. advisory lock transaccional `SHARED`, Company-scoped, para
+   `HealthcareEquipmentAssignmentSettings`.
+4. Cases relevantes — candidato más Cases de todas las Assignments
+   same-asset `RESERVED` relevantes — deduplicados y ordenados por id, con
+   `FOR SHARE`.
+5. fila `HealthcareEquipmentAssignmentSettings` con `FOR SHARE` cuando existe.
+6. rereads autoritativos y revalidación de Case, Asset, Requirement/capacity,
+   settings, reservas, conflictos, reservas no evaluables y fingerprint.
+7. review sin write o mutación atómica.
+
+El reread autoritativo ocurre después de adquirir la frontera de locks. Un cambio
+de schedule/status/settings confirmado antes de adquirirla debe ser observado;
+un cambio concurrente posterior queda bloqueado hasta terminar la transacción.
+
+La ausencia de una fila de settings no puede protegerse con row locking. Por
+ello, cualquier futura operación que inserte, actualice o elimine
+`HealthcareEquipmentAssignmentSettings` MUST adquirir primero el mismo advisory
+lock Company-scoped en modo transaccional `EXCLUSIVE`. C3 implementa y valida el
+lado `SHARED`; el endpoint de mutación de settings permanece futuro.
+
+C4 Replace / Release y cualquier otra mutación que pueda cambiar el conjunto de
+reservas activas del mismo EquipmentAsset MUST conservar la convención de
+locking por EquipmentAsset antes de alterar ese conjunto. Si C4 no puede
+preservarla, debe detenerse para una decisión explícita de concurrencia.
 
 ## J. Replacement
 
@@ -1902,12 +2007,15 @@ HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
 → COMPLETE / MERGED
 
 HC-NEXT-03C2 — Assignment Backend Base
+→ COMPLETE / MERGED
+
+HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 → COMPLETE / READY FOR REVIEW
 
 Next
-→ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency — NEXT / BLOCKED UNTIL C2 MERGED
+→ HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE
-→ AVAILABILITY / CONFLICT REVIEW, REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
+→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
 ```
