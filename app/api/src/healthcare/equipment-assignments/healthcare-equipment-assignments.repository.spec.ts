@@ -1,6 +1,7 @@
 import {
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
+  HealthcareEquipmentAssignmentReleaseCause,
   IdempotencyScope,
 } from '@prisma/client';
 
@@ -10,6 +11,8 @@ const companyId = '11111111-1111-4111-8111-111111111111';
 const caseId = '22222222-2222-4222-8222-222222222222';
 const requirementId = '33333333-3333-4333-8333-333333333333';
 const equipmentAssetId = '44444444-4444-4444-8444-444444444444';
+const assignmentId = '55555555-5555-4555-8555-555555555555';
+const userId = '66666666-6666-4666-8666-666666666666';
 
 describe('HealthcareEquipmentAssignmentsRepository', () => {
   const prisma = {
@@ -34,6 +37,7 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+      updateMany: jest.fn(),
     },
     healthcareEquipmentAssignmentConflictOverride: {
       createMany: jest.fn(),
@@ -51,7 +55,7 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     await repository.findCase(companyId, caseId);
     await repository.findRequirement(companyId, requirementId);
     await repository.findEquipmentAsset(companyId, equipmentAssetId);
-    await repository.findAssignment(companyId, 'assignment-1');
+    await repository.findAssignment(companyId, assignmentId);
 
     expect(prisma.healthcareCase.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: caseId, companyId } }),
@@ -64,9 +68,43 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     );
     expect(prisma.healthcareEquipmentAssignment.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'assignment-1', companyId },
+        where: { id: assignmentId, companyId },
       }),
     );
+  });
+
+  it('releases only a tenant-scoped RESERVED assignment', async () => {
+    const releasedAt = new Date('2026-09-17T18:00:00.000Z');
+
+    prisma.healthcareEquipmentAssignment.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    await repository.releaseAssignment(prisma as never, {
+      companyId,
+      assignmentId,
+      releasedAt,
+      releasedById: userId,
+      releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+      releaseReason: 'Equipo ya no requerido',
+    });
+
+    expect(
+      prisma.healthcareEquipmentAssignment.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: assignmentId,
+        companyId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      data: {
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      },
+    });
   });
 
   it('uses the exact CREATE idempotency identity', async () => {

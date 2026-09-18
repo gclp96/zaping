@@ -1,10 +1,12 @@
 import { HttpException, Injectable } from '@nestjs/common';
+
 import {
   EquipmentCondition,
   EquipmentLifecycle,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
+  HealthcareEquipmentAssignmentReleaseCause,
   HealthcareRequirementLifecycle,
   IdempotencyScope,
   Prisma,
@@ -19,6 +21,8 @@ import {
   caseNotFoundException,
   conflictOverrideReasonRequiredException,
   equipmentAssignmentNotFoundException,
+  equipmentAssignmentNotReservedException,
+  equipmentAssignmentReleaseReasonRequiredException,
   equipmentAssetNotEligibleException,
   equipmentAssetNotFoundException,
   healthcarePersistenceException,
@@ -26,17 +30,22 @@ import {
   invalidAssignmentOriginException,
   invalidConflictReviewConfirmationException,
   relatedResourceChangedException,
+  resourceStateChangedException,
   requirementNotFoundException,
   requirementOverCoverageException,
   requirementRetiredException,
 } from '../common/healthcare-errors';
+
 import { normalizeHealthcareOptionalText } from '../common/healthcare-normalization';
 import { CreateHealthcareEquipmentAssignmentDto } from './dto/create-healthcare-equipment-assignment.dto';
+import { ReleaseHealthcareEquipmentAssignmentDto } from './dto/release-healthcare-equipment-assignment.dto';
+
 import {
   HealthcareEquipmentAssignmentListQueryDto,
   HealthcareEquipmentAssignmentListStatus,
   toAssignmentLifecycleFilter,
 } from './dto/healthcare-equipment-assignment-list-query.dto';
+
 import {
   createEquipmentAssignmentConflictReviewFingerprint,
   deriveEquipmentAssignmentOperationalWindow,
@@ -45,7 +54,9 @@ import {
   OperationalWindow,
   resolveEquipmentAssignmentBuffers,
 } from './healthcare-equipment-assignment-availability';
+
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
+
 import {
   HealthcareEquipmentAssignmentRecord,
   HealthcareEquipmentAssignmentsRepository,
@@ -602,6 +613,68 @@ export class HealthcareEquipmentAssignmentsService {
         throw relatedResourceChangedException();
       }
 
+      this.rethrowPersistenceError(error);
+    }
+  }
+
+  async release(
+    companyId: string,
+    releasedById: string,
+    assignmentId: string,
+    dto: ReleaseHealthcareEquipmentAssignmentDto,
+  ): Promise<HealthcareEquipmentAssignmentResponse> {
+    const releaseReason = normalizeHealthcareOptionalText(dto.reason);
+
+    if (!releaseReason) {
+      throw equipmentAssignmentReleaseReasonRequiredException();
+    }
+
+    const releasedAt = new Date();
+
+    try {
+      return await this.repository.runInTransaction(async (transaction) => {
+        const locked = await this.repository.lockAssignment(
+          transaction,
+          companyId,
+          assignmentId,
+        );
+
+        if (!locked) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        if (
+          locked.lifecycle !== HealthcareEquipmentAssignmentLifecycle.RESERVED
+        ) {
+          throw equipmentAssignmentNotReservedException();
+        }
+
+        const result = await this.repository.releaseAssignment(transaction, {
+          companyId,
+          assignmentId,
+          releasedAt,
+          releasedById,
+          releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          releaseReason,
+        });
+
+        if (result.count !== 1) {
+          throw resourceStateChangedException();
+        }
+
+        const record = await this.repository.findAssignment(
+          companyId,
+          assignmentId,
+          transaction,
+        );
+
+        if (!record) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        return this.mapResponse(record, null);
+      });
+    } catch (error) {
       this.rethrowPersistenceError(error);
     }
   }

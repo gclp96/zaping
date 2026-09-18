@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
+  HealthcareEquipmentAssignmentReleaseCause,
   IdempotencyScope,
   Prisma,
 } from '@prisma/client';
@@ -323,6 +324,27 @@ export class HealthcareEquipmentAssignmentsRepository {
     return rows.length === 1;
   }
 
+  async lockAssignment(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    assignmentId: string,
+  ) {
+    const rows = await transaction.$queryRaw<
+      Array<{
+        id: string;
+        lifecycle: HealthcareEquipmentAssignmentLifecycle;
+      }>
+    >(Prisma.sql`
+    SELECT "id", "lifecycle"
+    FROM "HealthcareEquipmentAssignment"
+    WHERE "id" = ${assignmentId}
+      AND "companyId" = ${companyId}
+    FOR UPDATE
+  `);
+
+    return rows[0] ?? null;
+  }
+
   async acquireSettingsSharedAdvisoryLock(
     transaction: Prisma.TransactionClient,
     companyId: string,
@@ -443,6 +465,33 @@ export class HealthcareEquipmentAssignmentsRepository {
     return transaction.healthcareEquipmentAssignment.create({
       data,
       select: healthcareEquipmentAssignmentResponseSelect,
+    });
+  }
+
+  releaseAssignment(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      assignmentId: string;
+      releasedAt: Date;
+      releasedById: string;
+      releaseCause: HealthcareEquipmentAssignmentReleaseCause;
+      releaseReason: string;
+    },
+  ) {
+    return transaction.healthcareEquipmentAssignment.updateMany({
+      where: {
+        id: data.assignmentId,
+        companyId: data.companyId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      data: {
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt: data.releasedAt,
+        releasedById: data.releasedById,
+        releaseCause: data.releaseCause,
+        releaseReason: data.releaseReason,
+      },
     });
   }
 

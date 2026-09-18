@@ -25,6 +25,9 @@ export const HEALTHCARE_ERROR_CODES = {
   requirementFulfillmentLocked: 'REQUIREMENT_FULFILLMENT_LOCKED',
   invalidRequirementReorder: 'INVALID_REQUIREMENT_REORDER',
   equipmentAssignmentNotFound: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+  equipmentAssignmentNotReserved: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+  equipmentAssignmentReleaseReasonRequired:
+    'EQUIPMENT_ASSIGNMENT_RELEASE_REASON_REQUIRED',
   equipmentAssetNotFound: 'EQUIPMENT_ASSET_NOT_FOUND',
   invalidAssignmentOrigin: 'INVALID_ASSIGNMENT_ORIGIN',
   caseEquipmentAssignmentsReadOnly: 'CASE_EQUIPMENT_ASSIGNMENTS_READ_ONLY',
@@ -186,6 +189,24 @@ export function equipmentAssignmentNotFoundException(): NotFoundException {
     error: 'Not Found',
     code: HEALTHCARE_ERROR_CODES.equipmentAssignmentNotFound,
     message: 'Asignación de equipo no encontrada',
+  });
+}
+
+export function equipmentAssignmentNotReservedException(): ConflictException {
+  return new ConflictException({
+    statusCode: HttpStatus.CONFLICT,
+    error: 'Conflict',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssignmentNotReserved,
+    message: 'La asignación de equipo ya no está reservada',
+  });
+}
+
+export function equipmentAssignmentReleaseReasonRequiredException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssignmentReleaseReasonRequired,
+    message: 'La razón de liberación es obligatoria',
   });
 }
 

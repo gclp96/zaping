@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -13,6 +14,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+
 import { UserRole } from '@prisma/client';
 import { Response } from 'express';
 
@@ -23,6 +25,7 @@ import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-reques
 import { CreateHealthcareEquipmentAssignmentDto } from './dto/create-healthcare-equipment-assignment.dto';
 import { HealthcareEquipmentAssignmentListQueryDto } from './dto/healthcare-equipment-assignment-list-query.dto';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
+import { ReleaseHealthcareEquipmentAssignmentDto } from './dto/release-healthcare-equipment-assignment.dto';
 
 const readRoles = [
   UserRole.ADMIN,
@@ -78,6 +81,22 @@ export class HealthcareEquipmentAssignmentsController {
     );
 
     return result;
+  }
+
+  @Post(':assignmentId/release')
+  @HttpCode(HttpStatus.OK)
+  @Roles(...mutationRoles)
+  release(
+    @Req() request: AuthenticatedRequest,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Body() dto: ReleaseHealthcareEquipmentAssignmentDto,
+  ) {
+    return this.service.release(
+      request.user.companyId,
+      request.user.id,
+      assignmentId,
+      dto,
+    );
   }
 
   private validateIdempotencyKey(value: string | undefined): string {

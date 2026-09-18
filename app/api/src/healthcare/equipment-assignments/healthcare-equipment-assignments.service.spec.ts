@@ -109,6 +109,22 @@ const baseRecord = {
   conflictOverrides: [],
 };
 
+const releasedAt = new Date('2026-09-17T18:00:00.000Z');
+
+const releasedRecord = {
+  ...baseRecord,
+  lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+  releasedAt,
+  releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+  releaseReason: 'Equipo ya no requerido',
+  releasedBy: {
+    id: userId,
+    firstName: 'Ana',
+    lastName: 'Pérez',
+  },
+  updatedAt: releasedAt,
+};
+
 const requirementDto = {
   caseId,
   equipmentAssetId,
@@ -167,6 +183,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     findEquipmentAsset: jest.fn(),
     findSettings: jest.fn(),
     findSettingsForShare: jest.fn(),
+    lockAssignment: jest.fn(),
     lockEquipmentAsset: jest.fn(),
     lockRequirement: jest.fn(),
     acquireSettingsSharedAdvisoryLock: jest.fn(),
@@ -177,6 +194,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     findReservedAssignmentsForAsset: jest.fn(),
     findReservedAssignmentsForAssets: jest.fn(),
     createAssignment: jest.fn(),
+    releaseAssignment: jest.fn(),
     createConflictOverrides: jest.fn(),
     findAssignment: jest.fn(),
     countAssignments: jest.fn(),
@@ -200,6 +218,15 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.findSettingsForShare.mockResolvedValue(null);
     repository.lockEquipmentAsset.mockResolvedValue(true);
     repository.lockRequirement.mockResolvedValue(true);
+
+    repository.lockAssignment.mockResolvedValue({
+      id: assignmentId,
+      lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+    });
+
+    repository.releaseAssignment.mockResolvedValue({
+      count: 1,
+    });
     repository.acquireSettingsSharedAdvisoryLock.mockResolvedValue(undefined);
     repository.lockHealthcareCasesForShare.mockResolvedValue([caseId]);
     repository.countRequirementCoverage.mockResolvedValue(0);
@@ -213,6 +240,136 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.countAssignments.mockResolvedValue(1);
     repository.findAssignments.mockResolvedValue([baseRecord]);
     service = new HealthcareEquipmentAssignmentsService(repository as never);
+  });
+
+  describe('release', () => {
+    it('releases a RESERVED assignment with MANUAL cause', async () => {
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+
+      const result = await service.release(companyId, userId, assignmentId, {
+        reason: '  Equipo ya no requerido  ',
+      });
+
+      expect(repository.lockAssignment).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.releaseAssignment).toHaveBeenCalledWith(
+        transaction,
+        expect.objectContaining({
+          companyId,
+          assignmentId,
+          releasedById: userId,
+          releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          releaseReason: 'Equipo ya no requerido',
+        }),
+      );
+
+      expect(repository.findAssignment).toHaveBeenCalledWith(
+        companyId,
+        assignmentId,
+        transaction,
+      );
+
+      expect(result.id).toBe(assignmentId);
+      expect(result.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.RELEASED,
+      );
+      expect(result.release).toMatchObject({
+        cause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        reason: 'Equipo ya no requerido',
+      });
+    });
+
+    it('rejects release when the assignment does not exist in the tenant', async () => {
+      repository.lockAssignment.mockResolvedValue(null);
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+        },
+      });
+
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects release when the assignment is already RELEASED', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        id: assignmentId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+        },
+      });
+
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects release when the assignment is already REPLACED', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        id: assignmentId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+        },
+      });
+
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects an empty release reason before starting a transaction', async () => {
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: '   ',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_RELEASE_REASON_REQUIRED',
+        },
+      });
+
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.lockAssignment).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects release when the guarded lifecycle update affects no row', async () => {
+      repository.releaseAssignment.mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'RESOURCE_STATE_CHANGED',
+        },
+      });
+
+      expect(repository.findAssignment).not.toHaveBeenCalled();
+    });
   });
 
   describe('reads', () => {

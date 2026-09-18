@@ -17,6 +17,7 @@ describe('HealthcareEquipmentAssignmentsController', () => {
     findAll: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
+    release: jest.fn(),
   };
   const controller = new HealthcareEquipmentAssignmentsController(
     service as never,
@@ -27,7 +28,7 @@ describe('HealthcareEquipmentAssignmentsController', () => {
     response.status.mockReturnValue(response);
   });
 
-  it('registers only the canonical C2 resource routes', () => {
+  it('registers the equipment assignment resource routes', () => {
     expect(
       Reflect.getMetadata(
         PATH_METADATA,
@@ -37,6 +38,8 @@ describe('HealthcareEquipmentAssignmentsController', () => {
     expect(getPath('findAll')).toBe('/');
     expect(getPath('findOne')).toBe(':assignmentId');
     expect(getPath('create')).toBe('/');
+    expect(getPath('release')).toBe(':assignmentId/release');
+    expect(getPath('release')).toBe(':assignmentId/release');
   });
 
   it('lists and reads with authenticated companyId', async () => {
@@ -77,6 +80,26 @@ describe('HealthcareEquipmentAssignmentsController', () => {
       dto,
     );
     expect(response.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+  });
+
+  it('releases with authenticated tenant and actor', async () => {
+    const dto = {
+      reason: 'Equipo ya no requerido',
+    };
+
+    service.release.mockResolvedValue({
+      id: assignmentId,
+      status: 'RELEASED',
+    });
+
+    await controller.release(request as never, assignmentId, dto);
+
+    expect(service.release).toHaveBeenCalledWith(
+      companyId,
+      userId,
+      assignmentId,
+      dto,
+    );
   });
 
   it('returns 200 for conflict review without changing the route contract', async () => {
@@ -125,9 +148,43 @@ describe('HealthcareEquipmentAssignmentsController', () => {
 
     expect(idParam?.pipes).toContain(ParseUUIDPipe);
   });
+
+  it('releases with authenticated company and actor', async () => {
+    const dto = {
+      reason: 'Equipo ya no requerido',
+    };
+
+    service.release.mockResolvedValue({
+      id: assignmentId,
+      status: 'RELEASED',
+    });
+
+    await controller.release(request as never, assignmentId, dto);
+
+    expect(service.release).toHaveBeenCalledWith(
+      companyId,
+      userId,
+      assignmentId,
+      dto,
+    );
+  });
+
+  it('validates release assignmentId with ParseUUIDPipe', () => {
+    const metadata = Reflect.getMetadata(
+      ROUTE_ARGS_METADATA,
+      HealthcareEquipmentAssignmentsController,
+      'release',
+    ) as Record<string, { data?: string; pipes?: unknown[] }>;
+
+    const idParam = Object.values(metadata).find(
+      (value) => value.data === 'assignmentId',
+    );
+
+    expect(idParam?.pipes).toContain(ParseUUIDPipe);
+  });
 });
 
-type ControllerMethod = 'findAll' | 'findOne' | 'create';
+type ControllerMethod = 'findAll' | 'findOne' | 'create' | 'release';
 
 function getHandler(methodName: ControllerMethod): object {
   return Object.getOwnPropertyDescriptor(
