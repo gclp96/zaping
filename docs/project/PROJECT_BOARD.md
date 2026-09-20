@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED — HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED — HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / READY FOR REVIEW — HC-NEXT-03C4 Replace / Release / Parent Integrations NEXT / BLOCKED UNTIL C3 MERGED
-Última actualización: 2026-09-17
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C3 COMPLETE / MERGED — HC-NEXT-03C4 Replace / Release / Parent Integrations IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND VALIDATED / READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
+Última actualización: 2026-09-20
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -142,15 +142,21 @@ Frontend UX workstream
     ├── DataTable para listas operativas
     └── StaticTable para detalle/documentación
 
-CURRENT / READY FOR REVIEW
+CURRENT / READY FOR COMMIT
 
 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
-        → COMPLETE / READY FOR REVIEW
+        → COMPLETE / MERGED
+
+HC-NEXT-03C4 — Replace / Release / Parent Integrations
+        → IN PROGRESS
+        → Manual Release COMPLETE / COMMITTED
+        → Replace backend COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
+        → Parent integrations PENDING
 
 NEXT
 
-HC-NEXT-03C4 — Replace / Release / Parent Integrations
-        → NEXT / BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 parent integrations
+        → PENDING AFTER REPLACE COMMIT
 
 DEFERRED
 
@@ -1752,10 +1758,11 @@ recurso top-level, DTOs allowlisted, review 200/no-write con fingerprint,
 Create/Replace/Release, fixed-role RBAC, errores estables, idempotencia y
 atomicidad. HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract está
 APPROVED / DOCUMENTED con la secuencia C1–C7, gates por slice y acceptance A–P.
-HC-NEXT-03C1 Equipment Assignment Persistence / Migration y HC-NEXT-03C2
-Assignment Backend Base están COMPLETE / MERGED. HC-NEXT-03C3 Availability /
-Conflict Review / Concurrency queda COMPLETE / READY FOR REVIEW; C4
-replace/release y frontend siguen NOT IMPLEMENTED.
+HC-NEXT-03C1 Equipment Assignment Persistence / Migration, HC-NEXT-03C2
+Assignment Backend Base y HC-NEXT-03C3 Availability / Conflict Review /
+Concurrency están COMPLETE / MERGED. HC-NEXT-03C4 está IN PROGRESS: Manual
+Release está committed y Replace backend está validado y READY FOR COMMIT sin
+commit local todavía. Parent integrations y frontend siguen pendientes.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2243,9 +2250,9 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 → Requirements Acceptance COMPLETE / ACCEPTED — ADMIN / MANAGER / SALES /
   WAREHOUSE PASS
 
-NEXT ROADMAP ITEM
+CURRENT ROADMAP ITEM
 
-→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
 
 DEFERRED
 
@@ -2463,14 +2470,17 @@ HC-NEXT-03C2 Assignment Backend Base
 → COMPLETE / MERGED
 
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency
-→ COMPLETE / READY FOR REVIEW
+→ COMPLETE / MERGED
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations
-→ NEXT / BLOCKED UNTIL C3 MERGED
+→ IN PROGRESS
+→ MANUAL RELEASE COMPLETE / COMMITTED
+→ REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
+→ PARENT INTEGRATIONS PENDING
 
 Healthcare Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
-→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + MANUAL RELEASE COMMITTED + REPLACE BACKEND VALIDATED
+→ PARENT INTEGRATIONS Y FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED

@@ -1,10 +1,12 @@
 import { HttpException, Injectable } from '@nestjs/common';
+
 import {
   EquipmentCondition,
   EquipmentLifecycle,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
+  HealthcareEquipmentAssignmentReleaseCause,
   HealthcareRequirementLifecycle,
   IdempotencyScope,
   Prisma,
@@ -19,33 +21,48 @@ import {
   caseNotFoundException,
   conflictOverrideReasonRequiredException,
   equipmentAssignmentNotFoundException,
+  equipmentAssignmentNotReservedException,
+  equipmentAssignmentReleaseReasonRequiredException,
   equipmentAssetNotEligibleException,
   equipmentAssetNotFoundException,
   healthcarePersistenceException,
   idempotencyKeyReusedException,
   invalidAssignmentOriginException,
   invalidConflictReviewConfirmationException,
+  equipmentAssignmentReplacementReasonRequiredException,
+  equipmentAssignmentReplacementSameAssetException,
   relatedResourceChangedException,
+  resourceStateChangedException,
   requirementNotFoundException,
   requirementOverCoverageException,
   requirementRetiredException,
 } from '../common/healthcare-errors';
+
 import { normalizeHealthcareOptionalText } from '../common/healthcare-normalization';
 import { CreateHealthcareEquipmentAssignmentDto } from './dto/create-healthcare-equipment-assignment.dto';
+import { ReleaseHealthcareEquipmentAssignmentDto } from './dto/release-healthcare-equipment-assignment.dto';
+
 import {
   HealthcareEquipmentAssignmentListQueryDto,
   HealthcareEquipmentAssignmentListStatus,
   toAssignmentLifecycleFilter,
 } from './dto/healthcare-equipment-assignment-list-query.dto';
+
 import {
   createEquipmentAssignmentConflictReviewFingerprint,
   deriveEquipmentAssignmentOperationalWindow,
   EquipmentAssignmentBuffers,
+  createEquipmentAssignmentReplaceConflictReviewFingerprint,
   equipmentAssignmentWindowsOverlap,
   OperationalWindow,
   resolveEquipmentAssignmentBuffers,
 } from './healthcare-equipment-assignment-availability';
+
+import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
+
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
+import { ReplaceHealthcareEquipmentAssignmentDto } from './dto/replace-healthcare-equipment-assignment.dto';
+
 import {
   HealthcareEquipmentAssignmentRecord,
   HealthcareEquipmentAssignmentsRepository,
@@ -53,6 +70,7 @@ import {
 } from './healthcare-equipment-assignments.repository';
 
 const CREATE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE;
+const REPLACE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE;
 const RESERVED_ASSIGNMENT_UNIQUE_CONSTRAINT =
   'HealthcareEquipmentAssignment_reserved_case_asset_key';
 const IDEMPOTENCY_UNIQUE_CONSTRAINT =
@@ -127,6 +145,14 @@ type NormalizedCreateInput = {
   conflictOverrideReason: string | null;
 };
 
+type NormalizedReplaceInput = {
+  equipmentAssetId: string;
+  replacementReason: string;
+  confirmConflictOverride: boolean;
+  conflictReviewFingerprint: string | null;
+  conflictOverrideReason: string | null;
+};
+
 type HealthcareEquipmentRequirementRecord = NonNullable<
   Awaited<
     ReturnType<HealthcareEquipmentAssignmentsRepository['findRequirement']>
@@ -185,6 +211,21 @@ type HealthcareEquipmentAssignmentCreateResponse =
       data: HealthcareEquipmentAssignmentResponse;
     }
   | HealthcareEquipmentAssignmentConflictReviewResponse;
+
+export type HealthcareEquipmentAssignmentReplaceConflictReviewResponse =
+  HealthcareEquipmentAssignmentConflictReviewResponse & {
+    sourceAssignmentId: string;
+  };
+
+type HealthcareEquipmentAssignmentReplaceResponse =
+  | {
+      outcome: 'REPLACED';
+      data: {
+        replacedAssignment: HealthcareEquipmentAssignmentResponse;
+        replacementAssignment: HealthcareEquipmentAssignmentResponse;
+      };
+    }
+  | HealthcareEquipmentAssignmentReplaceConflictReviewResponse;
 
 @Injectable()
 export class HealthcareEquipmentAssignmentsService {
@@ -606,6 +647,503 @@ export class HealthcareEquipmentAssignmentsService {
     }
   }
 
+  async release(
+    companyId: string,
+    releasedById: string,
+    assignmentId: string,
+    dto: ReleaseHealthcareEquipmentAssignmentDto,
+  ): Promise<HealthcareEquipmentAssignmentResponse> {
+    const releaseReason = normalizeHealthcareOptionalText(dto.reason);
+
+    if (!releaseReason) {
+      throw equipmentAssignmentReleaseReasonRequiredException();
+    }
+
+    const releasedAt = new Date();
+
+    try {
+      return await this.repository.runInTransaction(async (transaction) => {
+        const locked = await this.repository.lockAssignment(
+          transaction,
+          companyId,
+          assignmentId,
+        );
+
+        if (!locked) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        if (
+          locked.lifecycle !== HealthcareEquipmentAssignmentLifecycle.RESERVED
+        ) {
+          throw equipmentAssignmentNotReservedException();
+        }
+
+        const result = await this.repository.releaseAssignment(transaction, {
+          companyId,
+          assignmentId,
+          releasedAt,
+          releasedById,
+          releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          releaseReason,
+        });
+
+        if (result.count !== 1) {
+          throw resourceStateChangedException();
+        }
+
+        const record = await this.repository.findAssignment(
+          companyId,
+          assignmentId,
+          transaction,
+        );
+
+        if (!record) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        return this.mapResponse(record, null);
+      });
+    } catch (error) {
+      this.rethrowPersistenceError(error);
+    }
+  }
+
+  async replace(
+    companyId: string,
+    replacedById: string,
+    assignmentId: string,
+    idempotencyKey: string,
+    dto: ReplaceHealthcareEquipmentAssignmentDto,
+  ): Promise<HealthcareEquipmentAssignmentReplaceResponse> {
+    const input = this.normalizeReplaceInput(dto);
+    const requestHash = createHealthcareEquipmentAssignmentReplaceRequestHash(
+      assignmentId,
+      dto,
+    );
+
+    try {
+      const existingReplay = await this.findCompletedIdempotentReplacement(
+        companyId,
+        idempotencyKey,
+        requestHash,
+      );
+
+      if (existingReplay) {
+        return existingReplay;
+      }
+
+      const source = await this.repository.findAssignmentReplacementSource(
+        companyId,
+        assignmentId,
+      );
+
+      if (!source) {
+        throw equipmentAssignmentNotFoundException();
+      }
+
+      if (
+        source.lifecycle !== HealthcareEquipmentAssignmentLifecycle.RESERVED
+      ) {
+        throw equipmentAssignmentNotReservedException();
+      }
+
+      if (source.equipmentAssetId === input.equipmentAssetId) {
+        throw equipmentAssignmentReplacementSameAssetException();
+      }
+
+      return await this.repository.runInTransaction(async (transaction) => {
+        const assetLocked = await this.repository.lockEquipmentAsset(
+          transaction,
+          companyId,
+          input.equipmentAssetId,
+        );
+
+        if (!assetLocked) {
+          throw equipmentAssetNotFoundException();
+        }
+
+        if (source.requirementId) {
+          const requirementLocked = await this.repository.lockRequirement(
+            transaction,
+            companyId,
+            source.requirementId,
+          );
+
+          if (!requirementLocked) {
+            throw requirementNotFoundException();
+          }
+        }
+
+        const lockedSource = await this.repository.lockAssignment(
+          transaction,
+          companyId,
+          assignmentId,
+        );
+
+        if (!lockedSource) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        const transactionalReplay =
+          await this.findCompletedIdempotentReplacement(
+            companyId,
+            idempotencyKey,
+            requestHash,
+            transaction,
+          );
+
+        if (transactionalReplay) {
+          return transactionalReplay;
+        }
+
+        if (
+          lockedSource.lifecycle !==
+          HealthcareEquipmentAssignmentLifecycle.RESERVED
+        ) {
+          throw equipmentAssignmentNotReservedException();
+        }
+
+        if (
+          lockedSource.companyId !== source.companyId ||
+          lockedSource.caseId !== source.caseId ||
+          lockedSource.equipmentAssetId !== source.equipmentAssetId ||
+          lockedSource.requirementId !== source.requirementId ||
+          lockedSource.origin !== source.origin ||
+          lockedSource.directAssignmentReason !==
+            source.directAssignmentReason ||
+          lockedSource.updatedAt.getTime() !== source.updatedAt.getTime()
+        ) {
+          throw resourceStateChangedException();
+        }
+
+        const reservedCaseReferences =
+          await this.repository.findReservedAssignmentCaseIdsForAsset(
+            companyId,
+            input.equipmentAssetId,
+            transaction,
+          );
+
+        await this.repository.acquireSettingsSharedAdvisoryLock(
+          transaction,
+          companyId,
+        );
+
+        const relevantCaseIds = [
+          ...new Set([
+            lockedSource.caseId,
+            ...reservedCaseReferences.map((reference) => reference.caseId),
+          ]),
+        ].sort((left, right) => left.localeCompare(right));
+
+        await this.repository.lockHealthcareCasesForShare(
+          transaction,
+          companyId,
+          relevantCaseIds,
+        );
+
+        const settings = await this.repository.findSettingsForShare(
+          transaction,
+          companyId,
+        );
+
+        const healthcareCase = await this.repository.findCase(
+          companyId,
+          lockedSource.caseId,
+          transaction,
+        );
+
+        if (!healthcareCase) {
+          throw caseNotFoundException();
+        }
+
+        if (healthcareCase.status === HealthcareCaseStatus.CANCELLED) {
+          throw caseEquipmentAssignmentsReadOnlyException();
+        }
+
+        const equipmentAsset = await this.repository.findEquipmentAsset(
+          companyId,
+          input.equipmentAssetId,
+          transaction,
+        );
+
+        if (!equipmentAsset) {
+          throw equipmentAssetNotFoundException();
+        }
+
+        this.assertEquipmentAssetEligible(equipmentAsset);
+
+        let requirement: HealthcareEquipmentRequirementRecord | null = null;
+
+        if (
+          lockedSource.origin ===
+          HealthcareEquipmentAssignmentOrigin.REQUIREMENT
+        ) {
+          if (!lockedSource.requirementId) {
+            throw resourceStateChangedException();
+          }
+
+          requirement = await this.repository.findRequirement(
+            companyId,
+            lockedSource.requirementId,
+            transaction,
+          );
+
+          if (!requirement) {
+            throw requirementNotFoundException();
+          }
+
+          if (requirement.caseId !== lockedSource.caseId) {
+            throw assignmentRequirementCaseMismatchException();
+          }
+
+          if (requirement.lifecycle !== HealthcareRequirementLifecycle.ACTIVE) {
+            throw requirementRetiredException();
+          }
+
+          if (
+            requirement.productId !== equipmentAsset.productId ||
+            requirement.product.inventoryTracking !==
+              ProductInventoryTracking.ASSET
+          ) {
+            throw assignmentProductMismatchException();
+          }
+        } else if (lockedSource.requirementId !== null) {
+          throw resourceStateChangedException();
+        }
+
+        const duplicate =
+          await this.repository.findReservedAssignmentForCaseAsset(
+            companyId,
+            lockedSource.caseId,
+            input.equipmentAssetId,
+            transaction,
+          );
+
+        if (duplicate) {
+          throw assignmentAlreadyReservedException();
+        }
+
+        const currentCoverage = requirement
+          ? await this.repository.countRequirementCoverage(
+              companyId,
+              requirement.id,
+              transaction,
+            )
+          : null;
+
+        const reservations =
+          await this.repository.findReservedAssignmentsForAsset(
+            companyId,
+            input.equipmentAssetId,
+            assignmentId,
+            transaction,
+          );
+
+        const buffers = resolveEquipmentAssignmentBuffers(settings);
+
+        const evaluation = this.evaluateAvailability(
+          healthcareCase,
+          buffers,
+          reservations,
+        );
+
+        if (input.confirmConflictOverride && !evaluation.candidateWindow) {
+          throw invalidConflictReviewConfirmationException();
+        }
+
+        const fingerprint = evaluation.candidateWindow
+          ? createEquipmentAssignmentReplaceConflictReviewFingerprint({
+              companyId,
+              sourceAssignment: {
+                id: lockedSource.id,
+                lifecycle: lockedSource.lifecycle,
+                updatedAt: lockedSource.updatedAt,
+              },
+              candidate: {
+                caseId: lockedSource.caseId,
+                equipmentAssetId: input.equipmentAssetId,
+                requirementId: lockedSource.requirementId,
+                origin: lockedSource.origin,
+                window: evaluation.candidateWindow,
+                caseUpdatedAt: healthcareCase.updatedAt,
+                equipmentAssetUpdatedAt: equipmentAsset.updatedAt,
+              },
+              buffers,
+              requirementCapacity:
+                requirement && currentCoverage !== null
+                  ? {
+                      lifecycle: requirement.lifecycle,
+                      requestedQty: requirement.requestedQty,
+                      currentCoverage,
+                      updatedAt: requirement.updatedAt,
+                    }
+                  : null,
+              conflicts: evaluation.conflicts.map((conflict) => ({
+                assignmentId: conflict.reservation.id,
+                caseId: conflict.reservation.caseId,
+                window: conflict.window,
+                assignmentUpdatedAt: conflict.reservation.updatedAt,
+                caseUpdatedAt: conflict.reservation.healthcareCase.updatedAt,
+              })),
+              unresolvedReservations: evaluation.unresolvedReservations.map(
+                (reservation) => ({
+                  assignmentId: reservation.id,
+                  caseId: reservation.caseId,
+                  assignmentUpdatedAt: reservation.updatedAt,
+                  caseUpdatedAt: reservation.healthcareCase.updatedAt,
+                  scheduledStart: reservation.healthcareCase.scheduledStart,
+                  scheduledEnd: reservation.healthcareCase.scheduledEnd,
+                }),
+              ),
+            })
+          : null;
+
+        if (
+          evaluation.candidateWindow &&
+          fingerprint &&
+          (evaluation.conflicts.length > 0 || input.confirmConflictOverride)
+        ) {
+          if (
+            !input.confirmConflictOverride ||
+            input.conflictReviewFingerprint !== fingerprint ||
+            evaluation.conflicts.length === 0
+          ) {
+            return this.buildReplaceConflictReviewResponse(
+              lockedSource,
+              input,
+              equipmentAsset,
+              evaluation as AvailabilityEvaluation & {
+                candidateWindow: OperationalWindow;
+              },
+              fingerprint,
+            );
+          }
+        }
+
+        const claim = await this.repository.createIdempotencyClaim(
+          transaction,
+          companyId,
+          idempotencyKey,
+          REPLACE_SCOPE,
+          requestHash,
+        );
+
+        const createdReplacement = await this.repository.createAssignment(
+          transaction,
+          {
+            companyId,
+            caseId: lockedSource.caseId,
+            equipmentAssetId: input.equipmentAssetId,
+            requirementId: lockedSource.requirementId,
+            origin: lockedSource.origin,
+            directAssignmentReason: lockedSource.directAssignmentReason,
+            createdById: replacedById,
+            replacesAssignmentId: lockedSource.id,
+          },
+        );
+
+        if (evaluation.conflicts.length > 0) {
+          await this.repository.createConflictOverrides(
+            transaction,
+            evaluation.conflicts.map((conflict) => ({
+              companyId,
+              assignmentId: createdReplacement.id,
+              conflictingAssignmentId: conflict.reservation.id,
+              assignmentWindowStart: evaluation.candidateWindow!.start,
+              assignmentWindowEnd: evaluation.candidateWindow!.end,
+              conflictingWindowStart: conflict.window.start,
+              conflictingWindowEnd: conflict.window.end,
+              approvedById: replacedById,
+              reason: input.conflictOverrideReason as string,
+            })),
+          );
+        }
+
+        const replacedAt = new Date();
+
+        const transition = await this.repository.replaceAssignment(
+          transaction,
+          {
+            companyId,
+            assignmentId: lockedSource.id,
+            replacedAt,
+            replacedById,
+            replacementReason: input.replacementReason,
+          },
+        );
+
+        if (transition.count !== 1) {
+          throw resourceStateChangedException();
+        }
+
+        const replacedRecord = await this.repository.findAssignment(
+          companyId,
+          lockedSource.id,
+          transaction,
+        );
+
+        if (!replacedRecord) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        const replacementRecord = await this.repository.findAssignment(
+          companyId,
+          createdReplacement.id,
+          transaction,
+        );
+
+        if (!replacementRecord) {
+          throw equipmentAssignmentNotFoundException();
+        }
+
+        await this.repository.completeIdempotencyClaim(
+          transaction,
+          claim.id,
+          replacementRecord.id,
+        );
+
+        return {
+          outcome: 'REPLACED' as const,
+          data: {
+            replacedAssignment: this.mapResponse(replacedRecord, null),
+            replacementAssignment: this.mapResponse(
+              replacementRecord,
+              this.buildAvailability(
+                evaluation.candidateWindow,
+                evaluation.conflicts,
+                evaluation.unresolvedReservations,
+                evaluation.conflicts.length > 0,
+              ),
+            ),
+          },
+        };
+      });
+    } catch (error) {
+      if (this.isIdempotencyUniqueViolation(error)) {
+        const replay = await this.findCompletedIdempotentReplacement(
+          companyId,
+          idempotencyKey,
+          requestHash,
+        );
+
+        if (replay) {
+          return replay;
+        }
+      }
+
+      if (this.isReservedAssignmentUniqueViolation(error)) {
+        throw assignmentAlreadyReservedException();
+      }
+
+      if (this.isForeignKeyViolation(error)) {
+        throw relatedResourceChangedException();
+      }
+
+      this.rethrowPersistenceError(error);
+    }
+  }
+
   private async validateListFilters(
     companyId: string,
     query: HealthcareEquipmentAssignmentListQueryDto,
@@ -716,6 +1254,51 @@ export class HealthcareEquipmentAssignmentsService {
     };
   }
 
+  private normalizeReplaceInput(
+    dto: ReplaceHealthcareEquipmentAssignmentDto,
+  ): NormalizedReplaceInput {
+    const replacementReason =
+      normalizeHealthcareOptionalText(dto.replacementReason) ?? null;
+
+    const conflictOverrideReason =
+      normalizeHealthcareOptionalText(dto.conflictOverrideReason) ?? null;
+
+    const confirmConflictOverride = dto.confirmConflictOverride ?? false;
+    const conflictReviewFingerprint = dto.conflictReviewFingerprint ?? null;
+
+    if (!replacementReason) {
+      throw equipmentAssignmentReplacementReasonRequiredException();
+    }
+
+    if (!confirmConflictOverride) {
+      if (
+        dto.conflictReviewFingerprint !== undefined ||
+        dto.conflictOverrideReason !== undefined
+      ) {
+        throw invalidConflictReviewConfirmationException();
+      }
+    } else {
+      if (
+        !conflictReviewFingerprint ||
+        !CONFLICT_REVIEW_FINGERPRINT_PATTERN.test(conflictReviewFingerprint)
+      ) {
+        throw invalidConflictReviewConfirmationException();
+      }
+
+      if (!conflictOverrideReason) {
+        throw conflictOverrideReasonRequiredException();
+      }
+    }
+
+    return {
+      equipmentAssetId: dto.equipmentAssetId,
+      replacementReason,
+      confirmConflictOverride,
+      conflictReviewFingerprint,
+      conflictOverrideReason,
+    };
+  }
+
   private assertEquipmentAssetEligible(equipmentAsset: {
     lifecycle: EquipmentLifecycle;
     condition: EquipmentCondition;
@@ -782,6 +1365,91 @@ export class HealthcareEquipmentAssignmentsService {
           assignment,
           client,
         ),
+      };
+    } catch (error) {
+      this.rethrowPersistenceError(error);
+    }
+  }
+
+  private async findCompletedIdempotentReplacement(
+    companyId: string,
+    idempotencyKey: string,
+    requestHash: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<{
+    outcome: 'REPLACED';
+    data: {
+      replacedAssignment: HealthcareEquipmentAssignmentResponse;
+      replacementAssignment: HealthcareEquipmentAssignmentResponse;
+    };
+  } | null> {
+    try {
+      const record = client
+        ? await this.repository.findIdempotencyRecord(
+            companyId,
+            idempotencyKey,
+            REPLACE_SCOPE,
+            client,
+          )
+        : await this.repository.findIdempotencyRecord(
+            companyId,
+            idempotencyKey,
+            REPLACE_SCOPE,
+          );
+
+      if (!record) {
+        return null;
+      }
+
+      if (record.requestHash !== requestHash) {
+        throw idempotencyKeyReusedException();
+      }
+
+      if (!record.resourceId) {
+        return null;
+      }
+
+      const replacementAssignment = client
+        ? await this.repository.findAssignment(
+            companyId,
+            record.resourceId,
+            client,
+          )
+        : await this.repository.findAssignment(companyId, record.resourceId);
+
+      if (!replacementAssignment) {
+        throw equipmentAssignmentNotFoundException();
+      }
+
+      if (!replacementAssignment.replacesAssignmentId) {
+        throw resourceStateChangedException();
+      }
+
+      const replacedAssignment = client
+        ? await this.repository.findAssignment(
+            companyId,
+            replacementAssignment.replacesAssignmentId,
+            client,
+          )
+        : await this.repository.findAssignment(
+            companyId,
+            replacementAssignment.replacesAssignmentId,
+          );
+
+      if (!replacedAssignment) {
+        throw equipmentAssignmentNotFoundException();
+      }
+
+      return {
+        outcome: 'REPLACED',
+        data: {
+          replacedAssignment: this.mapResponse(replacedAssignment, null),
+          replacementAssignment: await this.mapRecordWithCurrentAvailability(
+            companyId,
+            replacementAssignment,
+            client,
+          ),
+        },
       };
     } catch (error) {
       this.rethrowPersistenceError(error);
@@ -942,6 +1610,43 @@ export class HealthcareEquipmentAssignmentsService {
         }),
       ),
       availability: evaluation.availability,
+    };
+  }
+
+  private buildReplaceConflictReviewResponse(
+    sourceAssignment: {
+      id: string;
+      caseId: string;
+      requirementId: string | null;
+      origin: HealthcareEquipmentAssignmentOrigin;
+      directAssignmentReason: string | null;
+    },
+    input: NormalizedReplaceInput,
+    equipmentAsset: HealthcareEquipmentAssetRecord,
+    evaluation: AvailabilityEvaluation & {
+      candidateWindow: OperationalWindow;
+    },
+    fingerprint: string,
+  ): HealthcareEquipmentAssignmentReplaceConflictReviewResponse {
+    const response = this.buildConflictReviewResponse(
+      {
+        caseId: sourceAssignment.caseId,
+        equipmentAssetId: input.equipmentAssetId,
+        requirementId: sourceAssignment.requirementId,
+        origin: sourceAssignment.origin,
+        directAssignmentReason: sourceAssignment.directAssignmentReason,
+        confirmConflictOverride: input.confirmConflictOverride,
+        conflictReviewFingerprint: input.conflictReviewFingerprint,
+        conflictOverrideReason: input.conflictOverrideReason,
+      },
+      equipmentAsset,
+      evaluation,
+      fingerprint,
+    );
+
+    return {
+      ...response,
+      sourceAssignmentId: sourceAssignment.id,
     };
   }
 

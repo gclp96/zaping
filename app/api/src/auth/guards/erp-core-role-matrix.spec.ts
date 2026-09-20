@@ -227,6 +227,8 @@ const roleMatrix: RoleMatrix[] = [
       findAll: allRoles,
       findOne: allRoles,
       create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      release: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      replace: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
     },
   },
 ];
@@ -559,19 +561,21 @@ describe('ERP Core role matrix', () => {
     [UserRole.WAREHOUSE, true],
     [UserRole.SALES, false],
   ])(
-    'enforces Equipment Assignment create access for %s',
-    (role, canCreate) => {
+    'enforces Equipment Assignment mutation access for %s',
+    (role, canMutate) => {
       const rolesGuard = new RolesGuard(new Reflector());
 
-      expect(
-        rolesGuard.canActivate(
-          buildRoleContext(
-            HealthcareEquipmentAssignmentsController,
-            'create',
-            role,
+      for (const methodName of ['create', 'release', 'replace']) {
+        expect(
+          rolesGuard.canActivate(
+            buildRoleContext(
+              HealthcareEquipmentAssignmentsController,
+              methodName,
+              role,
+            ),
           ),
-        ),
-      ).toBe(canCreate);
+        ).toBe(canMutate);
+      }
       expect(
         rolesGuard.canActivate(
           buildRoleContext(

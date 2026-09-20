@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-15
+Última actualización: 2026-09-20
 Responsable: Zaping Team
 
 1. Propósito
@@ -97,9 +97,9 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
 HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-NEXT — HC-NEXT-03C4 Replace / Release / Parent Integrations — BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -123,9 +123,10 @@ Design, HC-NEXT-03B.2 API / DTO / Authorization Contract y HC-NEXT-03B.3
 Implementation Slicing / Acceptance Contract APPROVED / DOCUMENTED;
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED;
 HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED;
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / READY FOR
-REVIEW; HC-NEXT-03C4 Replace / Release / Parent Integrations NEXT / BLOCKED
-UNTIL C3 MERGED
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
+HC-NEXT-03C4 Replace / Release / Parent Integrations IN PROGRESS, con Manual
+Release committed, Replace backend validado y READY FOR COMMIT sin commit local,
+y parent integrations pendientes
 
 También permanecen como TARGET Healthcare:
 
@@ -944,7 +945,9 @@ TECHNICAL DESIGN COMPLETE / APPROVED — HC-NEXT-03B.1 PERSISTENCE & AVAILABILIT
 HC-NEXT-03B.2 API / DTO / AUTHORIZATION Y HC-NEXT-03B.3 IMPLEMENTATION SLICING /
 ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
-COMPLETE / READY FOR REVIEW — PARTIALLY IMPLEMENTED.
+COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS: MANUAL RELEASE COMMITTED, REPLACE
+BACKEND READY FOR COMMIT (UNCOMMITTED), PARENT INTEGRATIONS PENDING — PARTIALLY
+IMPLEMENTED.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1006,8 +1009,9 @@ permanecen diferidos. HC-NEXT-03B.3 aprueba la secuencia C1–C7, sus
 dependencias/gates y el acceptance A–P. HC-NEXT-03C1 Persistence / Migration
 está COMPLETE / MERGED, HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
 MERGED y HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda
-COMPLETE / READY FOR REVIEW. HC-NEXT-03C4 Replace / Release / Parent
-Integrations queda NEXT / BLOCKED UNTIL C3 MERGED.
+COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está IN
+PROGRESS: Manual Release está committed, Replace backend está validado y READY
+FOR COMMIT sin commit local, y parent integrations permanecen pendientes.
 
 Debe mantenerse:
 
@@ -2746,9 +2750,9 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 
 HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
-HC-NEXT-03C4 Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
 
 Case Availability
 
@@ -2887,9 +2891,9 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration — COMPLETE / MERGED
 ↓
 HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
-HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / READY FOR REVIEW
+HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-HC-NEXT-03C4 Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

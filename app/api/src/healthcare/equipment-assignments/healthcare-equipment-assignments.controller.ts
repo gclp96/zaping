@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -13,6 +14,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+
 import { UserRole } from '@prisma/client';
 import { Response } from 'express';
 
@@ -22,6 +24,8 @@ import { RolesGuard } from '../../auth/guards/roles.guards';
 import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-request.interface';
 import { CreateHealthcareEquipmentAssignmentDto } from './dto/create-healthcare-equipment-assignment.dto';
 import { HealthcareEquipmentAssignmentListQueryDto } from './dto/healthcare-equipment-assignment-list-query.dto';
+import { ReleaseHealthcareEquipmentAssignmentDto } from './dto/release-healthcare-equipment-assignment.dto';
+import { ReplaceHealthcareEquipmentAssignmentDto } from './dto/replace-healthcare-equipment-assignment.dto';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
 
 const readRoles = [
@@ -78,6 +82,40 @@ export class HealthcareEquipmentAssignmentsController {
     );
 
     return result;
+  }
+
+  @Post(':assignmentId/release')
+  @HttpCode(HttpStatus.OK)
+  @Roles(...mutationRoles)
+  release(
+    @Req() request: AuthenticatedRequest,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Body() dto: ReleaseHealthcareEquipmentAssignmentDto,
+  ) {
+    return this.service.release(
+      request.user.companyId,
+      request.user.id,
+      assignmentId,
+      dto,
+    );
+  }
+
+  @Post(':assignmentId/replace')
+  @HttpCode(HttpStatus.OK)
+  @Roles(...mutationRoles)
+  replace(
+    @Req() request: AuthenticatedRequest,
+    @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
+    @Body() dto: ReplaceHealthcareEquipmentAssignmentDto,
+  ) {
+    return this.service.replace(
+      request.user.companyId,
+      request.user.id,
+      assignmentId,
+      this.validateIdempotencyKey(idempotencyKeyHeader),
+      dto,
+    );
   }
 
   private validateIdempotencyKey(value: string | undefined): string {
