@@ -12,10 +12,10 @@
 **Estado HC-NEXT-03B.3:** IMPLEMENTATION SLICING / ACCEPTANCE CONTRACT — APPROVED / DOCUMENTED
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
-**Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / READY FOR REVIEW
-**Siguiente:** HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY; REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
-**Última actualización:** 2026-09-17
+**Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE COMPLETE / COMMITTED; REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT (UNCOMMITTED); PARENT INTEGRATIONS PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 MERGED + C4 MANUAL RELEASE COMMITTED + C4-B REPLACE BACKEND VALIDATED; PARENT INTEGRATIONS Y FRONTEND PENDING
+**Última actualización:** 2026-09-20
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -428,8 +428,37 @@ conserva lectura. Frontend UX continúa diferido.
 La implementación concreta del guard futuro con Dispatch/Custody permanece
 diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
 de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
-concurrencia de Create. Replace/release, integraciones padre y frontend
-permanecen sin implementar.
+concurrencia de Create. En HC-NEXT-03C4, Manual Release está committed y Replace
+backend está validado y listo para commit; las integraciones padre y frontend
+permanecen pendientes.
+
+## 13.1 Corte de implementación HC-NEXT-03C4-B — Replace
+
+`POST /healthcare/equipment-assignments/:assignmentId/replace` devuelve HTTP 200
+tanto para `REPLACED` como para `CONFLICT_REVIEW_REQUIRED`. ADMIN, MANAGER y
+WAREHOUSE pueden ejecutar el comando; SALES conserva acceso read-only.
+
+Replace sólo acepta una fuente `RESERVED`: conserva A y su activo original como
+historia `REPLACED`, crea B `RESERVED` con `replacesAssignmentId = A.id` y hereda
+Case, Requirement, origin y `directAssignmentReason`. Actor, timestamp y razón
+quedan en A; cualquier `ConflictOverride` confirmado queda asociado a B. Claim,
+B, overrides y transición de A comparten una transacción, y el claim completado
+de scope `HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE` apunta a B.
+
+La evaluación autoritativa reutiliza C3 bajo locks, excluye la fuente cuando
+corresponde, no fabrica conflictos ante horarios incompletos y retorna review sin
+writes antes de una confirmación válida. Replace sustituye una unidad de
+cobertura: incluso con el Requirement ya cubierto, la cobertura `RESERVED` neta
+no aumenta.
+
+Validación de cierre B5: backend unitario 85 suites / 1353 tests PASS; foco
+Equipment Assignment/RBAC 8 suites / 268 tests PASS; PostgreSQL QA real B4-A
+6/6, B4-B1 7/7 y B4-B2 HTTP/JWT 8/8 PASS; typecheck, lint y build PASS.
+
+Limitaciones conocidas: el E2E HTTP usa una app NestJS in-process con Supertest,
+no un puerto/proxy externo; cancelación del cliente mientras espera locks no fue
+ejercitada. Parent integrations, frontend y los guards futuros de
+Dispatch/Custody continúan fuera de C4-B.
 
 ---
 
@@ -458,14 +487,17 @@ HC-NEXT-03C2 — Assignment Backend Base
 → COMPLETE / MERGED
 
 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
-→ COMPLETE / READY FOR REVIEW
+→ COMPLETE / MERGED
 
-Next
-→ HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 — Replace / Release / Parent Integrations
+→ IN PROGRESS
+→ MANUAL RELEASE COMPLETE / COMMITTED
+→ REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
+→ PARENT INTEGRATIONS PENDING
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
-→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + MANUAL RELEASE COMMITTED + REPLACE BACKEND VALIDATED
+→ PARENT INTEGRATIONS Y FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:

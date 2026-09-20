@@ -1,19 +1,29 @@
 import 'dotenv/config';
 
+import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import {
   EquipmentCondition,
   HealthcareCaseStatus,
+  HealthcareEquipmentAssignmentLifecycle,
+  HealthcareEquipmentAssignmentOrigin,
   HealthcareRequirementType,
+  IdempotencyScope,
   Prisma,
   ProductInventoryTracking,
   UserRole,
 } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
+import supertest from 'supertest';
+import { App } from 'supertest/types';
 
+import { AuthModule } from '../src/auth/auth.module';
+import { HealthcareEquipmentAssignmentsModule } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.module';
 import {
   equipmentAssignmentSettingsAdvisoryLockKey,
   HealthcareEquipmentAssignmentsRepository,
 } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
+import { createHealthcareEquipmentAssignmentReplaceRequestHash } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignment-replace-request-hash';
 import { HealthcareEquipmentAssignmentsService } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -97,6 +107,38 @@ if (runDbIntegrityTests) {
   assertSafeDbIntegrityDatabase();
 }
 
+async function assertConnectedDbIntegrityDatabase(
+  prisma: PrismaService,
+): Promise<void> {
+  const databaseUrl = new URL(process.env.DATABASE_URL as string);
+  const expectedDatabaseName = decodeURIComponent(
+    databaseUrl.pathname.replace(/^\/+/, ''),
+  );
+  const expectedDatabaseUser = decodeURIComponent(databaseUrl.username);
+  const requiredDatabaseName =
+    process.env.DB_INTEGRITY_EXPECTED_DATABASE ?? null;
+  const rows = await prisma.$queryRaw<
+    Array<{ databaseName: string; databaseUser: string }>
+  >(Prisma.sql`
+    SELECT
+      current_database() AS "databaseName",
+      current_user AS "databaseUser"
+  `);
+  const identity = rows[0];
+
+  if (
+    !identity ||
+    identity.databaseName !== expectedDatabaseName ||
+    identity.databaseUser !== expectedDatabaseUser ||
+    (requiredDatabaseName !== null &&
+      identity.databaseName !== requiredDatabaseName)
+  ) {
+    throw new Error(
+      'Connected PostgreSQL identity does not match the authorized integrity-test destination.',
+    );
+  }
+}
+
 function buildFixture(): Fixture {
   return {
     companyAId: randomUUID(),
@@ -164,6 +206,183 @@ async function waitUntilBlockedBy(
   throw new Error(
     `PostgreSQL backend ${blockedPid} was not blocked by ${blockerPid}.`,
   );
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timeoutId!: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} exceeded ${timeoutMs} ms.`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function requireRecord(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object.`);
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function requireStringField(
+  record: Record<string, unknown>,
+  field: string,
+): string {
+  const value = record[field];
+
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string.`);
+  }
+
+  return value;
+}
+
+type ControlledDatabaseBlocker = {
+  pid: number;
+  release: () => void;
+  done: Promise<void>;
+};
+
+async function createControlledDatabaseBlocker(
+  prisma: PrismaService,
+  acquireLock: (transaction: Prisma.TransactionClient) => Promise<unknown>,
+): Promise<ControlledDatabaseBlocker> {
+  const ready = deferred<number>();
+  const release = deferred<void>();
+  const done = prisma.$transaction(async (transaction) => {
+    await acquireLock(transaction);
+    ready.resolve(await getBackendPid(transaction));
+    await release.promise;
+  });
+
+  void done.catch((error: unknown) => ready.reject(error));
+
+  return {
+    pid: await withTimeout(ready.promise, 5_000, 'Database blocker setup'),
+    release: () => release.resolve(undefined),
+    done,
+  };
+}
+
+async function waitForBlockedBackendChain(
+  prisma: PrismaService,
+  rootBlockerPid: number,
+  queryFragment: string,
+  expectedCount: number,
+): Promise<number[]> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const rows = await prisma.$queryRaw<
+      Array<{ pid: number; blockerPids: number[] }>
+    >(Prisma.sql`
+      SELECT
+        activity.pid::int AS "pid",
+        pg_blocking_pids(activity.pid)::int[] AS "blockerPids"
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.wait_event_type = 'Lock'
+        AND POSITION(${queryFragment} IN activity.query) > 0
+      ORDER BY activity.pid ASC
+    `);
+    const byPid = new Map(rows.map((row) => [row.pid, row]));
+    const reachesRootBlocker = (
+      pid: number,
+      visited = new Set<number>(),
+    ): boolean => {
+      if (visited.has(pid)) {
+        return false;
+      }
+
+      visited.add(pid);
+      const row = byPid.get(pid);
+
+      if (!row) {
+        return false;
+      }
+
+      return row.blockerPids.some(
+        (blockerPid) =>
+          blockerPid === rootBlockerPid ||
+          reachesRootBlocker(blockerPid, visited),
+      );
+    };
+    const blockedPids = rows
+      .filter((row) => reachesRootBlocker(row.pid))
+      .map((row) => row.pid);
+
+    if (blockedPids.length >= expectedCount) {
+      return blockedPids;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  throw new Error(
+    `Expected ${expectedCount} backend(s) blocked in query containing "${queryFragment}".`,
+  );
+}
+
+async function observeBlockedRace<T>(
+  prisma: PrismaService,
+  blocker: ControlledDatabaseBlocker,
+  queryFragment: string,
+  expectedBlockedCount: number,
+  operation: Promise<T>,
+  label: string,
+): Promise<{ blockedPids: number[]; result: T }> {
+  let blockedPids: number[] = [];
+  let observationError: unknown = null;
+
+  try {
+    blockedPids = await waitForBlockedBackendChain(
+      prisma,
+      blocker.pid,
+      queryFragment,
+      expectedBlockedCount,
+    );
+  } catch (error) {
+    observationError = error;
+  } finally {
+    blocker.release();
+  }
+
+  const [blockerSettlement, operationSettlement] = await Promise.allSettled([
+    blocker.done,
+    withTimeout(operation, 10_000, label),
+  ]);
+  const errors: unknown[] = [];
+
+  if (observationError !== null) {
+    errors.push(observationError);
+  }
+
+  if (blockerSettlement.status === 'rejected') {
+    errors.push(blockerSettlement.reason as unknown);
+  }
+
+  if (operationSettlement.status === 'rejected') {
+    errors.push(operationSettlement.reason as unknown);
+  }
+
+  if (errors.length > 0) {
+    throw new AggregateError(errors, `${label} failed.`);
+  }
+
+  if (operationSettlement.status !== 'fulfilled') {
+    throw new Error(`${label} did not settle.`);
+  }
+
+  return { blockedPids, result: operationSettlement.value };
 }
 
 async function cleanupFixture(
@@ -364,6 +583,7 @@ async function cleanupFixture(
     beforeAll(async () => {
       await prisma.$connect();
       databaseConnected = true;
+      await assertConnectedDbIntegrityDatabase(prisma);
       const suffix = randomUUID();
 
       await prisma.company.createMany({
@@ -1308,6 +1528,2022 @@ async function cleanupFixture(
           where: { companyId: scenario.companyId, key },
         }),
       ).resolves.toBe(0);
+    });
+
+    describe('B4-A Replace transactional integrity', () => {
+      const createDirectSource = async (
+        scenario: Scenario,
+        directAssignmentReason: string,
+      ) => {
+        const result = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4a-source-${randomUUID()}`,
+          {
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[0],
+            directAssignmentReason,
+          },
+        );
+
+        if (result.outcome !== 'CREATED') {
+          throw new Error('Expected source Assignment to be created');
+        }
+
+        return result.data;
+      };
+
+      const createConflictingReservation = async (scenario: Scenario) => {
+        const related = await createRelatedCase(scenario);
+        const result = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4a-conflict-${randomUUID()}`,
+          {
+            caseId: related.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            directAssignmentReason: 'Reserva conflictiva B4-A',
+          },
+        );
+
+        if (result.outcome !== 'CREATED') {
+          throw new Error('Expected conflicting Assignment to be created');
+        }
+
+        return result.data;
+      };
+
+      it('A persists the successful replacement, inheritance, audit and completed claim', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          requestedQty: 1,
+          assetCount: 2,
+        });
+        const directAssignmentReason = 'Respaldo directo B4-A';
+        const source = await createDirectSource(
+          scenario,
+          directAssignmentReason,
+        );
+        const key = `b4a-success-${randomUUID()}`;
+        const replacementReason = 'Equipo original no disponible';
+
+        const result = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason,
+          },
+        );
+
+        expect(result.outcome).toBe('REPLACED');
+
+        if (result.outcome !== 'REPLACED') {
+          throw new Error('Expected successful replacement');
+        }
+
+        const persistedSource =
+          await prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              caseId: true,
+              equipmentAssetId: true,
+              requirementId: true,
+              origin: true,
+              lifecycle: true,
+              directAssignmentReason: true,
+              replacedAt: true,
+              replacedById: true,
+              replacementReason: true,
+            },
+          });
+        const successors = await prisma.healthcareEquipmentAssignment.findMany({
+          where: {
+            companyId: scenario.companyId,
+            replacesAssignmentId: source.id,
+          },
+          select: {
+            id: true,
+            caseId: true,
+            equipmentAssetId: true,
+            requirementId: true,
+            origin: true,
+            lifecycle: true,
+            directAssignmentReason: true,
+            replacesAssignmentId: true,
+            createdById: true,
+          },
+        });
+
+        expect(persistedSource).toMatchObject({
+          caseId: scenario.caseId,
+          equipmentAssetId: scenario.equipmentAssetIds[0],
+          requirementId: null,
+          origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+          directAssignmentReason,
+          replacedById: scenario.userId,
+          replacementReason,
+        });
+        expect(persistedSource.replacedAt).toBeInstanceOf(Date);
+        expect(successors).toEqual([
+          {
+            id: result.data.replacementAssignment.id,
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            requirementId: null,
+            origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            directAssignmentReason,
+            replacesAssignmentId: source.id,
+            createdById: scenario.userId,
+          },
+        ]);
+        expect(result.data.replacedAssignment.id).toBe(source.id);
+        await expect(
+          prisma.idempotencyRecord.findUnique({
+            where: {
+              companyId_scope_key: {
+                companyId: scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+                key,
+              },
+            },
+            select: { resourceId: true },
+          }),
+        ).resolves.toEqual({
+          resourceId: result.data.replacementAssignment.id,
+        });
+      });
+
+      it('B replays the completed replacement without additional writes or audit changes', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectSource(
+          scenario,
+          'Origen directo para replay B4-A',
+        );
+        const key = `b4a-replay-${randomUUID()}`;
+        const dto = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Reemplazo estable para replay',
+        };
+        const first = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          dto,
+        );
+
+        if (first.outcome !== 'REPLACED') {
+          throw new Error('Expected initial replacement');
+        }
+
+        const readPersistedState = () =>
+          prisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              companyId: scenario.companyId,
+              OR: [{ id: source.id }, { replacesAssignmentId: source.id }],
+            },
+            orderBy: { id: 'asc' },
+            select: {
+              id: true,
+              lifecycle: true,
+              equipmentAssetId: true,
+              replacesAssignmentId: true,
+              replacedAt: true,
+              replacedById: true,
+              replacementReason: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+        const readClaim = () =>
+          prisma.idempotencyRecord.findUniqueOrThrow({
+            where: {
+              companyId_scope_key: {
+                companyId: scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+                key,
+              },
+            },
+            select: {
+              requestHash: true,
+              resourceId: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+        const stateBeforeReplay = await readPersistedState();
+        const claimBeforeReplay = await readClaim();
+
+        const replay = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          dto,
+        );
+
+        expect(replay.outcome).toBe('REPLACED');
+
+        if (replay.outcome !== 'REPLACED') {
+          throw new Error('Expected replacement replay');
+        }
+
+        expect(replay.data.replacedAssignment.id).toBe(source.id);
+        expect(replay.data.replacementAssignment.id).toBe(
+          first.data.replacementAssignment.id,
+        );
+        await expect(readPersistedState()).resolves.toEqual(stateBeforeReplay);
+        await expect(readClaim()).resolves.toEqual(claimBeforeReplay);
+        expect(stateBeforeReplay).toHaveLength(2);
+      });
+
+      it('C rejects a reused key with a different payload without mutating the completed operation', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectSource(
+          scenario,
+          'Origen directo para mismatch B4-A',
+        );
+        const key = `b4a-mismatch-${randomUUID()}`;
+        const first = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Motivo original B4-A',
+          },
+        );
+
+        if (first.outcome !== 'REPLACED') {
+          throw new Error('Expected initial replacement');
+        }
+
+        const readAssignments = () =>
+          prisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              companyId: scenario.companyId,
+              OR: [{ id: source.id }, { replacesAssignmentId: source.id }],
+            },
+            orderBy: { id: 'asc' },
+          });
+        const readClaim = () =>
+          prisma.idempotencyRecord.findUniqueOrThrow({
+            where: {
+              companyId_scope_key: {
+                companyId: scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+                key,
+              },
+            },
+          });
+        const assignmentsBefore = await readAssignments();
+        const claimBefore = await readClaim();
+
+        await expect(
+          service.replace(scenario.companyId, scenario.userId, source.id, key, {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Payload diferente B4-A',
+          }),
+        ).rejects.toMatchObject({
+          response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+        });
+
+        await expect(readAssignments()).resolves.toEqual(assignmentsBefore);
+        await expect(readClaim()).resolves.toEqual(claimBefore);
+      });
+
+      it('D rolls back source transition, successor, override and claim after an intermediate failure', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectSource(
+          scenario,
+          'Origen directo para rollback B4-A',
+        );
+        const conflictingAssignment =
+          await createConflictingReservation(scenario);
+        const key = `b4a-rollback-${randomUUID()}`;
+        const baseDto = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Reemplazo con rollback controlado',
+        };
+        const review = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          baseDto,
+        );
+
+        if (review.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+          throw new Error('Expected replacement conflict review');
+        }
+
+        const completion = jest
+          .spyOn(repository, 'completeIdempotencyClaim')
+          .mockRejectedValueOnce(new Error('forced Replace atomic rollback'));
+
+        try {
+          await expect(
+            service.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              key,
+              {
+                ...baseDto,
+                confirmConflictOverride: true,
+                conflictReviewFingerprint: review.conflictReviewFingerprint,
+                conflictOverrideReason: 'Riesgo controlado B4-A',
+              },
+            ),
+          ).rejects.toThrow('forced Replace atomic rollback');
+        } finally {
+          completion.mockRestore();
+        }
+
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              lifecycle: true,
+              replacedAt: true,
+              replacedById: true,
+              replacementReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          replacedAt: null,
+          replacedById: null,
+          replacementReason: null,
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.healthcareEquipmentAssignmentConflictOverride.count({
+            where: {
+              companyId: scenario.companyId,
+              conflictingAssignmentId: conflictingAssignment.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('E returns conflict review with zero writes', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectSource(
+          scenario,
+          'Origen directo para revisión B4-A',
+        );
+        const conflictingAssignment =
+          await createConflictingReservation(scenario);
+        const sourceBefore =
+          await prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          });
+        const key = `b4a-review-${randomUUID()}`;
+
+        const review = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Revisión sin escrituras B4-A',
+          },
+        );
+
+        expect(review).toMatchObject({
+          outcome: 'CONFLICT_REVIEW_REQUIRED',
+          sourceAssignmentId: source.id,
+          overrideRequired: true,
+          conflicts: [{ assignmentId: conflictingAssignment.id }],
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          }),
+        ).resolves.toEqual(sourceBefore);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.healthcareEquipmentAssignmentConflictOverride.count({
+            where: {
+              companyId: scenario.companyId,
+              conflictingAssignmentId: conflictingAssignment.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('F replaces a fully covered Requirement without increasing net coverage', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          requestedQty: 1,
+          assetCount: 2,
+        });
+        const sourceResult = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4a-coverage-source-${randomUUID()}`,
+          {
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[0],
+            requirementId: scenario.requirementId,
+          },
+        );
+
+        if (sourceResult.outcome !== 'CREATED') {
+          throw new Error('Expected Requirement source Assignment');
+        }
+
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              requirementId: scenario.requirementId,
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            },
+          }),
+        ).resolves.toBe(1);
+
+        const replacement = await service.replace(
+          scenario.companyId,
+          scenario.userId,
+          sourceResult.data.id,
+          `b4a-coverage-replace-${randomUUID()}`,
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Sustitución netamente neutra',
+          },
+        );
+
+        expect(replacement.outcome).toBe('REPLACED');
+
+        if (replacement.outcome !== 'REPLACED') {
+          throw new Error('Expected covered Requirement replacement');
+        }
+
+        const requirementAssignments =
+          await prisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              companyId: scenario.companyId,
+              requirementId: scenario.requirementId,
+            },
+            select: {
+              id: true,
+              caseId: true,
+              requirementId: true,
+              origin: true,
+              lifecycle: true,
+              equipmentAssetId: true,
+              directAssignmentReason: true,
+              replacesAssignmentId: true,
+            },
+          });
+
+        expect(requirementAssignments).toHaveLength(2);
+        expect(requirementAssignments).toEqual(
+          expect.arrayContaining([
+            {
+              id: sourceResult.data.id,
+              caseId: scenario.caseId,
+              requirementId: scenario.requirementId,
+              origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+              equipmentAssetId: scenario.equipmentAssetIds[0],
+              directAssignmentReason: null,
+              replacesAssignmentId: null,
+            },
+            {
+              id: replacement.data.replacementAssignment.id,
+              caseId: scenario.caseId,
+              requirementId: scenario.requirementId,
+              origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+              equipmentAssetId: scenario.equipmentAssetIds[1],
+              directAssignmentReason: null,
+              replacesAssignmentId: sourceResult.data.id,
+            },
+          ]),
+        );
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              requirementId: scenario.requirementId,
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            },
+          }),
+        ).resolves.toBe(1);
+      });
+    });
+
+    describe('B4-B1 Replace PostgreSQL concurrency', () => {
+      const createDirectAssignment = async (
+        scenario: Scenario,
+        caseId: string,
+        equipmentAssetId: string,
+        directAssignmentReason: string,
+      ) => {
+        const result = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4b1-source-${randomUUID()}`,
+          {
+            caseId,
+            equipmentAssetId,
+            directAssignmentReason,
+          },
+        );
+
+        if (result.outcome !== 'CREATED') {
+          throw new Error('Expected B4-B1 source Assignment to be created');
+        }
+
+        return result.data;
+      };
+
+      it('A/D serializes identical concurrent requests and replays the completed claim', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectAssignment(
+          scenario,
+          scenario.caseId,
+          scenario.equipmentAssetIds[0],
+          'Fuente para carrera idempotente B4-B1',
+        );
+        const key = `b4b1-identical-${randomUUID()}`;
+        const dto = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Reemplazo concurrente idéntico',
+        };
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "EquipmentAsset"
+              WHERE "id" = ${scenario.equipmentAssetIds[1]}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.all([
+          service.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            key,
+            dto,
+          ),
+          service.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            key,
+            dto,
+          ),
+        ]);
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "EquipmentAsset"',
+          2,
+          operation,
+          'Identical Replace race',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(new Set(race.blockedPids).size).toBe(2);
+        expect(race.result.map((result) => result.outcome)).toEqual([
+          'REPLACED',
+          'REPLACED',
+        ]);
+
+        const [first, second] = race.result;
+
+        if (first.outcome !== 'REPLACED' || second.outcome !== 'REPLACED') {
+          throw new Error(
+            'Expected both identical requests to return REPLACED',
+          );
+        }
+
+        expect(second.data.replacedAssignment.id).toBe(
+          first.data.replacedAssignment.id,
+        );
+        expect(second.data.replacementAssignment.id).toBe(
+          first.data.replacementAssignment.id,
+        );
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, replacementAssignments: true },
+          }),
+        ).resolves.toMatchObject({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+          replacementAssignments: [{ id: first.data.replacementAssignment.id }],
+        });
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+              resourceId: first.data.replacementAssignment.id,
+            },
+          }),
+        ).resolves.toBe(1);
+      }, 20_000);
+
+      it('B allows only one successor for concurrent distinct keys on the same source', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 3,
+        });
+        const source = await createDirectAssignment(
+          scenario,
+          scenario.caseId,
+          scenario.equipmentAssetIds[0],
+          'Fuente para claves distintas B4-B1',
+        );
+        const keys = [
+          `b4b1-distinct-a-${randomUUID()}`,
+          `b4b1-distinct-b-${randomUUID()}`,
+        ];
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "HealthcareEquipmentAssignment"
+              WHERE "id" = ${source.id}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.allSettled([
+          service.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            keys[0],
+            {
+              equipmentAssetId: scenario.equipmentAssetIds[1],
+              replacementReason: 'Candidato concurrente A',
+            },
+          ),
+          service.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            keys[1],
+            {
+              equipmentAssetId: scenario.equipmentAssetIds[2],
+              replacementReason: 'Candidato concurrente B',
+            },
+          ),
+        ]);
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "HealthcareEquipmentAssignment"',
+          2,
+          operation,
+          'Distinct-key same-source Replace race',
+        );
+        const fulfilled = race.result.filter(
+          (result) => result.status === 'fulfilled',
+        );
+        const rejected = race.result.filter(
+          (result) => result.status === 'rejected',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(fulfilled).toHaveLength(1);
+        expect(rejected).toHaveLength(1);
+        expect(fulfilled[0]).toMatchObject({
+          value: { outcome: 'REPLACED' },
+        });
+        expect(rejected[0]).toMatchObject({
+          reason: {
+            response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
+          },
+        });
+
+        const successors = await prisma.healthcareEquipmentAssignment.findMany({
+          where: {
+            companyId: scenario.companyId,
+            replacesAssignmentId: source.id,
+          },
+          select: { id: true, equipmentAssetId: true, lifecycle: true },
+        });
+
+        expect(successors).toHaveLength(1);
+        expect(successors[0]?.lifecycle).toBe(
+          HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        );
+        await expect(
+          prisma.idempotencyRecord.findMany({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key: { in: keys },
+            },
+            select: { resourceId: true },
+          }),
+        ).resolves.toEqual([{ resourceId: successors[0]?.id }]);
+      }, 20_000);
+
+      it('C rejects concurrent reuse of one key for different commands', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 3,
+        });
+        const source = await createDirectAssignment(
+          scenario,
+          scenario.caseId,
+          scenario.equipmentAssetIds[0],
+          'Fuente para payloads distintos B4-B1',
+        );
+        const key = `b4b1-mismatched-${randomUUID()}`;
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "HealthcareEquipmentAssignment"
+              WHERE "id" = ${source.id}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.allSettled([
+          service.replace(scenario.companyId, scenario.userId, source.id, key, {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Payload concurrente A',
+          }),
+          service.replace(scenario.companyId, scenario.userId, source.id, key, {
+            equipmentAssetId: scenario.equipmentAssetIds[2],
+            replacementReason: 'Payload concurrente B',
+          }),
+        ]);
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "HealthcareEquipmentAssignment"',
+          2,
+          operation,
+          'Mismatched same-key Replace race',
+        );
+        const fulfilled = race.result.filter(
+          (result) => result.status === 'fulfilled',
+        );
+        const rejected = race.result.filter(
+          (result) => result.status === 'rejected',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(fulfilled).toHaveLength(1);
+        expect(fulfilled[0]).toMatchObject({
+          value: { outcome: 'REPLACED' },
+        });
+        expect(rejected).toHaveLength(1);
+        expect(rejected[0]).toMatchObject({
+          reason: { response: { code: 'IDEMPOTENCY_KEY_REUSED' } },
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(1);
+      }, 20_000);
+
+      it('D observes a completed claim after a real unique-index collision', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 2,
+        });
+        const source = await createDirectAssignment(
+          scenario,
+          scenario.caseId,
+          scenario.equipmentAssetIds[0],
+          'Fuente para visibilidad de claim B4-B1',
+        );
+        const key = `b4b1-claim-visibility-${randomUUID()}`;
+        const dto = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Visibilidad de claim completado',
+        };
+        const requestHash =
+          createHealthcareEquipmentAssignmentReplaceRequestHash(source.id, dto);
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "User"
+              WHERE "id" = ${scenario.userId}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const winner = service.replace(
+          scenario.companyId,
+          scenario.userId,
+          source.id,
+          key,
+          dto,
+        );
+        let collisionError: unknown = null;
+        let recoveredPromise: ReturnType<typeof service.replace> | null = null;
+        let winnerBlockedPids: number[] = [];
+        let claimantBlockedPids: number[] = [];
+        let observationError: unknown = null;
+
+        try {
+          winnerBlockedPids = await waitForBlockedBackendChain(
+            prisma,
+            blocker.pid,
+            '"HealthcareEquipmentAssignment"',
+            1,
+          );
+          const winnerPid = winnerBlockedPids[0];
+
+          if (winnerPid === undefined) {
+            throw new Error('Could not identify the winning backend PID.');
+          }
+
+          const collisionAttempt = repository.runInTransaction((transaction) =>
+            repository.createIdempotencyClaim(
+              transaction,
+              scenario.companyId,
+              key,
+              IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              requestHash,
+            ),
+          );
+
+          recoveredPromise = collisionAttempt.then(
+            () => {
+              throw new Error('Expected a real idempotency unique collision.');
+            },
+            (error: unknown) => {
+              collisionError = error;
+              return service.replace(
+                scenario.companyId,
+                scenario.userId,
+                source.id,
+                key,
+                dto,
+              );
+            },
+          );
+          claimantBlockedPids = await waitForBlockedBackendChain(
+            prisma,
+            winnerPid,
+            '"IdempotencyRecord"',
+            1,
+          );
+        } catch (error) {
+          observationError = error;
+        } finally {
+          blocker.release();
+        }
+
+        const [, winnerResult, recoveredResult] = await Promise.all([
+          blocker.done,
+          withTimeout(winner, 10_000, 'Claim visibility winner'),
+          recoveredPromise
+            ? withTimeout(recoveredPromise, 10_000, 'Claim visibility recovery')
+            : Promise.resolve(null),
+        ]);
+
+        if (observationError !== null) {
+          throw new AggregateError(
+            [observationError],
+            'Claim visibility race observation failed.',
+          );
+        }
+
+        expect(winnerBlockedPids).toHaveLength(1);
+        expect(claimantBlockedPids).toHaveLength(1);
+        expect(collisionError).toBeInstanceOf(
+          Prisma.PrismaClientKnownRequestError,
+        );
+        expect(collisionError).toMatchObject({ code: 'P2002' });
+        expect(winnerResult.outcome).toBe('REPLACED');
+        expect(recoveredResult).not.toBeNull();
+
+        if (
+          winnerResult.outcome !== 'REPLACED' ||
+          recoveredResult === null ||
+          recoveredResult.outcome !== 'REPLACED'
+        ) {
+          throw new Error('Expected winner and recovered REPLACED results');
+        }
+
+        expect(recoveredResult.data.replacedAssignment.id).toBe(source.id);
+        expect(recoveredResult.data.replacementAssignment.id).toBe(
+          winnerResult.data.replacementAssignment.id,
+        );
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+              resourceId: winnerResult.data.replacementAssignment.id,
+            },
+          }),
+        ).resolves.toBe(1);
+      }, 20_000);
+
+      it('E rereads an overlapping same-asset winner and requires conflict review', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 3,
+        });
+        const related = await createRelatedCase(scenario);
+        const sources = await Promise.all([
+          createDirectAssignment(
+            scenario,
+            scenario.caseId,
+            scenario.equipmentAssetIds[0],
+            'Fuente solapada A B4-B1',
+          ),
+          createDirectAssignment(
+            scenario,
+            related.caseId,
+            scenario.equipmentAssetIds[1],
+            'Fuente solapada B B4-B1',
+          ),
+        ]);
+        const keys = [
+          `b4b1-overlap-a-${randomUUID()}`,
+          `b4b1-overlap-b-${randomUUID()}`,
+        ];
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "EquipmentAsset"
+              WHERE "id" = ${scenario.equipmentAssetIds[2]}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.all(
+          sources.map((source, index) =>
+            service.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              keys[index],
+              {
+                equipmentAssetId: scenario.equipmentAssetIds[2],
+                replacementReason: `Contención solapada ${index}`,
+              },
+            ),
+          ),
+        );
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "EquipmentAsset"',
+          2,
+          operation,
+          'Overlapping same-asset Replace race',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(race.result.map((result) => result.outcome).sort()).toEqual([
+          'CONFLICT_REVIEW_REQUIRED',
+          'REPLACED',
+        ]);
+
+        const review = race.result.find(
+          (result) => result.outcome === 'CONFLICT_REVIEW_REQUIRED',
+        );
+        const successors = await prisma.healthcareEquipmentAssignment.findMany({
+          where: {
+            companyId: scenario.companyId,
+            replacesAssignmentId: { in: sources.map((source) => source.id) },
+          },
+          select: { id: true, equipmentAssetId: true },
+        });
+
+        expect(successors).toHaveLength(1);
+        expect(typeof successors[0]?.id).toBe('string');
+        expect(successors[0]?.equipmentAssetId).toBe(
+          scenario.equipmentAssetIds[2],
+        );
+        expect(review).toMatchObject({
+          overrideRequired: true,
+          conflicts: [{ assignmentId: successors[0]?.id }],
+        });
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key: { in: keys },
+            },
+          }),
+        ).resolves.toBe(1);
+      }, 20_000);
+
+      it('E allows concurrent same-asset replacements when Case windows do not overlap', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          assetCount: 3,
+        });
+        const related = await createRelatedCase(scenario);
+
+        await prisma.healthcareCase.update({
+          where: { id: related.caseId },
+          data: {
+            scheduledStart: new Date('2026-09-17T16:00:00.000Z'),
+            scheduledEnd: new Date('2026-09-17T18:00:00.000Z'),
+          },
+        });
+
+        const sources = await Promise.all([
+          createDirectAssignment(
+            scenario,
+            scenario.caseId,
+            scenario.equipmentAssetIds[0],
+            'Fuente no solapada A B4-B1',
+          ),
+          createDirectAssignment(
+            scenario,
+            related.caseId,
+            scenario.equipmentAssetIds[1],
+            'Fuente no solapada B B4-B1',
+          ),
+        ]);
+        const keys = [
+          `b4b1-no-overlap-a-${randomUUID()}`,
+          `b4b1-no-overlap-b-${randomUUID()}`,
+        ];
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "EquipmentAsset"
+              WHERE "id" = ${scenario.equipmentAssetIds[2]}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.all(
+          sources.map((source, index) =>
+            service.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              keys[index],
+              {
+                equipmentAssetId: scenario.equipmentAssetIds[2],
+                replacementReason: `Contención no solapada ${index}`,
+              },
+            ),
+          ),
+        );
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "EquipmentAsset"',
+          2,
+          operation,
+          'Non-overlapping same-asset Replace race',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(race.result.map((result) => result.outcome)).toEqual([
+          'REPLACED',
+          'REPLACED',
+        ]);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              equipmentAssetId: scenario.equipmentAssetIds[2],
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            },
+          }),
+        ).resolves.toBe(2);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key: { in: keys },
+            },
+          }),
+        ).resolves.toBe(2);
+      }, 20_000);
+
+      it('F serializes Replace and Create on one fully covered Requirement', async () => {
+        const scenario = await createScenario(fixture.companyAId, {
+          requestedQty: 1,
+          assetCount: 3,
+        });
+        const sourceResult = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4b1-capacity-source-${randomUUID()}`,
+          {
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[0],
+            requirementId: scenario.requirementId,
+          },
+        );
+
+        if (sourceResult.outcome !== 'CREATED') {
+          throw new Error('Expected covered Requirement source');
+        }
+
+        const replaceKey = `b4b1-capacity-replace-${randomUUID()}`;
+        const createKey = `b4b1-capacity-create-${randomUUID()}`;
+        const blocker = await createControlledDatabaseBlocker(
+          prisma,
+          (transaction) =>
+            transaction.$queryRaw(Prisma.sql`
+              SELECT "id"
+              FROM "HealthcareCaseRequirement"
+              WHERE "id" = ${scenario.requirementId}
+                AND "companyId" = ${scenario.companyId}
+              FOR UPDATE
+            `),
+        );
+        const operation = Promise.allSettled([
+          service.replace(
+            scenario.companyId,
+            scenario.userId,
+            sourceResult.data.id,
+            replaceKey,
+            {
+              equipmentAssetId: scenario.equipmentAssetIds[1],
+              replacementReason: 'Reemplazo concurrente de cobertura',
+            },
+          ),
+          service.create(scenario.companyId, scenario.userId, createKey, {
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[2],
+            requirementId: scenario.requirementId,
+          }),
+        ]);
+        const race = await observeBlockedRace(
+          prisma,
+          blocker,
+          'FROM "HealthcareCaseRequirement"',
+          2,
+          operation,
+          'Replace/Create Requirement-capacity race',
+        );
+
+        expect(race.blockedPids).toHaveLength(2);
+        expect(race.result[0]).toMatchObject({
+          status: 'fulfilled',
+          value: { outcome: 'REPLACED' },
+        });
+        expect(race.result[1]).toMatchObject({
+          status: 'rejected',
+          reason: { response: { code: 'REQUIREMENT_OVER_COVERAGE' } },
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              requirementId: scenario.requirementId,
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              requirementId: scenario.requirementId,
+            },
+          }),
+        ).resolves.toBe(2);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key: replaceKey,
+            },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+              key: createKey,
+            },
+          }),
+        ).resolves.toBe(0);
+      }, 20_000);
+    });
+
+    describe('B4-B2 Replace HTTP with real JWT and PostgreSQL', () => {
+      const companyARoles = [
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.SALES,
+        UserRole.WAREHOUSE,
+      ] as const;
+      type CompanyARole = (typeof companyARoles)[number];
+
+      const httpUserIds: Record<CompanyARole, string> = {
+        [UserRole.ADMIN]: fixture.userAId,
+        [UserRole.MANAGER]: randomUUID(),
+        [UserRole.SALES]: randomUUID(),
+        [UserRole.WAREHOUSE]: randomUUID(),
+      };
+      const companyBAdminId = fixture.userBId;
+      const httpEmails: Record<CompanyARole, string> = {
+        [UserRole.ADMIN]: `hc-ea-http-admin-${httpUserIds.ADMIN}@qa.example.test`,
+        [UserRole.MANAGER]: `hc-ea-http-manager-${httpUserIds.MANAGER}@qa.example.test`,
+        [UserRole.SALES]: `hc-ea-http-sales-${httpUserIds.SALES}@qa.example.test`,
+        [UserRole.WAREHOUSE]: `hc-ea-http-warehouse-${httpUserIds.WAREHOUSE}@qa.example.test`,
+      };
+      const companyBAdminEmail = `hc-ea-http-admin-b-${companyBAdminId}@qa.example.test`;
+      const qaCredentialEmails: Record<CompanyARole, string> = {
+        [UserRole.ADMIN]: 'admin.a@qa.example.test',
+        [UserRole.MANAGER]: 'manager.a@qa.example.test',
+        [UserRole.SALES]: 'sales.a@qa.example.test',
+        [UserRole.WAREHOUSE]: 'warehouse.a@qa.example.test',
+      };
+      const tokens: Partial<Record<CompanyARole, string>> = {};
+      let companyBToken = '';
+      let httpApp: INestApplication<App> | null = null;
+
+      const tokenFor = (role: CompanyARole): string => {
+        const token = tokens[role];
+
+        if (!token) {
+          throw new Error(`Missing HTTP token for ${role}.`);
+        }
+
+        return token;
+      };
+
+      const login = async (
+        email: string,
+        password: string,
+        expectedRole: UserRole,
+        expectedCompanyId: string,
+      ): Promise<string> => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const response = await supertest(httpApp.getHttpServer())
+          .post('/auth/login')
+          .send({ email, password })
+          .expect(HttpStatus.CREATED);
+        const body = requireRecord(response.body as unknown, 'Login response');
+        const user = requireRecord(body.user, 'Login user');
+
+        expect(user.role).toBe(expectedRole);
+        expect(user.companyId).toBe(expectedCompanyId);
+
+        return requireStringField(body, 'token');
+      };
+
+      const createHttpSource = async (
+        companyId = fixture.companyAId,
+        assetCount = 2,
+      ) => {
+        const scenario = await createScenario(companyId, { assetCount });
+        const source = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4b2-source-${randomUUID()}`,
+          {
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[0],
+            directAssignmentReason: 'Fuente HTTP B4-B2',
+          },
+        );
+
+        if (source.outcome !== 'CREATED') {
+          throw new Error('Expected HTTP source Assignment');
+        }
+
+        return { scenario, source: source.data };
+      };
+
+      beforeAll(async () => {
+        const qaPassword = process.env.QA_PASSWORD;
+
+        if (!qaPassword || qaPassword.length < 12) {
+          throw new Error('QA_PASSWORD is required for real HTTP login tests.');
+        }
+
+        const credentialSources = await prisma.user.findMany({
+          where: {
+            email: {
+              in: [
+                ...Object.values(qaCredentialEmails),
+                'admin.b@qa.example.test',
+              ],
+            },
+          },
+          select: {
+            email: true,
+            role: true,
+            isActive: true,
+            passwordHash: true,
+            company: { select: { name: true } },
+          },
+        });
+        const credentialByEmail = new Map(
+          credentialSources.map((user) => [user.email, user]),
+        );
+        const credentialFor = (email: string, expectedRole: UserRole) => {
+          const credential = credentialByEmail.get(email);
+          const expectedCompanyName = email.includes('.b@')
+            ? 'Zaping QA Company B'
+            : 'Zaping QA Company A';
+
+          if (
+            !credential ||
+            !credential.isActive ||
+            credential.role !== expectedRole ||
+            credential.company.name !== expectedCompanyName
+          ) {
+            throw new Error('QA authentication fixture identity mismatch.');
+          }
+
+          return credential;
+        };
+
+        await prisma.$transaction(async (transaction) => {
+          const adminCredential = credentialFor(
+            qaCredentialEmails.ADMIN,
+            UserRole.ADMIN,
+          );
+          const companyBAdminCredential = credentialFor(
+            'admin.b@qa.example.test',
+            UserRole.ADMIN,
+          );
+
+          await transaction.user.update({
+            where: { id: httpUserIds.ADMIN },
+            data: {
+              email: httpEmails.ADMIN,
+              passwordHash: adminCredential.passwordHash,
+              isActive: true,
+              authVersion: 0,
+            },
+          });
+          await transaction.user.update({
+            where: { id: companyBAdminId },
+            data: {
+              email: companyBAdminEmail,
+              passwordHash: companyBAdminCredential.passwordHash,
+              isActive: true,
+              authVersion: 0,
+            },
+          });
+          await transaction.user.createMany({
+            data: [UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE].map(
+              (role) => ({
+                id: httpUserIds[role],
+                companyId: fixture.companyAId,
+                firstName: 'Equipment HTTP',
+                lastName: role,
+                email: httpEmails[role],
+                passwordHash: credentialFor(qaCredentialEmails[role], role)
+                  .passwordHash,
+                role,
+                isActive: true,
+                authVersion: 0,
+              }),
+            ),
+          });
+        });
+
+        const moduleRef: TestingModule = await Test.createTestingModule({
+          imports: [AuthModule, HealthcareEquipmentAssignmentsModule],
+        }).compile();
+
+        httpApp = moduleRef.createNestApplication();
+        httpApp.useGlobalPipes(
+          new ValidationPipe({
+            whitelist: true,
+            forbidNonWhitelisted: true,
+            transform: true,
+          }),
+        );
+        await httpApp.init();
+        await assertConnectedDbIntegrityDatabase(moduleRef.get(PrismaService));
+
+        for (const role of companyARoles) {
+          tokens[role] = await login(
+            httpEmails[role],
+            qaPassword,
+            role,
+            fixture.companyAId,
+          );
+        }
+
+        companyBToken = await login(
+          companyBAdminEmail,
+          qaPassword,
+          UserRole.ADMIN,
+          fixture.companyBId,
+        );
+
+        for (const role of companyARoles) {
+          await supertest(httpApp.getHttpServer())
+            .get('/auth/me')
+            .set('Authorization', `Bearer ${tokenFor(role)}`)
+            .expect(HttpStatus.OK);
+        }
+
+        await supertest(httpApp.getHttpServer())
+          .get('/auth/me')
+          .set('Authorization', `Bearer ${companyBToken}`)
+          .expect(HttpStatus.OK);
+      }, 20_000);
+
+      afterAll(async () => {
+        if (httpApp) {
+          await httpApp.close();
+          httpApp = null;
+        }
+      });
+
+      it('A rejects missing and invalid JWTs before any Replace write', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource();
+        const key = `b4b2-auth-${randomUUID()}`;
+        const body = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'No debe ejecutarse sin JWT válido',
+        };
+
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Idempotency-Key', key)
+          .send(body)
+          .expect(HttpStatus.UNAUTHORIZED);
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', 'Bearer invalid-qa-token')
+          .set('Idempotency-Key', key)
+          .send(body)
+          .expect(HttpStatus.UNAUTHORIZED);
+
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, replacementAssignments: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          replacementAssignments: [],
+        });
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('B allows MANAGER and WAREHOUSE with their real JWT identities', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        for (const role of [UserRole.MANAGER, UserRole.WAREHOUSE] as const) {
+          const { scenario, source } = await createHttpSource();
+          const response = await supertest(httpApp.getHttpServer())
+            .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+            .set('Authorization', `Bearer ${tokenFor(role)}`)
+            .set('Idempotency-Key', `b4b2-role-${role}-${randomUUID()}`)
+            .send({
+              equipmentAssetId: scenario.equipmentAssetIds[1],
+              replacementReason: `Reemplazo autorizado para ${role}`,
+            })
+            .expect(HttpStatus.OK);
+          const body = requireRecord(
+            response.body as unknown,
+            `${role} Replace response`,
+          );
+          const data = requireRecord(body.data, `${role} Replace data`);
+          const replacement = requireRecord(
+            data.replacementAssignment,
+            `${role} replacement Assignment`,
+          );
+          const replacementId = requireStringField(replacement, 'id');
+
+          expect(body.outcome).toBe('REPLACED');
+          await expect(
+            prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+              where: { id: replacementId },
+              select: { createdById: true, replacesAssignmentId: true },
+            }),
+          ).resolves.toEqual({
+            createdById: httpUserIds[role],
+            replacesAssignmentId: source.id,
+          });
+        }
+      });
+
+      it('B returns 403 for SALES and keeps the source unchanged', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource();
+        const sourceBefore =
+          await prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          });
+        const key = `b4b2-sales-${randomUUID()}`;
+
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${tokenFor(UserRole.SALES)}`)
+          .set('Idempotency-Key', key)
+          .send({
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'SALES no puede reemplazar',
+          })
+          .expect(HttpStatus.FORBIDDEN);
+
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          }),
+        ).resolves.toEqual(sourceBefore);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('C/D performs and replays one ADMIN Replace through the full HTTP pipeline', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource();
+        const key = `b4b2-success-${randomUUID()}`;
+        const body = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Reemplazo HTTP confirmado',
+        };
+        const firstResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${tokenFor(UserRole.ADMIN)}`)
+          .set('Idempotency-Key', key)
+          .send(body)
+          .expect(HttpStatus.OK);
+        const firstBody = requireRecord(
+          firstResponse.body as unknown,
+          'First Replace response',
+        );
+        const firstData = requireRecord(firstBody.data, 'First Replace data');
+        const firstReplaced = requireRecord(
+          firstData.replacedAssignment,
+          'First replaced Assignment',
+        );
+        const firstReplacement = requireRecord(
+          firstData.replacementAssignment,
+          'First replacement Assignment',
+        );
+        const replacementId = requireStringField(firstReplacement, 'id');
+
+        expect(firstBody.outcome).toBe('REPLACED');
+        expect(firstReplaced.id).toBe(source.id);
+
+        const persistedBeforeReplay =
+          await prisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              companyId: scenario.companyId,
+              OR: [{ id: source.id }, { replacesAssignmentId: source.id }],
+            },
+            orderBy: { id: 'asc' },
+          });
+        const replayResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${tokenFor(UserRole.ADMIN)}`)
+          .set('Idempotency-Key', key)
+          .send(body)
+          .expect(HttpStatus.OK);
+        const replayBody = requireRecord(
+          replayResponse.body as unknown,
+          'Replay response',
+        );
+        const replayData = requireRecord(replayBody.data, 'Replay data');
+        const replayReplacement = requireRecord(
+          replayData.replacementAssignment,
+          'Replay replacement Assignment',
+        );
+
+        expect(replayBody.outcome).toBe('REPLACED');
+        expect(requireStringField(replayReplacement, 'id')).toBe(replacementId);
+        await expect(
+          prisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              companyId: scenario.companyId,
+              OR: [{ id: source.id }, { replacesAssignmentId: source.id }],
+            },
+            orderBy: { id: 'asc' },
+          }),
+        ).resolves.toEqual(persistedBeforeReplay);
+        expect(persistedBeforeReplay).toHaveLength(2);
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: replacementId },
+            select: {
+              companyId: true,
+              lifecycle: true,
+              replacesAssignmentId: true,
+              createdById: true,
+            },
+          }),
+        ).resolves.toEqual({
+          companyId: fixture.companyAId,
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          replacesAssignmentId: source.id,
+          createdById: httpUserIds.ADMIN,
+        });
+      });
+
+      it('E returns conflict review zero-write and confirms the override through HTTP', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource(
+          fixture.companyAId,
+          2,
+        );
+        const related = await createRelatedCase(scenario);
+        const conflicting = await service.create(
+          scenario.companyId,
+          scenario.userId,
+          `b4b2-conflict-source-${randomUUID()}`,
+          {
+            caseId: related.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            directAssignmentReason: 'Reserva conflictiva HTTP',
+          },
+        );
+
+        if (conflicting.outcome !== 'CREATED') {
+          throw new Error('Expected HTTP conflicting Assignment');
+        }
+
+        const key = `b4b2-conflict-${randomUUID()}`;
+        const body = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Conflicto HTTP controlado',
+        };
+        const reviewResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${tokenFor(UserRole.ADMIN)}`)
+          .set('Idempotency-Key', key)
+          .send(body)
+          .expect(HttpStatus.OK);
+        const reviewBody = requireRecord(
+          reviewResponse.body as unknown,
+          'Conflict review response',
+        );
+        const fingerprint = requireStringField(
+          reviewBody,
+          'conflictReviewFingerprint',
+        );
+
+        expect(reviewBody).toMatchObject({
+          outcome: 'CONFLICT_REVIEW_REQUIRED',
+          sourceAssignmentId: source.id,
+          overrideRequired: true,
+          conflicts: [{ assignmentId: conflicting.data.id }],
+        });
+        expect(fingerprint).toMatch(/^[a-f0-9]{64}$/u);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.healthcareEquipmentAssignmentConflictOverride.count({
+            where: {
+              companyId: scenario.companyId,
+              conflictingAssignmentId: conflicting.data.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+
+        const confirmationResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${tokenFor(UserRole.ADMIN)}`)
+          .set('Idempotency-Key', key)
+          .send({
+            ...body,
+            confirmConflictOverride: true,
+            conflictReviewFingerprint: fingerprint,
+            conflictOverrideReason: 'Riesgo aceptado por HTTP',
+          })
+          .expect(HttpStatus.OK);
+        const confirmationBody = requireRecord(
+          confirmationResponse.body as unknown,
+          'Conflict confirmation response',
+        );
+        const confirmationData = requireRecord(
+          confirmationBody.data,
+          'Conflict confirmation data',
+        );
+        const replacement = requireRecord(
+          confirmationData.replacementAssignment,
+          'Confirmed replacement Assignment',
+        );
+        const replacementId = requireStringField(replacement, 'id');
+
+        expect(confirmationBody.outcome).toBe('REPLACED');
+        await expect(
+          prisma.healthcareEquipmentAssignmentConflictOverride.findMany({
+            where: {
+              companyId: scenario.companyId,
+              assignmentId: replacementId,
+            },
+            select: {
+              conflictingAssignmentId: true,
+              approvedById: true,
+              reason: true,
+            },
+          }),
+        ).resolves.toEqual([
+          {
+            conflictingAssignmentId: conflicting.data.id,
+            approvedById: httpUserIds.ADMIN,
+            reason: 'Riesgo aceptado por HTTP',
+          },
+        ]);
+      });
+
+      it('F rejects invalid headers, params and bodies with HTTP 400 and zero writes', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource();
+        const token = tokenFor(UserRole.ADMIN);
+        const longKey = 'x'.repeat(129);
+        const invalidParamKey = `b4b2-invalid-param-${randomUUID()}`;
+        const invalidBodyKey = `b4b2-invalid-body-${randomUUID()}`;
+        const validBody = {
+          equipmentAssetId: scenario.equipmentAssetIds[1],
+          replacementReason: 'Payload válido de control',
+        };
+
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .send(validBody)
+          .expect(HttpStatus.BAD_REQUEST);
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', longKey)
+          .send(validBody)
+          .expect(HttpStatus.BAD_REQUEST);
+        await supertest(httpApp.getHttpServer())
+          .post('/healthcare/equipment-assignments/not-a-uuid/replace')
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', invalidParamKey)
+          .send(validBody)
+          .expect(HttpStatus.BAD_REQUEST);
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', invalidBodyKey)
+          .send({
+            equipmentAssetId: 'not-a-uuid',
+            replacementReason: '   ',
+          })
+          .expect(HttpStatus.BAD_REQUEST);
+
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, replacementAssignments: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          replacementAssignments: [],
+        });
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key: { in: [longKey, invalidParamKey, invalidBodyKey] },
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('F maps key reuse and non-RESERVED source errors to the domain HTTP contract', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource(
+          fixture.companyAId,
+          3,
+        );
+        const token = tokenFor(UserRole.ADMIN);
+        const key = `b4b2-errors-${randomUUID()}`;
+
+        await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', key)
+          .send({
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Comando original HTTP',
+          })
+          .expect(HttpStatus.OK);
+        const reusedResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', key)
+          .send({
+            equipmentAssetId: scenario.equipmentAssetIds[2],
+            replacementReason: 'Comando diferente HTTP',
+          })
+          .expect(HttpStatus.CONFLICT);
+        const stateResponse = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', `b4b2-state-${randomUUID()}`)
+          .send({
+            equipmentAssetId: scenario.equipmentAssetIds[2],
+            replacementReason: 'Fuente ya reemplazada',
+          })
+          .expect(HttpStatus.CONFLICT);
+
+        expect(reusedResponse.body).toMatchObject({
+          statusCode: HttpStatus.CONFLICT,
+          code: 'IDEMPOTENCY_KEY_REUSED',
+        });
+        expect(stateResponse.body).toMatchObject({
+          statusCode: HttpStatus.CONFLICT,
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('G hides Company A Assignments from a valid Company B JWT', async () => {
+        if (!httpApp) {
+          throw new Error('HTTP test application is not initialized.');
+        }
+
+        const { scenario, source } = await createHttpSource();
+        const sourceBefore =
+          await prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          });
+        const key = `b4b2-tenant-${randomUUID()}`;
+        const response = await supertest(httpApp.getHttpServer())
+          .post(`/healthcare/equipment-assignments/${source.id}/replace`)
+          .set('Authorization', `Bearer ${companyBToken}`)
+          .set('Idempotency-Key', key)
+          .send({
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'No debe cruzar compañías',
+          })
+          .expect(HttpStatus.NOT_FOUND);
+
+        expect(response.body).toMatchObject({
+          statusCode: HttpStatus.NOT_FOUND,
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+        });
+        await expect(
+          prisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+          }),
+        ).resolves.toEqual(sourceBefore);
+        await expect(
+          prisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          prisma.idempotencyRecord.count({
+            where: {
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
     });
   },
 );

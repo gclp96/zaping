@@ -5,7 +5,10 @@ import {
   IdempotencyScope,
 } from '@prisma/client';
 
-import { HealthcareEquipmentAssignmentsRepository } from './healthcare-equipment-assignments.repository';
+import {
+  HealthcareEquipmentAssignmentsRepository,
+  healthcareEquipmentAssignmentResponseSelect,
+} from './healthcare-equipment-assignments.repository';
 
 const companyId = '11111111-1111-4111-8111-111111111111';
 const caseId = '22222222-2222-4222-8222-222222222222';
@@ -37,6 +40,7 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
       findFirst: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+      create: jest.fn(),
       updateMany: jest.fn(),
     },
     healthcareEquipmentAssignmentConflictOverride: {
@@ -107,22 +111,144 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     });
   });
 
-  it('uses the exact CREATE idempotency identity', async () => {
-    await repository.findIdempotencyRecord(
-      companyId,
-      'request-key',
-      IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+  it('finds a tenant-scoped replacement source with the lightweight select', async () => {
+    prisma.healthcareEquipmentAssignment.findFirst.mockResolvedValue({
+      id: assignmentId,
+    });
+
+    await repository.findAssignmentReplacementSource(companyId, assignmentId);
+
+    expect(prisma.healthcareEquipmentAssignment.findFirst).toHaveBeenCalledWith(
+      {
+        where: {
+          id: assignmentId,
+          companyId,
+        },
+        select: {
+          id: true,
+          companyId: true,
+          caseId: true,
+          equipmentAssetId: true,
+          requirementId: true,
+          origin: true,
+          lifecycle: true,
+          directAssignmentReason: true,
+          updatedAt: true,
+        },
+      },
     );
+  });
+
+  it('locks a tenant-scoped Assignment with the replacement snapshot fields', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        id: assignmentId,
+        companyId,
+        caseId,
+        equipmentAssetId,
+        requirementId: null,
+        origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        directAssignmentReason: 'Urgente',
+        updatedAt: new Date('2026-09-18T18:00:00.000Z'),
+      },
+    ]);
+
+    const result = await repository.lockAssignment(
+      prisma as never,
+      companyId,
+      assignmentId,
+    );
+
+    expect(result).toMatchObject({
+      id: assignmentId,
+      companyId,
+      caseId,
+      equipmentAssetId,
+      lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+    });
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('creates a replacement Assignment linked to the source Assignment', async () => {
+    prisma.healthcareEquipmentAssignment.create.mockResolvedValue({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+
+    await repository.createAssignment(prisma as never, {
+      companyId,
+      caseId,
+      equipmentAssetId,
+      requirementId: null,
+      origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+      directAssignmentReason: 'Urgente',
+      createdById: userId,
+      replacesAssignmentId: assignmentId,
+    });
+
+    expect(prisma.healthcareEquipmentAssignment.create).toHaveBeenCalledWith({
+      data: {
+        companyId,
+        caseId,
+        equipmentAssetId,
+        requirementId: null,
+        origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+        directAssignmentReason: 'Urgente',
+        createdById: userId,
+        replacesAssignmentId: assignmentId,
+      },
+      select: healthcareEquipmentAssignmentResponseSelect,
+    });
+  });
+
+  it.each([
+    IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+    IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+  ])('uses the exact %s idempotency identity', async (scope) => {
+    await repository.findIdempotencyRecord(companyId, 'request-key', scope);
 
     expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledWith({
       where: {
         companyId_scope_key: {
           companyId,
-          scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+          scope,
           key: 'request-key',
         },
       },
       select: { requestHash: true, resourceId: true },
+    });
+  });
+
+  it('marks only a tenant-scoped RESERVED Assignment as REPLACED', async () => {
+    const replacedAt = new Date('2026-09-18T18:00:00.000Z');
+
+    prisma.healthcareEquipmentAssignment.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    await repository.replaceAssignment(prisma as never, {
+      companyId,
+      assignmentId,
+      replacedAt,
+      replacedById: userId,
+      replacementReason: 'Equipo original no disponible',
+    });
+
+    expect(
+      prisma.healthcareEquipmentAssignment.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: assignmentId,
+        companyId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      data: {
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+        replacedAt,
+        replacedById: userId,
+        replacementReason: 'Equipo original no disponible',
+      },
     });
   });
 

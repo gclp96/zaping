@@ -28,6 +28,11 @@ export const HEALTHCARE_ERROR_CODES = {
   equipmentAssignmentNotReserved: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
   equipmentAssignmentReleaseReasonRequired:
     'EQUIPMENT_ASSIGNMENT_RELEASE_REASON_REQUIRED',
+  equipmentAssignmentReplacementReasonRequired:
+    'EQUIPMENT_ASSIGNMENT_REPLACEMENT_REASON_REQUIRED',
+
+  equipmentAssignmentReplacementSameAsset:
+    'EQUIPMENT_ASSIGNMENT_REPLACEMENT_SAME_ASSET',
   equipmentAssetNotFound: 'EQUIPMENT_ASSET_NOT_FOUND',
   invalidAssignmentOrigin: 'INVALID_ASSIGNMENT_ORIGIN',
   caseEquipmentAssignmentsReadOnly: 'CASE_EQUIPMENT_ASSIGNMENTS_READ_ONLY',
@@ -216,6 +221,24 @@ export function equipmentAssetNotFoundException(): NotFoundException {
     error: 'Not Found',
     code: HEALTHCARE_ERROR_CODES.equipmentAssetNotFound,
     message: 'Equipo no encontrado',
+  });
+}
+
+export function equipmentAssignmentReplacementReasonRequiredException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssignmentReplacementReasonRequired,
+    message: 'La razón de reemplazo es obligatoria',
+  });
+}
+
+export function equipmentAssignmentReplacementSameAssetException(): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssignmentReplacementSameAsset,
+    message: 'El equipo de reemplazo debe ser distinto al equipo actual',
   });
 }
 

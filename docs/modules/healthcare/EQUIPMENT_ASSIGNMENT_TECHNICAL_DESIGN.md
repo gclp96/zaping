@@ -10,10 +10,10 @@
 **Estado de HC-NEXT-03B:** COMPLETE / APPROVED
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
-**Estado HC-NEXT-03C3:** COMPLETE / READY FOR REVIEW
-**Estado siguiente:** HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY; REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
-**Última actualización:** 2026-09-17
+**Estado HC-NEXT-03C3:** COMPLETE / MERGED
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE COMPLETE / COMMITTED; REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT (UNCOMMITTED); PARENT INTEGRATIONS PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 MERGED + C4 MANUAL RELEASE COMMITTED + C4-B REPLACE BACKEND VALIDATED; PARENT INTEGRATIONS Y FRONTEND PENDING
+**Última actualización:** 2026-09-20
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -1174,26 +1174,42 @@ permiso ni evita revalidaciones.
 Sin conflicto:
 
 ```text
-→ 201 Created
+→ 200 OK
 → outcome = REPLACED
 ```
 
 ```json
 {
   "outcome": "REPLACED",
-  "data": {},
-  "replacedAssignmentId": "uuid"
+  "data": {
+    "replacedAssignment": {
+      "id": "source-assignment-uuid",
+      "status": "REPLACED"
+    },
+    "replacementAssignment": {
+      "id": "successor-assignment-uuid",
+      "status": "RESERVED",
+      "replacesAssignmentId": "source-assignment-uuid"
+    }
+  }
 }
 ```
 
 Con conflicto devuelve el mismo 200 `CONFLICT_REVIEW_REQUIRED` antes de
-cualquier write. La candidate identifica el comando `REPLACE` y la predecesora.
+cualquier write. La respuesta incluye `sourceAssignmentId`, candidate,
+fingerprint, conflictos, reservas no verificables y warnings vigentes.
 
 Una original `RELEASED` o `REPLACED` no se vuelve a reemplazar con otra key:
-devuelve 409 `ASSIGNMENT_INVALID_LIFECYCLE`. Un replay con la misma
+devuelve 409 `EQUIPMENT_ASSIGNMENT_NOT_RESERVED`. Un replay con la misma
 `Idempotency-Key` y payload del reemplazo exitoso devuelve el resultado
 original. La unique de lineage y el lock de la original evitan múltiples
 sucesoras activas.
+
+Usar el mismo EquipmentAsset devuelve 400
+`EQUIPMENT_ASSIGNMENT_REPLACEMENT_SAME_ASSET`. Una razón ausente o vacía se
+rechaza por `ValidationPipe` en HTTP; el guard de dominio conserva 400
+`EQUIPMENT_ASSIGNMENT_REPLACEMENT_REASON_REQUIRED` para invocaciones directas.
+Estos códigos reflejan el contrato implementado y validado de HC-NEXT-03C4-B.
 
 El reemplazo no fabrica Return ni disponibilidad física. El guard futuro de
 Dispatch/Custody continúa diferido.
@@ -1404,8 +1420,9 @@ Los errores con branching conservan la forma:
 | EquipmentAsset lifecycle/condition no elegible | 409 | `EQUIPMENT_ASSET_NOT_ELIGIBLE` |
 | Capacity `requestedQty` ya cubierta | 409 | `REQUIREMENT_OVER_COVERAGE` |
 | Mismo activo ya `RESERVED` en el mismo Case | 409 | `ASSIGNMENT_ALREADY_RESERVED` |
-| Replacement usa el mismo activo u otra relación inválida | 409 | `INVALID_ASSIGNMENT_REPLACEMENT` |
-| Lifecycle no permite replace/release | 409 | `ASSIGNMENT_INVALID_LIFECYCLE` |
+| Replacement usa el mismo activo | 400 | `EQUIPMENT_ASSIGNMENT_REPLACEMENT_SAME_ASSET` |
+| Razón de Replacement ausente/blank | 400 | `ValidationPipe`; guard de dominio `EQUIPMENT_ASSIGNMENT_REPLACEMENT_REASON_REQUIRED` |
+| Lifecycle no permite replace/release | 409 | `EQUIPMENT_ASSIGNMENT_NOT_RESERVED` |
 | Estado cambió durante conditional write | 409 | Existing `RESOURCE_STATE_CHANGED` |
 | FK/recurso relacionado cambió durante write | 409 | Existing `RELATED_RESOURCE_CHANGED` |
 | Misma idempotency key con payload distinto | 409 | `IDEMPOTENCY_KEY_REUSED` |
@@ -2010,12 +2027,15 @@ HC-NEXT-03C2 — Assignment Backend Base
 → COMPLETE / MERGED
 
 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
-→ COMPLETE / READY FOR REVIEW
+→ COMPLETE / MERGED
 
-Next
-→ HC-NEXT-03C4 — Replace / Release / Parent Integrations — NEXT / BLOCKED UNTIL C3 MERGED
+HC-NEXT-03C4 — Replace / Release / Parent Integrations
+→ IN PROGRESS
+→ MANUAL RELEASE COMPLETE / COMMITTED
+→ REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
+→ PARENT INTEGRATIONS PENDING
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1 PERSISTENCE / MIGRATION + C2 BACKEND BASE + C3 AVAILABILITY / CONFLICT REVIEW / CONCURRENCY
-→ REPLACE / RELEASE Y FRONTEND NOT IMPLEMENTED
+→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + MANUAL RELEASE COMMITTED + REPLACE BACKEND VALIDATED
+→ PARENT INTEGRATIONS Y FRONTEND PENDING
 ```

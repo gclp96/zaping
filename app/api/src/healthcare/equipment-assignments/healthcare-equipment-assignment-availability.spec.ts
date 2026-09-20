@@ -1,5 +1,6 @@
 import {
   createEquipmentAssignmentConflictReviewFingerprint,
+  createEquipmentAssignmentReplaceConflictReviewFingerprint,
   deriveEquipmentAssignmentOperationalWindow,
   equipmentAssignmentWindowsOverlap,
   resolveEquipmentAssignmentBuffers,
@@ -140,6 +141,107 @@ describe('Healthcare Equipment Assignment availability primitives', () => {
       createEquipmentAssignmentConflictReviewFingerprint(before),
     );
   });
+
+  it('builds a deterministic Replace fingerprint independent of collection order', () => {
+    const input = replaceFingerprintInput();
+    const reversed = {
+      ...input,
+      conflicts: [...input.conflicts].reverse(),
+      unresolvedReservations: [...input.unresolvedReservations].reverse(),
+    };
+
+    expect(
+      createEquipmentAssignmentReplaceConflictReviewFingerprint(input),
+    ).toMatch(/^[a-f0-9]{64}$/u);
+
+    expect(
+      createEquipmentAssignmentReplaceConflictReviewFingerprint(input),
+    ).toBe(createEquipmentAssignmentReplaceConflictReviewFingerprint(reversed));
+  });
+
+  it.each([
+    [
+      'source Assignment id',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.sourceAssignment.id = '99999999-9999-4999-8999-999999999999';
+      },
+    ],
+    [
+      'source Assignment lifecycle',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.sourceAssignment.lifecycle = 'RELEASED';
+      },
+    ],
+    [
+      'source Assignment updatedAt',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.sourceAssignment.updatedAt = new Date('2026-09-15T12:01:00.000Z');
+      },
+    ],
+    [
+      'replacement EquipmentAsset',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.candidate.equipmentAssetId =
+          '99999999-9999-4999-8999-999999999999';
+      },
+    ],
+    [
+      'replacement EquipmentAsset state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.candidate.equipmentAssetUpdatedAt = new Date(
+          '2026-09-15T12:01:00.000Z',
+        );
+      },
+    ],
+    [
+      'candidate Case schedule state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.candidate.caseUpdatedAt = new Date('2026-09-15T12:01:00.000Z');
+      },
+    ],
+    [
+      'Company buffer state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.buffers.preCaseBufferMinutes = 121;
+      },
+    ],
+    [
+      'confirmed conflict state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.conflicts[0].assignmentUpdatedAt = new Date(
+          '2026-09-15T12:01:00.000Z',
+        );
+      },
+    ],
+    [
+      'unresolved schedule state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.unresolvedReservations[0].scheduledEnd = new Date(
+          '2026-09-15T20:00:00.000Z',
+        );
+      },
+    ],
+    [
+      'Requirement capacity state',
+      (input: ReturnType<typeof replaceFingerprintInput>) => {
+        input.requirementCapacity.currentCoverage = 1;
+      },
+    ],
+  ] as const)(
+    'changes Replace fingerprint when %s changes',
+    (_label, mutate) => {
+      const before = replaceFingerprintInput();
+      const after = replaceFingerprintInput();
+
+      mutate(after);
+
+      expect(
+        createEquipmentAssignmentReplaceConflictReviewFingerprint(after),
+      ).not.toBe(
+        createEquipmentAssignmentReplaceConflictReviewFingerprint(before),
+      );
+    },
+  );
 });
 
 function fingerprintInput() {
@@ -205,5 +307,18 @@ function fingerprintInput() {
         scheduledEnd: null,
       },
     ],
+  };
+}
+
+function replaceFingerprintInput() {
+  const base = fingerprintInput();
+
+  return {
+    ...base,
+    sourceAssignment: {
+      id: '66666666-6666-4666-8666-666666666666',
+      lifecycle: 'RESERVED',
+      updatedAt: new Date('2026-09-15T12:00:00.000Z'),
+    },
   };
 }

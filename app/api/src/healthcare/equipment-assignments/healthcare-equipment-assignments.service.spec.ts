@@ -8,11 +8,13 @@ import {
   HealthcareEquipmentAssignmentOrigin,
   HealthcareEquipmentAssignmentReleaseCause,
   HealthcareRequirementLifecycle,
+  IdempotencyScope,
   Prisma,
   ProductInventoryTracking,
 } from '@prisma/client';
 
 import { HealthcareEquipmentAssignmentListStatus } from './dto/healthcare-equipment-assignment-list-query.dto';
+import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
 
@@ -23,9 +25,12 @@ const caseId = '44444444-4444-4444-8444-444444444444';
 const otherCaseId = '55555555-5555-4555-8555-555555555555';
 const requirementId = '66666666-6666-4666-8666-666666666666';
 const equipmentAssetId = '77777777-7777-4777-8777-777777777777';
+const replacementEquipmentAssetId = '12121212-1212-4212-8212-121212121212';
 const productId = '88888888-8888-4888-8888-888888888888';
 const assignmentId = '99999999-9999-4999-8999-999999999999';
 const conflictingAssignmentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const replacementAssignmentId = '13131313-1313-4313-8313-131313131313';
+const replacedAt = new Date('2026-09-18T18:00:00.000Z');
 const createdAt = new Date('2026-09-15T15:00:00.000Z');
 const updatedAt = new Date('2026-09-15T15:05:00.000Z');
 const completeCase = {
@@ -61,6 +66,12 @@ const equipmentAsset = {
     name: 'Equipo clínico',
     isActive: true,
   },
+};
+const replacementEquipmentAsset = {
+  ...equipmentAsset,
+  id: replacementEquipmentAssetId,
+  assetCode: 'EQ-000002',
+  serialNumber: 'SN-002',
 };
 const baseRecord = {
   id: assignmentId,
@@ -108,6 +119,48 @@ const baseRecord = {
   replacementAssignments: [],
   conflictOverrides: [],
 };
+const replacementSourceSnapshot = {
+  id: assignmentId,
+  companyId,
+  caseId,
+  equipmentAssetId,
+  requirementId,
+  origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+  lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+  directAssignmentReason: null,
+  updatedAt,
+};
+const replacementRecord = {
+  ...baseRecord,
+  id: replacementAssignmentId,
+  replacesAssignmentId: assignmentId,
+  equipmentAsset: {
+    ...baseRecord.equipmentAsset,
+    id: replacementEquipmentAssetId,
+    assetCode: 'EQ-000002',
+    serialNumber: 'SN-002',
+  },
+  createdAt: replacedAt,
+  updatedAt: replacedAt,
+};
+
+const replacedRecord = {
+  ...baseRecord,
+  lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+  replacedAt,
+  replacementReason: 'Equipo original no disponible',
+  replacedBy: {
+    id: userId,
+    firstName: 'Ana',
+    lastName: 'Pérez',
+  },
+  replacementAssignments: [
+    {
+      id: replacementAssignmentId,
+    },
+  ],
+  updatedAt: replacedAt,
+};
 
 const releasedAt = new Date('2026-09-17T18:00:00.000Z');
 
@@ -124,7 +177,6 @@ const releasedRecord = {
   },
   updatedAt: releasedAt,
 };
-
 const requirementDto = {
   caseId,
   equipmentAssetId,
@@ -135,6 +187,11 @@ const directDto = {
   caseId,
   equipmentAssetId,
   directAssignmentReason: '  Respaldo urgente  ',
+};
+
+const replaceDto = {
+  equipmentAssetId: replacementEquipmentAssetId,
+  replacementReason: 'Equipo original no disponible',
 };
 
 const overlappingReservation = {
@@ -199,6 +256,8 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     findAssignment: jest.fn(),
     countAssignments: jest.fn(),
     findAssignments: jest.fn(),
+    findAssignmentReplacementSource: jest.fn(),
+    replaceAssignment: jest.fn(),
   };
   let service: HealthcareEquipmentAssignmentsService;
 
@@ -208,6 +267,11 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
     );
+
+    repository.replaceAssignment.mockResolvedValue({
+      count: 1,
+    });
+
     repository.findIdempotencyRecord.mockResolvedValue(null);
     repository.createIdempotencyClaim.mockResolvedValue({ id: 'claim-1' });
     repository.completeIdempotencyClaim.mockResolvedValue({ id: 'claim-1' });
@@ -219,9 +283,30 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.lockEquipmentAsset.mockResolvedValue(true);
     repository.lockRequirement.mockResolvedValue(true);
 
+    repository.findAssignmentReplacementSource.mockResolvedValue(
+      replacementSourceSnapshot,
+    );
+
+    repository.findEquipmentAsset.mockImplementation(
+      (_companyId: string, assetId: string) => {
+        if (assetId === replacementEquipmentAssetId) {
+          return Promise.resolve(replacementEquipmentAsset);
+        }
+
+        return Promise.resolve(equipmentAsset);
+      },
+    );
+
     repository.lockAssignment.mockResolvedValue({
       id: assignmentId,
+      companyId,
+      caseId,
+      equipmentAssetId,
+      requirementId,
+      origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
       lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      directAssignmentReason: null,
+      updatedAt,
     });
 
     repository.releaseAssignment.mockResolvedValue({
@@ -369,6 +454,1231 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       });
 
       expect(repository.findAssignment).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('replace', () => {
+    it('replaces a RESERVED Assignment without increasing Requirement coverage', async () => {
+      repository.countRequirementCoverage.mockResolvedValue(
+        requirement.requestedQty,
+      );
+
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+
+      repository.findAssignment
+        .mockResolvedValueOnce(replacedRecord)
+        .mockResolvedValueOnce(replacementRecord);
+
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-1',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: '  Equipo original no disponible  ',
+        },
+      );
+
+      expect(repository.findAssignmentReplacementSource).toHaveBeenCalledWith(
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.countRequirementCoverage).toHaveBeenCalledWith(
+        companyId,
+        requirementId,
+        transaction,
+      );
+
+      expect(repository.findReservedAssignmentsForAsset).toHaveBeenCalledWith(
+        companyId,
+        replacementEquipmentAssetId,
+        assignmentId,
+        transaction,
+      );
+
+      expect(repository.createAssignment).toHaveBeenCalledWith(transaction, {
+        companyId,
+        caseId,
+        equipmentAssetId: replacementEquipmentAssetId,
+        requirementId,
+        origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+        directAssignmentReason: null,
+        createdById: userId,
+        replacesAssignmentId: assignmentId,
+      });
+
+      expect(repository.createIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        'replace-key-1',
+        IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        createHealthcareEquipmentAssignmentReplaceRequestHash(assignmentId, {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: '  Equipo original no disponible  ',
+        }),
+      );
+
+      expect(repository.completeIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        'claim-1',
+        replacementAssignmentId,
+      );
+
+      expect(result.outcome).toBe('REPLACED');
+
+      if (result.outcome !== 'REPLACED') {
+        throw new Error('Expected REPLACED outcome');
+      }
+
+      expect(result.data.replacedAssignment.id).toBe(assignmentId);
+      expect(result.data.replacedAssignment.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.REPLACED,
+      );
+
+      expect(result.data.replacementAssignment.id).toBe(
+        replacementAssignmentId,
+      );
+
+      expect(result.data.replacementAssignment.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      );
+
+      expect(result.data.replacementAssignment.replacesAssignmentId).toBe(
+        assignmentId,
+      );
+    });
+
+    it('rejects an empty replacement reason before starting persistence work', async () => {
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-empty-reason',
+          {
+            equipmentAssetId: replacementEquipmentAssetId,
+            replacementReason: '   ',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_REPLACEMENT_REASON_REQUIRED',
+        },
+      });
+
+      expect(repository.findIdempotencyRecord).not.toHaveBeenCalled();
+      expect(repository.findAssignmentReplacementSource).not.toHaveBeenCalled();
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects replacement with the same EquipmentAsset', async () => {
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-same-asset',
+          {
+            equipmentAssetId,
+            replacementReason: 'Reemplazo inválido',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_REPLACEMENT_SAME_ASSET',
+        },
+      });
+
+      expect(repository.findAssignmentReplacementSource).toHaveBeenCalledWith(
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects replacement when the source Assignment does not exist in the tenant', async () => {
+      repository.findAssignmentReplacementSource.mockResolvedValue(null);
+
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-not-found',
+          {
+            equipmentAssetId: replacementEquipmentAssetId,
+            replacementReason: 'Equipo original no disponible',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+        },
+      });
+
+      expect(repository.findAssignmentReplacementSource).toHaveBeenCalledWith(
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      HealthcareEquipmentAssignmentLifecycle.RELEASED,
+      HealthcareEquipmentAssignmentLifecycle.REPLACED,
+    ])(
+      'rejects replacement when the source Assignment is %s',
+      async (lifecycle) => {
+        repository.findAssignmentReplacementSource.mockResolvedValue({
+          ...replacementSourceSnapshot,
+          lifecycle,
+        });
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            `replace-key-${lifecycle}`,
+            {
+              equipmentAssetId: replacementEquipmentAssetId,
+              replacementReason: 'Equipo original no disponible',
+            },
+          ),
+        ).rejects.toMatchObject({
+          response: {
+            code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+          },
+        });
+
+        expect(repository.runInTransaction).not.toHaveBeenCalled();
+        expect(repository.createAssignment).not.toHaveBeenCalled();
+        expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      },
+    );
+
+    it('rejects replacement when the source was released before acquiring its lock', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        updatedAt: new Date('2026-09-19T18:00:00.000Z'),
+      });
+
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-concurrent-release',
+          {
+            equipmentAssetId: replacementEquipmentAssetId,
+            replacementReason: 'Equipo original no disponible',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+        },
+      });
+
+      expect(repository.findAssignmentReplacementSource).toHaveBeenCalledWith(
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.lockAssignment).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects replacement when the source snapshot changes before acquiring its lock', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        updatedAt: new Date('2026-09-19T18:00:00.000Z'),
+      });
+
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-source-changed',
+          {
+            equipmentAssetId: replacementEquipmentAssetId,
+            replacementReason: 'Equipo original no disponible',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'RESOURCE_STATE_CHANGED',
+        },
+      });
+
+      expect(repository.lockAssignment).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        assignmentId,
+      );
+
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects replacement when the guarded source transition affects no row', async () => {
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+
+      repository.replaceAssignment.mockResolvedValue({
+        count: 0,
+      });
+
+      await expect(
+        service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-key-guarded-transition',
+          {
+            equipmentAssetId: replacementEquipmentAssetId,
+            replacementReason: 'Equipo original no disponible',
+          },
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'RESOURCE_STATE_CHANGED',
+        },
+      });
+
+      expect(repository.replaceAssignment).toHaveBeenCalledWith(
+        transaction,
+        expect.objectContaining({
+          companyId,
+          assignmentId,
+          replacedById: userId,
+          replacementReason: 'Equipo original no disponible',
+        }),
+      );
+
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('replaces with an unresolved related reservation without creating an override for uncertainty', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: unresolvedReservation.caseId },
+      ]);
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        unresolvedReservation.caseId,
+      ]);
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        unresolvedReservation,
+      ]);
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+      repository.findAssignment
+        .mockResolvedValueOnce(replacedRecord)
+        .mockResolvedValueOnce(replacementRecord);
+
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-unresolved-reservation',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'REPLACED',
+        data: {
+          replacementAssignment: {
+            availability: {
+              fullyVerifiable: false,
+              conflictFree: null,
+              warnings: [
+                {
+                  code: 'RELATED_RESERVATION_SCHEDULE_INCOMPLETE',
+                  message:
+                    'Existe una reserva activa del mismo equipo con horario incompleto; la disponibilidad no puede verificarse completamente.',
+                },
+              ],
+            },
+          },
+        },
+      });
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it('requests zero-write review for a confirmed conflict while preserving unresolved-reservation uncertainty', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+        { caseId: unresolvedReservation.caseId },
+      ]);
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+        unresolvedReservation.caseId,
+      ]);
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        unresolvedReservation,
+        overlappingReservation,
+      ]);
+
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-mixed-review',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'CONFLICT_REVIEW_REQUIRED',
+        sourceAssignmentId: assignmentId,
+        overrideRequired: true,
+        conflicts: [{ assignmentId: conflictingAssignmentId }],
+        unresolvedReservations: [
+          {
+            assignmentId: unresolvedReservation.id,
+            caseId: unresolvedReservation.caseId,
+          },
+        ],
+        availability: {
+          fullyVerifiable: false,
+          conflictFree: false,
+          warnings: [
+            expect.objectContaining({ code: 'CURRENT_ASSIGNMENT_CONFLICT' }),
+            expect.objectContaining({
+              code: 'RELATED_RESERVATION_SCHEDULE_INCOMPLETE',
+            }),
+          ],
+        },
+      });
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('keeps C3 availability semantics when the candidate Case schedule is incomplete', async () => {
+      repository.findCase.mockResolvedValue({
+        ...completeCase,
+        scheduledEnd: null,
+      });
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+      ]);
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+      ]);
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+      repository.findAssignment
+        .mockResolvedValueOnce(replacedRecord)
+        .mockResolvedValueOnce(replacementRecord);
+
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-incomplete-candidate',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(result).toMatchObject({
+        outcome: 'REPLACED',
+        data: {
+          replacementAssignment: {
+            availability: {
+              fullyVerifiable: false,
+              conflictFree: null,
+              warnings: [
+                {
+                  code: 'INCOMPLETE_CASE_SCHEDULE',
+                  message:
+                    'La disponibilidad requiere revisar el horario del caso',
+                },
+              ],
+            },
+          },
+        },
+      });
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        {
+          conflictReviewFingerprint: 'a'.repeat(64),
+          conflictOverrideReason: 'Riesgo',
+        },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        { confirmConflictOverride: true, conflictOverrideReason: 'Riesgo' },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        {
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: 'invalid',
+          conflictOverrideReason: 'Riesgo',
+        },
+        'INVALID_CONFLICT_REVIEW_CONFIRMATION',
+      ],
+      [
+        {
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: 'a'.repeat(64),
+          conflictOverrideReason: '   ',
+        },
+        'CONFLICT_OVERRIDE_REASON_REQUIRED',
+      ],
+    ])(
+      'rejects invalid Replace conflict confirmation %# before persistence',
+      async (review, code) => {
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-key-invalid-review',
+            {
+              equipmentAssetId: replacementEquipmentAssetId,
+              replacementReason: 'Equipo original no disponible',
+              ...review,
+            },
+          ),
+        ).rejects.toMatchObject({ response: { code } });
+
+        expect(
+          repository.findAssignmentReplacementSource,
+        ).not.toHaveBeenCalled();
+        expect(repository.runInTransaction).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns a zero-write conflict review when the replacement asset has a confirmed overlap', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+      ]);
+
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+      ]);
+
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-conflict-review',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(result.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (result.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected CONFLICT_REVIEW_REQUIRED outcome');
+      }
+
+      expect(result.sourceAssignmentId).toBe(assignmentId);
+      expect(result.overrideRequired).toBe(true);
+      expect(result.conflictReviewFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0].assignmentId).toBe(conflictingAssignmentId);
+
+      expect(result.candidate.equipmentAsset.id).toBe(
+        replacementEquipmentAssetId,
+      );
+
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('confirms a reviewed conflict and creates overrides for the replacement Assignment', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+      ]);
+
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+      ]);
+
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+
+      repository.findAssignment
+        .mockResolvedValueOnce(replacedRecord)
+        .mockResolvedValueOnce(replacementRecord);
+
+      // Primera solicitud: obtener la revisión sin ejecutar escrituras.
+      const review = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-confirmed-conflict',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(review.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (review.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected CONFLICT_REVIEW_REQUIRED outcome');
+      }
+
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+
+      // Segunda solicitud: confirmar exactamente el conflicto revisado.
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-confirmed-conflict',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: review.conflictReviewFingerprint,
+          conflictOverrideReason: '  Riesgo aceptado por almacén  ',
+        },
+      );
+
+      expect(result.outcome).toBe('REPLACED');
+
+      if (result.outcome !== 'REPLACED') {
+        throw new Error('Expected REPLACED outcome');
+      }
+
+      expect(repository.createConflictOverrides).toHaveBeenCalledWith(
+        transaction,
+        [
+          {
+            companyId,
+            assignmentId: replacementAssignmentId,
+            conflictingAssignmentId,
+            assignmentWindowStart: review.candidate.operationalWindow.start,
+            assignmentWindowEnd: review.candidate.operationalWindow.end,
+            conflictingWindowStart: review.conflicts[0].windowStart,
+            conflictingWindowEnd: review.conflicts[0].windowEnd,
+            approvedById: userId,
+            reason: 'Riesgo aceptado por almacén',
+          },
+        ],
+      );
+
+      expect(repository.replaceAssignment).toHaveBeenCalledTimes(1);
+
+      expect(repository.completeIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        'claim-1',
+        replacementAssignmentId,
+      );
+
+      expect(result.data.replacedAssignment.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.REPLACED,
+      );
+
+      expect(result.data.replacementAssignment.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      );
+
+      expect(result.data.replacementAssignment.replacesAssignmentId).toBe(
+        assignmentId,
+      );
+    });
+
+    it('returns a fresh zero-write review when the Replace conflict fingerprint is stale', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+      ]);
+
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+      ]);
+
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+
+      // Primera solicitud: obtener el fingerprint original.
+      const initialReview = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-stale-review',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(initialReview.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (initialReview.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected initial conflict review');
+      }
+
+      const originalFingerprint = initialReview.conflictReviewFingerprint;
+
+      // La reserva relacionada cambia después de la primera revisión.
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        {
+          ...overlappingReservation,
+          updatedAt: new Date('2026-09-19T18:00:00.000Z'),
+        },
+      ]);
+
+      // Segunda solicitud: intentar confirmar el fingerprint anterior.
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-stale-review',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: originalFingerprint,
+          conflictOverrideReason: 'Riesgo aceptado por almacén',
+        },
+      );
+
+      expect(result.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (result.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected fresh conflict review');
+      }
+
+      expect(result.sourceAssignmentId).toBe(assignmentId);
+      expect(result.overrideRequired).toBe(true);
+
+      expect(result.conflictReviewFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+      expect(result.conflictReviewFingerprint).not.toBe(originalFingerprint);
+
+      expect(result.conflicts).toHaveLength(1);
+      expect(result.conflicts[0].assignmentId).toBe(conflictingAssignmentId);
+
+      // Ninguna de las dos solicitudes debe ejecutar escrituras.
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('returns a fresh zero-write review when the reviewed Replace conflict disappears', async () => {
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+      ]);
+
+      repository.lockHealthcareCasesForShare.mockResolvedValue([
+        caseId,
+        otherCaseId,
+      ]);
+
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([
+        overlappingReservation,
+      ]);
+
+      // Primera solicitud: obtener la revisión del conflicto.
+      const initialReview = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-conflict-disappeared',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+        },
+      );
+
+      expect(initialReview.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (initialReview.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected initial conflict review');
+      }
+
+      const originalFingerprint = initialReview.conflictReviewFingerprint;
+
+      // El conflicto desaparece antes de la confirmación.
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([]);
+      repository.lockHealthcareCasesForShare.mockResolvedValue([caseId]);
+      repository.findReservedAssignmentsForAsset.mockResolvedValue([]);
+
+      // Segunda solicitud: intentar confirmar el conflicto anterior.
+      const result = await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-key-conflict-disappeared',
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: 'Equipo original no disponible',
+          confirmConflictOverride: true,
+          conflictReviewFingerprint: originalFingerprint,
+          conflictOverrideReason: 'Riesgo aceptado por almacén',
+        },
+      );
+
+      expect(result.outcome).toBe('CONFLICT_REVIEW_REQUIRED');
+
+      if (result.outcome !== 'CONFLICT_REVIEW_REQUIRED') {
+        throw new Error('Expected fresh conflict review');
+      }
+
+      expect(result.sourceAssignmentId).toBe(assignmentId);
+      expect(result.overrideRequired).toBe(false);
+      expect(result.conflicts).toHaveLength(0);
+
+      expect(result.conflictReviewFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+      expect(result.conflictReviewFingerprint).not.toBe(originalFingerprint);
+
+      // Ninguna solicitud debe modificar A, crear B ni registrar overrides.
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.createAssignment).not.toHaveBeenCalled();
+      expect(repository.createConflictOverrides).not.toHaveBeenCalled();
+      expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    describe('idempotency and replay', () => {
+      it('replays a completed normalized Replace before inspecting the REPLACED source', async () => {
+        const replayDto = {
+          ...replaceDto,
+          replacementReason: '  Equipo original no disponible  ',
+        };
+        const requestHash =
+          createHealthcareEquipmentAssignmentReplaceRequestHash(
+            assignmentId,
+            replayDto,
+          );
+        repository.findIdempotencyRecord.mockResolvedValue({
+          requestHash,
+          resourceId: replacementAssignmentId,
+        });
+        repository.findAssignment
+          .mockResolvedValueOnce(replacementRecord)
+          .mockResolvedValueOnce(replacedRecord);
+
+        const result = await service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'replace-replay-key',
+          replayDto,
+        );
+
+        expect(result).toMatchObject({
+          outcome: 'REPLACED',
+          data: {
+            replacedAssignment: {
+              id: assignmentId,
+              status: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+            },
+            replacementAssignment: {
+              id: replacementAssignmentId,
+              status: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+              replacesAssignmentId: assignmentId,
+            },
+          },
+        });
+        expect(repository.findIdempotencyRecord).toHaveBeenCalledWith(
+          companyId,
+          'replace-replay-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        );
+        expect(repository.findAssignment).toHaveBeenNthCalledWith(
+          1,
+          companyId,
+          replacementAssignmentId,
+        );
+        expect(repository.findAssignment).toHaveBeenNthCalledWith(
+          2,
+          companyId,
+          assignmentId,
+        );
+        expect(
+          repository.findAssignmentReplacementSource,
+        ).not.toHaveBeenCalled();
+        expect(repository.runInTransaction).not.toHaveBeenCalled();
+        expect(repository.createAssignment).not.toHaveBeenCalled();
+        expect(repository.replaceAssignment).not.toHaveBeenCalled();
+      });
+
+      it('rejects reuse of a Replace key with a different payload', async () => {
+        repository.findIdempotencyRecord.mockResolvedValue({
+          requestHash: createHealthcareEquipmentAssignmentReplaceRequestHash(
+            assignmentId,
+            replaceDto,
+          ),
+          resourceId: replacementAssignmentId,
+        });
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-reused-payload-key',
+            {
+              ...replaceDto,
+              replacementReason: 'Equipo dañado',
+            },
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+        });
+        expect(repository.findIdempotencyRecord).toHaveBeenCalledWith(
+          companyId,
+          'replace-reused-payload-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        );
+        expect(
+          repository.findAssignmentReplacementSource,
+        ).not.toHaveBeenCalled();
+        expect(repository.runInTransaction).not.toHaveBeenCalled();
+      });
+
+      it('rejects the same Replace key when the source Assignment changes', async () => {
+        repository.findIdempotencyRecord.mockResolvedValue({
+          requestHash: createHealthcareEquipmentAssignmentReplaceRequestHash(
+            assignmentId,
+            replaceDto,
+          ),
+          resourceId: replacementAssignmentId,
+        });
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            conflictingAssignmentId,
+            'replace-reused-source-key',
+            replaceDto,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+        });
+        expect(
+          repository.findAssignmentReplacementSource,
+        ).not.toHaveBeenCalled();
+        expect(repository.runInTransaction).not.toHaveBeenCalled();
+      });
+
+      it('does not confuse a Create key with the Replace idempotency scope', async () => {
+        const createRecord = {
+          requestHash:
+            createHealthcareEquipmentAssignmentRequestHash(requirementDto),
+          resourceId: assignmentId,
+        };
+        repository.findIdempotencyRecord.mockImplementation(
+          (_companyId, _key, scope: IdempotencyScope) =>
+            Promise.resolve(
+              scope === IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
+                ? createRecord
+                : null,
+            ),
+        );
+        repository.createAssignment.mockResolvedValue(replacementRecord);
+        repository.findAssignment
+          .mockResolvedValueOnce(replacedRecord)
+          .mockResolvedValueOnce(replacementRecord);
+
+        const result = await service.replace(
+          companyId,
+          userId,
+          assignmentId,
+          'shared-create-replace-key',
+          replaceDto,
+        );
+
+        expect(result.outcome).toBe('REPLACED');
+        expect(repository.findIdempotencyRecord).toHaveBeenNthCalledWith(
+          1,
+          companyId,
+          'shared-create-replace-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        );
+        expect(repository.findIdempotencyRecord).toHaveBeenNthCalledWith(
+          2,
+          companyId,
+          'shared-create-replace-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+          transaction,
+        );
+        expect(repository.createIdempotencyClaim).toHaveBeenCalledWith(
+          transaction,
+          companyId,
+          'shared-create-replace-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+          expect.any(String),
+        );
+      });
+
+      it('recovers the losing same-key request from the completed Replace claim', async () => {
+        const requestHash =
+          createHealthcareEquipmentAssignmentReplaceRequestHash(
+            assignmentId,
+            replaceDto,
+          );
+        let completed = false;
+        let transactionAttempt = 0;
+        let finishWinner!: () => void;
+        const winnerFinished = new Promise<void>((resolve) => {
+          finishWinner = resolve;
+        });
+
+        repository.findIdempotencyRecord.mockImplementation(
+          (_companyId, _key, scope: IdempotencyScope) =>
+            Promise.resolve(
+              completed &&
+                scope ===
+                  IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
+                ? { requestHash, resourceId: replacementAssignmentId }
+                : null,
+            ),
+        );
+        repository.runInTransaction.mockImplementation(
+          async (
+            operation: (client: typeof transaction) => Promise<unknown>,
+          ) => {
+            const currentAttempt = transactionAttempt;
+            transactionAttempt += 1;
+
+            if (currentAttempt === 0) {
+              try {
+                return await operation(transaction);
+              } finally {
+                finishWinner();
+              }
+            }
+
+            await winnerFinished;
+            throw knownPrismaError(
+              'P2002',
+              'IdempotencyRecord_companyId_scope_key_key',
+            );
+          },
+        );
+        repository.createAssignment.mockResolvedValue(replacementRecord);
+        repository.completeIdempotencyClaim.mockImplementation(() => {
+          completed = true;
+          return Promise.resolve({ id: 'claim-1' });
+        });
+        repository.findAssignment
+          .mockResolvedValueOnce(replacedRecord)
+          .mockResolvedValueOnce(replacementRecord)
+          .mockResolvedValueOnce(replacementRecord)
+          .mockResolvedValueOnce(replacedRecord);
+
+        // El mock modela al ganador y al perdedor del índice único. La
+        // serialización real de PostgreSQL se valida en B4.
+        const [winner, recovered] = await Promise.all([
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-concurrent-key',
+            replaceDto,
+          ),
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-concurrent-key',
+            replaceDto,
+          ),
+        ]);
+
+        expect(winner.outcome).toBe('REPLACED');
+        expect(recovered.outcome).toBe('REPLACED');
+        expect(repository.createIdempotencyClaim).toHaveBeenCalledTimes(1);
+        expect(repository.createAssignment).toHaveBeenCalledTimes(1);
+        expect(repository.replaceAssignment).toHaveBeenCalledTimes(1);
+        expect(repository.completeIdempotencyClaim).toHaveBeenCalledTimes(1);
+      });
+
+      it('allows only one successor when different keys target the same source after serialized locks', async () => {
+        let transactionQueue = Promise.resolve<unknown>(undefined);
+        repository.runInTransaction.mockImplementation(
+          (operation: (client: typeof transaction) => Promise<unknown>) => {
+            const result = transactionQueue.then(() => operation(transaction));
+            transactionQueue = result.then(
+              () => undefined,
+              () => undefined,
+            );
+            return result;
+          },
+        );
+        repository.lockAssignment
+          .mockResolvedValueOnce(replacementSourceSnapshot)
+          .mockResolvedValueOnce({
+            ...replacementSourceSnapshot,
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+            updatedAt: replacedAt,
+          });
+        repository.createAssignment.mockResolvedValue(replacementRecord);
+        repository.findAssignment
+          .mockResolvedValueOnce(replacedRecord)
+          .mockResolvedValueOnce(replacementRecord);
+
+        // El mock entrega locks en serie; la contención real de filas queda
+        // reservada para las pruebas PostgreSQL de B4.
+        const results = await Promise.allSettled([
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-distinct-key-1',
+            replaceDto,
+          ),
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-distinct-key-2',
+            replaceDto,
+          ),
+        ]);
+
+        expect(results[0]).toMatchObject({
+          status: 'fulfilled',
+          value: { outcome: 'REPLACED' },
+        });
+        expect(results[1]).toMatchObject({
+          status: 'rejected',
+          reason: {
+            response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
+          },
+        });
+        expect(repository.createIdempotencyClaim).toHaveBeenCalledTimes(1);
+        expect(repository.createAssignment).toHaveBeenCalledTimes(1);
+        expect(repository.replaceAssignment).toHaveBeenCalledTimes(1);
+        expect(repository.completeIdempotencyClaim).toHaveBeenCalledTimes(1);
+      });
+
+      it('checks the Replace scope and hash before replaying an idempotency unique violation', async () => {
+        repository.findIdempotencyRecord
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            requestHash: 'different-request-hash',
+            resourceId: replacementAssignmentId,
+          });
+        repository.runInTransaction.mockRejectedValueOnce(
+          knownPrismaError(
+            'P2002',
+            'IdempotencyRecord_companyId_scope_key_key',
+          ),
+        );
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-race-wrong-hash-key',
+            replaceDto,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'IDEMPOTENCY_KEY_REUSED' },
+        });
+        expect(repository.findIdempotencyRecord).toHaveBeenCalledTimes(2);
+        expect(repository.findIdempotencyRecord).toHaveBeenNthCalledWith(
+          1,
+          companyId,
+          'replace-race-wrong-hash-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        );
+        expect(repository.findIdempotencyRecord).toHaveBeenNthCalledWith(
+          2,
+          companyId,
+          'replace-race-wrong-hash-key',
+          IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+        );
+        expect(repository.findAssignment).not.toHaveBeenCalled();
+      });
+
+      it('does not treat an incomplete Replace idempotency record as completed', async () => {
+        const requestHash =
+          createHealthcareEquipmentAssignmentReplaceRequestHash(
+            assignmentId,
+            replaceDto,
+          );
+        repository.findIdempotencyRecord.mockResolvedValue({
+          requestHash,
+          resourceId: null,
+        });
+        repository.runInTransaction.mockRejectedValueOnce(
+          knownPrismaError(
+            'P2002',
+            'IdempotencyRecord_companyId_scope_key_key',
+          ),
+        );
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-incomplete-claim-key',
+            replaceDto,
+          ),
+        ).rejects.toMatchObject({
+          response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
+        });
+        expect(repository.findAssignment).not.toHaveBeenCalled();
+        expect(repository.createAssignment).not.toHaveBeenCalled();
+        expect(repository.replaceAssignment).not.toHaveBeenCalled();
+        expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+      });
     });
   });
 

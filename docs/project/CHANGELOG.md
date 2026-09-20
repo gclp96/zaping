@@ -1,10 +1,40 @@
 # Changelog — Zaping
 
 **Documento:** Historial consolidado del proyecto
-**Versión:** 1.4.0
+**Versión:** 1.5.0
 **Estado:** Activo
-**Última actualización:** 2026-09-17
+**Última actualización:** 2026-09-20
 **Responsable:** Zaping Team
+
+---
+
+# 2026-09-20 — HC-NEXT-03C4-B Equipment Assignment Replace backend
+
+**Estado:** COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED — HC-NEXT-03C4 REMAINS IN PROGRESS
+
+Se implementó `POST /healthcare/equipment-assignments/:assignmentId/replace`
+con HTTP 200 para `REPLACED` y `CONFLICT_REVIEW_REQUIRED`, autenticación JWT,
+RBAC ADMIN/MANAGER/WAREHOUSE, DTO allowlisted, tenant isolation e idempotencia
+en scope `HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE`. SALES permanece read-only.
+
+Una fuente A sólo transiciona `RESERVED → REPLACED`; conserva su
+`equipmentAssetId` y auditoría, mientras B se crea `RESERVED`, apunta a A mediante
+`replacesAssignmentId` y hereda Case, Requirement, origin y
+`directAssignmentReason`. B, overrides, transición de A y claim completado son
+atómicos; el claim apunta a B. Replace conserva cobertura neta, revalida bajo
+locks y reutiliza las reglas C3 para conflictos e incertidumbre de schedules. El
+review inicial o stale no escribe.
+
+Evidencia B5: backend unitario 85 suites / 1353 tests PASS; foco Equipment
+Assignment/RBAC 8 suites / 268 tests PASS; PostgreSQL QA real B4-A 6/6, B4-B1
+7/7 y B4-B2 HTTP/JWT 8/8 PASS; typecheck, lint, build y diff-check PASS. La
+revisión final eliminó un test duplicado del repository sin retirar cobertura.
+
+Limitaciones: el HTTP E2E usa NestJS in-process con Supertest, no un puerto/proxy
+externo; no se probó cancelación del cliente durante espera por locks. Manual
+Release ya está committed; parent integrations, frontend y Dispatch/Custody no
+forman parte de C4-B. Replace no se marca mergeado ni desplegado y el milestone
+HC-NEXT-03C4 no se marca completo.
 
 ---
 
