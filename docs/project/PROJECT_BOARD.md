@@ -2474,12 +2474,12 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE COMPLETE / COMMITTED
-→ REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
-→ PARENT INTEGRATIONS PENDING
+→ MANUAL RELEASE COMPLETE / MERGED
+→ REPLACE BACKEND COMPLETE / MERGED — PR #27
+→ PARENT INTEGRATIONS PENDING — HC-NEXT-03C4-C IN REFINEMENT
 
 Healthcare Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + MANUAL RELEASE COMMITTED + REPLACE BACKEND VALIDATED
+→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + C4 MANUAL RELEASE AND REPLACE BACKEND MERGED
 → PARENT INTEGRATIONS Y FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -2492,3 +2492,48 @@ No staging or production deployment is claimed by this baseline. ERP Core V1
 continúa abierto a evoluciones futuras como SalesOrder + Delivery, Commercial
 Returns, FEFO, Expiration, Audit, Permission-Based RBAC, Data Import, Advanced
 Inventory y Billing / CFDI, sin reabrir por ello su aceptación local V1.
+
+### HC-NEXT-03C4-C — Equipment Assignment Parent Integrations
+
+Estado: REFINEMENT
+Prioridad: P1
+Milestone: M-HC1 — Healthcare Operations Foundation
+Sprint candidato: HC-01
+Estimación: 8 SP — PROVISIONAL
+Commitment: NO ESTABLECIDO
+
+Baseline de partida: main @ 7eda28c
+PR #27: MERGED
+Manual Release y Replace: INTEGRADOS EN MAIN
+HC-NEXT-03C4: IN PROGRESS — Parent Integrations pendientes
+
+Objetivo:
+Liberar de forma atómica las reservas lógicas aplicables cuando se
+cancela un Healthcare Case o se retira una Requirement.
+
+Alcance:
+- Case cancellation: liberar Assignments RESERVED del Case con
+  releaseCause = CASE_CANCELLED.
+- Requirement retire: liberar sólo Assignments RESERVED de origen
+  REQUIREMENT asociadas a la Requirement, con
+  releaseCause = REQUIREMENT_WITHDRAWN.
+- Preservar DIRECT e historial.
+- Compartir Prisma.TransactionClient entre el comando padre y sus releases.
+- Mantener autorización, respuestas públicas y aislamiento tenant.
+- No crear InventoryMovement, Return ni cambios de Custody.
+
+Bloqueo de Definition of Ready:
+Aprobar y documentar un protocolo de concurrencia compatible con
+Create, Replace, Manual Release, Case Cancellation y Requirement Retire.
+El advisory lock por Case es una alternativa pendiente de validación;
+no se considera una solución aprobada por sí sola.
+
+Gates:
+Pruebas focales, rollback íntegro, concurrencia real en PostgreSQL,
+regresiones de Cases/Requirements/C3, autorización, tenant isolation,
+API tests, lint, typecheck, build y git diff --check.
+
+Finding relacionado de cierre C4:
+Verificar y corregir la discrepancia entre el contrato documentado
+de Release manual repetido y el comportamiento del servicio actual.
+No declarar C4 completado hasta resolver y validar ese hallazgo.
