@@ -4,6 +4,7 @@ import {
   HttpStatus,
   InternalServerErrorException,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 
 export const HEALTHCARE_ERROR_CODES = {
@@ -46,6 +47,7 @@ export const HEALTHCARE_ERROR_CODES = {
   idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
+  concurrencyTimeout: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
   persistenceError: 'HEALTHCARE_PERSISTENCE_ERROR',
 } as const;
 
@@ -333,6 +335,16 @@ export function relatedResourceChangedException(): ConflictException {
     error: 'Conflict',
     code: HEALTHCARE_ERROR_CODES.relatedResourceChanged,
     message: 'Un recurso relacionado cambió. Recarga e intenta nuevamente',
+  });
+}
+
+export function healthcareConcurrencyTimeoutException(): ServiceUnavailableException {
+  return new ServiceUnavailableException({
+    statusCode: HttpStatus.SERVICE_UNAVAILABLE,
+    error: 'Service Unavailable',
+    code: HEALTHCARE_ERROR_CODES.concurrencyTimeout,
+    message:
+      'La operación no pudo iniciar por concurrencia. Intenta nuevamente',
   });
 }
 

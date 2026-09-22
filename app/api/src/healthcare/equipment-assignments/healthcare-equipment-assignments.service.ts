@@ -1,4 +1,5 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 
 import {
   EquipmentCondition,
@@ -25,6 +26,7 @@ import {
   equipmentAssignmentReleaseReasonRequiredException,
   equipmentAssetNotEligibleException,
   equipmentAssetNotFoundException,
+  healthcareConcurrencyTimeoutException,
   healthcarePersistenceException,
   idempotencyKeyReusedException,
   invalidAssignmentOriginException,
@@ -38,7 +40,11 @@ import {
   requirementRetiredException,
 } from '../common/healthcare-errors';
 
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { healthcareCompanyTransactionTimeoutConfiguration } from '../common/healthcare-company-transaction-timeout.config';
 import { normalizeHealthcareOptionalText } from '../common/healthcare-normalization';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
 import { CreateHealthcareEquipmentAssignmentDto } from './dto/create-healthcare-equipment-assignment.dto';
 import { ReleaseHealthcareEquipmentAssignmentDto } from './dto/release-healthcare-equipment-assignment.dto';
 
@@ -231,6 +237,10 @@ type HealthcareEquipmentAssignmentReplaceResponse =
 export class HealthcareEquipmentAssignmentsService {
   constructor(
     private readonly repository: HealthcareEquipmentAssignmentsRepository,
+    @Inject(healthcareCompanyTransactionTimeoutConfiguration.KEY)
+    private readonly companyTransactionTimeoutPolicy: ConfigType<
+      typeof healthcareCompanyTransactionTimeoutConfiguration
+    >,
   ) {}
 
   async findAll(
@@ -326,7 +336,23 @@ export class HealthcareEquipmentAssignmentsService {
         throw idempotencyKeyReusedException();
       }
 
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.repository.runInTransaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         const assetLocked = await this.repository.lockEquipmentAsset(
           transaction,
           companyId,
@@ -614,8 +640,12 @@ export class HealthcareEquipmentAssignmentsService {
             ),
           ),
         };
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       if (this.isIdempotencyUniqueViolation(error)) {
         const idempotencyRecord = await this.repository.findIdempotencyRecord(
           companyId,
