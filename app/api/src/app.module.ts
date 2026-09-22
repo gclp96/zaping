@@ -24,11 +24,13 @@ import { HealthcareEquipmentAssignmentsModule } from './healthcare/equipment-ass
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { validateEnvironment } from './config/env.validation';
+import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/common/healthcare-company-transaction-timeout.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [healthcareCompanyTransactionTimeoutConfiguration],
       validate: validateEnvironment,
     }),
     PrismaModule,
