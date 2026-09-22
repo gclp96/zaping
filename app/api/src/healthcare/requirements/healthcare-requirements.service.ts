@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import {
   HealthcareCaseStatus,
   HealthcareRequirementLifecycle,
@@ -9,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import {
   caseNotFoundException,
   caseRequirementsReadOnlyException,
+  healthcareConcurrencyTimeoutException,
   healthcarePersistenceException,
   invalidRequirementReorderException,
   productInactiveException,
@@ -19,10 +21,14 @@ import {
   requirementRetiredException,
   resourceStateChangedException,
 } from '../common/healthcare-errors';
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { healthcareCompanyTransactionTimeoutConfiguration } from '../common/healthcare-company-transaction-timeout.config';
 import {
   normalizeHealthcareDisplayText,
   normalizeHealthcareOptionalText,
 } from '../common/healthcare-normalization';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
 import { CreateHealthcareRequirementDto } from './dto/create-healthcare-requirement.dto';
 import {
   HealthcareRequirementListQueryDto,
@@ -127,6 +133,10 @@ export class HealthcareRequirementsService {
     private readonly prisma: PrismaService,
     @Inject(REQUIREMENT_OPERATIONAL_EVIDENCE_POLICY)
     private readonly evidencePolicy: RequirementOperationalEvidencePolicy,
+    @Inject(healthcareCompanyTransactionTimeoutConfiguration.KEY)
+    private readonly companyTransactionTimeoutPolicy: ConfigType<
+      typeof healthcareCompanyTransactionTimeoutConfiguration
+    >,
   ) {}
 
   async findAllForCase(
@@ -236,7 +246,23 @@ export class HealthcareRequirementsService {
     dto: UpdateHealthcareRequirementDto,
   ): Promise<HealthcareRequirementRecord> {
     try {
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.prisma.$transaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         const owner = await this.lockMutableCaseForRequirement(
           transaction,
           companyId,
@@ -288,8 +314,12 @@ export class HealthcareRequirementsService {
           companyId,
           requirementId,
         );
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       this.rethrowPersistenceError(error);
     }
   }
@@ -305,7 +335,23 @@ export class HealthcareRequirementsService {
     );
 
     try {
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.prisma.$transaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         const owner = await this.lockMutableCaseForRequirement(
           transaction,
           companyId,
@@ -352,8 +398,12 @@ export class HealthcareRequirementsService {
           companyId,
           requirementId,
         );
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       this.rethrowPersistenceError(error);
     }
   }
@@ -364,7 +414,23 @@ export class HealthcareRequirementsService {
     requirementId: string,
   ): Promise<HealthcareRequirementRecord> {
     try {
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.prisma.$transaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         const owner = await this.lockMutableCaseForRequirement(
           transaction,
           companyId,
@@ -423,8 +489,12 @@ export class HealthcareRequirementsService {
           companyId,
           requirementId,
         );
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       this.rethrowPersistenceError(error);
     }
   }
@@ -437,7 +507,23 @@ export class HealthcareRequirementsService {
     this.assertValidReorder(dto);
 
     try {
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.prisma.$transaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         await this.lockMutableCase(transaction, companyId, caseId);
 
         const requestedById = new Map(
@@ -506,8 +592,12 @@ export class HealthcareRequirementsService {
           companyId,
           caseId,
         );
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       this.rethrowPersistenceError(error);
     }
   }
