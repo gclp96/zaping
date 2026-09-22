@@ -1,6 +1,5 @@
-import 'dotenv/config';
-
 import { HttpStatus, INestApplication, ValidationPipe } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   EquipmentCondition,
@@ -13,11 +12,14 @@ import {
   ProductInventoryTracking,
   UserRole,
 } from '@prisma/client';
+import { config as loadDotenv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
 import supertest from 'supertest';
 import { App } from 'supertest/types';
 
 import { AuthModule } from '../src/auth/auth.module';
+import { healthcareCompanyTransactionTimeoutConfiguration } from '../src/healthcare/common/healthcare-company-transaction-timeout.config';
 import { HealthcareEquipmentAssignmentsModule } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.module';
 import {
   equipmentAssignmentSettingsAdvisoryLockKey,
@@ -42,6 +44,84 @@ type Scenario = {
   requirementId: string;
   equipmentAssetIds: string[];
 };
+
+const ISOLATED_B4B1_RUN_FLAG = 'RUN_HC_LOCK_B4B1_POSTGRES_TESTS';
+const ISOLATED_B4B1_CONNECTION_VARIABLE = 'HC_LOCK_B4B1_DATABASE_URL';
+const ISOLATED_B4B1_DATABASE = 'zaping_spike_test';
+const ISOLATED_B4B1_USER = 'zaping_hc_lock_b4b1';
+const ISOLATED_B4B1_HOST = '127.0.0.1';
+const ISOLATED_B4B1_HOST_PORT = '5434';
+const ISOLATED_B4B1_SERVER_PORT = 5432;
+const ISOLATED_B4B1_REQUIRED_TABLES = [
+  'Company',
+  'User',
+  'Product',
+  'HealthcareCase',
+  'HealthcareCaseRequirement',
+  'EquipmentAsset',
+  'HealthcareEquipmentAssignment',
+  'HealthcareEquipmentAssignmentConflictOverride',
+  'HealthcareEquipmentRequirementCoverageNote',
+  'HealthcareEquipmentAssignmentSettings',
+  'IdempotencyRecord',
+] as const;
+const ISOLATED_B4B1_ROW_LOCK_PRIVILEGES = [
+  { tableName: 'EquipmentAsset', lockColumn: 'id' },
+  { tableName: 'HealthcareCase', lockColumn: 'id' },
+  { tableName: 'HealthcareCaseRequirement', lockColumn: 'id' },
+  { tableName: 'HealthcareEquipmentAssignment', lockColumn: 'id' },
+  {
+    tableName: 'HealthcareEquipmentAssignmentSettings',
+    lockColumn: 'companyId',
+  },
+] as const;
+const ISOLATED_B4B1_TABLE_PRIVILEGES = [
+  { tableName: 'Company', privileges: ['SELECT', 'INSERT', 'DELETE'] },
+  { tableName: 'User', privileges: ['SELECT', 'INSERT', 'DELETE'] },
+  { tableName: 'Product', privileges: ['SELECT', 'INSERT', 'DELETE'] },
+  {
+    tableName: 'HealthcareCase',
+    privileges: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  },
+  {
+    tableName: 'HealthcareCaseRequirement',
+    privileges: ['SELECT', 'INSERT', 'DELETE'],
+  },
+  {
+    tableName: 'EquipmentAsset',
+    privileges: ['SELECT', 'INSERT', 'DELETE'],
+  },
+  {
+    tableName: 'HealthcareEquipmentAssignment',
+    privileges: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  },
+  {
+    tableName: 'HealthcareEquipmentAssignmentConflictOverride',
+    privileges: ['SELECT', 'DELETE'],
+  },
+  {
+    tableName: 'HealthcareEquipmentRequirementCoverageNote',
+    privileges: ['SELECT', 'DELETE'],
+  },
+  {
+    tableName: 'HealthcareEquipmentAssignmentSettings',
+    privileges: ['SELECT', 'DELETE'],
+  },
+  {
+    tableName: 'IdempotencyRecord',
+    privileges: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'],
+  },
+] as const;
+
+const runIsolatedB4B1Tests = process.env[ISOLATED_B4B1_RUN_FLAG] === '1';
+
+if (!runIsolatedB4B1Tests) {
+  loadDotenv(
+    process.env.DOTENV_CONFIG_PATH
+      ? { path: process.env.DOTENV_CONFIG_PATH }
+      : undefined,
+  );
+}
 
 const safeDatabaseNamePattern =
   /(?:^|[_-])(?:test|testing|integration|ci|qa|ephemeral)(?:[_-]|$)/i;
@@ -103,8 +183,96 @@ function assertSafeDbIntegrityDatabase(): void {
 
 const runDbIntegrityTests = process.env.RUN_DB_INTEGRITY_TESTS === '1';
 
+if (runIsolatedB4B1Tests && runDbIntegrityTests) {
+  throw new Error(
+    `${ISOLATED_B4B1_RUN_FLAG}=1 cannot be combined with RUN_DB_INTEGRITY_TESTS=1.`,
+  );
+}
+
 if (runDbIntegrityTests) {
   assertSafeDbIntegrityDatabase();
+}
+
+function requireIsolatedB4B1ConnectionUrl(): URL {
+  const rawConnectionUrl = process.env[ISOLATED_B4B1_CONNECTION_VARIABLE];
+
+  if (!rawConnectionUrl) {
+    throw new Error(
+      `${ISOLATED_B4B1_CONNECTION_VARIABLE} is required when ${ISOLATED_B4B1_RUN_FLAG}=1.`,
+    );
+  }
+
+  let connectionUrl: URL;
+
+  try {
+    connectionUrl = new URL(rawConnectionUrl);
+  } catch {
+    throw new Error(
+      `${ISOLATED_B4B1_CONNECTION_VARIABLE} must be a valid PostgreSQL URL.`,
+    );
+  }
+
+  let databaseName: string;
+  let databaseUser: string;
+
+  try {
+    databaseName = decodeURIComponent(
+      connectionUrl.pathname.replace(/^\/+/, ''),
+    );
+    databaseUser = decodeURIComponent(connectionUrl.username);
+  } catch {
+    throw new Error(
+      `${ISOLATED_B4B1_CONNECTION_VARIABLE} contains invalid percent-encoding.`,
+    );
+  }
+
+  if (
+    !['postgres:', 'postgresql:'].includes(connectionUrl.protocol) ||
+    connectionUrl.hostname !== ISOLATED_B4B1_HOST ||
+    connectionUrl.port !== ISOLATED_B4B1_HOST_PORT ||
+    databaseName !== ISOLATED_B4B1_DATABASE ||
+    databaseUser !== ISOLATED_B4B1_USER ||
+    !connectionUrl.password
+  ) {
+    throw new Error(
+      `${ISOLATED_B4B1_CONNECTION_VARIABLE} does not identify the authorized isolated B4-B1 target.`,
+    );
+  }
+
+  if (connectionUrl.search.length > 0 || connectionUrl.hash.length > 0) {
+    throw new Error(
+      `${ISOLATED_B4B1_CONNECTION_VARIABLE} must not contain routing or connection-option overrides.`,
+    );
+  }
+
+  return connectionUrl;
+}
+
+const isolatedB4B1ConnectionUrl = runIsolatedB4B1Tests
+  ? requireIsolatedB4B1ConnectionUrl()
+  : null;
+
+class ExplicitB4B1PrismaService extends PrismaService {
+  constructor(datasourceUrl: string) {
+    super({ datasourceUrl });
+  }
+}
+
+function createBackendTestPrisma(): PrismaService {
+  if (!isolatedB4B1ConnectionUrl) {
+    return new PrismaService();
+  }
+
+  const clientUrl = new URL(isolatedB4B1ConnectionUrl.toString());
+  clientUrl.searchParams.set('connection_limit', '8');
+  clientUrl.searchParams.set('pool_timeout', '5');
+  clientUrl.searchParams.set('connect_timeout', '5');
+
+  try {
+    return new ExplicitB4B1PrismaService(clientUrl.toString());
+  } catch {
+    throw new Error('Could not construct the isolated B4-B1 Prisma client.');
+  }
 }
 
 async function assertConnectedDbIntegrityDatabase(
@@ -135,6 +303,200 @@ async function assertConnectedDbIntegrityDatabase(
   ) {
     throw new Error(
       'Connected PostgreSQL identity does not match the authorized integrity-test destination.',
+    );
+  }
+}
+
+type IsolatedB4B1DatabaseIdentity = {
+  databaseName: string;
+  databaseUser: string;
+  serverPort: number;
+  serverVersionNumber: string;
+  currentSchema: string;
+  backendPid: number;
+};
+
+type RawQueryClient = {
+  $queryRaw<T = unknown>(query: Prisma.Sql): Promise<T>;
+};
+
+async function assertConnectedIsolatedB4B1Database(
+  prisma: RawQueryClient,
+): Promise<IsolatedB4B1DatabaseIdentity> {
+  const [identity] = await prisma.$queryRaw<IsolatedB4B1DatabaseIdentity[]>(
+    Prisma.sql`
+      SELECT
+        current_database() AS "databaseName",
+        current_user AS "databaseUser",
+        inet_server_port()::int AS "serverPort",
+        current_setting('server_version_num') AS "serverVersionNumber",
+        current_schema() AS "currentSchema",
+        pg_backend_pid()::int AS "backendPid"
+    `,
+  );
+  const serverVersionNumber = Number(identity?.serverVersionNumber);
+
+  if (
+    !identity ||
+    identity.databaseName !== ISOLATED_B4B1_DATABASE ||
+    identity.databaseUser !== ISOLATED_B4B1_USER ||
+    identity.serverPort !== ISOLATED_B4B1_SERVER_PORT ||
+    identity.currentSchema !== 'public' ||
+    !Number.isInteger(serverVersionNumber) ||
+    serverVersionNumber < 160_000 ||
+    serverVersionNumber >= 170_000 ||
+    !Number.isSafeInteger(identity.backendPid) ||
+    identity.backendPid <= 0
+  ) {
+    throw new Error(
+      'Connected PostgreSQL identity does not match the authorized isolated B4-B1 target.',
+    );
+  }
+
+  return identity;
+}
+
+async function assertIsolatedB4B1SchemaAndPrivileges(
+  prisma: RawQueryClient,
+): Promise<void> {
+  const tableRows = await prisma.$queryRaw<
+    Array<{ tableName: string; tableOid: string | null }>
+  >(Prisma.sql`
+    SELECT required."tableName", to_regclass(
+      format('public.%I', required."tableName")
+    )::text AS "tableOid"
+    FROM (
+      VALUES ${Prisma.join(
+        ISOLATED_B4B1_REQUIRED_TABLES.map(
+          (tableName) => Prisma.sql`(${tableName})`,
+        ),
+      )}
+    ) AS required("tableName")
+  `);
+  const missingTables = tableRows
+    .filter((row) => row.tableOid === null)
+    .map((row) => row.tableName);
+
+  if (
+    tableRows.length !== ISOLATED_B4B1_REQUIRED_TABLES.length ||
+    missingTables.length > 0
+  ) {
+    throw new Error(
+      `Isolated B4-B1 schema is missing required table(s): ${missingTables.join(', ') || 'unknown'}.`,
+    );
+  }
+
+  const tablePrivilegeRows = await prisma.$queryRaw<
+    Array<{ tableName: string; privilege: string; allowed: boolean }>
+  >(Prisma.sql`
+    SELECT
+      required."tableName",
+      required."privilege",
+      COALESCE(
+        has_table_privilege(
+          current_user,
+          format('public.%I', required."tableName"),
+          required."privilege"
+        ),
+        false
+      ) AS "allowed"
+    FROM (
+      VALUES ${Prisma.join(
+        ISOLATED_B4B1_TABLE_PRIVILEGES.flatMap(({ tableName, privileges }) =>
+          privileges.map(
+            (privilege) => Prisma.sql`(${tableName}, ${privilege})`,
+          ),
+        ),
+      )}
+    ) AS required("tableName", "privilege")
+  `);
+  const missingTablePrivileges = tablePrivilegeRows
+    .filter((row) => !row.allowed)
+    .map((row) => `${row.tableName} ${row.privilege}`);
+
+  const rowLockPrivilegeRows = await prisma.$queryRaw<
+    Array<{
+      tableName: string;
+      lockColumn: string;
+      canSelect: boolean;
+      canUpdateLockColumn: boolean;
+    }>
+  >(Prisma.sql`
+    SELECT
+      required."tableName",
+      required."lockColumn",
+      COALESCE(
+        has_table_privilege(current_user, relation.oid, 'SELECT'),
+        false
+      ) AS "canSelect",
+      COALESCE(
+        has_column_privilege(
+          current_user,
+          relation.oid,
+          attribute.attnum,
+          'UPDATE'
+        ),
+        false
+      ) AS "canUpdateLockColumn"
+    FROM (
+      VALUES ${Prisma.join(
+        ISOLATED_B4B1_ROW_LOCK_PRIVILEGES.map(
+          ({ tableName, lockColumn }) =>
+            Prisma.sql`(${tableName}, ${lockColumn})`,
+        ),
+      )}
+    ) AS required("tableName", "lockColumn")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_class AS relation
+      ON relation.relnamespace = namespace.oid
+      AND relation.relname = required."tableName"
+    LEFT JOIN pg_attribute AS attribute
+      ON attribute.attrelid = relation.oid
+      AND attribute.attname = required."lockColumn"
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+  `);
+  const missingRowLockPrivileges = rowLockPrivilegeRows
+    .filter((row) => !row.canSelect || !row.canUpdateLockColumn)
+    .map((row) => `${row.tableName} UPDATE(${row.lockColumn})`);
+
+  if (
+    tablePrivilegeRows.length !==
+      ISOLATED_B4B1_TABLE_PRIVILEGES.reduce(
+        (total, requirement) => total + requirement.privileges.length,
+        0,
+      ) ||
+    missingTablePrivileges.length > 0 ||
+    rowLockPrivilegeRows.length !== ISOLATED_B4B1_ROW_LOCK_PRIVILEGES.length ||
+    missingRowLockPrivileges.length > 0
+  ) {
+    throw new Error(
+      `Isolated B4-B1 privilege preflight failed for: ${
+        [...missingTablePrivileges, ...missingRowLockPrivileges].join(', ') ||
+        'unknown target'
+      }.`,
+    );
+  }
+}
+
+async function assertIsolatedB4B1ExclusiveAvailability(
+  prisma: RawQueryClient,
+  ownBackendPid: number,
+): Promise<void> {
+  const otherSessions = await prisma.$queryRaw<Array<{ pid: number }>>(
+    Prisma.sql`
+      SELECT pid::int AS "pid"
+      FROM pg_stat_activity
+      WHERE datname = ${ISOLATED_B4B1_DATABASE}
+        AND backend_type = 'client backend'
+        AND pid <> ${ownBackendPid}::integer
+    `,
+  );
+
+  if (otherSessions.length > 0) {
+    throw new Error(
+      `Isolated B4-B1 target has ${otherSessions.length} unrelated session(s); exclusive availability is required.`,
     );
   }
 }
@@ -332,23 +694,91 @@ async function waitForBlockedBackendChain(
   );
 }
 
-async function observeBlockedRace<T>(
+type BlockingBackendObservation = {
+  pid: number;
+  blockerPids: number[];
+};
+
+type CompanyFirstBlockingChain = {
+  rowLockWaiter: BlockingBackendObservation;
+  companyLockWaiter: BlockingBackendObservation;
+};
+
+async function waitForCompanyFirstBlockingChain(
+  prisma: PrismaService,
+  rootBlockerPid: number,
+  rowLockQueryFragment: string,
+  observationBudgetMs: number,
+): Promise<CompanyFirstBlockingChain> {
+  const deadline = performance.now() + observationBudgetMs;
+
+  while (performance.now() < deadline) {
+    const rows = await prisma.$queryRaw<
+      Array<BlockingBackendObservation & { queryText: string }>
+    >(Prisma.sql`
+      SELECT
+        activity.pid::int AS "pid",
+        activity.query AS "queryText",
+        pg_blocking_pids(activity.pid)::int[] AS "blockerPids"
+      FROM pg_stat_activity AS activity
+      WHERE activity.datname = current_database()
+        AND activity.pid <> pg_backend_pid()
+        AND activity.wait_event_type = 'Lock'
+      ORDER BY activity.pid ASC
+    `);
+    const rowLockWaiters = rows.filter(
+      (row) =>
+        row.queryText.includes(rowLockQueryFragment) &&
+        row.blockerPids.includes(rootBlockerPid),
+    );
+
+    if (rowLockWaiters.length === 1) {
+      const rowLockWaiter = rowLockWaiters[0];
+      const companyLockWaiters = rows.filter(
+        (row) =>
+          row.queryText.includes('pg_advisory_xact_lock') &&
+          row.blockerPids.includes(rowLockWaiter.pid),
+      );
+
+      if (companyLockWaiters.length === 1) {
+        return {
+          rowLockWaiter,
+          companyLockWaiter: companyLockWaiters[0],
+        };
+      }
+    }
+
+    const remainingMs = deadline - performance.now();
+
+    if (remainingMs > 0) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(25, Math.max(1, remainingMs))),
+      );
+    }
+  }
+
+  throw new Error(
+    `Expected one backend blocked by ${rootBlockerPid} in a query containing "${rowLockQueryFragment}" and one backend blocked behind its Company advisory lock.`,
+  );
+}
+
+async function observeCompanyFirstBlockedRace<T>(
   prisma: PrismaService,
   blocker: ControlledDatabaseBlocker,
-  queryFragment: string,
-  expectedBlockedCount: number,
+  rowLockQueryFragment: string,
   operation: Promise<T>,
   label: string,
-): Promise<{ blockedPids: number[]; result: T }> {
-  let blockedPids: number[] = [];
+  observationBudgetMs: number,
+): Promise<CompanyFirstBlockingChain & { result: T }> {
+  let blockingChain: CompanyFirstBlockingChain | null = null;
   let observationError: unknown = null;
 
   try {
-    blockedPids = await waitForBlockedBackendChain(
+    blockingChain = await waitForCompanyFirstBlockingChain(
       prisma,
       blocker.pid,
-      queryFragment,
-      expectedBlockedCount,
+      rowLockQueryFragment,
+      observationBudgetMs,
     );
   } catch (error) {
     observationError = error;
@@ -382,7 +812,11 @@ async function observeBlockedRace<T>(
     throw new Error(`${label} did not settle.`);
   }
 
-  return { blockedPids, result: operationSettlement.value };
+  if (blockingChain === null) {
+    throw new Error(`${label} did not produce a blocking-chain observation.`);
+  }
+
+  return { ...blockingChain, result: operationSettlement.value };
 }
 
 async function cleanupFixture(
@@ -459,14 +893,84 @@ async function cleanupFixture(
   }
 }
 
-(runDbIntegrityTests ? describe : describe.skip)(
+async function assertNoRunOwnedFixtures(
+  prisma: PrismaService,
+  fixture: Fixture,
+): Promise<void> {
+  const companyIds = [fixture.companyAId, fixture.companyBId];
+  const counts = await Promise.all([
+    prisma.healthcareEquipmentAssignmentConflictOverride.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareEquipmentRequirementCoverageNote.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareEquipmentAssignment.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.idempotencyRecord.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareEquipmentAssignmentSettings.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareCaseRequirement.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareCase.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.equipmentAsset.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.product.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.user.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.company.count({
+      where: { id: { in: companyIds } },
+    }),
+  ]);
+
+  if (counts.some((count) => count !== 0)) {
+    throw new Error(
+      `Isolated B4-B1 fixture cleanup left run-owned record counts: ${counts.join(', ')}.`,
+    );
+  }
+}
+
+(runDbIntegrityTests || runIsolatedB4B1Tests ? describe : describe.skip)(
   'Healthcare Equipment Assignment backend PostgreSQL integration',
   () => {
-    const prisma = new PrismaService();
+    const prisma = createBackendTestPrisma();
     const repository = new HealthcareEquipmentAssignmentsRepository(prisma);
-    const service = new HealthcareEquipmentAssignmentsService(repository);
+    const companyTransactionTimeoutPolicy =
+      healthcareCompanyTransactionTimeoutConfiguration();
+    const blockingChainObservationBudgetMs =
+      Math.min(
+        companyTransactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+        companyTransactionTimeoutPolicy.subsequentLockTimeoutMs,
+      ) - 500;
+    const service = new HealthcareEquipmentAssignmentsService(
+      repository,
+      companyTransactionTimeoutPolicy,
+    );
     const fixture = buildFixture();
+    const describeB4B1Concurrency = runIsolatedB4B1Tests
+      ? describe.only
+      : describe;
+    const testNonIsolatedB4B1Case = runIsolatedB4B1Tests ? it.skip : it;
     let databaseConnected = false;
+    let targetVerified = false;
+    let fixturesStarted = false;
+
+    if (blockingChainObservationBudgetMs <= 0) {
+      throw new Error(
+        'The B4-B1 blocking-chain observation budget must leave a positive safety margin.',
+      );
+    }
 
     const userForCompany = (companyId: string): string =>
       companyId === fixture.companyAId ? fixture.userAId : fixture.userBId;
@@ -581,11 +1085,38 @@ async function cleanupFixture(
     };
 
     beforeAll(async () => {
-      await prisma.$connect();
+      try {
+        await prisma.$connect();
+      } catch (error) {
+        if (runIsolatedB4B1Tests) {
+          throw new Error(
+            'Could not connect the isolated B4-B1 Prisma client.',
+          );
+        }
+
+        throw error;
+      }
+
       databaseConnected = true;
-      await assertConnectedDbIntegrityDatabase(prisma);
+
+      if (runIsolatedB4B1Tests) {
+        await prisma.$transaction(async (transaction) => {
+          const identity =
+            await assertConnectedIsolatedB4B1Database(transaction);
+          await assertIsolatedB4B1SchemaAndPrivileges(transaction);
+          await assertIsolatedB4B1ExclusiveAvailability(
+            transaction,
+            identity.backendPid,
+          );
+        });
+      } else {
+        await assertConnectedDbIntegrityDatabase(prisma);
+      }
+
+      targetVerified = true;
       const suffix = randomUUID();
 
+      fixturesStarted = true;
       await prisma.company.createMany({
         data: [
           {
@@ -629,10 +1160,39 @@ async function cleanupFixture(
         return;
       }
 
+      const errors: unknown[] = [];
+
+      if (targetVerified && fixturesStarted) {
+        try {
+          await cleanupFixture(prisma, fixture);
+        } catch (error) {
+          errors.push(error);
+        }
+
+        try {
+          await assertNoRunOwnedFixtures(prisma, fixture);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+
       try {
-        await cleanupFixture(prisma, fixture);
-      } finally {
         await prisma.$disconnect();
+      } catch (error) {
+        errors.push(
+          runIsolatedB4B1Tests
+            ? new Error(
+                'The isolated B4-B1 Prisma client failed to disconnect.',
+              )
+            : error,
+        );
+      }
+
+      if (errors.length > 0) {
+        throw new AggregateError(
+          errors,
+          'Healthcare Equipment Assignment backend teardown failed.',
+        );
       }
     });
 
@@ -2081,7 +2641,7 @@ async function cleanupFixture(
       });
     });
 
-    describe('B4-B1 Replace PostgreSQL concurrency', () => {
+    describeB4B1Concurrency('B4-B1 Replace PostgreSQL concurrency', () => {
       const createDirectAssignment = async (
         scenario: Scenario,
         caseId: string,
@@ -2148,17 +2708,20 @@ async function cleanupFixture(
             dto,
           ),
         ]);
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "EquipmentAsset"',
-          2,
           operation,
           'Identical Replace race',
+          blockingChainObservationBudgetMs,
         );
 
-        expect(race.blockedPids).toHaveLength(2);
-        expect(new Set(race.blockedPids).size).toBe(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(race.result.map((result) => result.outcome)).toEqual([
           'REPLACED',
           'REPLACED',
@@ -2246,13 +2809,13 @@ async function cleanupFixture(
             },
           ),
         ]);
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "HealthcareEquipmentAssignment"',
-          2,
           operation,
           'Distinct-key same-source Replace race',
+          blockingChainObservationBudgetMs,
         );
         const fulfilled = race.result.filter(
           (result) => result.status === 'fulfilled',
@@ -2261,7 +2824,11 @@ async function cleanupFixture(
           (result) => result.status === 'rejected',
         );
 
-        expect(race.blockedPids).toHaveLength(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(fulfilled).toHaveLength(1);
         expect(rejected).toHaveLength(1);
         expect(fulfilled[0]).toMatchObject({
@@ -2329,13 +2896,13 @@ async function cleanupFixture(
             replacementReason: 'Payload concurrente B',
           }),
         ]);
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "HealthcareEquipmentAssignment"',
-          2,
           operation,
           'Mismatched same-key Replace race',
+          blockingChainObservationBudgetMs,
         );
         const fulfilled = race.result.filter(
           (result) => result.status === 'fulfilled',
@@ -2344,7 +2911,11 @@ async function cleanupFixture(
           (result) => result.status === 'rejected',
         );
 
-        expect(race.blockedPids).toHaveLength(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(fulfilled).toHaveLength(1);
         expect(fulfilled[0]).toMatchObject({
           value: { outcome: 'REPLACED' },
@@ -2372,144 +2943,159 @@ async function cleanupFixture(
         ).resolves.toBe(1);
       }, 20_000);
 
-      it('D observes a completed claim after a real unique-index collision', async () => {
-        const scenario = await createScenario(fixture.companyAId, {
-          assetCount: 2,
-        });
-        const source = await createDirectAssignment(
-          scenario,
-          scenario.caseId,
-          scenario.equipmentAssetIds[0],
-          'Fuente para visibilidad de claim B4-B1',
-        );
-        const key = `b4b1-claim-visibility-${randomUUID()}`;
-        const dto = {
-          equipmentAssetId: scenario.equipmentAssetIds[1],
-          replacementReason: 'Visibilidad de claim completado',
-        };
-        const requestHash =
-          createHealthcareEquipmentAssignmentReplaceRequestHash(source.id, dto);
-        const blocker = await createControlledDatabaseBlocker(
-          prisma,
-          (transaction) =>
-            transaction.$queryRaw(Prisma.sql`
+      testNonIsolatedB4B1Case(
+        'D observes a completed claim after a real unique-index collision',
+        async () => {
+          const scenario = await createScenario(fixture.companyAId, {
+            assetCount: 2,
+          });
+          const source = await createDirectAssignment(
+            scenario,
+            scenario.caseId,
+            scenario.equipmentAssetIds[0],
+            'Fuente para visibilidad de claim B4-B1',
+          );
+          const key = `b4b1-claim-visibility-${randomUUID()}`;
+          const dto = {
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            replacementReason: 'Visibilidad de claim completado',
+          };
+          const requestHash =
+            createHealthcareEquipmentAssignmentReplaceRequestHash(
+              source.id,
+              dto,
+            );
+          const blocker = await createControlledDatabaseBlocker(
+            prisma,
+            (transaction) =>
+              transaction.$queryRaw(Prisma.sql`
               SELECT "id"
               FROM "User"
               WHERE "id" = ${scenario.userId}
                 AND "companyId" = ${scenario.companyId}
               FOR UPDATE
             `),
-        );
-        const winner = service.replace(
-          scenario.companyId,
-          scenario.userId,
-          source.id,
-          key,
-          dto,
-        );
-        let collisionError: unknown = null;
-        let recoveredPromise: ReturnType<typeof service.replace> | null = null;
-        let winnerBlockedPids: number[] = [];
-        let claimantBlockedPids: number[] = [];
-        let observationError: unknown = null;
-
-        try {
-          winnerBlockedPids = await waitForBlockedBackendChain(
-            prisma,
-            blocker.pid,
-            '"HealthcareEquipmentAssignment"',
-            1,
           );
-          const winnerPid = winnerBlockedPids[0];
+          const winner = service.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            key,
+            dto,
+          );
+          let collisionError: unknown = null;
+          let recoveredPromise: ReturnType<typeof service.replace> | null =
+            null;
+          let winnerBlockedPids: number[] = [];
+          let claimantBlockedPids: number[] = [];
+          let observationError: unknown = null;
 
-          if (winnerPid === undefined) {
-            throw new Error('Could not identify the winning backend PID.');
+          try {
+            winnerBlockedPids = await waitForBlockedBackendChain(
+              prisma,
+              blocker.pid,
+              '"HealthcareEquipmentAssignment"',
+              1,
+            );
+            const winnerPid = winnerBlockedPids[0];
+
+            if (winnerPid === undefined) {
+              throw new Error('Could not identify the winning backend PID.');
+            }
+
+            const collisionAttempt = repository.runInTransaction(
+              (transaction) =>
+                repository.createIdempotencyClaim(
+                  transaction,
+                  scenario.companyId,
+                  key,
+                  IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+                  requestHash,
+                ),
+            );
+
+            recoveredPromise = collisionAttempt.then(
+              () => {
+                throw new Error(
+                  'Expected a real idempotency unique collision.',
+                );
+              },
+              (error: unknown) => {
+                collisionError = error;
+                return service.replace(
+                  scenario.companyId,
+                  scenario.userId,
+                  source.id,
+                  key,
+                  dto,
+                );
+              },
+            );
+            claimantBlockedPids = await waitForBlockedBackendChain(
+              prisma,
+              winnerPid,
+              '"IdempotencyRecord"',
+              1,
+            );
+          } catch (error) {
+            observationError = error;
+          } finally {
+            blocker.release();
           }
 
-          const collisionAttempt = repository.runInTransaction((transaction) =>
-            repository.createIdempotencyClaim(
-              transaction,
-              scenario.companyId,
-              key,
-              IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
-              requestHash,
-            ),
-          );
+          const [, winnerResult, recoveredResult] = await Promise.all([
+            blocker.done,
+            withTimeout(winner, 10_000, 'Claim visibility winner'),
+            recoveredPromise
+              ? withTimeout(
+                  recoveredPromise,
+                  10_000,
+                  'Claim visibility recovery',
+                )
+              : Promise.resolve(null),
+          ]);
 
-          recoveredPromise = collisionAttempt.then(
-            () => {
-              throw new Error('Expected a real idempotency unique collision.');
-            },
-            (error: unknown) => {
-              collisionError = error;
-              return service.replace(
-                scenario.companyId,
-                scenario.userId,
-                source.id,
+          if (observationError !== null) {
+            throw new AggregateError(
+              [observationError],
+              'Claim visibility race observation failed.',
+            );
+          }
+
+          expect(winnerBlockedPids).toHaveLength(1);
+          expect(claimantBlockedPids).toHaveLength(1);
+          expect(collisionError).toBeInstanceOf(
+            Prisma.PrismaClientKnownRequestError,
+          );
+          expect(collisionError).toMatchObject({ code: 'P2002' });
+          expect(winnerResult.outcome).toBe('REPLACED');
+          expect(recoveredResult).not.toBeNull();
+
+          if (
+            winnerResult.outcome !== 'REPLACED' ||
+            recoveredResult === null ||
+            recoveredResult.outcome !== 'REPLACED'
+          ) {
+            throw new Error('Expected winner and recovered REPLACED results');
+          }
+
+          expect(recoveredResult.data.replacedAssignment.id).toBe(source.id);
+          expect(recoveredResult.data.replacementAssignment.id).toBe(
+            winnerResult.data.replacementAssignment.id,
+          );
+          await expect(
+            prisma.idempotencyRecord.count({
+              where: {
+                companyId: scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
                 key,
-                dto,
-              );
-            },
-          );
-          claimantBlockedPids = await waitForBlockedBackendChain(
-            prisma,
-            winnerPid,
-            '"IdempotencyRecord"',
-            1,
-          );
-        } catch (error) {
-          observationError = error;
-        } finally {
-          blocker.release();
-        }
-
-        const [, winnerResult, recoveredResult] = await Promise.all([
-          blocker.done,
-          withTimeout(winner, 10_000, 'Claim visibility winner'),
-          recoveredPromise
-            ? withTimeout(recoveredPromise, 10_000, 'Claim visibility recovery')
-            : Promise.resolve(null),
-        ]);
-
-        if (observationError !== null) {
-          throw new AggregateError(
-            [observationError],
-            'Claim visibility race observation failed.',
-          );
-        }
-
-        expect(winnerBlockedPids).toHaveLength(1);
-        expect(claimantBlockedPids).toHaveLength(1);
-        expect(collisionError).toBeInstanceOf(
-          Prisma.PrismaClientKnownRequestError,
-        );
-        expect(collisionError).toMatchObject({ code: 'P2002' });
-        expect(winnerResult.outcome).toBe('REPLACED');
-        expect(recoveredResult).not.toBeNull();
-
-        if (
-          winnerResult.outcome !== 'REPLACED' ||
-          recoveredResult === null ||
-          recoveredResult.outcome !== 'REPLACED'
-        ) {
-          throw new Error('Expected winner and recovered REPLACED results');
-        }
-
-        expect(recoveredResult.data.replacedAssignment.id).toBe(source.id);
-        expect(recoveredResult.data.replacementAssignment.id).toBe(
-          winnerResult.data.replacementAssignment.id,
-        );
-        await expect(
-          prisma.idempotencyRecord.count({
-            where: {
-              companyId: scenario.companyId,
-              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
-              key,
-              resourceId: winnerResult.data.replacementAssignment.id,
-            },
-          }),
-        ).resolves.toBe(1);
-      }, 20_000);
+                resourceId: winnerResult.data.replacementAssignment.id,
+              },
+            }),
+          ).resolves.toBe(1);
+        },
+        20_000,
+      );
 
       it('E rereads an overlapping same-asset winner and requires conflict review', async () => {
         const scenario = await createScenario(fixture.companyAId, {
@@ -2559,16 +3145,20 @@ async function cleanupFixture(
             ),
           ),
         );
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "EquipmentAsset"',
-          2,
           operation,
           'Overlapping same-asset Replace race',
+          blockingChainObservationBudgetMs,
         );
 
-        expect(race.blockedPids).toHaveLength(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(race.result.map((result) => result.outcome).sort()).toEqual([
           'CONFLICT_REVIEW_REQUIRED',
           'REPLACED',
@@ -2662,16 +3252,20 @@ async function cleanupFixture(
             ),
           ),
         );
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "EquipmentAsset"',
-          2,
           operation,
           'Non-overlapping same-asset Replace race',
+          blockingChainObservationBudgetMs,
         );
 
-        expect(race.blockedPids).toHaveLength(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(race.result.map((result) => result.outcome)).toEqual([
           'REPLACED',
           'REPLACED',
@@ -2746,16 +3340,20 @@ async function cleanupFixture(
             requirementId: scenario.requirementId,
           }),
         ]);
-        const race = await observeBlockedRace(
+        const race = await observeCompanyFirstBlockedRace(
           prisma,
           blocker,
           'FROM "HealthcareCaseRequirement"',
-          2,
           operation,
           'Replace/Create Requirement-capacity race',
+          blockingChainObservationBudgetMs,
         );
 
-        expect(race.blockedPids).toHaveLength(2);
+        expect(race.rowLockWaiter.blockerPids).toContain(blocker.pid);
+        expect(race.companyLockWaiter.blockerPids).toContain(
+          race.rowLockWaiter.pid,
+        );
+        expect(race.companyLockWaiter.pid).not.toBe(race.rowLockWaiter.pid);
         expect(race.result[0]).toMatchObject({
           status: 'fulfilled',
           value: { outcome: 'REPLACED' },
@@ -2983,7 +3581,15 @@ async function cleanupFixture(
         });
 
         const moduleRef: TestingModule = await Test.createTestingModule({
-          imports: [AuthModule, HealthcareEquipmentAssignmentsModule],
+          imports: [
+            ConfigModule.forRoot({
+              isGlobal: true,
+              ignoreEnvFile: true,
+              load: [healthcareCompanyTransactionTimeoutConfiguration],
+            }),
+            AuthModule,
+            HealthcareEquipmentAssignmentsModule,
+          ],
         }).compile();
 
         httpApp = moduleRef.createNestApplication();
