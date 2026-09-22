@@ -782,7 +782,23 @@ export class HealthcareEquipmentAssignmentsService {
         throw equipmentAssignmentReplacementSameAssetException();
       }
 
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.repository.runInTransaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
         const assetLocked = await this.repository.lockEquipmentAsset(
           transaction,
           companyId,
@@ -1148,8 +1164,12 @@ export class HealthcareEquipmentAssignmentsService {
             ),
           },
         };
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       if (this.isIdempotencyUniqueViolation(error)) {
         const replay = await this.findCompletedIdempotentReplacement(
           companyId,
