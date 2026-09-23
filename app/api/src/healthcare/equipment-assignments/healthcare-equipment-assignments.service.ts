@@ -65,6 +65,7 @@ import {
 } from './healthcare-equipment-assignment-availability';
 
 import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
+import { createHealthcareEquipmentAssignmentReleaseRequestHash } from './healthcare-equipment-assignment-release-request-hash';
 
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
 import { ReplaceHealthcareEquipmentAssignmentDto } from './dto/replace-healthcare-equipment-assignment.dto';
@@ -77,6 +78,7 @@ import {
 
 const CREATE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE;
 const REPLACE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE;
+const RELEASE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE;
 const RESERVED_ASSIGNMENT_UNIQUE_CONSTRAINT =
   'HealthcareEquipmentAssignment_reserved_case_asset_key';
 const IDEMPOTENCY_UNIQUE_CONSTRAINT =
@@ -682,6 +684,7 @@ export class HealthcareEquipmentAssignmentsService {
     releasedById: string,
     assignmentId: string,
     dto: ReleaseHealthcareEquipmentAssignmentDto,
+    idempotencyKey?: string,
   ): Promise<HealthcareEquipmentAssignmentResponse> {
     const releaseReason = normalizeHealthcareOptionalText(dto.reason);
 
@@ -689,10 +692,51 @@ export class HealthcareEquipmentAssignmentsService {
       throw equipmentAssignmentReleaseReasonRequiredException();
     }
 
+    const requestHash = idempotencyKey
+      ? createHealthcareEquipmentAssignmentReleaseRequestHash(
+          assignmentId,
+          releaseReason,
+        )
+      : null;
     const releasedAt = new Date();
 
     try {
+      const source = await this.repository.findAssignmentReleaseSource(
+        companyId,
+        assignmentId,
+      );
+
+      if (!source) {
+        throw equipmentAssignmentNotFoundException();
+      }
+
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
+
       return await this.repository.runInTransaction(async (transaction) => {
+        await acquireHealthcareCompanyLock(transaction, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          transaction,
+          this.companyTransactionTimeoutPolicy,
+        );
+
+        const assetLocked = await this.repository.lockEquipmentAsset(
+          transaction,
+          companyId,
+          source.equipmentAssetId,
+        );
+
+        if (!assetLocked) {
+          throw equipmentAssetNotFoundException();
+        }
+
         const locked = await this.repository.lockAssignment(
           transaction,
           companyId,
@@ -703,12 +747,59 @@ export class HealthcareEquipmentAssignmentsService {
           throw equipmentAssignmentNotFoundException();
         }
 
+        if (locked.equipmentAssetId !== source.equipmentAssetId) {
+          throw resourceStateChangedException();
+        }
+
+        if (idempotencyKey && requestHash) {
+          const replay = await this.findCompletedIdempotentRelease(
+            companyId,
+            idempotencyKey,
+            requestHash,
+            transaction,
+          );
+
+          if (replay) {
+            return replay;
+          }
+        }
+
+        if (
+          locked.lifecycle ===
+            HealthcareEquipmentAssignmentLifecycle.RELEASED &&
+          locked.releaseCause ===
+            HealthcareEquipmentAssignmentReleaseCause.MANUAL &&
+          locked.releaseReason === releaseReason
+        ) {
+          const replay = await this.repository.findAssignment(
+            companyId,
+            assignmentId,
+            transaction,
+          );
+
+          if (!replay) {
+            throw equipmentAssignmentNotFoundException();
+          }
+
+          return this.mapResponse(replay, null);
+        }
+
         if (
           locked.lifecycle !== HealthcareEquipmentAssignmentLifecycle.RESERVED
         ) {
           throw equipmentAssignmentNotReservedException();
         }
 
+        const claim =
+          idempotencyKey && requestHash
+            ? await this.repository.createIdempotencyClaim(
+                transaction,
+                companyId,
+                idempotencyKey,
+                RELEASE_SCOPE,
+                requestHash,
+              )
+            : null;
         const result = await this.repository.releaseAssignment(transaction, {
           companyId,
           assignmentId,
@@ -732,9 +823,37 @@ export class HealthcareEquipmentAssignmentsService {
           throw equipmentAssignmentNotFoundException();
         }
 
+        if (claim) {
+          await this.repository.completeIdempotencyClaim(
+            transaction,
+            claim.id,
+            record.id,
+          );
+        }
+
         return this.mapResponse(record, null);
-      });
+      }, transactionOptions);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
+      if (
+        idempotencyKey &&
+        requestHash &&
+        this.isIdempotencyUniqueViolation(error)
+      ) {
+        const replay = await this.findCompletedIdempotentRelease(
+          companyId,
+          idempotencyKey,
+          requestHash,
+        );
+
+        if (replay) {
+          return replay;
+        }
+      }
+
       this.rethrowPersistenceError(error);
     }
   }
@@ -1501,6 +1620,56 @@ export class HealthcareEquipmentAssignmentsService {
           ),
         },
       };
+    } catch (error) {
+      this.rethrowPersistenceError(error);
+    }
+  }
+
+  private async findCompletedIdempotentRelease(
+    companyId: string,
+    idempotencyKey: string,
+    requestHash: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<HealthcareEquipmentAssignmentResponse | null> {
+    try {
+      const record = client
+        ? await this.repository.findIdempotencyRecord(
+            companyId,
+            idempotencyKey,
+            RELEASE_SCOPE,
+            client,
+          )
+        : await this.repository.findIdempotencyRecord(
+            companyId,
+            idempotencyKey,
+            RELEASE_SCOPE,
+          );
+
+      if (!record) {
+        return null;
+      }
+
+      if (record.requestHash !== requestHash) {
+        throw idempotencyKeyReusedException();
+      }
+
+      if (!record.resourceId) {
+        return null;
+      }
+
+      const assignment = client
+        ? await this.repository.findAssignment(
+            companyId,
+            record.resourceId,
+            client,
+          )
+        : await this.repository.findAssignment(companyId, record.resourceId);
+
+      if (!assignment) {
+        throw equipmentAssignmentNotFoundException();
+      }
+
+      return this.mapResponse(assignment, null);
     } catch (error) {
       this.rethrowPersistenceError(error);
     }

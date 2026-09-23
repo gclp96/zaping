@@ -139,6 +139,28 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     );
   });
 
+  it('discovers only the tenant-scoped source Asset for Manual Release', async () => {
+    prisma.healthcareEquipmentAssignment.findFirst.mockResolvedValue({
+      id: assignmentId,
+      equipmentAssetId,
+    });
+
+    await repository.findAssignmentReleaseSource(companyId, assignmentId);
+
+    expect(prisma.healthcareEquipmentAssignment.findFirst).toHaveBeenCalledWith(
+      {
+        where: {
+          id: assignmentId,
+          companyId,
+        },
+        select: {
+          id: true,
+          equipmentAssetId: true,
+        },
+      },
+    );
+  });
+
   it('locks a tenant-scoped Assignment with the replacement snapshot fields', async () => {
     prisma.$queryRaw.mockResolvedValue([
       {
@@ -150,6 +172,10 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
         origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
         lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
         directAssignmentReason: 'Urgente',
+        releasedAt: null,
+        releasedById: null,
+        releaseCause: null,
+        releaseReason: null,
         updatedAt: new Date('2026-09-18T18:00:00.000Z'),
       },
     ]);
@@ -205,6 +231,7 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
   it.each([
     IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
     IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+    IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
   ])('uses the exact %s idempotency identity', async (scope) => {
     await repository.findIdempotencyRecord(companyId, 'request-key', scope);
 

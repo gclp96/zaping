@@ -358,6 +358,23 @@ export class HealthcareEquipmentAssignmentsRepository {
     });
   }
 
+  findAssignmentReleaseSource(
+    companyId: string,
+    assignmentId: string,
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
+  ) {
+    return client.healthcareEquipmentAssignment.findFirst({
+      where: {
+        id: assignmentId,
+        companyId,
+      },
+      select: {
+        id: true,
+        equipmentAssetId: true,
+      },
+    });
+  }
+
   async lockAssignment(
     transaction: Prisma.TransactionClient,
     companyId: string,
@@ -373,6 +390,10 @@ export class HealthcareEquipmentAssignmentsRepository {
         origin: HealthcareEquipmentAssignmentOrigin;
         lifecycle: HealthcareEquipmentAssignmentLifecycle;
         directAssignmentReason: string | null;
+        releasedAt: Date | null;
+        releasedById: string | null;
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause | null;
+        releaseReason: string | null;
         updatedAt: Date;
       }>
     >(Prisma.sql`
@@ -385,6 +406,10 @@ export class HealthcareEquipmentAssignmentsRepository {
       "origin",
       "lifecycle",
       "directAssignmentReason",
+      "releasedAt",
+      "releasedById",
+      "releaseCause",
+      "releaseReason",
       "updatedAt"
     FROM "HealthcareEquipmentAssignment"
     WHERE "id" = ${assignmentId}

@@ -99,7 +99,7 @@ describe('HealthcareEquipmentAssignmentsController', () => {
     expect(response.status).toHaveBeenCalledWith(HttpStatus.CREATED);
   });
 
-  it('releases with authenticated tenant and actor', async () => {
+  it('releases with authenticated tenant, actor and optional trimmed idempotency key', async () => {
     const dto = {
       reason: 'Equipo ya no requerido',
     };
@@ -109,15 +109,34 @@ describe('HealthcareEquipmentAssignmentsController', () => {
       status: 'RELEASED',
     });
 
-    await controller.release(request as never, assignmentId, dto);
+    await controller.release(
+      request as never,
+      assignmentId,
+      '  release-request-key  ',
+      dto,
+    );
 
     expect(service.release).toHaveBeenCalledWith(
       companyId,
       userId,
       assignmentId,
       dto,
+      'release-request-key',
     );
   });
+
+  it.each(['', '   ', 'x'.repeat(129)])(
+    'rejects supplied invalid optional Release Idempotency-Key %p',
+    (key) => {
+      expect(() =>
+        controller.release(request as never, assignmentId, key, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).toThrow(BadRequestException);
+
+      expect(service.release).not.toHaveBeenCalled();
+    },
+  );
 
   it('replaces with authenticated tenant/actor and trimmed idempotency key', async () => {
     const dto = {
@@ -539,6 +558,57 @@ describe('HealthcareEquipmentAssignmentsController Replace HTTP', () => {
       userId,
       assignmentId,
       { reason: 'Equipo ya no requerido' },
+      undefined,
     );
   });
+
+  it.each([UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE])(
+    'allows %s to release with an optional normalized key',
+    async (role) => {
+      currentRole = role;
+
+      const response = await supertest(app.getHttpServer())
+        .post(`/healthcare/equipment-assignments/${assignmentId}/release`)
+        .set('Idempotency-Key', '  release-http-key  ')
+        .send({ reason: 'Equipo ya no requerido' })
+        .expect(HttpStatus.OK);
+
+      expect(response.body).toEqual({
+        id: assignmentId,
+        status: 'RELEASED',
+      });
+      expect(httpService.release).toHaveBeenCalledWith(
+        companyId,
+        userId,
+        assignmentId,
+        { reason: 'Equipo ya no requerido' },
+        'release-http-key',
+      );
+    },
+  );
+
+  it('returns 403 before lookup when SALES attempts Manual Release', async () => {
+    currentRole = UserRole.SALES;
+
+    await supertest(app.getHttpServer())
+      .post(`/healthcare/equipment-assignments/${assignmentId}/release`)
+      .set('Idempotency-Key', 'release-http-key')
+      .send({ reason: 'Equipo ya no requerido' })
+      .expect(HttpStatus.FORBIDDEN);
+
+    expect(httpService.release).not.toHaveBeenCalled();
+  });
+
+  it.each(['   ', 'x'.repeat(129)])(
+    'returns 400 for supplied invalid optional Release Idempotency-Key %p',
+    async (idempotencyKey) => {
+      await supertest(app.getHttpServer())
+        .post(`/healthcare/equipment-assignments/${assignmentId}/release`)
+        .set('Idempotency-Key', idempotencyKey)
+        .send({ reason: 'Equipo ya no requerido' })
+        .expect(HttpStatus.BAD_REQUEST);
+
+      expect(httpService.release).not.toHaveBeenCalled();
+    },
+  );
 });
