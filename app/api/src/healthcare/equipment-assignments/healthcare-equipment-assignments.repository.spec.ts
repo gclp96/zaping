@@ -418,6 +418,23 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     await expect(
       repository.runInTransaction((client) => Promise.resolve(client)),
     ).resolves.toBe(transaction);
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('forwards optional interactive transaction limits without changing the default call', async () => {
+    const transaction = { id: 'transaction' };
+    const options = { maxWait: 3_000, timeout: 20_000 };
+    prisma.$transaction.mockImplementation(
+      (callback: (client: typeof transaction) => Promise<unknown>) =>
+        callback(transaction),
+    );
+
+    await expect(
+      repository.runInTransaction((client) => Promise.resolve(client), options),
+    ).resolves.toBe(transaction);
+    expect(prisma.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      options,
+    );
   });
 });

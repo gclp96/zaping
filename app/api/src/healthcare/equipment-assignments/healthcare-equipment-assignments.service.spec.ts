@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 
+import { HttpException } from '@nestjs/common';
 import {
   EquipmentCondition,
   EquipmentLifecycle,
@@ -13,10 +14,17 @@ import {
   ProductInventoryTracking,
 } from '@prisma/client';
 
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { HealthcareCompanyTransactionTimeoutPolicy } from '../common/healthcare-company-transaction-timeout-policy';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
 import { HealthcareEquipmentAssignmentListStatus } from './dto/healthcare-equipment-assignment-list-query.dto';
 import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
+
+jest.mock('../common/healthcare-company-lock');
+jest.mock('../common/healthcare-subsequent-transaction-timeouts');
 
 const companyId = '11111111-1111-4111-8111-111111111111';
 const otherCompanyId = '22222222-2222-4222-8222-222222222222';
@@ -28,6 +36,13 @@ const equipmentAssetId = '77777777-7777-4777-8777-777777777777';
 const replacementEquipmentAssetId = '12121212-1212-4212-8212-121212121212';
 const productId = '88888888-8888-4888-8888-888888888888';
 const assignmentId = '99999999-9999-4999-8999-999999999999';
+const transactionTimeoutPolicy = {
+  companyLockAcquisitionTimeoutMs: 2_500,
+  subsequentLockTimeoutMs: 1_500,
+  subsequentStatementTimeoutMs: 4_000,
+  prismaMaxWaitMs: 3_000,
+  prismaTransactionTimeoutMs: 20_000,
+} satisfies HealthcareCompanyTransactionTimeoutPolicy;
 const conflictingAssignmentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const replacementAssignmentId = '13131313-1313-4313-8313-131313131313';
 const replacedAt = new Date('2026-09-18T18:00:00.000Z');
@@ -228,6 +243,14 @@ function knownPrismaError(code: string, target?: string | string[]) {
   });
 }
 
+function knownPrismaRawQueryError(sqlState: string) {
+  return new Prisma.PrismaClientKnownRequestError('database error', {
+    code: 'P2010',
+    clientVersion: '6.19.3',
+    meta: { code: sqlState },
+  });
+}
+
 describe('HealthcareEquipmentAssignmentsService', () => {
   const transaction = { transaction: true };
   const repository = {
@@ -263,6 +286,10 @@ describe('HealthcareEquipmentAssignmentsService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(acquireHealthcareCompanyLock).mockResolvedValue(undefined);
+    jest
+      .mocked(applyHealthcareSubsequentTransactionTimeouts)
+      .mockResolvedValue(undefined);
     repository.runInTransaction.mockImplementation(
       (operation: (client: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
@@ -324,7 +351,10 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.findAssignment.mockResolvedValue(baseRecord);
     repository.countAssignments.mockResolvedValue(1);
     repository.findAssignments.mockResolvedValue([baseRecord]);
-    service = new HealthcareEquipmentAssignmentsService(repository as never);
+    service = new HealthcareEquipmentAssignmentsService(
+      repository as never,
+      transactionTimeoutPolicy,
+    );
   });
 
   describe('release', () => {
@@ -356,6 +386,9 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         companyId,
         assignmentId,
         transaction,
+      );
+      expect(repository.runInTransaction).toHaveBeenCalledWith(
+        expect.any(Function),
       );
 
       expect(result.id).toBe(assignmentId);
@@ -549,6 +582,149 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         assignmentId,
       );
     });
+
+    it('uses the canonical Company, timeout, destination Asset, Requirement, source Assignment, settings and Case lock order', async () => {
+      const calls: string[] = [];
+      jest.mocked(acquireHealthcareCompanyLock).mockImplementation(() => {
+        calls.push('company');
+        return Promise.resolve();
+      });
+      jest
+        .mocked(applyHealthcareSubsequentTransactionTimeouts)
+        .mockImplementation(() => {
+          calls.push('subsequent-timeouts');
+          return Promise.resolve();
+        });
+      repository.lockEquipmentAsset.mockImplementation(() => {
+        calls.push('destination-asset');
+        return Promise.resolve(true);
+      });
+      repository.lockRequirement.mockImplementation(() => {
+        calls.push('requirement');
+        return Promise.resolve(true);
+      });
+      repository.lockAssignment.mockImplementation(() => {
+        calls.push('source-assignment');
+        return Promise.resolve(replacementSourceSnapshot);
+      });
+      repository.findReservedAssignmentCaseIdsForAsset.mockResolvedValue([
+        { caseId: otherCaseId },
+        { caseId },
+      ]);
+      repository.acquireSettingsSharedAdvisoryLock.mockImplementation(() => {
+        calls.push('settings-advisory');
+        return Promise.resolve();
+      });
+      repository.lockHealthcareCasesForShare.mockImplementation(
+        (_transaction, _companyId, caseIds: string[]) => {
+          calls.push(`cases:${caseIds.join(',')}`);
+          return Promise.resolve(caseIds);
+        },
+      );
+      repository.findSettingsForShare.mockImplementation(() => {
+        calls.push('settings-row');
+        return Promise.resolve(null);
+      });
+      repository.findCase.mockImplementation(() => {
+        calls.push('authoritative-case');
+        return Promise.resolve(completeCase);
+      });
+      repository.createAssignment.mockResolvedValue(replacementRecord);
+      repository.findAssignment
+        .mockResolvedValueOnce(replacedRecord)
+        .mockResolvedValueOnce(replacementRecord);
+
+      await service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-lock-order-key',
+        replaceDto,
+      );
+
+      expect(calls).toEqual([
+        'company',
+        'subsequent-timeouts',
+        'destination-asset',
+        'requirement',
+        'source-assignment',
+        'settings-advisory',
+        `cases:${caseId},${otherCaseId}`,
+        'settings-row',
+        'authoritative-case',
+      ]);
+      expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        {
+          acquisitionTimeoutMs:
+            transactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+        },
+      );
+      expect(applyHealthcareSubsequentTransactionTimeouts).toHaveBeenCalledWith(
+        transaction,
+        transactionTimeoutPolicy,
+      );
+      expect(repository.runInTransaction).toHaveBeenCalledTimes(1);
+      expect(repository.runInTransaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          maxWait: transactionTimeoutPolicy.prismaMaxWaitMs,
+          timeout: transactionTimeoutPolicy.prismaTransactionTimeoutMs,
+        },
+      );
+    });
+
+    it('maps only the dedicated Company-lock acquisition timeout to the approved HTTP 503 contract', async () => {
+      repository.runInTransaction.mockRejectedValueOnce(
+        new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+      );
+
+      const result = service.replace(
+        companyId,
+        userId,
+        assignmentId,
+        'replace-company-timeout-key',
+        replaceDto,
+      );
+      const error = await result.catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(503);
+      expect((error as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        code: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
+      });
+      expect(
+        JSON.stringify((error as HttpException).getResponse()),
+      ).not.toContain('internal cause');
+    });
+
+    it.each([
+      ['subsequent lock timeout', knownPrismaRawQueryError('55P03')],
+      ['subsequent statement timeout', knownPrismaRawQueryError('57014')],
+      ['deadlock', knownPrismaRawQueryError('40P01')],
+      ['Prisma transaction error', knownPrismaError('P2028')],
+    ])(
+      'does not remap a Replace %s as a Company-lock timeout',
+      async (_name, error) => {
+        repository.runInTransaction.mockRejectedValueOnce(error);
+
+        await expect(
+          service.replace(
+            companyId,
+            userId,
+            assignmentId,
+            'replace-other-timeout-key',
+            replaceDto,
+          ),
+        ).rejects.toMatchObject({
+          status: 500,
+          response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
+        });
+      },
+    );
 
     it('rejects an empty replacement reason before starting persistence work', async () => {
       await expect(
@@ -2546,8 +2722,18 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       expect(repository.createAssignment).not.toHaveBeenCalled();
     });
 
-    it('uses the canonical asset, Requirement, settings and sorted Case lock order', async () => {
+    it('uses the canonical Company, timeout, asset, Requirement, settings and sorted Case lock order', async () => {
       const calls: string[] = [];
+      jest.mocked(acquireHealthcareCompanyLock).mockImplementation(() => {
+        calls.push('company');
+        return Promise.resolve();
+      });
+      jest
+        .mocked(applyHealthcareSubsequentTransactionTimeouts)
+        .mockImplementation(() => {
+          calls.push('subsequent-timeouts');
+          return Promise.resolve();
+        });
       repository.lockEquipmentAsset.mockImplementation(() => {
         calls.push('asset');
         return Promise.resolve(true);
@@ -2582,6 +2768,8 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       await service.create(companyId, userId, 'lock-order-key', requirementDto);
 
       expect(calls).toEqual([
+        'company',
+        'subsequent-timeouts',
         'asset',
         'requirement',
         'settings-advisory',
@@ -2589,6 +2777,26 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         'settings-row',
         'authoritative-case',
       ]);
+      expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        {
+          acquisitionTimeoutMs:
+            transactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+        },
+      );
+      expect(applyHealthcareSubsequentTransactionTimeouts).toHaveBeenCalledWith(
+        transaction,
+        transactionTimeoutPolicy,
+      );
+      expect(repository.runInTransaction).toHaveBeenCalledTimes(1);
+      expect(repository.runInTransaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          maxWait: transactionTimeoutPolicy.prismaMaxWaitMs,
+          timeout: transactionTimeoutPolicy.prismaTransactionTimeoutMs,
+        },
+      );
     });
 
     it('replays a completed same-payload command under the protected transaction', async () => {
@@ -2703,5 +2911,54 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
       });
     });
+
+    it('maps only the dedicated Company-lock acquisition timeout to the approved HTTP 503 contract', async () => {
+      repository.runInTransaction.mockRejectedValueOnce(
+        new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+      );
+
+      const result = service.create(
+        companyId,
+        userId,
+        'company-timeout-key',
+        requirementDto,
+      );
+      const error = await result.catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(503);
+      expect((error as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        code: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
+      });
+      expect(
+        JSON.stringify((error as HttpException).getResponse()),
+      ).not.toContain('internal cause');
+    });
+
+    it.each([
+      ['subsequent lock timeout', knownPrismaRawQueryError('55P03')],
+      ['subsequent statement timeout', knownPrismaRawQueryError('57014')],
+      ['deadlock', knownPrismaRawQueryError('40P01')],
+      ['Prisma transaction error', knownPrismaError('P2028')],
+    ])(
+      'does not remap a %s as a Company-lock timeout',
+      async (_name, error) => {
+        repository.runInTransaction.mockRejectedValueOnce(error);
+
+        await expect(
+          service.create(
+            companyId,
+            userId,
+            'other-timeout-key',
+            requirementDto,
+          ),
+        ).rejects.toMatchObject({
+          status: 500,
+          response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
+        });
+      },
+    );
   });
 });

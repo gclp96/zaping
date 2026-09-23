@@ -1,3 +1,4 @@
+import { HttpException } from '@nestjs/common';
 import {
   HealthcareCaseStatus,
   HealthcareRequirementLifecycle,
@@ -6,10 +7,17 @@ import {
   ProductInventoryTracking,
 } from '@prisma/client';
 
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { HealthcareCompanyTransactionTimeoutPolicy } from '../common/healthcare-company-transaction-timeout-policy';
 import { requirementFulfillmentLockedException } from '../common/healthcare-errors';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
 import { HealthcareRequirementListStatus } from './dto/healthcare-requirement-list-query.dto';
 import { HealthcareRequirementsService } from './healthcare-requirements.service';
 import { NoopRequirementOperationalEvidencePolicy } from './requirement-operational-evidence-policy';
+
+jest.mock('../common/healthcare-company-lock');
+jest.mock('../common/healthcare-subsequent-transaction-timeouts');
 
 const companyId = '11111111-1111-4111-8111-111111111111';
 const otherCompanyId = '22222222-2222-4222-8222-222222222222';
@@ -18,6 +26,13 @@ const caseId = '44444444-4444-4444-8444-444444444444';
 const productId = '55555555-5555-4555-8555-555555555555';
 const requirementId = '66666666-6666-4666-8666-666666666666';
 const requirementIdB = '77777777-7777-4777-8777-777777777777';
+const transactionTimeoutPolicy = {
+  companyLockAcquisitionTimeoutMs: 2_500,
+  subsequentLockTimeoutMs: 1_500,
+  subsequentStatementTimeoutMs: 4_000,
+  prismaMaxWaitMs: 3_000,
+  prismaTransactionTimeoutMs: 20_000,
+} satisfies HealthcareCompanyTransactionTimeoutPolicy;
 
 const createDto = {
   productId,
@@ -99,6 +114,9 @@ type RequirementPolicyContext = {
   productId: string;
 };
 
+type ParticipatingRequirementCommand =
+  'update' | 'retire' | 'reactivate' | 'reorder';
+
 describe('HealthcareRequirementsService', () => {
   const transaction = {
     $queryRaw: jest.fn<Promise<unknown[]>, [Prisma.Sql]>(),
@@ -130,8 +148,31 @@ describe('HealthcareRequirementsService', () => {
 
   let service: HealthcareRequirementsService;
 
+  function runParticipatingCommand(
+    command: ParticipatingRequirementCommand,
+  ): Promise<unknown> {
+    switch (command) {
+      case 'update':
+        return service.update(companyId, requirementId, { requestedQty: 3 });
+      case 'retire':
+        return service.retire(companyId, userId, requirementId, {
+          retirementReason: 'Cambio clínico',
+        });
+      case 'reactivate':
+        return service.reactivate(companyId, userId, requirementId);
+      case 'reorder':
+        return service.reorder(companyId, caseId, {
+          items: [{ requirementId, sortOrder: 20 }],
+        });
+    }
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(acquireHealthcareCompanyLock).mockResolvedValue(undefined);
+    jest
+      .mocked(applyHealthcareSubsequentTransactionTimeouts)
+      .mockResolvedValue(undefined);
     prisma.$transaction.mockImplementation(
       (callback: (tx: typeof transaction) => unknown) => callback(transaction),
     );
@@ -139,7 +180,107 @@ describe('HealthcareRequirementsService', () => {
     service = new HealthcareRequirementsService(
       prisma as never,
       evidencePolicy as never,
+      transactionTimeoutPolicy,
     );
+  });
+
+  describe('Company transaction protocol', () => {
+    it.each(['update', 'retire', 'reactivate', 'reorder'] as const)(
+      'acquires Company first and forwards the exact policy for %s',
+      async (command) => {
+        const calls: string[] = [];
+        const rowLockError = new Error(`stop after ${command} first row lock`);
+        jest.mocked(acquireHealthcareCompanyLock).mockImplementation(() => {
+          calls.push('company');
+          return Promise.resolve();
+        });
+        jest
+          .mocked(applyHealthcareSubsequentTransactionTimeouts)
+          .mockImplementation(() => {
+            calls.push('subsequent-timeouts');
+            return Promise.resolve();
+          });
+        transaction.$queryRaw.mockImplementationOnce(() => {
+          calls.push('first-row-lock');
+          return Promise.reject(rowLockError);
+        });
+
+        await expect(runParticipatingCommand(command)).rejects.toBe(
+          rowLockError,
+        );
+
+        expect(calls).toEqual([
+          'company',
+          'subsequent-timeouts',
+          'first-row-lock',
+        ]);
+        expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+          transaction,
+          companyId,
+          {
+            acquisitionTimeoutMs:
+              transactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+          },
+        );
+        expect(
+          applyHealthcareSubsequentTransactionTimeouts,
+        ).toHaveBeenCalledWith(transaction, transactionTimeoutPolicy);
+        expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+          maxWait: transactionTimeoutPolicy.prismaMaxWaitMs,
+          timeout: transactionTimeoutPolicy.prismaTransactionTimeoutMs,
+        });
+        expect(
+          transaction.healthcareCaseRequirement.updateMany,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['update', 'retire', 'reactivate', 'reorder'] as const)(
+      'maps only the dedicated Company-lock timeout for %s',
+      async (command) => {
+        prisma.$transaction.mockRejectedValueOnce(
+          new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+        );
+
+        const error = await captureError(runParticipatingCommand(command));
+
+        expect(error).toBeInstanceOf(HttpException);
+        expect((error as HttpException).getStatus()).toBe(503);
+        expect((error as HttpException).getResponse()).toMatchObject({
+          statusCode: 503,
+          error: 'Service Unavailable',
+          code: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
+        });
+        expect(
+          JSON.stringify((error as HttpException).getResponse()),
+        ).not.toContain('internal cause');
+      },
+    );
+
+    it.each<
+      [
+        ParticipatingRequirementCommand,
+        string,
+        Prisma.PrismaClientKnownRequestError,
+      ]
+    >([
+      ['update', 'subsequent lock timeout', knownPrismaRawQueryError('55P03')],
+      [
+        'retire',
+        'subsequent statement timeout',
+        knownPrismaRawQueryError('57014'),
+      ],
+      ['reactivate', 'deadlock', knownPrismaRawQueryError('40P01')],
+      ['reorder', 'Prisma transaction error', knownPrismaError('P2028')],
+    ])('does not remap %s %s to the new 503', async (command, _name, error) => {
+      prisma.$transaction.mockRejectedValueOnce(error);
+
+      await expect(runParticipatingCommand(command)).rejects.toMatchObject({
+        status: 500,
+        response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
+      });
+    });
   });
 
   describe('read', () => {
@@ -982,6 +1123,12 @@ function knownPrismaError(
     clientVersion: '6.19.3',
     meta,
   });
+}
+
+function knownPrismaRawQueryError(
+  sqlState: string,
+): Prisma.PrismaClientKnownRequestError {
+  return knownPrismaError('P2010', { code: sqlState });
 }
 
 async function captureError(promise: Promise<unknown>): Promise<unknown> {

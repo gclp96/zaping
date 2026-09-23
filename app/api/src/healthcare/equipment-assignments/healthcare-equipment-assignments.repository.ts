@@ -121,6 +121,11 @@ export type HealthcareEquipmentAssignmentRecord =
 type HealthcareEquipmentAssignmentDatabaseClient =
   Prisma.TransactionClient | PrismaService;
 
+export interface HealthcareEquipmentAssignmentTransactionOptions {
+  readonly maxWait: number;
+  readonly timeout: number;
+}
+
 export const healthcareEquipmentReservationAvailabilitySelect = {
   id: true,
   caseId: true,
@@ -147,7 +152,12 @@ export class HealthcareEquipmentAssignmentsRepository {
 
   runInTransaction<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+    options?: HealthcareEquipmentAssignmentTransactionOptions,
   ): Promise<T> {
+    if (options) {
+      return this.prisma.$transaction(operation, options);
+    }
+
     return this.prisma.$transaction(operation);
   }
 
