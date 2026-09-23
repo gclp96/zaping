@@ -7,7 +7,27 @@ import {
 } from './healthcare-company-transaction-timeout.config';
 
 describe('Healthcare Company transaction timeout configuration', () => {
-  it('exposes the approved initial integration policy through Nest configuration', async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalPolicyId = process.env.HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID;
+
+  afterEach(() => {
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+
+    if (originalPolicyId === undefined) {
+      delete process.env.HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID;
+    } else {
+      process.env.HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID = originalPolicyId;
+    }
+  });
+
+  it('exposes the provisional integration policy through Nest configuration', async () => {
+    process.env.NODE_ENV = 'test';
+    delete process.env.HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID;
+
     const moduleRef = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -33,6 +53,24 @@ describe('Healthcare Company transaction timeout configuration', () => {
     } finally {
       await moduleRef.close();
     }
+  });
+
+  it('fails Nest configuration before startup can listen when production approval is absent', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID;
+
+    await expect(
+      Test.createTestingModule({
+        imports: [
+          ConfigModule.forRoot({
+            ignoreEnvFile: true,
+            load: [healthcareCompanyTransactionTimeoutConfiguration],
+          }),
+        ],
+      }).compile(),
+    ).rejects.toThrow(
+      'Healthcare Company timeout policy selection is required in production.',
+    );
   });
 
   it('rejects an explicitly supplied missing policy', () => {

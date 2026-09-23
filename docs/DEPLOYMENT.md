@@ -153,20 +153,27 @@ aplicación debe recibir el valor; `OPTIONAL` significa que el código aplica el
 default indicado; `DEFERRED` significa que la capacidad no forma parte del
 staging temporal y requiere una decisión antes de producción.
 
-| Variable | LOCAL | STAGING | PRODUCTION | Contrato actual |
-| --- | --- | --- | --- | --- |
-| `NODE_ENV` | REQUIRED: `development` o `test` | REQUIRED: preferir `production`; no existe `staging` | REQUIRED: `production` | Sólo acepta `development`, `test`, `production` |
-| `DATABASE_URL` | REQUIRED | REQUIRED | REQUIRED | Secret backend; DB separada por ambiente |
-| `JWT_SECRET` | REQUIRED | REQUIRED | REQUIRED | Mínimo 32 caracteres; generado independientemente |
-| `FRONTEND_ORIGIN` | OPTIONAL: default `http://localhost:3000` | REQUIRED: URL HTTPS del Web | REQUIRED: URL HTTPS del Web | Origin concreto, no `*` |
-| `FRONTEND_BASE_URL` | OPTIONAL: default `http://localhost:3000` | REQUIRED: URL HTTPS del Web | REQUIRED: URL HTTPS del Web | HTTPS obligatorio en `production` |
-| `RESEND_API_KEY` | OPTIONAL | REQUIRED si `NODE_ENV=production`; DEFERRED sólo para staging no-production explícitamente aceptado | REQUIRED | No guardar en Git ni logs |
-| `EMAIL_FROM` | OPTIONAL | REQUIRED si `NODE_ENV=production`; DEFERRED sólo para staging no-production explícitamente aceptado | REQUIRED | Sender verificado cuando B3B5 se reactive |
-| `PORT` | OPTIONAL: default `3001` | OPTIONAL por código; el proveedor debe inyectarlo | OPTIONAL por código; el proveedor debe inyectarlo | Entero entre 1 y 65535 |
-| `TRUST_PROXY_HOPS` | OPTIONAL: default `0` | OPTIONAL, pero topología debe aprobarlo | OPTIONAL, pero topología debe aprobarlo | Entero entre 0 y 10; default seguro `0` |
+| Variable                               | LOCAL                                                | STAGING                                                                                             | PRODUCTION                                        | Contrato actual                                                                                                                                           |
+| -------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                             | REQUIRED: `development` o `test`                     | REQUIRED: preferir `production`; no existe `staging`                                                | REQUIRED: `production`                            | Sólo acepta `development`, `test`, `production`                                                                                                           |
+| `DATABASE_URL`                         | REQUIRED                                             | REQUIRED                                                                                            | REQUIRED                                          | Secret backend; DB separada por ambiente                                                                                                                  |
+| `JWT_SECRET`                           | REQUIRED                                             | REQUIRED                                                                                            | REQUIRED                                          | Mínimo 32 caracteres; generado independientemente                                                                                                         |
+| `FRONTEND_ORIGIN`                      | OPTIONAL: default `http://localhost:3000`            | REQUIRED: URL HTTPS del Web                                                                         | REQUIRED: URL HTTPS del Web                       | Origin concreto, no `*`                                                                                                                                   |
+| `FRONTEND_BASE_URL`                    | OPTIONAL: default `http://localhost:3000`            | REQUIRED: URL HTTPS del Web                                                                         | REQUIRED: URL HTTPS del Web                       | HTTPS obligatorio en `production`                                                                                                                         |
+| `RESEND_API_KEY`                       | OPTIONAL                                             | REQUIRED si `NODE_ENV=production`; DEFERRED sólo para staging no-production explícitamente aceptado | REQUIRED                                          | No guardar en Git ni logs                                                                                                                                 |
+| `EMAIL_FROM`                           | OPTIONAL                                             | REQUIRED si `NODE_ENV=production`; DEFERRED sólo para staging no-production explícitamente aceptado | REQUIRED                                          | Sender verificado cuando B3B5 se reactive                                                                                                                 |
+| `PORT`                                 | OPTIONAL: default `3001`                             | OPTIONAL por código; el proveedor debe inyectarlo                                                   | OPTIONAL por código; el proveedor debe inyectarlo | Entero entre 1 y 65535                                                                                                                                    |
+| `TRUST_PROXY_HOPS`                     | OPTIONAL: default `0`                                | OPTIONAL, pero topología debe aprobarlo                                                             | OPTIONAL, pero topología debe aprobarlo           | Entero entre 0 y 10; default seguro `0`                                                                                                                   |
+| `HEALTHCARE_COMPANY_TIMEOUT_POLICY_ID` | OPTIONAL; usa la política provisional de integración | REQUIRED si STAGING usa `NODE_ENV=production`                                                       | REQUIRED                                          | Debe seleccionar un descriptor versionado presente en el registro de políticas aprobadas; el registro está vacío hasta completar calibración y aprobación |
 
 En PRODUCTION la configuración inválida debe impedir el arranque. No se debe
 debilitar la validación para hacer que una release arranque.
+
+La política `HC-LOCK-02` de `3000/2500/1500/4000/20000 ms` es exclusivamente
+provisional para desarrollo e integración. Una huella SHA-256 válida sólo
+demuestra consistencia del contenido: no sustituye evidencia de calibración ni
+aprobación. Mientras el registro de políticas productivas permanezca vacío, la
+API debe rechazar todo arranque con `NODE_ENV=production`.
 
 `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY` y cualquier credencial son
 secretos backend-only. Nunca deben aparecer en `NEXT_PUBLIC_*`, Git,
@@ -191,10 +198,10 @@ No incluir valores en tickets, comandos copiados a logs o este documento.
 `NEXT_PUBLIC_API_URL` es configuración pública de build-time. No contiene ni
 debe sustituir secretos.
 
-| Ambiente | Valor esperado |
-| --- | --- |
-| LOCAL | `http://localhost:3001` |
-| STAGING | `https://<provider-api-url>` |
+| Ambiente   | Valor esperado                |
+| ---------- | ----------------------------- |
+| LOCAL      | `http://localhost:3001`       |
+| STAGING    | `https://<provider-api-url>`  |
 | PRODUCTION | `https://api.<future-domain>` |
 
 Build y start:
@@ -251,8 +258,15 @@ Cada deployment debe señalar:
 2. Seleccionar el release SHA revisado.
 3. Revisar el diff de migrations desde la release anterior.
 4. Validar todas las variables y secretos del ambiente.
-5. Confirmar backup/snapshot recuperable.
-6. Decidir si la migration requiere ventana de mantenimiento.
+5. Ejecutar desde `app/api` el gate de política Healthcare con la configuración
+   exacta del release: `npm run validate:healthcare-timeout-release`.
+6. Confirmar backup/snapshot recuperable.
+7. Decidir si la migration requiere ventana de mantenimiento.
+
+El gate del paso 5 es obligatorio antes de cualquier comando de migración,
+incluidos deployments manuales o externos a CI. Debe terminar en cero y validar
+un descriptor registrado, aprobado y ligado por huella a sus valores exactos.
+Con el registro actual vacío, el fallo es intencional y bloquea el release.
 
 ### Database release step
 
@@ -265,9 +279,16 @@ Desde `app/api`:
 ```bash
 npm ci
 npx prisma generate
+npm run build
+npm run validate:healthcare-timeout-release
 npm run prisma:migrate:deploy
 npx prisma migrate status
 ```
+
+El gate ejecuta exclusivamente el artefacto compilado
+`dist/src/healthcare/common/validate-healthcare-company-timeout-release.js`;
+por eso `npm run build` debe completarse antes. La misma ruta existe en la
+imagen runtime Docker, sin depender de `ts-node` ni de otras devDependencies.
 
 Comprobar que el status coincide con el SHA seleccionado antes de arrancar
 réplicas.
@@ -299,11 +320,16 @@ La configuración objetivo de DigitalOcean es:
 ```text
 source_dir: app/api
 Dockerfile: app/api/Dockerfile
-PRE_DEPLOY: npx prisma migrate deploy
+PRE_DEPLOY: npm run validate:healthcare-timeout-release && npx prisma migrate deploy
 Liveness: GET /health/live
 Readiness: GET /health/ready
 NODE_ENV: production
 ```
+
+El `PRE_DEPLOY` real debe encadenar primero
+`npm run validate:healthcare-timeout-release` y sólo después, si el gate pasa,
+`npx prisma migrate deploy`. Fusionar el PR de HC-LOCK-02 no autoriza un
+deployment productivo ni aprueba los valores provisionales.
 
 El puerto continúa siendo el valor inyectado en `PORT`; no se fija un puerto
 productivo en la imagen.
@@ -700,6 +726,8 @@ PRE
 [ ] Release SHA seleccionado
 [ ] Migration diff revisado
 [ ] Environment y secrets verificados
+[ ] Descriptor Healthcare productivo seleccionado, calibrado y aprobado
+[ ] npm run validate:healthcare-timeout-release = PASS antes de migrations
 [ ] Backup/snapshot disponible
 [ ] Decisión de ventana de mantenimiento
 [ ] Topología proxy / TRUST_PROXY_HOPS confirmada
@@ -761,6 +789,9 @@ validarse explícitamente:
 - HSTS y CSP son hardening posterior, no parte de este runbook;
 - la topología definitiva de proxy aún debe confirmarse por ambiente;
 - la validación de recovery con email real no está cubierta por este checkpoint.
+- el registro de políticas productivas de timeout Healthcare está vacío; falta
+  calibración y aprobación explícita antes de cualquier deployment con
+  `NODE_ENV=production`.
 
 Por estas limitaciones, este documento define el procedimiento operativo y no
 constituye una autorización de producción.

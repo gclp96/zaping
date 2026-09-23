@@ -4,22 +4,13 @@ import {
   assertValidHealthcareCompanyTransactionTimeoutPolicy,
   HealthcareCompanyTransactionTimeoutPolicy,
 } from './healthcare-company-transaction-timeout-policy';
-
-// Complete initial HC-LOCK-02 integration/test values; no external timeout
-// configuration is currently required. Production calibration remains pending.
-const INITIAL_HC_LOCK_02_INTEGRATION_TIMEOUT_POLICY = {
-  companyLockAcquisitionTimeoutMs: 2_500,
-  subsequentLockTimeoutMs: 1_500,
-  subsequentStatementTimeoutMs: 4_000,
-  prismaMaxWaitMs: 3_000,
-  prismaTransactionTimeoutMs: 20_000,
-} satisfies HealthcareCompanyTransactionTimeoutPolicy;
+import { resolveRuntimeHealthcareCompanyTimeoutPolicyDescriptor } from './healthcare-company-transaction-timeout-release-policy';
 
 export const healthcareCompanyTransactionTimeoutConfiguration = registerAs(
   'healthcareCompanyTransactionTimeoutPolicy',
   (): HealthcareCompanyTransactionTimeoutPolicy =>
     createHealthcareCompanyTransactionTimeoutPolicy(
-      INITIAL_HC_LOCK_02_INTEGRATION_TIMEOUT_POLICY,
+      resolveRuntimeHealthcareCompanyTimeoutPolicyDescriptor().policy,
     ),
 );
 
