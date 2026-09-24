@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING — HC-NEXT-03C5-B BLOCKED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY
 Última actualización: 2026-09-24
 Responsable: Zaping Team
 
@@ -171,10 +171,10 @@ HC-NEXT-03C4-C parent integrations
         → C4-C2 CASE CANCEL COMPLETE / MERGED IN main@f429e9f
 
 HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
-        → TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
+        → COMPLETE / MERGED — PR #36 — main@5b7c03e
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → BLOCKED BY C5-A
+        → PENDING REFINEMENT / DOR / PLANNING — NOT READY
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
         → CONTRACT PENDING / REQUIRED BEFORE C6
@@ -2275,8 +2275,8 @@ CURRENT ROADMAP ITEM
 
 → HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — COMPLETE / MERGED — HC-LOCK-04 FINAL CLOSED / ACCEPTED
 
-→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
-→ HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
+→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 — main@5b7c03e
+→ HC-NEXT-03C5-B Integrated Backend Validation — PENDING REFINEMENT / DOR / PLANNING — NOT READY
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
 
 DEFERRED
@@ -2506,8 +2506,8 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations
 
 Healthcare Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
-→ C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
+→ C5-A COMPLETE / MERGED — PR #36 — main@5b7c03e
+→ C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2847,10 +2847,11 @@ Decisiones aprobadas:
 
 #### HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
 
-Estado: TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING
+Estado: COMPLETE / MERGED — PR #36 — `main@5b7c03e`
 
 Dependencias satisfechas:
-- branch limpia desde `main@5d33cb0`;
+- baseline de inicio `main@5d33cb0` e integración mediante PR #36 en
+  `main@5b7c03e`;
 - HC-NEXT-03C1–C4 COMPLETE / MERGED;
 - HC-LOCK-04 final CLOSED / ACCEPTED sobre la baseline productivamente
   equivalente `main@be73bc4`;
@@ -2908,25 +2909,27 @@ Definition of Done:
 - preflight autorizado documenta identidad efectiva sin secretos;
 - validaciones estáticas y `git diff --check` verdes;
 - PostgreSQL C1 27/27 PASS y teardown sin errores reportados;
-- PR e integración en `main`: pendientes. Hasta entonces C5-A no está DONE y C5-B
-  continúa bloqueado.
+- PR #36 integrado en `main@5b7c03e`; C5-A COMPLETE / MERGED.
 
-Sprint 1 propuesto:
+Sprint 1:
 - ventana: 24-sep–07-oct-2026;
 - objetivo: completar C5-A;
 - Target: 07-oct-2026;
-- Forecast: pendiente de aprobación;
-- Commitment: pendiente de aprobación;
-- Actual: pendiente de integración.
+- Actual C5-A: 24-sep-2026 — completado antes del Target;
+- Commitment: no establecido; no se registra un compromiso retroactivo;
+- Forecast del trabajo restante: pendiente de estimación;
+- C5-B requiere refinamiento, DoR y planificación antes de asumir fechas
+  comprometidas.
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: BLOCKED BY C5-A / NOT READY
+Estado: PENDING REFINEMENT / DOR / PLANNING — NOT READY
 
 Dependencias / DoR:
-- C5-A DONE y disposable acreditada;
-- contrato B.1/B.2/B.3 alineado y findings documentales cerrados;
-- matriz focal definitiva aprobada, sin duplicar HC-LOCK-04.
+- C5-A COMPLETE / MERGED y disposable acreditada: satisfecho;
+- refinamiento y DoR de C5-B: pendientes;
+- matriz focal definitiva y planificación: pendientes de aprobación, sin duplicar
+  HC-LOCK-04 ni asumir fechas comprometidas.
 
 Alcance previsto:
 - E2E HTTP/PostgreSQL faltantes de GET list/detail y POST Create con JWT real,

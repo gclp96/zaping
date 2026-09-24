@@ -12,7 +12,7 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING; C5-B BLOCKED; FRONTEND PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; FRONTEND PENDING
 **Última actualización:** 2026-09-24
 **Responsable:** Zaping Healthcare Team
 
@@ -1829,11 +1829,11 @@ Decisiones aprobadas:
 
 ### 34.5.1 C5-A — Contract Alignment & Safe PostgreSQL Harness
 
-**Estado:** TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING.
+**Estado:** COMPLETE / MERGED — PR #36 — `main@5b7c03e`.
 
-**Dependencias satisfechas:** branch limpia desde `main@5d33cb0`; C1–C4 COMPLETE /
-MERGED; HC-LOCK-04 CLOSED / ACCEPTED; alineación B.1/B.2/B.3 y matriz de gaps
-refinadas.
+**Dependencias satisfechas:** baseline de inicio `main@5d33cb0` e integración
+mediante PR #36 en `main@5b7c03e`; C1–C4 COMPLETE / MERGED; HC-LOCK-04 CLOSED /
+ACCEPTED; alineación B.1/B.2/B.3 y matriz de gaps refinadas.
 
 **Scope:** corregir divergencias documentales CURRENT y endurecer únicamente el
 harness PostgreSQL C1. La configuración será opt-in mediante
@@ -1871,23 +1871,25 @@ propios con conteos cero; ningún cambio productivo o de contrato.
 
 **Definition of Done:** harness focal implementado/revisado; preflight autorizado
 documentado sin secretos; gates estáticos y `git diff --check` verdes; PostgreSQL
-real 27/27 PASS. PR e integración en `main` continúan pendientes; hasta entonces
-C5-A no está DONE y C5-B permanece bloqueado.
+real 27/27 PASS; PR #36 integrado en `main@5b7c03e`. C5-A está COMPLETE / MERGED.
 
 **Evidencia:** harness C1 en `85b480d` y `02d7a6e`; 27/27 PASS, 0 skipped, exit 0;
 preflight y teardown sin errores reportados. El teardown acredita sólo los fixtures
 propios, no una base globalmente vacía. Riesgo residual: la exclusividad se
 comprueba al inicio, pero no está garantizada durante toda la ejecución.
 
-**Sprint 1 propuesto:** 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026;
-Forecast y Commitment pendientes de aprobación; Actual pendiente de integración.
+**Sprint 1:** 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026; Actual C5-A
+24-sep-2026, completado antes del Target. No se registra Commitment retroactivo.
+El Forecast del trabajo restante está pendiente de estimación. C5-B requiere
+refinamiento, DoR y planificación antes de asumir fechas comprometidas.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
-**Estado:** BLOCKED BY C5-A / NOT READY.
+**Estado:** PENDING REFINEMENT / DOR / PLANNING — NOT READY.
 
-**DoR:** C5-A DONE, disposable acreditada, divergencias B.1/B.2/B.3 cerradas y
-matriz focal final aprobada sin duplicar HC-LOCK-04.
+**DoR:** C5-A COMPLETE / MERGED y disposable acreditada. Permanecen pendientes el
+refinamiento de C5-B, la aprobación de su DoR, la matriz focal final sin duplicar
+HC-LOCK-04 y la planificación; no se asumen fechas comprometidas.
 
 **Scope:** añadir sólo E2E HTTP/PostgreSQL faltantes para list/detail/Create con
 JWT real, Company A/B y ADMIN/MANAGER/SALES/WAREHOUSE; filtros/paginación,
@@ -2273,7 +2275,7 @@ decisión; no inventa semántica.
 | B.3 aprobado | `HC-NEXT-03B COMPLETE / APPROVED — IMPLEMENTATION NOT STARTED` |
 | C1 merged | `PARTIALLY IMPLEMENTED — PERSISTENCE` |
 | C2–C4 merged | `PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS`, enumerando slices reales |
-| C5-A validado técnicamente en rama | `PARTIALLY IMPLEMENTED — C5-A PR / MERGE PENDING` |
+| C5-A merged | `PARTIALLY IMPLEMENTED — C5-A COMPLETE / MERGED` |
 | C5-B merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
 | C6 merged | `IMPLEMENTED / INTEGRATED ACCEPTANCE REQUIRED` |
 | C7 automated green, manual pendiente | `IN PROGRESS / PENDING MANUAL QA / NOT ACCEPTED` |
@@ -2318,6 +2320,6 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
-→ C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
+→ C5-A COMPLETE / MERGED — PR #36 — main@5b7c03e
+→ C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 ```

@@ -14,7 +14,7 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING; C5-B BLOCKED; FRONTEND PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; FRONTEND PENDING
 **Última actualización:** 2026-09-24
 **Responsable:** Zaping Healthcare Team
 
@@ -773,7 +773,7 @@ cleanup de sus fixtures propios, no una base globalmente vacía.
 
 ### C5-A — contrato y DoR
 
-**Estado:** TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING.
+**Estado:** COMPLETE / MERGED — PR #36 — `main@5b7c03e`.
 
 C5-A alinea el contrato CURRENT y endurece sólo el harness PostgreSQL C1. Debe
 usar `RUN_HC_C5_POSTGRES_TESTS=1` y `HC_C5_DATABASE_URL`, sin dotenv/fallback;
@@ -802,17 +802,20 @@ Evidencia técnica C5-A:
   no una base globalmente vacía;
 - riesgo residual: la exclusividad se comprueba al inicio y no se garantiza durante
   toda la ejecución;
-- PR e integración pendientes; C5-A no está DONE y C5-B continúa bloqueado.
+- PR #36 integrado en `main@5b7c03e`; Actual C5-A: 24-sep-2026.
 
-Sprint 1 propuesto: 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026;
-Forecast y Commitment pendientes de aprobación; Actual pendiente de integración.
+Sprint 1: 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026; Actual C5-A
+24-sep-2026, completado antes del Target. No se registra Commitment retroactivo.
+El Forecast del trabajo restante está pendiente de estimación. C5-B requiere
+refinamiento, DoR y planificación antes de asumir fechas comprometidas.
 
-### C5-B — contrato y bloqueo
+### C5-B — contrato y preparación pendiente
 
-**Estado:** BLOCKED BY C5-A / NOT READY.
+**Estado:** PENDING REFINEMENT / DOR / PLANNING — NOT READY.
 
-Cuando C5-A esté DONE, C5-B agrega sólo la evidencia integrada faltante para
-list/detail/Create con JWT real, Company A/B y cuatro roles; filtros/paginación,
+C5-B deberá refinar y aprobar su DoR y planificación antes de agregar la evidencia
+integrada faltante para list/detail/Create con JWT real, Company A/B y cuatro roles;
+filtros/paginación,
 historical reads, foreign igual a missing, schedule reevaluado y error de
 persistencia sanitizado. Reutiliza las suites focales C1–C4 y HC-LOCK-04; no
 duplica escenarios ni agrega capability.
@@ -868,8 +871,8 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
-→ C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
+→ C5-A COMPLETE / MERGED — PR #36 — main@5b7c03e
+→ C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:
