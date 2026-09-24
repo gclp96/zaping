@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-23
+Última actualización: 2026-09-24
 Responsable: Zaping Team
 
 1. Propósito
@@ -101,7 +101,11 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+↓
+HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
+↓
+HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE C6
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -129,7 +133,10 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
 HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
 Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
 `main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
-HC-NEXT-03C5 queda PENDING / DOR NOT YET CONFIRMED y no se declara READY.
+DEC-C5-02 divide HC-NEXT-03C5: C5-A queda CONTRACT DOCUMENTED / INFRASTRUCTURE
+APPROVAL PENDING y C5-B permanece BLOCKED BY C5-A. Ninguno se declara READY.
+DEC-C5-01 separa CoverageNote y cobertura agregada en HC-NEXT-03C5-COVERAGE,
+ticket backend independiente con contrato pendiente y requerido antes de C6.
 
 También permanecen como TARGET Healthcare:
 
@@ -950,7 +957,8 @@ ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATI
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
 COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
-ACCEPTED IN main@be73bc4 — HC-NEXT-03C5 PENDING DOR REVIEW — PARTIALLY
+ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE
+APPROVAL PENDING — HC-NEXT-03C5-B BLOCKED — PARTIALLY
 IMPLEMENTED: BACKEND C1–C4 COMPLETE; FRONTEND PENDING.
 
 El contrato canónico aprobado se documenta en
@@ -1015,8 +1023,12 @@ está COMPLETE / MERGED, HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
 MERGED y HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda
 COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está
 COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
-ACCEPTED sobre `main@be73bc4`. HC-NEXT-03C5 permanece PENDING / DOR NOT YET
-CONFIRMED; este cierre no declara Healthcare Core terminado.
+ACCEPTED sobre `main@be73bc4`. DEC-C5-02 divide hardening en C5-A Contract
+Alignment & Safe PostgreSQL Harness y C5-B Integrated Backend Validation. C5-A
+está CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING y C5-B BLOCKED; no se
+declara DoR completo. DEC-C5-01 deja CoverageNote y cobertura agregada fuera de
+C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional pendiente y como prerequisito
+de C6. Este corte no declara Healthcare Core terminado.
 
 Debe mantenerse:
 
@@ -2759,7 +2771,11 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
-HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+
+HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
+
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
 
 Case Availability
 
@@ -2902,7 +2918,11 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+↓
+HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
+↓
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

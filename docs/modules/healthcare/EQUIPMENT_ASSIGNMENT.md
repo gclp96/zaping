@@ -14,8 +14,8 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
-**Última actualización:** 2026-09-23
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING; C5-B BLOCKED; FRONTEND PENDING
+**Última actualización:** 2026-09-24
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -438,6 +438,8 @@ permanece pendiente.
 `POST /healthcare/equipment-assignments/:assignmentId/replace` devuelve HTTP 200
 tanto para `REPLACED` como para `CONFLICT_REVIEW_REQUIRED`. ADMIN, MANAGER y
 WAREHOUSE pueden ejecutar el comando; SALES conserva acceso read-only.
+El DTO vigente usa `equipmentAssetId` y `replacementReason`, además de los campos
+opcionales de confirmación de conflict review.
 
 Replace sólo acepta una fuente `RESERVED`: conserva A y su activo original como
 historia `REPLACED`, crea B `RESERVED` con `replacesAssignmentId = A.id` y hereda
@@ -757,6 +759,65 @@ del harness B4-B1; el diff `f429e9f..be73bc4` no modifica producción, por lo qu
 ambas ejecuciones acreditan la misma baseline productiva. Cada harness acreditó
 cleanup de sus fixtures propios, no una base globalmente vacía.
 
+## 13.4 HC-NEXT-03C5 — Backend Hardening / Integrated E2E
+
+### Decisiones de alcance
+
+- **DEC-C5-01:** CoverageNote y cobertura agregada no forman parte de C5. El
+  ticket backend independiente HC-NEXT-03C5-COVERAGE debe aprobar su contrato e
+  implementarse antes de C6. No está READY y C5 no inventa su API o semántica.
+- **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
+  Harness y C5-B Integrated Backend Validation.
+- HC-LOCK-04 permanece CLOSED / ACCEPTED; sus capabilities y protocolo no se
+  reabren sin un defecto concreto.
+
+### C5-A — contrato y DoR
+
+**Estado:** CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING — DOR INCOMPLETE.
+
+C5-A alinea el contrato CURRENT y endurece sólo el harness PostgreSQL C1. Debe
+usar `RUN_HC_C5_POSTGRES_TESTS=1` y `HC_C5_DATABASE_URL`, sin dotenv/fallback;
+validar la identidad conectada, base, usuario, host, puertos, versión, schema,
+permisos mínimos y exclusividad de sesiones antes de escribir; y limitar
+fixtures/cleanup a IDs propios del run con conteos cero y propagación de fallos.
+
+Se propone `zaping_hc_c5` sobre `zaping_spike_test` vía `127.0.0.1:5434`, sujeto
+a aprobación posterior de identidad y privilegios. Esta propuesta no acredita
+infraestructura ni autoriza crear roles, conceder permisos o ejecutar E2E. B4-B1
+y 2H no se heredan automáticamente.
+
+Acceptance Criteria y DoD:
+- fail-closed ante mismatch de identidad, schema, permisos o sesiones;
+- `CONNECT`, `USAGE` y privilegios de tabla/columna limitados a operaciones
+  demostradas; sin privilegios administrativos/globales ni secuencias supuestas;
+- cleanup tenant-scoped propio con readback en cero y fallos propagados;
+- sin cambios de producción, schema, migraciones o contratos C1–C4;
+- evidencia de preflight autorizada, gates estáticos verdes y aprobación explícita
+  de infraestructura antes de desbloquear C5-B.
+
+### C5-B — contrato y bloqueo
+
+**Estado:** BLOCKED BY C5-A / NOT READY.
+
+Cuando C5-A esté DONE, C5-B agrega sólo la evidencia integrada faltante para
+list/detail/Create con JWT real, Company A/B y cuatro roles; filtros/paginación,
+historical reads, foreign igual a missing, schedule reevaluado y error de
+persistencia sanitizado. Reutiliza las suites focales C1–C4 y HC-LOCK-04; no
+duplica escenarios ni agrega capability.
+
+Su DoD exige PostgreSQL/HTTP sobre la disposable aprobada, full API, Prisma
+validate/generate, lint, typecheck, build y `git diff --check` verdes, evidencia
+de seleccionados/skipped/cleanup, cero flakes inexplicadas y cero información
+interna expuesta.
+
+### HC-NEXT-03C5-COVERAGE
+
+**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6.
+
+El contrato pendiente debe definir lectura agregada `PENDING` / `PARTIAL` /
+`UNAVAILABLE` / `CONFLICT`, registro y resolución de CoverageNotes, tenant scope,
+RBAC, auditoría, concurrencia y HTTP. Es independiente de C5-A/C5-B.
+
 ---
 
 # 14. Estado final
@@ -795,7 +856,8 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
+→ C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+→ C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:
