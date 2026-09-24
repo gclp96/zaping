@@ -804,26 +804,58 @@ async function assertC5RoleIsNonAdministrative(
   }
 }
 
+type C5SchemaAclSubstageCode =
+  | 'C5PF-03A-BASE-ACL'
+  | 'C5PF-03B-TABLE-CATALOG'
+  | 'C5PF-03C-COLUMN-CATALOG'
+  | 'C5PF-03D-TABLE-ACL'
+  | 'C5PF-03E-ENUM-USAGE'
+  | 'C5PF-03F-FUNCTION-EXECUTE'
+  | 'C5PF-03G-CONSTRAINT-CATALOG'
+  | 'C5PF-03H-INDEX-CATALOG'
+  | 'C5PF-03I-IDEMPOTENCY-SCOPE';
+
+async function runC5SchemaAclSubstage<T>(
+  code: C5SchemaAclSubstageCode,
+  substage: () => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await substage();
+  } catch (error) {
+    if (error instanceof C5PreflightError) {
+      throw new C5PreflightError(`[${code}] ${error.message}`);
+    }
+
+    throw new C5PreflightError(
+      `[${code}] The isolated C5 schema and ACL substage could not complete safely.`,
+    );
+  }
+}
+
 async function assertC5SchemaAndPrivileges(
   prisma: PrismaService,
 ): Promise<void> {
-  const [basePrivileges] = await prisma.$queryRaw<
-    Array<{ canConnect: boolean; canUseSchema: boolean }>
-  >(Prisma.sql`
-    SELECT
-      COALESCE(
-        has_database_privilege(current_user, database.oid, 'CONNECT'),
-        false
-      ) AS "canConnect",
-      COALESCE(
-        has_schema_privilege(current_user, namespace.oid, 'USAGE'),
-        false
-      ) AS "canUseSchema"
-    FROM pg_database AS database
-    CROSS JOIN pg_namespace AS namespace
-    WHERE database.datname = ${C5_EXPECTED_DATABASE}
-      AND namespace.nspname = 'public'
-  `);
+  const [basePrivileges] = await runC5SchemaAclSubstage(
+    'C5PF-03A-BASE-ACL',
+    () =>
+      prisma.$queryRaw<
+        Array<{ canConnect: boolean; canUseSchema: boolean }>
+      >(Prisma.sql`
+        SELECT
+          COALESCE(
+            has_database_privilege(current_user, database.oid, 'CONNECT'),
+            false
+          ) AS "canConnect",
+          COALESCE(
+            has_schema_privilege(current_user, namespace.oid, 'USAGE'),
+            false
+          ) AS "canUseSchema"
+        FROM pg_database AS database
+        CROSS JOIN pg_namespace AS namespace
+        WHERE database.datname = ${C5_EXPECTED_DATABASE}
+          AND namespace.nspname = 'public'
+      `),
+  );
 
   if (!basePrivileges?.canConnect || !basePrivileges.canUseSchema) {
     throw new C5PreflightError(
@@ -831,54 +863,60 @@ async function assertC5SchemaAndPrivileges(
     );
   }
 
-  const tableRows = await prisma.$queryRaw<
-    Array<{ tableName: string; tableOid: string | null }>
-  >(Prisma.sql`
-    SELECT
-      required."tableName",
-      relation.oid::text AS "tableOid"
-    FROM (
-      VALUES ${Prisma.join(
-        C5_REQUIRED_TABLES.map((tableName) => Prisma.sql`(${tableName})`),
-      )}
-    ) AS required("tableName")
-    LEFT JOIN pg_namespace AS namespace
-      ON namespace.nspname = 'public'
-    LEFT JOIN pg_class AS relation
-      ON relation.relnamespace = namespace.oid
-      AND relation.relname = required."tableName"
-      AND relation.relkind IN ('r', 'p')
-  `);
+  const tableRows = await runC5SchemaAclSubstage('C5PF-03B-TABLE-CATALOG', () =>
+    prisma.$queryRaw<
+      Array<{ tableName: string; tableOid: string | null }>
+    >(Prisma.sql`
+        SELECT
+          required."tableName",
+          relation.oid::text AS "tableOid"
+        FROM (
+          VALUES ${Prisma.join(
+            C5_REQUIRED_TABLES.map((tableName) => Prisma.sql`(${tableName})`),
+          )}
+        ) AS required("tableName")
+        LEFT JOIN pg_namespace AS namespace
+          ON namespace.nspname = 'public'
+        LEFT JOIN pg_class AS relation
+          ON relation.relnamespace = namespace.oid
+          AND relation.relname = required."tableName"
+          AND relation.relkind IN ('r', 'p')
+      `),
+  );
   const missingTables = tableRows
     .filter(({ tableOid }) => tableOid === null)
     .map(({ tableName }) => tableName);
 
-  const columnRows = await prisma.$queryRaw<
-    Array<{ tableName: string; columnName: string; exists: boolean }>
-  >(Prisma.sql`
-    SELECT
-      required."tableName",
-      required."columnName",
-      attribute.attnum IS NOT NULL AS "exists"
-    FROM (
-      VALUES ${Prisma.join(
-        C5_REQUIRED_COLUMNS.map(
-          ({ tableName, columnName }) =>
-            Prisma.sql`(${tableName}, ${columnName})`,
-        ),
-      )}
-    ) AS required("tableName", "columnName")
-    LEFT JOIN pg_namespace AS namespace
-      ON namespace.nspname = 'public'
-    LEFT JOIN pg_class AS relation
-      ON relation.relnamespace = namespace.oid
-      AND relation.relname = required."tableName"
-    LEFT JOIN pg_attribute AS attribute
-      ON attribute.attrelid = relation.oid
-      AND attribute.attname = required."columnName"
-      AND attribute.attnum > 0
-      AND NOT attribute.attisdropped
-  `);
+  const columnRows = await runC5SchemaAclSubstage(
+    'C5PF-03C-COLUMN-CATALOG',
+    () =>
+      prisma.$queryRaw<
+        Array<{ tableName: string; columnName: string; exists: boolean }>
+      >(Prisma.sql`
+        SELECT
+          required."tableName",
+          required."columnName",
+          attribute.attnum IS NOT NULL AS "exists"
+        FROM (
+          VALUES ${Prisma.join(
+            C5_REQUIRED_COLUMNS.map(
+              ({ tableName, columnName }) =>
+                Prisma.sql`(${tableName}, ${columnName})`,
+            ),
+          )}
+        ) AS required("tableName", "columnName")
+        LEFT JOIN pg_namespace AS namespace
+          ON namespace.nspname = 'public'
+        LEFT JOIN pg_class AS relation
+          ON relation.relnamespace = namespace.oid
+          AND relation.relname = required."tableName"
+        LEFT JOIN pg_attribute AS attribute
+          ON attribute.attrelid = relation.oid
+          AND attribute.attname = required."columnName"
+          AND attribute.attnum > 0
+          AND NOT attribute.attisdropped
+      `),
+  );
   const missingColumns = columnRows
     .filter((row) => !row.exists)
     .map((row) => `${row.tableName}.${row.columnName}`);
@@ -889,95 +927,105 @@ async function assertC5SchemaAndPrivileges(
       privilege,
     })),
   );
-  const tablePrivilegeRows = await prisma.$queryRaw<
-    Array<{ tableName: string; privilege: string; allowed: boolean }>
-  >(Prisma.sql`
-    SELECT
-      required."tableName",
-      required."privilege",
-      COALESCE(
-        has_table_privilege(
-          current_user,
-          relation.oid,
-          required."privilege"
-        ),
-        false
-      ) AS "allowed"
-    FROM (
-      VALUES ${Prisma.join(
-        requiredTablePrivileges.map(
-          ({ tableName, privilege }) =>
-            Prisma.sql`(${tableName}, ${privilege})`,
-        ),
-      )}
-    ) AS required("tableName", "privilege")
-    LEFT JOIN pg_namespace AS namespace
-      ON namespace.nspname = 'public'
-    LEFT JOIN pg_class AS relation
-      ON relation.relnamespace = namespace.oid
-      AND relation.relname = required."tableName"
-  `);
+  const tablePrivilegeRows = await runC5SchemaAclSubstage(
+    'C5PF-03D-TABLE-ACL',
+    () =>
+      prisma.$queryRaw<
+        Array<{ tableName: string; privilege: string; allowed: boolean }>
+      >(Prisma.sql`
+        SELECT
+          required."tableName",
+          required."privilege",
+          COALESCE(
+            has_table_privilege(
+              current_user,
+              relation.oid,
+              required."privilege"
+            ),
+            false
+          ) AS "allowed"
+        FROM (
+          VALUES ${Prisma.join(
+            requiredTablePrivileges.map(
+              ({ tableName, privilege }) =>
+                Prisma.sql`(${tableName}, ${privilege})`,
+            ),
+          )}
+        ) AS required("tableName", "privilege")
+        LEFT JOIN pg_namespace AS namespace
+          ON namespace.nspname = 'public'
+        LEFT JOIN pg_class AS relation
+          ON relation.relnamespace = namespace.oid
+          AND relation.relname = required."tableName"
+      `),
+  );
   const missingTablePrivileges = tablePrivilegeRows
     .filter((row) => !row.allowed)
     .map((row) => `${row.tableName} ${row.privilege}`);
 
-  const enumRows = await prisma.$queryRaw<
-    Array<{ typeName: string; typeOid: string | null; canUse: boolean }>
-  >(Prisma.sql`
-    SELECT
-      required."typeName",
-      enum_type.oid::text AS "typeOid",
-      COALESCE(
-        has_type_privilege(current_user, enum_type.oid, 'USAGE'),
-        false
-      ) AS "canUse"
-    FROM (
-      VALUES ${Prisma.join(
-        C5_REQUIRED_ENUMS.map((typeName) => Prisma.sql`(${typeName})`),
-      )}
-    ) AS required("typeName")
-    LEFT JOIN pg_namespace AS namespace
-      ON namespace.nspname = 'public'
-    LEFT JOIN pg_type AS enum_type
-      ON enum_type.typnamespace = namespace.oid
-      AND enum_type.typname = required."typeName"
-      AND enum_type.typtype = 'e'
-  `);
+  const enumRows = await runC5SchemaAclSubstage('C5PF-03E-ENUM-USAGE', () =>
+    prisma.$queryRaw<
+      Array<{ typeName: string; typeOid: string | null; canUse: boolean }>
+    >(Prisma.sql`
+        SELECT
+          required."typeName",
+          enum_type.oid::text AS "typeOid",
+          COALESCE(
+            has_type_privilege(current_user, enum_type.oid, 'USAGE'),
+            false
+          ) AS "canUse"
+        FROM (
+          VALUES ${Prisma.join(
+            C5_REQUIRED_ENUMS.map((typeName) => Prisma.sql`(${typeName})`),
+          )}
+        ) AS required("typeName")
+        LEFT JOIN pg_namespace AS namespace
+          ON namespace.nspname = 'public'
+        LEFT JOIN pg_type AS enum_type
+          ON enum_type.typnamespace = namespace.oid
+          AND enum_type.typname = required."typeName"
+          AND enum_type.typtype = 'e'
+      `),
+  );
   const missingEnumsOrUsage = enumRows
     .filter((row) => row.typeOid === null || !row.canUse)
     .map((row) => row.typeName);
 
-  const functionRows = await prisma.$queryRaw<
-    Array<{
-      signature: string;
-      functionOid: string | null;
-      canExecute: boolean;
-    }>
-  >(Prisma.sql`
-    SELECT
-      required."signature",
-      resolved."functionOid"::text AS "functionOid",
-      COALESCE(
-        has_function_privilege(
-          current_user,
-          resolved."functionOid",
-          'EXECUTE'
-        ),
-        false
-      ) AS "canExecute"
-    FROM (
-      VALUES ${Prisma.join(
-        C5_REQUIRED_FUNCTION_SIGNATURES.map(
-          (signature) => Prisma.sql`(${signature})`,
-        ),
-      )}
-    ) AS required("signature")
-    CROSS JOIN LATERAL (
-      SELECT to_regprocedure(
-        'pg_catalog.' || required."signature"
-      ) AS "functionOid"
-    ) AS resolved
-  `);
+  const functionRows = await runC5SchemaAclSubstage(
+    'C5PF-03F-FUNCTION-EXECUTE',
+    () =>
+      prisma.$queryRaw<
+        Array<{
+          signature: string;
+          functionOid: string | null;
+          canExecute: boolean;
+        }>
+      >(Prisma.sql`
+        SELECT
+          required."signature",
+          resolved."functionOid"::text AS "functionOid",
+          COALESCE(
+            has_function_privilege(
+              current_user,
+              resolved."functionOid",
+              'EXECUTE'
+            ),
+            false
+          ) AS "canExecute"
+        FROM (
+          VALUES ${Prisma.join(
+            C5_REQUIRED_FUNCTION_SIGNATURES.map(
+              (signature) => Prisma.sql`(${signature})`,
+            ),
+          )}
+        ) AS required("signature")
+        CROSS JOIN LATERAL (
+          SELECT to_regprocedure(
+            'pg_catalog.' || required."signature"
+          ) AS "functionOid"
+        ) AS resolved
+      `),
+  );
   const missingFunctionsOrExecute = functionRows
     .filter((row) => row.functionOid === null || !row.canExecute)
     .map((row) => row.signature);
@@ -986,20 +1034,24 @@ async function assertC5SchemaAndPrivileges(
     ...C5_REQUIRED_CHECK_NAMES,
     ...C5_REQUIRED_FOREIGN_KEY_NAMES,
   ];
-  const constraintRows = await prisma.$queryRaw<
-    Array<{ conname: string; contype: string; confdeltype: string }>
-  >(
-    Prisma.sql`
-      SELECT
-        constraint.conname,
-        constraint.contype::text AS contype,
-        constraint.confdeltype::text AS confdeltype
-      FROM pg_constraint AS constraint
-      JOIN pg_namespace AS namespace
-        ON namespace.oid = constraint.connamespace
-      WHERE namespace.nspname = 'public'
-        AND constraint.conname = ANY(${requiredConstraintNames})
-    `,
+  const constraintRows = await runC5SchemaAclSubstage(
+    'C5PF-03G-CONSTRAINT-CATALOG',
+    () =>
+      prisma.$queryRaw<
+        Array<{ conname: string; contype: string; confdeltype: string }>
+      >(
+        Prisma.sql`
+          SELECT
+            catalog_constraint.conname,
+            catalog_constraint.contype::text AS contype,
+            catalog_constraint.confdeltype::text AS confdeltype
+          FROM pg_constraint AS catalog_constraint
+          JOIN pg_namespace AS namespace
+            ON namespace.oid = catalog_constraint.connamespace
+          WHERE namespace.nspname = 'public'
+            AND catalog_constraint.conname = ANY(${requiredConstraintNames})
+        `,
+      ),
   );
   const presentConstraintNames = new Set(
     constraintRows.map(({ conname }) => conname),
@@ -1016,13 +1068,15 @@ async function assertC5SchemaAndPrivileges(
     )
     .map(({ conname }) => conname);
 
-  const indexRows = await prisma.$queryRaw<Array<{ indexname: string }>>(
-    Prisma.sql`
-      SELECT indexname
-      FROM pg_indexes
-      WHERE schemaname = 'public'
-        AND indexname = ANY(${C5_REQUIRED_INDEX_NAMES})
-    `,
+  const indexRows = await runC5SchemaAclSubstage('C5PF-03H-INDEX-CATALOG', () =>
+    prisma.$queryRaw<Array<{ indexname: string }>>(
+      Prisma.sql`
+          SELECT indexname
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname = ANY(${C5_REQUIRED_INDEX_NAMES})
+        `,
+    ),
   );
   const presentIndexNames = new Set(
     indexRows.map(({ indexname }) => indexname),
@@ -1031,17 +1085,19 @@ async function assertC5SchemaAndPrivileges(
     (indexName) => !presentIndexNames.has(indexName),
   );
 
-  const idempotencyScopeRows = await prisma.$queryRaw<
-    Array<{ enumlabel: string }>
-  >(Prisma.sql`
-    SELECT enum_value.enumlabel
-    FROM pg_enum AS enum_value
-    JOIN pg_type AS enum_type ON enum_type.oid = enum_value.enumtypid
-    JOIN pg_namespace AS namespace ON namespace.oid = enum_type.typnamespace
-    WHERE namespace.nspname = 'public'
-      AND enum_type.typname = 'IdempotencyScope'
-      AND enum_value.enumlabel = ANY(${C5_REQUIRED_IDEMPOTENCY_SCOPE_VALUES})
-  `);
+  const idempotencyScopeRows = await runC5SchemaAclSubstage(
+    'C5PF-03I-IDEMPOTENCY-SCOPE',
+    () =>
+      prisma.$queryRaw<Array<{ enumlabel: string }>>(Prisma.sql`
+        SELECT enum_value.enumlabel
+        FROM pg_enum AS enum_value
+        JOIN pg_type AS enum_type ON enum_type.oid = enum_value.enumtypid
+        JOIN pg_namespace AS namespace ON namespace.oid = enum_type.typnamespace
+        WHERE namespace.nspname = 'public'
+          AND enum_type.typname = 'IdempotencyScope'
+          AND enum_value.enumlabel = ANY(${C5_REQUIRED_IDEMPOTENCY_SCOPE_VALUES})
+      `),
+  );
   const presentIdempotencyScopes = new Set(
     idempotencyScopeRows.map(({ enumlabel }) => enumlabel),
   );
@@ -1098,27 +1154,54 @@ async function assertC5ExclusiveAvailability(
   }
 }
 
+type C5PreflightStageCode =
+  | 'C5PF-01-IDENTITY'
+  | 'C5PF-02-ROLE'
+  | 'C5PF-03-SCHEMA-ACL'
+  | 'C5PF-04-BACKEND-CONSISTENCY'
+  | 'C5PF-05-SESSIONS'
+  | 'C5PF-06-FIXTURE-COLLISION';
+
+async function runC5PreflightStage<T>(
+  code: C5PreflightStageCode,
+  stage: () => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await stage();
+  } catch (error) {
+    if (error instanceof C5PreflightError) {
+      throw new C5PreflightError(`[${code}] ${error.message}`);
+    }
+
+    throw new C5PreflightError(
+      `[${code}] The isolated C5 PostgreSQL preflight stage could not complete safely.`,
+    );
+  }
+}
+
 async function runC5Preflight(
   prisma: PrismaService,
   reservedCompanyIds: ReadonlySet<string>,
 ): Promise<void> {
-  try {
-    const initialIdentity = await readAndValidateC5Identity(prisma);
-    await assertC5RoleIsNonAdministrative(prisma);
-    await assertC5SchemaAndPrivileges(prisma);
+  const initialIdentity = await runC5PreflightStage('C5PF-01-IDENTITY', () =>
+    readAndValidateC5Identity(prisma),
+  );
+  await runC5PreflightStage('C5PF-02-ROLE', () =>
+    assertC5RoleIsNonAdministrative(prisma),
+  );
+  await runC5PreflightStage('C5PF-03-SCHEMA-ACL', () =>
+    assertC5SchemaAndPrivileges(prisma),
+  );
+  await runC5PreflightStage('C5PF-04-BACKEND-CONSISTENCY', async () => {
     const confirmedIdentity = await readAndValidateC5Identity(prisma);
     assertConsistentC5Identity(initialIdentity, confirmedIdentity);
-    await assertC5ExclusiveAvailability(prisma, initialIdentity.backendPid);
-    await assertReservedCompanyIdsAreUnused(prisma, reservedCompanyIds);
-  } catch (error) {
-    if (error instanceof C5PreflightError) {
-      throw error;
-    }
-
-    throw new C5PreflightError(
-      'The isolated C5 PostgreSQL preflight could not complete safely.',
-    );
-  }
+  });
+  await runC5PreflightStage('C5PF-05-SESSIONS', () =>
+    assertC5ExclusiveAvailability(prisma, initialIdentity.backendPid),
+  );
+  await runC5PreflightStage('C5PF-06-FIXTURE-COLLISION', () =>
+    assertReservedCompanyIdsAreUnused(prisma, reservedCompanyIds),
+  );
 }
 
 const runC5PostgresTests = process.env[C5_RUN_FLAG] === '1';
