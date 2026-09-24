@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C3 COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS — MANUAL RELEASE AND REPLACE BACKEND MERGED — HC-LOCK-01 DONE — ARCHITECTURE / DOCUMENTATION ACCEPTED — COMPANY LOCK IMPLEMENTATION / PRODUCTION PENDING — PARENT INTEGRATIONS PENDING
-Última actualización: 2026-09-21
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C3 COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED
+Última actualización: 2026-09-23
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -149,8 +149,9 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
         → IN PROGRESS
-        → Manual Release and Replace backend COMPLETE / MERGED
-        → Parent integrations PENDING
+        → Manual Release HC-LOCK-03B VALIDATED ON BRANCH / PENDING INTEGRATION
+        → Replace backend COMPLETE / MERGED
+        → Parent integrations BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 HC-LOCK-01 — Company Lock Protocol ADR
         → ARCHITECTURE ACCEPTED
@@ -159,11 +160,13 @@ HC-LOCK-01 — Company Lock Protocol ADR
 
 NEXT
 
-HC-LOCK-02 / HC-LOCK-03 / HC-LOCK-04
-        → PROTOCOL CONSOLIDATION / MANUAL RELEASE / INTEGRATION QA PENDING
+HC-LOCK-02 / HC-LOCK-03B / HC-LOCK-04
+        → PROTOCOL CONSOLIDATED / MANUAL RELEASE VALIDATED
+        → HC-LOCK-04 PREREQUISITE CHECKPOINT ACCREDITED
+        → HC-LOCK-03B INTEGRATION AND FINAL PARENT-INTEGRATION CHECKPOINT PENDING
 
 HC-NEXT-03C4-C parent integrations
-        → SEPARATE FUNCTIONAL DELIVERABLE — PENDING
+        → SEPARATE FUNCTIONAL DELIVERABLE — BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 DEFERRED
 
@@ -2260,7 +2263,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 CURRENT ROADMAP ITEM
 
-→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE AND REPLACE BACKEND MERGED — HC-LOCK WORKSTREAM AND PARENT INTEGRATIONS PENDING
+→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 DEFERRED
 
@@ -2482,12 +2485,12 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE COMPLETE / MERGED
+→ MANUAL RELEASE HC-LOCK-03B VALIDATED ON BRANCH / PENDING INTEGRATION
 → REPLACE BACKEND COMPLETE / MERGED — PR #27
-→ PARENT INTEGRATIONS PENDING — HC-NEXT-03C4-C IN REFINEMENT
+→ PARENT INTEGRATIONS BLOCKED — HC-NEXT-03C4-C WAITS FOR HC-LOCK-03B IN MAIN
 
 Healthcare Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + C4 MANUAL RELEASE AND REPLACE BACKEND MERGED
+→ PARTIALLY IMPLEMENTED — C1–C3 AND REPLACE MERGED; MANUAL RELEASE VALIDATED / PENDING INTEGRATION
 → PARENT INTEGRATIONS Y FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -2503,16 +2506,18 @@ Inventory y Billing / CFDI, sin reabrir por ello su aceptación local V1.
 
 ### HC-NEXT-03C4-C — Equipment Assignment Parent Integrations
 
-Estado: REFINEMENT
+Estado: BLOCKED — WAITING FOR HC-LOCK-03B INTEGRATION IN MAIN
 Prioridad: P1
 Milestone: M-HC1 — Healthcare Operations Foundation
 Sprint candidato: HC-01
 Estimación: 8 SP — PROVISIONAL
 Commitment: NO ESTABLECIDO
 
-Baseline de partida: main @ 7eda28c
+Baseline de partida: main con HC-LOCK-02 @ e002453
 PR #27: MERGED
-Manual Release y Replace: INTEGRADOS EN MAIN
+Manual Release HC-LOCK-03B: VALIDADO EN `feat/hc-lock-03-manual-release` @ 1003806;
+integración en `main` pendiente
+Replace: INTEGRADO EN MAIN
 HC-NEXT-03C4: IN PROGRESS — Parent Integrations pendientes
 
 Objetivo:
@@ -2533,9 +2538,10 @@ Alcance:
 Dependencias de Definition of Ready:
 - [ADR-HC-LOCK-001](../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md)
   aprobado como arquitectura; no como implementación o readiness productiva.
-- HC-LOCK-02 debe consolidar el protocolo V1 y sus timeouts.
-- HC-LOCK-03 debe cerrar el contrato e integración de Manual Release.
-- HC-LOCK-04 debe completar primero el gate de protocolo aplicable; su validación
+- HC-LOCK-02 consolidó el protocolo V1 y sus timeouts en `main` @ e002453.
+- HC-LOCK-03B cerró y validó el contrato de Manual Release; falta integrarlo en
+  `main` antes de iniciar este ticket.
+- El prerequisite protocol QA de HC-LOCK-04 está acreditado; su validación
   integrada final ocurre después de implementar los releases derivados.
 
 Gates:
@@ -2544,10 +2550,10 @@ regresiones de Cases/Requirements/C3, autorización, tenant isolation,
 API tests, lint, typecheck, build y git diff --check.
 
 Finding relacionado de cierre C4:
-Verificar y corregir la discrepancia entre el contrato documentado
-de Release manual repetido y el comportamiento del servicio actual.
-El finding se gestiona en HC-LOCK-03. No declarar C4 completado hasta resolverlo
-y validarlo.
+La discrepancia entre el contrato documentado de Release manual repetido y el
+comportamiento del servicio quedó resuelta y validada en HC-LOCK-03B. No declarar
+C4 completado hasta integrar HC-LOCK-03B y completar Parent Integrations con el
+checkpoint final de HC-LOCK-04.
 
 ### HC-LOCK-01 — Healthcare Company Lock Architecture Decision
 
@@ -2570,7 +2576,7 @@ permanecen pendientes en sus respectivos tickets.
 
 ### HC-LOCK-02 — Stable Company Lock Protocol Consolidation
 
-Estado: PENDING
+Estado: COMPLETE / MERGED — main @ e002453
 
 Objetivo:
 Consolidar la implementación V1 del protocolo común, incluida la derivación
@@ -2584,7 +2590,7 @@ Dependencias:
 
 ### HC-LOCK-03 — Manual Release Refinement and Implementation
 
-Estado: REFINEMENT / PENDING
+Estado: HC-LOCK-03B VALIDATED ON BRANCH — PENDING INTEGRATION
 
 Objetivo:
 Refinar e implementar Manual Release con orden
@@ -2598,9 +2604,20 @@ Dependencias:
 
 No incluye los releases derivados de Case Cancel o Requirement Retire.
 
+Evidencia de validación de HC-LOCK-03B:
+
+- Jest focal de Release: 177/177 PASS.
+- Typecheck, build, ESLint, Prettier focal y `git diff --check`: PASS.
+- PostgreSQL/HTTP real aislado: 14/14 PASS, exit 0, sobre
+  `zaping_spike_test` en `127.0.0.1:5434` con usuario dedicado.
+- El cleanup acreditado se limita a los fixtures propiedad de la ejecución: el
+  `afterAll` ejecuta cleanup acotado por sus Company IDs y verifica conteos cero;
+  el exit 0 confirma que ese hook terminó sin error. No acredita una base globalmente
+  vacía ni readiness productiva.
+
 ### HC-LOCK-04 — Company Lock Integration and Regression QA
 
-Estado: PENDING
+Estado: PREREQUISITE CHECKPOINT ACCREDITED — FINAL CHECKPOINT PENDING
 
 Objetivo:
 Validar sobre PostgreSQL y HTTP el protocolo consolidado, rollback, contención,
@@ -2608,8 +2625,9 @@ esperas acotadas, aislamiento multi-tenant, contrato 503 y regresiones.
 
 La ejecución se separa en dos checkpoints dentro del mismo ticket:
 
-1. **Prerequisite protocol QA:** valida HC-LOCK-02 y los escenarios aplicables de
-   HC-LOCK-03 antes de integrar releases derivados.
+1. **Prerequisite protocol QA — ACCREDITED:** validó HC-LOCK-02 y los escenarios
+   aplicables de HC-LOCK-03B con 14/14 E2E PostgreSQL/HTTP PASS, exit 0, en la
+   base aislada indicada arriba.
 2. **Final integrated QA:** después de implementar HC-NEXT-03C4-C, valida Case
    Cancel y Requirement Retire con sus releases dentro de la frontera
    transaccional final y ejecuta las regresiones integradas correspondientes.
@@ -2620,8 +2638,9 @@ Dependencias:
 - HC-NEXT-03C4-C implementado para ejecutar el checkpoint integrado final; no
   para el prerequisite protocol QA.
 
-Los resultados focales del spike son evidencia experimental y no sustituyen este
-gate ni acreditan production readiness.
+El prerequisite acreditado no sustituye el checkpoint final ni acredita
+production readiness. Ese checkpoint permanece pendiente hasta implementar y
+validar Parent Integrations.
 
 ### Relación con Parent Integrations
 
@@ -2633,3 +2652,6 @@ sólo puede ejecutarse después de implementar esos releases. Luego,
 HC-NEXT-03C4-C alimenta el checkpoint final de HC-LOCK-04. Parent Integrations no
 forma parte del closeout documental HC-LOCK-01. Dispatch, Return, Custody e
 Inventory Movement permanecen fuera de este workstream.
+
+Aunque el prerequisite de HC-LOCK-04 está acreditado, HC-NEXT-03C4-C permanece
+bloqueado hasta integrar HC-LOCK-03B en `main`.

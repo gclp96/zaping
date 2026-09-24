@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-20
+Última actualización: 2026-09-23
 Responsable: Zaping Team
 
 1. Propósito
@@ -99,7 +99,7 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -125,8 +125,10 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED;
 HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED;
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
 HC-NEXT-03C4 Replace / Release / Parent Integrations IN PROGRESS, con Manual
-Release committed, Replace backend validado y READY FOR COMMIT sin commit local,
-y parent integrations pendientes
+Release HC-LOCK-03B validado y pendiente de integración, Replace backend merged,
+el prerequisite checkpoint de HC-LOCK-04 acreditado y Parent Integrations
+bloqueadas hasta integrar HC-LOCK-03B en `main`. El checkpoint final de
+HC-LOCK-04 permanece pendiente hasta completar Parent Integrations.
 
 También permanecen como TARGET Healthcare:
 
@@ -945,8 +947,9 @@ TECHNICAL DESIGN COMPLETE / APPROVED — HC-NEXT-03B.1 PERSISTENCE & AVAILABILIT
 HC-NEXT-03B.2 API / DTO / AUTHORIZATION Y HC-NEXT-03B.3 IMPLEMENTATION SLICING /
 ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
-COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS: MANUAL RELEASE COMMITTED, REPLACE
-BACKEND READY FOR COMMIT (UNCOMMITTED), PARENT INTEGRATIONS PENDING — PARTIALLY
+COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS: MANUAL RELEASE HC-LOCK-03B
+VALIDATED / PENDING INTEGRATION, REPLACE BACKEND MERGED, HC-LOCK-04 PREREQUISITE
+ACCREDITED, PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN — PARTIALLY
 IMPLEMENTED.
 
 El contrato canónico aprobado se documenta en
@@ -1010,8 +1013,10 @@ dependencias/gates y el acceptance A–P. HC-NEXT-03C1 Persistence / Migration
 está COMPLETE / MERGED, HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
 MERGED y HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda
 COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está IN
-PROGRESS: Manual Release está committed, Replace backend está validado y READY
-FOR COMMIT sin commit local, y parent integrations permanecen pendientes.
+PROGRESS: Manual Release HC-LOCK-03B está validado y pendiente de integración,
+Replace backend está merged, el prerequisite checkpoint de HC-LOCK-04 está
+acreditado y Parent Integrations permanecen bloqueadas hasta integrar HC-LOCK-03B
+en `main`. El checkpoint final de HC-LOCK-04 permanece pendiente.
 
 Debe mantenerse:
 
@@ -2752,7 +2757,7 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 Case Availability
 
@@ -2893,7 +2898,7 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE COMMITTED — REPLACE BACKEND READY FOR COMMIT (UNCOMMITTED) — PARENT INTEGRATIONS PENDING
+HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

@@ -11,9 +11,9 @@
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE AND REPLACE BACKEND MERGED; COMPANY LOCK ARCHITECTURE ACCEPTED WITH IMPLEMENTATION / PRODUCTION PENDING; PARENT INTEGRATIONS PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE BACKEND MERGED; LOCK CONSOLIDATION, PARENT INTEGRATIONS Y FRONTEND PENDING
-**Última actualización:** 2026-09-21
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION; REPLACE BACKEND MERGED; HC-LOCK-04 PREREQUISITE ACCREDITED; PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + REPLACE MERGED; MANUAL RELEASE PENDING INTEGRATION; PARENT INTEGRATIONS Y FRONTEND PENDING
+**Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -536,9 +536,11 @@ Cases; el override aprobado debe poder persistirse.
 # 14. Release, Case cancellation y Requirement withdrawal
 
 Manual Release implementa el protocolo Company-first y la idempotencia de
-HC-LOCK-03. La primera transición aplica únicamente a una fila `RESERVED` y la
-lleva a `RELEASED` con `releaseCause = MANUAL`; una fila ya liberada manualmente
-admite replay sin writes sólo con la misma razón normalizada.
+HC-LOCK-03B. La primera transición aplica únicamente a una fila `RESERVED` y la
+lleva a `RELEASED` con `releaseCause = MANUAL`; no debe confundirse con el replay
+válido de una fila ya liberada manualmente, que sólo admite la misma razón
+normalizada y no realiza writes. El incremento está validado en rama y su
+integración en `main` permanece pendiente.
 
 La Parent Integration futura de Case Cancel llevará sus filas `RESERVED`
 aplicables a `RELEASED` con `releaseCause = CASE_CANCELLED` y conservará los
@@ -749,7 +751,9 @@ la decisión de review o write ocurren después de establecer esta frontera.
 
 Release implementa el orden `Company → EquipmentAsset → Assignment`, junto con
 el conditional write, la semántica idempotente y el error público de lifecycle.
-La validación con concurrencia PostgreSQL real permanece pendiente.
+El prerequisite checkpoint de HC-LOCK-04 acreditó esta secuencia con 14/14 E2E
+PostgreSQL/HTTP PASS sobre la base aislada `zaping_spike_test`. La validación
+integrada final permanece pendiente hasta completar Parent Integrations.
 
 Case cancellation y Requirement withdrawal deben adquirir/actualizar sus filas
 `RESERVED` en orden determinista. La coordinación exacta con los comandos
@@ -2024,15 +2028,17 @@ de Zaping no puede debilitar otro heredado más estricto. `lock_timeout`,
 por statement no garantiza por sí solo una duración absoluta de la transacción.
 
 El `1000ms` del spike es experimental, no un valor aprobado para producción.
-HC-LOCK-02 define implementación y calibración; HC-LOCK-04 valida cancelación,
-rollback, recovery y comportamiento bajo contención.
+HC-LOCK-02 define implementación y calibración. El prerequisite checkpoint de
+HC-LOCK-04 acreditó para Manual Release rollback, recovery y comportamiento bajo
+contención; el checkpoint final validará los releases derivados.
 
 Replace conserva el lock del EquipmentAsset destino antes de alterar el conjunto
 de reservas. Manual Release implementa la secuencia
-`Company → EquipmentAsset → Assignment`; su validación con PostgreSQL real
-permanece pendiente antes de integrar el workflow completo. Otras mutaciones se
-incorporan al protocolo sólo cuando exista una dependencia concreta sobre los
-mismos recursos; no participan por el solo hecho de pertenecer a Healthcare.
+`Company → EquipmentAsset → Assignment`; su validación PostgreSQL/HTTP real del
+prerequisite está acreditada y la integración de HC-LOCK-03B en `main` permanece
+pendiente. Otras mutaciones se incorporan al protocolo sólo cuando exista una
+dependencia concreta sobre los mismos recursos; no participan por el solo hecho
+de pertenecer a Healthcare.
 
 ## J. Replacement
 
@@ -2190,12 +2196,14 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE AND REPLACE BACKEND MERGED
-→ COMPANY LOCK ARCHITECTURE ACCEPTED — IMPLEMENTATION / PRODUCTION PENDING
-→ MANUAL RELEASE COMPANY-FIRST + IDEMPOTENCY IMPLEMENTED — POSTGRESQL VALIDATION PENDING
-→ PARENT INTEGRATIONS PENDING — HC-NEXT-03C4-C
+→ MANUAL RELEASE HC-LOCK-03B VALIDATED ON BRANCH — INTEGRATION PENDING
+→ REPLACE BACKEND MERGED
+→ COMPANY LOCK ARCHITECTURE AND HC-LOCK-02 IMPLEMENTATION IN MAIN
+→ HC-LOCK-04 PREREQUISITE POSTGRESQL/HTTP CHECKPOINT ACCREDITED
+→ PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+→ HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING AFTER PARENT INTEGRATIONS
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE BACKEND MERGED
-→ LOCK CONSOLIDATION, PARENT INTEGRATIONS Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + REPLACE MERGED; MANUAL RELEASE PENDING INTEGRATION
+→ PARENT INTEGRATIONS Y FRONTEND PENDING
 ```
