@@ -11,8 +11,8 @@
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE HC-LOCK-03B, REPLACE AND REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 CASE CANCEL TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION; HC-LOCK-04 PREREQUISITE ACCREDITED / FINAL CHECKPOINT PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL C4-C2 VALIDATED ON BRANCH / PENDING INTEGRATION; FRONTEND PENDING
+**Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
 **Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
@@ -544,8 +544,8 @@ normalizada y no realiza writes. El incremento fue validado y quedó merged en
 
 La Parent Integration C4-C2 de Case Cancel lleva sus filas `RESERVED` aplicables
 a `RELEASED` con `releaseCause = CASE_CANCELLED` y conserva los datos de
-auditoría del actor que ejecutó la cancelación. Está implementada y validada en
-rama, pendiente de integración.
+auditoría del actor que ejecutó la cancelación. Está integrada en
+`main@f429e9f`.
 
 La Parent Integration de Requirement Retire C4-C1 lleva sus filas `RESERVED` de
 origen `REQUIREMENT` a `RELEASED` con
@@ -752,9 +752,13 @@ la decisión de review o write ocurren después de establecer esta frontera.
 
 Release implementa el orden `Company → EquipmentAsset → Assignment`, junto con
 el conditional write, la semántica idempotente y el error público de lifecycle.
-El prerequisite checkpoint de HC-LOCK-04 acreditó esta secuencia con 14/14 E2E
-PostgreSQL/HTTP PASS sobre la base aislada `zaping_spike_test`. La validación
-integrada final permanece pendiente hasta completar Parent Integrations.
+HC-LOCK-04 acreditó esta secuencia y el checkpoint integrado final. Manual
+Release B4-B1 ejecutó 14/14 E2E PostgreSQL/HTTP PASS, exit 0, en
+`fix/hc-lock-04-jwt-isolation@9cc76ce`; Parent Integrations 2H ejecutó 28/28
+PASS, exit 0, sobre `main@f429e9f`. PR #34 llevó únicamente el ajuste de
+aislamiento JWT del harness a `main@be73bc4`, sin cambios productivos entre ambas
+baselines. Ambos harnesses acreditaron cleanup de sus fixtures propios; no una
+base globalmente vacía.
 
 Requirement withdrawal implementa y valida el orden
 `Company → Case → Requirement → Assignments por ID ASC` dentro de una sola
@@ -1314,15 +1318,16 @@ y después sus Assignments `RESERVED` por ID ascendente. Libera ambos origins co
 `releaseCause = CASE_CANCELLED`, el actor y la razón persistida del comando, y un
 timestamp compartido con `cancelledAt`. No se crea otro endpoint público de
 cancelación o bulk release en Assignment. La implementación está validada en
-rama y pendiente de integración.
+PostgreSQL y está integrada en `main@f429e9f`.
 
-La evidencia en rama registra Jest focal 346/346 PASS; typecheck, `lint:check`,
-Prettier focal, API build y `git diff --check` PASS; y PostgreSQL/HTTP E2E focal
+La evidencia técnica de C4-C2 registra Jest focal 346/346 PASS; typecheck,
+`lint:check`, Prettier focal, API build y `git diff --check` PASS; y
+PostgreSQL/HTTP E2E focal
 16/16 PASS, 26 skipped por filtro, exit 0, sobre `zaping_spike_test`. La selección
 incluyó 15 escenarios C4-C2 y la regresión C4-C1 que preserva `DIRECT`. El
 teardown limita cleanup a los Company IDs del run, verifica conteos cero y
-propaga fallos. No se acreditan todavía integración en `main`, frontend,
-logística física ni el checkpoint integrado final de HC-LOCK-04.
+propaga fallos. La aceptación no acredita frontend, logística física, una base
+globalmente vacía ni readiness productiva.
 
 ## 27.3 Requirement withdrawal/cancellation
 
@@ -1343,9 +1348,8 @@ ruta. C4-C1 implementa la integración padre con el orden
 Esta mutación derivada se autoriza por el comando padre de Requirement; no
 concede a SALES acceso al endpoint manual de Assignment release.
 
-Requirement Retire está integrado en `main@3e1810f`. Case Cancel C4-C2 está
-técnicamente completo y validado en rama, pendiente de integración. Ambos
-releases son lógicos;
+Requirement Retire está integrado en `main@3e1810f` y Case Cancel C4-C2 en
+`main@f429e9f`. Ambos releases son lógicos;
 cuando Dispatch/Custody exista, su guard deberá impedir que se presenten como
 disponibilidad física falsa.
 
@@ -1588,7 +1592,7 @@ Protecciones naturales adicionales:
 | Review inicial/stale | Cero writes; no claim persistido. |
 | Replace | Claim + original `REPLACED` + sucesora `RESERVED` + lineage + override rows. |
 | Release | Claim opcional, sólo con `Idempotency-Key` en la primera transición, + status `RELEASED` + actor/time/reason/cause. |
-| Case cancellation | Cambio de Case + releases lógicos aplicables dentro de una sola transacción; C4-C2 validado en rama, pendiente de integración. |
+| Case cancellation | Cambio de Case + releases lógicos aplicables dentro de una sola transacción; C4-C2 integrado en `main@f429e9f`. |
 | Requirement withdrawal | Cambio de Requirement + releases `REQUIREMENT` aplicables en la misma transacción; C4-C1 integrado en `main@3e1810f`. |
 
 Los comandos participantes aplican el siguiente orden principal dentro de la
@@ -1619,8 +1623,8 @@ esa primitiva para Case Cancel. Ninguno usa llamadas HTTP internas ni degrada el
 contrato a best-effort silencioso.
 
 Case Cancel adquiere Company antes de sus releases. Requirement Retire conserva
-el orden aprobado y ejecuta sus releases derivados en C4-C1. C4-C2 sigue siendo
-un entregable separado hasta su integración.
+el orden aprobado y ejecuta sus releases derivados en C4-C1. Ambas Parent
+Integrations están integradas y conservan una única frontera transaccional.
 
 ---
 
@@ -1784,10 +1788,10 @@ Assignments `REQUIREMENT` por Requirement withdrawal/cancellation y preserva
 los `DIRECT`.
 
 Replace y Manual Release existen como capabilities separadas. Las integraciones
-padre descritas en este slice siguen pendientes en HC-NEXT-03C4-C y no deben
-interpretarse como comportamiento actual.
+padre descritas en este slice están implementadas e integradas: C4-C1 en
+`main@3e1810f` y C4-C2 en `main@f429e9f`.
 
-Las integraciones padre deberán usar la coordinación interna transaction-bound de la
+Las integraciones padre usan la coordinación interna transaction-bound de la
 sección 32: el cambio de Case/Requirement y sus releases comparten transaction
 client y commit/rollback. No invocan rutas HTTP ni una cadena best-effort.
 
@@ -1810,6 +1814,17 @@ release de un DIRECT por retiro de Requirement, semántica de devolución físic
 fabricada o parent command degradado a best-effort silencioso.
 
 ## 34.5 HC-NEXT-03C5 — Backend Hardening / Integrated E2E
+
+**Estado:** PENDING / DOR NOT YET CONFIRMED. HC-NEXT-03C4 y HC-LOCK-04 están
+cerrados en la baseline productivamente equivalente `main@be73bc4`, pero este
+estado no declara C5 READY ni Healthcare Core terminado.
+
+**Criterios de entrada:** partir de una rama limpia creada desde el `main`
+posterior al merge de este closeout; comprobar que B.1/B.2/B.3 siguen alineados
+con el código integrado; refinar la matriz exacta de suites y findings sin
+agregar capability; y verificar el preflight e identidad de la base PostgreSQL
+disposable que usarán los E2E integrados. Mientras esos puntos no tengan
+evidencia en el ticket C5, su DoR permanece pendiente.
 
 **Scope:** cerrar findings del backend integrado sin agregar capability:
 regresión completa de API, tenant isolation, matriz de roles, replay/mismatch,
@@ -2041,9 +2056,11 @@ de Zaping no puede debilitar otro heredado más estricto. `lock_timeout`,
 por statement no garantiza por sí solo una duración absoluta de la transacción.
 
 El `1000ms` del spike es experimental, no un valor aprobado para producción.
-HC-LOCK-02 define implementación y calibración. El prerequisite checkpoint de
-HC-LOCK-04 acreditó para Manual Release rollback, recovery y comportamiento bajo
-contención; el checkpoint final validará los releases derivados.
+HC-LOCK-02 define implementación y calibración. HC-LOCK-04 acreditó Manual
+Release y los releases derivados: Parent Integrations 2H 28/28 PASS sobre
+`main@f429e9f` y Manual Release B4-B1 14/14 PASS sobre
+`fix/hc-lock-04-jwt-isolation@9cc76ce`. PR #34 integró sólo el ajuste E2E JWT y
+dejó la producción equivalente en `main@be73bc4`.
 
 Replace conserva el lock del EquipmentAsset destino antes de alterar el conjunto
 de reservas. Manual Release implementa la secuencia
@@ -2091,8 +2108,8 @@ Movement ni Custody.
 
 La Parent Integration C4-C2 adquiere Company primero, cambia el Case y libera
 consistentemente sus Assignments lógicas `RESERVED` aplicables en una frontera
-atómica. Retiene historia y no fabrica una devolución física. Está implementada
-y validada en rama, pendiente de integración.
+atómica. Retiene historia y no fabrica una devolución física. Está integrada en
+`main@f429e9f`.
 
 ## M. Requirement withdrawal/cancellation
 
@@ -2166,10 +2183,10 @@ reserva lógica nunca implica que el activo volvió físicamente a Warehouse ni
 que está disponible si Dispatch/Custody llega a gobernar su posición.
 
 Al cierre de B.3 no se identificaron otros blockers para iniciar C3. Esa
-conclusión estaba limitada a aquella fase y no elimina los gates actuales de
-HC-LOCK-02, HC-LOCK-03, HC-LOCK-04 ni HC-NEXT-03C4-C. Si la implementación
-descubre un blocker, el slice afectado se detiene y solicita una decisión; no
-inventa semántica.
+conclusión estaba limitada a aquella fase. HC-LOCK-02/03/04 y HC-NEXT-03C4-C ya
+están cerrados; no elimina los gates pendientes propios de C5–C7. Si la
+implementación descubre un blocker, el slice afectado se detiene y solicita una
+decisión; no inventa semántica.
 
 ---
 
@@ -2215,15 +2232,14 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 → COMPLETE / MERGED
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
-→ IN PROGRESS
+→ COMPLETE / MERGED
 → MANUAL RELEASE HC-LOCK-03B AND REPLACE BACKEND MERGED
 → REQUIREMENT RETIRE C4-C1 COMPLETE / MERGED IN main@3e1810f
-→ CASE CANCEL C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+→ CASE CANCEL C4-C2 COMPLETE / MERGED IN main@f429e9f
 → COMPANY LOCK ARCHITECTURE AND HC-LOCK-02 IMPLEMENTATION IN MAIN
-→ HC-LOCK-04 PREREQUISITE POSTGRESQL/HTTP CHECKPOINT ACCREDITED
-→ HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING AFTER C4-C1/C4-C2 INTEGRATION AND VALIDATION
+→ HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 VALIDATED ON BRANCH
-→ C4-C2 PENDING INTEGRATION; FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
+→ HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
 ```

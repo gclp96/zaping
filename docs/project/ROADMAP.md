@@ -99,7 +99,9 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
+↓
+HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -124,11 +126,10 @@ Implementation Slicing / Acceptance Contract APPROVED / DOCUMENTED;
 HC-NEXT-03C1 Equipment Assignment Persistence / Migration COMPLETE / MERGED;
 HC-NEXT-03C2 Assignment Backend Base COMPLETE / MERGED;
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
-HC-NEXT-03C4 Replace / Release / Parent Integrations IN PROGRESS, con Manual
-Release HC-LOCK-03B validado y pendiente de integración, Replace backend merged,
-el prerequisite checkpoint de HC-LOCK-04 acreditado y Parent Integrations
-bloqueadas hasta integrar HC-LOCK-03B en `main`. El checkpoint final de
-HC-LOCK-04 permanece pendiente hasta completar Parent Integrations.
+HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
+Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
+`main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
+HC-NEXT-03C5 queda PENDING / DOR NOT YET CONFIRMED y no se declara READY.
 
 También permanecen como TARGET Healthcare:
 
@@ -947,10 +948,10 @@ TECHNICAL DESIGN COMPLETE / APPROVED — HC-NEXT-03B.1 PERSISTENCE & AVAILABILIT
 HC-NEXT-03B.2 API / DTO / AUTHORIZATION Y HC-NEXT-03B.3 IMPLEMENTATION SLICING /
 ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATION
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
-COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS: MANUAL RELEASE HC-LOCK-03B
-VALIDATED / PENDING INTEGRATION, REPLACE BACKEND MERGED, HC-LOCK-04 PREREQUISITE
-ACCREDITED, PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN — PARTIALLY
-IMPLEMENTED.
+COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
+REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
+ACCEPTED IN main@be73bc4 — HC-NEXT-03C5 PENDING DOR REVIEW — PARTIALLY
+IMPLEMENTED: BACKEND C1–C4 COMPLETE; FRONTEND PENDING.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1012,11 +1013,10 @@ permanecen diferidos. HC-NEXT-03B.3 aprueba la secuencia C1–C7, sus
 dependencias/gates y el acceptance A–P. HC-NEXT-03C1 Persistence / Migration
 está COMPLETE / MERGED, HC-NEXT-03C2 Assignment Backend Base está COMPLETE /
 MERGED y HC-NEXT-03C3 Availability / Conflict Review / Concurrency queda
-COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está IN
-PROGRESS: Manual Release HC-LOCK-03B está validado y pendiente de integración,
-Replace backend está merged, el prerequisite checkpoint de HC-LOCK-04 está
-acreditado y Parent Integrations permanecen bloqueadas hasta integrar HC-LOCK-03B
-en `main`. El checkpoint final de HC-LOCK-04 permanece pendiente.
+COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está
+COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
+ACCEPTED sobre `main@be73bc4`. HC-NEXT-03C5 permanece PENDING / DOR NOT YET
+CONFIRMED; este cierre no declara Healthcare Core terminado.
 
 Debe mantenerse:
 
@@ -2757,7 +2757,9 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
+
+HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
 
 Case Availability
 
@@ -2898,7 +2900,9 @@ HC-NEXT-03C2 Assignment Backend Base — COMPLETE / MERGED
 ↓
 HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
-HC-NEXT-03C4 Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
+↓
+HC-NEXT-03C5 Backend Hardening / Integrated E2E — PENDING / DOR NOT YET CONFIRMED
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

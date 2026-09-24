@@ -13,8 +13,8 @@
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE, REPLACE AND HC-NEXT-03C4-C1 REQUIREMENT RETIRE MERGED; HC-NEXT-03C4-C2 CASE CANCEL TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL VALIDATED ON BRANCH / PENDING INTEGRATION; FRONTEND PENDING
+**Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
 **Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
@@ -428,9 +428,10 @@ conserva lectura. Frontend UX continúa diferido.
 La implementación concreta del guard futuro con Dispatch/Custody permanece
 diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
 de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
-concurrencia de Create. En HC-NEXT-03C4, Manual Release, Replace y C4-C1
-Requirement Retire están merged. C4-C2 Case Cancel está implementado y validado
-técnicamente en rama, pendiente de integración; frontend permanece pendiente.
+concurrencia de Create. HC-NEXT-03C4 integra Manual Release, Replace, C4-C1
+Requirement Retire y C4-C2 Case Cancel en `main@f429e9f`; el checkpoint final
+HC-LOCK-04 quedó aceptado sobre la baseline equivalente `main@be73bc4`. Frontend
+permanece pendiente.
 
 ## 13.1 Corte de implementación HC-NEXT-03C4-B — Replace
 
@@ -480,9 +481,9 @@ una segunda transacción.
 
 ### Dependencias y Definition of Ready
 
-- `main@8a3b189` integra HC-LOCK-02 y HC-LOCK-03.
-- El prerequisite checkpoint de HC-LOCK-04 está acreditado; el checkpoint final
-  permanece pendiente.
+- En el DoR original, `main@8a3b189` integraba HC-LOCK-02 y HC-LOCK-03 y
+  HC-LOCK-04 sólo tenía acreditado el prerequisite. El checkpoint final quedó
+  posteriormente CLOSED / ACCEPTED sobre `main@be73bc4`.
 - Existen `origin = REQUIREMENT`, `lifecycle = RESERVED/RELEASED`,
   `releaseCause = REQUIREMENT_WITHDRAWN` y el índice tenant-scoped por
   Requirement/lifecycle; no se requiere migración.
@@ -600,20 +601,21 @@ un orden determinista.
 
 ### Fuera de alcance y checkpoint posterior
 
-Quedan fuera Case Cancel Parent Integration, reparación de datos históricos,
+Case Cancel Parent Integration quedó fuera del alcance propio de C4-C1 y fue
+completado después en C4-C2. Continúan fuera reparación de datos históricos,
 reactivación o recreación automática de reservas, Manual Release/Replace nuevos,
 frontend, Dispatch, Return, Custody, movimiento o disponibilidad física y cambios
-de inventario. Case Cancel será un incremento separado de HC-NEXT-03C4-C.
+de inventario.
 
-HC-NEXT-03C4-C1 aporta evidencia al checkpoint final de HC-LOCK-04, pero no lo
-completa. Ese checkpoint sólo puede acreditarse después de implementar la Parent
-Integration restante y ejecutar las regresiones integradas de ambos comandos.
+HC-NEXT-03C4-C1 aportó evidencia al checkpoint final de HC-LOCK-04. C4-C2 y las
+regresiones integradas posteriores completaron ese checkpoint en
+`main@be73bc4`.
 
 ---
 
 ## 13.3 HC-NEXT-03C4-C2 — Case Cancel Parent Integration
 
-**Estado:** TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+**Estado:** COMPLETE / MERGED IN `main@f429e9f`
 
 ### Objetivo y alcance
 
@@ -632,8 +634,9 @@ abre una segunda transacción.
 
 - C4-C1 y sus primitivas transaction-bound están integradas en
   `main@3e1810f`.
-- HC-LOCK-02 y HC-LOCK-03 están integrados; el prerequisite checkpoint de
-  HC-LOCK-04 está acreditado y su checkpoint final permanece pendiente.
+- HC-LOCK-02 y HC-LOCK-03 están integrados. En el DoR original de C4-C2,
+  HC-LOCK-04 tenía acreditado el prerequisite; su checkpoint final quedó después
+  CLOSED / ACCEPTED sobre `main@be73bc4`.
 - Existen `origin = DIRECT/REQUIREMENT`, `lifecycle = RESERVED/RELEASED`,
   `releaseCause = CASE_CANCELLED` y el índice tenant-scoped por Case/lifecycle;
   no se requiere migración.
@@ -725,10 +728,10 @@ lógicas.
   real aislada para concurrencia y rollback.
 - Sin cambios de schema, migraciones, rutas, DTOs ni contratos públicos.
 - Documentación y Project Board alineados con la evidencia final.
-- C4-C2 puede cerrarse sin declarar cerrado HC-NEXT-03C4-C ni el checkpoint final
-  de HC-LOCK-04 hasta completar la integración y validación conjunta.
+- C4-C2 queda COMPLETE / MERGED en `main@f429e9f`; su validación conjunta forma
+  parte del cierre final de HC-LOCK-04 sobre `main@be73bc4`.
 
-### Evidencia de validación en rama
+### Evidencia de validación e integración
 
 - Jest focal: 346/346 PASS.
 - Typecheck, `lint:check`, Prettier focal, API build y `git diff --check`: PASS.
@@ -737,8 +740,7 @@ lógicas.
   y la regresión C4-C1 que mantiene `DIRECT` al retirar una Requirement.
 - El harness elimina únicamente fixtures de los Company IDs del run, verifica
   conteos cero y propaga cualquier fallo de cleanup.
-- La aceptación en rama no sustituye la integración en `main` ni el checkpoint
-  integrado final de HC-LOCK-04.
+- C4-C2 fue integrado mediante PR #33 en `main@f429e9f`.
 
 ### Fuera de alcance y checkpoint posterior
 
@@ -747,9 +749,13 @@ frontend, Dispatch, Return, Custody, Inventory Movement, disponibilidad física 
 cambios de lifecycle/condition del EquipmentAsset. C4-C2 no implementa nuevas
 capacidades de Manual Release, Replace o Requirement Retire.
 
-El prerequisite checkpoint de HC-LOCK-04 está acreditado. Su checkpoint final
-permanece pendiente hasta integrar C4-C2 y ejecutar las regresiones integradas de
-ambas Parent Integrations.
+El checkpoint final de HC-LOCK-04 quedó CLOSED / ACCEPTED sobre
+`main@be73bc4`. Parent Integrations 2H ejecutó 28/28 PASS, exit 0, sobre
+`main@f429e9f`; Manual Release B4-B1 ejecutó 14/14 PASS, exit 0, en
+`fix/hc-lock-04-jwt-isolation@9cc76ce`. PR #34 sólo integró el aislamiento JWT
+del harness B4-B1; el diff `f429e9f..be73bc4` no modifica producción, por lo que
+ambas ejecuciones acreditan la misma baseline productiva. Cada harness acreditó
+cleanup de sus fixtures propios, no una base globalmente vacía.
 
 ---
 
@@ -781,15 +787,15 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 → COMPLETE / MERGED
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
-→ IN PROGRESS
+→ COMPLETE / MERGED
 → MANUAL RELEASE AND REPLACE COMPLETE / MERGED
 → REQUIREMENT RETIRE C4-C1 COMPLETE / MERGED IN main@3e1810f
-→ CASE CANCEL C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
-→ HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING
+→ CASE CANCEL C4-C2 COMPLETE / MERGED IN main@f429e9f
+→ HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 VALIDATED ON BRANCH
-→ C4-C2 PENDING INTEGRATION; FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
+→ HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:
