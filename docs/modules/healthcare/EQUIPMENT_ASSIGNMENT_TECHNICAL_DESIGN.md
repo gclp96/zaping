@@ -11,8 +11,8 @@
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE HC-LOCK-03B AND REPLACE MERGED; REQUIREMENT RETIRE C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION; C4-C2 CASE CANCEL PENDING; HC-LOCK-04 PREREQUISITE ACCREDITED / FINAL CHECKPOINT PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED; REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; CASE CANCEL Y FRONTEND PENDING
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE HC-LOCK-03B, REPLACE AND REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 CASE CANCEL TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION; HC-LOCK-04 PREREQUISITE ACCREDITED / FINAL CHECKPOINT PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL C4-C2 VALIDATED ON BRANCH / PENDING INTEGRATION; FRONTEND PENDING
 **Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
@@ -542,15 +542,15 @@ válido de una fila ya liberada manualmente, que sólo admite la misma razón
 normalizada y no realiza writes. El incremento fue validado y quedó merged en
 `main@8a3b189`.
 
-La Parent Integration futura de Case Cancel llevará sus filas `RESERVED`
-aplicables a `RELEASED` con `releaseCause = CASE_CANCELLED` y conservará los
-datos de auditoría del actor que ejecutó la cancelación.
+La Parent Integration C4-C2 de Case Cancel lleva sus filas `RESERVED` aplicables
+a `RELEASED` con `releaseCause = CASE_CANCELLED` y conserva los datos de
+auditoría del actor que ejecutó la cancelación. Está implementada y validada en
+rama, pendiente de integración.
 
 La Parent Integration de Requirement Retire C4-C1 lleva sus filas `RESERVED` de
 origen `REQUIREMENT` a `RELEASED` con
 `releaseCause = REQUIREMENT_WITHDRAWN`. Conserva filas históricas y no libera
-Assignments `DIRECT`. Está implementada y validada técnicamente en rama,
-pendiente de integración. C4-C2 Case Cancel permanece pendiente.
+Assignments `DIRECT`. Está integrada en `main@3e1810f`.
 
 El release:
 
@@ -562,8 +562,9 @@ El release:
 - no cambia EquipmentAsset lifecycle/condition.
 
 Requirement Retire comparte el `Prisma.TransactionClient` del padre y conserva
-`Company → Case → Requirement → Assignments por ID ASC`. La integración exacta
-de Case Cancel queda para C4-C2. Un futuro productor Dispatch/Custody debe
+`Company → Case → Requirement → Assignments por ID ASC`. Case Cancel comparte el
+cliente del padre y conserva `Company → Case → Assignments por ID ASC`. Un futuro
+productor Dispatch/Custody debe
 impedir que cualquier release automático se interprete como disponibilidad
 física cuando el activo ya salió de Warehouse o está gobernado por Custody.
 
@@ -757,8 +758,9 @@ integrada final permanece pendiente hasta completar Parent Integrations.
 
 Requirement withdrawal implementa y valida el orden
 `Company → Case → Requirement → Assignments por ID ASC` dentro de una sola
-transacción. Case cancellation deberá adquirir/actualizar sus filas `RESERVED`
-en orden determinista durante C4-C2.
+transacción. Case cancellation implementa y valida
+`Company → Case → Assignments RESERVED por ID ASC` dentro de una sola
+transacción.
 
 ---
 
@@ -1307,11 +1309,20 @@ nueva ejecuta cero writes y no consume esa key.
 
 El comando público existente
 `POST /healthcare/cases/:caseId/cancel` mantiene su RBAC ADMIN/MANAGER. Dentro de
-la integración padre futura, Case Cancel debe adquirir primero Company y liberar
-sus Assignments `RESERVED` con `releaseCause = CASE_CANCELLED` y el actor del
-comando. No se crea otro endpoint público de cancelación o bulk release en
-Assignment. Este release derivado no está implementado por el protocolo
-experimental y permanece en HC-NEXT-03C4-C.
+la integración padre C4-C2, Case Cancel adquiere primero Company, bloquea el Case
+y después sus Assignments `RESERVED` por ID ascendente. Libera ambos origins con
+`releaseCause = CASE_CANCELLED`, el actor y la razón persistida del comando, y un
+timestamp compartido con `cancelledAt`. No se crea otro endpoint público de
+cancelación o bulk release en Assignment. La implementación está validada en
+rama y pendiente de integración.
+
+La evidencia en rama registra Jest focal 346/346 PASS; typecheck, `lint:check`,
+Prettier focal, API build y `git diff --check` PASS; y PostgreSQL/HTTP E2E focal
+16/16 PASS, 26 skipped por filtro, exit 0, sobre `zaping_spike_test`. La selección
+incluyó 15 escenarios C4-C2 y la regresión C4-C1 que preserva `DIRECT`. El
+teardown limita cleanup a los Company IDs del run, verifica conteos cero y
+propaga fallos. No se acreditan todavía integración en `main`, frontend,
+logística física ni el checkpoint integrado final de HC-LOCK-04.
 
 ## 27.3 Requirement withdrawal/cancellation
 
@@ -1332,8 +1343,9 @@ ruta. C4-C1 implementa la integración padre con el orden
 Esta mutación derivada se autoriza por el comando padre de Requirement; no
 concede a SALES acceso al endpoint manual de Assignment release.
 
-Requirement Retire está técnicamente completo y validado en rama, pendiente de
-integración. Case Cancel C4-C2 permanece pendiente. Ambos releases son lógicos;
+Requirement Retire está integrado en `main@3e1810f`. Case Cancel C4-C2 está
+técnicamente completo y validado en rama, pendiente de integración. Ambos
+releases son lógicos;
 cuando Dispatch/Custody exista, su guard deberá impedir que se presenten como
 disponibilidad física falsa.
 
@@ -1576,8 +1588,8 @@ Protecciones naturales adicionales:
 | Review inicial/stale | Cero writes; no claim persistido. |
 | Replace | Claim + original `REPLACED` + sucesora `RESERVED` + lineage + override rows. |
 | Release | Claim opcional, sólo con `Idempotency-Key` en la primera transición, + status `RELEASED` + actor/time/reason/cause. |
-| Case cancellation objetivo | Cambio de Case + releases lógicos aplicables dentro de una frontera consistente; integración pendiente. |
-| Requirement withdrawal | Cambio de Requirement + releases `REQUIREMENT` aplicables en la misma transacción; C4-C1 validado en rama, pendiente de integración. |
+| Case cancellation | Cambio de Case + releases lógicos aplicables dentro de una sola transacción; C4-C2 validado en rama, pendiente de integración. |
+| Requirement withdrawal | Cambio de Requirement + releases `REQUIREMENT` aplicables en la misma transacción; C4-C1 integrado en `main@3e1810f`. |
 
 Los comandos participantes aplican el siguiente orden principal dentro de la
 misma transacción:
@@ -1591,6 +1603,7 @@ misma transacción:
 | Requirement Reactivate | Company → Case → Product → Requirement. |
 | Requirement Reorder | Company → Case → Requirements en orden determinista por ID. |
 | Manual Release | Company → EquipmentAsset → Assignment. |
+| Case Cancel | Company → Case → Assignments RESERVED por ID ASC. |
 
 La tabla expresa el orden principal y no elimina los detalles del comando:
 settings conserva su advisory lock separado; los Cases múltiples se deduplican y
@@ -1601,13 +1614,13 @@ locks. Sólo entonces se decide review sin write o mutación atómica.
 
 La implementación debe evitar estado parcialmente visible. C4-C1 incorpora una
 coordinación interna transaction-bound que permite al servicio padre ejecutar
-su cambio y los releases con el mismo Prisma transaction client. No usa llamadas
-HTTP internas ni degrada el contrato a best-effort silencioso. C4-C2 deberá
-mantener la misma propiedad para Case Cancel.
+su cambio y los releases con el mismo Prisma transaction client. C4-C2 reutiliza
+esa primitiva para Case Cancel. Ninguno usa llamadas HTTP internas ni degrada el
+contrato a best-effort silencioso.
 
-Case Cancel debe adquirir Company antes de sus futuros releases. Requirement
-Retire ya conserva el orden aprobado y ejecuta sus releases derivados en C4-C1.
-C4-C2 sigue siendo un entregable separado.
+Case Cancel adquiere Company antes de sus releases. Requirement Retire conserva
+el orden aprobado y ejecuta sus releases derivados en C4-C1. C4-C2 sigue siendo
+un entregable separado hasta su integración.
 
 ---
 
@@ -2076,10 +2089,10 @@ Movement ni Custody.
 
 ## L. Case cancellation
 
-La Parent Integration futura debe adquirir Company primero, cambiar el Case y
-liberar consistentemente sus Assignments lógicas `RESERVED` aplicables en una
-frontera atómica. Retiene historia y no fabrica una devolución física. Esta
-integración no está implementada y permanece en HC-NEXT-03C4-C.
+La Parent Integration C4-C2 adquiere Company primero, cambia el Case y libera
+consistentemente sus Assignments lógicas `RESERVED` aplicables en una frontera
+atómica. Retiene historia y no fabrica una devolución física. Está implementada
+y validada en rama, pendiente de integración.
 
 ## M. Requirement withdrawal/cancellation
 
@@ -2088,7 +2101,7 @@ C4-C1 implementa Requirement Retire con orden
 updates condicionales. Libera las Assignments `RESERVED` de origin `REQUIREMENT`,
 preserva `DIRECT` e historia y reutiliza actor, razón normalizada y timestamp del
 padre. Replay `RETIRED` es zero-write y no repara historia. La implementación
-está validada técnicamente en rama y pendiente de integración.
+está integrada en `main@3e1810f`.
 
 Evidencia de cierre técnico C4-C1: Jest focal 429/429 PASS; typecheck, ESLint,
 Prettier focal, API build y `git diff --check` PASS; PostgreSQL E2E 13/13 PASS,
@@ -2204,13 +2217,13 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
 → MANUAL RELEASE HC-LOCK-03B AND REPLACE BACKEND MERGED
-→ REQUIREMENT RETIRE C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
-→ CASE CANCEL C4-C2 PENDING
+→ REQUIREMENT RETIRE C4-C1 COMPLETE / MERGED IN main@3e1810f
+→ CASE CANCEL C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
 → COMPANY LOCK ARCHITECTURE AND HC-LOCK-02 IMPLEMENTATION IN MAIN
 → HC-LOCK-04 PREREQUISITE POSTGRESQL/HTTP CHECKPOINT ACCREDITED
 → HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING AFTER C4-C1/C4-C2 INTEGRATION AND VALIDATION
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED; REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH
-→ C4-C2 CASE CANCEL Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 VALIDATED ON BRANCH
+→ C4-C2 PENDING INTEGRATION; FRONTEND PENDING
 ```

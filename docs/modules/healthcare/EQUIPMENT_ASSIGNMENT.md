@@ -13,8 +13,8 @@
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE AND REPLACE MERGED; HC-NEXT-03C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION; HC-NEXT-03C4-C2 CASE CANCEL PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED; REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; CASE CANCEL Y FRONTEND PENDING
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE, REPLACE AND HC-NEXT-03C4-C1 REQUIREMENT RETIRE MERGED; HC-NEXT-03C4-C2 CASE CANCEL TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL VALIDATED ON BRANCH / PENDING INTEGRATION; FRONTEND PENDING
 **Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
@@ -428,9 +428,9 @@ conserva lectura. Frontend UX continúa diferido.
 La implementación concreta del guard futuro con Dispatch/Custody permanece
 diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
 de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
-concurrencia de Create. En HC-NEXT-03C4, Manual Release y Replace están merged;
-C4-C1 Requirement Retire está implementado y validado técnicamente en rama,
-pendiente de integración. C4-C2 Case Cancel y frontend permanecen pendientes.
+concurrencia de Create. En HC-NEXT-03C4, Manual Release, Replace y C4-C1
+Requirement Retire están merged. C4-C2 Case Cancel está implementado y validado
+técnicamente en rama, pendiente de integración; frontend permanece pendiente.
 
 ## 13.1 Corte de implementación HC-NEXT-03C4-B — Replace
 
@@ -462,7 +462,7 @@ Dispatch/Custody continúan fuera de C4-B.
 
 ## 13.2 HC-NEXT-03C4-C1 — Requirement Retire Parent Integration
 
-**Estado:** TECHNICALLY COMPLETE / VALIDATED ON BRANCH — PENDING INTEGRATION
+**Estado:** COMPLETE / MERGED IN `main@3e1810f`
 
 ### Objetivo y alcance
 
@@ -611,6 +611,148 @@ Integration restante y ejecutar las regresiones integradas de ambos comandos.
 
 ---
 
+## 13.3 HC-NEXT-03C4-C2 — Case Cancel Parent Integration
+
+**Estado:** TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+
+### Objetivo y alcance
+
+El comando existente `POST /healthcare/cases/:caseId/cancel` debe cancelar el
+Healthcare Case y liberar atómicamente todas sus Equipment Assignments que bajo
+lock continúen `RESERVED` y pertenezcan al mismo `companyId` y `caseId`. La regla
+incluye ambos origins, `DIRECT` y `REQUIREMENT`; no crea una ruta nueva ni cambia
+el DTO, RBAC, status HTTP o respuesta pública directa del Case.
+
+El comando padre y los releases derivados comparten una sola transacción y el
+mismo `Prisma.TransactionClient`. La integración reutiliza las primitivas
+internas introducidas por C4-C1; no invoca la ruta pública de Manual Release ni
+abre una segunda transacción.
+
+### Dependencias y Definition of Ready
+
+- C4-C1 y sus primitivas transaction-bound están integradas en
+  `main@3e1810f`.
+- HC-LOCK-02 y HC-LOCK-03 están integrados; el prerequisite checkpoint de
+  HC-LOCK-04 está acreditado y su checkpoint final permanece pendiente.
+- Existen `origin = DIRECT/REQUIREMENT`, `lifecycle = RESERVED/RELEASED`,
+  `releaseCause = CASE_CANCELLED` y el índice tenant-scoped por Case/lifecycle;
+  no se requiere migración.
+- El endpoint vigente ya autoriza sólo ADMIN/MANAGER, valida el actor y la razón
+  y conserva la respuesta pública directa del Case.
+- Las reglas funcionales, de replay, auditoría y atomicidad de esta sección
+  están aprobadas.
+
+**DoR:** READY.
+
+### Reglas funcionales y de auditoría
+
+1. Sólo transicionan Assignments que bajo lock sigan `RESERVED` y pertenezcan al
+   `companyId` y `caseId` del comando padre. Se incluyen `DIRECT` y
+   `REQUIREMENT`.
+2. Assignments de otro Case o Company y filas ya `RELEASED` o `REPLACED`
+   permanecen intactas; todas las filas históricas siguen legibles.
+3. Cada transición derivada persiste `releaseCause = CASE_CANCELLED`,
+   `releasedById = cancelledById` y `releaseReason` igual a la
+   `cancellationReason` persistida por el Case, sin normalización adicional.
+4. `cancelledAt` y todos los `releasedAt` de la operación comparten un único
+   timestamp.
+5. Repetir Cancel sobre un Case ya `CANCELLED` conserva el HTTP 409 vigente y
+   ejecuta cero writes: no sobrescribe auditoría, no vuelve a liberar filas y no
+   repara Assignments históricas rezagadas.
+6. Cero Assignments elegibles es una cancelación válida.
+7. Case Cancel no incorpora `Idempotency-Key` ni crea claims de Assignment.
+
+### Frontera transaccional y orden
+
+La única transacción sigue este orden:
+
+```text
+Company advisory lock
+→ subsequent transaction timeouts
+→ HealthcareCase FOR UPDATE
+→ revalidación tenant-scoped de lifecycle y actor
+→ Assignments RESERVED del Case FOR UPDATE, ORDER BY id ASC
+→ transición condicional del Case
+→ releases condicionales de Assignments
+→ readback del Case
+→ commit
+```
+
+Los locks y updates de Assignment revalidan `companyId`, `caseId` y lifecycle.
+Si el Case o una fila bloqueada no puede transicionar como se esperaba, la
+operación devuelve el conflicto estable aplicable y toda la transacción revierte.
+No se adquieren locks de EquipmentAsset: el Company lock serializa los comandos
+participantes de la misma Company y esta integración sólo termina reservas
+lógicas.
+
+### Acceptance Criteria
+
+- Cancelar un Case elegible confirma en un solo commit su auditoría y el release
+  de todas las Assignments `RESERVED` `DIRECT` y `REQUIREMENT` aplicables.
+- Una, múltiples o cero Assignments aplicables producen el resultado definido,
+  sin liberaciones parciales.
+- Cause, actor, razón exacta del padre y timestamp compartido quedan persistidos
+  según este contrato.
+- Replay `CANCELLED` devuelve HTTP 409 con cero writes y sin reparación
+  histórica.
+- Otros tenants/Cases y lifecycles históricos permanecen intactos.
+- Create/Replace/Manual Release/Requirement Retire concurrentes observan el
+  estado confirmado del ganador después de la serialización Company-first.
+- Un fallo en cualquier write o readback revierte Case y Assignments.
+- Se preservan endpoint, DTO, RBAC ADMIN/MANAGER, status HTTP, tenant isolation,
+  respuesta pública directa y precedencia de errores del comando padre.
+- No se crean claims, Inventory Movement, Return, Custody ni efectos físicos.
+
+### Pruebas requeridas
+
+- Unitarias de Cases: orden, mismo transaction client, timestamp único, replay
+  409 zero-write, cero/una/múltiples filas, rollback y propagación de errores.
+- Unitarias de Assignment service/repository: locks deterministas, ambos
+  origins, filtros tenant/Case/lifecycle, auditoría y conditional update en cero.
+- Regresiones de controller/RBAC, validación, status y respuesta pública de Case.
+- PostgreSQL E2E determinista para Cancel con cero/una/múltiples reservas;
+  Create/Cancel, Replace/Cancel, Manual Release/Cancel y Requirement
+  Retire/Cancel en ambos órdenes de commit; rollback persistido, aislamiento
+  tenant, replay y ausencia de claims o efectos físicos.
+- Gates estáticos y locales: suites focales, typecheck, ESLint, Prettier, build y
+  `git diff --check`.
+
+### Definition of Done
+
+- Implementación limitada a Case Cancel y la coordinación interna
+  transaction-bound reutilizable de Equipment Assignments.
+- Acceptance Criteria y pruebas requeridas PASS, incluida evidencia PostgreSQL
+  real aislada para concurrencia y rollback.
+- Sin cambios de schema, migraciones, rutas, DTOs ni contratos públicos.
+- Documentación y Project Board alineados con la evidencia final.
+- C4-C2 puede cerrarse sin declarar cerrado HC-NEXT-03C4-C ni el checkpoint final
+  de HC-LOCK-04 hasta completar la integración y validación conjunta.
+
+### Evidencia de validación en rama
+
+- Jest focal: 346/346 PASS.
+- Typecheck, `lint:check`, Prettier focal, API build y `git diff --check`: PASS.
+- PostgreSQL/HTTP E2E focal sobre la base aislada `zaping_spike_test`: 16/16
+  PASS, 26 skipped por filtro, exit 0. La ejecución cubrió 15 escenarios C4-C2
+  y la regresión C4-C1 que mantiene `DIRECT` al retirar una Requirement.
+- El harness elimina únicamente fixtures de los Company IDs del run, verifica
+  conteos cero y propaga cualquier fallo de cleanup.
+- La aceptación en rama no sustituye la integración en `main` ni el checkpoint
+  integrado final de HC-LOCK-04.
+
+### Fuera de alcance y checkpoint posterior
+
+Quedan fuera reparación histórica, reapertura de Cases, Case Availability,
+frontend, Dispatch, Return, Custody, Inventory Movement, disponibilidad física y
+cambios de lifecycle/condition del EquipmentAsset. C4-C2 no implementa nuevas
+capacidades de Manual Release, Replace o Requirement Retire.
+
+El prerequisite checkpoint de HC-LOCK-04 está acreditado. Su checkpoint final
+permanece pendiente hasta integrar C4-C2 y ejecutar las regresiones integradas de
+ambas Parent Integrations.
+
+---
+
 # 14. Estado final
 
 ```text
@@ -641,13 +783,13 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
 → MANUAL RELEASE AND REPLACE COMPLETE / MERGED
-→ REQUIREMENT RETIRE C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
-→ CASE CANCEL C4-C2 PENDING
+→ REQUIREMENT RETIRE C4-C1 COMPLETE / MERGED IN main@3e1810f
+→ CASE CANCEL C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
 → HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED
-→ REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; C4-C2 Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 VALIDATED ON BRANCH
+→ C4-C2 PENDING INTEGRATION; FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:

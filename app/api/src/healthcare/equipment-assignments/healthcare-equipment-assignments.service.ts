@@ -872,6 +872,16 @@ export class HealthcareEquipmentAssignmentsService {
     );
   }
 
+  lockReservedCaseAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseId: string;
+    },
+  ): Promise<string[]> {
+    return this.repository.lockReservedCaseAssignments(transaction, data);
+  }
+
   async releaseLockedRequirementAssignments(
     transaction: Prisma.TransactionClient,
     data: {
@@ -884,6 +894,68 @@ export class HealthcareEquipmentAssignmentsService {
       releaseReason: string;
     },
   ): Promise<void> {
+    return this.releaseLockedAssignments(transaction, {
+      companyId: data.companyId,
+      assignmentIds: data.assignmentIds,
+      releasedAt: data.releasedAt,
+      releasedById: data.releasedById,
+      releaseCause:
+        HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+      releaseReason: data.releaseReason,
+      expectedContext: {
+        caseId: data.caseId,
+        requirementId: data.requirementId,
+        origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+      },
+    });
+  }
+
+  async releaseLockedCaseAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseId: string;
+      assignmentIds: string[];
+      releasedAt: Date;
+      releasedById: string;
+      releaseReason: string;
+    },
+  ): Promise<void> {
+    return this.releaseLockedAssignments(transaction, {
+      companyId: data.companyId,
+      assignmentIds: data.assignmentIds,
+      releasedAt: data.releasedAt,
+      releasedById: data.releasedById,
+      releaseCause: HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+      releaseReason: data.releaseReason,
+      expectedContext: {
+        caseId: data.caseId,
+      },
+    });
+  }
+
+  private async releaseLockedAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      assignmentIds: string[];
+      releasedAt: Date;
+      releasedById: string;
+      releaseCause: HealthcareEquipmentAssignmentReleaseCause;
+      releaseReason: string;
+      expectedContext:
+        | {
+            caseId: string;
+            requirementId: string;
+            origin: HealthcareEquipmentAssignmentOrigin;
+          }
+        | {
+            caseId: string;
+            requirementId?: never;
+            origin?: never;
+          };
+    },
+  ): Promise<void> {
     const assignmentIds = [...new Set(data.assignmentIds)].sort((left, right) =>
       left.localeCompare(right),
     );
@@ -894,14 +966,9 @@ export class HealthcareEquipmentAssignmentsService {
         assignmentId,
         releasedAt: data.releasedAt,
         releasedById: data.releasedById,
-        releaseCause:
-          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        releaseCause: data.releaseCause,
         releaseReason: data.releaseReason,
-        expectedContext: {
-          caseId: data.caseId,
-          requirementId: data.requirementId,
-          origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
-        },
+        expectedContext: data.expectedContext,
       });
 
       if (result.count !== 1) {

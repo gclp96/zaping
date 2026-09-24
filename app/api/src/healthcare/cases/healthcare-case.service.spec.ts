@@ -7,9 +7,25 @@ import {
 import { HealthcareCase, HealthcareCaseStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { HealthcareCompanyTransactionTimeoutPolicy } from '../common/healthcare-company-transaction-timeout-policy';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
+import { HealthcareEquipmentAssignmentsService } from '../equipment-assignments/healthcare-equipment-assignments.service';
 
 import { HealthcareCaseFolioService } from './healthcare-case-folio.service';
 import { HealthcareCaseService } from './healthcare-case.service';
+
+jest.mock('../common/healthcare-company-lock');
+jest.mock('../common/healthcare-subsequent-transaction-timeouts');
+
+const transactionTimeoutPolicy = {
+  companyLockAcquisitionTimeoutMs: 2_500,
+  subsequentLockTimeoutMs: 1_500,
+  subsequentStatementTimeoutMs: 4_000,
+  prismaMaxWaitMs: 3_000,
+  prismaTransactionTimeoutMs: 20_000,
+} satisfies HealthcareCompanyTransactionTimeoutPolicy;
 
 type UserLookupResult = {
   id: string;
@@ -115,9 +131,11 @@ describe('HealthcareCaseService', () => {
     Promise<UpdateManyResult>,
     [HealthcareCaseUpdateManyArgs]
   >();
+  const queryRawMock = jest.fn();
   const prismaTransactionMock = jest.fn();
 
   const txMock = {
+    $queryRaw: queryRawMock,
     user: {
       findFirst: userFindFirstMock,
     },
@@ -144,6 +162,10 @@ describe('HealthcareCaseService', () => {
 
   const healthcareCaseFolioServiceMock = {
     allocateNextAvailableFolio: jest.fn<Promise<string>, [unknown, string]>(),
+  };
+  const equipmentAssignmentsServiceMock = {
+    lockReservedCaseAssignments: jest.fn(),
+    releaseLockedCaseAssignments: jest.fn(),
   };
 
   const createdAt = new Date('2026-08-24T10:00:00.000Z');
@@ -173,6 +195,10 @@ describe('HealthcareCaseService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    jest.mocked(acquireHealthcareCompanyLock).mockResolvedValue(undefined);
+    jest
+      .mocked(applyHealthcareSubsequentTransactionTimeouts)
+      .mockResolvedValue(undefined);
 
     persistedCase = {
       ...baseCase,
@@ -180,6 +206,20 @@ describe('HealthcareCaseService', () => {
 
     prismaTransactionMock.mockImplementation(
       (callback: (tx: typeof txMock) => Promise<unknown>) => callback(txMock),
+    );
+    queryRawMock.mockImplementation(() =>
+      Promise.resolve([
+        {
+          id: persistedCase.id,
+          status: persistedCase.status,
+        },
+      ]),
+    );
+    equipmentAssignmentsServiceMock.lockReservedCaseAssignments.mockResolvedValue(
+      [],
+    );
+    equipmentAssignmentsServiceMock.releaseLockedCaseAssignments.mockResolvedValue(
+      undefined,
     );
 
     userFindFirstMock.mockResolvedValue({
@@ -252,6 +292,8 @@ describe('HealthcareCaseService', () => {
     service = new HealthcareCaseService(
       prismaMock as unknown as PrismaService,
       healthcareCaseFolioServiceMock as unknown as HealthcareCaseFolioService,
+      equipmentAssignmentsServiceMock as unknown as HealthcareEquipmentAssignmentsService,
+      transactionTimeoutPolicy,
     );
   });
 
@@ -317,6 +359,13 @@ describe('HealthcareCaseService', () => {
     new Prisma.PrismaClientKnownRequestError('sensitive persistence detail', {
       code,
       clientVersion: '6.19.3',
+    });
+
+  const knownPrismaRawQueryError = (sqlState: string) =>
+    new Prisma.PrismaClientKnownRequestError('database error', {
+      code: 'P2010',
+      clientVersion: '6.19.3',
+      meta: { code: sqlState },
     });
 
   it('should create an unscheduled case as DRAFT', async () => {
@@ -1701,6 +1750,169 @@ describe('HealthcareCaseService', () => {
     expect(getLastUpdateData().cancelledAt).toBeInstanceOf(Date);
   });
 
+  it('should acquire locks in Company, Case, Assignment order with the shared transaction policy', async () => {
+    const calls: string[] = [];
+    jest.mocked(acquireHealthcareCompanyLock).mockImplementation(() => {
+      calls.push('company');
+      return Promise.resolve();
+    });
+    jest
+      .mocked(applyHealthcareSubsequentTransactionTimeouts)
+      .mockImplementation(() => {
+        calls.push('subsequent-timeouts');
+        return Promise.resolve();
+      });
+    queryRawMock.mockImplementationOnce(() => {
+      calls.push('case-lock');
+      return Promise.resolve([
+        { id: caseId, status: HealthcareCaseStatus.DRAFT },
+      ]);
+    });
+    userFindFirstMock.mockImplementationOnce(() => {
+      calls.push('actor');
+      return Promise.resolve({ id: createdById });
+    });
+    equipmentAssignmentsServiceMock.lockReservedCaseAssignments.mockImplementationOnce(
+      () => {
+        calls.push('assignment-locks');
+        return Promise.resolve([]);
+      },
+    );
+    healthcareCaseUpdateManyMock.mockImplementationOnce(() => {
+      calls.push('case-update');
+      return Promise.resolve({ count: 1 });
+    });
+    equipmentAssignmentsServiceMock.releaseLockedCaseAssignments.mockImplementationOnce(
+      () => {
+        calls.push('assignment-releases');
+        return Promise.resolve();
+      },
+    );
+    txHealthcareCaseFindFirstMock.mockImplementationOnce(() => {
+      calls.push('case-readback');
+      return Promise.resolve({
+        ...baseCase,
+        status: HealthcareCaseStatus.CANCELLED,
+      });
+    });
+
+    await service.cancel(
+      companyId,
+      caseId,
+      createdById,
+      'Cancelación operacional',
+    );
+
+    expect(calls).toEqual([
+      'company',
+      'subsequent-timeouts',
+      'case-lock',
+      'actor',
+      'assignment-locks',
+      'case-update',
+      'assignment-releases',
+      'case-readback',
+    ]);
+    expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+      txMock,
+      companyId,
+      {
+        acquisitionTimeoutMs:
+          transactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+      },
+    );
+    expect(applyHealthcareSubsequentTransactionTimeouts).toHaveBeenCalledWith(
+      txMock,
+      transactionTimeoutPolicy,
+    );
+    expect(prismaTransactionMock).toHaveBeenCalledWith(expect.any(Function), {
+      maxWait: transactionTimeoutPolicy.prismaMaxWaitMs,
+      timeout: transactionTimeoutPolicy.prismaTransactionTimeoutMs,
+    });
+  });
+
+  it('should pass zero eligible Assignments through the same transaction', async () => {
+    await service.cancel(
+      companyId,
+      caseId,
+      createdById,
+      'Cancelación operacional',
+    );
+
+    expect(
+      equipmentAssignmentsServiceMock.releaseLockedCaseAssignments,
+    ).toHaveBeenCalledWith(
+      txMock,
+      expect.objectContaining({
+        companyId,
+        caseId,
+        assignmentIds: [],
+      }),
+    );
+  });
+
+  it('should release all locked Case Assignments with the persisted parent audit and timestamp', async () => {
+    equipmentAssignmentsServiceMock.lockReservedCaseAssignments.mockResolvedValueOnce(
+      ['assignment-direct', 'assignment-requirement'],
+    );
+
+    await service.cancel(
+      companyId,
+      caseId,
+      createdById,
+      '  Razón   persistida  ',
+    );
+
+    const cancelledAt = getLastUpdateData().cancelledAt;
+    expect(cancelledAt).toBeInstanceOf(Date);
+    expectLastUpdateData({
+      cancelledById: createdById,
+      cancellationReason: 'Razón   persistida',
+    });
+    expect(
+      equipmentAssignmentsServiceMock.releaseLockedCaseAssignments,
+    ).toHaveBeenCalledWith(txMock, {
+      companyId,
+      caseId,
+      assignmentIds: ['assignment-direct', 'assignment-requirement'],
+      releasedAt: cancelledAt,
+      releasedById: createdById,
+      releaseReason: 'Razón   persistida',
+    });
+  });
+
+  it('should map only the dedicated Company acquisition timeout to sanitized 503', async () => {
+    prismaTransactionMock.mockRejectedValueOnce(
+      new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+    );
+
+    const error = await captureHttpException(
+      service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
+    );
+
+    expect(error.getStatus()).toBe(503);
+    expect(error.getResponse()).toMatchObject({
+      statusCode: 503,
+      code: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
+    });
+    expect(JSON.stringify(error.getResponse())).not.toContain('internal cause');
+  });
+
+  it('should not map a subsequent timeout as a Company acquisition timeout', async () => {
+    prismaTransactionMock.mockRejectedValueOnce(
+      knownPrismaRawQueryError('55P03'),
+    );
+
+    const error = await captureHttpException(
+      service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
+    );
+
+    expect(error.getStatus()).toBe(500);
+    expect(error.getResponse()).toMatchObject({
+      code: 'HEALTHCARE_PERSISTENCE_ERROR',
+    });
+  });
+
   it('should cancel a SCHEDULED case', async () => {
     persistedCase = {
       ...baseCase,
@@ -1799,13 +2011,20 @@ describe('HealthcareCaseService', () => {
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(healthcareCaseUpdateManyMock).not.toHaveBeenCalled();
+    expect(userFindFirstMock).not.toHaveBeenCalled();
+    expect(
+      equipmentAssignmentsServiceMock.lockReservedCaseAssignments,
+    ).not.toHaveBeenCalled();
+    expect(
+      equipmentAssignmentsServiceMock.releaseLockedCaseAssignments,
+    ).not.toHaveBeenCalled();
     expect(persistedCase.cancelledAt).toBe(originalCancelledAt);
     expect(persistedCase.cancelledById).toBe('original-user-id');
     expect(persistedCase.cancellationReason).toBe('Original reason');
   });
 
   it('should return NotFound when cancelling a missing case', async () => {
-    txHealthcareCaseFindFirstMock.mockResolvedValueOnce(null);
+    queryRawMock.mockResolvedValueOnce([]);
 
     await expect(
       service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
@@ -1815,7 +2034,7 @@ describe('HealthcareCaseService', () => {
   });
 
   it('should return the same NotFound for cross-tenant cancel simulation', async () => {
-    txHealthcareCaseFindFirstMock.mockResolvedValueOnce(null);
+    queryRawMock.mockResolvedValueOnce([]);
 
     await expect(
       service.cancel(
@@ -1861,7 +2080,7 @@ describe('HealthcareCaseService', () => {
       statusCode: 409,
       code: 'RESOURCE_STATE_CHANGED',
     });
-    expect(txHealthcareCaseFindFirstMock).toHaveBeenNthCalledWith(2, {
+    expect(txHealthcareCaseFindFirstMock).toHaveBeenCalledWith({
       where: { id: caseId, companyId },
       select: { id: true },
     });
@@ -1869,13 +2088,25 @@ describe('HealthcareCaseService', () => {
 
   it('should preserve missing/foreign 404 semantics when cancellation loses its row', async () => {
     healthcareCaseUpdateManyMock.mockResolvedValueOnce({ count: 0 });
-    txHealthcareCaseFindFirstMock
-      .mockResolvedValueOnce(baseCase)
-      .mockResolvedValueOnce(null);
+    txHealthcareCaseFindFirstMock.mockResolvedValueOnce(null);
 
     await expect(
       service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
     ).rejects.toEqual(new NotFoundException('Caso no encontrado'));
+  });
+
+  it('should propagate a derived release failure before Case readback', async () => {
+    const releaseError = new Error('derived release failed');
+    equipmentAssignmentsServiceMock.releaseLockedCaseAssignments.mockRejectedValueOnce(
+      releaseError,
+    );
+
+    await expect(
+      service.cancel(companyId, caseId, createdById, 'Cancelación operacional'),
+    ).rejects.toBe(releaseError);
+
+    expect(healthcareCaseUpdateManyMock).toHaveBeenCalledTimes(1);
+    expect(txHealthcareCaseFindFirstMock).not.toHaveBeenCalled();
   });
 
   it.each([
