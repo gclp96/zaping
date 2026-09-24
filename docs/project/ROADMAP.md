@@ -101,11 +101,13 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 — main@5b7c03e
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — PENDING REFINEMENT / DOR / PLANNING — NOT READY
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
 ↓
-HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE C6
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+↓
+HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -133,8 +135,8 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
 HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
 Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
 `main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
-DEC-C5-02 divide HC-NEXT-03C5: C5-A queda COMPLETE / MERGED mediante PR #36 en
-`main@5b7c03e`; C5-B permanece PENDING REFINEMENT / DOR / PLANNING — NOT READY.
+DEC-C5-02 divide HC-NEXT-03C5: C5-A queda COMPLETE / MERGED mediante PR #36 y #37
+en `main@5ec9f67`; C5-B queda PLANNED con B0 NOT READY y B1–B3 NOT IMPLEMENTED.
 C5-A ejecutó PostgreSQL real
 27/27 PASS, 0 skipped, exit 0, con preflight y teardown sin errores reportados;
 el harness está contenido en `85b480d` y `02d7a6e`. La identidad dedicada y los
@@ -143,12 +145,23 @@ permisos mínimos quedaron verificados. La excepción aprobada conserva
 La exclusividad se comprobó al inicio, no durante toda la ejecución; no se declara
 la base globalmente vacía.
 DEC-C5-01 separa CoverageNote y cobertura agregada en HC-NEXT-03C5-COVERAGE,
-ticket backend independiente con contrato pendiente y requerido antes de C6.
+ticket backend independiente con contrato pendiente y requerido antes de slices
+posteriores de C6 que muestren coverage o muten Assignments; no bloquea C6-A.
 
-Sprint 1: 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026; Actual C5-A
-24-sep-2026, completado antes del Target. No se registra Commitment retroactivo.
-El Forecast del trabajo restante está pendiente de estimación; C5-B requiere
-refinamiento, DoR y planificación antes de asumir fechas comprometidas.
+DEC-C5B-01 diseña el rol dedicado `zaping_hc_c5b`, sin autorizar su creación ni
+cambios ACL. DEC-C5B-02 acepta evidencia compuesta del error sanitizado: mapping
+unitario, fallo PostgreSQL/HTTP real 2H con auth guard de test y una comprobación
+HTTP C5-B representativa con JWT real; no demuestra PG+JWT real en la misma
+petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
+List/Detail HTTP el recálculo, no Case Update API.
+
+Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
+velocidad o Commitment; C5-A quedó completado el 24-sep. Se prioriza C6-A como
+primer incremento visible: listado, detalle, disponibilidad API y estados
+loading/empty/error/RBAC. Puede iniciarse sin B0, pero su aceptación integrada
+depende de los gates aplicables de autenticación, permisos y List/Detail. Sus SP,
+fecha y Forecast están pendientes de estimación; no existe Commitment. C5-B
+conserva B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
 
 También permanecen como TARGET Healthcare:
 
@@ -969,9 +982,9 @@ ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATI
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
 COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
-ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5b7c03e VIA
-PR #36 — HC-NEXT-03C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY — PARTIALLY
-IMPLEMENTED: BACKEND C1–C4 COMPLETE; FRONTEND PENDING.
+ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5ec9f67 VIA
+PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED — PARTIALLY
+IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW PLANNED NEXT.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1037,11 +1050,21 @@ COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está
 COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
 ACCEPTED sobre `main@be73bc4`. DEC-C5-02 divide hardening en C5-A Contract
 Alignment & Safe PostgreSQL Harness y C5-B Integrated Backend Validation. C5-A
-está COMPLETE / MERGED mediante PR #36 en `main@5b7c03e`; C5-B requiere
-refinamiento, DoR y planificación y permanece NOT READY. DEC-C5-01 deja CoverageNote
+está COMPLETE / MERGED mediante PR #36 y #37 en `main@5ec9f67`; C5-B está
+planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 NOT READY y B1–B3 NOT
+IMPLEMENTED. DEC-C5B-01/02/03 fijan rol dedicado sin autorización de provisioning,
+evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
+DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
-pendiente y como prerequisito de C6. Este corte no declara Healthcare Core ni
-producción terminados.
+pendiente y como prerequisito de slices posteriores de C6 que requieran coverage
+o mutaciones, no de C6-A. El siguiente incremento de producto es C6-A, una vista
+read-only de Equipment Assignments por Case conectada a List/Detail existentes.
+Incluye listado, detalle, disponibilidad API y estados loading/empty/error/RBAC;
+excluye Create/Replace/Release en UI, CoverageNote, movimientos físicos y cambios
+productivos de backend. Puede comenzar sin B0, aunque su aceptación integrada
+depende de los gates aplicables de autenticación, permisos y List/Detail. Sus SP,
+fechas, Forecast y Commitment continúan pendientes. Este corte no declara
+Healthcare Core ni producción terminados.
 
 Debe mantenerse:
 
@@ -2784,11 +2807,13 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 — main@5b7c03e
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 
-HC-NEXT-03C5-B Integrated Backend Validation — PENDING REFINEMENT / DOR / PLANNING — NOT READY
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
 
-HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
 Case Availability
 
@@ -2931,11 +2956,13 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 — main@5b7c03e
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — PENDING REFINEMENT / DOR / PLANNING — NOT READY
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
 ↓
-HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+↓
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
