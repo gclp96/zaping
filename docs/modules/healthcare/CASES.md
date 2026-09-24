@@ -4,8 +4,8 @@ Módulo: Healthcare Cases
 Producto: Zaping Healthcare
 Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C8 CLOSED / MERGED / ACCEPTED
-Última actualización: 2026-09-13
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C8 CLOSED / MERGED / ACCEPTED; C4-C2 CONTRACT READY / IMPLEMENTATION PENDING
+Última actualización: 2026-09-23
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -889,6 +889,38 @@ DELETE /healthcare/cases/:caseId
 como workflow normal.
 
 Cancellation es la operación terminal soportada por Foundation.
+
+51.1 C4-C2 Equipment Assignment release TARGET / READY
+
+La primera transición válida de Case `DRAFT` o `SCHEDULED` a `CANCELLED` debe
+liberar en la misma transacción todas las Equipment Assignments del Case que bajo
+lock continúen `RESERVED`, incluyendo origins `DIRECT` y `REQUIREMENT`.
+
+Cada release derivado conserva la fila histórica y persiste:
+
+```text
+releaseCause = CASE_CANCELLED
+releasedById = cancelledById
+releaseReason = cancellationReason persistida por el Case
+releasedAt = cancelledAt
+```
+
+No se aplica normalización adicional a `releaseReason`; `cancelledAt` y
+`releasedAt` comparten un timestamp único. Cero reservas elegibles es éxito.
+
+La frontera usa una transacción y un `Prisma.TransactionClient`, con orden
+`Company → Case → Assignments RESERVED por ID ASC`, revalidaciones tenant-scoped,
+updates condicionales y rollback conjunto. Reutiliza primitivas internas de
+Equipment Assignment y no llama al endpoint público de Manual Release.
+
+Un Case ya `CANCELLED` conserva la semántica vigente: HTTP 409, cero writes y sin
+reparación de Assignments históricas. C4-C2 no cambia la ruta, DTO, status HTTP,
+respuesta pública directa, RBAC ADMIN/MANAGER, tenant isolation ni precedencia de
+errores de Cancel.
+
+Esta integración sólo termina reservas lógicas. No crea idempotency claims,
+Inventory Movement, Return o Custody, ni cambia lifecycle/condition del
+EquipmentAsset. El contrato está READY; la implementación permanece pendiente.
 
 52. Completion CURRENT
 
