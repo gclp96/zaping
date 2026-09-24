@@ -14,7 +14,7 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING; C5-B BLOCKED; FRONTEND PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING; C5-B BLOCKED; FRONTEND PENDING
 **Última actualización:** 2026-09-24
 **Responsable:** Zaping Healthcare Team
 
@@ -773,7 +773,7 @@ cleanup de sus fixtures propios, no una base globalmente vacía.
 
 ### C5-A — contrato y DoR
 
-**Estado:** CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING — DOR INCOMPLETE.
+**Estado:** TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING.
 
 C5-A alinea el contrato CURRENT y endurece sólo el harness PostgreSQL C1. Debe
 usar `RUN_HC_C5_POSTGRES_TESTS=1` y `HC_C5_DATABASE_URL`, sin dotenv/fallback;
@@ -781,10 +781,10 @@ validar la identidad conectada, base, usuario, host, puertos, versión, schema,
 permisos mínimos y exclusividad de sesiones antes de escribir; y limitar
 fixtures/cleanup a IDs propios del run con conteos cero y propagación de fallos.
 
-Se propone `zaping_hc_c5` sobre `zaping_spike_test` vía `127.0.0.1:5434`, sujeto
-a aprobación posterior de identidad y privilegios. Esta propuesta no acredita
-infraestructura ni autoriza crear roles, conceder permisos o ejecutar E2E. B4-B1
-y 2H no se heredan automáticamente.
+La ejecución acreditó `zaping_hc_c5` sobre `zaping_spike_test` vía
+`127.0.0.1:5434`, con identidad dedicada y permisos mínimos verificados. La
+excepción ACL aprobada conserva `CONNECT`/`TEMPORARY` y `USAGE` heredados de
+`PUBLIC`, sin modificar ACL compartidas. B4-B1 y 2H no se heredan automáticamente.
 
 Acceptance Criteria y DoD:
 - fail-closed ante mismatch de identidad, schema, permisos o sesiones;
@@ -794,6 +794,18 @@ Acceptance Criteria y DoD:
 - sin cambios de producción, schema, migraciones o contratos C1–C4;
 - evidencia de preflight autorizada, gates estáticos verdes y aprobación explícita
   de infraestructura antes de desbloquear C5-B.
+
+Evidencia técnica C5-A:
+- harness C1 en `85b480d` y `02d7a6e`;
+- PostgreSQL real: 27/27 PASS, 0 skipped, exit 0;
+- preflight y teardown sin errores reportados; la evidencia cubre fixtures propios,
+  no una base globalmente vacía;
+- riesgo residual: la exclusividad se comprueba al inicio y no se garantiza durante
+  toda la ejecución;
+- PR e integración pendientes; C5-A no está DONE y C5-B continúa bloqueado.
+
+Sprint 1 propuesto: 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026;
+Forecast y Commitment pendientes de aprobación; Actual pendiente de integración.
 
 ### C5-B — contrato y bloqueo
 
@@ -856,7 +868,7 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 → C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 ```
 

@@ -101,7 +101,7 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
 ↓
@@ -133,10 +133,19 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency COMPLETE / MERGED;
 HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
 Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
 `main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
-DEC-C5-02 divide HC-NEXT-03C5: C5-A queda CONTRACT DOCUMENTED / INFRASTRUCTURE
-APPROVAL PENDING y C5-B permanece BLOCKED BY C5-A. Ninguno se declara READY.
+DEC-C5-02 divide HC-NEXT-03C5: C5-A queda TECHNICALLY VALIDATED IN BRANCH / PR &
+MERGE PENDING y C5-B permanece BLOCKED BY C5-A. C5-A ejecutó PostgreSQL real
+27/27 PASS, 0 skipped, exit 0, con preflight y teardown sin errores reportados;
+el harness está contenido en `85b480d` y `02d7a6e`. La identidad dedicada y los
+permisos mínimos quedaron verificados. La excepción aprobada conserva
+`CONNECT`/`TEMPORARY` y `USAGE` heredados de `PUBLIC`, sin cambiar ACL compartidas.
+La exclusividad se comprobó al inicio, no durante toda la ejecución; no se declara
+la base globalmente vacía ni C5-A integrado.
 DEC-C5-01 separa CoverageNote y cobertura agregada en HC-NEXT-03C5-COVERAGE,
 ticket backend independiente con contrato pendiente y requerido antes de C6.
+
+Sprint 1 propuesto: 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026;
+Forecast y Commitment pendientes de aprobación; Actual pendiente de integración.
 
 También permanecen como TARGET Healthcare:
 
@@ -957,8 +966,8 @@ ACCEPTANCE CONTRACT APPROVED / DOCUMENTED — HC-NEXT-03C1 PERSISTENCE / MIGRATI
 COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3
 COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
-ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE
-APPROVAL PENDING — HC-NEXT-03C5-B BLOCKED — PARTIALLY
+ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A TECHNICALLY VALIDATED IN BRANCH / PR &
+MERGE PENDING — HC-NEXT-03C5-B BLOCKED — PARTIALLY
 IMPLEMENTED: BACKEND C1–C4 COMPLETE; FRONTEND PENDING.
 
 El contrato canónico aprobado se documenta en
@@ -1025,10 +1034,11 @@ COMPLETE / MERGED. HC-NEXT-03C4 Replace / Release / Parent Integrations está
 COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
 ACCEPTED sobre `main@be73bc4`. DEC-C5-02 divide hardening en C5-A Contract
 Alignment & Safe PostgreSQL Harness y C5-B Integrated Backend Validation. C5-A
-está CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING y C5-B BLOCKED; no se
-declara DoR completo. DEC-C5-01 deja CoverageNote y cobertura agregada fuera de
-C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional pendiente y como prerequisito
-de C6. Este corte no declara Healthcare Core terminado.
+está TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING y C5-B BLOCKED. Su DoR
+técnico está acreditado; el DoD requiere integración. DEC-C5-01 deja CoverageNote
+y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
+pendiente y como prerequisito de C6. Este corte no declara Healthcare Core ni
+producción terminados.
 
 Debe mantenerse:
 
@@ -2771,7 +2781,7 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 
 HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
 
@@ -2918,7 +2928,7 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency — COMPLETE / MERGED
 ↓
 HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 ↓
-HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
 ↓

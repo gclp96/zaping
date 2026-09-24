@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING — HC-NEXT-03C5-B BLOCKED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING — HC-NEXT-03C5-B BLOCKED
 Última actualización: 2026-09-24
 Responsable: Zaping Team
 
@@ -171,7 +171,7 @@ HC-NEXT-03C4-C parent integrations
         → C4-C2 CASE CANCEL COMPLETE / MERGED IN main@f429e9f
 
 HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
-        → CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+        → TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → BLOCKED BY C5-A
@@ -2275,7 +2275,7 @@ CURRENT ROADMAP ITEM
 
 → HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — COMPLETE / MERGED — HC-LOCK-04 FINAL CLOSED / ACCEPTED
 
-→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 → HC-NEXT-03C5-B Integrated Backend Validation — BLOCKED BY C5-A
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
 
@@ -2506,7 +2506,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations
 
 Healthcare Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING
+→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
 → C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -2847,7 +2847,7 @@ Decisiones aprobadas:
 
 #### HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
 
-Estado: CONTRACT DOCUMENTED / INFRASTRUCTURE APPROVAL PENDING — DOR INCOMPLETE
+Estado: TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING
 
 Dependencias satisfechas:
 - branch limpia desde `main@5d33cb0`;
@@ -2855,6 +2855,8 @@ Dependencias satisfechas:
 - HC-LOCK-04 final CLOSED / ACCEPTED sobre la baseline productivamente
   equivalente `main@be73bc4`;
 - matriz C1–C4 y divergencias B.1/B.2/B.3 refinadas.
+- harness C1 endurecido en `85b480d` y corrección diagnóstica/SQL integrada en
+  `02d7a6e`.
 
 Alcance:
 - alinear la documentación CURRENT de Replace, Company Lock y estados de slices;
@@ -2863,29 +2865,35 @@ Alcance:
   dotenv, `.env`, `DATABASE_URL` genérica ni fallback;
 - verificar antes de toda escritura la identidad conectada, base, usuario, host,
   puertos host/server, versión PostgreSQL y schema efectivo;
-- verificar `CONNECT`, `USAGE`, privilegios mínimos por tabla y, donde exista un
-  `FOR UPDATE`, `SELECT` y `UPDATE(columna)`; no conceder privilegios globales ni
-  privilegios de secuencia no demostrados por las operaciones seleccionadas;
+- verificar `CONNECT`, `USAGE` y `SELECT`/`INSERT`/`DELETE` únicamente sobre las
+  diez tablas requeridas; sin `UPDATE`, privilegios globales, administrativos ni
+  privilegios de secuencia;
 - exigir que todas las conexiones alcancen la misma instancia y que no existan
   sesiones ajenas al run;
 - usar fixtures con IDs propios del run y cleanup tenant-scoped en orden
   referencial, con readback de conteos cero y propagación agregada de fallos.
 
-Propuesta de infraestructura, no acreditada:
+Infraestructura y ejecución acreditadas para C5-A:
 - usuario dedicado `zaping_hc_c5`;
 - base `zaping_spike_test`;
 - endpoint host `127.0.0.1:5434`.
+- identidad dedicada y permisos mínimos verificados;
+- PostgreSQL real: 27/27 PASS, 0 skipped, exit 0; preflight y teardown sin errores
+  reportados;
+- excepción ACL aprobada: `CONNECT`/`TEMPORARY` y `USAGE` heredados de `PUBLIC`,
+  sin cambios en ACL compartidas.
 
-La propuesta queda sujeta a aprobación posterior de identidad y privilegios. No
-autoriza crear el rol, conceder permisos, configurar secretos ni ejecutar E2E.
-Los laboratorios B4-B1 y 2H no se consideran equivalentes automáticamente.
+La evidencia acredita sólo los fixtures propios y su teardown; no declara la base
+globalmente vacía. La exclusividad se comprueba al inicio, pero no queda garantizada
+durante toda la ejecución. Los laboratorios B4-B1 y 2H no se consideran
+equivalentes automáticamente.
 
 Definition of Ready:
 - contrato C5-A documentado y baseline limpia: satisfecho;
 - identidad/usuario/variable explícita y manifiesto mínimo de privilegios
-  aprobados: pendiente;
+  aprobados: satisfecho;
 - conexión efectiva, schema, aislamiento de sesiones y cleanup verificados en
-  preflight autorizado: pendiente.
+  preflight autorizado: satisfecho para la ejecución C1 acreditada.
 
 Acceptance Criteria:
 - el harness falla cerrado antes de escribir ante cualquier mismatch de identidad,
@@ -2899,8 +2907,17 @@ Definition of Done:
 - implementación y revisión focal del harness completadas;
 - preflight autorizado documenta identidad efectiva sin secretos;
 - validaciones estáticas y `git diff --check` verdes;
-- infraestructura aprobada y C5-B desbloqueado explícitamente. Hasta entonces
-  C5-A no está READY ni DONE.
+- PostgreSQL C1 27/27 PASS y teardown sin errores reportados;
+- PR e integración en `main`: pendientes. Hasta entonces C5-A no está DONE y C5-B
+  continúa bloqueado.
+
+Sprint 1 propuesto:
+- ventana: 24-sep–07-oct-2026;
+- objetivo: completar C5-A;
+- Target: 07-oct-2026;
+- Forecast: pendiente de aprobación;
+- Commitment: pendiente de aprobación;
+- Actual: pendiente de integración.
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
