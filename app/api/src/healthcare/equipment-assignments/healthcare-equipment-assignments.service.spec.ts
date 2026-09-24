@@ -19,6 +19,7 @@ import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-
 import { HealthcareCompanyTransactionTimeoutPolicy } from '../common/healthcare-company-transaction-timeout-policy';
 import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
 import { HealthcareEquipmentAssignmentListStatus } from './dto/healthcare-equipment-assignment-list-query.dto';
+import { createHealthcareEquipmentAssignmentReleaseRequestHash } from './healthcare-equipment-assignment-release-request-hash';
 import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
 import { createHealthcareEquipmentAssignmentRequestHash } from './healthcare-equipment-assignment-request-hash';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
@@ -277,6 +278,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     releaseAssignment: jest.fn(),
     createConflictOverrides: jest.fn(),
     findAssignment: jest.fn(),
+    findAssignmentReleaseSource: jest.fn(),
     countAssignments: jest.fn(),
     findAssignments: jest.fn(),
     findAssignmentReplacementSource: jest.fn(),
@@ -313,6 +315,10 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.findAssignmentReplacementSource.mockResolvedValue(
       replacementSourceSnapshot,
     );
+    repository.findAssignmentReleaseSource.mockResolvedValue({
+      id: assignmentId,
+      equipmentAssetId,
+    });
 
     repository.findEquipmentAsset.mockImplementation(
       (_companyId: string, assetId: string) => {
@@ -333,6 +339,10 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
       lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
       directAssignmentReason: null,
+      releasedAt: null,
+      releasedById: null,
+      releaseCause: null,
+      releaseReason: null,
       updatedAt,
     });
 
@@ -358,7 +368,80 @@ describe('HealthcareEquipmentAssignmentsService', () => {
   });
 
   describe('release', () => {
-    it('releases a RESERVED assignment with MANUAL cause', async () => {
+    it('uses the canonical Company, timeout, source Asset and Assignment lock order', async () => {
+      const calls: string[] = [];
+      repository.findAssignmentReleaseSource.mockImplementation(() => {
+        calls.push('asset-discovery');
+        return Promise.resolve({ id: assignmentId, equipmentAssetId });
+      });
+      jest.mocked(acquireHealthcareCompanyLock).mockImplementation(() => {
+        calls.push('company');
+        return Promise.resolve();
+      });
+      jest
+        .mocked(applyHealthcareSubsequentTransactionTimeouts)
+        .mockImplementation(() => {
+          calls.push('subsequent-timeouts');
+          return Promise.resolve();
+        });
+      repository.lockEquipmentAsset.mockImplementation(() => {
+        calls.push('asset');
+        return Promise.resolve(true);
+      });
+      repository.lockAssignment.mockImplementation(() => {
+        calls.push('assignment');
+        return Promise.resolve({
+          ...replacementSourceSnapshot,
+          releasedAt: null,
+          releasedById: null,
+          releaseCause: null,
+          releaseReason: null,
+        });
+      });
+      repository.releaseAssignment.mockImplementation(() => {
+        calls.push('release');
+        return Promise.resolve({ count: 1 });
+      });
+      repository.findAssignment.mockImplementation(() => {
+        calls.push('response-reread');
+        return Promise.resolve(releasedRecord);
+      });
+
+      await service.release(companyId, userId, assignmentId, {
+        reason: '  Equipo ya no requerido  ',
+      });
+
+      expect(calls).toEqual([
+        'asset-discovery',
+        'company',
+        'subsequent-timeouts',
+        'asset',
+        'assignment',
+        'release',
+        'response-reread',
+      ]);
+      expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        {
+          acquisitionTimeoutMs:
+            transactionTimeoutPolicy.companyLockAcquisitionTimeoutMs,
+        },
+      );
+      expect(applyHealthcareSubsequentTransactionTimeouts).toHaveBeenCalledWith(
+        transaction,
+        transactionTimeoutPolicy,
+      );
+      expect(repository.runInTransaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        {
+          maxWait: transactionTimeoutPolicy.prismaMaxWaitMs,
+          timeout: transactionTimeoutPolicy.prismaTransactionTimeoutMs,
+        },
+      );
+    });
+
+    it('releases a RESERVED assignment with MANUAL cause and no optional key', async () => {
       repository.findAssignment.mockResolvedValue(releasedRecord);
 
       const result = await service.release(companyId, userId, assignmentId, {
@@ -369,6 +452,11 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         transaction,
         companyId,
         assignmentId,
+      );
+      expect(repository.lockEquipmentAsset).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        equipmentAssetId,
       );
 
       expect(repository.releaseAssignment).toHaveBeenCalledWith(
@@ -387,9 +475,9 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         assignmentId,
         transaction,
       );
-      expect(repository.runInTransaction).toHaveBeenCalledWith(
-        expect.any(Function),
-      );
+      expect(repository.findIdempotencyRecord).not.toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
 
       expect(result.id).toBe(assignmentId);
       expect(result.status).toBe(
@@ -401,7 +489,61 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       });
     });
 
-    it('rejects release when the assignment does not exist in the tenant', async () => {
+    it('persists the optional claim, MANUAL release and completion in one transaction', async () => {
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+      const requestHash = createHealthcareEquipmentAssignmentReleaseRequestHash(
+        assignmentId,
+        'Equipo ya no requerido',
+      );
+
+      await service.release(
+        companyId,
+        userId,
+        assignmentId,
+        { reason: '  Equipo ya no requerido  ' },
+        'release-key',
+      );
+
+      expect(repository.findIdempotencyRecord).toHaveBeenCalledWith(
+        companyId,
+        'release-key',
+        IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+        transaction,
+      );
+      expect(repository.createIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        companyId,
+        'release-key',
+        IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+        requestHash,
+      );
+      expect(repository.completeIdempotencyClaim).toHaveBeenCalledWith(
+        transaction,
+        'claim-1',
+        assignmentId,
+      );
+    });
+
+    it('rejects release when Asset discovery cannot find the Assignment in the tenant', async () => {
+      repository.findAssignmentReleaseSource.mockResolvedValue(null);
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'EQUIPMENT_ASSIGNMENT_NOT_FOUND',
+        },
+      });
+
+      expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.lockEquipmentAsset).not.toHaveBeenCalled();
+      expect(repository.lockAssignment).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects release when the Assignment disappears after discovery', async () => {
       repository.lockAssignment.mockResolvedValue(null);
 
       await expect(
@@ -417,10 +559,14 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       expect(repository.releaseAssignment).not.toHaveBeenCalled();
     });
 
-    it('rejects release when the assignment is already RELEASED', async () => {
+    it('rejects a changed Assignment-to-discovered-Asset relationship without writes', async () => {
       repository.lockAssignment.mockResolvedValue({
-        id: assignmentId,
-        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        ...replacementSourceSnapshot,
+        equipmentAssetId: replacementEquipmentAssetId,
+        releasedAt: null,
+        releasedById: null,
+        releaseCause: null,
+        releaseReason: null,
       });
 
       await expect(
@@ -429,17 +575,119 @@ describe('HealthcareEquipmentAssignmentsService', () => {
         }),
       ).rejects.toMatchObject({
         response: {
-          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
+          code: 'RESOURCE_STATE_CHANGED',
         },
+      });
+
+      expect(repository.findIdempotencyRecord).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects release when the discovered source Asset cannot be locked', async () => {
+      repository.lockEquipmentAsset.mockResolvedValue(false);
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'EQUIPMENT_ASSET_NOT_FOUND' },
+      });
+
+      expect(repository.lockAssignment).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('returns the original response for a same-reason MANUAL state replay by another actor', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      });
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+
+      const result = await service.release(
+        companyId,
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        assignmentId,
+        { reason: '  Equipo ya no requerido  ' },
+      );
+
+      expect(result).toMatchObject({
+        id: assignmentId,
+        status: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        release: {
+          cause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          reason: 'Equipo ya no requerido',
+          releasedAt,
+          releasedBy: releasedRecord.releasedBy,
+        },
+      });
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('does not consume a new key for a same-reason MANUAL state replay', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      });
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+
+      await service.release(
+        companyId,
+        userId,
+        assignmentId,
+        { reason: 'Equipo ya no requerido' },
+        'new-state-replay-key',
+      );
+
+      expect(repository.findIdempotencyRecord).toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects a different reason after MANUAL release without overwriting audit', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Cambio operativo',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
       });
 
       expect(repository.releaseAssignment).not.toHaveBeenCalled();
     });
 
-    it('rejects release when the assignment is already REPLACED', async () => {
+    it.each([
+      HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+      HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+    ])('rejects an Assignment automatically released by %s', async (cause) => {
       repository.lockAssignment.mockResolvedValue({
-        id: assignmentId,
-        lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: cause,
+        releaseReason: null,
       });
 
       await expect(
@@ -447,12 +695,155 @@ describe('HealthcareEquipmentAssignmentsService', () => {
           reason: 'Equipo ya no requerido',
         }),
       ).rejects.toMatchObject({
-        response: {
-          code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED',
-        },
+        response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
       });
 
       expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already REPLACED Assignment', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+        releasedAt: null,
+        releasedById: null,
+        releaseCause: null,
+        releaseReason: null,
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
+      });
+
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already RELEASED Assignment without matching MANUAL audit metadata', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt: null,
+        releasedById: null,
+        releaseCause: null,
+        releaseReason: null,
+      });
+
+      await expect(
+        service.release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        }),
+      ).rejects.toMatchObject({
+        status: 409,
+        response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' },
+      });
+
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('returns a completed same-key/same-payload replay before state rejection', async () => {
+      const requestHash = createHealthcareEquipmentAssignmentReleaseRequestHash(
+        assignmentId,
+        'Equipo ya no requerido',
+      );
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      });
+      repository.findIdempotencyRecord.mockResolvedValue({
+        requestHash,
+        resourceId: assignmentId,
+      });
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+
+      const result = await service.release(
+        companyId,
+        userId,
+        assignmentId,
+        { reason: 'Equipo ya no requerido' },
+        'completed-release-key',
+      );
+
+      expect(result).toMatchObject({
+        id: assignmentId,
+        status: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        release: {
+          cause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          reason: 'Equipo ya no requerido',
+          releasedAt,
+          releasedBy: releasedRecord.releasedBy,
+        },
+      });
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    });
+
+    it('checks a claimed key for payload mismatch before same-reason state replay', async () => {
+      repository.lockAssignment.mockResolvedValue({
+        ...replacementSourceSnapshot,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Equipo ya no requerido',
+      });
+      repository.findIdempotencyRecord.mockResolvedValue({
+        requestHash: 'different-request-hash',
+        resourceId: assignmentId,
+      });
+
+      await expect(
+        service.release(
+          companyId,
+          userId,
+          assignmentId,
+          { reason: 'Equipo ya no requerido' },
+          'reused-release-key',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_KEY_REUSED' } });
+
+      expect(repository.findAssignment).not.toHaveBeenCalled();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('recovers a concurrent optional claim collision as a completed replay', async () => {
+      const requestHash = createHealthcareEquipmentAssignmentReleaseRequestHash(
+        assignmentId,
+        'Equipo ya no requerido',
+      );
+      repository.runInTransaction.mockRejectedValueOnce(
+        knownPrismaError('P2002', 'IdempotencyRecord_companyId_scope_key_key'),
+      );
+      repository.findIdempotencyRecord.mockResolvedValue({
+        requestHash,
+        resourceId: assignmentId,
+      });
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+
+      const result = await service.release(
+        companyId,
+        userId,
+        assignmentId,
+        { reason: 'Equipo ya no requerido' },
+        'concurrent-release-key',
+      );
+
+      expect(result).toMatchObject({ id: assignmentId, status: 'RELEASED' });
+      expect(repository.findIdempotencyRecord).toHaveBeenCalledWith(
+        companyId,
+        'concurrent-release-key',
+        IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+      );
     });
 
     it('rejects an empty release reason before starting a transaction', async () => {
@@ -467,6 +858,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
       });
 
       expect(repository.runInTransaction).not.toHaveBeenCalled();
+      expect(repository.findAssignmentReleaseSource).not.toHaveBeenCalled();
       expect(repository.lockAssignment).not.toHaveBeenCalled();
       expect(repository.releaseAssignment).not.toHaveBeenCalled();
     });
@@ -488,6 +880,71 @@ describe('HealthcareEquipmentAssignmentsService', () => {
 
       expect(repository.findAssignment).not.toHaveBeenCalled();
     });
+
+    it('propagates claim-completion failure from the transaction boundary', async () => {
+      repository.findAssignment.mockResolvedValue(releasedRecord);
+      repository.completeIdempotencyClaim.mockRejectedValueOnce(
+        new Error('forced release completion failure'),
+      );
+
+      await expect(
+        service.release(
+          companyId,
+          userId,
+          assignmentId,
+          { reason: 'Equipo ya no requerido' },
+          'failing-release-key',
+        ),
+      ).rejects.toThrow('forced release completion failure');
+
+      expect(repository.createIdempotencyClaim).toHaveBeenCalled();
+      expect(repository.releaseAssignment).toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).toHaveBeenCalled();
+    });
+
+    it('maps only the dedicated Company-lock acquisition timeout to sanitized HTTP 503', async () => {
+      repository.runInTransaction.mockRejectedValueOnce(
+        new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+      );
+
+      const error = await service
+        .release(companyId, userId, assignmentId, {
+          reason: 'Equipo ya no requerido',
+        })
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(HttpException);
+      expect((error as HttpException).getStatus()).toBe(503);
+      expect((error as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        error: 'Service Unavailable',
+        code: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
+      });
+      expect(
+        JSON.stringify((error as HttpException).getResponse()),
+      ).not.toContain('internal cause');
+    });
+
+    it.each([
+      ['subsequent lock timeout', knownPrismaRawQueryError('55P03')],
+      ['subsequent statement timeout', knownPrismaRawQueryError('57014')],
+      ['deadlock', knownPrismaRawQueryError('40P01')],
+      ['Prisma transaction error', knownPrismaError('P2028')],
+    ])(
+      'does not remap a Release %s as a Company-lock timeout',
+      async (_name, error) => {
+        repository.runInTransaction.mockRejectedValueOnce(error);
+
+        await expect(
+          service.release(companyId, userId, assignmentId, {
+            reason: 'Equipo ya no requerido',
+          }),
+        ).rejects.toMatchObject({
+          status: 500,
+          response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
+        });
+      },
+    );
   });
 
   describe('replace', () => {

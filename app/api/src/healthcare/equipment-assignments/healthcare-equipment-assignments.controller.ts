@@ -90,6 +90,7 @@ export class HealthcareEquipmentAssignmentsController {
   release(
     @Req() request: AuthenticatedRequest,
     @Param('assignmentId', ParseUUIDPipe) assignmentId: string,
+    @Headers('idempotency-key') idempotencyKeyHeader: string | undefined,
     @Body() dto: ReleaseHealthcareEquipmentAssignmentDto,
   ) {
     return this.service.release(
@@ -97,6 +98,7 @@ export class HealthcareEquipmentAssignmentsController {
       request.user.id,
       assignmentId,
       dto,
+      this.normalizeOptionalIdempotencyKey(idempotencyKeyHeader),
     );
   }
 
@@ -128,5 +130,11 @@ export class HealthcareEquipmentAssignmentsController {
     }
 
     return normalizedValue;
+  }
+
+  private normalizeOptionalIdempotencyKey(
+    value: string | undefined,
+  ): string | undefined {
+    return value === undefined ? undefined : this.validateIdempotencyKey(value);
   }
 }

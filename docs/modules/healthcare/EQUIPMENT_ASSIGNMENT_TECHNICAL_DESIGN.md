@@ -11,9 +11,9 @@
 **Estado HC-NEXT-03C1:** COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE AND REPLACE BACKEND MERGED; COMPANY LOCK ARCHITECTURE ACCEPTED WITH IMPLEMENTATION / PRODUCTION PENDING; PARENT INTEGRATIONS PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE BACKEND MERGED; LOCK CONSOLIDATION, PARENT INTEGRATIONS Y FRONTEND PENDING
-**Última actualización:** 2026-09-21
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION; REPLACE BACKEND MERGED; HC-LOCK-04 PREREQUISITE ACCREDITED; PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + REPLACE MERGED; MANUAL RELEASE PENDING INTEGRATION; PARENT INTEGRATIONS Y FRONTEND PENDING
+**Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -535,10 +535,12 @@ Cases; el override aprobado debe poder persistirse.
 
 # 14. Release, Case cancellation y Requirement withdrawal
 
-Esta sección expresa el estado objetivo. Manual Release existe, pero su
-refinamiento de protocolo e idempotencia permanece en HC-LOCK-03. Aplica
-únicamente a una fila `RESERVED` y la lleva a `RELEASED` con
-`releaseCause = MANUAL`.
+Manual Release implementa el protocolo Company-first y la idempotencia de
+HC-LOCK-03B. La primera transición aplica únicamente a una fila `RESERVED` y la
+lleva a `RELEASED` con `releaseCause = MANUAL`; no debe confundirse con el replay
+válido de una fila ya liberada manualmente, que sólo admite la misma razón
+normalizada y no realiza writes. El incremento está validado en rama y su
+integración en `main` permanece pendiente.
 
 La Parent Integration futura de Case Cancel llevará sus filas `RESERVED`
 aplicables a `RELEASED` con `releaseCause = CASE_CANCELLED` y conservará los
@@ -747,9 +749,11 @@ Company
 No se agrega un lock del EquipmentAsset de origen. Los rereads autoritativos y
 la decisión de review o write ocurren después de establecer esta frontera.
 
-Release tiene como orden objetivo
-`Company → EquipmentAsset → Assignment`. Su protocolo final, conditional write,
-semántica idempotente y error público de lifecycle se completan en HC-LOCK-03.
+Release implementa el orden `Company → EquipmentAsset → Assignment`, junto con
+el conditional write, la semántica idempotente y el error público de lifecycle.
+El prerequisite checkpoint de HC-LOCK-04 acreditó esta secuencia con 14/14 E2E
+PostgreSQL/HTTP PASS sobre la base aislada `zaping_spike_test`. La validación
+integrada final permanece pendiente hasta completar Parent Integrations.
 
 Case cancellation y Requirement withdrawal deben adquirir/actualizar sus filas
 `RESERVED` en orden determinista. La coordinación exacta con los comandos
@@ -1256,27 +1260,26 @@ Dispatch/Custody continúa diferido.
 - termina sólo la reserva lógica;
 - no crea Inventory Movement, Return ni cambio de Custody.
 
-La primera transición manual aplica mientras el Case está `DRAFT` o
-`SCHEDULED`. La precedencia de un replay idempotente frente al lifecycle actual
-del Case continúa diferida a HC-LOCK-03. Esta regla no define el resultado de una
-solicitud manual posterior a un release por `CASE_CANCELLED` o
-`REQUIREMENT_WITHDRAWN`.
+HC-LOCK-03 no agrega una nueva restricción por status del Case. Un replay
+completado válido conserva precedencia sobre cambios posteriores del Case.
 
-El orden transaccional objetivo es:
+El orden transaccional implementado es:
 
 ```text
 Company → EquipmentAsset → Assignment
 ```
 
-El Asset se descubre de forma tenant-scoped y, bajo lock, se revalida la relación
-Assignment-to-Asset. La adopción de este protocolo por Manual Release pertenece
-a HC-LOCK-03 y todavía no está completa.
+El Asset se descubre de forma ligera y tenant-scoped antes de la transacción. La
+lectura no bloquea ni escribe. Dentro de la transacción se adquieren Company,
+timeouts posteriores, Asset `FOR UPDATE` y Assignment `FOR UPDATE`, en ese orden,
+y se revalida la relación Assignment-to-Asset. Un cambio de relación devuelve
+409 `RESOURCE_STATE_CHANGED` sin writes.
 
 Resultado:
 
 ```text
 → 200 OK
-→ outcome = RELEASED
+→ `HealthcareEquipmentAssignmentResponse` directo, sin wrapper `outcome/data`
 ```
 
 Una repetición válida del release manual con la misma razón normalizada devuelve
@@ -1286,17 +1289,18 @@ alterar historia. Deben preservarse tanto la idempotencia por estado como
 `Idempotency-Key + payload`. Una Assignment `REPLACED` no puede transicionar a
 `RELEASED` mediante release manual.
 
-HC-LOCK-03 debe resolver antes de implementación final, sin inferir resultados:
+Una Assignment liberada por `CASE_CANCELLED` o `REQUIREMENT_WITHDRAWN`, o una
+Assignment `REPLACED`, devuelve 409 `EQUIPMENT_ASSIGNMENT_NOT_RESERVED`. Para un
+release `MANUAL`, la misma razón normalizada es replay aunque cambie el actor que
+solicita; una razón distinta devuelve el mismo 409 y nunca sobrescribe auditoría.
 
-1. precedencia entre replay idempotente y lifecycle actual del Case;
-2. request manual después de un release por `CASE_CANCELLED` o
-   `REQUIREMENT_WITHDRAWN`;
-3. código público estable para lifecycle incompatible;
-4. contrato HTTP exacto de `Idempotency-Key`, scope, fingerprint y
-   persistencia/recovery de Release;
-5. descubrimiento tenant-scoped del Asset y revalidación dentro de la secuencia
-   final;
-6. carreras Release/Release, Release/Replace y Release/Parent Integrations.
+`Idempotency-Key` es opcional para compatibilidad. Cuando se envía, se trimmea,
+debe ser non-empty y tener máximo 128 caracteres. El fingerprint SHA-256 incluye
+`assignmentId` y la razón normalizada, bajo scope
+`HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE`. Un claim completado se valida antes
+del replay por estado: mismo key/payload relee la respuesta canónica y payload
+distinto devuelve 409 `IDEMPOTENCY_KEY_REUSED`. Un replay por estado con key
+nueva ejecuta cero writes y no consume esa key.
 
 ## 27.2 Case cancellation
 
@@ -1480,7 +1484,7 @@ Los errores con branching conservan la forma:
 | Replacement usa el mismo activo | 400 | `EQUIPMENT_ASSIGNMENT_REPLACEMENT_SAME_ASSET` |
 | Razón de Replacement ausente/blank | 400 | `ValidationPipe`; guard de dominio `EQUIPMENT_ASSIGNMENT_REPLACEMENT_REASON_REQUIRED` |
 | Lifecycle no permite Replace | 409 | `EQUIPMENT_ASSIGNMENT_NOT_RESERVED` |
-| Lifecycle incompatible en Manual Release | 409 | Código público estable pendiente de HC-LOCK-03. |
+| Lifecycle incompatible en Manual Release | 409 | `EQUIPMENT_ASSIGNMENT_NOT_RESERVED` |
 | Estado cambió durante conditional write | 409 | Existing `RESOURCE_STATE_CHANGED` |
 | FK/recurso relacionado cambió durante write | 409 | Existing `RELATED_RESOURCE_CHANGED` |
 | Misma idempotency key con payload distinto | 409 | `IDEMPOTENCY_KEY_REUSED` |
@@ -1517,28 +1521,26 @@ Create y Replace adoptan el mecanismo reusable sin crear otro subsistema. Para
 esos comandos, el header es requerido, se trimmea, debe ser non-empty y tener
 máximo 128 caracteres.
 
-Para Manual Release, esta sección expresa el contrato objetivo aprobado, no el
-estado completo de la implementación actual. HC-LOCK-03 debe cerrar el contrato
-HTTP exacto de `Idempotency-Key`, el scope específico, fingerprint y estrategia
-de persistencia/recovery antes de afirmar equivalencia con Create y Replace.
+Para Manual Release el header es opcional por compatibilidad. Si se proporciona,
+usa la misma normalización y límite de 128 caracteres que Create/Replace.
 
-Scopes establecidos para Create/Replace y requisito de separación para Release:
+Scopes separados establecidos para Create, Replace y Release:
 
 ```text
 HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
 HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
-[RELEASE-SPECIFIC SCOPE — PENDING HC-LOCK-03]
+HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE
 ```
 
-Para Create y Replace, el hash incluye path parameters y body normalizado. La
-forma exacta del fingerprint de Release permanece pendiente de HC-LOCK-03. La
-identidad conceptual común es:
+Los hashes incluyen path parameters y body normalizado. Para Release, la forma
+canónica contiene `assignmentId` y `reason` normalizada. La identidad conceptual
+común es:
 
 ```text
 companyId + scope + Idempotency-Key
 ```
 
-Comportamiento establecido para Create/Replace y objetivo para Release:
+Comportamiento establecido para Create, Replace y Release:
 
 - same key + same normalized request → replay de la misma identidad/outcome sin
   reejecutar la mutación; la representación se relee tenant-scoped en su estado
@@ -1557,8 +1559,8 @@ Protecciones naturales adicionales:
 - la partial unique impide dos `RESERVED` del mismo activo/Case;
 - Requirement lock + recount impide over-coverage;
 - unique lineage + lock de predecesora impide sucesores múltiples;
-- el target de repeated Manual Release con la misma razón normalizada es no-op y
-  no sobrescribe auditoría; su implementación completa permanece en HC-LOCK-03;
+- repeated Manual Release con la misma razón normalizada es no-op y no
+  sobrescribe auditoría; un key nuevo no se consume para este replay por estado;
 - los futuros releases derivados de Case/Requirement deberán usar estado
   esperado y no duplicar historia.
 
@@ -1572,7 +1574,7 @@ Protecciones naturales adicionales:
 | Create con override | Claim + Assignment + todas las ConflictOverride rows. |
 | Review inicial/stale | Cero writes; no claim persistido. |
 | Replace | Claim + original `REPLACED` + sucesora `RESERVED` + lineage + override rows. |
-| Release | Claim + status `RELEASED` + actor/time/reason/cause. |
+| Release | Claim opcional, sólo con `Idempotency-Key` en la primera transición, + status `RELEASED` + actor/time/reason/cause. |
 | Case cancellation objetivo | Cambio de Case + releases lógicos aplicables dentro de una frontera consistente; integración pendiente. |
 | Requirement withdrawal objetivo | Cambio de Requirement + releases `REQUIREMENT` aplicables dentro de una frontera consistente; integración pendiente. |
 
@@ -1587,7 +1589,7 @@ misma transacción:
 | Requirement Retire | Company → Case → Requirement. |
 | Requirement Reactivate | Company → Case → Product → Requirement. |
 | Requirement Reorder | Company → Case → Requirements en orden determinista por ID. |
-| Manual Release objetivo | Company → EquipmentAsset → Assignment. |
+| Manual Release | Company → EquipmentAsset → Assignment. |
 
 La tabla expresa el orden principal y no elimina los detalles del comando:
 settings conserva su advisory lock separado; los Cases múltiples se deduplican y
@@ -2026,15 +2028,17 @@ de Zaping no puede debilitar otro heredado más estricto. `lock_timeout`,
 por statement no garantiza por sí solo una duración absoluta de la transacción.
 
 El `1000ms` del spike es experimental, no un valor aprobado para producción.
-HC-LOCK-02 define implementación y calibración; HC-LOCK-04 valida cancelación,
-rollback, recovery y comportamiento bajo contención.
+HC-LOCK-02 define implementación y calibración. El prerequisite checkpoint de
+HC-LOCK-04 acreditó para Manual Release rollback, recovery y comportamiento bajo
+contención; el checkpoint final validará los releases derivados.
 
 Replace conserva el lock del EquipmentAsset destino antes de alterar el conjunto
-de reservas. Manual Release debe adoptar la secuencia
-`Company → EquipmentAsset → Assignment` en HC-LOCK-03 antes de integrar el
-workflow completo. Otras mutaciones se incorporan al protocolo sólo cuando
-exista una dependencia concreta sobre los mismos recursos; no participan por el
-solo hecho de pertenecer a Healthcare.
+de reservas. Manual Release implementa la secuencia
+`Company → EquipmentAsset → Assignment`; su validación PostgreSQL/HTTP real del
+prerequisite está acreditada y la integración de HC-LOCK-03B en `main` permanece
+pendiente. Otras mutaciones se incorporan al protocolo sólo cuando exista una
+dependencia concreta sobre los mismos recursos; no participan por el solo hecho
+de pertenecer a Healthcare.
 
 ## J. Replacement
 
@@ -2065,9 +2069,10 @@ repetir con otra razón devuelve 409 sin cambiar historia. Se conservan la
 idempotencia por estado y por `Idempotency-Key + payload`. `REPLACED` no puede
 transicionar a `RELEASED` por esta operación.
 
-El orden objetivo `Company → EquipmentAsset → Assignment` y las decisiones
-enumeradas en 27.1 permanecen pendientes de HC-LOCK-03. Release sigue siendo
-lógico: no implica retorno, Inventory Movement ni Custody.
+Manual Release usa `Company → EquipmentAsset → Assignment`, con timeouts
+posteriores inmediatamente después de Company y revalidación de la relación
+Assignment-to-Asset. Release sigue siendo lógico: no implica retorno, Inventory
+Movement ni Custody.
 
 ## L. Case cancellation
 
@@ -2191,12 +2196,14 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE AND REPLACE BACKEND MERGED
-→ COMPANY LOCK ARCHITECTURE ACCEPTED — IMPLEMENTATION / PRODUCTION PENDING
-→ MANUAL RELEASE REFINEMENT PENDING — HC-LOCK-03
-→ PARENT INTEGRATIONS PENDING — HC-NEXT-03C4-C
+→ MANUAL RELEASE HC-LOCK-03B VALIDATED ON BRANCH — INTEGRATION PENDING
+→ REPLACE BACKEND MERGED
+→ COMPANY LOCK ARCHITECTURE AND HC-LOCK-02 IMPLEMENTATION IN MAIN
+→ HC-LOCK-04 PREREQUISITE POSTGRESQL/HTTP CHECKPOINT ACCREDITED
+→ PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+→ HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING AFTER PARENT INTEGRATIONS
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE BACKEND MERGED
-→ LOCK CONSOLIDATION, PARENT INTEGRATIONS Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + REPLACE MERGED; MANUAL RELEASE PENDING INTEGRATION
+→ PARENT INTEGRATIONS Y FRONTEND PENDING
 ```
