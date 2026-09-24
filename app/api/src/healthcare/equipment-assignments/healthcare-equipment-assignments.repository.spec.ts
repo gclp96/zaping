@@ -147,6 +147,38 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     expect(sql).toContain('FOR UPDATE');
   });
 
+  it('locks every RESERVED Case Assignment in deterministic order without filtering origin', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'assignment-a' },
+      { id: 'assignment-b' },
+    ]);
+
+    await expect(
+      repository.lockReservedCaseAssignments(prisma as never, {
+        companyId,
+        caseId,
+      }),
+    ).resolves.toEqual(['assignment-a', 'assignment-b']);
+
+    const queryRawMock = prisma.$queryRaw as jest.MockedFunction<
+      (query: Prisma.Sql) => Promise<Array<{ id: string }>>
+    >;
+    const query = queryRawMock.mock.calls[0][0];
+    expect(query.values).toEqual([
+      companyId,
+      caseId,
+      HealthcareEquipmentAssignmentLifecycle.RESERVED,
+    ]);
+    const sql = query.strings.join(' ');
+    expect(sql).toContain('"companyId"');
+    expect(sql).toContain('"caseId"');
+    expect(sql).toContain('"lifecycle"');
+    expect(sql).not.toContain('"requirementId"');
+    expect(sql).not.toContain('"origin"');
+    expect(sql).toContain('ORDER BY "id" ASC');
+    expect(sql).toContain('FOR UPDATE');
+  });
+
   it('conditionally releases a locked Requirement Assignment with parent context', async () => {
     const releasedAt = new Date('2026-09-17T18:00:00.000Z');
 
@@ -187,6 +219,44 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
         releaseCause:
           HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
         releaseReason: 'Cambio clínico',
+      },
+    });
+  });
+
+  it('conditionally releases a locked Case Assignment without restricting its origin', async () => {
+    const releasedAt = new Date('2026-09-17T18:00:00.000Z');
+
+    prisma.healthcareEquipmentAssignment.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    await repository.releaseAssignment(prisma as never, {
+      companyId,
+      assignmentId,
+      releasedAt,
+      releasedById: userId,
+      releaseCause: HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+      releaseReason: 'Caso cancelado',
+      expectedContext: {
+        caseId,
+      },
+    });
+
+    expect(
+      prisma.healthcareEquipmentAssignment.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: assignmentId,
+        companyId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        caseId,
+      },
+      data: {
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+        releaseReason: 'Caso cancelado',
       },
     });
   });

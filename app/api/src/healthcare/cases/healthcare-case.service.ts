@@ -1,21 +1,29 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
 import { HealthcareCaseStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   doctorInactiveException,
   doctorNotFoundException,
+  healthcareConcurrencyTimeoutException,
   healthcarePersistenceException,
   hospitalInactiveException,
   hospitalNotFoundException,
   relatedResourceChangedException,
   resourceStateChangedException,
 } from '../common/healthcare-errors';
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-lock-timeout.error';
+import { healthcareCompanyTransactionTimeoutConfiguration } from '../common/healthcare-company-transaction-timeout.config';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
+import { HealthcareEquipmentAssignmentsService } from '../equipment-assignments/healthcare-equipment-assignments.service';
 
 import { HealthcareCaseFolioService } from './healthcare-case-folio.service';
 
@@ -102,11 +110,21 @@ type NormalizedCreateHealthcareCaseInput = {
 
 type NormalizedUpdateHealthcareCaseInput = NormalizedCreateHealthcareCaseInput;
 
+type LockedHealthcareCase = {
+  id: string;
+  status: HealthcareCaseStatus;
+};
+
 @Injectable()
 export class HealthcareCaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly healthcareCaseFolioService: HealthcareCaseFolioService,
+    private readonly equipmentAssignmentsService: HealthcareEquipmentAssignmentsService,
+    @Inject(healthcareCompanyTransactionTimeoutConfiguration.KEY)
+    private readonly companyTransactionTimeoutPolicy: ConfigType<
+      typeof healthcareCompanyTransactionTimeoutConfiguration
+    >,
   ) {}
 
   async create(
@@ -307,27 +325,43 @@ export class HealthcareCaseService {
   ): Promise<HealthcareCaseResponse> {
     const normalizedReason =
       this.normalizeCancellationReason(cancellationReason);
-    const cancelledAt = new Date();
 
     try {
-      const cancelledCase = await this.prisma.$transaction(async (tx) => {
-        const healthcareCase = await tx.healthcareCase.findFirst({
-          where: {
-            id: caseId,
-            companyId,
-          },
-          select: healthcareCaseResponseSelect,
-        });
+      const transactionOptions = {
+        maxWait: this.companyTransactionTimeoutPolicy.prismaMaxWaitMs,
+        timeout:
+          this.companyTransactionTimeoutPolicy.prismaTransactionTimeoutMs,
+      };
 
-        if (!healthcareCase) {
-          throw new NotFoundException('Caso no encontrado');
-        }
+      const cancelledCase = await this.prisma.$transaction(async (tx) => {
+        await acquireHealthcareCompanyLock(tx, companyId, {
+          acquisitionTimeoutMs:
+            this.companyTransactionTimeoutPolicy
+              .companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(
+          tx,
+          this.companyTransactionTimeoutPolicy,
+        );
+
+        const healthcareCase = await this.lockCaseForCancellation(
+          tx,
+          companyId,
+          caseId,
+        );
 
         if (healthcareCase.status === HealthcareCaseStatus.CANCELLED) {
           throw new ConflictException('El caso ya está cancelado');
         }
 
         await this.validateCancellationActor(tx, companyId, cancelledById);
+
+        const assignmentIds =
+          await this.equipmentAssignmentsService.lockReservedCaseAssignments(
+            tx,
+            { companyId, caseId },
+          );
+        const cancelledAt = new Date();
 
         const updateResult = await tx.healthcareCase.updateMany({
           where: {
@@ -349,11 +383,27 @@ export class HealthcareCaseService {
           await this.resolveLostCaseMutation(tx, companyId, caseId);
         }
 
+        await this.equipmentAssignmentsService.releaseLockedCaseAssignments(
+          tx,
+          {
+            companyId,
+            caseId,
+            assignmentIds,
+            releasedAt: cancelledAt,
+            releasedById: cancelledById,
+            releaseReason: normalizedReason,
+          },
+        );
+
         return this.findOneInTransaction(tx, companyId, caseId);
-      });
+      }, transactionOptions);
 
       return this.mapResponse(cancelledCase);
     } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+
       this.rethrowWriteError(error);
     }
   }
@@ -607,6 +657,27 @@ export class HealthcareCaseService {
     if (!cancelledBy) {
       throw new BadRequestException('Usuario cancelador no válido');
     }
+  }
+
+  private async lockCaseForCancellation(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    caseId: string,
+  ): Promise<LockedHealthcareCase> {
+    const [healthcareCase] = await tx.$queryRaw<LockedHealthcareCase[]>(
+      Prisma.sql`
+        SELECT "id", "status"
+        FROM "HealthcareCase"
+        WHERE "id" = ${caseId} AND "companyId" = ${companyId}
+        FOR UPDATE
+      `,
+    );
+
+    if (!healthcareCase) {
+      throw new NotFoundException('Caso no encontrado');
+    }
+
+    return healthcareCase;
   }
 
   private async findOneInTransaction(

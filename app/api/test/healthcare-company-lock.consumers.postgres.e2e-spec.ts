@@ -7,6 +7,7 @@ import {
 import { Test } from '@nestjs/testing';
 import {
   EquipmentCondition,
+  HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
   HealthcareEquipmentAssignmentReleaseCause,
@@ -30,6 +31,9 @@ import {
   classifyHealthcareTransactionError,
   HEALTHCARE_TRANSACTION_ERROR_KINDS,
 } from '../src/healthcare/common/healthcare-transaction-error-classification';
+import { HealthcareCaseFolioService } from '../src/healthcare/cases/healthcare-case-folio.service';
+import { HealthcareCaseService } from '../src/healthcare/cases/healthcare-case.service';
+import { HealthcareCasesController } from '../src/healthcare/cases/healthcare-cases.controller';
 import { HealthcareEquipmentAssignmentsController } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller';
 import { HealthcareEquipmentAssignmentsRepository } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
 import { HealthcareEquipmentAssignmentsService } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
@@ -47,7 +51,7 @@ const EXPECTED_USER = 'zaping_hc_lock_2h';
 const EXPECTED_HOST = '127.0.0.1';
 const EXPECTED_HOST_PORT = '5434';
 const EXPECTED_SERVER_PORT = 5432;
-const CLIENT_COUNT = 8;
+const CLIENT_COUNT = 9;
 const OPERATION_TIMEOUT_MS = 12_000;
 const CLEANUP_TIMEOUT_MS = 15_000;
 const DISCONNECT_TIMEOUT_MS = 8_000;
@@ -76,6 +80,14 @@ const requiredRowLockPrivileges = [
     lockColumn: 'companyId',
   },
   { tableName: 'Product', lockColumn: 'id' },
+] as const;
+
+const requiredCaseCancelUpdateColumns = [
+  'status',
+  'cancelledAt',
+  'cancelledById',
+  'cancellationReason',
+  'updatedAt',
 ] as const;
 
 const runPostgreSqlTests = process.env[RUN_FLAG] === '1';
@@ -156,14 +168,17 @@ describePostgreSql(
     let blockerPrisma: ExplicitPrismaService;
     let assignmentPrisma: ExplicitPrismaService;
     let requirementPrisma: ExplicitPrismaService;
+    let casePrisma: ExplicitPrismaService;
     let httpPrisma: ExplicitPrismaService;
     let deadlockAPrisma: ExplicitPrismaService;
     let deadlockBPrisma: ExplicitPrismaService;
     let assignmentRepository: HealthcareEquipmentAssignmentsRepository;
     let assignmentService: HealthcareEquipmentAssignmentsService;
     let requirementService: HealthcareRequirementsService;
+    let caseService: HealthcareCaseService;
     let httpRepository: HealthcareEquipmentAssignmentsRepository;
     let httpService: HealthcareEquipmentAssignmentsService;
+    let httpCaseService: HealthcareCaseService;
     let httpApp: INestApplication<App> | null = null;
     let httpAuthenticatedRole: UserRole | 'UNAUTHORIZED' = UserRole.ADMIN;
     let databaseReady = false;
@@ -210,6 +225,7 @@ describePostgreSql(
         blockerPrisma,
         assignmentPrisma,
         requirementPrisma,
+        casePrisma,
         httpPrisma,
         deadlockAPrisma,
         deadlockBPrisma,
@@ -233,6 +249,7 @@ describePostgreSql(
 
       await assertExpectedSchema(setupPrisma);
       await assertRequiredRowLockPrivileges(setupPrisma);
+      await assertRequiredCaseCancelUpdatePrivileges(setupPrisma);
       await assertExclusiveTargetAvailability(observerPrisma, clients);
       databaseReady = true;
 
@@ -249,9 +266,21 @@ describePostgreSql(
         new NoopRequirementOperationalEvidencePolicy(),
         policy,
       );
+      caseService = new HealthcareCaseService(
+        casePrisma,
+        createUnusedCaseFolioService(),
+        assignmentService,
+        policy,
+      );
       httpRepository = new HealthcareEquipmentAssignmentsRepository(httpPrisma);
       httpService = new HealthcareEquipmentAssignmentsService(
         httpRepository,
+        policy,
+      );
+      httpCaseService = new HealthcareCaseService(
+        httpPrisma,
+        createUnusedCaseFolioService(),
+        httpService,
         policy,
       );
 
@@ -370,11 +399,16 @@ describePostgreSql(
       };
       const moduleRef = await Test.createTestingModule({
         controllers: [
+          HealthcareCasesController,
           HealthcareEquipmentAssignmentsController,
           HealthcareRequirementsController,
         ],
         providers: [
           RolesGuard,
+          {
+            provide: HealthcareCaseService,
+            useValue: httpCaseService,
+          },
           {
             provide: HealthcareEquipmentAssignmentsService,
             useValue: httpService,
@@ -660,6 +694,153 @@ describePostgreSql(
           error,
           cleanupErrors,
           'Retire-first cross-consumer race',
+        );
+      }
+    }
+
+    async function runAssignmentBeforeCancelRace<TFirst, TSecond>(
+      assetId: string,
+      companyId: string,
+      first: () => Promise<TFirst>,
+      second: () => Promise<TSecond>,
+    ): Promise<[TFirst, TSecond]> {
+      const firstPid = await getBackendPid(assignmentPrisma);
+      const secondPid = await getBackendPid(casePrisma);
+      const blocker = await startAssetRowBlocker(
+        blockerPrisma,
+        companyId,
+        assetId,
+      );
+      let firstOperation: Promise<TFirst> | null = null;
+      let secondOperation: Promise<TSecond> | null = null;
+
+      try {
+        firstOperation = first();
+        await waitUntilBlockedBy(observerPrisma, firstPid, blocker.pid);
+        secondOperation = second();
+        await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+        blocker.release();
+
+        const result = await withTimeout(
+          Promise.all([firstOperation, secondOperation]),
+          OPERATION_TIMEOUT_MS,
+          'Assignment-before-Cancel race',
+        );
+        await withTimeout(
+          blocker.done,
+          OPERATION_TIMEOUT_MS,
+          'Asset blocker completion',
+        );
+        return result;
+      } catch (error) {
+        blocker.release();
+        const cleanupErrors = await settleForCleanup([
+          blocker.done,
+          ...(firstOperation ? [firstOperation] : []),
+          ...(secondOperation ? [secondOperation] : []),
+        ]);
+        throwWithCleanupErrors(
+          error,
+          cleanupErrors,
+          'Assignment-before-Cancel race',
+        );
+      }
+    }
+
+    async function runCancelBeforeConsumerRace<TFirst, TSecond>(
+      scenario: Scenario,
+      secondClient: ExplicitPrismaService,
+      first: () => Promise<TFirst>,
+      second: () => Promise<TSecond>,
+    ): Promise<[PromiseSettledResult<TFirst>, PromiseSettledResult<TSecond>]> {
+      const firstPid = await getBackendPid(casePrisma);
+      const secondPid = await getBackendPid(secondClient);
+      const blocker = await startCaseRowBlocker(
+        blockerPrisma,
+        scenario.companyId,
+        scenario.caseId,
+      );
+      let firstOperation: Promise<TFirst> | null = null;
+      let secondOperation: Promise<TSecond> | null = null;
+
+      try {
+        firstOperation = first();
+        await waitUntilBlockedBy(observerPrisma, firstPid, blocker.pid);
+        secondOperation = second();
+        await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+        blocker.release();
+
+        const results = await withTimeout(
+          Promise.allSettled([firstOperation, secondOperation]),
+          OPERATION_TIMEOUT_MS,
+          'Cancel-before-consumer race',
+        );
+        await withTimeout(
+          blocker.done,
+          OPERATION_TIMEOUT_MS,
+          'Case blocker completion',
+        );
+        return results;
+      } catch (error) {
+        blocker.release();
+        const cleanupErrors = await settleForCleanup([
+          blocker.done,
+          ...(firstOperation ? [firstOperation] : []),
+          ...(secondOperation ? [secondOperation] : []),
+        ]);
+        throwWithCleanupErrors(
+          error,
+          cleanupErrors,
+          'Cancel-before-consumer race',
+        );
+      }
+    }
+
+    async function runRetireBeforeCancelRace<TFirst, TSecond>(
+      scenario: Scenario,
+      first: () => Promise<TFirst>,
+      second: () => Promise<TSecond>,
+    ): Promise<[TFirst, TSecond]> {
+      const firstPid = await getBackendPid(requirementPrisma);
+      const secondPid = await getBackendPid(casePrisma);
+      const blocker = await startRequirementRowBlocker(
+        blockerPrisma,
+        scenario.companyId,
+        scenario.caseId,
+        scenario.requirementIds[0],
+      );
+      let firstOperation: Promise<TFirst> | null = null;
+      let secondOperation: Promise<TSecond> | null = null;
+
+      try {
+        firstOperation = first();
+        await waitUntilBlockedBy(observerPrisma, firstPid, blocker.pid);
+        secondOperation = second();
+        await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+        blocker.release();
+
+        const result = await withTimeout(
+          Promise.all([firstOperation, secondOperation]),
+          OPERATION_TIMEOUT_MS,
+          'Retire-before-Cancel race',
+        );
+        await withTimeout(
+          blocker.done,
+          OPERATION_TIMEOUT_MS,
+          'Requirement blocker completion',
+        );
+        return result;
+      } catch (error) {
+        blocker.release();
+        const cleanupErrors = await settleForCleanup([
+          blocker.done,
+          ...(firstOperation ? [firstOperation] : []),
+          ...(secondOperation ? [secondOperation] : []),
+        ]);
+        throwWithCleanupErrors(
+          error,
+          cleanupErrors,
+          'Retire-before-Cancel race',
         );
       }
     }
@@ -1171,6 +1352,952 @@ describePostgreSql(
           }),
         ).resolves.toEqual({
           lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+        });
+      });
+    });
+
+    describe('HC-NEXT-03C4-C2 Case Cancel integration', () => {
+      it.each([0, 1, 4])(
+        'cancels atomically with %i eligible DIRECT/REQUIREMENT reservation(s)',
+        async (assignmentCount) => {
+          const scenario = await createScenario(companyAId, {
+            requestedQty: Math.max(assignmentCount, 1),
+            assetCount: Math.max(assignmentCount, 1),
+          });
+          const assignmentIds: string[] = [];
+          for (let index = 0; index < assignmentCount; index += 1) {
+            const assignment =
+              index % 2 === 0
+                ? await createDirectSource({
+                    ...scenario,
+                    equipmentAssetIds: [scenario.equipmentAssetIds[index]],
+                  })
+                : await createRequirementSource(
+                    scenario,
+                    scenario.equipmentAssetIds[index],
+                    scenario.requirementIds[0],
+                    `cancel-${assignmentCount}-requirement-source`,
+                  );
+            assignmentIds.push(assignment.id);
+          }
+          const [claimsBefore, movementsBefore] = await Promise.all([
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+            setupPrisma.inventoryMovement.count({
+              where: {
+                companyId: scenario.companyId,
+                productId: { in: scenario.productIds },
+              },
+            }),
+          ]);
+
+          const cancelled = await caseService.cancel(
+            scenario.companyId,
+            scenario.caseId,
+            scenario.userId,
+            '  Cancelación   clínica E2E  ',
+          );
+          const [persistedCase, persistedAssignments] = await Promise.all([
+            setupPrisma.healthcareCase.findUniqueOrThrow({
+              where: { id: scenario.caseId },
+              select: {
+                status: true,
+                cancelledAt: true,
+                cancelledById: true,
+                cancellationReason: true,
+              },
+            }),
+            setupPrisma.healthcareEquipmentAssignment.findMany({
+              where: { id: { in: assignmentIds } },
+              orderBy: { id: 'asc' },
+              select: {
+                lifecycle: true,
+                releasedAt: true,
+                releasedById: true,
+                releaseCause: true,
+                releaseReason: true,
+              },
+            }),
+          ]);
+
+          expect(cancelled.status).toBe(HealthcareCaseStatus.CANCELLED);
+          expect(persistedCase.cancelledAt).toBeInstanceOf(Date);
+          expect(persistedCase).toMatchObject({
+            status: HealthcareCaseStatus.CANCELLED,
+            cancelledById: scenario.userId,
+            cancellationReason: 'Cancelación   clínica E2E',
+          });
+          expect(persistedAssignments).toHaveLength(assignmentCount);
+          for (const assignment of persistedAssignments) {
+            expect(assignment).toEqual({
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+              releasedAt: persistedCase.cancelledAt,
+              releasedById: scenario.userId,
+              releaseCause:
+                HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+              releaseReason: 'Cancelación   clínica E2E',
+            });
+          }
+          await expect(
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+          ).resolves.toBe(claimsBefore);
+          await expect(
+            setupPrisma.inventoryMovement.count({
+              where: {
+                companyId: scenario.companyId,
+                productId: { in: scenario.productIds },
+              },
+            }),
+          ).resolves.toBe(movementsBefore);
+        },
+      );
+
+      it('rolls back Case audit and every release after the first release write succeeds', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 2,
+          assetCount: 2,
+        });
+        const direct = await createDirectSource(scenario);
+        const requirement = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[1],
+          scenario.requirementIds[0],
+          'cancel-rollback-requirement-source',
+        );
+        const caseBefore = await setupPrisma.healthcareCase.findUniqueOrThrow({
+          where: { id: scenario.caseId },
+          select: {
+            status: true,
+            cancelledAt: true,
+            cancelledById: true,
+            cancellationReason: true,
+          },
+        });
+        const claimsBefore = await setupPrisma.idempotencyRecord.count({
+          where: { companyId: scenario.companyId },
+        });
+        type ReleaseAssignment =
+          HealthcareEquipmentAssignmentsRepository['releaseAssignment'];
+        const originalRelease = assignmentRepository.releaseAssignment.bind(
+          assignmentRepository,
+        ) as ReleaseAssignment;
+        let releaseCalls = 0;
+        const releaseWrite = jest
+          .spyOn(assignmentRepository, 'releaseAssignment')
+          .mockImplementation((...args: Parameters<ReleaseAssignment>) => {
+            releaseCalls += 1;
+            if (releaseCalls === 2) {
+              throw new Error('forced C4-C2 derived release rollback');
+            }
+            return originalRelease(...args);
+          });
+
+        try {
+          await expect(
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Rollback C4-C2',
+            ),
+          ).rejects.toThrow('forced C4-C2 derived release rollback');
+        } finally {
+          releaseWrite.mockRestore();
+        }
+
+        expect(releaseCalls).toBe(2);
+        await expect(
+          setupPrisma.healthcareCase.findUniqueOrThrow({
+            where: { id: scenario.caseId },
+            select: {
+              status: true,
+              cancelledAt: true,
+              cancelledById: true,
+              cancellationReason: true,
+            },
+          }),
+        ).resolves.toEqual(caseBefore);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: { id: { in: [direct.id, requirement.id] } },
+            orderBy: { id: 'asc' },
+            select: {
+              lifecycle: true,
+              releasedAt: true,
+              releasedById: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+        ).resolves.toEqual([
+          {
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releasedAt: null,
+            releasedById: null,
+            releaseCause: null,
+            releaseReason: null,
+          },
+          {
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releasedAt: null,
+            releasedById: null,
+            releaseCause: null,
+            releaseReason: null,
+          },
+        ]);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: { companyId: scenario.companyId },
+          }),
+        ).resolves.toBe(claimsBefore);
+      });
+
+      it('releases only current Case reservations and preserves tenant, Case and lifecycle exclusions', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 8,
+          assetCount: 7,
+        });
+        const eligibleDirect = await createDirectSource(scenario);
+        const eligibleRequirement = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[1],
+        );
+        const manualSource = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[2],
+        );
+        await assignmentService.release(
+          scenario.companyId,
+          scenario.userId,
+          manualSource.id,
+          { reason: 'Auditoría manual original' },
+          trackKey('cancel-exclusion-manual'),
+        );
+        const replacedSource = await createDirectSource({
+          ...scenario,
+          equipmentAssetIds: [scenario.equipmentAssetIds[3]],
+        });
+        const replacement = await assignmentService.replace(
+          scenario.companyId,
+          scenario.userId,
+          replacedSource.id,
+          trackKey('cancel-exclusion-replace'),
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[4],
+            replacementReason: 'Preparar histórico REPLACED',
+          },
+        );
+        if (replacement.outcome !== 'REPLACED') {
+          throw new Error('Expected the historical replacement fixture.');
+        }
+        const successorId = replacement.data.replacementAssignment.id;
+        registry.assignmentIds.add(successorId);
+        const relatedCase = await createRelatedCase(scenario);
+        const otherCaseResult = await assignmentService.create(
+          scenario.companyId,
+          scenario.userId,
+          trackKey('cancel-exclusion-other-case'),
+          {
+            caseId: relatedCase.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[5],
+            requirementId: relatedCase.requirementId,
+          },
+        );
+        if (otherCaseResult.outcome !== 'CREATED') {
+          throw new Error('Expected the other-Case fixture.');
+        }
+        registry.assignmentIds.add(otherCaseResult.data.id);
+        const otherTenant = await createScenario(companyBId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const otherTenantSource = await createRequirementSource(
+          otherTenant,
+          otherTenant.equipmentAssetIds[0],
+        );
+
+        await caseService.cancel(
+          scenario.companyId,
+          scenario.caseId,
+          scenario.userId,
+          'Cancelación selectiva',
+        );
+
+        const persisted =
+          await setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: {
+              id: {
+                in: [
+                  eligibleDirect.id,
+                  eligibleRequirement.id,
+                  manualSource.id,
+                  replacedSource.id,
+                  successorId,
+                  otherCaseResult.data.id,
+                  otherTenantSource.id,
+                ],
+              },
+            },
+            select: { id: true, lifecycle: true, releaseCause: true },
+          });
+        const byId = new Map(persisted.map((record) => [record.id, record]));
+        for (const id of [
+          eligibleDirect.id,
+          eligibleRequirement.id,
+          successorId,
+        ]) {
+          expect(byId.get(id)).toMatchObject({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+            releaseCause:
+              HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+          });
+        }
+        expect(byId.get(manualSource.id)).toMatchObject({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        });
+        expect(byId.get(replacedSource.id)).toMatchObject({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+          releaseCause: null,
+        });
+        for (const id of [otherCaseResult.data.id, otherTenantSource.id]) {
+          expect(byId.get(id)).toMatchObject({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releaseCause: null,
+          });
+        }
+      });
+
+      it('rejects CANCELLED replay with zero writes and does not repair a lagging reservation', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 2,
+          assetCount: 2,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        await caseService.cancel(
+          scenario.companyId,
+          scenario.caseId,
+          scenario.userId,
+          'Razón original',
+        );
+        const laggingId = randomUUID();
+        registry.assignmentIds.add(laggingId);
+        await setupPrisma.healthcareEquipmentAssignment.create({
+          data: {
+            id: laggingId,
+            companyId: scenario.companyId,
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            requirementId: scenario.requirementIds[0],
+            origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+            createdById: scenario.userId,
+          },
+        });
+        const [caseBefore, assignmentsBefore, claimsBefore] = await Promise.all(
+          [
+            setupPrisma.healthcareCase.findUniqueOrThrow({
+              where: { id: scenario.caseId },
+            }),
+            setupPrisma.healthcareEquipmentAssignment.findMany({
+              where: { id: { in: [source.id, laggingId] } },
+              orderBy: { id: 'asc' },
+            }),
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+          ],
+        );
+
+        await expect(
+          caseService.cancel(
+            scenario.companyId,
+            scenario.caseId,
+            scenario.userId,
+            'No sobrescribir ni reparar',
+          ),
+        ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+        await expect(
+          setupPrisma.healthcareCase.findUniqueOrThrow({
+            where: { id: scenario.caseId },
+          }),
+        ).resolves.toEqual(caseBefore);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: { id: { in: [source.id, laggingId] } },
+            orderBy: { id: 'asc' },
+          }),
+        ).resolves.toEqual(assignmentsBefore);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: { companyId: scenario.companyId },
+          }),
+        ).resolves.toBe(claimsBefore);
+      });
+
+      it('preserves Case Cancel HTTP shape, RBAC and tenant isolation', async () => {
+        for (const role of [UserRole.ADMIN, UserRole.MANAGER]) {
+          const scenario = await createScenario(companyAId, {
+            requestedQty: 1,
+            assetCount: 1,
+          });
+          const source = await createRequirementSource(
+            scenario,
+            scenario.equipmentAssetIds[0],
+            scenario.requirementIds[0],
+            'cancel-http-source',
+          );
+          httpAuthenticatedRole = role;
+          const response = await supertest(requireHttpApp().getHttpServer())
+            .post(`/healthcare/cases/${scenario.caseId}/cancel`)
+            .send({ cancellationReason: '  Cancelación HTTP  ' })
+            .expect(HttpStatus.CREATED);
+          expect(response.body).toMatchObject({
+            id: scenario.caseId,
+            status: HealthcareCaseStatus.CANCELLED,
+            cancelledById: scenario.userId,
+            cancellationReason: 'Cancelación HTTP',
+          });
+          expect(response.body).not.toHaveProperty('data');
+          expect(response.body).not.toHaveProperty('outcome');
+          await expect(
+            setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+              where: { id: source.id },
+              select: { lifecycle: true, releaseCause: true },
+            }),
+          ).resolves.toEqual({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+            releaseCause:
+              HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+          });
+          await supertest(requireHttpApp().getHttpServer())
+            .post(`/healthcare/cases/${scenario.caseId}/cancel`)
+            .send({ cancellationReason: 'Replay no permitido' })
+            .expect(HttpStatus.CONFLICT);
+        }
+
+        for (const role of [UserRole.SALES, UserRole.WAREHOUSE]) {
+          const denied = await createScenario(companyAId, {
+            requestedQty: 1,
+            assetCount: 1,
+          });
+          const deniedSource = await createRequirementSource(
+            denied,
+            denied.equipmentAssetIds[0],
+          );
+          httpAuthenticatedRole = role;
+          await supertest(requireHttpApp().getHttpServer())
+            .post(`/healthcare/cases/${denied.caseId}/cancel`)
+            .send({ cancellationReason: 'Rol sin permiso' })
+            .expect(HttpStatus.FORBIDDEN);
+          await expect(
+            setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+              where: { id: deniedSource.id },
+              select: { lifecycle: true },
+            }),
+          ).resolves.toEqual({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          });
+        }
+
+        const otherTenant = await createScenario(companyBId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const otherTenantSource = await createRequirementSource(
+          otherTenant,
+          otherTenant.equipmentAssetIds[0],
+        );
+        httpAuthenticatedRole = UserRole.ADMIN;
+        await supertest(requireHttpApp().getHttpServer())
+          .post(`/healthcare/cases/${otherTenant.caseId}/cancel`)
+          .send({ cancellationReason: 'Cruce de tenant' })
+          .expect(HttpStatus.NOT_FOUND);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: otherTenantSource.id },
+            select: { lifecycle: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        });
+      });
+    });
+
+    describe('HC-NEXT-03C4-C2 deterministic cross-consumer ordering', () => {
+      it('serializes Create before Cancel and releases the committed reservation', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const key = trackKey('create-before-cancel');
+        const [created, cancelled] = await runAssignmentBeforeCancelRace(
+          scenario.equipmentAssetIds[0],
+          scenario.companyId,
+          () =>
+            assignmentService.create(scenario.companyId, scenario.userId, key, {
+              caseId: scenario.caseId,
+              equipmentAssetId: scenario.equipmentAssetIds[0],
+              requirementId: scenario.requirementIds[0],
+            }),
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel after Create',
+            ),
+        );
+
+        expect(created.outcome).toBe('CREATED');
+        expect(cancelled.status).toBe(HealthcareCaseStatus.CANCELLED);
+        if (created.outcome !== 'CREATED') {
+          throw new Error('Expected Create to commit before Cancel.');
+        }
+        registry.assignmentIds.add(created.data.id);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: created.data.id },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+        });
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+              key,
+            },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('serializes Cancel before Create without an Assignment or claim', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const key = trackKey('cancel-before-create');
+        const [cancelResult, createResult] = await runCancelBeforeConsumerRace(
+          scenario,
+          assignmentPrisma,
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel wins before Create',
+            ),
+          () =>
+            assignmentService.create(scenario.companyId, scenario.userId, key, {
+              caseId: scenario.caseId,
+              equipmentAssetId: scenario.equipmentAssetIds[0],
+              requirementId: scenario.requirementIds[0],
+            }),
+        );
+
+        expect(cancelResult).toMatchObject({
+          status: 'fulfilled',
+          value: { status: HealthcareCaseStatus.CANCELLED },
+        });
+        expect(createResult).toMatchObject({
+          status: 'rejected',
+          reason: {
+            response: { code: 'CASE_EQUIPMENT_ASSIGNMENTS_READ_ONLY' },
+          },
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.count({
+            where: { companyId: scenario.companyId, caseId: scenario.caseId },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('serializes Replace before Cancel and releases only the committed successor', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 2,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const [replacement, cancelled] = await runAssignmentBeforeCancelRace(
+          scenario.equipmentAssetIds[1],
+          scenario.companyId,
+          () =>
+            assignmentService.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              trackKey('replace-before-cancel'),
+              {
+                equipmentAssetId: scenario.equipmentAssetIds[1],
+                replacementReason: 'Replace wins before Cancel',
+              },
+            ),
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel after Replace',
+            ),
+        );
+
+        expect(replacement.outcome).toBe('REPLACED');
+        expect(cancelled.status).toBe(HealthcareCaseStatus.CANCELLED);
+        if (replacement.outcome !== 'REPLACED') {
+          throw new Error('Expected Replace to commit before Cancel.');
+        }
+        const successorId = replacement.data.replacementAssignment.id;
+        registry.assignmentIds.add(successorId);
+        const [persistedSource, persistedSuccessor] = await Promise.all([
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: successorId },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+        ]);
+        expect(persistedSource).toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+          releaseCause: null,
+        });
+        expect(persistedSuccessor).toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+        });
+      });
+
+      it('serializes Cancel before Replace without a successor or claim', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 2,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const key = trackKey('cancel-before-replace');
+        const [cancelResult, replaceResult] = await runCancelBeforeConsumerRace(
+          scenario,
+          assignmentPrisma,
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel wins before Replace',
+            ),
+          () =>
+            assignmentService.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              key,
+              {
+                equipmentAssetId: scenario.equipmentAssetIds[1],
+                replacementReason: 'Must lose after Cancel',
+              },
+            ),
+        );
+
+        expect(cancelResult).toMatchObject({
+          status: 'fulfilled',
+          value: { status: HealthcareCaseStatus.CANCELLED },
+        });
+        expect(replaceResult).toMatchObject({
+          status: 'rejected',
+          reason: { response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' } },
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.count({
+            where: {
+              companyId: scenario.companyId,
+              replacesAssignmentId: source.id,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('serializes Manual Release before Cancel and preserves the manual audit', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const key = trackKey('release-before-cancel');
+        const [released, cancelled] = await runAssignmentBeforeCancelRace(
+          scenario.equipmentAssetIds[0],
+          scenario.companyId,
+          () =>
+            assignmentService.release(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              { reason: 'Manual wins before Cancel' },
+              key,
+            ),
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel after Manual Release',
+            ),
+        );
+
+        expect(released.status).toBe(
+          HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        );
+        expect(cancelled.status).toBe(HealthcareCaseStatus.CANCELLED);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              lifecycle: true,
+              releaseCause: true,
+              releaseReason: true,
+              releasedById: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+          releaseReason: 'Manual wins before Cancel',
+          releasedById: scenario.userId,
+        });
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+              key,
+            },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('serializes Cancel before Manual Release without a release claim', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const key = trackKey('cancel-before-release');
+        const [cancelResult, releaseResult] = await runCancelBeforeConsumerRace(
+          scenario,
+          assignmentPrisma,
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel wins before Manual Release',
+            ),
+          () =>
+            assignmentService.release(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              { reason: 'Must not overwrite Case audit' },
+              key,
+            ),
+        );
+
+        expect(cancelResult).toMatchObject({
+          status: 'fulfilled',
+          value: { status: HealthcareCaseStatus.CANCELLED },
+        });
+        expect(releaseResult).toMatchObject({
+          status: 'rejected',
+          reason: { response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' } },
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              lifecycle: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+          releaseReason: 'Cancel wins before Manual Release',
+        });
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+
+      it('serializes Requirement Retire before Cancel and preserves the withdrawal audit', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const [retired, cancelled] = await runRetireBeforeCancelRace(
+          scenario,
+          () =>
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Retire wins before Cancel' },
+            ),
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel after Retire',
+            ),
+        );
+
+        expect(retired.lifecycle).toBe(HealthcareRequirementLifecycle.RETIRED);
+        expect(cancelled.status).toBe(HealthcareCaseStatus.CANCELLED);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              lifecycle: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+          releaseReason: 'Retire wins before Cancel',
+        });
+      });
+
+      it('serializes Cancel before Requirement Retire without rewriting either audit', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const [cancelResult, retireResult] = await runCancelBeforeConsumerRace(
+          scenario,
+          requirementPrisma,
+          () =>
+            caseService.cancel(
+              scenario.companyId,
+              scenario.caseId,
+              scenario.userId,
+              'Cancel wins before Retire',
+            ),
+          () =>
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Must lose after Cancel' },
+            ),
+        );
+
+        expect(cancelResult).toMatchObject({
+          status: 'fulfilled',
+          value: { status: HealthcareCaseStatus.CANCELLED },
+        });
+        expect(retireResult).toMatchObject({
+          status: 'rejected',
+          reason: { response: { code: 'CASE_REQUIREMENTS_READ_ONLY' } },
+        });
+        await expect(
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: scenario.requirementIds[0] },
+            select: {
+              lifecycle: true,
+              retiredAt: true,
+              retiredById: true,
+              retirementReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+          retiredAt: null,
+          retiredById: null,
+          retirementReason: null,
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: {
+              lifecycle: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+          releaseReason: 'Cancel wins before Retire',
         });
       });
     });
@@ -2585,6 +3712,14 @@ function createIsolatedClient(connectionUrl: URL): ExplicitPrismaService {
   }
 }
 
+function createUnusedCaseFolioService(): HealthcareCaseFolioService {
+  return {
+    allocateNextAvailableFolio: () => {
+      throw new Error('Case folio allocation is outside C4-C2 E2E scope.');
+    },
+  } as unknown as HealthcareCaseFolioService;
+}
+
 async function readAndValidateDatabaseIdentity(
   client: ExplicitPrismaService,
 ): Promise<DatabaseIdentity> {
@@ -2710,6 +3845,55 @@ async function assertRequiredRowLockPrivileges(
   }
 }
 
+async function assertRequiredCaseCancelUpdatePrivileges(
+  client: ExplicitPrismaService,
+): Promise<void> {
+  const rows = await client.$queryRaw<
+    Array<{ columnName: string; canUpdate: boolean }>
+  >(Prisma.sql`
+    SELECT
+      required."columnName",
+      COALESCE(
+        has_column_privilege(
+          current_user,
+          relation.oid,
+          attribute.attnum,
+          'UPDATE'
+        ),
+        false
+      ) AS "canUpdate"
+    FROM (
+      VALUES ${Prisma.join(
+        requiredCaseCancelUpdateColumns.map(
+          (columnName) => Prisma.sql`(${columnName})`,
+        ),
+      )}
+    ) AS required("columnName")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_class AS relation
+      ON relation.relnamespace = namespace.oid
+      AND relation.relname = 'HealthcareCase'
+    LEFT JOIN pg_attribute AS attribute
+      ON attribute.attrelid = relation.oid
+      AND attribute.attname = required."columnName"
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+  `);
+  const missing = rows
+    .filter((row) => !row.canUpdate)
+    .map((row) => row.columnName);
+
+  if (
+    rows.length !== requiredCaseCancelUpdateColumns.length ||
+    missing.length > 0
+  ) {
+    throw new Error(
+      `HC-NEXT-03C4-C2 Case Cancel UPDATE privilege preflight failed for: ${missing.join(', ') || 'unknown column'}.`,
+    );
+  }
+}
+
 async function assertExclusiveTargetAvailability(
   observer: ExplicitPrismaService,
   clients: ExplicitPrismaService[],
@@ -2781,6 +3965,30 @@ async function startRequirementRowBlocker(
   };
 }
 
+async function startCaseRowBlocker(
+  client: ExplicitPrismaService,
+  companyId: string,
+  caseId: string,
+): Promise<ControlledTransaction> {
+  const ready = deferred<number>();
+  const release = deferred<void>();
+  const done = client.$transaction(
+    async (transaction) => {
+      await lockCase(transaction, companyId, caseId);
+      ready.resolve(await getBackendPid(transaction));
+      await release.promise;
+    },
+    { maxWait: 3_000, timeout: 20_000 },
+  );
+  void done.catch((error: unknown) => ready.reject(error));
+
+  return {
+    pid: await withTimeout(ready.promise, 5_000, 'Case blocker setup'),
+    release: () => release.resolve(undefined),
+    done,
+  };
+}
+
 async function startCompanyLockHolder(
   client: ExplicitPrismaService,
   companyId: string,
@@ -2839,6 +4047,22 @@ async function lockRequirement(
   `);
   if (rows.length !== 1) {
     throw new Error('Controlled HealthcareCaseRequirement row was not found.');
+  }
+}
+
+async function lockCase(
+  transaction: Prisma.TransactionClient,
+  companyId: string,
+  caseId: string,
+): Promise<void> {
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT "id"
+    FROM "HealthcareCase"
+    WHERE "id" = ${caseId} AND "companyId" = ${companyId}
+    FOR UPDATE
+  `);
+  if (rows.length !== 1) {
+    throw new Error('Controlled HealthcareCase row was not found.');
   }
 }
 

@@ -266,6 +266,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     findSettingsForShare: jest.fn(),
     lockAssignment: jest.fn(),
     lockReservedRequirementAssignments: jest.fn(),
+    lockReservedCaseAssignments: jest.fn(),
     lockEquipmentAsset: jest.fn(),
     lockRequirement: jest.fn(),
     acquireSettingsSharedAdvisoryLock: jest.fn(),
@@ -313,6 +314,7 @@ describe('HealthcareEquipmentAssignmentsService', () => {
     repository.lockEquipmentAsset.mockResolvedValue(true);
     repository.lockRequirement.mockResolvedValue(true);
     repository.lockReservedRequirementAssignments.mockResolvedValue([]);
+    repository.lockReservedCaseAssignments.mockResolvedValue([]);
 
     repository.findAssignmentReplacementSource.mockResolvedValue(
       replacementSourceSnapshot,
@@ -1079,6 +1081,113 @@ describe('HealthcareEquipmentAssignmentsService', () => {
           releasedAt,
           releasedById: userId,
           releaseReason: 'Cambio clínico',
+        }),
+      ).rejects.toMatchObject({
+        response: { code: 'RESOURCE_STATE_CHANGED' },
+      });
+      expect(repository.releaseAssignment).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Case Cancel derived release', () => {
+    it('delegates the tenant-scoped deterministic lock to the repository', async () => {
+      repository.lockReservedCaseAssignments.mockResolvedValue([
+        'assignment-direct',
+        'assignment-requirement',
+      ]);
+
+      await expect(
+        service.lockReservedCaseAssignments(transaction as never, {
+          companyId,
+          caseId,
+        }),
+      ).resolves.toEqual(['assignment-direct', 'assignment-requirement']);
+      expect(repository.lockReservedCaseAssignments).toHaveBeenCalledWith(
+        transaction,
+        { companyId, caseId },
+      );
+    });
+
+    it('accepts zero eligible Assignments without writes', async () => {
+      await expect(
+        service.releaseLockedCaseAssignments(transaction as never, {
+          companyId,
+          caseId,
+          assignmentIds: [],
+          releasedAt,
+          releasedById: userId,
+          releaseReason: 'Caso cancelado',
+        }),
+      ).resolves.toBeUndefined();
+      expect(repository.releaseAssignment).not.toHaveBeenCalled();
+    });
+
+    it('releases DIRECT and REQUIREMENT rows without applying an origin filter', async () => {
+      await service.releaseLockedCaseAssignments(transaction as never, {
+        companyId,
+        caseId,
+        assignmentIds: ['assignment-requirement', 'assignment-direct'],
+        releasedAt,
+        releasedById: userId,
+        releaseReason: '  Razón persistida  ',
+      });
+
+      expect(repository.releaseAssignment.mock.calls).toEqual([
+        [
+          transaction,
+          {
+            companyId,
+            assignmentId: 'assignment-direct',
+            releasedAt,
+            releasedById: userId,
+            releaseCause:
+              HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+            releaseReason: '  Razón persistida  ',
+            expectedContext: { caseId },
+          },
+        ],
+        [
+          transaction,
+          {
+            companyId,
+            assignmentId: 'assignment-requirement',
+            releasedAt,
+            releasedById: userId,
+            releaseCause:
+              HealthcareEquipmentAssignmentReleaseCause.CASE_CANCELLED,
+            releaseReason: '  Razón persistida  ',
+            expectedContext: { caseId },
+          },
+        ],
+      ]);
+    });
+
+    it('deduplicates Assignment ids before releasing them', async () => {
+      await service.releaseLockedCaseAssignments(transaction as never, {
+        companyId,
+        caseId,
+        assignmentIds: ['assignment-a', 'assignment-a'],
+        releasedAt,
+        releasedById: userId,
+        releaseReason: 'Caso cancelado',
+      });
+
+      expect(repository.releaseAssignment).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns RESOURCE_STATE_CHANGED and stops after a conditional miss', async () => {
+      repository.releaseAssignment
+        .mockResolvedValueOnce({ count: 0 })
+        .mockResolvedValueOnce({ count: 1 });
+
+      await expect(
+        service.releaseLockedCaseAssignments(transaction as never, {
+          companyId,
+          caseId,
+          assignmentIds: ['assignment-a', 'assignment-b'],
+          releasedAt,
+          releasedById: userId,
+          releaseReason: 'Caso cancelado',
         }),
       ).rejects.toMatchObject({
         response: { code: 'RESOURCE_STATE_CHANGED' },

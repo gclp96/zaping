@@ -13,8 +13,8 @@
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE, REPLACE AND HC-NEXT-03C4-C1 REQUIREMENT RETIRE MERGED; HC-NEXT-03C4-C2 CASE CANCEL READY / NOT IMPLEMENTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL Y FRONTEND PENDING
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE, REPLACE AND HC-NEXT-03C4-C1 REQUIREMENT RETIRE MERGED; HC-NEXT-03C4-C2 CASE CANCEL TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; CASE CANCEL VALIDATED ON BRANCH / PENDING INTEGRATION; FRONTEND PENDING
 **Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
@@ -428,9 +428,9 @@ conserva lectura. Frontend UX continúa diferido.
 La implementación concreta del guard futuro con Dispatch/Custody permanece
 diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
 de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
-concurrencia de Create. En HC-NEXT-03C4, Manual Release y Replace están merged;
-C4-C1 Requirement Retire está implementado y validado técnicamente en rama,
-pendiente de integración. C4-C2 Case Cancel y frontend permanecen pendientes.
+concurrencia de Create. En HC-NEXT-03C4, Manual Release, Replace y C4-C1
+Requirement Retire están merged. C4-C2 Case Cancel está implementado y validado
+técnicamente en rama, pendiente de integración; frontend permanece pendiente.
 
 ## 13.1 Corte de implementación HC-NEXT-03C4-B — Replace
 
@@ -613,7 +613,7 @@ Integration restante y ejecutar las regresiones integradas de ambos comandos.
 
 ## 13.3 HC-NEXT-03C4-C2 — Case Cancel Parent Integration
 
-**Estado:** READY / NOT IMPLEMENTED
+**Estado:** TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
 
 ### Objetivo y alcance
 
@@ -728,6 +728,18 @@ lógicas.
 - C4-C2 puede cerrarse sin declarar cerrado HC-NEXT-03C4-C ni el checkpoint final
   de HC-LOCK-04 hasta completar la integración y validación conjunta.
 
+### Evidencia de validación en rama
+
+- Jest focal: 346/346 PASS.
+- Typecheck, `lint:check`, Prettier focal, API build y `git diff --check`: PASS.
+- PostgreSQL/HTTP E2E focal sobre la base aislada `zaping_spike_test`: 16/16
+  PASS, 26 skipped por filtro, exit 0. La ejecución cubrió 15 escenarios C4-C2
+  y la regresión C4-C1 que mantiene `DIRECT` al retirar una Requirement.
+- El harness elimina únicamente fixtures de los Company IDs del run, verifica
+  conteos cero y propaga cualquier fallo de cleanup.
+- La aceptación en rama no sustituye la integración en `main` ni el checkpoint
+  integrado final de HC-LOCK-04.
+
 ### Fuera de alcance y checkpoint posterior
 
 Quedan fuera reparación histórica, reapertura de Cases, Case Availability,
@@ -736,8 +748,8 @@ cambios de lifecycle/condition del EquipmentAsset. C4-C2 no implementa nuevas
 capacidades de Manual Release, Replace o Requirement Retire.
 
 El prerequisite checkpoint de HC-LOCK-04 está acreditado. Su checkpoint final
-permanece pendiente hasta implementar C4-C2, integrar las Parent Integrations y
-ejecutar sus regresiones integradas.
+permanece pendiente hasta integrar C4-C2 y ejecutar las regresiones integradas de
+ambas Parent Integrations.
 
 ---
 
@@ -772,12 +784,12 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
 → MANUAL RELEASE AND REPLACE COMPLETE / MERGED
 → REQUIREMENT RETIRE C4-C1 COMPLETE / MERGED IN main@3e1810f
-→ CASE CANCEL C4-C2 READY / NOT IMPLEMENTED
+→ CASE CANCEL C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
 → HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED
-→ C4-C2 READY / NOT IMPLEMENTED; FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE + REQUIREMENT RETIRE C4-C1 MERGED; C4-C2 VALIDATED ON BRANCH
+→ C4-C2 PENDING INTEGRATION; FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:
