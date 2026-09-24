@@ -4726,6 +4726,33 @@ async function assertNoRunOwnedFixtures(
             const tokens: Partial<Record<UserRole, string>> = {};
             let companyBToken = '';
             let httpApp: INestApplication<App> | null = null;
+            let hadJwtSecret = false;
+            let previousJwtSecret: string | undefined;
+            let jwtSecretInstalled = false;
+
+            const restoreJwtSecret = (): void => {
+              if (!jwtSecretInstalled) {
+                return;
+              }
+
+              if (hadJwtSecret && previousJwtSecret !== undefined) {
+                process.env.JWT_SECRET = previousJwtSecret;
+              } else {
+                delete process.env.JWT_SECRET;
+              }
+
+              jwtSecretInstalled = false;
+            };
+
+            const closeHttpApp = async (): Promise<void> => {
+              if (!httpApp) {
+                return;
+              }
+
+              const app = httpApp;
+              httpApp = null;
+              await app.close();
+            };
 
             const tokenFor = (role: UserRole): string => {
               const token = tokens[role];
@@ -4752,37 +4779,32 @@ async function assertNoRunOwnedFixtures(
             };
 
             beforeAll(async () => {
-              if (
-                Object.prototype.hasOwnProperty.call(process.env, 'JWT_SECRET')
-              ) {
-                throw new Error(
-                  'The isolated Manual Release HTTP process must not inherit JWT_SECRET.',
-                );
-              }
-
-              await prisma.user.createMany({
-                data: (
-                  [
-                    UserRole.MANAGER,
-                    UserRole.SALES,
-                    UserRole.WAREHOUSE,
-                  ] as const
-                ).map((role) => ({
-                  id: httpUserIds[role],
-                  companyId: fixture.companyAId,
-                  firstName: 'Manual Release HTTP',
-                  lastName: role,
-                  email: `hc-lock-04-http-${role.toLowerCase()}-${httpUserIds[role]}@example.test`,
-                  passwordHash: 'not-used-by-backend-test',
-                  role,
-                  authVersion: 0,
-                })),
-              });
-
+              hadJwtSecret = Object.hasOwn(process.env, 'JWT_SECRET');
+              previousJwtSecret = process.env.JWT_SECRET;
               const jwtSecret = `${randomUUID()}${randomUUID()}`;
               process.env.JWT_SECRET = jwtSecret;
+              jwtSecretInstalled = true;
 
               try {
+                await prisma.user.createMany({
+                  data: (
+                    [
+                      UserRole.MANAGER,
+                      UserRole.SALES,
+                      UserRole.WAREHOUSE,
+                    ] as const
+                  ).map((role) => ({
+                    id: httpUserIds[role],
+                    companyId: fixture.companyAId,
+                    firstName: 'Manual Release HTTP',
+                    lastName: role,
+                    email: `hc-lock-04-http-${role.toLowerCase()}-${httpUserIds[role]}@example.test`,
+                    passwordHash: 'not-used-by-backend-test',
+                    role,
+                    authVersion: 0,
+                  })),
+                });
+
                 const moduleRef: TestingModule = await Test.createTestingModule(
                   {
                     imports: [
@@ -4865,15 +4887,27 @@ async function assertNoRunOwnedFixtures(
                   role: companyBAdmin.role,
                   authVersion: companyBAdmin.authVersion,
                 });
-              } finally {
-                delete process.env.JWT_SECRET;
+              } catch (setupError) {
+                try {
+                  await closeHttpApp();
+                } catch (cleanupError) {
+                  throw new AggregateError(
+                    [setupError, cleanupError],
+                    'Manual Release HTTP setup and cleanup failed.',
+                  );
+                } finally {
+                  restoreJwtSecret();
+                }
+
+                throw setupError;
               }
             }, 20_000);
 
             afterAll(async () => {
-              if (httpApp) {
-                await httpApp.close();
-                httpApp = null;
+              try {
+                await closeHttpApp();
+              } finally {
+                restoreJwtSecret();
               }
             });
 
