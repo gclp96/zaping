@@ -12,8 +12,8 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
-**Última actualización:** 2026-09-23
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING; C5-B BLOCKED; FRONTEND PENDING
+**Última actualización:** 2026-09-24
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -890,7 +890,7 @@ No se crean nested mutation routes ni un endpoint general de Case Availability.
 | GET | `/healthcare/equipment-assignments` | Lista tenant-scoped con filtros. | 200 paginado | ADMIN, MANAGER, SALES, WAREHOUSE |
 | GET | `/healthcare/equipment-assignments/:assignmentId` | Detail actual o histórico. | 200 | ADMIN, MANAGER, SALES, WAREHOUSE |
 | POST | `/healthcare/equipment-assignments` | Crear una reserva lógica. | 201 o review 200 | ADMIN, MANAGER, WAREHOUSE |
-| POST | `/healthcare/equipment-assignments/:assignmentId/replace` | Reemplazar una reserva preservando lineage. | 201 o review 200 | ADMIN, MANAGER, WAREHOUSE |
+| POST | `/healthcare/equipment-assignments/:assignmentId/replace` | Reemplazar una reserva preservando lineage. | 200 para `REPLACED` o review | ADMIN, MANAGER, WAREHOUSE |
 | POST | `/healthcare/equipment-assignments/:assignmentId/release` | Liberación manual lógica. | 200 | ADMIN, MANAGER, WAREHOUSE |
 
 ## 22.1 Query DTO
@@ -987,8 +987,8 @@ persiste dentro de Assignment.
 
 | Campo | Tipo | Requerido | Validación |
 | --- | --- | --- | --- |
-| `replacementEquipmentAssetId` | UUID | sí | UUID válido y distinto del activo original. |
-| `reason` | string | sí | Normalizada, no blank, máximo 1000. |
+| `equipmentAssetId` | UUID | sí | UUID válido y distinto del activo original. |
+| `replacementReason` | string | sí | Normalizada, no blank, máximo 1000. |
 | `conflictReviewFingerprint` | string | condicional | Mismo contrato de Create. |
 | `confirmConflictOverride` | boolean | no | Default false. |
 | `conflictOverrideReason` | string | condicional | Mismo contrato de Create. |
@@ -1666,7 +1666,9 @@ HC-NEXT-03C1 Persistence / Migration
 → HC-NEXT-03C2 Assignment Backend Base
 → HC-NEXT-03C3 Availability / Conflict Review / Concurrency
 → HC-NEXT-03C4 Replace / Release / Parent Integrations
-→ HC-NEXT-03C5 Backend Hardening / Integrated E2E
+→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness
+→ HC-NEXT-03C5-B Integrated Backend Validation
+→ HC-NEXT-03C5-COVERAGE backend independiente
 → HC-NEXT-03C6 Frontend Equipment Assignment
 → HC-NEXT-03C7 Integrated Acceptance
 ```
@@ -1815,33 +1817,106 @@ fabricada o parent command degradado a best-effort silencioso.
 
 ## 34.5 HC-NEXT-03C5 — Backend Hardening / Integrated E2E
 
-**Estado:** PENDING / DOR NOT YET CONFIRMED. HC-NEXT-03C4 y HC-LOCK-04 están
-cerrados en la baseline productivamente equivalente `main@be73bc4`, pero este
-estado no declara C5 READY ni Healthcare Core terminado.
+Decisiones aprobadas:
 
-**Criterios de entrada:** partir de una rama limpia creada desde el `main`
-posterior al merge de este closeout; comprobar que B.1/B.2/B.3 siguen alineados
-con el código integrado; refinar la matriz exacta de suites y findings sin
-agregar capability; y verificar el preflight e identidad de la base PostgreSQL
-disposable que usarán los E2E integrados. Mientras esos puntos no tengan
-evidencia en el ticket C5, su DoR permanece pendiente.
+- **DEC-C5-01:** CoverageNote y cobertura agregada quedan fuera de C5. El ticket
+  backend independiente HC-NEXT-03C5-COVERAGE debe definir su contrato y
+  completarse antes de C6.
+- **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
+  Harness y C5-B Integrated Backend Validation.
+- HC-LOCK-04 permanece CLOSED / ACCEPTED; no se reabre su protocolo ni su
+  capability sin un defecto concreto demostrado.
 
-**Scope:** cerrar findings del backend integrado sin agregar capability:
-regresión completa de API, tenant isolation, matriz de roles, replay/mismatch,
-stale review, races, historical reads, lifecycle inválido, persistence error
-mapping, Case cancellation, Requirement withdrawal y schedule incompleto.
+### 34.5.1 C5-A — Contract Alignment & Safe PostgreSQL Harness
 
-**Out of scope:** frontend, nuevas rutas, fuzzy search, permission-based RBAC,
-Dispatch/Custody y cambios funcionales no respaldados por B.1/B.2.
+**Estado:** TECHNICALLY VALIDATED IN BRANCH — PR / MERGE PENDING.
 
-**Gates:** todos los focales C1–C4; PostgreSQL disposable integrity/concurrency
-E2E; tests integrados de Company A/B y los cuatro roles; full API estable;
-Prisma validate/generate; API lint/typecheck/build; `git diff --check`; cero
-flakiness no explicada y cero información Prisma/PostgreSQL expuesta.
+**Dependencias satisfechas:** branch limpia desde `main@5d33cb0`; C1–C4 COMPLETE /
+MERGED; HC-LOCK-04 CLOSED / ACCEPTED; alineación B.1/B.2/B.3 y matriz de gaps
+refinadas.
 
-**STOP:** cualquier full gate rojo, race no determinista, tenant/RBAC gap,
-unsafe DB harness, error interno expuesto o divergencia entre schema, API y
-contrato.
+**Scope:** corregir divergencias documentales CURRENT y endurecer únicamente el
+harness PostgreSQL C1. La configuración será opt-in mediante
+`RUN_HC_C5_POSTGRES_TESTS=1` y URL explícita en `HC_C5_DATABASE_URL`, sin dotenv,
+`.env`, `DATABASE_URL` genérica ni fallback. Antes de cualquier write debe validar:
+
+- URL PostgreSQL explícita sin routing/options no autorizados;
+- `current_database()`, `current_user`, host y puerto externo esperados, puerto
+  del servidor, versión PostgreSQL y `current_schema()`;
+- `CONNECT`, `USAGE` y `SELECT`/`INSERT`/`DELETE` únicamente sobre las diez tablas
+  usadas; sin `UPDATE`, privilegios administrativos/globales ni secuencias;
+- que todas las conexiones alcanzan la misma instancia y no hay sesiones ajenas
+  al run antes de crear fixtures.
+
+Los fixtures usan IDs aleatorios registrados por el run. El cleanup opera sólo
+sobre esos Company IDs, respeta el orden referencial, hace readback de conteos
+cero y agrega/propaga fallos de cleanup o disconnect.
+
+**Infraestructura acreditada para C5-A:** usuario `zaping_hc_c5`, base
+`zaping_spike_test` y host `127.0.0.1:5434`; identidad dedicada y permisos mínimos
+verificados. La excepción ACL aprobada conserva `CONNECT`/`TEMPORARY` y `USAGE`
+heredados de `PUBLIC`, sin modificar ACL compartidas. No se hereda la autorización
+de los laboratorios B4-B1 o 2H.
+
+**Out of scope:** producción, schema, migraciones, semántica C1–C4, secretos,
+frontend y CoverageNote runtime.
+
+**Definition of Ready:** contrato, baseline, identidad, variable explícita,
+privilegios mínimos y preflight efectivo de conexión/schema/sesiones/cleanup
+acreditados para la ejecución C1. El DoR técnico está satisfecho.
+
+**Acceptance Criteria:** fail-closed antes de escribir ante cualquier mismatch;
+cero configuración implícita; privilegios mínimos demostrados; fixtures y cleanup
+propios con conteos cero; ningún cambio productivo o de contrato.
+
+**Definition of Done:** harness focal implementado/revisado; preflight autorizado
+documentado sin secretos; gates estáticos y `git diff --check` verdes; PostgreSQL
+real 27/27 PASS. PR e integración en `main` continúan pendientes; hasta entonces
+C5-A no está DONE y C5-B permanece bloqueado.
+
+**Evidencia:** harness C1 en `85b480d` y `02d7a6e`; 27/27 PASS, 0 skipped, exit 0;
+preflight y teardown sin errores reportados. El teardown acredita sólo los fixtures
+propios, no una base globalmente vacía. Riesgo residual: la exclusividad se
+comprueba al inicio, pero no está garantizada durante toda la ejecución.
+
+**Sprint 1 propuesto:** 24-sep–07-oct-2026; objetivo C5-A; Target 07-oct-2026;
+Forecast y Commitment pendientes de aprobación; Actual pendiente de integración.
+
+### 34.5.2 C5-B — Integrated Backend Validation
+
+**Estado:** BLOCKED BY C5-A / NOT READY.
+
+**DoR:** C5-A DONE, disposable acreditada, divergencias B.1/B.2/B.3 cerradas y
+matriz focal final aprobada sin duplicar HC-LOCK-04.
+
+**Scope:** añadir sólo E2E HTTP/PostgreSQL faltantes para list/detail/Create con
+JWT real, Company A/B y ADMIN/MANAGER/SALES/WAREHOUSE; filtros/paginación,
+historical reads, foreign igual a missing, reevaluación al cambiar schedule y
+error de persistencia sanitizado. Ejecutar focales C1–C4 y full API sobre la
+baseline integrada; los escenarios ya acreditados de locks, replay, races,
+Replace, Manual Release y Parent Integrations se reutilizan sin rediseño.
+
+**Out of scope:** capabilities o rutas nuevas, CoverageNote/cobertura agregada,
+frontend, Case Availability general, fuzzy search, permission-based RBAC,
+Dispatch/Custody, efectos físicos y staging/producción.
+
+**Acceptance Criteria:** matriz faltante verde con PostgreSQL/JWT reales; tenant
+A/B y cuatro roles; respuestas históricas y errores sin información interna;
+regresiones C1–C4 verdes sin flakiness no explicada.
+
+**Definition of Done:** full API, Prisma validate/generate, lint, typecheck, build
+y `git diff --check` verdes; evidencia separa seleccionados/skipped/no ejecutados,
+registra identidad sin secretos y acredita cleanup propio. Un defecto productivo
+requiere corrección focal; no amplía capability por inferencia.
+
+### 34.5.3 HC-NEXT-03C5-COVERAGE
+
+**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6.
+
+Ticket backend independiente para lectura agregada `PENDING` / `PARTIAL` /
+`UNAVAILABLE` / `CONFLICT` y commands de registro/resolución de CoverageNotes.
+Debe decidir contrato HTTP, tenant, RBAC, auditoría, concurrencia, replay y
+pruebas. No forma parte de C5-A/C5-B.
 
 ## 34.6 HC-NEXT-03C6 — Frontend Equipment Assignment
 
@@ -1852,8 +1927,10 @@ incompleto, revisar conflictos, confirmar override con reason obligatorio,
 Replace, Release e historia. SALES tiene UI read-only; ADMIN, MANAGER y
 WAREHOUSE conservan controles de mutación.
 
-La UI representa estados derivados y respuestas aprobadas; no inventa prioridad,
-availability persistida ni reglas paralelas. Un 403 no destruye la sesión.
+La entrada de C6 exige que HC-NEXT-03C5-COVERAGE esté contratado, implementado e
+integrado. La UI representa estados derivados y respuestas aprobadas; no inventa
+prioridad, availability persistida ni reglas paralelas. Un 403 no destruye la
+sesión.
 
 **Out of scope:** screens de Dispatch/Custody, Case Availability general,
 rediseño backend, permission-based RBAC y nuevos workflows de Equipment Core.
@@ -2008,11 +2085,10 @@ interpretan como `int64` con signo en big-endian, sin seed, usando el overload d
 un solo `bigint`. Los detalles normativos están en
 [ADR-HC-LOCK-001](../../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md).
 
-El helper actual del spike usa `hashtextextended()` con namespace y seed
-diferentes. Es evidencia experimental, no implementa SHA-256, no es compatible
-con la identidad V1 y no está aprobado para producción. HC-LOCK-02 debe
-consolidar la derivación, vectores y rollout sin instancias concurrentes con
-identidades incompatibles.
+El helper CURRENT implementa esta derivación SHA-256 y sus vectores normativos.
+HC-LOCK-02 consolidó la identidad V1; HC-LOCK-04 permanece CLOSED / ACCEPTED.
+La evidencia histórica del spike basada en `hashtextextended()` no describe el
+runtime integrado y no debe usarse como contrato alternativo.
 
 El Company lock no vuelve autoritativos los reads previos. El estado crítico se
 relee después de adquirir Company y los locks específicos. Tampoco sustituye
@@ -2197,7 +2273,8 @@ decisión; no inventa semántica.
 | B.3 aprobado | `HC-NEXT-03B COMPLETE / APPROVED — IMPLEMENTATION NOT STARTED` |
 | C1 merged | `PARTIALLY IMPLEMENTED — PERSISTENCE` |
 | C2–C4 merged | `PARTIALLY IMPLEMENTED — BACKEND IN PROGRESS`, enumerando slices reales |
-| C5 merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
+| C5-A validado técnicamente en rama | `PARTIALLY IMPLEMENTED — C5-A PR / MERGE PENDING` |
+| C5-B merged | `PARTIALLY IMPLEMENTED — BACKEND VALIDATED` |
 | C6 merged | `IMPLEMENTED / INTEGRATED ACCEPTANCE REQUIRED` |
 | C7 automated green, manual pendiente | `IN PROGRESS / PENDING MANUAL QA / NOT ACCEPTED` |
 | C7 completo | `COMPLETE / ACCEPTED` sólo con escenarios A–P y matriz manual verdes |
@@ -2241,5 +2318,6 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ HC-NEXT-03C5 HARDENING PENDING DOR; FRONTEND PENDING
+→ C5-A TECHNICALLY VALIDATED IN BRANCH / PR & MERGE PENDING
+→ C5-B BLOCKED; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
 ```
