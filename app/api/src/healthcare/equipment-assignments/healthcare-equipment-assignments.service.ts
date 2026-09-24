@@ -858,6 +858,58 @@ export class HealthcareEquipmentAssignmentsService {
     }
   }
 
+  lockReservedRequirementAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseId: string;
+      requirementId: string;
+    },
+  ): Promise<string[]> {
+    return this.repository.lockReservedRequirementAssignments(
+      transaction,
+      data,
+    );
+  }
+
+  async releaseLockedRequirementAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseId: string;
+      requirementId: string;
+      assignmentIds: string[];
+      releasedAt: Date;
+      releasedById: string;
+      releaseReason: string;
+    },
+  ): Promise<void> {
+    const assignmentIds = [...new Set(data.assignmentIds)].sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    for (const assignmentId of assignmentIds) {
+      const result = await this.repository.releaseAssignment(transaction, {
+        companyId: data.companyId,
+        assignmentId,
+        releasedAt: data.releasedAt,
+        releasedById: data.releasedById,
+        releaseCause:
+          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        releaseReason: data.releaseReason,
+        expectedContext: {
+          caseId: data.caseId,
+          requirementId: data.requirementId,
+          origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+        },
+      });
+
+      if (result.count !== 1) {
+        throw resourceStateChangedException();
+      }
+    }
+  }
+
   async replace(
     companyId: string,
     replacedById: string,

@@ -13,9 +13,9 @@
 **Estado HC-NEXT-03C1:** PERSISTENCE / MIGRATION — COMPLETE / MERGED
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
-**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE COMPLETE / COMMITTED; REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT (UNCOMMITTED); PARENT INTEGRATIONS PENDING
-**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 MERGED + C4 MANUAL RELEASE COMMITTED + C4-B REPLACE BACKEND VALIDATED; PARENT INTEGRATIONS Y FRONTEND PENDING
-**Última actualización:** 2026-09-20
+**Estado HC-NEXT-03C4:** IN PROGRESS — MANUAL RELEASE AND REPLACE MERGED; HC-NEXT-03C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION; HC-NEXT-03C4-C2 CASE CANCEL PENDING
+**Estado de implementación:** PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED; REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; CASE CANCEL Y FRONTEND PENDING
+**Última actualización:** 2026-09-23
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -428,9 +428,9 @@ conserva lectura. Frontend UX continúa diferido.
 La implementación concreta del guard futuro con Dispatch/Custody permanece
 diferida. HC-NEXT-03C1 implementa la persistencia, HC-NEXT-03C2 el backend base
 de lectura y creación, y HC-NEXT-03C3 Availability/conflict review y la
-concurrencia de Create. En HC-NEXT-03C4, Manual Release está committed y Replace
-backend está validado y listo para commit; las integraciones padre y frontend
-permanecen pendientes.
+concurrencia de Create. En HC-NEXT-03C4, Manual Release y Replace están merged;
+C4-C1 Requirement Retire está implementado y validado técnicamente en rama,
+pendiente de integración. C4-C2 Case Cancel y frontend permanecen pendientes.
 
 ## 13.1 Corte de implementación HC-NEXT-03C4-B — Replace
 
@@ -459,6 +459,155 @@ Limitaciones conocidas: el E2E HTTP usa una app NestJS in-process con Supertest,
 no un puerto/proxy externo; cancelación del cliente mientras espera locks no fue
 ejercitada. Parent integrations, frontend y los guards futuros de
 Dispatch/Custody continúan fuera de C4-B.
+
+## 13.2 HC-NEXT-03C4-C1 — Requirement Retire Parent Integration
+
+**Estado:** TECHNICALLY COMPLETE / VALIDATED ON BRANCH — PENDING INTEGRATION
+
+### Objetivo y alcance
+
+El comando existente
+`POST /healthcare/requirements/:requirementId/retire` debe retirar la Requirement
+y liberar atómicamente todas sus Equipment Assignments que continúen
+`RESERVED`, tengan `origin = REQUIREMENT` y pertenezcan al mismo tenant, Case y
+Requirement. No se crea una ruta nueva ni cambia la respuesta pública del
+Requirement.
+
+El comando padre conserva su RBAC, validación, normalización, errores e
+idempotencia por estado. El release derivado se ejecuta con el mismo
+`Prisma.TransactionClient`; no invoca la ruta pública de Manual Release ni abre
+una segunda transacción.
+
+### Dependencias y Definition of Ready
+
+- `main@8a3b189` integra HC-LOCK-02 y HC-LOCK-03.
+- El prerequisite checkpoint de HC-LOCK-04 está acreditado; el checkpoint final
+  permanece pendiente.
+- Existen `origin = REQUIREMENT`, `lifecycle = RESERVED/RELEASED`,
+  `releaseCause = REQUIREMENT_WITHDRAWN` y el índice tenant-scoped por
+  Requirement/lifecycle; no se requiere migración.
+- El comando padre ya aplica la política compartida de transacción, Company lock,
+  subsequent timeouts y locks tenant-scoped de Case y Requirement.
+- Las decisiones funcionales y transaccionales de esta sección están aprobadas.
+
+Estas dependencias formaron el DoR aprobado y quedaron satisfechas para la
+implementación y validación técnica de C4-C1.
+
+### Reglas funcionales y de auditoría
+
+1. Sólo transicionan Assignments que, bajo lock, sigan siendo `RESERVED`, tengan
+   `origin = REQUIREMENT` y estén relacionadas con el `companyId`, `caseId` y
+   `requirementId` del comando padre.
+2. `DIRECT`, Assignments de otra Requirement, Case o Company, y filas ya
+   `RELEASED` o `REPLACED` permanecen intactas.
+3. Cada transición derivada persiste `releaseCause = REQUIREMENT_WITHDRAWN`,
+   `releasedById = retiredById` y `releaseReason = retirementReason` ya
+   normalizada por el comando padre.
+4. `retiredAt` y todos los `releasedAt` de la operación comparten un único
+   timestamp creado para esa operación.
+5. Un replay sobre una Requirement ya `RETIRED` devuelve la respuesta histórica
+   vigente con cero writes: no sobrescribe auditoría, no vuelve a liberar filas y
+   no repara Assignments históricas rezagadas.
+6. Retire no incorpora `Idempotency-Key` ni crea claims de Assignment. Su replay
+   continúa determinado por el lifecycle del Requirement.
+7. Todas las filas históricas permanecen legibles.
+
+### Frontera transaccional y orden
+
+La única transacción sigue este orden:
+
+```text
+Company advisory lock
+→ subsequent transaction timeouts
+→ HealthcareCase FOR UPDATE
+→ HealthcareCaseRequirement FOR UPDATE
+→ revalidación de lifecycle y policy del Requirement
+→ Assignments aplicables FOR UPDATE, ORDER BY id ASC
+→ transición condicional del Requirement
+→ releases condicionales de Assignments
+→ readback del Requirement
+→ commit
+```
+
+El reread/lock de Assignments revalida tenant, Case, Requirement, origin y
+lifecycle antes de escribir. Los updates conservan esos predicados; si una fila
+bloqueada no puede transicionar como se esperaba, la operación falla con el
+conflicto estable de cambio de estado y toda la transacción revierte. Cero
+Assignments aplicables es un retiro válido.
+
+No se adquieren locks de EquipmentAsset: el Company lock serializa los comandos
+participantes de la misma Company y esta integración sólo termina reservas
+lógicas. Las Assignments múltiples se bloquean por ID ascendente para conservar
+un orden determinista.
+
+### Acceptance Criteria
+
+- Retirar una Requirement `ACTIVE` confirma en un solo commit su auditoría y el
+  release de todas las Assignments aplicables.
+- Una, múltiples o cero Assignments aplicables producen el resultado definido,
+  sin liberaciones parciales.
+- Actor, razón normalizada y timestamp compartido quedan persistidos exactamente
+  según este contrato.
+- Repetir Retire sobre `RETIRED` devuelve HTTP 200 sin writes ni reparación.
+- `DIRECT`, otros tenants/parents y lifecycles históricos no cambian.
+- Create/Replace/Manual Release concurrentes observan el estado confirmado del
+  ganador después de la serialización Company-first; no hay reserva huérfana ni
+  auditoría sobrescrita.
+- Un fallo en cualquier write o readback revierte Requirement y Assignments.
+- Se preservan RBAC, aislamiento tenant, respuesta HTTP directa y precedencia de
+  errores del comando padre.
+- No se crean Inventory Movement, Return, Custody ni efectos físicos.
+
+### Pruebas requeridas
+
+- Unitarias de Requirements: orden, mismo transaction client, timestamp único,
+  replay zero-write, cero/múltiples filas, propagación de errores y ausencia de
+  writes posteriores al fallo.
+- Unitarias de Assignment service/repository: selección y locks deterministas,
+  filtros tenant/Case/Requirement/origin/lifecycle, auditoría y conditional
+  update en cero.
+- Regresiones de controller/RBAC y respuesta pública de Requirement.
+- PostgreSQL E2E determinista para Retire con cero/una/múltiples reservas;
+  Create/Retire, Replace/Retire y Manual Release/Retire en ambos órdenes de
+  commit; rollback persistido; aislamiento tenant; replay; y ausencia de claims
+  o efectos físicos.
+- Gates estáticos y locales: suites focales, typecheck, ESLint, Prettier, build y
+  `git diff --check`.
+
+### Definition of Done
+
+- Implementación limitada a la coordinación interna transaction-bound y sus
+  primitivas repository/service.
+- Acceptance Criteria y pruebas requeridas PASS, incluida evidencia PostgreSQL
+  real aislada para concurrencia y rollback.
+- Sin cambios de schema, migraciones, rutas, DTOs ni contrato HTTP.
+- Documentación y Project Board alineados con la evidencia final.
+- C4-C1 puede cerrarse sin declarar cerrado HC-NEXT-03C4-C ni HC-LOCK-04.
+
+### Evidencia de cierre técnico
+
+- Jest focal: 429/429 PASS.
+- Typecheck, ESLint, Prettier focal, API build y `git diff --check`: PASS.
+- PostgreSQL E2E C4-C1: 13/13 PASS, exit 0; 14 pruebas no seleccionadas por el
+  filtro; ejecución sobre `zaping_spike_test` aislada.
+- El E2E acreditó cero/una/múltiples reservas, auditoría y timestamp compartido,
+  rollback persistido, replay zero-write, exclusiones, aislamiento tenant,
+  HTTP/RBAC y ambos órdenes de commit frente a Create, Replace y Manual Release.
+- No hubo cambios de schema o migraciones, claims nuevos ni efectos físicos.
+- El cleanup acreditado está acotado a fixtures del run: el teardown elimina por
+  sus Company IDs, verifica conteos cero y propaga fallos. No acredita una base
+  globalmente vacía, staging, producción ni readiness productiva.
+
+### Fuera de alcance y checkpoint posterior
+
+Quedan fuera Case Cancel Parent Integration, reparación de datos históricos,
+reactivación o recreación automática de reservas, Manual Release/Replace nuevos,
+frontend, Dispatch, Return, Custody, movimiento o disponibilidad física y cambios
+de inventario. Case Cancel será un incremento separado de HC-NEXT-03C4-C.
+
+HC-NEXT-03C4-C1 aporta evidencia al checkpoint final de HC-LOCK-04, pero no lo
+completa. Ese checkpoint sólo puede acreditarse después de implementar la Parent
+Integration restante y ejecutar las regresiones integradas de ambos comandos.
 
 ---
 
@@ -491,13 +640,14 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE COMPLETE / COMMITTED
-→ REPLACE BACKEND COMPLETE / VALIDATED / READY FOR COMMIT — UNCOMMITTED
-→ PARENT INTEGRATIONS PENDING
+→ MANUAL RELEASE AND REPLACE COMPLETE / MERGED
+→ REQUIREMENT RETIRE C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+→ CASE CANCEL C4-C2 PENDING
+→ HC-LOCK-04 FINAL INTEGRATED CHECKPOINT PENDING
 
 Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 MERGED + MANUAL RELEASE COMMITTED + REPLACE BACKEND VALIDATED
-→ PARENT INTEGRATIONS Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED
+→ REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; C4-C2 Y FRONTEND PENDING
 ```
 
 El contrato aprobado mantiene la secuencia:

@@ -9,6 +9,7 @@ import {
   EquipmentCondition,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
+  HealthcareEquipmentAssignmentReleaseCause,
   HealthcareRequirementLifecycle,
   HealthcareRequirementType,
   IdempotencyScope,
@@ -32,6 +33,7 @@ import {
 import { HealthcareEquipmentAssignmentsController } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller';
 import { HealthcareEquipmentAssignmentsRepository } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
 import { HealthcareEquipmentAssignmentsService } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
+import { HealthcareRequirementsController } from '../src/healthcare/requirements/healthcare-requirements.controller';
 import { HealthcareRequirementsService } from '../src/healthcare/requirements/healthcare-requirements.service';
 import { NoopRequirementOperationalEvidencePolicy } from '../src/healthcare/requirements/requirement-operational-evidence-policy';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -163,6 +165,7 @@ describePostgreSql(
     let httpRepository: HealthcareEquipmentAssignmentsRepository;
     let httpService: HealthcareEquipmentAssignmentsService;
     let httpApp: INestApplication<App> | null = null;
+    let httpAuthenticatedRole: UserRole | 'UNAUTHORIZED' = UserRole.ADMIN;
     let databaseReady = false;
     let fixturesStarted = false;
 
@@ -242,6 +245,7 @@ describePostgreSql(
       );
       requirementService = new HealthcareRequirementsService(
         requirementPrisma,
+        assignmentService,
         new NoopRequirementOperationalEvidencePolicy(),
         policy,
       );
@@ -257,6 +261,7 @@ describePostgreSql(
     }, 25_000);
 
     beforeEach(async () => {
+      httpAuthenticatedRole = UserRole.ADMIN;
       await assertExclusiveTargetAvailability(observerPrisma, clients);
     });
 
@@ -350,7 +355,9 @@ describePostgreSql(
       const authenticatedUser = {
         id: userAId,
         companyId: companyAId,
-        role: UserRole.ADMIN,
+        get role(): UserRole {
+          return httpAuthenticatedRole as UserRole;
+        },
       };
       const testAuthGuard = {
         canActivate(context: ExecutionContext): boolean {
@@ -362,18 +369,24 @@ describePostgreSql(
         },
       };
       const moduleRef = await Test.createTestingModule({
-        controllers: [HealthcareEquipmentAssignmentsController],
+        controllers: [
+          HealthcareEquipmentAssignmentsController,
+          HealthcareRequirementsController,
+        ],
         providers: [
+          RolesGuard,
           {
             provide: HealthcareEquipmentAssignmentsService,
             useValue: httpService,
+          },
+          {
+            provide: HealthcareRequirementsService,
+            useValue: requirementService,
           },
         ],
       })
         .overrideGuard(JwtAuthGuard)
         .useValue(testAuthGuard)
-        .overrideGuard(RolesGuard)
-        .useValue({ canActivate: () => true })
         .compile();
 
       httpApp = moduleRef.createNestApplication();
@@ -522,6 +535,47 @@ describePostgreSql(
       return result.data;
     }
 
+    async function createRequirementSource(
+      scenario: Scenario,
+      equipmentAssetId: string,
+      requirementId = scenario.requirementIds[0],
+      keyPrefix = 'requirement-source',
+    ) {
+      const result = await assignmentService.create(
+        scenario.companyId,
+        scenario.userId,
+        trackKey(keyPrefix),
+        {
+          caseId: scenario.caseId,
+          equipmentAssetId,
+          requirementId,
+        },
+      );
+      if (result.outcome !== 'CREATED') {
+        throw new Error('Expected a Requirement Assignment source.');
+      }
+      registry.assignmentIds.add(result.data.id);
+      return result.data;
+    }
+
+    async function createScenarioAsset(
+      scenario: Scenario,
+      productId = scenario.productIds[0],
+    ): Promise<string> {
+      const equipmentAssetId = randomUUID();
+      registry.equipmentAssetIds.add(equipmentAssetId);
+      await setupPrisma.equipmentAsset.create({
+        data: {
+          id: equipmentAssetId,
+          companyId: scenario.companyId,
+          productId,
+          assetCode: `HC-L2H-${equipmentAssetId}`,
+          condition: EquipmentCondition.GOOD,
+        },
+      });
+      return equipmentAssetId;
+    }
+
     async function runSerializedCrossConsumerRace<TFirst, TSecond>(
       assetId: string,
       companyId: string,
@@ -560,6 +614,566 @@ describePostgreSql(
         throwWithCleanupErrors(error, cleanupErrors, 'cross-consumer race');
       }
     }
+
+    async function runRetireFirstCrossConsumerRace<TFirst, TSecond>(
+      scenario: Scenario,
+      first: () => Promise<TFirst>,
+      second: () => Promise<TSecond>,
+    ): Promise<[PromiseSettledResult<TFirst>, PromiseSettledResult<TSecond>]> {
+      const firstPid = await getBackendPid(requirementPrisma);
+      const secondPid = await getBackendPid(assignmentPrisma);
+      const blocker = await startRequirementRowBlocker(
+        blockerPrisma,
+        scenario.companyId,
+        scenario.caseId,
+        scenario.requirementIds[0],
+      );
+      let firstOperation: Promise<TFirst> | null = null;
+      let secondOperation: Promise<TSecond> | null = null;
+
+      try {
+        firstOperation = first();
+        await waitUntilBlockedBy(observerPrisma, firstPid, blocker.pid);
+        secondOperation = second();
+        await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+        blocker.release();
+
+        const results = await withTimeout(
+          Promise.allSettled([firstOperation, secondOperation]),
+          OPERATION_TIMEOUT_MS,
+          'Retire-first cross-consumer race',
+        );
+        await withTimeout(
+          blocker.done,
+          OPERATION_TIMEOUT_MS,
+          'Requirement blocker completion',
+        );
+        return results;
+      } catch (error) {
+        blocker.release();
+        const cleanupErrors = await settleForCleanup([
+          blocker.done,
+          ...(firstOperation ? [firstOperation] : []),
+          ...(secondOperation ? [secondOperation] : []),
+        ]);
+        throwWithCleanupErrors(
+          error,
+          cleanupErrors,
+          'Retire-first cross-consumer race',
+        );
+      }
+    }
+
+    describe('HC-NEXT-03C4-C1 Requirement Retire integration', () => {
+      it.each([0, 1, 3])(
+        'retires atomically with %i eligible Requirement Assignment(s)',
+        async (assignmentCount) => {
+          const scenario = await createScenario(companyAId, {
+            requestedQty: Math.max(assignmentCount, 1),
+            assetCount: Math.max(assignmentCount, 1),
+          });
+          const assignments: Array<
+            Awaited<ReturnType<typeof createRequirementSource>>
+          > = [];
+          for (let index = 0; index < assignmentCount; index += 1) {
+            assignments.push(
+              await createRequirementSource(
+                scenario,
+                scenario.equipmentAssetIds[index],
+                scenario.requirementIds[0],
+                `retire-${assignmentCount}-source`,
+              ),
+            );
+          }
+          const [claimsBefore, movementsBefore] = await Promise.all([
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+            setupPrisma.inventoryMovement.count({
+              where: {
+                companyId: scenario.companyId,
+                productId: { in: scenario.productIds },
+              },
+            }),
+          ]);
+
+          const retired = await requirementService.retire(
+            scenario.companyId,
+            scenario.userId,
+            scenario.requirementIds[0],
+            { retirementReason: '  Cambio   clínico E2E  ' },
+          );
+          const [persistedRequirement, persistedAssignments] =
+            await Promise.all([
+              setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+                where: { id: scenario.requirementIds[0] },
+                select: {
+                  lifecycle: true,
+                  retiredAt: true,
+                  retiredById: true,
+                  retirementReason: true,
+                },
+              }),
+              setupPrisma.healthcareEquipmentAssignment.findMany({
+                where: { id: { in: assignments.map(({ id }) => id) } },
+                orderBy: { id: 'asc' },
+                select: {
+                  lifecycle: true,
+                  releasedAt: true,
+                  releasedById: true,
+                  releaseCause: true,
+                  releaseReason: true,
+                },
+              }),
+            ]);
+
+          expect(retired.lifecycle).toBe(
+            HealthcareRequirementLifecycle.RETIRED,
+          );
+          expect(persistedRequirement.retiredAt).toBeInstanceOf(Date);
+          expect(persistedRequirement).toMatchObject({
+            lifecycle: HealthcareRequirementLifecycle.RETIRED,
+            retiredById: scenario.userId,
+            retirementReason: 'Cambio clínico E2E',
+          });
+          expect(persistedAssignments).toHaveLength(assignmentCount);
+          for (const assignment of persistedAssignments) {
+            expect(assignment).toEqual({
+              lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+              releasedAt: persistedRequirement.retiredAt,
+              releasedById: scenario.userId,
+              releaseCause:
+                HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+              releaseReason: 'Cambio clínico E2E',
+            });
+          }
+          await expect(
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+          ).resolves.toBe(claimsBefore);
+          await expect(
+            setupPrisma.inventoryMovement.count({
+              where: {
+                companyId: scenario.companyId,
+                productId: { in: scenario.productIds },
+              },
+            }),
+          ).resolves.toBe(movementsBefore);
+        },
+      );
+
+      it('rolls back the Requirement and every derived release after a later release write fails', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 2,
+          assetCount: 2,
+        });
+        const sources: Array<
+          Awaited<ReturnType<typeof createRequirementSource>>
+        > = [];
+        for (const equipmentAssetId of scenario.equipmentAssetIds) {
+          sources.push(
+            await createRequirementSource(
+              scenario,
+              equipmentAssetId,
+              scenario.requirementIds[0],
+              'retire-rollback-source',
+            ),
+          );
+        }
+        const claimsBefore = await setupPrisma.idempotencyRecord.count({
+          where: { companyId: scenario.companyId },
+        });
+        type ReleaseAssignment =
+          HealthcareEquipmentAssignmentsRepository['releaseAssignment'];
+        const originalRelease = assignmentRepository.releaseAssignment.bind(
+          assignmentRepository,
+        ) as ReleaseAssignment;
+        let releaseCalls = 0;
+        const releaseWrite = jest
+          .spyOn(assignmentRepository, 'releaseAssignment')
+          .mockImplementation((...args: Parameters<ReleaseAssignment>) => {
+            releaseCalls += 1;
+            if (releaseCalls === 2) {
+              throw new Error('forced C4-C1 derived release rollback');
+            }
+            return originalRelease(...args);
+          });
+
+        try {
+          await expect(
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Rollback C4-C1' },
+            ),
+          ).rejects.toThrow('forced C4-C1 derived release rollback');
+        } finally {
+          releaseWrite.mockRestore();
+        }
+
+        expect(releaseCalls).toBe(2);
+        await expect(
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: scenario.requirementIds[0] },
+            select: {
+              lifecycle: true,
+              retiredAt: true,
+              retiredById: true,
+              retirementReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+          retiredAt: null,
+          retiredById: null,
+          retirementReason: null,
+        });
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: { id: { in: sources.map(({ id }) => id) } },
+            orderBy: { id: 'asc' },
+            select: {
+              lifecycle: true,
+              releasedAt: true,
+              releasedById: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+        ).resolves.toEqual([
+          {
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releasedAt: null,
+            releasedById: null,
+            releaseCause: null,
+            releaseReason: null,
+          },
+          {
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releasedAt: null,
+            releasedById: null,
+            releaseCause: null,
+            releaseReason: null,
+          },
+        ]);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: { companyId: scenario.companyId },
+          }),
+        ).resolves.toBe(claimsBefore);
+      });
+
+      it('preserves DIRECT, other parents, tenants and historical lifecycles', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 4,
+          assetCount: 6,
+          requirementCount: 2,
+        });
+        const otherCompanyScenario = await createScenario(companyBId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const eligible = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+          scenario.requirementIds[0],
+          'retire-exclusion-eligible',
+        );
+        const direct = await createDirectSource({
+          ...scenario,
+          equipmentAssetIds: [scenario.equipmentAssetIds[1]],
+        });
+        const manuallyReleased = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[2],
+          scenario.requirementIds[0],
+          'retire-exclusion-released',
+        );
+        await assignmentService.release(
+          scenario.companyId,
+          scenario.userId,
+          manuallyReleased.id,
+          { reason: 'Liberación manual previa' },
+        );
+        const replacementSource = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[3],
+          scenario.requirementIds[0],
+          'retire-exclusion-replaced',
+        );
+        const replacement = await assignmentService.replace(
+          scenario.companyId,
+          scenario.userId,
+          replacementSource.id,
+          trackKey('retire-exclusion-replacement'),
+          {
+            equipmentAssetId: scenario.equipmentAssetIds[4],
+            replacementReason: 'Reemplazo previo al retiro',
+          },
+        );
+        if (replacement.outcome !== 'REPLACED') {
+          throw new Error('Expected a replacement before Requirement Retire.');
+        }
+        const successor = replacement.data.replacementAssignment;
+        registry.assignmentIds.add(successor.id);
+        const otherRequirementAssetId = await createScenarioAsset(
+          scenario,
+          scenario.productIds[1],
+        );
+        const otherRequirement = await createRequirementSource(
+          scenario,
+          otherRequirementAssetId,
+          scenario.requirementIds[1],
+          'retire-exclusion-other-requirement',
+        );
+        const related = await createRelatedCase(scenario);
+        const otherCaseResult = await assignmentService.create(
+          scenario.companyId,
+          scenario.userId,
+          trackKey('retire-exclusion-other-case'),
+          {
+            caseId: related.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[5],
+            requirementId: related.requirementId,
+          },
+        );
+        if (otherCaseResult.outcome !== 'CREATED') {
+          throw new Error('Expected an Assignment for the related Case.');
+        }
+        const otherCase = otherCaseResult.data;
+        registry.assignmentIds.add(otherCase.id);
+        const otherTenant = await createRequirementSource(
+          otherCompanyScenario,
+          otherCompanyScenario.equipmentAssetIds[0],
+          otherCompanyScenario.requirementIds[0],
+          'retire-exclusion-other-tenant',
+        );
+        const manualBefore =
+          await setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: manuallyReleased.id },
+          });
+
+        await requirementService.retire(
+          scenario.companyId,
+          scenario.userId,
+          scenario.requirementIds[0],
+          { retirementReason: 'Retiro con exclusiones' },
+        );
+
+        const rows = await setupPrisma.healthcareEquipmentAssignment.findMany({
+          where: {
+            id: {
+              in: [
+                eligible.id,
+                direct.id,
+                manuallyReleased.id,
+                replacementSource.id,
+                successor.id,
+                otherRequirement.id,
+                otherCase.id,
+                otherTenant.id,
+              ],
+            },
+          },
+          select: {
+            id: true,
+            lifecycle: true,
+            releaseCause: true,
+            releaseReason: true,
+            releasedAt: true,
+            releasedById: true,
+          },
+        });
+        const byId = new Map(rows.map((row) => [row.id, row]));
+
+        for (const id of [eligible.id, successor.id]) {
+          expect(byId.get(id)).toMatchObject({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+            releaseCause:
+              HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+            releaseReason: 'Retiro con exclusiones',
+            releasedById: scenario.userId,
+          });
+        }
+        expect(byId.get(manuallyReleased.id)).toEqual({
+          id: manuallyReleased.id,
+          lifecycle: manualBefore.lifecycle,
+          releaseCause: manualBefore.releaseCause,
+          releaseReason: manualBefore.releaseReason,
+          releasedAt: manualBefore.releasedAt,
+          releasedById: manualBefore.releasedById,
+        });
+        expect(byId.get(replacementSource.id)).toMatchObject({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+          releaseCause: null,
+        });
+        for (const id of [
+          direct.id,
+          otherRequirement.id,
+          otherCase.id,
+          otherTenant.id,
+        ]) {
+          expect(byId.get(id)).toMatchObject({
+            lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+            releaseCause: null,
+            releasedAt: null,
+          });
+        }
+      });
+
+      it('replays a RETIRED Requirement with zero writes and does not repair a lagging Assignment', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 2,
+          assetCount: 2,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const first = await requirementService.retire(
+          scenario.companyId,
+          scenario.userId,
+          scenario.requirementIds[0],
+          { retirementReason: 'Razón original' },
+        );
+        const laggingId = randomUUID();
+        registry.assignmentIds.add(laggingId);
+        await setupPrisma.healthcareEquipmentAssignment.create({
+          data: {
+            id: laggingId,
+            companyId: scenario.companyId,
+            caseId: scenario.caseId,
+            equipmentAssetId: scenario.equipmentAssetIds[1],
+            requirementId: scenario.requirementIds[0],
+            origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+            createdById: scenario.userId,
+          },
+        });
+        const [requirementBefore, assignmentsBefore, claimsBefore] =
+          await Promise.all([
+            setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+              where: { id: scenario.requirementIds[0] },
+            }),
+            setupPrisma.healthcareEquipmentAssignment.findMany({
+              where: { id: { in: [source.id, laggingId] } },
+              orderBy: { id: 'asc' },
+            }),
+            setupPrisma.idempotencyRecord.count({
+              where: { companyId: scenario.companyId },
+            }),
+          ]);
+
+        const replay = await requirementService.retire(
+          scenario.companyId,
+          scenario.userId,
+          scenario.requirementIds[0],
+          { retirementReason: 'No sobrescribir ni reparar' },
+        );
+
+        expect(replay).toEqual(first);
+        await expect(
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: scenario.requirementIds[0] },
+          }),
+        ).resolves.toEqual(requirementBefore);
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: { id: { in: [source.id, laggingId] } },
+            orderBy: { id: 'asc' },
+          }),
+        ).resolves.toEqual(assignmentsBefore);
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: { companyId: scenario.companyId },
+          }),
+        ).resolves.toBe(claimsBefore);
+      });
+
+      it('preserves the direct HTTP response, tenant boundary and Requirement RBAC', async () => {
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        const source = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+          scenario.requirementIds[0],
+          'retire-http-source',
+        );
+        let firstBody: Record<string, unknown> | null = null;
+
+        for (const role of [
+          UserRole.ADMIN,
+          UserRole.MANAGER,
+          UserRole.SALES,
+          UserRole.WAREHOUSE,
+        ]) {
+          httpAuthenticatedRole = role;
+          const response = await supertest(requireHttpApp().getHttpServer())
+            .post(
+              `/healthcare/requirements/${scenario.requirementIds[0]}/retire`,
+            )
+            .send({ retirementReason: '  Retiro   HTTP  ' })
+            .expect(HttpStatus.OK);
+          expect(response.body).toMatchObject({
+            id: scenario.requirementIds[0],
+            lifecycle: HealthcareRequirementLifecycle.RETIRED,
+            retiredById: scenario.userId,
+            retirementReason: 'Retiro HTTP',
+          });
+          expect(response.body).not.toHaveProperty('data');
+          expect(response.body).not.toHaveProperty('outcome');
+          firstBody ??= response.body as Record<string, unknown>;
+          expect(response.body).toEqual(firstBody);
+        }
+        await expect(
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        });
+
+        const deniedScenario = await createScenario(companyAId);
+        httpAuthenticatedRole = 'UNAUTHORIZED';
+        await supertest(requireHttpApp().getHttpServer())
+          .post(
+            `/healthcare/requirements/${deniedScenario.requirementIds[0]}/retire`,
+          )
+          .send({ retirementReason: 'No autorizado' })
+          .expect(HttpStatus.FORBIDDEN);
+        await expect(
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: deniedScenario.requirementIds[0] },
+            select: { lifecycle: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+        });
+
+        const otherTenantScenario = await createScenario(companyBId);
+        httpAuthenticatedRole = UserRole.ADMIN;
+        await supertest(requireHttpApp().getHttpServer())
+          .post(
+            `/healthcare/requirements/${otherTenantScenario.requirementIds[0]}/retire`,
+          )
+          .send({ retirementReason: 'Cruce de tenant' })
+          .expect(HttpStatus.NOT_FOUND);
+        await expect(
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: otherTenantScenario.requirementIds[0] },
+            select: { lifecycle: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+        });
+      });
+    });
 
     it('serializes Create before Requirement Update in the same Company', async () => {
       const scenario = await createScenario(companyAId, {
@@ -600,7 +1214,7 @@ describePostgreSql(
       ).resolves.toBe(1);
     });
 
-    it('serializes Create before Requirement Retire without derived release', async () => {
+    it('serializes Create before Requirement Retire and releases the committed reservation', async () => {
       const scenario = await createScenario(companyAId, {
         requestedQty: 1,
         assetCount: 1,
@@ -632,15 +1246,362 @@ describePostgreSql(
       expect(retired.lifecycle).toBe(HealthcareRequirementLifecycle.RETIRED);
       if (created.outcome === 'CREATED') {
         registry.assignmentIds.add(created.data.id);
-        await expect(
-          setupPrisma.healthcareEquipmentAssignment.findUnique({
+        const [persistedAssignment, persistedRequirement] = await Promise.all([
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
             where: { id: created.data.id },
-            select: { lifecycle: true },
+            select: {
+              lifecycle: true,
+              releasedAt: true,
+              releasedById: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
           }),
-        ).resolves.toEqual({
-          lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: scenario.requirementIds[0] },
+            select: { retiredAt: true },
+          }),
+        ]);
+        expect(persistedAssignment).toEqual({
+          lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+          releasedAt: persistedRequirement.retiredAt,
+          releasedById: scenario.userId,
+          releaseCause:
+            HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+          releaseReason: 'HC-LOCK-02 2H controlled retirement',
         });
+        expect(persistedRequirement.retiredAt).toBeInstanceOf(Date);
       }
+    });
+
+    it('serializes Requirement Retire before Create and leaves no orphan reservation or claim', async () => {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 1,
+      });
+      const key = trackKey('retire-before-create');
+      const [retireResult, createResult] =
+        await runRetireFirstCrossConsumerRace(
+          scenario,
+          () =>
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Retire wins before Create' },
+            ),
+          () =>
+            assignmentService.create(scenario.companyId, scenario.userId, key, {
+              caseId: scenario.caseId,
+              equipmentAssetId: scenario.equipmentAssetIds[0],
+              requirementId: scenario.requirementIds[0],
+            }),
+        );
+
+      expect(retireResult).toMatchObject({
+        status: 'fulfilled',
+        value: { lifecycle: HealthcareRequirementLifecycle.RETIRED },
+      });
+      expect(createResult).toMatchObject({
+        status: 'rejected',
+        reason: { response: { code: 'REQUIREMENT_RETIRED' } },
+      });
+      await expect(
+        setupPrisma.healthcareEquipmentAssignment.count({
+          where: {
+            companyId: scenario.companyId,
+            requirementId: scenario.requirementIds[0],
+          },
+        }),
+      ).resolves.toBe(0);
+      await expect(
+        setupPrisma.idempotencyRecord.count({
+          where: {
+            companyId: scenario.companyId,
+            scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE,
+            key,
+          },
+        }),
+      ).resolves.toBe(0);
+    });
+
+    it('serializes Replace before Requirement Retire and releases only the successor', async () => {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 2,
+      });
+      const source = await createRequirementSource(
+        scenario,
+        scenario.equipmentAssetIds[0],
+        scenario.requirementIds[0],
+        'replace-before-retire-source',
+      );
+      const [replacement, retired] = await runSerializedCrossConsumerRace(
+        scenario.equipmentAssetIds[1],
+        scenario.companyId,
+        () =>
+          assignmentService.replace(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            trackKey('replace-before-retire'),
+            {
+              equipmentAssetId: scenario.equipmentAssetIds[1],
+              replacementReason: 'Replace wins before Retire',
+            },
+          ),
+        () =>
+          requirementService.retire(
+            scenario.companyId,
+            scenario.userId,
+            scenario.requirementIds[0],
+            { retirementReason: 'Retire after Replace' },
+          ),
+      );
+
+      expect(replacement.outcome).toBe('REPLACED');
+      expect(retired.lifecycle).toBe(HealthcareRequirementLifecycle.RETIRED);
+      if (replacement.outcome !== 'REPLACED') {
+        throw new Error('Expected Replace to win before Requirement Retire.');
+      }
+      const successorId = replacement.data.replacementAssignment.id;
+      registry.assignmentIds.add(successorId);
+      const [persistedSource, persistedSuccessor, persistedRequirement] =
+        await Promise.all([
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: source.id },
+            select: { lifecycle: true, releaseCause: true },
+          }),
+          setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+            where: { id: successorId },
+            select: {
+              lifecycle: true,
+              releasedAt: true,
+              releasedById: true,
+              releaseCause: true,
+              releaseReason: true,
+            },
+          }),
+          setupPrisma.healthcareCaseRequirement.findUniqueOrThrow({
+            where: { id: scenario.requirementIds[0] },
+            select: { retiredAt: true },
+          }),
+        ]);
+      expect(persistedSource).toEqual({
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.REPLACED,
+        releaseCause: null,
+      });
+      expect(persistedSuccessor).toEqual({
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt: persistedRequirement.retiredAt,
+        releasedById: scenario.userId,
+        releaseCause:
+          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        releaseReason: 'Retire after Replace',
+      });
+    });
+
+    it('serializes Requirement Retire before Replace without a partial successor or claim', async () => {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 2,
+      });
+      const source = await createRequirementSource(
+        scenario,
+        scenario.equipmentAssetIds[0],
+        scenario.requirementIds[0],
+        'retire-before-replace-source',
+      );
+      const key = trackKey('retire-before-replace');
+      const [retireResult, replaceResult] =
+        await runRetireFirstCrossConsumerRace(
+          scenario,
+          () =>
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Retire wins before Replace' },
+            ),
+          () =>
+            assignmentService.replace(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              key,
+              {
+                equipmentAssetId: scenario.equipmentAssetIds[1],
+                replacementReason: 'Must lose after Retire',
+              },
+            ),
+        );
+
+      expect(retireResult).toMatchObject({
+        status: 'fulfilled',
+        value: { lifecycle: HealthcareRequirementLifecycle.RETIRED },
+      });
+      expect(replaceResult).toMatchObject({
+        status: 'rejected',
+        reason: { response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' } },
+      });
+      await expect(
+        setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+          where: { id: source.id },
+          select: { lifecycle: true, releaseCause: true },
+        }),
+      ).resolves.toEqual({
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releaseCause:
+          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+      });
+      await expect(
+        setupPrisma.healthcareEquipmentAssignment.count({
+          where: {
+            companyId: scenario.companyId,
+            replacesAssignmentId: source.id,
+          },
+        }),
+      ).resolves.toBe(0);
+      await expect(
+        setupPrisma.idempotencyRecord.count({
+          where: {
+            companyId: scenario.companyId,
+            scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE,
+            key,
+          },
+        }),
+      ).resolves.toBe(0);
+    });
+
+    it('serializes Manual Release before Requirement Retire and preserves the manual audit', async () => {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 1,
+      });
+      const source = await createRequirementSource(
+        scenario,
+        scenario.equipmentAssetIds[0],
+        scenario.requirementIds[0],
+        'release-before-retire-source',
+      );
+      const key = trackKey('release-before-retire');
+      const [released, retired] = await runSerializedCrossConsumerRace(
+        scenario.equipmentAssetIds[0],
+        scenario.companyId,
+        () =>
+          assignmentService.release(
+            scenario.companyId,
+            scenario.userId,
+            source.id,
+            { reason: 'Manual gana primero' },
+            key,
+          ),
+        () =>
+          requirementService.retire(
+            scenario.companyId,
+            scenario.userId,
+            scenario.requirementIds[0],
+            { retirementReason: 'Retiro posterior' },
+          ),
+      );
+
+      expect(released.status).toBe(
+        HealthcareEquipmentAssignmentLifecycle.RELEASED,
+      );
+      expect(retired.lifecycle).toBe(HealthcareRequirementLifecycle.RETIRED);
+      await expect(
+        setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+          where: { id: source.id },
+          select: {
+            lifecycle: true,
+            releaseCause: true,
+            releaseReason: true,
+            releasedById: true,
+          },
+        }),
+      ).resolves.toEqual({
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
+        releaseReason: 'Manual gana primero',
+        releasedById: scenario.userId,
+      });
+      await expect(
+        setupPrisma.idempotencyRecord.count({
+          where: {
+            companyId: scenario.companyId,
+            scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+            key,
+          },
+        }),
+      ).resolves.toBe(1);
+    });
+
+    it('serializes Requirement Retire before Manual Release without a release claim', async () => {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 1,
+      });
+      const source = await createRequirementSource(
+        scenario,
+        scenario.equipmentAssetIds[0],
+        scenario.requirementIds[0],
+        'retire-before-release-source',
+      );
+      const key = trackKey('retire-before-release');
+      const [retireResult, releaseResult] =
+        await runRetireFirstCrossConsumerRace(
+          scenario,
+          () =>
+            requirementService.retire(
+              scenario.companyId,
+              scenario.userId,
+              scenario.requirementIds[0],
+              { retirementReason: 'Retire wins before Manual Release' },
+            ),
+          () =>
+            assignmentService.release(
+              scenario.companyId,
+              scenario.userId,
+              source.id,
+              { reason: 'No debe sobrescribir' },
+              key,
+            ),
+        );
+
+      expect(retireResult).toMatchObject({
+        status: 'fulfilled',
+        value: { lifecycle: HealthcareRequirementLifecycle.RETIRED },
+      });
+      expect(releaseResult).toMatchObject({
+        status: 'rejected',
+        reason: { response: { code: 'EQUIPMENT_ASSIGNMENT_NOT_RESERVED' } },
+      });
+      await expect(
+        setupPrisma.healthcareEquipmentAssignment.findUniqueOrThrow({
+          where: { id: source.id },
+          select: {
+            lifecycle: true,
+            releaseCause: true,
+            releaseReason: true,
+            releasedById: true,
+          },
+        }),
+      ).resolves.toEqual({
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releaseCause:
+          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        releaseReason: 'Retire wins before Manual Release',
+        releasedById: scenario.userId,
+      });
+      await expect(
+        setupPrisma.idempotencyRecord.count({
+          where: {
+            companyId: scenario.companyId,
+            scope: IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE,
+            key,
+          },
+        }),
+      ).resolves.toBe(0);
     });
 
     it('serializes Replace before Requirement Reactivate', async () => {
@@ -1795,6 +2756,31 @@ async function startAssetRowBlocker(
   };
 }
 
+async function startRequirementRowBlocker(
+  client: ExplicitPrismaService,
+  companyId: string,
+  caseId: string,
+  requirementId: string,
+): Promise<ControlledTransaction> {
+  const ready = deferred<number>();
+  const release = deferred<void>();
+  const done = client.$transaction(
+    async (transaction) => {
+      await lockRequirement(transaction, companyId, caseId, requirementId);
+      ready.resolve(await getBackendPid(transaction));
+      await release.promise;
+    },
+    { maxWait: 3_000, timeout: 20_000 },
+  );
+  void done.catch((error: unknown) => ready.reject(error));
+
+  return {
+    pid: await withTimeout(ready.promise, 5_000, 'Requirement blocker setup'),
+    release: () => release.resolve(undefined),
+    done,
+  };
+}
+
 async function startCompanyLockHolder(
   client: ExplicitPrismaService,
   companyId: string,
@@ -1834,6 +2820,25 @@ async function lockAsset(
   `);
   if (rows.length !== 1) {
     throw new Error('Controlled EquipmentAsset row was not found.');
+  }
+}
+
+async function lockRequirement(
+  transaction: Prisma.TransactionClient,
+  companyId: string,
+  caseId: string,
+  requirementId: string,
+): Promise<void> {
+  const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT "id"
+    FROM "HealthcareCaseRequirement"
+    WHERE "id" = ${requirementId}
+      AND "companyId" = ${companyId}
+      AND "caseId" = ${caseId}
+    FOR UPDATE
+  `);
+  if (rows.length !== 1) {
+    throw new Error('Controlled HealthcareCaseRequirement row was not found.');
   }
 }
 

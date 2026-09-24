@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C3 COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C3 COMPLETE / MERGED — HC-NEXT-03C4 IN PROGRESS — MANUAL RELEASE AND REPLACE MERGED — HC-NEXT-03C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION — HC-NEXT-03C4-C2 PENDING — HC-LOCK-04 PREREQUISITE ACCREDITED — FINAL CHECKPOINT PENDING
 Última actualización: 2026-09-23
 Responsable: Zaping Team
 
@@ -149,9 +149,10 @@ HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
         → IN PROGRESS
-        → Manual Release HC-LOCK-03B VALIDATED ON BRANCH / PENDING INTEGRATION
+        → Manual Release HC-LOCK-03B COMPLETE / MERGED IN main@8a3b189
         → Replace backend COMPLETE / MERGED
-        → Parent integrations BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+        → Requirement Retire C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+        → Case Cancel C4-C2 PENDING
 
 HC-LOCK-01 — Company Lock Protocol ADR
         → ARCHITECTURE ACCEPTED
@@ -161,12 +162,13 @@ HC-LOCK-01 — Company Lock Protocol ADR
 NEXT
 
 HC-LOCK-02 / HC-LOCK-03B / HC-LOCK-04
-        → PROTOCOL CONSOLIDATED / MANUAL RELEASE VALIDATED
+        → PROTOCOL CONSOLIDATED / MANUAL RELEASE MERGED
         → HC-LOCK-04 PREREQUISITE CHECKPOINT ACCREDITED
-        → HC-LOCK-03B INTEGRATION AND FINAL PARENT-INTEGRATION CHECKPOINT PENDING
+        → FINAL PARENT-INTEGRATION CHECKPOINT PENDING
 
 HC-NEXT-03C4-C parent integrations
-        → SEPARATE FUNCTIONAL DELIVERABLE — BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+        → C4-C1 REQUIREMENT RETIRE TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+        → C4-C2 CASE CANCEL PENDING
 
 DEFERRED
 
@@ -2263,7 +2265,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 
 CURRENT ROADMAP ITEM
 
-→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE HC-LOCK-03B VALIDATED / PENDING INTEGRATION — REPLACE BACKEND MERGED — HC-LOCK-04 PREREQUISITE ACCREDITED — PARENT INTEGRATIONS BLOCKED UNTIL HC-LOCK-03B IS IN MAIN
+→ HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — IN PROGRESS — MANUAL RELEASE AND REPLACE MERGED — HC-NEXT-03C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION — C4-C2 CASE CANCEL AND HC-LOCK-04 FINAL CHECKPOINT PENDING
 
 DEFERRED
 
@@ -2485,13 +2487,14 @@ HC-NEXT-03C3 Availability / Conflict Review / Concurrency
 
 HC-NEXT-03C4 Replace / Release / Parent Integrations
 → IN PROGRESS
-→ MANUAL RELEASE HC-LOCK-03B VALIDATED ON BRANCH / PENDING INTEGRATION
+→ MANUAL RELEASE HC-LOCK-03B COMPLETE / MERGED — PR #31
 → REPLACE BACKEND COMPLETE / MERGED — PR #27
-→ PARENT INTEGRATIONS BLOCKED — HC-NEXT-03C4-C WAITS FOR HC-LOCK-03B IN MAIN
+→ REQUIREMENT RETIRE C4-C1 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
+→ CASE CANCEL C4-C2 PENDING
 
 Healthcare Equipment Assignment implementation
-→ PARTIALLY IMPLEMENTED — C1–C3 AND REPLACE MERGED; MANUAL RELEASE VALIDATED / PENDING INTEGRATION
-→ PARENT INTEGRATIONS Y FRONTEND PENDING
+→ PARTIALLY IMPLEMENTED — C1–C3 + MANUAL RELEASE + REPLACE MERGED
+→ REQUIREMENT RETIRE C4-C1 VALIDATED ON BRANCH; C4-C2 Y FRONTEND PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2506,19 +2509,18 @@ Inventory y Billing / CFDI, sin reabrir por ello su aceptación local V1.
 
 ### HC-NEXT-03C4-C — Equipment Assignment Parent Integrations
 
-Estado: BLOCKED — WAITING FOR HC-LOCK-03B INTEGRATION IN MAIN
+Estado: IN PROGRESS — C4-C1 TECHNICALLY COMPLETE / PENDING INTEGRATION — C4-C2 PENDING
 Prioridad: P1
 Milestone: M-HC1 — Healthcare Operations Foundation
 Sprint candidato: HC-01
 Estimación: 8 SP — PROVISIONAL
 Commitment: NO ESTABLECIDO
 
-Baseline de partida: main con HC-LOCK-02 @ e002453
+Baseline de partida: main @ 8a3b189
 PR #27: MERGED
-Manual Release HC-LOCK-03B: VALIDADO EN `feat/hc-lock-03-manual-release` @ 1003806;
-integración en `main` pendiente
+PR #31 / Manual Release HC-LOCK-03B: MERGED
 Replace: INTEGRADO EN MAIN
-HC-NEXT-03C4: IN PROGRESS — Parent Integrations pendientes
+HC-NEXT-03C4: IN PROGRESS — C4-C1 validado en rama; C4-C2 pendiente
 
 Objetivo:
 Liberar de forma atómica las reservas lógicas aplicables cuando se
@@ -2538,9 +2540,8 @@ Alcance:
 Dependencias de Definition of Ready:
 - [ADR-HC-LOCK-001](../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md)
   aprobado como arquitectura; no como implementación o readiness productiva.
-- HC-LOCK-02 consolidó el protocolo V1 y sus timeouts en `main` @ e002453.
-- HC-LOCK-03B cerró y validó el contrato de Manual Release; falta integrarlo en
-  `main` antes de iniciar este ticket.
+- HC-LOCK-02 consolidó el protocolo V1 y sus timeouts.
+- HC-LOCK-03B está integrado en `main` @ 8a3b189.
 - El prerequisite protocol QA de HC-LOCK-04 está acreditado; su validación
   integrada final ocurre después de implementar los releases derivados.
 
@@ -2551,9 +2552,86 @@ API tests, lint, typecheck, build y git diff --check.
 
 Finding relacionado de cierre C4:
 La discrepancia entre el contrato documentado de Release manual repetido y el
-comportamiento del servicio quedó resuelta y validada en HC-LOCK-03B. No declarar
-C4 completado hasta integrar HC-LOCK-03B y completar Parent Integrations con el
-checkpoint final de HC-LOCK-04.
+comportamiento del servicio quedó resuelta, validada e integrada en HC-LOCK-03B.
+No declarar C4 completado hasta completar Parent Integrations y el checkpoint
+final de HC-LOCK-04.
+
+### HC-NEXT-03C4-C1 — Requirement Retire Parent Integration
+
+Estado: TECHNICALLY COMPLETE / VALIDATED ON BRANCH — PENDING INTEGRATION
+Prioridad: P1
+Milestone: M-HC1 — Healthcare Operations Foundation
+Baseline: main @ 8a3b189
+
+Objetivo:
+Retirar una Requirement y liberar en la misma transacción todas sus Equipment
+Assignments `RESERVED` de origen `REQUIREMENT`, preservando historial y el
+contrato público existente.
+
+Scope:
+- Reutilizar el `Prisma.TransactionClient` del comando padre.
+- Orden obligatorio: `Company → Case → Requirement → Assignments por ID ASC`.
+- Revalidar tenant, Case, Requirement, origin y lifecycle bajo lock.
+- Persistir `REQUIREMENT_WITHDRAWN`, actor del comando, `retirementReason`
+  normalizada como `releaseReason` y un timestamp compartido con `retiredAt`.
+- Mantener el replay de Requirement `RETIRED` como HTTP 200 zero-write, sin
+  reparación de Assignments históricas.
+- Rollback conjunto ante cualquier fallo; cero reservas aplicables es válido.
+- No crear idempotency claims de Assignment ni efectos físicos.
+
+Dependencias / DoR:
+- HC-LOCK-02 y HC-LOCK-03 integrados en `main`.
+- HC-LOCK-04 prerequisite checkpoint acreditado.
+- Enum, relaciones e índice tenant-scoped existentes; no requiere migración.
+- Contrato funcional y transaccional aprobado en
+  `EQUIPMENT_ASSIGNMENT.md`, sección 13.2.
+- DoR: READY.
+
+Acceptance Criteria:
+- Una, múltiples o cero reservas aplicables se resuelven atómicamente.
+- `DIRECT`, otros parents/tenants y filas históricas permanecen intactas.
+- Replay no escribe ni sobrescribe auditoría.
+- Create/Replace/Manual Release concurrentes observan el estado confirmado del
+  ganador sin filas parciales.
+- Fallos de write/readback revierten Requirement y releases.
+- RBAC, tenant isolation, errores y respuesta HTTP del padre no cambian.
+- No hay Inventory Movement, Return ni Custody.
+
+Pruebas requeridas:
+- Unitarias focales de Requirements y Assignment service/repository.
+- Regresiones controller/RBAC y respuesta pública.
+- PostgreSQL E2E determinista de transición, replay, aislamiento, rollback y
+  carreras Create/Replace/Manual Release contra Retire en ambos órdenes.
+- Aserciones de ausencia de claims y efectos físicos.
+- Typecheck, lint, Prettier, build y `git diff --check`.
+
+Evidencia de cierre técnico:
+- Jest focal: 429/429 PASS.
+- Typecheck, ESLint, Prettier focal, API build y `git diff --check`: PASS.
+- PostgreSQL E2E C4-C1: 13/13 PASS, exit 0; 14 pruebas skipped por el filtro;
+  ejecución en la base aislada `zaping_spike_test`.
+- El teardown elimina sólo fixtures de los Company IDs del run, refresca el
+  registro de Assignments/claims, verifica conteos cero y propaga fallos de
+  cleanup o desconexión. El exit 0 acredita ese alcance, no una base globalmente
+  vacía ni readiness productiva.
+- Revisión final: sin schema, migraciones, rutas, DTOs, claims derivados ni
+  efectos físicos nuevos.
+
+Definition of Done:
+- Implementación transaction-bound sin nested transaction ni llamada HTTP
+  interna.
+- AC y gates locales/PostgreSQL PASS con evidencia verificable.
+- Sin schema, migraciones, rutas, DTOs ni contratos nuevos.
+- Documentación y board alineados.
+
+Fuera de alcance:
+Case Cancel Parent Integration C4-C2, reparación histórica, frontend, Dispatch,
+Return, Custody, Inventory Movement y cambios de disponibilidad física.
+
+Dependencia de cierre:
+C4-C1 alimenta, pero no completa, el checkpoint final de HC-LOCK-04. Ese
+checkpoint permanece pendiente hasta implementar la Parent Integration de Case
+Cancel C4-C2, integrar ambos incrementos y ejecutar las regresiones integradas.
 
 ### HC-LOCK-01 — Healthcare Company Lock Architecture Decision
 
@@ -2590,7 +2668,7 @@ Dependencias:
 
 ### HC-LOCK-03 — Manual Release Refinement and Implementation
 
-Estado: HC-LOCK-03B VALIDATED ON BRANCH — PENDING INTEGRATION
+Estado: HC-LOCK-03B COMPLETE / MERGED — main @ 8a3b189
 
 Objetivo:
 Refinar e implementar Manual Release con orden
@@ -2628,9 +2706,9 @@ La ejecución se separa en dos checkpoints dentro del mismo ticket:
 1. **Prerequisite protocol QA — ACCREDITED:** validó HC-LOCK-02 y los escenarios
    aplicables de HC-LOCK-03B con 14/14 E2E PostgreSQL/HTTP PASS, exit 0, en la
    base aislada indicada arriba.
-2. **Final integrated QA:** después de implementar HC-NEXT-03C4-C, valida Case
-   Cancel y Requirement Retire con sus releases dentro de la frontera
-   transaccional final y ejecuta las regresiones integradas correspondientes.
+2. **Final integrated QA:** después de integrar C4-C1 e implementar/integrar
+   C4-C2, valida Case Cancel y Requirement Retire con sus releases dentro de la
+   frontera transaccional final y ejecuta las regresiones correspondientes.
 
 Dependencias:
 - HC-LOCK-02 para el protocolo consolidado.
@@ -2653,5 +2731,7 @@ HC-NEXT-03C4-C alimenta el checkpoint final de HC-LOCK-04. Parent Integrations n
 forma parte del closeout documental HC-LOCK-01. Dispatch, Return, Custody e
 Inventory Movement permanecen fuera de este workstream.
 
-Aunque el prerequisite de HC-LOCK-04 está acreditado, HC-NEXT-03C4-C permanece
-bloqueado hasta integrar HC-LOCK-03B en `main`.
+HC-NEXT-03C4-C1 está técnicamente completo y validado en rama, pendiente de
+integración. C4-C2 Case Cancel, el cierre de HC-NEXT-03C4-C y el checkpoint final
+de HC-LOCK-04 permanecen pendientes hasta completar e integrar la Parent
+Integration restante y ejecutar su validación integrada.
