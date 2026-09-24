@@ -29,6 +29,7 @@ import {
   normalizeHealthcareOptionalText,
 } from '../common/healthcare-normalization';
 import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
+import { HealthcareEquipmentAssignmentsService } from '../equipment-assignments/healthcare-equipment-assignments.service';
 import { CreateHealthcareRequirementDto } from './dto/create-healthcare-requirement.dto';
 import {
   HealthcareRequirementListQueryDto,
@@ -131,6 +132,7 @@ type LockedRequirement = {
 export class HealthcareRequirementsService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly equipmentAssignmentsService: HealthcareEquipmentAssignmentsService,
     @Inject(REQUIREMENT_OPERATIONAL_EVIDENCE_POLICY)
     private readonly evidencePolicy: RequirementOperationalEvidencePolicy,
     @Inject(healthcareCompanyTransactionTimeoutConfiguration.KEY)
@@ -374,6 +376,17 @@ export class HealthcareRequirementsService {
 
         await this.assertRequirementMutable(transaction, companyId, locked);
 
+        const assignmentIds =
+          await this.equipmentAssignmentsService.lockReservedRequirementAssignments(
+            transaction,
+            {
+              companyId,
+              caseId: owner.caseId,
+              requirementId,
+            },
+          );
+        const retiredAt = new Date();
+
         const result = await transaction.healthcareCaseRequirement.updateMany({
           where: {
             id: requirementId,
@@ -383,7 +396,7 @@ export class HealthcareRequirementsService {
           },
           data: {
             lifecycle: HealthcareRequirementLifecycle.RETIRED,
-            retiredAt: new Date(),
+            retiredAt,
             retiredById,
             retirementReason,
           },
@@ -392,6 +405,19 @@ export class HealthcareRequirementsService {
         if (result.count !== 1) {
           return this.resolveRetireRace(transaction, companyId, requirementId);
         }
+
+        await this.equipmentAssignmentsService.releaseLockedRequirementAssignments(
+          transaction,
+          {
+            companyId,
+            caseId: owner.caseId,
+            requirementId,
+            assignmentIds,
+            releasedAt: retiredAt,
+            releasedById: retiredById,
+            releaseReason: retirementReason,
+          },
+        );
 
         return this.findRequirementRecord(
           transaction,

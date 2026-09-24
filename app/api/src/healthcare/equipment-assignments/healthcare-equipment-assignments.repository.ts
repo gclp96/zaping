@@ -420,6 +420,29 @@ export class HealthcareEquipmentAssignmentsRepository {
     return rows[0] ?? null;
   }
 
+  async lockReservedRequirementAssignments(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseId: string;
+      requirementId: string;
+    },
+  ): Promise<string[]> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id"
+      FROM "HealthcareEquipmentAssignment"
+      WHERE "companyId" = ${data.companyId}
+        AND "caseId" = ${data.caseId}
+        AND "requirementId" = ${data.requirementId}
+        AND "origin" = CAST(${HealthcareEquipmentAssignmentOrigin.REQUIREMENT} AS "HealthcareEquipmentAssignmentOrigin")
+        AND "lifecycle" = CAST(${HealthcareEquipmentAssignmentLifecycle.RESERVED} AS "HealthcareEquipmentAssignmentLifecycle")
+      ORDER BY "id" ASC
+      FOR UPDATE
+    `);
+
+    return rows.map((row) => row.id);
+  }
+
   async acquireSettingsSharedAdvisoryLock(
     transaction: Prisma.TransactionClient,
     companyId: string,
@@ -553,6 +576,11 @@ export class HealthcareEquipmentAssignmentsRepository {
       releasedById: string;
       releaseCause: HealthcareEquipmentAssignmentReleaseCause;
       releaseReason: string;
+      expectedContext?: {
+        caseId: string;
+        requirementId: string;
+        origin: HealthcareEquipmentAssignmentOrigin;
+      };
     },
   ) {
     return transaction.healthcareEquipmentAssignment.updateMany({
@@ -560,6 +588,7 @@ export class HealthcareEquipmentAssignmentsRepository {
         id: data.assignmentId,
         companyId: data.companyId,
         lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        ...(data.expectedContext ?? {}),
       },
       data: {
         lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,

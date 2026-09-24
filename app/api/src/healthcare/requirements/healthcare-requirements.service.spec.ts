@@ -145,6 +145,10 @@ describe('HealthcareRequirementsService', () => {
       [typeof transaction, RequirementPolicyContext]
     >(),
   };
+  const equipmentAssignmentsService = {
+    lockReservedRequirementAssignments: jest.fn(),
+    releaseLockedRequirementAssignments: jest.fn(),
+  };
 
   let service: HealthcareRequirementsService;
 
@@ -177,8 +181,15 @@ describe('HealthcareRequirementsService', () => {
       (callback: (tx: typeof transaction) => unknown) => callback(transaction),
     );
     evidencePolicy.assertMutable.mockResolvedValue(undefined);
+    equipmentAssignmentsService.lockReservedRequirementAssignments.mockResolvedValue(
+      [],
+    );
+    equipmentAssignmentsService.releaseLockedRequirementAssignments.mockResolvedValue(
+      undefined,
+    );
     service = new HealthcareRequirementsService(
       prisma as never,
+      equipmentAssignmentsService as never,
       evidencePolicy as never,
       transactionTimeoutPolicy,
     );
@@ -747,6 +758,138 @@ describe('HealthcareRequirementsService', () => {
         retirementReason: 'Cambio clínico',
       });
       expect(retireData.retiredAt).toBeInstanceOf(Date);
+      expect(
+        equipmentAssignmentsService.lockReservedRequirementAssignments,
+      ).toHaveBeenCalledWith(transaction, {
+        companyId,
+        caseId,
+        requirementId,
+      });
+      expect(
+        equipmentAssignmentsService.releaseLockedRequirementAssignments,
+      ).toHaveBeenCalledWith(transaction, {
+        companyId,
+        caseId,
+        requirementId,
+        assignmentIds: [],
+        releasedAt: retireData.retiredAt,
+        releasedById: userId,
+        releaseReason: 'Cambio clínico',
+      });
+    });
+
+    it('locks derived Assignments after the parent locks and before any write', async () => {
+      const calls: string[] = [];
+      transaction.$queryRaw
+        .mockImplementationOnce(() => {
+          calls.push('case');
+          return Promise.resolve([
+            {
+              id: caseId,
+              caseId,
+              productId,
+              status: HealthcareCaseStatus.SCHEDULED,
+            },
+          ]);
+        })
+        .mockImplementationOnce(() => {
+          calls.push('requirement');
+          return Promise.resolve([makeLockedRequirement()]);
+        });
+      evidencePolicy.assertMutable.mockImplementation(() => {
+        calls.push('policy');
+        return Promise.resolve();
+      });
+      equipmentAssignmentsService.lockReservedRequirementAssignments.mockImplementation(
+        () => {
+          calls.push('assignments');
+          return Promise.resolve(['assignment-b', 'assignment-a']);
+        },
+      );
+      transaction.healthcareCaseRequirement.updateMany.mockImplementation(
+        () => {
+          calls.push('requirement-write');
+          return Promise.resolve({ count: 1 });
+        },
+      );
+      equipmentAssignmentsService.releaseLockedRequirementAssignments.mockImplementation(
+        () => {
+          calls.push('assignment-writes');
+          return Promise.resolve();
+        },
+      );
+      transaction.healthcareCaseRequirement.findFirst.mockResolvedValue(
+        makeRecord({ lifecycle: HealthcareRequirementLifecycle.RETIRED }),
+      );
+
+      await service.retire(companyId, userId, requirementId, {
+        retirementReason: 'Cambio clínico',
+      });
+
+      expect(calls).toEqual([
+        'case',
+        'requirement',
+        'policy',
+        'assignments',
+        'requirement-write',
+        'assignment-writes',
+      ]);
+    });
+
+    it('propagates a derived release failure before response readback', async () => {
+      const releaseError = new Error('derived release failed');
+      transaction.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: caseId,
+            caseId,
+            productId,
+            status: HealthcareCaseStatus.SCHEDULED,
+          },
+        ])
+        .mockResolvedValueOnce([makeLockedRequirement()]);
+      equipmentAssignmentsService.lockReservedRequirementAssignments.mockResolvedValue(
+        ['assignment-a'],
+      );
+      transaction.healthcareCaseRequirement.updateMany.mockResolvedValue({
+        count: 1,
+      });
+      equipmentAssignmentsService.releaseLockedRequirementAssignments.mockRejectedValue(
+        releaseError,
+      );
+
+      await expect(
+        service.retire(companyId, userId, requirementId, {
+          retirementReason: 'Cambio clínico',
+        }),
+      ).rejects.toBe(releaseError);
+      expect(
+        transaction.healthcareCaseRequirement.findFirst,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('returns tenant-safe REQUIREMENT_NOT_FOUND before locking or releasing Assignments', async () => {
+      transaction.$queryRaw.mockResolvedValueOnce([]);
+
+      await expect(
+        service.retire(otherCompanyId, userId, requirementId, {
+          retirementReason: 'Cambio clínico',
+        }),
+      ).rejects.toMatchObject({ response: { code: 'REQUIREMENT_NOT_FOUND' } });
+      expect(acquireHealthcareCompanyLock).toHaveBeenCalledWith(
+        transaction,
+        otherCompanyId,
+        expect.any(Object),
+      );
+      expect(
+        equipmentAssignmentsService.lockReservedRequirementAssignments,
+      ).not.toHaveBeenCalled();
+      expect(
+        equipmentAssignmentsService.releaseLockedRequirementAssignments,
+      ).not.toHaveBeenCalled();
+      expect(
+        transaction.healthcareCaseRequirement.updateMany,
+      ).not.toHaveBeenCalled();
     });
 
     it('keeps retirement audit unchanged on an idempotent retire', async () => {
@@ -776,6 +919,12 @@ describe('HealthcareRequirementsService', () => {
       expect(evidencePolicy.assertMutable).not.toHaveBeenCalled();
       expect(
         transaction.healthcareCaseRequirement.updateMany,
+      ).not.toHaveBeenCalled();
+      expect(
+        equipmentAssignmentsService.lockReservedRequirementAssignments,
+      ).not.toHaveBeenCalled();
+      expect(
+        equipmentAssignmentsService.releaseLockedRequirementAssignments,
       ).not.toHaveBeenCalled();
     });
 
@@ -893,6 +1042,11 @@ describe('HealthcareRequirementsService', () => {
         await expect(operation).resolves.toMatchObject({
           lifecycle: reachedLifecycle,
         });
+        if (command === 'retire') {
+          expect(
+            equipmentAssignmentsService.releaseLockedRequirementAssignments,
+          ).not.toHaveBeenCalled();
+        }
       },
     );
 

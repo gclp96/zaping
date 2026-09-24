@@ -3,6 +3,7 @@ import {
   HealthcareEquipmentAssignmentOrigin,
   HealthcareEquipmentAssignmentReleaseCause,
   IdempotencyScope,
+  Prisma,
 } from '@prisma/client';
 
 import {
@@ -107,6 +108,85 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
         releasedById: userId,
         releaseCause: HealthcareEquipmentAssignmentReleaseCause.MANUAL,
         releaseReason: 'Equipo ya no requerido',
+      },
+    });
+  });
+
+  it('locks only applicable Requirement Assignments in deterministic order', async () => {
+    prisma.$queryRaw.mockResolvedValue([
+      { id: 'assignment-a' },
+      { id: 'assignment-b' },
+    ]);
+
+    await expect(
+      repository.lockReservedRequirementAssignments(prisma as never, {
+        companyId,
+        caseId,
+        requirementId,
+      }),
+    ).resolves.toEqual(['assignment-a', 'assignment-b']);
+
+    const queryRawMock = prisma.$queryRaw as jest.MockedFunction<
+      (query: Prisma.Sql) => Promise<Array<{ id: string }>>
+    >;
+    const query = queryRawMock.mock.calls[0][0];
+    expect(query.values).toEqual([
+      companyId,
+      caseId,
+      requirementId,
+      HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+      HealthcareEquipmentAssignmentLifecycle.RESERVED,
+    ]);
+    const sql = query.strings.join(' ');
+    expect(sql).toContain('"companyId"');
+    expect(sql).toContain('"caseId"');
+    expect(sql).toContain('"requirementId"');
+    expect(sql).toContain('"origin"');
+    expect(sql).toContain('"lifecycle"');
+    expect(sql).toContain('ORDER BY "id" ASC');
+    expect(sql).toContain('FOR UPDATE');
+  });
+
+  it('conditionally releases a locked Requirement Assignment with parent context', async () => {
+    const releasedAt = new Date('2026-09-17T18:00:00.000Z');
+
+    prisma.healthcareEquipmentAssignment.updateMany.mockResolvedValue({
+      count: 1,
+    });
+
+    await repository.releaseAssignment(prisma as never, {
+      companyId,
+      assignmentId,
+      releasedAt,
+      releasedById: userId,
+      releaseCause:
+        HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+      releaseReason: 'Cambio clínico',
+      expectedContext: {
+        caseId,
+        requirementId,
+        origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+      },
+    });
+
+    expect(
+      prisma.healthcareEquipmentAssignment.updateMany,
+    ).toHaveBeenCalledWith({
+      where: {
+        id: assignmentId,
+        companyId,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+        caseId,
+        requirementId,
+        origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+      },
+      data: {
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RELEASED,
+        releasedAt,
+        releasedById: userId,
+        releaseCause:
+          HealthcareEquipmentAssignmentReleaseCause.REQUIREMENT_WITHDRAWN,
+        releaseReason: 'Cambio clínico',
       },
     });
   });

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../prisma/prisma.module';
+import { HealthcareEquipmentAssignmentsModule } from '../equipment-assignments/healthcare-equipment-assignments.module';
 import { HealthcareRequirementsController } from './healthcare-requirements.controller';
 import { HealthcareRequirementsService } from './healthcare-requirements.service';
 import {
@@ -9,7 +10,7 @@ import {
 } from './requirement-operational-evidence-policy';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, HealthcareEquipmentAssignmentsModule],
   controllers: [HealthcareRequirementsController],
   providers: [
     HealthcareRequirementsService,
