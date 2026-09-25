@@ -12,12 +12,22 @@ import type { HealthcareRequirement } from '@/services/healthcare-requirements';
 import HealthcareCasesPage from './page';
 import type { HealthcareCase } from './types';
 
+const routerMock = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
 vi.mock('@/services/api', () => ({
   api: {
     get: vi.fn(),
     post: vi.fn(),
     patch: vi.fn(),
   },
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: routerMock.push,
+  }),
 }));
 
 vi.mock('@/services/errors', () => ({
@@ -588,6 +598,21 @@ describe('HealthcareCasesPage', () => {
         String(url).match(/^\/healthcare\/(doctors|hospitals)\//),
       ),
     ).toBe(false);
+  });
+
+  it('navega desde el Case a su pantalla read-only de asignaciones', async () => {
+    const user = userEvent.setup();
+    await renderCases('SALES');
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver asignaciones' }));
+
+    expect(routerMock.push).toHaveBeenCalledWith(
+      '/healthcare-cases/case-1/equipment-assignments',
+    );
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
   });
 
   it('permite a WAREHOUSE administrar Requirements sin habilitar edición general del Case', async () => {

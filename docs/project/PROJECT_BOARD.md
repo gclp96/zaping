@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A READ-ONLY CASE VIEW PLANNED AS NEXT PRODUCT INCREMENT — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-24
 Responsable: Zaping Team
 
@@ -171,13 +171,16 @@ HC-NEXT-03C4-C parent integrations
         → C4-C2 CASE CANCEL COMPLETE / MERGED IN main@f429e9f
 
 HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
-        → COMPLETE / MERGED — PR #36 — main@5b7c03e
+        → COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
+
+HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
+        → PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → PENDING REFINEMENT / DOR / PLANNING — NOT READY
+        → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
-        → CONTRACT PENDING / REQUIRED BEFORE C6
+        → CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
 DEFERRED
 
@@ -2275,9 +2278,10 @@ CURRENT ROADMAP ITEM
 
 → HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — COMPLETE / MERGED — HC-LOCK-04 FINAL CLOSED / ACCEPTED
 
-→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 — main@5b7c03e
-→ HC-NEXT-03C5-B Integrated Backend Validation — PENDING REFINEMENT / DOR / PLANNING — NOT READY
-→ HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6
+→ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
+→ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+→ HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+→ HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
 DEFERRED
 
@@ -2506,8 +2510,8 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations
 
 Healthcare Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
-→ C5-A COMPLETE / MERGED — PR #36 — main@5b7c03e
-→ C5-B PENDING REFINEMENT / DOR / PLANNING — NOT READY; C5-COVERAGE CONTRACT PENDING; FRONTEND PENDING
+→ C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
+→ C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C6-A READ-ONLY VIEW PLANNED NEXT; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2843,15 +2847,26 @@ Decisiones aprobadas:
   HC-NEXT-03C5-COVERAGE antes de C6; su contrato funcional aún está pendiente.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
+- **DEC-C5B-01:** C5-B diseña un rol dedicado `zaping_hc_c5b`. La decisión no
+  autoriza crear el rol, establecer credenciales ni modificar ACL.
+- **DEC-C5B-02:** el error sanitizado se acredita con evidencia compuesta: los
+  unitarios prueban el mapping Prisma estable; 2H prueba fallos PostgreSQL reales
+  y su respuesta HTTP sanitizada con auth guard de test; una prueba C5-B
+  representativa probará el pipeline HTTP con JWT real y un error Prisma
+  controlado. La combinación no demuestra un fallo PostgreSQL nativo y JWT real
+  en la misma petición ni reabre los timeouts de HC-LOCK-04.
+- **DEC-C5B-03:** el harness actualizará directamente el fixture persistido de
+  Case y verificará por List/Detail HTTP el recálculo de disponibilidad. No usa ni
+  acredita Case Update API o concurrencia durante la reprogramación.
 - HC-LOCK-04 permanece CLOSED / ACCEPTED y no se reabre sin un defecto concreto.
 
 #### HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
 
-Estado: COMPLETE / MERGED — PR #36 — `main@5b7c03e`
+Estado: COMPLETE / MERGED — PR #36 + #37 — `main@5ec9f67`
 
 Dependencias satisfechas:
-- baseline de inicio `main@5d33cb0` e integración mediante PR #36 en
-  `main@5b7c03e`;
+- baseline de inicio `main@5d33cb0`, integración mediante PR #36 y cierre
+  documental mediante PR #37 en `main@5ec9f67`;
 - HC-NEXT-03C1–C4 COMPLETE / MERGED;
 - HC-LOCK-04 final CLOSED / ACCEPTED sobre la baseline productivamente
   equivalente `main@be73bc4`;
@@ -2909,29 +2924,131 @@ Definition of Done:
 - preflight autorizado documenta identidad efectiva sin secretos;
 - validaciones estáticas y `git diff --check` verdes;
 - PostgreSQL C1 27/27 PASS y teardown sin errores reportados;
-- PR #36 integrado en `main@5b7c03e`; C5-A COMPLETE / MERGED.
+- PR #36 y #37 integrados en `main@5ec9f67`; C5-A COMPLETE / MERGED.
 
 Sprint 1:
 - ventana: 24-sep–07-oct-2026;
-- objetivo: completar C5-A;
-- Target: 07-oct-2026;
+- capacidad bruta informada: 20 h/semana; no equivale a velocidad, Forecast ni
+  Commitment;
+- C5-A completado el 24-sep-2026;
+- se prioriza como próximo incremento de producto C6-A, una pantalla visible de
+  consulta read-only de Equipment Assignments para un Case;
+- C6-A puede iniciarse sin completar B0; sus SP y fecha de entrega permanecen
+  pendientes de estimación. El 07-oct-2026 es el cierre de la ventana, no un
+  Commitment de entrega del slice;
+- B0 conserva sus 3 SP y estado NOT READY dentro del trabajo pendiente de C5-B;
 - Actual C5-A: 24-sep-2026 — completado antes del Target;
-- Commitment: no establecido; no se registra un compromiso retroactivo;
-- Forecast del trabajo restante: pendiente de estimación;
-- C5-B requiere refinamiento, DoR y planificación antes de asumir fechas
-  comprometidas.
+- Forecast: pendiente de estimar para C6-A y para el resto del trabajo;
+- Commitment: pendiente; no se asumen fechas comprometidas.
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: PENDING REFINEMENT / DOR / PLANNING — NOT READY
+Estado: PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
-Dependencias / DoR:
-- C5-A COMPLETE / MERGED y disposable acreditada: satisfecho;
-- refinamiento y DoR de C5-B: pendientes;
-- matriz focal definitiva y planificación: pendientes de aprobación, sin duplicar
-  HC-LOCK-04 ni asumir fechas comprometidas.
+Estimación total: 16 SP. Los SP expresan complejidad relativa y no se convierten
+en horas ni Commitment.
 
-Alcance previsto:
+##### C5-B0 — Safe Integrated Harness — 3 SP
+
+Estado: NOT READY / CANDIDATE FOR SPRINT 1
+
+Dependencias y DoR:
+- C5-A COMPLETE / MERGED y HC-LOCK-04 CLOSED / ACCEPTED: satisfecho;
+- aprobar la identidad diseñada `zaping_hc_c5b`,
+  `RUN_HC_C5B_POSTGRES_TESTS=1`, `HC_C5B_DATABASE_URL` y el target propuesto
+  `zaping_spike_test` vía `127.0.0.1:5434` (servidor 5432); pendiente, sin
+  autorización de provisioning;
+- inventariar y aprobar las operaciones SQL de fixtures, JWT, List/Detail/Create,
+  actualización del horario, locks, assertions y cleanup;
+- aprobar y verificar efectivamente `CONNECT`, `USAGE`, DML por tabla,
+  `UPDATE` por columna sólo para row locks, horario y claim, `USAGE` de enums y
+  `EXECUTE` de funciones; sin secuencias ni privilegios administrativos/globales;
+- aprobar el preflight, JWT efímero, aislamiento de sesiones, propiedad de
+  fixtures y cleanup antes de ejecutar PostgreSQL.
+
+Manifiesto mínimo diseñado, aún no acreditado:
+- `CONNECT` en `zaping_spike_test` y `USAGE` en `public`;
+- `SELECT/INSERT/DELETE` en `Company`, `User`, `Product`, `HealthcareCase`,
+  `HealthcareCaseRequirement`, `EquipmentAsset`,
+  `HealthcareEquipmentAssignment` e `IdempotencyRecord`;
+- `SELECT` en `HealthcareEquipmentAssignmentConflictOverride` y
+  `HealthcareEquipmentAssignmentSettings`;
+- `UPDATE(id)` en `HealthcareCase`, `HealthcareCaseRequirement` y
+  `EquipmentAsset`, y `UPDATE(companyId)` en Settings, exclusivamente para
+  `FOR SHARE`/`FOR UPDATE`;
+- `UPDATE(scheduledStart, scheduledEnd, updatedAt)` en Case para DEC-C5B-03 y
+  `UPDATE(resourceId, updatedAt)` en `IdempotencyRecord` para completar el claim;
+- `USAGE` de los enums usados, incluido `IdempotencyScope`, y `EXECUTE` de
+  `btrim`, `current_setting`, `set_config`, advisory locks y funciones de
+  introspección del preflight. No se requieren secuencias.
+
+Preflight y seguridad requeridos antes del primer DML:
+- flag/URL exclusivos, sin dotenv/fallback; URL válida sin query/hash, contraseña
+  no vacía y sin imprimir valores sensibles;
+- identidad de URL y conexión efectiva, PostgreSQL 16, schema `public`, puertos,
+  PID, rol LOGIN no administrativo y backend consistente;
+- presencia de tablas/columnas/constraints/índices, ACL efectivas, enums,
+  funciones y ausencia de sesiones ajenas; no terminar sesiones;
+- JWT efímero instalado antes de `JwtStrategy`, `ignoreEnvFile: true`, Prisma
+  aislado compartido por Nest y restauración exacta aun ante setup/teardown fallido;
+- IDs Company A/B preasignados; collision check en todas las tablas tocadas;
+  marcadores `id/name/rfc`, reacreditación posterior al INSERT y cleanup sólo de
+  IDs con propiedad demostrada;
+- cleanup referencial, conteos cero por IDs/keys propios y `AggregateError` que
+  preserve fallos funcionales, de app close, cleanup y disconnect.
+
+Falta acreditar: existencia e identidad del rol, URL segura, ACL efectivas,
+catálogo/schema, funciones/enums, exclusividad de sesiones, ausencia de colisiones,
+ciclo JWT, ownership y cleanup reales. Hasta entonces B0 no está READY.
+
+Acceptance Criteria:
+- cualquier mismatch falla cerrado antes del primer write y sin filtrar secretos;
+- ninguna ruta de error puede autorizar cleanup sobre IDs no acreditados;
+- el harness no carga configuración implícita ni amplía permisos por conveniencia.
+
+Definition of Done:
+- harness focal implementado y revisado estáticamente;
+- preflight autorizado PASS antes de fixtures y teardown propio con conteos cero;
+- TypeScript, ESLint, Prettier y `git diff --check` verdes, con evidencia sin
+  secretos. El DoD no autoriza por sí mismo infraestructura posterior.
+
+Riesgos: privilegios insuficientes para row locks/claim, sesiones concurrentes,
+colisión de fixture, fuga de JWT/configuración y cleanup parcial.
+
+##### C5-B1 — List/Detail HTTP Readback — 5 SP
+
+Estado: PLANNED / BLOCKED BY B0 / NOT IMPLEMENTED
+
+DoR: B0 DONE; fixtures A/B e históricos aprobados. AC: JWT real para los cuatro
+roles; tenant isolation; filtros/paginación; foreign igual a missing; forma pública;
+y DEC-C5B-03 para completar/reprogramar el fixture y observar el recálculo por
+List/Detail. DoD: E2E PostgreSQL/HTTP focales PASS, readback persistido, cero writes
+de lectura y cleanup propio acreditado. Riesgos: matriz combinatoria y assertions
+frágiles por orden/paginación.
+
+##### C5-B2 — Create HTTP/JWT — 5 SP
+
+Estado: PLANNED / BLOCKED BY B0 / NOT IMPLEMENTED
+
+DoR: B0 DONE y DEC-C5B-02 aceptada. AC: ADMIN/MANAGER/WAREHOUSE 201; SALES 403;
+401 sin JWT válido; Company A/B y foreign igual a missing; Assignment/claim
+persistidos atómicamente; wrapper público `outcome/data`; error HTTP representativo
+sanitizado sin afirmar concurrencia PostgreSQL real. DoD: E2E focales PASS,
+rechazos zero-write y cleanup propio acreditado. Riesgos: confundir evidencia
+compuesta con una prueba PG+JWT del mismo fallo o duplicar idempotencia/locks de
+HC-LOCK-04.
+
+##### C5-B3 — Integrated Gate & Closeout — 3 SP
+
+Estado: PLANNED / BLOCKED BY B1+B2 / NOT IMPLEMENTED
+
+DoR: B1 y B2 verdes. AC: nueva matriz C5-B, regresiones focales C1–C4 y full API
+sin reejecutar HC-LOCK-04 por defecto. DoD: Prisma validate/generate, lint,
+typecheck, build y `git diff --check` verdes; reporte de selected/skipped/no
+ejecutados, identidad no sensible y cleanup propio. Riesgos: flakiness no explicada
+o ampliar scope para corregir defectos no demostrados.
+
+Alcance consolidado:
 - E2E HTTP/PostgreSQL faltantes de GET list/detail y POST Create con JWT real,
   Company A/B y los cuatro roles;
 - filtros/paginación, historical reads, foreign igual a missing, schedule
@@ -2950,12 +3067,41 @@ Acceptance Criteria / Definition of Done:
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
-Estado: CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6
+Estado: CONTRACT PENDING / NOT READY — PREREQUISITE FOR LATER C6 COVERAGE OR
+MUTATION SLICES; NOT A BLOCKER FOR C6-A
 
 Debe formalizar lectura agregada `PENDING` / `PARTIAL` / `UNAVAILABLE` /
 `CONFLICT` y commands para registrar/resolver CoverageNotes, incluyendo tenant,
 RBAC, auditoría, concurrencia y contrato HTTP. No forma parte de C5-A ni C5-B y
 no puede implementarse por inferencia durante hardening.
+
+#### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
+
+Estado: PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION / FORECAST / COMMITMENT
+PENDING
+
+Objetivo y alcance inicial:
+- entregar una pantalla centrada en Case, conectada a List/Detail existentes;
+- mostrar listado, detalle y disponibilidad expuesta por la API;
+- cubrir estados loading, empty, error y RBAC sin inventar reglas frontend;
+- permitir iniciar el desarrollo sin B0. La aceptación integrada sí depende de
+  los gates aplicables de autenticación, permisos y List/Detail.
+
+Acceptance Criteria:
+- desde un Case se consulta su listado y se abre el detalle de una Assignment;
+- la UI representa la disponibilidad recibida y estados loading/empty/error;
+- los cuatro roles respetan el contrato read-only y un 403 no destruye la sesión;
+- no se exponen ni habilitan acciones fuera del alcance.
+
+Definition of Done:
+- pruebas focales de pantalla/componentes y estados de consulta verdes;
+- integración con List/Detail verificada con los gates aplicables de auth/RBAC;
+- Web lint, typecheck, build y `git diff --check` verdes;
+- SP, fecha Target y Forecast se acuerdan tras refinamiento; no existe Commitment
+  en este documento.
+
+Fuera de alcance: Create, Replace o Release en UI, CoverageNote, movimientos
+físicos y cambios productivos de backend.
 
 Quedan fuera de C5-A/C5-B frontend, Case Availability general, nuevas capacidades
 funcionales, fuzzy search, permission-based RBAC, Dispatch, Return, Custody,

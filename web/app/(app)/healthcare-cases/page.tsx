@@ -1,6 +1,7 @@
 'use client';
 
 import { Plus } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -93,6 +94,7 @@ const columns: DataTableColumn<HealthcareCase>[] = [
 ];
 
 export default function HealthcareCasesPage() {
+  const router = useRouter();
   const sessionState = useAuthenticatedSession();
   const canEdit = canEditHealthcareCases(
     sessionState.status === 'success' ? sessionState.user.role : null,
@@ -168,6 +170,15 @@ export default function HealthcareCasesPage() {
         onSelect: (healthcareCase: HealthcareCase) => {
           setOpenRequirementForCaseId(null);
           setViewCase(healthcareCase);
+        },
+      },
+      {
+        id: 'viewAssignments',
+        label: 'Ver asignaciones',
+        onSelect: (healthcareCase: HealthcareCase) => {
+          router.push(
+            `/healthcare-cases/${healthcareCase.id}/equipment-assignments`,
+          );
         },
       },
       ...(canEdit
