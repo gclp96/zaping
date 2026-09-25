@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-24
+Última actualización: 2026-09-25
 Responsable: Zaping Team
 
 1. Propósito
@@ -103,7 +103,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — M
 ↓
 HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 ↓
-HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -156,12 +156,10 @@ petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
 List/Detail HTTP el recálculo, no Case Update API.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment; C5-A quedó completado el 24-sep. Se prioriza C6-A como
-primer incremento visible: listado, detalle, disponibilidad API y estados
-loading/empty/error/RBAC. Puede iniciarse sin B0, pero su aceptación integrada
-depende de los gates aplicables de autenticación, permisos y List/Detail. Sus SP,
-fecha y Forecast están pendientes de estimación; no existe Commitment. C5-B
-conserva B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
+velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A el 25-sep mediante
+PR #38 en `main@8a67d5a`. El Forecast del trabajo restante sigue pendiente y no se
+declara un siguiente slice READY. C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con
+B0 NOT READY.
 
 También permanecen como TARGET Healthcare:
 
@@ -984,7 +982,7 @@ COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
 ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5ec9f67 VIA
 PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED — PARTIALLY
-IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW PLANNED NEXT.
+IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN main@8a67d5a.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1057,14 +1055,14 @@ evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
 pendiente y como prerequisito de slices posteriores de C6 que requieran coverage
-o mutaciones, no de C6-A. El siguiente incremento de producto es C6-A, una vista
-read-only de Equipment Assignments por Case conectada a List/Detail existentes.
-Incluye listado, detalle, disponibilidad API y estados loading/empty/error/RBAC;
-excluye Create/Replace/Release en UI, CoverageNote, movimientos físicos y cambios
-productivos de backend. Puede comenzar sin B0, aunque su aceptación integrada
-depende de los gates aplicables de autenticación, permisos y List/Detail. Sus SP,
-fechas, Forecast y Commitment continúan pendientes. Este corte no declara
-Healthcare Core ni producción terminados.
+o mutaciones, no de C6-A. C6-A está COMPLETE / MERGED mediante PR #38 en
+`main@8a67d5a`, con Actual 25-sep-2026. Vitest focal 29/29, ESLint, TypeScript,
+Next.js build y CI API/Web pasaron; la validación manual cubrió empty state,
+DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con
+`INCOMPLETE_CASE_SCHEDULE`. El mojibake observado sólo en datos de desarrollo
+(“Cirug�a”/“Demostraci�n”) es un known non-blocker; la UI estática UTF-8 es
+correcta. Este corte no declara otro slice READY, Healthcare Core ni producción
+terminados.
 
 Debe mantenerse:
 
@@ -2809,7 +2807,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — P
 
 HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 
-HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -2958,7 +2956,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations — COMPLETE / MERGED — P
 ↓
 HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 ↓
-HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
