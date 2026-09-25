@@ -107,7 +107,9 @@ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED �
 ↓
 HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
 ↓
-HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
+↓
+HC-NEXT-03C6-D Replace Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -160,11 +162,11 @@ petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
 List/Detail HTTP el recálculo, no Case Update API.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A/C6-B el 25-sep,
-mediante PR #38 en `main@8a67d5a` y PR #40 en `main@4805128`. El Forecast del
-trabajo restante sigue pendiente. C6-C se registra sólo como próximo candidato
-funcional y permanece NOT READY; C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con
-B0 NOT READY.
+velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A/C6-B/C6-C el
+25-sep, mediante PR #38 en `main@8a67d5a`, PR #40 en `main@4805128` y PR #42 en
+`main@9bade4d`. El Forecast del trabajo restante sigue pendiente. C6-D se registra
+sólo como siguiente candidato funcional y permanece NOT READY; C5-B conserva
+B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
 
 También permanecen como TARGET Healthcare:
 
@@ -1061,7 +1063,7 @@ evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
 pendiente y como prerequisito de slices posteriores de C6 que requieran coverage
-pero no de C6-A/C6-B. C6-A está COMPLETE / MERGED mediante PR #38 en
+pero no de C6-A/C6-B/C6-C. C6-A está COMPLETE / MERGED mediante PR #38 en
 `main@8a67d5a`, con Actual 25-sep-2026. Vitest focal 29/29, ESLint, TypeScript,
 Next.js build y CI API/Web pasaron; la validación manual cubrió empty state,
 DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con
@@ -1071,9 +1073,14 @@ correcta. C6-B está COMPLETE / MERGED mediante PR #40 en `main@4805128`, con
 Actual 25-sep-2026: Vitest focal 19/19, TypeScript Web, ESLint Web, Next.js build
 y CI API/Web pasaron. La validación manual acreditó MANAGER Create DIRECT, éxito
 con refresh de List, nueva RESERVED visible, disponibilidad/warning renderizados
-y SALES sin acción Create. C6-C Release Assignment UI queda sólo como próximo
-candidato funcional / NOT READY, sin SP, Forecast ni Commitment. Este corte no
-declara Healthcare Core ni producción terminados.
+y SALES sin acción Create. C6-C está COMPLETE / MERGED mediante PR #42 en
+`main@9bade4d`, con Actual 25-sep-2026: Vitest focal 26/26, TypeScript Web, ESLint
+Web, Next.js build y CI API/Web pasaron. La validación manual acreditó MANAGER con
+Release sobre RESERVED, motivo requerido, transición a RELEASED, feedback con
+refresh, disponibilidad “No aplica (histórico)” y desaparición de Release. SALES
+read-only conserva sólo evidencia automatizada. C6-D Replace Assignment UI queda
+como siguiente candidato funcional / NOT READY, sin SP, Forecast ni Commitment.
+Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
 
@@ -2822,7 +2829,9 @@ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED �
 
 HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
 
-HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
+
+HC-NEXT-03C6-D Replace Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -2975,7 +2984,9 @@ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED �
 ↓
 HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
 ↓
-HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
+↓
+HC-NEXT-03C6-D Replace Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓

@@ -12,7 +12,7 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW AND C6-B CREATE UI COMPLETE / MERGED; C6-C NEXT FUNCTIONAL CANDIDATE / NOT READY; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI AND C6-C RELEASE UI COMPLETE / MERGED; C6-D NEXT FUNCTIONAL CANDIDATE / NOT READY; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 **Última actualización:** 2026-09-25
 **Responsable:** Zaping Healthcare Team
 
@@ -1669,8 +1669,9 @@ HC-NEXT-03C1 Persistence / Migration
 → HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness
 → HC-NEXT-03C6-A Case Equipment Assignments Read-only View
 → HC-NEXT-03C6-B Create Assignment UI
+→ HC-NEXT-03C6-C Release Assignment UI
 
-Track pendiente, no bloqueante para C6-A/C6-B:
+Track pendiente, no bloqueante para C6-A/C6-B/C6-C:
 HC-NEXT-03C5-B Integrated Backend Validation (B0 → B1/B2 → B3)
 → HC-NEXT-03C5-COVERAGE backend independiente
 → slices posteriores de HC-NEXT-03C6
@@ -1680,9 +1681,10 @@ HC-NEXT-03C5-B Integrated Backend Validation (B0 → B1/B2 → B3)
 Cada slice parte de `main` después de que sus dependencias aplicables estén merged
 y green. C6-A consume List/Detail existentes y puede comenzar sin B0; su
 aceptación integrada espera los gates aplicables de autenticación, permisos y
-List/Detail. C6-B reutiliza Create ya integrado sin adelantar CoverageNote. Los
-slices que dependan de coverage esperan HC-NEXT-03C5-COVERAGE. Un PR no mezcla el
-scope de su sucesor para ahorrar una integración.
+List/Detail. C6-B reutiliza Create y C6-C Manual Release ya integrados, sin
+adelantar CoverageNote. Los slices que dependan de coverage esperan
+HC-NEXT-03C5-COVERAGE. Un PR no mezcla el scope de su sucesor para ahorrar una
+integración.
 
 Reglas comunes de entrada y salida:
 
@@ -1896,10 +1898,11 @@ propios, no una base globalmente vacía. Riesgo residual: la exclusividad se
 comprueba al inicio, pero no está garantizada durante toda la ejecución.
 
 **Sprint 1:** 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment. C5-A se completó el 24-sep y C6-A/C6-B el 25-sep,
-mediante PR #38 en `main@8a67d5a` y PR #40 en `main@4805128`. El Forecast del
-trabajo restante permanece pendiente. C6-C queda como candidato funcional NOT
-READY; B0 conserva sus 3 SP y estado NOT READY dentro del backlog C5-B.
+velocidad o Commitment. C5-A se completó el 24-sep y C6-A/C6-B/C6-C el 25-sep,
+mediante PR #38 en `main@8a67d5a`, PR #40 en `main@4805128` y PR #42 en
+`main@9bade4d`. El Forecast del trabajo restante permanece pendiente. C6-D queda
+como candidato funcional NOT READY; B0 conserva sus 3 SP y estado NOT READY
+dentro del backlog C5-B.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
@@ -2020,7 +2023,7 @@ requiere corrección focal; no amplía capability por inferencia.
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
 **Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND
-ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B.
+ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C.
 
 Ticket backend independiente para lectura agregada `PENDING` / `PARTIAL` /
 `UNAVAILABLE` / `CONFLICT` y commands de registro/resolución de CoverageNotes.
@@ -2076,12 +2079,31 @@ desarrollo continúa como known non-blocker; la UI estática UTF-8 es correcta.
 
 ### 34.6.3 HC-NEXT-03C6-C — Release Assignment UI
 
+**Estado:** COMPLETE / MERGED — PR #42 — `main@9bade4d` — Actual 25-sep-2026.
+
+**Scope:** acción Release únicamente sobre Assignment RESERVED para los roles de
+mutación, modal con motivo requerido, Idempotency-Key por request y consumo de
+Manual Release integrado. Tras HTTP 200, cierra modal, muestra feedback, refresca
+List y representa RELEASED con disponibilidad histórica no aplicable.
+
+**Evidencia de cierre:** Vitest focal 26/26 PASS; TypeScript Web, ESLint Web,
+Next.js build y CI API/Web PASS. La validación manual acreditó MANAGER con Release
+sobre RESERVED, motivo requerido, transición RESERVED → RELEASED, feedback con
+refresh, “No aplica (histórico)” y desaparición de Release. SALES read-only cuenta
+con evidencia automatizada, no con validación manual declarada.
+
+**Out of scope:** Replace, CoverageNote, Dispatch/Custody y cambios backend. El
+mojibake en datos de desarrollo continúa como known non-blocker; la UI estática
+UTF-8 es correcta.
+
+### 34.6.4 HC-NEXT-03C6-D — Replace Assignment UI
+
 **Estado:** NEXT FUNCTIONAL CANDIDATE / NOT READY.
 
-Se registra sólo como próximo candidato funcional. Requiere refinamiento y DoR;
-no se le asignan SP, Forecast ni Commitment y no abre infraestructura nueva.
+Se registra sólo como siguiente candidato funcional. Requiere refinamiento y DoR;
+no se le asignan SP, Forecast ni Commitment.
 
-### 34.6.4 Slices posteriores de Frontend Equipment Assignment
+### 34.6.5 Slices posteriores de Frontend Equipment Assignment
 
 La evolución posterior cubre UX centrada en Case para ver Requirements de equipo
 y coverage, asignar EquipmentAsset concreto, crear Assignment DIRECT con reason,
@@ -2484,6 +2506,7 @@ Equipment Assignment implementation
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 → C6-A READ-ONLY CASE VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a — ACTUAL 25-sep-2026
 → C6-B CREATE ASSIGNMENT UI COMPLETE / MERGED — PR #40 — main@4805128 — ACTUAL 25-sep-2026
-→ C6-C RELEASE ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+→ C6-C RELEASE ASSIGNMENT UI COMPLETE / MERGED — PR #42 — main@9bade4d — ACTUAL 25-sep-2026
+→ C6-D REPLACE ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
