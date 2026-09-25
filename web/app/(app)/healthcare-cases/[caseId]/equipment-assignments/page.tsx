@@ -30,6 +30,7 @@ import {
   getHealthcareEquipmentAssignment,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
+  releaseHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
   type HealthcareEquipmentAssignmentAvailability,
@@ -40,6 +41,7 @@ import {
 
 import type { HealthcareCase } from '../../types';
 import CreateDirectAssignmentModal from './CreateDirectAssignmentModal';
+import ReleaseAssignmentModal from './ReleaseAssignmentModal';
 
 const statusDescriptors: Record<
   HealthcareEquipmentAssignmentStatus,
@@ -138,6 +140,30 @@ function createAssignmentErrorMessage(error: unknown): string {
     : message;
 }
 
+function releaseAssignmentErrorFallback(error: unknown): string {
+  switch (getApiErrorStatus(error)) {
+    case 400:
+      return 'Revisa el motivo antes de liberar la asignación.';
+    case 403:
+      return 'No tienes permisos para liberar asignaciones de equipo.';
+    case 409:
+      return 'La asignación cambió y ya no puede liberarse. Actualiza la información.';
+    case 500:
+      return 'No fue posible liberar la asignación por un error de persistencia.';
+    default:
+      return 'No fue posible liberar la asignación.';
+  }
+}
+
+function releaseAssignmentErrorMessage(error: unknown): string {
+  const fallback = releaseAssignmentErrorFallback(error);
+  const message = getApiErrorMessage(error, fallback);
+
+  return /^Request failed with status code \d+$/i.test(message)
+    ? fallback
+    : message;
+}
+
 const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
   {
     id: 'equipment',
@@ -197,10 +223,12 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
       ? sessionState.user?.role ?? null
       : null;
   const canCreateAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
+  const canReleaseAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
   const requestId = useRef(0);
   const detailRequestId = useRef(0);
   const assetRequestId = useRef(0);
   const createSubmissionInFlight = useRef(false);
+  const releaseSubmissionInFlight = useRef(false);
   const [healthcareCase, setHealthcareCase] = useState<HealthcareCase | null>(
     null,
   );
@@ -229,6 +257,11 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const [createError, setCreateError] = useState('');
   const [conflictReview, setConflictReview] =
     useState<HealthcareEquipmentAssignmentConflictReviewResponse | null>(null);
+  const [releaseAssignment, setReleaseAssignment] =
+    useState<HealthcareEquipmentAssignment | null>(null);
+  const [releaseReason, setReleaseReason] = useState('');
+  const [releaseSaving, setReleaseSaving] = useState(false);
+  const [releaseError, setReleaseError] = useState('');
   const [detailAssignmentId, setDetailAssignmentId] = useState<string | null>(
     null,
   );
@@ -355,6 +388,30 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     ],
   };
 
+  const assignmentColumns: DataTableColumn<HealthcareEquipmentAssignment>[] =
+    canReleaseAssignment
+      ? [
+          ...columns,
+          {
+            id: 'release',
+            header: 'Acción',
+            cell: (assignment) =>
+              assignment.status === 'RESERVED' ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  aria-label={`Liberar ${assignment.equipmentAsset.assetCode}`}
+                  onClick={() => openReleaseModal(assignment)}
+                >
+                  Liberar
+                </Button>
+              ) : null,
+            minWidth: 110,
+          },
+        ]
+      : columns;
+
   function closeDetail() {
     detailRequestId.current += 1;
     setDetailAssignmentId(null);
@@ -445,6 +502,59 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     }
   }
 
+  function openReleaseModal(assignment: HealthcareEquipmentAssignment) {
+    if (!canReleaseAssignment || assignment.status !== 'RESERVED') return;
+    setNotice('');
+    setReleaseAssignment(assignment);
+    setReleaseReason('');
+    setReleaseError('');
+  }
+
+  function closeReleaseModal(force = false) {
+    if (releaseSubmissionInFlight.current && !force) return;
+    setReleaseAssignment(null);
+    setReleaseReason('');
+    setReleaseError('');
+  }
+
+  function updateReleaseReason(reason: string) {
+    setReleaseReason(reason);
+    setReleaseError('');
+  }
+
+  async function submitReleaseAssignment() {
+    const normalizedReason = releaseReason.trim();
+    const assignmentId = releaseAssignment?.id;
+
+    if (
+      !canReleaseAssignment ||
+      !assignmentId ||
+      releaseAssignment.status !== 'RESERVED' ||
+      !normalizedReason ||
+      releaseSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    releaseSubmissionInFlight.current = true;
+    setReleaseSaving(true);
+    setReleaseError('');
+
+    try {
+      await releaseHealthcareEquipmentAssignment(assignmentId, {
+        reason: normalizedReason,
+      });
+      closeReleaseModal(true);
+      setNotice('Asignación liberada correctamente.');
+      await loadAssignments();
+    } catch (requestError: unknown) {
+      setReleaseError(releaseAssignmentErrorMessage(requestError));
+    } finally {
+      releaseSubmissionInFlight.current = false;
+      setReleaseSaving(false);
+    }
+  }
+
   return (
     <>
       <PageContainer>
@@ -488,12 +598,12 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
         ) : (
           <Section
             title="Asignaciones de equipo"
-            description="Reservas activas e historial del caso. Los roles autorizados pueden crear asignaciones directas."
+            description="Reservas activas e historial del caso. Los roles autorizados pueden crear asignaciones directas y liberar reservas."
           >
             <DataTable
               caption="Asignaciones de equipo del caso"
               rows={assignments}
-              columns={columns}
+              columns={assignmentColumns}
               getRowId={(assignment) => assignment.id}
               rowActions={rowActions}
               pagination={
@@ -552,6 +662,16 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
         onRetryAssets={() => void loadEligibleAssets()}
         onClose={closeCreateModal}
         onSubmit={() => void submitDirectAssignment()}
+      />
+
+      <ReleaseAssignmentModal
+        assignment={releaseAssignment}
+        reason={releaseReason}
+        saving={releaseSaving}
+        error={releaseError}
+        onReasonChange={updateReleaseReason}
+        onClose={closeReleaseModal}
+        onSubmit={() => void submitReleaseAssignment()}
       />
 
       <Modal
