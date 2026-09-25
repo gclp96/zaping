@@ -14,7 +14,7 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW COMPLETE / MERGED; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW AND C6-B CREATE UI COMPLETE / MERGED; C6-C NEXT FUNCTIONAL CANDIDATE / NOT READY; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 **Última actualización:** 2026-09-25
 **Responsable:** Zaping Healthcare Team
 
@@ -765,7 +765,8 @@ cleanup de sus fixtures propios, no una base globalmente vacía.
 
 - **DEC-C5-01:** CoverageNote y cobertura agregada no forman parte de C5. El
   ticket backend independiente HC-NEXT-03C5-COVERAGE debe aprobar su contrato e
-  implementarse antes de C6. No está READY y C5 no inventa su API o semántica.
+  implementarse antes de cualquier slice C6 que dependa de cobertura. No está
+  READY y C5 no inventa su API o semántica.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
 - **DEC-C5B-01:** se diseña el rol dedicado `zaping_hc_c5b`; documentarlo no
@@ -815,9 +816,10 @@ Evidencia técnica C5-A:
 - PR #36 y #37 integrados en `main@5ec9f67`; Actual C5-A: 24-sep-2026.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin conversión a
-velocidad ni Commitment. C5-A se completó el 24-sep y C6-A el 25-sep mediante PR
-#38 en `main@8a67d5a`. El Forecast del trabajo restante permanece pendiente; no
-se declara un siguiente slice READY. B0 conserva sus 3 SP y estado NOT READY.
+velocidad ni Commitment. C5-A se completó el 24-sep y C6-A/C6-B el 25-sep,
+mediante PR #38 en `main@8a67d5a` y PR #40 en `main@4805128`. El Forecast del
+trabajo restante permanece pendiente. C6-C queda como candidato funcional NOT
+READY; B0 conserva sus 3 SP y estado NOT READY.
 
 ### C5-B — contrato y preparación pendiente
 
@@ -891,8 +893,8 @@ interna expuesta.
 
 ### HC-NEXT-03C5-COVERAGE
 
-**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR LATER C6 COVERAGE OR
-MUTATION SLICES; NOT A BLOCKER FOR C6-A.
+**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND
+ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B.
 
 El contrato pendiente debe definir lectura agregada `PENDING` / `PARTIAL` /
 `UNAVAILABLE` / `CONFLICT`, registro y resolución de CoverageNotes, tenant scope,
@@ -921,6 +923,31 @@ DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con war
 
 Known non-blocker: los datos de desarrollo pueden presentar mojibake como
 “Cirug�a”/“Demostraci�n”; la UI estática UTF-8 es correcta.
+
+### HC-NEXT-03C6-B — Create Assignment UI
+
+**Estado:** COMPLETE / MERGED — PR #40 — `main@4805128` — Actual 25-sep-2026.
+
+El segundo slice visual añade creación DIRECT sobre la pantalla de C6-A usando el
+backend Create integrado. Conserva RBAC, genera Idempotency-Key por request,
+refresca List tras éxito y representa los resultados y errores aprobados sin
+duplicar reglas complejas del dominio.
+
+Evidencia de cierre: Vitest focal 19/19 PASS; TypeScript Web, ESLint Web y Next.js
+build PASS; CI API/Web PASS. La validación manual acreditó MANAGER Create DIRECT,
+éxito con refresh de List, nueva Assignment RESERVED visible,
+disponibilidad/warning renderizados y SALES sin acción Create.
+
+Quedan fuera Requirement assignment, Replace, Release, CoverageNote, movimientos
+físicos y cambios productivos de backend. El mojibake de datos de desarrollo
+permanece como known non-blocker; la UI estática UTF-8 es correcta.
+
+### HC-NEXT-03C6-C — Release Assignment UI
+
+**Estado:** NEXT FUNCTIONAL CANDIDATE / NOT READY.
+
+Se registra únicamente como próximo candidato funcional. Requiere refinamiento y
+DoR; no tiene SP, Forecast ni Commitment asignados y no abre infraestructura.
 
 ---
 
@@ -962,6 +989,8 @@ Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 → C6-A READ-ONLY CASE VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a — ACTUAL 25-sep-2026
+→ C6-B CREATE ASSIGNMENT UI COMPLETE / MERGED — PR #40 — main@4805128 — ACTUAL 25-sep-2026
+→ C6-C RELEASE ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
 
