@@ -12,6 +12,7 @@ import {
   getHealthcareEquipmentAssignment,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
+  releaseHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
   type HealthcareEquipmentAssignmentConflictReviewResponse,
@@ -46,6 +47,7 @@ vi.mock('@/services/healthcare-equipment-assignments', async (importOriginal) =>
     getHealthcareEquipmentAssignment: vi.fn(),
     listEligibleEquipmentAssignmentAssets: vi.fn(),
     createDirectHealthcareEquipmentAssignment: vi.fn(),
+    releaseHealthcareEquipmentAssignment: vi.fn(),
   };
 });
 
@@ -157,6 +159,23 @@ const directAssignment: HealthcareEquipmentAssignment = {
   },
 };
 
+const releasedAssignment: HealthcareEquipmentAssignment = {
+  ...assignment,
+  status: 'RELEASED',
+  release: {
+    cause: 'MANUAL',
+    reason: 'Equipo ya no requerido',
+    releasedAt: '2026-09-25T20:00:00.000Z',
+    releasedBy: {
+      id: 'manager-1',
+      firstName: 'Mara',
+      lastName: 'Núñez',
+    },
+  },
+  availability: null,
+  updatedAt: '2026-09-25T20:00:00.000Z',
+};
+
 const conflictReview: HealthcareEquipmentAssignmentConflictReviewResponse = {
   outcome: 'CONFLICT_REVIEW_REQUIRED',
   conflictReviewFingerprint: 'a'.repeat(64),
@@ -246,6 +265,9 @@ async function renderPage(role: UserRole = 'ADMIN') {
     outcome: 'CREATED',
     data: directAssignment,
   });
+  vi.mocked(releaseHealthcareEquipmentAssignment).mockResolvedValue(
+    releasedAssignment,
+  );
   render(<HealthcareCaseEquipmentAssignmentsPage />);
   await screen.findByText('Torre laparoscópica');
 }
@@ -285,13 +307,18 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
         expect(
           screen.queryByRole('button', { name: 'Nueva asignación' }),
         ).toBeNull();
+        expect(
+          screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
+        ).toBeNull();
       } else {
         expect(
           screen.getByRole('button', { name: 'Nueva asignación' }),
         ).toBeTruthy();
+        expect(
+          screen.getByRole('button', { name: 'Liberar EQ-0001' }),
+        ).toBeTruthy();
       }
-      expect(screen.queryByRole('button', { name: /reemplazar|liberar/i }))
-        .toBeNull();
+      expect(screen.queryByRole('button', { name: /reemplazar/i })).toBeNull();
     },
   );
 
@@ -505,6 +532,113 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
       expect(
         screen.queryByText('Asignación creada correctamente.'),
       ).toBeNull();
+    },
+  );
+
+  it('libera una RESERVED, cierra el modal y refresca su estado histórico', async () => {
+    const user = userEvent.setup();
+    await renderPage('MANAGER');
+    vi.mocked(listHealthcareEquipmentAssignments).mockResolvedValue(
+      listResponse([releasedAssignment]),
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Liberar EQ-0001' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Liberar asignación',
+    });
+    const submitButton = within(dialog).getByRole('button', {
+      name: 'Liberar asignación',
+    });
+    expect(submitButton).toHaveProperty('disabled', true);
+
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo de liberación/),
+      '  Equipo ya no requerido  ',
+    );
+    await user.click(submitButton);
+
+    await waitFor(() =>
+      expect(releaseHealthcareEquipmentAssignment).toHaveBeenCalledWith(
+        'assignment-1',
+        { reason: 'Equipo ya no requerido' },
+      ),
+    );
+    expect(
+      await screen.findByText('Asignación liberada correctamente.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('dialog', { name: 'Liberar asignación' }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(2),
+    );
+    expect(screen.getByText('Liberada')).toBeTruthy();
+    expect(screen.getByText('No aplica (histórico)')).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
+    ).toBeNull();
+  });
+
+  it('no ofrece Release para una Assignment histórica a un rol autorizado', async () => {
+    configureApi('ADMIN');
+    vi.mocked(listHealthcareEquipmentAssignments).mockResolvedValue(
+      listResponse([releasedAssignment]),
+    );
+
+    render(<HealthcareCaseEquipmentAssignmentsPage />);
+
+    expect(await screen.findByText('Liberada')).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
+    ).toBeNull();
+    expect(releaseHealthcareEquipmentAssignment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [400, 'El motivo no es válido.', 'El motivo no es válido.'],
+    [
+      403,
+      'No tienes permisos para liberar la asignación.',
+      'No tienes permisos para liberar la asignación.',
+    ],
+    [409, 'La asignación ya cambió.', 'La asignación ya cambió.'],
+    [
+      500,
+      'Request failed with status code 500',
+      'No fue posible liberar la asignación por un error de persistencia.',
+    ],
+  ])(
+    'mantiene la sesión y muestra el error Release HTTP %s dentro del modal',
+    async (status, responseMessage, expectedMessage) => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('token', 'valid-token');
+      await renderPage('WAREHOUSE');
+      vi.mocked(releaseHealthcareEquipmentAssignment).mockRejectedValue(
+        Object.assign(new Error(responseMessage), { response: { status } }),
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Liberar EQ-0001' }),
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Liberar asignación',
+      });
+      await user.type(
+        within(dialog).getByLabelText(/^Motivo de liberación/),
+        'Equipo ya no requerido',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Liberar asignación' }),
+      );
+
+      expect(await within(dialog).findByText(expectedMessage)).toBeTruthy();
+      expect(window.localStorage.getItem('token')).toBe('valid-token');
+      expect(
+        screen.queryByText('Asignación liberada correctamente.'),
+      ).toBeNull();
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
     },
   );
 

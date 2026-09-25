@@ -97,6 +97,10 @@ export type CreateDirectHealthcareEquipmentAssignmentPayload = {
   directAssignmentReason: string;
 };
 
+export type ReleaseHealthcareEquipmentAssignmentPayload = {
+  reason: string;
+};
+
 export type HealthcareEquipmentAssignmentConflictReviewResponse = {
   outcome: 'CONFLICT_REVIEW_REQUIRED';
   conflictReviewFingerprint: string;
@@ -183,6 +187,24 @@ export async function createDirectHealthcareEquipmentAssignment(
   const idempotencyKey = `hc-assignment-${globalThis.crypto.randomUUID()}`;
   const response = await api.post<CreateHealthcareEquipmentAssignmentResponse>(
     '/healthcare/equipment-assignments',
+    payload,
+    {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function releaseHealthcareEquipmentAssignment(
+  assignmentId: string,
+  payload: ReleaseHealthcareEquipmentAssignmentPayload,
+): Promise<HealthcareEquipmentAssignment> {
+  const idempotencyKey = `hc-assignment-release-${globalThis.crypto.randomUUID()}`;
+  const response = await api.post<HealthcareEquipmentAssignment>(
+    `/healthcare/equipment-assignments/${assignmentId}/release`,
     payload,
     {
       headers: {

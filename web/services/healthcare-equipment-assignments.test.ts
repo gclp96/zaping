@@ -6,6 +6,7 @@ import {
   getHealthcareEquipmentAssignment,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
+  releaseHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
 } from './healthcare-equipment-assignments';
@@ -118,6 +119,37 @@ describe('healthcare-equipment-assignments service', () => {
       {
         headers: {
           'Idempotency-Key': expect.stringMatching(/^hc-assignment-/),
+        },
+      },
+    );
+    const firstKey = vi.mocked(api.post).mock.calls[0]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    const secondKey = vi.mocked(api.post).mock.calls[1]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    expect(firstKey).not.toBe(secondKey);
+  });
+
+  it('libera una Assignment con respuesta directa e Idempotency-Key nueva por request', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: assignment });
+    const payload = { reason: 'Equipo ya no requerido' };
+
+    await expect(
+      releaseHealthcareEquipmentAssignment('assignment-1', payload),
+    ).resolves.toBe(assignment);
+    await releaseHealthcareEquipmentAssignment('assignment-1', payload);
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/healthcare/equipment-assignments/assignment-1/release',
+      payload,
+      {
+        headers: {
+          'Idempotency-Key': expect.stringMatching(
+            /^hc-assignment-release-/,
+          ),
         },
       },
     );
