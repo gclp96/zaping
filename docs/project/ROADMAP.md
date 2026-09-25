@@ -105,9 +105,13 @@ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGE
 ↓
 HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 ↓
+HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+↓
+HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
-HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
+HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -146,7 +150,7 @@ La exclusividad se comprobó al inicio, no durante toda la ejecución; no se dec
 la base globalmente vacía.
 DEC-C5-01 separa CoverageNote y cobertura agregada en HC-NEXT-03C5-COVERAGE,
 ticket backend independiente con contrato pendiente y requerido antes de slices
-posteriores de C6 que muestren coverage o muten Assignments; no bloquea C6-A.
+posteriores de C6 que dependan de coverage; no bloquea C6-A/C6-B.
 
 DEC-C5B-01 diseña el rol dedicado `zaping_hc_c5b`, sin autorizar su creación ni
 cambios ACL. DEC-C5B-02 acepta evidencia compuesta del error sanitizado: mapping
@@ -156,9 +160,10 @@ petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
 List/Detail HTTP el recálculo, no Case Update API.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A el 25-sep mediante
-PR #38 en `main@8a67d5a`. El Forecast del trabajo restante sigue pendiente y no se
-declara un siguiente slice READY. C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con
+velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A/C6-B el 25-sep,
+mediante PR #38 en `main@8a67d5a` y PR #40 en `main@4805128`. El Forecast del
+trabajo restante sigue pendiente. C6-C se registra sólo como próximo candidato
+funcional y permanece NOT READY; C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con
 B0 NOT READY.
 
 También permanecen como TARGET Healthcare:
@@ -982,7 +987,8 @@ COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
 ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5ec9f67 VIA
 PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED — PARTIALLY
-IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN main@8a67d5a.
+IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN
+main@8a67d5a; C6-B CREATE UI COMPLETE / MERGED IN main@4805128.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1055,14 +1061,19 @@ evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
 pendiente y como prerequisito de slices posteriores de C6 que requieran coverage
-o mutaciones, no de C6-A. C6-A está COMPLETE / MERGED mediante PR #38 en
+pero no de C6-A/C6-B. C6-A está COMPLETE / MERGED mediante PR #38 en
 `main@8a67d5a`, con Actual 25-sep-2026. Vitest focal 29/29, ESLint, TypeScript,
 Next.js build y CI API/Web pasaron; la validación manual cubrió empty state,
 DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con
 `INCOMPLETE_CASE_SCHEDULE`. El mojibake observado sólo en datos de desarrollo
 (“Cirug�a”/“Demostraci�n”) es un known non-blocker; la UI estática UTF-8 es
-correcta. Este corte no declara otro slice READY, Healthcare Core ni producción
-terminados.
+correcta. C6-B está COMPLETE / MERGED mediante PR #40 en `main@4805128`, con
+Actual 25-sep-2026: Vitest focal 19/19, TypeScript Web, ESLint Web, Next.js build
+y CI API/Web pasaron. La validación manual acreditó MANAGER Create DIRECT, éxito
+con refresh de List, nueva RESERVED visible, disponibilidad/warning renderizados
+y SALES sin acción Create. C6-C Release Assignment UI queda sólo como próximo
+candidato funcional / NOT READY, sin SP, Forecast ni Commitment. Este corte no
+declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
 
@@ -2809,9 +2820,13 @@ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGE
 
 HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 
+HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+
+HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
-HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Case Availability
 
@@ -2958,9 +2973,13 @@ HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGE
 ↓
 HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 ↓
+HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+↓
+HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
-HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
+HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-25
 Responsable: Zaping Team
 
@@ -175,6 +175,12 @@ HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
 
 HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
         → COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
+
+HC-NEXT-03C6-B — Create Assignment UI
+        → COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+
+HC-NEXT-03C6-C — Release Assignment UI
+        → NEXT FUNCTIONAL CANDIDATE / NOT READY
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2280,8 +2286,10 @@ CURRENT ROADMAP ITEM
 
 → HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 → HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
+→ HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+→ HC-NEXT-03C6-C Release Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-→ HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
+→ HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
@@ -2511,7 +2519,10 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations
 Healthcare Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
-→ C6-A READ-ONLY VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
+→ C6-A READ-ONLY VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a
+→ C6-B CREATE UI COMPLETE / MERGED — PR #40 — main@4805128
+→ C6-C RELEASE UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+→ C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2844,7 +2855,8 @@ propagaron fallos de cleanup. Esta evidencia no afirma limpieza global de
 Decisiones aprobadas:
 - **DEC-C5-01:** `HealthcareEquipmentRequirementCoverageNote` y la cobertura
   agregada quedan fuera de C5. Se entregarán en el ticket backend independiente
-  HC-NEXT-03C5-COVERAGE antes de C6; su contrato funcional aún está pendiente.
+  HC-NEXT-03C5-COVERAGE antes de cualquier slice C6 que dependa de cobertura; su
+  contrato funcional aún está pendiente.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
 - **DEC-C5B-01:** C5-B diseña un rol dedicado `zaping_hc_c5b`. La decisión no
@@ -2933,8 +2945,10 @@ Sprint 1:
 - C5-A completado el 24-sep-2026;
 - C6-A, pantalla visible de consulta read-only de Equipment Assignments para un
   Case, quedó COMPLETE / MERGED mediante PR #38 en `main@8a67d5a`;
-- Actual C6-A: 25-sep-2026. El 07-oct-2026 continúa siendo el cierre de la
-  ventana, no un Commitment retroactivo ni la fecha asumida del siguiente slice;
+- C6-B, creación visual de Assignment DIRECT, quedó COMPLETE / MERGED mediante
+  PR #40 en `main@4805128`;
+- Actual C6-A y C6-B: 25-sep-2026. El 07-oct-2026 continúa siendo el cierre de la
+  ventana, no un Commitment retroactivo ni la fecha asumida de C6-C;
 - B0 conserva sus 3 SP y estado NOT READY dentro del trabajo pendiente de C5-B;
 - Actual C5-A: 24-sep-2026 — completado antes del Target;
 - Forecast: pendiente de estimar para el trabajo restante;
@@ -3067,8 +3081,8 @@ Acceptance Criteria / Definition of Done:
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
-Estado: CONTRACT PENDING / NOT READY — PREREQUISITE FOR LATER C6 COVERAGE OR
-MUTATION SLICES; NOT A BLOCKER FOR C6-A
+Estado: CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND ON
+COVERAGE; NOT A BLOCKER FOR C6-A/C6-B
 
 Debe formalizar lectura agregada `PENDING` / `PARTIAL` / `UNAVAILABLE` /
 `CONFLICT` y commands para registrar/resolver CoverageNotes, incluyendo tenant,
@@ -3106,6 +3120,34 @@ C6-A y no se abre trabajo de infraestructura en este cierre.
 
 Fuera de alcance: Create, Replace o Release en UI, CoverageNote, movimientos
 físicos y cambios productivos de backend.
+
+#### HC-NEXT-03C6-B — Create Assignment UI
+
+Estado: COMPLETE / MERGED — PR #40 — `main@4805128` — Actual 25-sep-2026
+
+El slice añadió sobre C6-A la creación de Assignment DIRECT mediante el backend
+Create integrado, con acción restringida por rol, formulario, Idempotency-Key por
+request, manejo de resultados y refresh de List, sin ampliar reglas de dominio en
+frontend ni incorporar Requirement assignment, Replace, Release o CoverageNote.
+
+Evidencia de cierre:
+- Vitest focal 19/19 PASS;
+- TypeScript Web, ESLint Web y Next.js build PASS;
+- CI API/Web PASS;
+- validación manual PASS para MANAGER Create DIRECT, éxito con refresh de List,
+  nueva Assignment RESERVED visible, disponibilidad/warning renderizados y SALES
+  sin acción Create.
+
+El mojibake observado en datos de desarrollo continúa como known non-blocker; la
+UI estática UTF-8 permanece correcta.
+
+#### HC-NEXT-03C6-C — Release Assignment UI
+
+Estado: NEXT FUNCTIONAL CANDIDATE / NOT READY
+
+Se registra únicamente como próximo candidato funcional. Requiere refinamiento y
+DoR antes de implementación; no se asignan SP, Forecast ni Commitment y este
+cierre no abre infraestructura nueva.
 
 Quedan fuera de C5-A/C5-B frontend, Case Availability general, nuevas capacidades
 funcionales, fuzzy search, permission-based RBAC, Dispatch, Return, Custody,

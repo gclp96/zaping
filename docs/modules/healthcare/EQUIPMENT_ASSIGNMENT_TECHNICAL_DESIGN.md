@@ -12,7 +12,7 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW COMPLETE / MERGED; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW AND C6-B CREATE UI COMPLETE / MERGED; C6-C NEXT FUNCTIONAL CANDIDATE / NOT READY; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 **Última actualización:** 2026-09-25
 **Responsable:** Zaping Healthcare Team
 
@@ -1668,8 +1668,9 @@ HC-NEXT-03C1 Persistence / Migration
 → HC-NEXT-03C4 Replace / Release / Parent Integrations
 → HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness
 → HC-NEXT-03C6-A Case Equipment Assignments Read-only View
+→ HC-NEXT-03C6-B Create Assignment UI
 
-Track pendiente, no bloqueante para iniciar C6-A:
+Track pendiente, no bloqueante para C6-A/C6-B:
 HC-NEXT-03C5-B Integrated Backend Validation (B0 → B1/B2 → B3)
 → HC-NEXT-03C5-COVERAGE backend independiente
 → slices posteriores de HC-NEXT-03C6
@@ -1679,8 +1680,9 @@ HC-NEXT-03C5-B Integrated Backend Validation (B0 → B1/B2 → B3)
 Cada slice parte de `main` después de que sus dependencias aplicables estén merged
 y green. C6-A consume List/Detail existentes y puede comenzar sin B0; su
 aceptación integrada espera los gates aplicables de autenticación, permisos y
-List/Detail. Los slices posteriores no adelantan CoverageNote ni mutaciones. Un
-PR no mezcla el scope de su sucesor para ahorrar una integración.
+List/Detail. C6-B reutiliza Create ya integrado sin adelantar CoverageNote. Los
+slices que dependan de coverage esperan HC-NEXT-03C5-COVERAGE. Un PR no mezcla el
+scope de su sucesor para ahorrar una integración.
 
 Reglas comunes de entrada y salida:
 
@@ -1825,7 +1827,7 @@ Decisiones aprobadas:
 
 - **DEC-C5-01:** CoverageNote y cobertura agregada quedan fuera de C5. El ticket
   backend independiente HC-NEXT-03C5-COVERAGE debe definir su contrato y
-  completarse antes de C6.
+  completarse antes de cualquier slice C6 que dependa de cobertura.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
 - **DEC-C5B-01:** se diseña la identidad dedicada `zaping_hc_c5b`. Esta decisión
@@ -1894,10 +1896,10 @@ propios, no una base globalmente vacía. Riesgo residual: la exclusividad se
 comprueba al inicio, pero no está garantizada durante toda la ejecución.
 
 **Sprint 1:** 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment. C5-A se completó el 24-sep y C6-A el 25-sep mediante PR
-#38 en `main@8a67d5a`. El Forecast del trabajo restante permanece pendiente y no
-se declara un siguiente slice READY. B0 conserva sus 3 SP y estado NOT READY
-dentro del backlog C5-B.
+velocidad o Commitment. C5-A se completó el 24-sep y C6-A/C6-B el 25-sep,
+mediante PR #38 en `main@8a67d5a` y PR #40 en `main@4805128`. El Forecast del
+trabajo restante permanece pendiente. C6-C queda como candidato funcional NOT
+READY; B0 conserva sus 3 SP y estado NOT READY dentro del backlog C5-B.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
@@ -2017,8 +2019,8 @@ requiere corrección focal; no amplía capability por inferencia.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
-**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR LATER C6 COVERAGE OR
-MUTATION SLICES; NOT A BLOCKER FOR C6-A.
+**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND
+ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B.
 
 Ticket backend independiente para lectura agregada `PENDING` / `PARTIAL` /
 `UNAVAILABLE` / `CONFLICT` y commands de registro/resolución de CoverageNotes.
@@ -2054,7 +2056,32 @@ con warning `INCOMPLETE_CASE_SCHEDULE`.
 **Known non-blocker:** mojibake en datos de desarrollo como
 “Cirug�a”/“Demostraci�n”; la UI estática UTF-8 es correcta.
 
-### 34.6.2 Slices posteriores de Frontend Equipment Assignment
+### 34.6.2 HC-NEXT-03C6-B — Create Assignment UI
+
+**Estado:** COMPLETE / MERGED — PR #40 — `main@4805128` — Actual 25-sep-2026.
+
+**Scope:** creación de Assignment DIRECT desde la pantalla C6-A, mediante el
+backend Create integrado; selección de equipo elegible, reason, Idempotency-Key
+por request, manejo de resultados, refresh de List y controles RBAC. No duplica
+reglas de dominio complejas ni cambia backend.
+
+**Evidencia de cierre:** Vitest focal 19/19 PASS; TypeScript Web, ESLint Web,
+Next.js build y CI API/Web PASS. La validación manual acreditó MANAGER Create
+DIRECT, éxito con refresh de List, nueva RESERVED visible,
+disponibilidad/warning renderizados y SALES sin acción Create.
+
+**Out of scope:** Requirement assignment, Replace, Release, CoverageNote,
+movimientos físicos y cambios productivos de backend. El mojibake en datos de
+desarrollo continúa como known non-blocker; la UI estática UTF-8 es correcta.
+
+### 34.6.3 HC-NEXT-03C6-C — Release Assignment UI
+
+**Estado:** NEXT FUNCTIONAL CANDIDATE / NOT READY.
+
+Se registra sólo como próximo candidato funcional. Requiere refinamiento y DoR;
+no se le asignan SP, Forecast ni Commitment y no abre infraestructura nueva.
+
+### 34.6.4 Slices posteriores de Frontend Equipment Assignment
 
 La evolución posterior cubre UX centrada en Case para ver Requirements de equipo
 y coverage, asignar EquipmentAsset concreto, crear Assignment DIRECT con reason,
@@ -2456,5 +2483,7 @@ Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 → C6-A READ-ONLY CASE VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a — ACTUAL 25-sep-2026
+→ C6-B CREATE ASSIGNMENT UI COMPLETE / MERGED — PR #40 — main@4805128 — ACTUAL 25-sep-2026
+→ C6-C RELEASE ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
