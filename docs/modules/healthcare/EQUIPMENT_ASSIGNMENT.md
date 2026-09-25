@@ -14,8 +14,8 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW PLANNED AS NEXT PRODUCT INCREMENT; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-**Última actualización:** 2026-09-24
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW COMPLETE / MERGED; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+**Última actualización:** 2026-09-25
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -815,10 +815,9 @@ Evidencia técnica C5-A:
 - PR #36 y #37 integrados en `main@5ec9f67`; Actual C5-A: 24-sep-2026.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin conversión a
-velocidad ni Commitment. C5-A se completó el 24-sep. Se prioriza C6-A como
-primer incremento visible; puede iniciarse sin B0. Sus SP y fecha permanecen
-pendientes de estimación, al igual que Forecast y Commitment. B0 conserva sus
-3 SP y estado NOT READY.
+velocidad ni Commitment. C5-A se completó el 24-sep y C6-A el 25-sep mediante PR
+#38 en `main@8a67d5a`. El Forecast del trabajo restante permanece pendiente; no
+se declara un siguiente slice READY. B0 conserva sus 3 SP y estado NOT READY.
 
 ### C5-B — contrato y preparación pendiente
 
@@ -901,20 +900,27 @@ RBAC, auditoría, concurrencia y HTTP. Es independiente de C5-A/C5-B.
 
 ### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 
-**Estado:** PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION / FORECAST / COMMITMENT
-PENDING.
+**Estado:** COMPLETE / MERGED — PR #38 — `main@8a67d5a` — Actual 25-sep-2026.
 
 El primer slice visual entrega una pantalla de consulta para un Case conectada a
 List/Detail existentes. Incluye listado, detalle, disponibilidad expuesta por la
-API y estados loading, empty, error y RBAC. Puede comenzar sin completar B0; su
-aceptación integrada depende de los gates aplicables de autenticación, permisos y
-List/Detail.
+API y estados loading, empty, error y RBAC. Se completó sin B0; su aceptación
+integrada queda limitada a los gates aplicables acreditados de autenticación,
+permisos y List/Detail.
 
 Acceptance Criteria / DoD: navegación Case → listado → detalle, representación
 fiel de disponibilidad y estados de consulta, comportamiento read-only por rol,
 pruebas focales de UI y gates Web verdes, más la verificación integrada aplicable
 de auth/RBAC/List/Detail. Quedan fuera Create/Replace/Release en UI, CoverageNote,
 movimientos físicos y cualquier cambio productivo de backend.
+
+Evidencia de cierre: Vitest focal 29/29 PASS; ESLint, TypeScript y Next.js build
+PASS; CI API/Web PASS. La validación manual acreditó empty state, una Assignment
+DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con warning
+`INCOMPLETE_CASE_SCHEDULE`.
+
+Known non-blocker: los datos de desarrollo pueden presentar mojibake como
+“Cirug�a”/“Demostraci�n”; la UI estática UTF-8 es correcta.
 
 ---
 
@@ -955,7 +961,7 @@ HC-NEXT-03C4 — Replace / Release / Parent Integrations
 Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
-→ C6-A READ-ONLY CASE VIEW PLANNED NEXT — ESTIMATION / FORECAST / COMMITMENT PENDING
+→ C6-A READ-ONLY CASE VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a — ACTUAL 25-sep-2026
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
 

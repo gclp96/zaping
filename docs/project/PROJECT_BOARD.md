@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A READ-ONLY CASE VIEW PLANNED AS NEXT PRODUCT INCREMENT — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-Última actualización: 2026-09-24
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Última actualización: 2026-09-25
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -174,7 +174,7 @@ HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
         → COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 
 HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
-        → PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+        → COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2279,7 +2279,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C4 Healthcare Equipment Assignment Replace / Release / Parent Integrations — COMPLETE / MERGED — HC-LOCK-04 FINAL CLOSED / ACCEPTED
 
 → HC-NEXT-03C5-A Contract Alignment & Safe PostgreSQL Harness — COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
-→ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION PENDING
+→ HC-NEXT-03C6-A Case Equipment Assignments Read-only View — COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE LATER C6 COVERAGE OR MUTATION SLICES
 
@@ -2511,7 +2511,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations
 Healthcare Equipment Assignment implementation
 → PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED
 → C5-A COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
-→ C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C6-A READ-ONLY VIEW PLANNED NEXT; C5-COVERAGE CONTRACT PENDING
+→ C6-A READ-ONLY VIEW COMPLETE / MERGED — PR #38 — main@8a67d5a; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2931,15 +2931,15 @@ Sprint 1:
 - capacidad bruta informada: 20 h/semana; no equivale a velocidad, Forecast ni
   Commitment;
 - C5-A completado el 24-sep-2026;
-- se prioriza como próximo incremento de producto C6-A, una pantalla visible de
-  consulta read-only de Equipment Assignments para un Case;
-- C6-A puede iniciarse sin completar B0; sus SP y fecha de entrega permanecen
-  pendientes de estimación. El 07-oct-2026 es el cierre de la ventana, no un
-  Commitment de entrega del slice;
+- C6-A, pantalla visible de consulta read-only de Equipment Assignments para un
+  Case, quedó COMPLETE / MERGED mediante PR #38 en `main@8a67d5a`;
+- Actual C6-A: 25-sep-2026. El 07-oct-2026 continúa siendo el cierre de la
+  ventana, no un Commitment retroactivo ni la fecha asumida del siguiente slice;
 - B0 conserva sus 3 SP y estado NOT READY dentro del trabajo pendiente de C5-B;
 - Actual C5-A: 24-sep-2026 — completado antes del Target;
-- Forecast: pendiente de estimar para C6-A y para el resto del trabajo;
-- Commitment: pendiente; no se asumen fechas comprometidas.
+- Forecast: pendiente de estimar para el trabajo restante;
+- Commitment: pendiente; no se asumen fechas comprometidas ni un siguiente slice
+  READY.
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
@@ -3077,15 +3077,14 @@ no puede implementarse por inferencia durante hardening.
 
 #### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 
-Estado: PLANNED — NEXT PRODUCT INCREMENT — ESTIMATION / FORECAST / COMMITMENT
-PENDING
+Estado: COMPLETE / MERGED — PR #38 — `main@8a67d5a` — Actual 25-sep-2026
 
 Objetivo y alcance inicial:
 - entregar una pantalla centrada en Case, conectada a List/Detail existentes;
 - mostrar listado, detalle y disponibilidad expuesta por la API;
 - cubrir estados loading, empty, error y RBAC sin inventar reglas frontend;
-- permitir iniciar el desarrollo sin B0. La aceptación integrada sí depende de
-  los gates aplicables de autenticación, permisos y List/Detail.
+- mantener el slice independiente de B0; su aceptación integrada quedó limitada
+  a los gates aplicables acreditados de autenticación, permisos y List/Detail.
 
 Acceptance Criteria:
 - desde un Case se consulta su listado y se abre el detalle de una Assignment;
@@ -3094,11 +3093,16 @@ Acceptance Criteria:
 - no se exponen ni habilitan acciones fuera del alcance.
 
 Definition of Done:
-- pruebas focales de pantalla/componentes y estados de consulta verdes;
-- integración con List/Detail verificada con los gates aplicables de auth/RBAC;
-- Web lint, typecheck, build y `git diff --check` verdes;
-- SP, fecha Target y Forecast se acuerdan tras refinamiento; no existe Commitment
-  en este documento.
+- Vitest focal 29/29 PASS;
+- ESLint, TypeScript y Next.js build PASS; CI API/Web PASS;
+- validación manual PASS para empty state, Assignment DIRECT/RESERVED real,
+  Detail modal y disponibilidad “No verificable” con warning
+  `INCOMPLETE_CASE_SCHEDULE`;
+- PR #38 integrado en `main@8a67d5a` el 25-sep-2026.
+
+Known non-blocker: datos de desarrollo presentan mojibake como “Cirug�a” o
+“Demostraci�n”; la UI estática UTF-8 es correcta. No bloqueó la aceptación de
+C6-A y no se abre trabajo de infraestructura en este cierre.
 
 Fuera de alcance: Create, Replace o Release en UI, CoverageNote, movimientos
 físicos y cambios productivos de backend.
