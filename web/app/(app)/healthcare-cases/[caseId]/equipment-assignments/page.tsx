@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,18 +18,28 @@ import Modal from '@/app/components/ui/Modal';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
+import { hasRole, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import { api } from '@/services/api';
-import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import {
+  getApiErrorMessage,
+  getApiErrorStatus,
+  isForbiddenError,
+} from '@/services/errors';
+import {
+  createDirectHealthcareEquipmentAssignment,
   getHealthcareEquipmentAssignment,
+  listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   type HealthcareEquipmentAssignment,
+  type HealthcareEquipmentAssignmentAssetCandidate,
   type HealthcareEquipmentAssignmentAvailability,
+  type HealthcareEquipmentAssignmentConflictReviewResponse,
   type HealthcareEquipmentAssignmentOrigin,
   type HealthcareEquipmentAssignmentStatus,
 } from '@/services/healthcare-equipment-assignments';
 
 import type { HealthcareCase } from '../../types';
+import CreateDirectAssignmentModal from './CreateDirectAssignmentModal';
 
 const statusDescriptors: Record<
   HealthcareEquipmentAssignmentStatus,
@@ -104,6 +114,30 @@ function AvailabilitySummary({
   );
 }
 
+function createAssignmentErrorFallback(error: unknown): string {
+  switch (getApiErrorStatus(error)) {
+    case 400:
+      return 'Revisa el equipo y el motivo antes de crear la asignación.';
+    case 403:
+      return 'No tienes permisos para crear asignaciones de equipo.';
+    case 409:
+      return 'El caso o el equipo cambió. Actualiza la información e inténtalo de nuevo.';
+    case 500:
+      return 'No fue posible crear la asignación por un error de persistencia.';
+    default:
+      return 'No fue posible crear la asignación.';
+  }
+}
+
+function createAssignmentErrorMessage(error: unknown): string {
+  const fallback = createAssignmentErrorFallback(error);
+  const message = getApiErrorMessage(error, fallback);
+
+  return /^Request failed with status code \d+$/i.test(message)
+    ? fallback
+    : message;
+}
+
 const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
   {
     id: 'equipment',
@@ -158,8 +192,15 @@ const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
 export default function HealthcareCaseEquipmentAssignmentsPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const sessionState = useAuthenticatedSession();
+  const currentUserRole =
+    sessionState.status === 'success'
+      ? sessionState.user?.role ?? null
+      : null;
+  const canCreateAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
   const requestId = useRef(0);
   const detailRequestId = useRef(0);
+  const assetRequestId = useRef(0);
+  const createSubmissionInFlight = useRef(false);
   const [healthcareCase, setHealthcareCase] = useState<HealthcareCase | null>(
     null,
   );
@@ -175,6 +216,19 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [eligibleAssets, setEligibleAssets] = useState<
+    HealthcareEquipmentAssignmentAssetCandidate[]
+  >([]);
+  const [eligibleAssetsLoading, setEligibleAssetsLoading] = useState(false);
+  const [eligibleAssetsError, setEligibleAssetsError] = useState('');
+  const [createEquipmentAssetId, setCreateEquipmentAssetId] = useState('');
+  const [directAssignmentReason, setDirectAssignmentReason] = useState('');
+  const [createSaving, setCreateSaving] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [conflictReview, setConflictReview] =
+    useState<HealthcareEquipmentAssignmentConflictReviewResponse | null>(null);
   const [detailAssignmentId, setDetailAssignmentId] = useState<string | null>(
     null,
   );
@@ -261,6 +315,34 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     }
   }, []);
 
+  const loadEligibleAssets = useCallback(async () => {
+    const currentRequestId = ++assetRequestId.current;
+    setEligibleAssetsLoading(true);
+    setEligibleAssetsError('');
+    setEligibleAssets([]);
+
+    try {
+      const assets = await listEligibleEquipmentAssignmentAssets();
+      if (currentRequestId === assetRequestId.current) {
+        setEligibleAssets(assets);
+      }
+    } catch (requestError: unknown) {
+      if (currentRequestId !== assetRequestId.current) return;
+      setEligibleAssetsError(
+        getApiErrorMessage(
+          requestError,
+          isForbiddenError(requestError)
+            ? 'No tienes permisos para consultar los equipos.'
+            : 'No fue posible cargar los equipos elegibles.',
+        ),
+      );
+    } finally {
+      if (currentRequestId === assetRequestId.current) {
+        setEligibleAssetsLoading(false);
+      }
+    }
+  }, []);
+
   const rowActions: DataTableRowActions<HealthcareEquipmentAssignment> = {
     label: (assignment) =>
       `Acciones de la asignación ${assignment.equipmentAsset.assetCode}`,
@@ -282,6 +364,87 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     setDetailForbidden(false);
   }
 
+  function resetCreateForm() {
+    setCreateEquipmentAssetId('');
+    setDirectAssignmentReason('');
+    setCreateError('');
+    setConflictReview(null);
+  }
+
+  function openCreateModal() {
+    if (!canCreateAssignment) return;
+    resetCreateForm();
+    setNotice('');
+    setCreateModalOpen(true);
+    void loadEligibleAssets();
+  }
+
+  function closeCreateModal(force = false) {
+    if (createSubmissionInFlight.current && !force) return;
+    assetRequestId.current += 1;
+    setCreateModalOpen(false);
+    setEligibleAssets([]);
+    setEligibleAssetsLoading(false);
+    setEligibleAssetsError('');
+    resetCreateForm();
+  }
+
+  function updateCreateEquipmentAssetId(equipmentAssetId: string) {
+    setCreateEquipmentAssetId(equipmentAssetId);
+    setCreateError('');
+    setConflictReview(null);
+  }
+
+  function updateDirectAssignmentReason(reason: string) {
+    setDirectAssignmentReason(reason);
+    setCreateError('');
+    setConflictReview(null);
+  }
+
+  async function submitDirectAssignment() {
+    const normalizedReason = directAssignmentReason.trim();
+    if (
+      !canCreateAssignment ||
+      !createEquipmentAssetId ||
+      !normalizedReason ||
+      createSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    createSubmissionInFlight.current = true;
+    setCreateSaving(true);
+    setCreateError('');
+    setConflictReview(null);
+
+    try {
+      const response = await createDirectHealthcareEquipmentAssignment({
+        caseId,
+        equipmentAssetId: createEquipmentAssetId,
+        directAssignmentReason: normalizedReason,
+      });
+
+      if (response.outcome === 'CONFLICT_REVIEW_REQUIRED') {
+        setConflictReview(response);
+        return;
+      }
+
+      closeCreateModal(true);
+      setNotice('Asignación creada correctamente.');
+
+      if (pagination.page === 1) {
+        await loadAssignments();
+      } else {
+        setPagination((current) => ({ ...current, page: 1 }));
+      }
+    } catch (requestError: unknown) {
+      setCreateError(createAssignmentErrorMessage(requestError));
+    } finally {
+      createSubmissionInFlight.current = false;
+      setCreateSaving(false);
+    }
+  }
+
   return (
     <>
       <PageContainer>
@@ -293,22 +456,39 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
               : 'Consulta las reservas y el historial de equipo del caso.'
           }
           action={
-            <Link
-              href="/healthcare-cases"
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-            >
-              <ArrowLeft aria-hidden="true" size={18} />
-              Volver a casos
-            </Link>
+            <div className="flex flex-wrap items-center gap-3">
+              {canCreateAssignment && !forbidden ? (
+                <Button type="button" onClick={openCreateModal}>
+                  <Plus aria-hidden="true" size={18} />
+                  Nueva asignación
+                </Button>
+              ) : null}
+              <Link
+                href="/healthcare-cases"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+              >
+                <ArrowLeft aria-hidden="true" size={18} />
+                Volver a casos
+              </Link>
+            </div>
           }
         />
+
+        {notice ? (
+          <div
+            role="status"
+            className="rounded-lg border border-green-200 bg-green-50 p-4 text-green-800"
+          >
+            {notice}
+          </div>
+        ) : null}
 
         {forbidden ? (
           <ForbiddenState />
         ) : (
           <Section
             title="Asignaciones de equipo"
-            description="Reservas activas e historial del caso. Esta vista es de sólo lectura."
+            description="Reservas activas e historial del caso. Los roles autorizados pueden crear asignaciones directas."
           >
             <DataTable
               caption="Asignaciones de equipo del caso"
@@ -356,6 +536,23 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
           </Section>
         )}
       </PageContainer>
+
+      <CreateDirectAssignmentModal
+        isOpen={createModalOpen}
+        assets={eligibleAssets}
+        assetsLoading={eligibleAssetsLoading}
+        assetsError={eligibleAssetsError}
+        equipmentAssetId={createEquipmentAssetId}
+        directAssignmentReason={directAssignmentReason}
+        saving={createSaving}
+        error={createError}
+        conflictReview={conflictReview}
+        onEquipmentAssetIdChange={updateCreateEquipmentAssetId}
+        onDirectAssignmentReasonChange={updateDirectAssignmentReason}
+        onRetryAssets={() => void loadEligibleAssets()}
+        onClose={closeCreateModal}
+        onSubmit={() => void submitDirectAssignment()}
+      />
 
       <Modal
         isOpen={detailAssignmentId !== null}

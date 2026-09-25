@@ -88,6 +88,53 @@ export type HealthcareEquipmentAssignmentListResponse = {
   };
 };
 
+export type HealthcareEquipmentAssignmentAssetCandidate =
+  HealthcareEquipmentAssignment['equipmentAsset'];
+
+export type CreateDirectHealthcareEquipmentAssignmentPayload = {
+  caseId: string;
+  equipmentAssetId: string;
+  directAssignmentReason: string;
+};
+
+export type HealthcareEquipmentAssignmentConflictReviewResponse = {
+  outcome: 'CONFLICT_REVIEW_REQUIRED';
+  conflictReviewFingerprint: string;
+  overrideRequired: boolean;
+  conflicts: Array<{
+    assignmentId: string;
+    caseId: string;
+    caseFolio: string;
+    windowStart: string;
+    windowEnd: string;
+  }>;
+  candidate: {
+    caseId: string;
+    requirementId: null;
+    origin: 'DIRECT';
+    equipmentAsset: HealthcareEquipmentAssignmentAssetCandidate;
+    operationalWindow: {
+      start: string;
+      end: string;
+    };
+  };
+  unresolvedReservations: Array<{
+    assignmentId: string;
+    caseId: string;
+    caseFolio: string;
+    scheduledStart: string | null;
+    scheduledEnd: string | null;
+  }>;
+  availability: HealthcareEquipmentAssignmentAvailability;
+};
+
+export type CreateHealthcareEquipmentAssignmentResponse =
+  | {
+      outcome: 'CREATED';
+      data: HealthcareEquipmentAssignment;
+    }
+  | HealthcareEquipmentAssignmentConflictReviewResponse;
+
 export async function listHealthcareEquipmentAssignments(
   caseId: string,
   page: number,
@@ -114,6 +161,34 @@ export async function getHealthcareEquipmentAssignment(
 ): Promise<HealthcareEquipmentAssignment> {
   const response = await api.get<HealthcareEquipmentAssignment>(
     `/healthcare/equipment-assignments/${assignmentId}`,
+  );
+
+  return response.data;
+}
+
+export async function listEligibleEquipmentAssignmentAssets(): Promise<
+  HealthcareEquipmentAssignmentAssetCandidate[]
+> {
+  const response =
+    await api.get<HealthcareEquipmentAssignmentAssetCandidate[]>('/equipment');
+
+  return response.data.filter(
+    (asset) => asset.lifecycle === 'ACTIVE' && asset.condition === 'GOOD',
+  );
+}
+
+export async function createDirectHealthcareEquipmentAssignment(
+  payload: CreateDirectHealthcareEquipmentAssignmentPayload,
+): Promise<CreateHealthcareEquipmentAssignmentResponse> {
+  const idempotencyKey = `hc-assignment-${globalThis.crypto.randomUUID()}`;
+  const response = await api.post<CreateHealthcareEquipmentAssignmentResponse>(
+    '/healthcare/equipment-assignments',
+    payload,
+    {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    },
   );
 
   return response.data;
