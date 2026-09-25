@@ -8,9 +8,13 @@ import {
 } from '@/app/auth-session';
 import { api } from '@/services/api';
 import {
+  createDirectHealthcareEquipmentAssignment,
   getHealthcareEquipmentAssignment,
+  listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   type HealthcareEquipmentAssignment,
+  type HealthcareEquipmentAssignmentAssetCandidate,
+  type HealthcareEquipmentAssignmentConflictReviewResponse,
   type HealthcareEquipmentAssignmentListResponse,
 } from '@/services/healthcare-equipment-assignments';
 
@@ -40,12 +44,18 @@ vi.mock('@/services/healthcare-equipment-assignments', async (importOriginal) =>
     ...actual,
     listHealthcareEquipmentAssignments: vi.fn(),
     getHealthcareEquipmentAssignment: vi.fn(),
+    listEligibleEquipmentAssignmentAssets: vi.fn(),
+    createDirectHealthcareEquipmentAssignment: vi.fn(),
   };
 });
 
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
+  getApiErrorStatus: (error: unknown) =>
+    error && typeof error === 'object' && 'response' in error
+      ? (error as { response?: { status?: number } }).response?.status
+      : undefined,
   isForbiddenError: (error: unknown) =>
     Boolean(
       error &&
@@ -118,6 +128,71 @@ const assignment: HealthcareEquipmentAssignment = {
   updatedAt: '2026-09-24T18:00:00.000Z',
 };
 
+const eligibleAsset: HealthcareEquipmentAssignmentAssetCandidate = {
+  id: 'asset-2',
+  productId: 'product-2',
+  assetCode: 'EQ-0002',
+  serialNumber: 'SN-0002',
+  lifecycle: 'ACTIVE',
+  condition: 'GOOD',
+  product: {
+    id: 'product-2',
+    sku: 'EQ-SKU-2',
+    name: 'Monitor de signos vitales',
+    isActive: true,
+  },
+};
+
+const directAssignment: HealthcareEquipmentAssignment = {
+  ...assignment,
+  id: 'assignment-2',
+  requirementId: null,
+  origin: 'DIRECT',
+  equipmentAsset: eligibleAsset,
+  directAssignmentReason: 'Necesidad de demostración',
+  availability: {
+    fullyVerifiable: true,
+    conflictFree: true,
+    warnings: [],
+  },
+};
+
+const conflictReview: HealthcareEquipmentAssignmentConflictReviewResponse = {
+  outcome: 'CONFLICT_REVIEW_REQUIRED',
+  conflictReviewFingerprint: 'a'.repeat(64),
+  overrideRequired: true,
+  conflicts: [
+    {
+      assignmentId: 'assignment-conflict',
+      caseId: 'case-2',
+      caseFolio: 'HC-0002',
+      windowStart: '2026-09-25T16:30:00.000Z',
+      windowEnd: '2026-09-25T17:30:00.000Z',
+    },
+  ],
+  candidate: {
+    caseId: 'case-1',
+    requirementId: null,
+    origin: 'DIRECT',
+    equipmentAsset: eligibleAsset,
+    operationalWindow: {
+      start: '2026-09-25T14:00:00.000Z',
+      end: '2026-09-25T21:00:00.000Z',
+    },
+  },
+  unresolvedReservations: [],
+  availability: {
+    fullyVerifiable: true,
+    conflictFree: false,
+    warnings: [
+      {
+        code: 'CURRENT_ASSIGNMENT_CONFLICT',
+        message: 'El equipo tiene una reserva con horario superpuesto.',
+      },
+    ],
+  },
+};
+
 function authResponse(role: UserRole) {
   return {
     data: {
@@ -164,6 +239,13 @@ async function renderPage(role: UserRole = 'ADMIN') {
     listResponse(),
   );
   vi.mocked(getHealthcareEquipmentAssignment).mockResolvedValue(assignment);
+  vi.mocked(listEligibleEquipmentAssignmentAssets).mockResolvedValue([
+    eligibleAsset,
+  ]);
+  vi.mocked(createDirectHealthcareEquipmentAssignment).mockResolvedValue({
+    outcome: 'CREATED',
+    data: directAssignment,
+  });
   render(<HealthcareCaseEquipmentAssignmentsPage />);
   await screen.findByText('Torre laparoscópica');
 }
@@ -199,7 +281,16 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
         1,
         25,
       );
-      expect(screen.queryByRole('button', { name: /crear|reemplazar|liberar/i }))
+      if (role === 'SALES') {
+        expect(
+          screen.queryByRole('button', { name: 'Nueva asignación' }),
+        ).toBeNull();
+      } else {
+        expect(
+          screen.getByRole('button', { name: 'Nueva asignación' }),
+        ).toBeTruthy();
+      }
+      expect(screen.queryByRole('button', { name: /reemplazar|liberar/i }))
         .toBeNull();
     },
   );
@@ -287,6 +378,135 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
       ),
     ).toBeTruthy();
   });
+
+  it('crea una Assignment DIRECT, cierra el modal y refresca la lista', async () => {
+    const user = userEvent.setup();
+    await renderPage('MANAGER');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Nueva asignación' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Nueva asignación directa',
+    });
+    expect(listEligibleEquipmentAssignmentAssets).toHaveBeenCalledTimes(1);
+
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo/),
+      'asset-2',
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo de asignación directa/),
+      '  Necesidad de demostración  ',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Crear asignación' }),
+    );
+
+    await waitFor(() =>
+      expect(createDirectHealthcareEquipmentAssignment).toHaveBeenCalledWith({
+        caseId: 'case-1',
+        equipmentAssetId: 'asset-2',
+        directAssignmentReason: 'Necesidad de demostración',
+      }),
+    );
+    expect(
+      await screen.findByText('Asignación creada correctamente.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('dialog', { name: 'Nueva asignación directa' }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it('muestra CONFLICT_REVIEW_REQUIRED sin afirmar que creó la asignación', async () => {
+    const user = userEvent.setup();
+    await renderPage('WAREHOUSE');
+    vi.mocked(createDirectHealthcareEquipmentAssignment).mockResolvedValue(
+      conflictReview,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Nueva asignación' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Nueva asignación directa',
+    });
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo/),
+      'asset-2',
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo de asignación directa/),
+      'Equipo para el procedimiento',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Crear asignación' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Revisión de conflicto requerida'),
+    ).toBeTruthy();
+    expect(within(dialog).getByText('Conflicto con HC-0002')).toBeTruthy();
+    expect(
+      within(dialog).getByText('La asignación no fue creada. Revisa el contexto o selecciona otro equipo.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('Asignación creada correctamente.'),
+    ).toBeNull();
+    expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [400, 'La solicitud no es válida.', 'La solicitud no es válida.'],
+    [
+      403,
+      'No tienes permisos para crear la asignación.',
+      'No tienes permisos para crear la asignación.',
+    ],
+    [409, 'El equipo ya está reservado.', 'El equipo ya está reservado.'],
+    [
+      500,
+      'Request failed with status code 500',
+      'No fue posible crear la asignación por un error de persistencia.',
+    ],
+  ])(
+    'mantiene la sesión y muestra el error HTTP %s dentro del modal',
+    async (status, responseMessage, expectedMessage) => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('token', 'valid-token');
+      await renderPage('MANAGER');
+      vi.mocked(createDirectHealthcareEquipmentAssignment).mockRejectedValue(
+        Object.assign(new Error(responseMessage), { response: { status } }),
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Nueva asignación' }),
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Nueva asignación directa',
+      });
+      await user.selectOptions(
+        within(dialog).getByLabelText(/^Equipo/),
+        'asset-2',
+      );
+      await user.type(
+        within(dialog).getByLabelText(/^Motivo de asignación directa/),
+        'Necesidad operativa',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Crear asignación' }),
+      );
+
+      expect(await within(dialog).findByText(expectedMessage)).toBeTruthy();
+      expect(window.localStorage.getItem('token')).toBe('valid-token');
+      expect(
+        screen.queryByText('Asignación creada correctamente.'),
+      ).toBeNull();
+    },
+  );
 
   it('pagina usando el contrato del backend', async () => {
     const user = userEvent.setup();
