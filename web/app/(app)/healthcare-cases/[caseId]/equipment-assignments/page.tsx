@@ -31,17 +31,20 @@ import {
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
+  replaceHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
   type HealthcareEquipmentAssignmentAvailability,
   type HealthcareEquipmentAssignmentConflictReviewResponse,
   type HealthcareEquipmentAssignmentOrigin,
+  type HealthcareEquipmentAssignmentReplaceConflictReviewResponse,
   type HealthcareEquipmentAssignmentStatus,
 } from '@/services/healthcare-equipment-assignments';
 
 import type { HealthcareCase } from '../../types';
 import CreateDirectAssignmentModal from './CreateDirectAssignmentModal';
 import ReleaseAssignmentModal from './ReleaseAssignmentModal';
+import ReplaceAssignmentModal from './ReplaceAssignmentModal';
 
 const statusDescriptors: Record<
   HealthcareEquipmentAssignmentStatus,
@@ -164,6 +167,30 @@ function releaseAssignmentErrorMessage(error: unknown): string {
     : message;
 }
 
+function replaceAssignmentErrorFallback(error: unknown): string {
+  switch (getApiErrorStatus(error)) {
+    case 400:
+      return 'Revisa el equipo sustituto y el motivo del reemplazo.';
+    case 403:
+      return 'No tienes permisos para reemplazar asignaciones de equipo.';
+    case 409:
+      return 'La asignación o el equipo cambió. Actualiza la información e inténtalo de nuevo.';
+    case 500:
+      return 'No fue posible reemplazar la asignación por un error de persistencia.';
+    default:
+      return 'No fue posible reemplazar la asignación.';
+  }
+}
+
+function replaceAssignmentErrorMessage(error: unknown): string {
+  const fallback = replaceAssignmentErrorFallback(error);
+  const message = getApiErrorMessage(error, fallback);
+
+  return /^Request failed with status code \d+$/i.test(message)
+    ? fallback
+    : message;
+}
+
 const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
   {
     id: 'equipment',
@@ -224,11 +251,13 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
       : null;
   const canCreateAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
   const canReleaseAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
+  const canReplaceAssignment = hasRole(currentUserRole, WAREHOUSE_ROLES);
   const requestId = useRef(0);
   const detailRequestId = useRef(0);
   const assetRequestId = useRef(0);
   const createSubmissionInFlight = useRef(false);
   const releaseSubmissionInFlight = useRef(false);
+  const replaceSubmissionInFlight = useRef(false);
   const [healthcareCase, setHealthcareCase] = useState<HealthcareCase | null>(
     null,
   );
@@ -262,6 +291,17 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const [releaseReason, setReleaseReason] = useState('');
   const [releaseSaving, setReleaseSaving] = useState(false);
   const [releaseError, setReleaseError] = useState('');
+  const [replaceAssignment, setReplaceAssignment] =
+    useState<HealthcareEquipmentAssignment | null>(null);
+  const [replacementEquipmentAssetId, setReplacementEquipmentAssetId] =
+    useState('');
+  const [replacementReason, setReplacementReason] = useState('');
+  const [replaceSaving, setReplaceSaving] = useState(false);
+  const [replaceError, setReplaceError] = useState('');
+  const [replaceConflictReview, setReplaceConflictReview] =
+    useState<HealthcareEquipmentAssignmentReplaceConflictReviewResponse | null>(
+      null,
+    );
   const [detailAssignmentId, setDetailAssignmentId] = useState<string | null>(
     null,
   );
@@ -389,25 +429,40 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   };
 
   const assignmentColumns: DataTableColumn<HealthcareEquipmentAssignment>[] =
-    canReleaseAssignment
+    canReleaseAssignment || canReplaceAssignment
       ? [
           ...columns,
           {
-            id: 'release',
+            id: 'mutations',
             header: 'Acción',
             cell: (assignment) =>
               assignment.status === 'RESERVED' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  aria-label={`Liberar ${assignment.equipmentAsset.assetCode}`}
-                  onClick={() => openReleaseModal(assignment)}
-                >
-                  Liberar
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  {canReplaceAssignment ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Reemplazar ${assignment.equipmentAsset.assetCode}`}
+                      onClick={() => openReplaceModal(assignment)}
+                    >
+                      Reemplazar
+                    </Button>
+                  ) : null}
+                  {canReleaseAssignment ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Liberar ${assignment.equipmentAsset.assetCode}`}
+                      onClick={() => openReleaseModal(assignment)}
+                    >
+                      Liberar
+                    </Button>
+                  ) : null}
+                </div>
               ) : null,
-            minWidth: 110,
+            minWidth: 230,
           },
         ]
       : columns;
@@ -555,6 +610,89 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     }
   }
 
+  function resetReplaceForm() {
+    setReplacementEquipmentAssetId('');
+    setReplacementReason('');
+    setReplaceError('');
+    setReplaceConflictReview(null);
+  }
+
+  function openReplaceModal(assignment: HealthcareEquipmentAssignment) {
+    if (!canReplaceAssignment || assignment.status !== 'RESERVED') return;
+    resetReplaceForm();
+    setNotice('');
+    setReplaceAssignment(assignment);
+    void loadEligibleAssets();
+  }
+
+  function closeReplaceModal(force = false) {
+    if (replaceSubmissionInFlight.current && !force) return;
+    assetRequestId.current += 1;
+    setReplaceAssignment(null);
+    setEligibleAssets([]);
+    setEligibleAssetsLoading(false);
+    setEligibleAssetsError('');
+    resetReplaceForm();
+  }
+
+  function updateReplacementEquipmentAssetId(equipmentAssetId: string) {
+    setReplacementEquipmentAssetId(equipmentAssetId);
+    setReplaceError('');
+    setReplaceConflictReview(null);
+  }
+
+  function updateReplacementReason(reason: string) {
+    setReplacementReason(reason);
+    setReplaceError('');
+    setReplaceConflictReview(null);
+  }
+
+  async function submitReplaceAssignment() {
+    const normalizedReason = replacementReason.trim();
+    const sourceAssignment = replaceAssignment;
+
+    if (
+      !canReplaceAssignment ||
+      !sourceAssignment ||
+      sourceAssignment.status !== 'RESERVED' ||
+      !replacementEquipmentAssetId ||
+      replacementEquipmentAssetId === sourceAssignment.equipmentAsset.id ||
+      !normalizedReason ||
+      replaceSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    replaceSubmissionInFlight.current = true;
+    setReplaceSaving(true);
+    setReplaceError('');
+    setReplaceConflictReview(null);
+
+    try {
+      const response = await replaceHealthcareEquipmentAssignment(
+        sourceAssignment.id,
+        {
+          equipmentAssetId: replacementEquipmentAssetId,
+          replacementReason: normalizedReason,
+        },
+      );
+
+      if (response.outcome === 'CONFLICT_REVIEW_REQUIRED') {
+        setReplaceConflictReview(response);
+        return;
+      }
+
+      closeReplaceModal(true);
+      setNotice('Asignación reemplazada correctamente.');
+      await loadAssignments();
+    } catch (requestError: unknown) {
+      setReplaceError(replaceAssignmentErrorMessage(requestError));
+    } finally {
+      replaceSubmissionInFlight.current = false;
+      setReplaceSaving(false);
+    }
+  }
+
   return (
     <>
       <PageContainer>
@@ -598,7 +736,7 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
         ) : (
           <Section
             title="Asignaciones de equipo"
-            description="Reservas activas e historial del caso. Los roles autorizados pueden crear asignaciones directas y liberar reservas."
+            description="Reservas activas e historial del caso. Los roles autorizados pueden crear, reemplazar y liberar reservas."
           >
             <DataTable
               caption="Asignaciones de equipo del caso"
@@ -672,6 +810,25 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
         onReasonChange={updateReleaseReason}
         onClose={closeReleaseModal}
         onSubmit={() => void submitReleaseAssignment()}
+      />
+
+      <ReplaceAssignmentModal
+        assignment={replaceAssignment}
+        assets={eligibleAssets.filter(
+          (asset) => asset.id !== replaceAssignment?.equipmentAsset.id,
+        )}
+        assetsLoading={eligibleAssetsLoading}
+        assetsError={eligibleAssetsError}
+        equipmentAssetId={replacementEquipmentAssetId}
+        replacementReason={replacementReason}
+        saving={replaceSaving}
+        error={replaceError}
+        conflictReview={replaceConflictReview}
+        onEquipmentAssetIdChange={updateReplacementEquipmentAssetId}
+        onReplacementReasonChange={updateReplacementReason}
+        onRetryAssets={() => void loadEligibleAssets()}
+        onClose={closeReplaceModal}
+        onSubmit={() => void submitReplaceAssignment()}
       />
 
       <Modal

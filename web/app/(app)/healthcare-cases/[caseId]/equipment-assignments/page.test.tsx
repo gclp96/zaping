@@ -13,10 +13,12 @@ import {
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
+  replaceHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
   type HealthcareEquipmentAssignmentConflictReviewResponse,
   type HealthcareEquipmentAssignmentListResponse,
+  type HealthcareEquipmentAssignmentReplaceConflictReviewResponse,
 } from '@/services/healthcare-equipment-assignments';
 
 import type { HealthcareCase } from '../../types';
@@ -48,6 +50,7 @@ vi.mock('@/services/healthcare-equipment-assignments', async (importOriginal) =>
     listEligibleEquipmentAssignmentAssets: vi.fn(),
     createDirectHealthcareEquipmentAssignment: vi.fn(),
     releaseHealthcareEquipmentAssignment: vi.fn(),
+    replaceHealthcareEquipmentAssignment: vi.fn(),
   };
 });
 
@@ -176,6 +179,36 @@ const releasedAssignment: HealthcareEquipmentAssignment = {
   updatedAt: '2026-09-25T20:00:00.000Z',
 };
 
+const replacedAssignment: HealthcareEquipmentAssignment = {
+  ...assignment,
+  status: 'REPLACED',
+  replacement: {
+    successorAssignmentId: 'assignment-3',
+    reason: 'Equipo sustituto requerido',
+    replacedAt: '2026-09-25T21:00:00.000Z',
+    replacedBy: {
+      id: 'manager-1',
+      firstName: 'Mara',
+      lastName: 'Núñez',
+    },
+  },
+  availability: null,
+  updatedAt: '2026-09-25T21:00:00.000Z',
+};
+
+const replacementAssignment: HealthcareEquipmentAssignment = {
+  ...assignment,
+  id: 'assignment-3',
+  equipmentAsset: eligibleAsset,
+  replacesAssignmentId: assignment.id,
+  availability: {
+    fullyVerifiable: true,
+    conflictFree: true,
+    warnings: [],
+  },
+  updatedAt: '2026-09-25T21:00:00.000Z',
+};
+
 const conflictReview: HealthcareEquipmentAssignmentConflictReviewResponse = {
   outcome: 'CONFLICT_REVIEW_REQUIRED',
   conflictReviewFingerprint: 'a'.repeat(64),
@@ -211,6 +244,17 @@ const conflictReview: HealthcareEquipmentAssignmentConflictReviewResponse = {
     ],
   },
 };
+
+const replaceConflictReview: HealthcareEquipmentAssignmentReplaceConflictReviewResponse =
+  {
+    ...conflictReview,
+    sourceAssignmentId: assignment.id,
+    candidate: {
+      ...conflictReview.candidate,
+      requirementId: assignment.requirementId,
+      origin: assignment.origin,
+    },
+  };
 
 function authResponse(role: UserRole) {
   return {
@@ -268,6 +312,13 @@ async function renderPage(role: UserRole = 'ADMIN') {
   vi.mocked(releaseHealthcareEquipmentAssignment).mockResolvedValue(
     releasedAssignment,
   );
+  vi.mocked(replaceHealthcareEquipmentAssignment).mockResolvedValue({
+    outcome: 'REPLACED',
+    data: {
+      replacedAssignment,
+      replacementAssignment,
+    },
+  });
   render(<HealthcareCaseEquipmentAssignmentsPage />);
   await screen.findByText('Torre laparoscópica');
 }
@@ -310,6 +361,9 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
         expect(
           screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
         ).toBeNull();
+        expect(
+          screen.queryByRole('button', { name: 'Reemplazar EQ-0001' }),
+        ).toBeNull();
       } else {
         expect(
           screen.getByRole('button', { name: 'Nueva asignación' }),
@@ -317,8 +371,10 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
         expect(
           screen.getByRole('button', { name: 'Liberar EQ-0001' }),
         ).toBeTruthy();
+        expect(
+          screen.getByRole('button', { name: 'Reemplazar EQ-0001' }),
+        ).toBeTruthy();
       }
-      expect(screen.queryByRole('button', { name: /reemplazar/i })).toBeNull();
     },
   );
 
@@ -581,7 +637,7 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
     ).toBeNull();
   });
 
-  it('no ofrece Release para una Assignment histórica a un rol autorizado', async () => {
+  it('no ofrece mutaciones para una Assignment histórica a un rol autorizado', async () => {
     configureApi('ADMIN');
     vi.mocked(listHealthcareEquipmentAssignments).mockResolvedValue(
       listResponse([releasedAssignment]),
@@ -593,7 +649,11 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
     expect(
       screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
     ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Reemplazar EQ-0001' }),
+    ).toBeNull();
     expect(releaseHealthcareEquipmentAssignment).not.toHaveBeenCalled();
+    expect(replaceHealthcareEquipmentAssignment).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -637,6 +697,164 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
       expect(window.localStorage.getItem('token')).toBe('valid-token');
       expect(
         screen.queryByText('Asignación liberada correctamente.'),
+      ).toBeNull();
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('reemplaza una RESERVED, excluye el Asset origen y refresca ambas filas', async () => {
+    const user = userEvent.setup();
+    await renderPage('MANAGER');
+    vi.mocked(listEligibleEquipmentAssignmentAssets).mockResolvedValue([
+      assignment.equipmentAsset,
+      eligibleAsset,
+    ]);
+    vi.mocked(listHealthcareEquipmentAssignments).mockResolvedValue(
+      listResponse([replacedAssignment, replacementAssignment]),
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reemplazar EQ-0001' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Reemplazar asignación',
+    });
+    expect(
+      within(dialog).getByText(
+        'Esta Assignment pasará a REPLACED cuando el reemplazo sea exitoso.',
+      ),
+    ).toBeTruthy();
+    expect(
+      await within(dialog).findByRole('option', {
+        name: /Monitor de signos vitales · EQ-0002/,
+      }),
+    ).toBeTruthy();
+    expect(
+      within(dialog).queryByRole('option', {
+        name: /Torre laparoscópica · EQ-0001/,
+      }),
+    ).toBeNull();
+
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo sustituto/),
+      'asset-2',
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo del reemplazo/),
+      '  Equipo sustituto requerido  ',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Reemplazar asignación' }),
+    );
+
+    await waitFor(() =>
+      expect(replaceHealthcareEquipmentAssignment).toHaveBeenCalledWith(
+        'assignment-1',
+        {
+          equipmentAssetId: 'asset-2',
+          replacementReason: 'Equipo sustituto requerido',
+        },
+      ),
+    );
+    expect(
+      await screen.findByText('Asignación reemplazada correctamente.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('dialog', { name: 'Reemplazar asignación' }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(2),
+    );
+    expect(screen.getByText('Reemplazada')).toBeTruthy();
+    expect(screen.getByText('Reservada')).toBeTruthy();
+    expect(screen.getByText('Monitor de signos vitales')).toBeTruthy();
+  });
+
+  it('mantiene la revisión de conflicto sin afirmar que reemplazó la Assignment', async () => {
+    const user = userEvent.setup();
+    await renderPage('WAREHOUSE');
+    vi.mocked(replaceHealthcareEquipmentAssignment).mockResolvedValue(
+      replaceConflictReview,
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Reemplazar EQ-0001' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Reemplazar asignación',
+    });
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo sustituto/),
+      'asset-2',
+    );
+    await user.type(
+      within(dialog).getByLabelText(/^Motivo del reemplazo/),
+      'Equipo sustituto requerido',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Reemplazar asignación' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Revisión de conflicto requerida'),
+    ).toBeTruthy();
+    expect(within(dialog).getByText('Conflicto con HC-0002')).toBeTruthy();
+    expect(
+      within(dialog).getByText(
+        'El equipo tiene una reserva con horario superpuesto.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText('Asignación reemplazada correctamente.'),
+    ).toBeNull();
+    expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [400, 'El reemplazo no es válido.', 'El reemplazo no es válido.'],
+    [
+      403,
+      'No tienes permisos para reemplazar la asignación.',
+      'No tienes permisos para reemplazar la asignación.',
+    ],
+    [409, 'La asignación ya cambió.', 'La asignación ya cambió.'],
+    [
+      500,
+      'Request failed with status code 500',
+      'No fue posible reemplazar la asignación por un error de persistencia.',
+    ],
+  ])(
+    'mantiene la sesión y muestra el error Replace HTTP %s dentro del modal',
+    async (status, responseMessage, expectedMessage) => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('token', 'valid-token');
+      await renderPage('ADMIN');
+      vi.mocked(replaceHealthcareEquipmentAssignment).mockRejectedValue(
+        Object.assign(new Error(responseMessage), { response: { status } }),
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Reemplazar EQ-0001' }),
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Reemplazar asignación',
+      });
+      await user.selectOptions(
+        within(dialog).getByLabelText(/^Equipo sustituto/),
+        'asset-2',
+      );
+      await user.type(
+        within(dialog).getByLabelText(/^Motivo del reemplazo/),
+        'Equipo sustituto requerido',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Reemplazar asignación' }),
+      );
+
+      expect(await within(dialog).findByText(expectedMessage)).toBeTruthy();
+      expect(window.localStorage.getItem('token')).toBe('valid-token');
+      expect(
+        screen.queryByText('Asignación reemplazada correctamente.'),
       ).toBeNull();
       expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
     },

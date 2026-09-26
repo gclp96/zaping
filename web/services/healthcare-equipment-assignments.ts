@@ -101,6 +101,14 @@ export type ReleaseHealthcareEquipmentAssignmentPayload = {
   reason: string;
 };
 
+export type ReplaceHealthcareEquipmentAssignmentPayload = {
+  equipmentAssetId: string;
+  replacementReason: string;
+  confirmConflictOverride?: boolean;
+  conflictReviewFingerprint?: string;
+  conflictOverrideReason?: string | null;
+};
+
 export type HealthcareEquipmentAssignmentConflictReviewResponse = {
   outcome: 'CONFLICT_REVIEW_REQUIRED';
   conflictReviewFingerprint: string;
@@ -114,8 +122,8 @@ export type HealthcareEquipmentAssignmentConflictReviewResponse = {
   }>;
   candidate: {
     caseId: string;
-    requirementId: null;
-    origin: 'DIRECT';
+    requirementId: string | null;
+    origin: HealthcareEquipmentAssignmentOrigin;
     equipmentAsset: HealthcareEquipmentAssignmentAssetCandidate;
     operationalWindow: {
       start: string;
@@ -138,6 +146,21 @@ export type CreateHealthcareEquipmentAssignmentResponse =
       data: HealthcareEquipmentAssignment;
     }
   | HealthcareEquipmentAssignmentConflictReviewResponse;
+
+export type HealthcareEquipmentAssignmentReplaceConflictReviewResponse =
+  HealthcareEquipmentAssignmentConflictReviewResponse & {
+    sourceAssignmentId: string;
+  };
+
+export type ReplaceHealthcareEquipmentAssignmentResponse =
+  | {
+      outcome: 'REPLACED';
+      data: {
+        replacedAssignment: HealthcareEquipmentAssignment;
+        replacementAssignment: HealthcareEquipmentAssignment;
+      };
+    }
+  | HealthcareEquipmentAssignmentReplaceConflictReviewResponse;
 
 export async function listHealthcareEquipmentAssignments(
   caseId: string,
@@ -212,6 +235,25 @@ export async function releaseHealthcareEquipmentAssignment(
       },
     },
   );
+
+  return response.data;
+}
+
+export async function replaceHealthcareEquipmentAssignment(
+  assignmentId: string,
+  payload: ReplaceHealthcareEquipmentAssignmentPayload,
+): Promise<ReplaceHealthcareEquipmentAssignmentResponse> {
+  const idempotencyKey = `hc-assignment-replace-${globalThis.crypto.randomUUID()}`;
+  const response =
+    await api.post<ReplaceHealthcareEquipmentAssignmentResponse>(
+      `/healthcare/equipment-assignments/${assignmentId}/replace`,
+      payload,
+      {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      },
+    );
 
   return response.data;
 }

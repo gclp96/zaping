@@ -7,6 +7,7 @@ import {
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
+  replaceHealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignment,
   type HealthcareEquipmentAssignmentAssetCandidate,
 } from './healthcare-equipment-assignments';
@@ -149,6 +150,50 @@ describe('healthcare-equipment-assignments service', () => {
         headers: {
           'Idempotency-Key': expect.stringMatching(
             /^hc-assignment-release-/,
+          ),
+        },
+      },
+    );
+    const firstKey = vi.mocked(api.post).mock.calls[0]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    const secondKey = vi.mocked(api.post).mock.calls[1]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    expect(firstKey).not.toBe(secondKey);
+  });
+
+  it('reemplaza una Assignment con la ruta y una Idempotency-Key nueva por request', async () => {
+    const response = {
+      outcome: 'REPLACED' as const,
+      data: {
+        replacedAssignment: assignment,
+        replacementAssignment: {
+          ...assignment,
+          id: 'assignment-2',
+        },
+      },
+    };
+    vi.mocked(api.post).mockResolvedValue({ data: response });
+    const payload = {
+      equipmentAssetId: 'asset-2',
+      replacementReason: 'Equipo sustituto requerido',
+    };
+
+    await expect(
+      replaceHealthcareEquipmentAssignment('assignment-1', payload),
+    ).resolves.toBe(response);
+    await replaceHealthcareEquipmentAssignment('assignment-1', payload);
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/healthcare/equipment-assignments/assignment-1/replace',
+      payload,
+      {
+        headers: {
+          'Idempotency-Key': expect.stringMatching(
+            /^hc-assignment-replace-/,
           ),
         },
       },
