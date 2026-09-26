@@ -349,7 +349,9 @@ describe('InventoryPage', () => {
     expect(screen.getByLabelText(/BLUNT TIP: Bajo stock/i)).toBeTruthy();
     expect(screen.getByLabelText(/Producto agotado: Sin stock/i)).toBeTruthy();
     expect(api.get).toHaveBeenCalledWith('/inventory');
-    expect(api.get).toHaveBeenCalledWith('/inventory/movements');
+    await waitFor(() => {
+      expect(api.get).toHaveBeenCalledWith('/inventory/movements');
+    });
     expect(screen.queryByRole('spinbutton')).toBeNull();
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(screen.queryByRole('button', { name: /ajustar stock/i })).toBeNull();
