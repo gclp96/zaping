@@ -97,6 +97,12 @@ export type CreateDirectHealthcareEquipmentAssignmentPayload = {
   directAssignmentReason: string;
 };
 
+export type CreateRequirementHealthcareEquipmentAssignmentPayload = {
+  caseId: string;
+  equipmentAssetId: string;
+  requirementId: string;
+};
+
 export type ReleaseHealthcareEquipmentAssignmentPayload = {
   reason: string;
 };
@@ -219,6 +225,43 @@ export async function createDirectHealthcareEquipmentAssignment(
   );
 
   return response.data;
+}
+
+export async function createRequirementHealthcareEquipmentAssignment(
+  payload: CreateRequirementHealthcareEquipmentAssignmentPayload,
+): Promise<CreateHealthcareEquipmentAssignmentResponse> {
+  const idempotencyKey = `hc-assignment-requirement-${globalThis.crypto.randomUUID()}`;
+  const response = await api.post<CreateHealthcareEquipmentAssignmentResponse>(
+    '/healthcare/equipment-assignments',
+    payload,
+    {
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+      },
+    },
+  );
+
+  return response.data;
+}
+
+export async function getHealthcareEquipmentRequirementCoverage(
+  caseId: string,
+  requirementId: string,
+): Promise<number> {
+  const response = await api.get<HealthcareEquipmentAssignmentListResponse>(
+    '/healthcare/equipment-assignments',
+    {
+      params: {
+        caseId,
+        requirementId,
+        status: 'RESERVED',
+        page: 1,
+        pageSize: 1,
+      },
+    },
+  );
+
+  return response.data.pagination.totalItems;
 }
 
 export async function releaseHealthcareEquipmentAssignment(

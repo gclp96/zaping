@@ -3,7 +3,7 @@
 import { ArrowLeft, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
 import StatusBadge from '@/app/components/business/StatusBadge';
@@ -27,7 +27,9 @@ import {
 } from '@/services/errors';
 import {
   createDirectHealthcareEquipmentAssignment,
+  createRequirementHealthcareEquipmentAssignment,
   getHealthcareEquipmentAssignment,
+  getHealthcareEquipmentRequirementCoverage,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
@@ -40,9 +42,14 @@ import {
   type HealthcareEquipmentAssignmentReplaceConflictReviewResponse,
   type HealthcareEquipmentAssignmentStatus,
 } from '@/services/healthcare-equipment-assignments';
+import {
+  listHealthcareRequirements,
+  type HealthcareRequirement,
+} from '@/services/healthcare-requirements';
 
 import type { HealthcareCase } from '../../types';
 import CreateDirectAssignmentModal from './CreateDirectAssignmentModal';
+import CreateRequirementAssignmentModal from './CreateRequirementAssignmentModal';
 import ReleaseAssignmentModal from './ReleaseAssignmentModal';
 import ReplaceAssignmentModal from './ReplaceAssignmentModal';
 
@@ -143,6 +150,30 @@ function createAssignmentErrorMessage(error: unknown): string {
     : message;
 }
 
+function createRequirementAssignmentErrorFallback(error: unknown): string {
+  switch (getApiErrorStatus(error)) {
+    case 400:
+      return 'Revisa el requerimiento y el equipo antes de crear la asignación.';
+    case 403:
+      return 'No tienes permisos para asignar equipos a requerimientos.';
+    case 409:
+      return 'El requerimiento, su cobertura o el equipo cambió. Actualiza la información e inténtalo de nuevo.';
+    case 500:
+      return 'No fue posible crear la asignación por un error de persistencia.';
+    default:
+      return 'No fue posible asignar el equipo al requerimiento.';
+  }
+}
+
+function createRequirementAssignmentErrorMessage(error: unknown): string {
+  const fallback = createRequirementAssignmentErrorFallback(error);
+  const message = getApiErrorMessage(error, fallback);
+
+  return /^Request failed with status code \d+$/i.test(message)
+    ? fallback
+    : message;
+}
+
 function releaseAssignmentErrorFallback(error: unknown): string {
   switch (getApiErrorStatus(error)) {
     case 400:
@@ -191,7 +222,11 @@ function replaceAssignmentErrorMessage(error: unknown): string {
     : message;
 }
 
-const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
+function buildColumns(
+  requirementById: ReadonlyMap<string, HealthcareRequirement>,
+  coverageByRequirementId: Readonly<Record<string, number>>,
+): DataTableColumn<HealthcareEquipmentAssignment>[] {
+  return [
   {
     id: 'equipment',
     header: 'Equipo',
@@ -217,6 +252,31 @@ const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
     minWidth: 130,
   },
   {
+    id: 'requirement',
+    header: 'Requerimiento',
+    cell: (assignment) => {
+      if (!assignment.requirementId) return 'No aplica';
+
+      const requirement = requirementById.get(assignment.requirementId);
+      if (!requirement) return `ID ${assignment.requirementId}`;
+
+      return (
+        <div>
+          <p className="font-medium">
+            {requirement.product.sku} — {requirement.product.name}
+          </p>
+          <p className="text-xs text-text-muted">
+            Cobertura{' '}
+            {coverageByRequirementId[requirement.id] ?? 0}/
+            {requirement.requestedQty}
+          </p>
+        </div>
+      );
+    },
+    priority: 'secondary',
+    minWidth: 220,
+  },
+  {
     id: 'status',
     header: 'Estado',
     cell: (assignment) => {
@@ -240,7 +300,8 @@ const columns: DataTableColumn<HealthcareEquipmentAssignment>[] = [
     priority: 'tertiary',
     minWidth: 170,
   },
-];
+  ];
+}
 
 export default function HealthcareCaseEquipmentAssignmentsPage() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -256,6 +317,7 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const detailRequestId = useRef(0);
   const assetRequestId = useRef(0);
   const createSubmissionInFlight = useRef(false);
+  const requirementSubmissionInFlight = useRef(false);
   const releaseSubmissionInFlight = useRef(false);
   const replaceSubmissionInFlight = useRef(false);
   const [healthcareCase, setHealthcareCase] = useState<HealthcareCase | null>(
@@ -264,6 +326,10 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const [assignments, setAssignments] = useState<
     HealthcareEquipmentAssignment[]
   >([]);
+  const [requirements, setRequirements] = useState<HealthcareRequirement[]>([]);
+  const [coverageByRequirementId, setCoverageByRequirementId] = useState<
+    Record<string, number>
+  >({});
   const [pagination, setPagination] = useState({
     page: 1,
     pageSize: 25,
@@ -285,6 +351,14 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const [createSaving, setCreateSaving] = useState(false);
   const [createError, setCreateError] = useState('');
   const [conflictReview, setConflictReview] =
+    useState<HealthcareEquipmentAssignmentConflictReviewResponse | null>(null);
+  const [requirementModalOpen, setRequirementModalOpen] = useState(false);
+  const [createRequirementId, setCreateRequirementId] = useState('');
+  const [requirementEquipmentAssetId, setRequirementEquipmentAssetId] =
+    useState('');
+  const [requirementSaving, setRequirementSaving] = useState(false);
+  const [requirementError, setRequirementError] = useState('');
+  const [requirementConflictReview, setRequirementConflictReview] =
     useState<HealthcareEquipmentAssignmentConflictReviewResponse | null>(null);
   const [releaseAssignment, setReleaseAssignment] =
     useState<HealthcareEquipmentAssignment | null>(null);
@@ -318,23 +392,43 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
       setLoading(true);
       setError('');
       setForbidden(false);
-      const [caseResponse, assignmentResponse] = await Promise.all([
+      const [caseResponse, assignmentResponse, requirementItems] =
+        await Promise.all([
         api.get<HealthcareCase>(`/healthcare/cases/${caseId}`),
         listHealthcareEquipmentAssignments(
           caseId,
           pagination.page,
           pagination.pageSize,
         ),
+        listHealthcareRequirements(caseId, 'ALL'),
       ]);
+      const assignableRequirements = requirementItems.filter(
+        (requirement) =>
+          requirement.lifecycle === 'ACTIVE' &&
+          requirement.product.inventoryTracking === 'ASSET',
+      );
+      const coverageEntries = await Promise.all(
+        assignableRequirements.map(async (requirement) => [
+          requirement.id,
+          await getHealthcareEquipmentRequirementCoverage(
+            caseId,
+            requirement.id,
+          ),
+        ] as const),
+      );
 
       if (currentRequestId !== requestId.current) return;
       setHealthcareCase(caseResponse.data);
       setAssignments(assignmentResponse.items);
+      setRequirements(requirementItems);
+      setCoverageByRequirementId(Object.fromEntries(coverageEntries));
       setPagination(assignmentResponse.pagination);
     } catch (requestError: unknown) {
       if (currentRequestId !== requestId.current) return;
       setHealthcareCase(null);
       setAssignments([]);
+      setRequirements([]);
+      setCoverageByRequirementId({});
       if (isForbiddenError(requestError)) {
         setForbidden(true);
       } else {
@@ -416,6 +510,45 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     }
   }, []);
 
+  const requirementById = useMemo(
+    () => new Map(requirements.map((requirement) => [requirement.id, requirement])),
+    [requirements],
+  );
+  const assignableRequirements = useMemo(
+    () =>
+      requirements.filter(
+        (requirement) =>
+          requirement.lifecycle === 'ACTIVE' &&
+          requirement.product.inventoryTracking === 'ASSET',
+      ),
+    [requirements],
+  );
+  const selectedRequirement = requirementById.get(createRequirementId);
+  const reservedAssetIds = useMemo(
+    () =>
+      new Set(
+        assignments
+          .filter((assignment) => assignment.status === 'RESERVED')
+          .map((assignment) => assignment.equipmentAsset.id),
+      ),
+    [assignments],
+  );
+  const requirementAssets = useMemo(
+    () =>
+      selectedRequirement
+        ? eligibleAssets.filter(
+            (asset) =>
+              asset.productId === selectedRequirement.productId &&
+              !reservedAssetIds.has(asset.id),
+          )
+        : [],
+    [eligibleAssets, reservedAssetIds, selectedRequirement],
+  );
+  const baseAssignmentColumns = useMemo(
+    () => buildColumns(requirementById, coverageByRequirementId),
+    [coverageByRequirementId, requirementById],
+  );
+
   const rowActions: DataTableRowActions<HealthcareEquipmentAssignment> = {
     label: (assignment) =>
       `Acciones de la asignación ${assignment.equipmentAsset.assetCode}`,
@@ -431,7 +564,7 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
   const assignmentColumns: DataTableColumn<HealthcareEquipmentAssignment>[] =
     canReleaseAssignment || canReplaceAssignment
       ? [
-          ...columns,
+          ...baseAssignmentColumns,
           {
             id: 'mutations',
             header: 'Acción',
@@ -465,7 +598,7 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
             minWidth: 230,
           },
         ]
-      : columns;
+      : baseAssignmentColumns;
 
   function closeDetail() {
     detailRequestId.current += 1;
@@ -554,6 +687,100 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
     } finally {
       createSubmissionInFlight.current = false;
       setCreateSaving(false);
+    }
+  }
+
+  function resetRequirementForm() {
+    setCreateRequirementId('');
+    setRequirementEquipmentAssetId('');
+    setRequirementError('');
+    setRequirementConflictReview(null);
+  }
+
+  function openRequirementModal() {
+    if (!canCreateAssignment) return;
+    resetRequirementForm();
+    setNotice('');
+    setRequirementModalOpen(true);
+    void loadEligibleAssets();
+  }
+
+  function closeRequirementModal(force = false) {
+    if (requirementSubmissionInFlight.current && !force) return;
+    assetRequestId.current += 1;
+    setRequirementModalOpen(false);
+    setEligibleAssets([]);
+    setEligibleAssetsLoading(false);
+    setEligibleAssetsError('');
+    resetRequirementForm();
+  }
+
+  function updateCreateRequirementId(requirementId: string) {
+    setCreateRequirementId(requirementId);
+    setRequirementEquipmentAssetId('');
+    setRequirementError('');
+    setRequirementConflictReview(null);
+  }
+
+  function updateRequirementEquipmentAssetId(equipmentAssetId: string) {
+    setRequirementEquipmentAssetId(equipmentAssetId);
+    setRequirementError('');
+    setRequirementConflictReview(null);
+  }
+
+  async function submitRequirementAssignment() {
+    const requirement = requirementById.get(createRequirementId);
+    const currentCoverage = requirement
+      ? (coverageByRequirementId[requirement.id] ?? 0)
+      : 0;
+
+    if (
+      !canCreateAssignment ||
+      !requirement ||
+      requirement.lifecycle !== 'ACTIVE' ||
+      requirement.product.inventoryTracking !== 'ASSET' ||
+      currentCoverage >= requirement.requestedQty ||
+      !requirementEquipmentAssetId ||
+      !requirementAssets.some(
+        (asset) => asset.id === requirementEquipmentAssetId,
+      ) ||
+      requirementSubmissionInFlight.current
+    ) {
+      return;
+    }
+
+    requirementSubmissionInFlight.current = true;
+    setRequirementSaving(true);
+    setRequirementError('');
+    setRequirementConflictReview(null);
+
+    try {
+      const response = await createRequirementHealthcareEquipmentAssignment({
+        caseId,
+        equipmentAssetId: requirementEquipmentAssetId,
+        requirementId: requirement.id,
+      });
+
+      if (response.outcome === 'CONFLICT_REVIEW_REQUIRED') {
+        setRequirementConflictReview(response);
+        return;
+      }
+
+      closeRequirementModal(true);
+      setNotice('Equipo asignado al requerimiento correctamente.');
+
+      if (pagination.page === 1) {
+        await loadAssignments();
+      } else {
+        setPagination((current) => ({ ...current, page: 1 }));
+      }
+    } catch (requestError: unknown) {
+      setRequirementError(
+        createRequirementAssignmentErrorMessage(requestError),
+      );
+    } finally {
+      requirementSubmissionInFlight.current = false;
+      setRequirementSaving(false);
     }
   }
 
@@ -706,10 +933,20 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
           action={
             <div className="flex flex-wrap items-center gap-3">
               {canCreateAssignment && !forbidden ? (
-                <Button type="button" onClick={openCreateModal}>
-                  <Plus aria-hidden="true" size={18} />
-                  Nueva asignación
-                </Button>
+                <>
+                  <Button type="button" onClick={openCreateModal}>
+                    <Plus aria-hidden="true" size={18} />
+                    Nueva asignación
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openRequirementModal}
+                  >
+                    <Plus aria-hidden="true" size={18} />
+                    Asignar requerimiento
+                  </Button>
+                </>
               ) : null}
               <Link
                 href="/healthcare-cases"
@@ -802,6 +1039,25 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
         onSubmit={() => void submitDirectAssignment()}
       />
 
+      <CreateRequirementAssignmentModal
+        isOpen={requirementModalOpen}
+        requirements={assignableRequirements}
+        coverageByRequirementId={coverageByRequirementId}
+        assets={requirementAssets}
+        assetsLoading={eligibleAssetsLoading}
+        assetsError={eligibleAssetsError}
+        requirementId={createRequirementId}
+        equipmentAssetId={requirementEquipmentAssetId}
+        saving={requirementSaving}
+        error={requirementError}
+        conflictReview={requirementConflictReview}
+        onRequirementIdChange={updateCreateRequirementId}
+        onEquipmentAssetIdChange={updateRequirementEquipmentAssetId}
+        onRetryAssets={() => void loadEligibleAssets()}
+        onClose={closeRequirementModal}
+        onSubmit={() => void submitRequirementAssignment()}
+      />
+
       <ReleaseAssignmentModal
         assignment={releaseAssignment}
         reason={releaseReason}
@@ -863,7 +1119,19 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
             </Button>
           </div>
         ) : detail ? (
-          <AssignmentDetail assignment={detail} />
+          <AssignmentDetail
+            assignment={detail}
+            requirement={
+              detail.requirementId
+                ? requirementById.get(detail.requirementId) ?? null
+                : null
+            }
+            coverage={
+              detail.requirementId
+                ? (coverageByRequirementId[detail.requirementId] ?? null)
+                : null
+            }
+          />
         ) : null}
       </Modal>
     </>
@@ -872,8 +1140,12 @@ export default function HealthcareCaseEquipmentAssignmentsPage() {
 
 function AssignmentDetail({
   assignment,
+  requirement,
+  coverage,
 }: {
   assignment: HealthcareEquipmentAssignment;
+  requirement: HealthcareRequirement | null;
+  coverage: number | null;
 }) {
   const status = statusDescriptors[assignment.status];
 
@@ -907,6 +1179,28 @@ function AssignmentDetail({
           label="Motivo de asignación directa"
           value={assignment.directAssignmentReason}
         />
+      ) : null}
+
+      {assignment.requirementId ? (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="font-semibold text-gray-900">
+            Requerimiento vinculado
+          </p>
+          {requirement ? (
+            <>
+              <p className="mt-1 text-sm text-gray-700">
+                {requirement.product.sku} — {requirement.product.name}
+              </p>
+              <p className="mt-1 text-sm text-gray-700">
+                Cobertura actual: {coverage ?? 0}/{requirement.requestedQty}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-gray-700">
+              ID {assignment.requirementId}
+            </p>
+          )}
+        </div>
       ) : null}
 
       <div>
