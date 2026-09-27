@@ -113,7 +113,7 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 ↓
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 ↓
-Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
+HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -1097,8 +1097,8 @@ DIRECT, la exclusión de Requirements QUANTITY, un Requirement ASSET disponible,
 la asignación de EquipmentAsset compatible desde UI, `origin=REQUIREMENT` y la
 relación con Requirement visibles en List, cobertura 1/1 y refresh automático. No
 se declara validación manual de SALES ni Detail. El mojibake de datos de desarrollo
-permanece como known non-blocker. El siguiente incremento funcional queda pendiente
-de refinamiento y no se declara READY ni se numera todavía.
+permanece como known non-blocker. HC-OPS-01A CaseKit Draft & Contents queda
+CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED, sin SP, Forecast ni Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
@@ -1168,6 +1168,12 @@ commercial Inventory OUT
 9.10 CaseKit / Maletín
 CaseKit representa la preparación real de material para un Case específico.
 
+HC-OPS-01A está CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED. Implementará un
+único CaseKit lógico `DRAFT` por Case y permitirá agregar material QUANTITY no
+reservante o Equipment Assignments RESERVED ya vinculadas al Case. Una fuente que
+después pierda elegibilidad permanece visible como stale mediante warnings
+derivados. Create/Add exigen Idempotency-Key.
+
 Puede contener conceptualmente:
 
 Products
@@ -1179,7 +1185,9 @@ batches
 Equipment
 
 preparation state
-La cardinalidad y schema exactos se definirán posteriormente.
+La cardinalidad de 01A es uno a uno lógico. El schema mínimo utiliza
+`HealthcareCaseKit` y `HealthcareCaseKitItem`; contenedores físicos, templates,
+PREPARED y logística permanecen posteriores.
 
 Debe mantenerse:
 
@@ -1192,6 +1200,10 @@ CaseKit
 ≠
 automatic Inventory OUT
 KitTemplate permanece FUTURE como capacidad de productividad reutilizable y no debe bloquear la primera implementación de CaseKit.
+
+El material QUANTITY de 01A no decrementa `Product.stock`, no modifica
+`InventoryBatch.availableQuantity`, no crea `InventoryMovement` y no garantiza
+disponibilidad física. La UI debe advertirlo.
 
 9.11 Dispatch / Custody
 Debe formalizar:
@@ -2854,7 +2866,7 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 
-Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
+HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -3013,7 +3025,7 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 ↓
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 ↓
-Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
+HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓

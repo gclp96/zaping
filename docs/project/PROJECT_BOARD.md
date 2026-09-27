@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-27
 Responsable: Zaping Team
 
@@ -188,8 +188,8 @@ HC-NEXT-03C6-D — Replace Assignment UI
 HC-NEXT-03C6-E — Requirement-linked Assignment UI
         → COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 
-Siguiente incremento funcional
-        → PENDING REFINEMENT / NOT READY
+HC-OPS-01A — CaseKit Draft & Contents
+        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -1801,7 +1801,8 @@ HC-NEXT-03C1 Equipment Assignment Persistence / Migration, HC-NEXT-03C2
 Assignment Backend Base, HC-NEXT-03C3 Availability / Conflict Review /
 Concurrency y HC-NEXT-03C4 Replace / Release / Parent Integrations están COMPLETE
 / MERGED. El protocolo Company-first, ambas Parent Integrations y HC-LOCK-04
-final están integrados/aceptados; C5 hardening y frontend siguen pendientes.
+final están integrados/aceptados; C6-A–C6-E están COMPLETE / MERGED y C5-B
+permanece pendiente con B0 NOT READY.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -1813,13 +1814,13 @@ Secuencia planeada de alto nivel para M-HC1:
 
 4. Case Availability
 
-5. Architecture gate for physical logistics
+5. CaseKit / Maletín DRAFT
 
-6. Dispatch / Custody
+6. Architecture gate for physical logistics
 
-7. Return / Reconciliation
+7. Dispatch / Custody
 
-8. CaseKit / Maletín
+8. Return / Reconciliation
 
 9. Calendar
 
@@ -1827,11 +1828,12 @@ Secuencia planeada de alto nivel para M-HC1:
 
 11. Mobile technician experience
 
+CaseKit DRAFT precede Dispatch y no crea movimiento, reserva física ni custodia.
 El gate previo a Dispatch / Custody debe resolver physical positioning,
 custody, location y transfer semantics mediante diseño/ADR explícito si es
 necesario. No bloquea Hospital / Doctor, Requirements, Equipment Assignment ni
-Case Availability, y no implica ejecutar todo Advanced Inventory dentro de
-M-HC1 o del mismo slice.
+Case Availability ni HC-OPS-01A, y no implica ejecutar todo Advanced Inventory
+dentro de M-HC1 o del mismo slice.
 
 Principios:
 
@@ -2299,7 +2301,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
 → HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
-→ Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
+→ HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2536,7 +2538,7 @@ Healthcare Equipment Assignment implementation
 → C6-C RELEASE UI COMPLETE / MERGED — PR #42 — main@9bade4d
 → C6-D REPLACE UI COMPLETE / MERGED — PR #45 — main@99efc5a
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
-→ SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
+→ HC-OPS-01A CASEKIT DRAFT & CONTENTS — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -3226,11 +3228,26 @@ No se declara validación manual de SALES ni Detail. El mojibake observado en da
 de desarrollo continúa como known non-blocker; la UI estática UTF-8 permanece
 correcta.
 
-#### Siguiente incremento funcional
+#### HC-OPS-01A — CaseKit Draft & Contents
 
-Estado: PENDING REFINEMENT / NOT READY. No se asigna todavía un número de slice.
+Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 
-Quedan fuera de C5-A/C5-B frontend, Case Availability general, nuevas capacidades
-funcionales, fuzzy search, permission-based RBAC, Dispatch, Return, Custody,
-Inventory Movement, disponibilidad física y despliegue staging/productivo.
-Healthcare Core y Equipment Assignment no se declaran terminados por estos gates.
+Contrato canónico: `docs/modules/healthcare/CASE_KITS.md`, sección 231.
+
+Decisiones cerradas: un CaseKit lógico por Case; status exclusivamente `DRAFT`;
+material QUANTITY no reservante; fuentes invalidadas conservadas como stale por
+read-model; Idempotency-Key obligatorio para Create/Add; errores estables,
+tenant isolation y fixed-role RBAC.
+
+Alcance: crear/consultar el Maletín y agregar Requirements QUANTITY o Assignments
+RESERVED ya vinculadas al Case. La UI debe advertir que no decrementa stock, no
+modifica batches, no crea InventoryMovement y no garantiza disponibilidad física.
+
+DoR: COMPLETE. No se asignan SP, Forecast ni Commitment. Update/remove,
+PREPARED, batches/seriales, reserva física, Dispatch, Custody, Return, Inspection
+y Reconciliation permanecen fuera de 01A y requieren contratos posteriores.
+
+Persisten como trabajos independientes C5-B, C5-COVERAGE, Case Availability
+general, permission-based RBAC y despliegue staging/productivo. HC-OPS-01A no
+implementa Dispatch, Return, Custody, Inventory Movement ni disponibilidad física,
+y no declara Healthcare Core terminado.

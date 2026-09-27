@@ -2,10 +2,10 @@
 
 **Módulo:** Healthcare Case Kits
 **Producto:** Zaping Healthcare
-**Versión:** 2.0.0
+**Versión:** 2.1.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN / APPROVED TARGET / NOT IMPLEMENTED
-**Última actualización:** 2026-08-20
+**Estado de implementación:** HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+**Última actualización:** 2026-09-27
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -3010,20 +3010,19 @@ CaseKit
 CaseKitItem
 ```
 
-debemos resolver:
+HC-OPS-01A resuelve para su alcance la cardinalidad, la separación entre cantidad
+solicitada y preparada, la referencia a Equipment Assignment y el lifecycle
+inicial `DRAFT`. Permanecen pendientes para slices posteriores:
 
 ```text
-Case ↔ CaseKit cardinality
 KitTemplate lifecycle
 required vs optional representation
-requested vs prepared quantities
 backup items
 substitutions
 batch allocation representation
 serial allocation representation
-Equipment requirement vs assignment
 reservation strategy
-preparation lifecycle
+preparation lifecycle posterior a DRAFT
 post-Dispatch mutability
 preparedBy / reviewedBy requirements
 ```
@@ -3069,3 +3068,318 @@ Reconciliation
 ```
 
 > **El maletín no es una venta ni una salida definitiva: es la preparación controlada de recursos para un Case, cuya historia debe permanecer separada de lo que finalmente salió y de lo que realmente se utilizó.**
+
+---
+
+# 231. HC-OPS-01A — CaseKit Draft & Contents
+
+**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+
+HC-OPS-01A implementará el primer slice visible de Maletín. Su alcance termina en
+la creación de un único CaseKit lógico `DRAFT` por HealthcareCase y el agregado de
+contenido ya vinculado al Case. No confirma preparación ni produce hechos físicos.
+
+## 231.1 Decisiones aprobadas
+
+- **DEC-OPS01A-01:** un único `HealthcareCaseKit` lógico por
+  `HealthcareCase`.
+- **DEC-OPS01A-02:** el único status implementado es `DRAFT`.
+- **DEC-OPS01A-03:** material `QUANTITY` puede agregarse mediante
+  `requirementId + preparedQuantity` como preparación lógica no reservante.
+- **DEC-OPS01A-04:** una fuente posteriormente inválida se conserva y se marca
+  `stale` mediante warnings derivados; no se autoelimina ni adquiere un lifecycle
+  persistido adicional.
+- **DEC-OPS01A-05:** `Idempotency-Key` es obligatorio para Create CaseKit y Add
+  CaseKitItem.
+- **DEC-OPS01A-06:** la API utiliza errores estables y sanitizados.
+
+## 231.2 Modelo Prisma mínimo aprobado
+
+```prisma
+enum HealthcareCaseKitStatus {
+  DRAFT
+}
+
+model HealthcareCaseKit {
+  id          String                  @id @default(uuid())
+  companyId   String
+  caseId      String
+  status      HealthcareCaseKitStatus @default(DRAFT)
+  createdById String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  company        Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  healthcareCase HealthcareCase @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy      User           @relation(fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict)
+  items          HealthcareCaseKitItem[]
+
+  @@unique([id, companyId])
+  @@unique([id, companyId, caseId])
+  @@unique([companyId, caseId])
+  @@index([companyId, status, updatedAt])
+}
+
+model HealthcareCaseKitItem {
+  id                    String   @id @default(uuid())
+  companyId             String
+  caseId                String
+  caseKitId             String
+  requirementId         String?
+  equipmentAssignmentId String?
+  preparedQuantity      Int?
+  addedById             String
+  createdAt             DateTime @default(now())
+
+  caseKit             HealthcareCaseKit              @relation(fields: [caseKitId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+  requirement         HealthcareCaseRequirement?     @relation(fields: [requirementId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+  equipmentAssignment HealthcareEquipmentAssignment? @relation(fields: [equipmentAssignmentId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+  addedBy             User                           @relation(fields: [addedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@index([companyId, caseKitId])
+  @@index([companyId, caseId])
+}
+```
+
+La implementación añadirá las relaciones inversas necesarias y
+`@@unique([id, companyId, caseId])` a
+`HealthcareEquipmentAssignment` exclusivamente para soportar el FK compuesto del
+item; esto no cambia el contrato de Assignment.
+
+También añadirá dos scopes a `IdempotencyScope`:
+
+```text
+HEALTHCARE_CASE_KIT_CREATE
+HEALTHCARE_CASE_KIT_ITEM_ADD
+```
+
+No se crean modelos `Container`, `Dispatch`, `Custody`, `Return` o `Inspection`.
+
+## 231.3 Constraints e índices exactos
+
+La migration futura deberá crear y nombrar explícitamente:
+
+- unique `HealthcareCaseKit_companyId_caseId_key` sobre `(companyId, caseId)`;
+- unique compuesto de identidad/tenant/case para CaseKit y Assignment;
+- índice parcial único `HealthcareCaseKitItem_requirement_source_key` sobre
+  `(companyId, caseKitId, requirementId) WHERE requirementId IS NOT NULL`;
+- índice parcial único `HealthcareCaseKitItem_assignment_source_key` sobre
+  `(companyId, caseKitId, equipmentAssignmentId) WHERE equipmentAssignmentId IS NOT NULL`;
+- CHECK `HealthcareCaseKitItem_source_shape_check`:
+  - fuente Requirement: `requirementId IS NOT NULL`,
+    `equipmentAssignmentId IS NULL`, `preparedQuantity > 0`;
+  - fuente Equipment: `requirementId IS NULL`,
+    `equipmentAssignmentId IS NOT NULL`, `preparedQuantity IS NULL`;
+- FKs tenant/case compuestos con `ON DELETE RESTRICT` para Case, Requirement,
+  Assignment y Users;
+- índices `(companyId, status, updatedAt)`, `(companyId, caseKitId)` y
+  `(companyId, caseId)`.
+
+La regla `preparedQuantity <= requestedQty` se valida dentro de la transacción;
+no puede expresarse como CHECK porque compara dos filas.
+
+## 231.4 Elegibilidad y mutabilidad
+
+- Case `DRAFT` o `SCHEDULED`: elegible.
+- Case `CANCELLED`: lectura permitida; Create/Add rechazados con
+  `CASE_NOT_ELIGIBLE`.
+- CaseKit: sólo `DRAFT`; una futura fila con otro status se rechaza con
+  `CASE_KIT_NOT_MUTABLE`.
+- Material: Requirement del mismo tenant/Case, `ACTIVE`, Product activo,
+  `inventoryTracking=QUANTITY` y `0 < preparedQuantity <= requestedQty`.
+- Requirement `ASSET`: entra mediante una Assignment `RESERVED`, no como cantidad.
+- `SERIALIZED`, selección de lote y batch allocation quedan fuera de 01A.
+- Equipment: Assignment del mismo tenant/Case, `RESERVED`, con EquipmentAsset
+  `ACTIVE + GOOD`.
+- El mismo Requirement o Assignment no puede agregarse dos veces al CaseKit.
+- 01A no expone update/remove de items. Su corrección y auditoría se contratarán
+  en un slice posterior; no se hará hard delete implícito.
+
+## 231.5 Contrato HTTP
+
+### GET `/healthcare/cases/:caseId/case-kit`
+
+- `200`: `HealthcareCaseKitResponse` directo.
+- `404 CASE_NOT_FOUND`: Case ausente o foreign-tenant.
+- `404 CASE_KIT_NOT_FOUND`: Case propio sin CaseKit.
+
+### POST `/healthcare/cases/:caseId/case-kit`
+
+- header obligatorio `Idempotency-Key`, trim, 1–128 caracteres;
+- body `{}` allowlisted;
+- `201`: primera creación;
+- `200`: replay completado con misma key/payload;
+- respuesta directa `HealthcareCaseKitResponse`, sin outcome/data wrapper.
+
+### POST `/healthcare/case-kits/:caseKitId/items`
+
+- header obligatorio `Idempotency-Key`, trim, 1–128 caracteres;
+- DTO discriminado y allowlisted:
+
+```text
+{ sourceType: "REQUIREMENT", requirementId, preparedQuantity }
+```
+
+o:
+
+```text
+{ sourceType: "EQUIPMENT_ASSIGNMENT", equipmentAssignmentId }
+```
+
+- `201`: primer agregado;
+- `200`: replay completado con misma key/payload;
+- respuesta directa `HealthcareCaseKitItemResponse`.
+
+No se añade endpoint de confirmación, cambio de status, Dispatch, Return,
+Inspection, update o remove.
+
+## 231.6 Response y warnings derivados
+
+`HealthcareCaseKitResponse` expone:
+
+```text
+id, caseId, status, createdBy, createdAt, updatedAt, items[]
+```
+
+Cada item expone:
+
+```text
+id
+sourceType
+preparedQuantity?
+requirement? / equipmentAssignment?
+sourceValid
+stale
+warnings[]
+addedBy
+createdAt
+```
+
+`sourceType`, `sourceValid`, `stale` y `warnings` se derivan; no se persiste un
+lifecycle nuevo de item. Warnings estables:
+
+- `CASE_KIT_CASE_CANCELLED`;
+- `CASE_KIT_REQUIREMENT_NOT_ACTIVE`;
+- `CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE`;
+- `CASE_KIT_PREPARED_QUANTITY_EXCEEDS_REQUESTED`;
+- `CASE_KIT_ASSIGNMENT_NOT_RESERVED`;
+- `CASE_KIT_EQUIPMENT_NOT_ACTIVE`;
+- `CASE_KIT_EQUIPMENT_NOT_GOOD`.
+
+Un warning vuelve `sourceValid=false` y `stale=true`. GET y replay recalculan el
+estado actual sin escribir, eliminar ni reparar el item. Futuras transiciones de
+preparación deberán rechazar cualquier item stale hasta una resolución explícita.
+
+## 231.7 Errores estables
+
+| HTTP | Code | Uso |
+|---|---|---|
+| 400 | `IDEMPOTENCY_KEY_REQUIRED` | Falta el header obligatorio. |
+| 400 | `INVALID_IDEMPOTENCY_KEY` | Header vacío o mayor a 128 caracteres. |
+| 400 | `INVALID_CASE_KIT_SOURCE` | DTO ambiguo, tracking no soportado o combinación inválida. |
+| 400 | `INVALID_PREPARED_QUANTITY` | Cantidad no entera, menor a 1 o mayor a la solicitada. |
+| 403 | `FORBIDDEN` | Rol sin autorización. |
+| 404 | `CASE_NOT_FOUND` | Case ausente o foreign-tenant. |
+| 404 | `CASE_KIT_NOT_FOUND` | CaseKit ausente o foreign-tenant. |
+| 404 | `CASE_KIT_SOURCE_NOT_FOUND` | Requirement/Assignment ausente o foreign-tenant. |
+| 409 | `CASE_KIT_ALREADY_EXISTS` | Otro request/key ya creó el CaseKit del Case. |
+| 409 | `CASE_KIT_NOT_MUTABLE` | El CaseKit no admite la mutación solicitada. |
+| 409 | `CASE_NOT_ELIGIBLE` | Case CANCELLED o no elegible. |
+| 409 | `CASE_KIT_ITEM_ALREADY_EXISTS` | La fuente ya pertenece al CaseKit. |
+| 409 | `CASE_KIT_SOURCE_NOT_ELIGIBLE` | La fuente existe pero su estado ya no permite agregarla. |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | Misma key con fingerprint distinto. |
+| 409 | `RESOURCE_STATE_CHANGED` | Una update/insert condicional perdió la carrera. |
+| 503 | `HEALTHCARE_CONCURRENCY_TIMEOUT` | Sólo timeout de adquisición del Company lock. |
+| 500 | `HEALTHCARE_PERSISTENCE_ERROR` | Error de persistencia sanitizado. |
+
+## 231.8 Tenant, transacción e idempotencia
+
+- `companyId` y actor provienen del JWT; nunca del body.
+- Un identificador foreign-tenant se presenta como missing y no revela estado.
+- Cada comando usa una sola transacción y las primitivas Healthcare vigentes:
+  Company advisory lock, subsequent timeouts, locks de Case/CaseKit/fuente y
+  revalidación antes del insert.
+- Create CaseKit, Create Item, claim y completion ocurren atómicamente; cualquier
+  fallo revierte todo.
+- El fingerprint canónico SHA-256 incluye versión, command, IDs y cantidad; no
+  depende de orden JSON ni campos extra rechazados por DTO.
+- Una key completada se comprueba primero: mismo fingerprint retorna el recurso
+  existente aun si después el Case o la fuente quedaron inválidos; el read-model
+  muestra los warnings actuales sin writes.
+- Misma key con fingerprint distinto retorna `IDEMPOTENCY_KEY_REUSED` antes de
+  cualquier replay por estado.
+- Un duplicado estructural con key nueva retorna `CASE_KIT_ALREADY_EXISTS` o
+  `CASE_KIT_ITEM_ALREADY_EXISTS` y no consume la key nueva.
+- La colisión concurrente del claim debe recuperar el ganador de forma segura.
+
+## 231.9 Semántica no reservante
+
+Agregar material QUANTITY:
+
+- no decrementa `Product.stock`;
+- no modifica `InventoryBatch.availableQuantity`;
+- no crea `InventoryMovement`;
+- no garantiza disponibilidad física;
+- no selecciona batch, serie, ubicación o custodio.
+
+La UI debe mostrar esta limitación junto al formulario y al estado DRAFT. El
+backend continúa siendo autoridad para elegibilidad y no debe presentar el
+CaseKit como reserva o salida física.
+
+## 231.10 RBAC
+
+- READ: `ADMIN`, `MANAGER`, `SALES`, `WAREHOUSE`.
+- CREATE CASEKIT / ADD ITEM: `ADMIN`, `MANAGER`, `WAREHOUSE`.
+- `SALES`: read-only.
+
+Se reutiliza fixed-role RBAC; permission-based RBAC y rol Technician quedan fuera.
+
+## 231.11 Acceptance Criteria
+
+- un Case propio DRAFT/SCHEDULED admite exactamente un CaseKit DRAFT;
+- material QUANTITY y Assignment RESERVED elegibles se agregan y se leen con su
+  relación al Case;
+- constraints y revalidación impiden tenant/case mismatch, fuentes ambiguas,
+  duplicados y cantidades inválidas;
+- una fuente invalidada después del agregado permanece, se marca stale y no causa
+  writes de reparación;
+- Create/Add, claim y completion son atómicos; replay y conflicto de payload
+  cumplen DEC-OPS01A-05;
+- Case CANCELLED y roles no autorizados producen rechazo zero-write;
+- UI Case → Maletín cubre loading/empty/error/403, creación, agregado, estado DRAFT
+  y advertencia no reservante;
+- no existe cambio en stock, batches, movimientos, Assignment lifecycle,
+  Equipment condition ni efectos físicos.
+
+## 231.12 Definition of Ready
+
+- DEC-OPS01A-01 a DEC-OPS01A-06 aprobadas y documentadas;
+- modelo, constraints, API, errores, tenant, warnings, idempotencia y RBAC cerrados;
+- alcance de migration, backend, Web y suites focales identificable sin diseñar
+  Dispatch/Custody;
+- exclusiones explícitas y sin dependencia de C5-COVERAGE.
+
+**Resultado DoR:** COMPLETE. HC-OPS-01A puede pasar a READY.
+
+## 231.13 Definition of Done
+
+- schema/migration Prisma con constraints e índices revisados;
+- controller/service/repository y cliente/pantalla Web implementados;
+- unit tests de DTO, hash, repository, service, controller y UI;
+- PostgreSQL/HTTP focal para constraints, tenant, idempotencia, concurrencia,
+  rollback, stale read-model y ausencia de efectos Inventory;
+- Prisma validate/generate, Jest/Vitest focal, TypeScript API/Web, ESLint,
+  Prettier, builds API/Web y `git diff --check` PASS;
+- validación manual de create/add/warnings/RBAC; evidencia de cleanup propio para
+  cualquier harness PostgreSQL.
+
+## 231.14 Fuera de alcance y decisiones abiertas no bloqueantes
+
+Quedan fuera y requieren contratos posteriores: update/remove/corrección auditada
+de items, `IN_PREPARATION`/`PREPARED`, preparedBy/preparedAt, templates, backup y
+substitutions, batch/serial allocation, reserva física, Container/QR, Dispatch,
+Custody, Return, Inspection y Reconciliation. No bloquean 01A porque ninguno es
+necesario para Create/Add/Read del borrador aprobado.
+
+No se asignan SP, Forecast ni Commitment.
