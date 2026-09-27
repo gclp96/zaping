@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-Última actualización: 2026-09-25
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Última actualización: 2026-09-27
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -186,7 +186,10 @@ HC-NEXT-03C6-D — Replace Assignment UI
         → COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 
 HC-NEXT-03C6-E — Requirement-linked Assignment UI
-        → NEXT FUNCTIONAL CANDIDATE / NOT READY
+        → COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+
+Siguiente incremento funcional
+        → PENDING REFINEMENT / NOT READY
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2295,7 +2298,8 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-B Create Assignment UI — COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
 → HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
 → HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
-→ HC-NEXT-03C6-E Requirement-linked Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+→ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+→ Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2531,7 +2535,8 @@ Healthcare Equipment Assignment implementation
 → C6-B CREATE UI COMPLETE / MERGED — PR #40 — main@4805128
 → C6-C RELEASE UI COMPLETE / MERGED — PR #42 — main@9bade4d
 → C6-D REPLACE UI COMPLETE / MERGED — PR #45 — main@99efc5a
-→ C6-E REQUIREMENT-LINKED ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+→ C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
+→ SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -2961,13 +2966,15 @@ Sprint 1:
   mediante PR #42 en `main@9bade4d`;
 - C6-D, reemplazo visual de Assignment RESERVED, quedó COMPLETE / MERGED mediante
   PR #45 en `main@99efc5a`;
+- C6-E, creación visual de Assignment vinculada a Requirement, quedó COMPLETE /
+  MERGED mediante PR #47 en `main@a1f0fee`, con Actual 27-sep-2026;
 - Actual C6-A, C6-B, C6-C y C6-D: 25-sep-2026. El 07-oct-2026 continúa siendo el
-  cierre de la ventana, no un Commitment retroactivo ni la fecha asumida de C6-E;
+  cierre de la ventana, no un Commitment retroactivo;
 - B0 conserva sus 3 SP y estado NOT READY dentro del trabajo pendiente de C5-B;
 - Actual C5-A: 24-sep-2026 — completado antes del Target;
 - Forecast: pendiente de estimar para el trabajo restante;
-- Commitment: pendiente; no se asumen fechas comprometidas ni un siguiente slice
-  READY.
+- Commitment: pendiente; el siguiente incremento funcional requiere refinamiento
+  y no se declara READY.
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
@@ -3096,7 +3103,7 @@ Acceptance Criteria / Definition of Done:
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
 Estado: CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND ON
-COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C/C6-D
+COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C/C6-D/C6-E
 
 Debe formalizar lectura agregada `PENDING` / `PARTIAL` / `UNAVAILABLE` /
 `CONFLICT` y commands para registrar/resolver CoverageNotes, incluyendo tenant,
@@ -3199,13 +3206,29 @@ correcta.
 
 #### HC-NEXT-03C6-E — Requirement-linked Assignment UI
 
-Estado: NEXT FUNCTIONAL CANDIDATE / NOT READY
+Estado: COMPLETE / MERGED — PR #47 — `main@a1f0fee` — Actual 27-sep-2026
 
-Se registra únicamente como siguiente candidato funcional. Requiere refinamiento
-y DoR; no se asignan SP, Forecast ni Commitment. Su objetivo futuro es crear una
-Equipment Assignment vinculada a `HealthcareCaseRequirement` con
-`origin=REQUIREMENT` y mostrar su relación/cobertura en la UI. Conflict Override
-UI permanece como candidato posterior sin número de slice asignado.
+El slice añadió un flujo REQUIREMENT separado de DIRECT: selecciona un Requirement
+ASSET activo del Case y un EquipmentAsset compatible, crea la Assignment mediante
+el backend integrado y refresca List mostrando `origin=REQUIREMENT`, la relación
+con el Requirement y su cobertura.
+
+Evidencia de cierre:
+- Vitest focal 42/42 PASS;
+- TypeScript Web, ESLint Web y Next.js build PASS;
+- CI API/Web PASS;
+- validación manual PASS para flujo REQUIREMENT separado de DIRECT, exclusión de
+  Requirements con tracking QUANTITY, Requirement ASSET disponible, asignación de
+  EquipmentAsset compatible desde UI, `origin=REQUIREMENT` visible, relación con
+  Requirement visible en List, cobertura actualizada a 1/1 y refresh automático.
+
+No se declara validación manual de SALES ni Detail. El mojibake observado en datos
+de desarrollo continúa como known non-blocker; la UI estática UTF-8 permanece
+correcta.
+
+#### Siguiente incremento funcional
+
+Estado: PENDING REFINEMENT / NOT READY. No se asigna todavía un número de slice.
 
 Quedan fuera de C5-A/C5-B frontend, Case Availability general, nuevas capacidades
 funcionales, fuzzy search, permission-based RBAC, Dispatch, Return, Custody,
