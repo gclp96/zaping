@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from './api';
 import {
   createDirectHealthcareEquipmentAssignment,
+  createRequirementHealthcareEquipmentAssignment,
   getHealthcareEquipmentAssignment,
+  getHealthcareEquipmentRequirementCoverage,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
@@ -130,6 +132,72 @@ describe('healthcare-equipment-assignments service', () => {
       'Idempotency-Key'
     ];
     expect(firstKey).not.toBe(secondKey);
+  });
+
+  it('crea una REQUIREMENT sin directAssignmentReason y con Idempotency-Key nueva por request', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { outcome: 'CREATED', data: assignment },
+    });
+    const payload = {
+      caseId: 'case-1',
+      equipmentAssetId: 'asset-1',
+      requirementId: 'requirement-1',
+    };
+
+    await createRequirementHealthcareEquipmentAssignment(payload);
+    await createRequirementHealthcareEquipmentAssignment(payload);
+
+    expect(api.post).toHaveBeenCalledTimes(2);
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      '/healthcare/equipment-assignments',
+      payload,
+      {
+        headers: {
+          'Idempotency-Key': expect.stringMatching(
+            /^hc-assignment-requirement-/,
+          ),
+        },
+      },
+    );
+    expect(payload).not.toHaveProperty('directAssignmentReason');
+    const firstKey = vi.mocked(api.post).mock.calls[0]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    const secondKey = vi.mocked(api.post).mock.calls[1]?.[2]?.headers?.[
+      'Idempotency-Key'
+    ];
+    expect(firstKey).not.toBe(secondKey);
+  });
+
+  it('obtiene cobertura RESERVED exacta del Requirement mediante totalItems', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        items: [],
+        pagination: {
+          page: 1,
+          pageSize: 1,
+          totalItems: 2,
+          totalPages: 2,
+        },
+      },
+    });
+
+    await expect(
+      getHealthcareEquipmentRequirementCoverage('case-1', 'requirement-1'),
+    ).resolves.toBe(2);
+    expect(api.get).toHaveBeenCalledWith(
+      '/healthcare/equipment-assignments',
+      {
+        params: {
+          caseId: 'case-1',
+          requirementId: 'requirement-1',
+          status: 'RESERVED',
+          page: 1,
+          pageSize: 1,
+        },
+      },
+    );
   });
 
   it('libera una Assignment con respuesta directa e Idempotency-Key nueva por request', async () => {

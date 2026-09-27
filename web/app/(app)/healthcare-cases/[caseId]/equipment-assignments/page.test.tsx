@@ -9,7 +9,9 @@ import {
 import { api } from '@/services/api';
 import {
   createDirectHealthcareEquipmentAssignment,
+  createRequirementHealthcareEquipmentAssignment,
   getHealthcareEquipmentAssignment,
+  getHealthcareEquipmentRequirementCoverage,
   listEligibleEquipmentAssignmentAssets,
   listHealthcareEquipmentAssignments,
   releaseHealthcareEquipmentAssignment,
@@ -20,6 +22,10 @@ import {
   type HealthcareEquipmentAssignmentListResponse,
   type HealthcareEquipmentAssignmentReplaceConflictReviewResponse,
 } from '@/services/healthcare-equipment-assignments';
+import {
+  listHealthcareRequirements,
+  type HealthcareRequirement,
+} from '@/services/healthcare-requirements';
 
 import type { HealthcareCase } from '../../types';
 import HealthcareCaseEquipmentAssignmentsPage from './page';
@@ -49,6 +55,8 @@ vi.mock('@/services/healthcare-equipment-assignments', async (importOriginal) =>
     getHealthcareEquipmentAssignment: vi.fn(),
     listEligibleEquipmentAssignmentAssets: vi.fn(),
     createDirectHealthcareEquipmentAssignment: vi.fn(),
+    createRequirementHealthcareEquipmentAssignment: vi.fn(),
+    getHealthcareEquipmentRequirementCoverage: vi.fn(),
     releaseHealthcareEquipmentAssignment: vi.fn(),
     replaceHealthcareEquipmentAssignment: vi.fn(),
   };
@@ -69,6 +77,17 @@ vi.mock('@/services/errors', () => ({
         (error as { response?: { status?: number } }).response?.status === 403,
     ),
 }));
+
+vi.mock('@/services/healthcare-requirements', async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import('@/services/healthcare-requirements')
+  >();
+
+  return {
+    ...actual,
+    listHealthcareRequirements: vi.fn(),
+  };
+});
 
 const healthcareCase: HealthcareCase = {
   id: 'case-1',
@@ -148,6 +167,58 @@ const eligibleAsset: HealthcareEquipmentAssignmentAssetCandidate = {
   },
 };
 
+const eligibleRequirementAsset: HealthcareEquipmentAssignmentAssetCandidate = {
+  id: 'asset-3',
+  productId: 'product-1',
+  assetCode: 'EQ-0003',
+  serialNumber: 'SN-0003',
+  lifecycle: 'ACTIVE',
+  condition: 'GOOD',
+  product: {
+    id: 'product-1',
+    sku: 'EQ-SKU-1',
+    name: 'Torre laparoscópica',
+    isActive: true,
+  },
+};
+
+const requirement: HealthcareRequirement = {
+  id: 'requirement-1',
+  caseId: healthcareCase.id,
+  productId: 'product-1',
+  requestedQty: 2,
+  type: 'REQUIRED',
+  notes: null,
+  sortOrder: 10,
+  lifecycle: 'ACTIVE',
+  retiredAt: null,
+  retirementReason: null,
+  createdAt: '2026-09-20T10:00:00.000Z',
+  updatedAt: '2026-09-20T10:00:00.000Z',
+  product: {
+    id: 'product-1',
+    sku: 'EQ-SKU-1',
+    name: 'Torre laparoscópica',
+    isActive: true,
+    inventoryTracking: 'ASSET',
+  },
+};
+
+const fullyCoveredRequirement: HealthcareRequirement = {
+  ...requirement,
+  id: 'requirement-2',
+  productId: 'product-2',
+  requestedQty: 1,
+  sortOrder: 20,
+  product: {
+    id: 'product-2',
+    sku: 'EQ-SKU-2',
+    name: 'Monitor de signos vitales',
+    isActive: true,
+    inventoryTracking: 'ASSET',
+  },
+};
+
 const directAssignment: HealthcareEquipmentAssignment = {
   ...assignment,
   id: 'assignment-2',
@@ -155,6 +226,17 @@ const directAssignment: HealthcareEquipmentAssignment = {
   origin: 'DIRECT',
   equipmentAsset: eligibleAsset,
   directAssignmentReason: 'Necesidad de demostración',
+  availability: {
+    fullyVerifiable: true,
+    conflictFree: true,
+    warnings: [],
+  },
+};
+
+const createdRequirementAssignment: HealthcareEquipmentAssignment = {
+  ...assignment,
+  id: 'assignment-requirement-created',
+  equipmentAsset: eligibleRequirementAsset,
   availability: {
     fullyVerifiable: true,
     conflictFree: true,
@@ -294,6 +376,11 @@ function configureApi(role: UserRole = 'ADMIN') {
     }
     throw new Error(`Unexpected endpoint ${String(url)}`);
   });
+  vi.mocked(listHealthcareRequirements).mockResolvedValue([
+    requirement,
+    fullyCoveredRequirement,
+  ]);
+  vi.mocked(getHealthcareEquipmentRequirementCoverage).mockResolvedValue(1);
 }
 
 async function renderPage(role: UserRole = 'ADMIN') {
@@ -303,11 +390,17 @@ async function renderPage(role: UserRole = 'ADMIN') {
   );
   vi.mocked(getHealthcareEquipmentAssignment).mockResolvedValue(assignment);
   vi.mocked(listEligibleEquipmentAssignmentAssets).mockResolvedValue([
+    assignment.equipmentAsset,
     eligibleAsset,
+    eligibleRequirementAsset,
   ]);
   vi.mocked(createDirectHealthcareEquipmentAssignment).mockResolvedValue({
     outcome: 'CREATED',
     data: directAssignment,
+  });
+  vi.mocked(createRequirementHealthcareEquipmentAssignment).mockResolvedValue({
+    outcome: 'CREATED',
+    data: createdRequirementAssignment,
   });
   vi.mocked(releaseHealthcareEquipmentAssignment).mockResolvedValue(
     releasedAssignment,
@@ -359,6 +452,9 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
           screen.queryByRole('button', { name: 'Nueva asignación' }),
         ).toBeNull();
         expect(
+          screen.queryByRole('button', { name: 'Asignar requerimiento' }),
+        ).toBeNull();
+        expect(
           screen.queryByRole('button', { name: 'Liberar EQ-0001' }),
         ).toBeNull();
         expect(
@@ -369,12 +465,20 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
           screen.getByRole('button', { name: 'Nueva asignación' }),
         ).toBeTruthy();
         expect(
+          screen.getByRole('button', { name: 'Asignar requerimiento' }),
+        ).toBeTruthy();
+        expect(
           screen.getByRole('button', { name: 'Liberar EQ-0001' }),
         ).toBeTruthy();
         expect(
           screen.getByRole('button', { name: 'Reemplazar EQ-0001' }),
         ).toBeTruthy();
       }
+      expect(listHealthcareRequirements).toHaveBeenCalledWith('case-1', 'ALL');
+      expect(
+        screen.getByText('EQ-SKU-1 — Torre laparoscópica'),
+      ).toBeTruthy();
+      expect(screen.getByText('Cobertura 1/2')).toBeTruthy();
     },
   );
 
@@ -454,6 +558,20 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
       'assignment-1',
     );
     expect(within(dialog).getByText('Ana Ramos')).toBeTruthy();
+    const requirementDetails = within(dialog).getByText(
+      'Requerimiento vinculado',
+    ).parentElement;
+    expect(requirementDetails).not.toBeNull();
+    expect(
+      within(requirementDetails as HTMLElement).getByText(
+        'EQ-SKU-1 — Torre laparoscópica',
+      ),
+    ).toBeTruthy();
+    expect(
+      within(requirementDetails as HTMLElement).getByText(
+        'Cobertura actual: 1/2',
+      ),
+    ).toBeTruthy();
     expect(within(dialog).getByText('Con conflicto')).toBeTruthy();
     expect(
       within(dialog).getByText(
@@ -588,6 +706,204 @@ describe('HealthcareCaseEquipmentAssignmentsPage', () => {
       expect(
         screen.queryByText('Asignación creada correctamente.'),
       ).toBeNull();
+    },
+  );
+
+  it('carga Requirements activos, muestra cobertura y filtra Assets por producto y reservas conocidas', async () => {
+    const user = userEvent.setup();
+    await renderPage('MANAGER');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Asignar requerimiento' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Asignar requerimiento',
+    });
+    expect(listHealthcareRequirements).toHaveBeenCalledWith('case-1', 'ALL');
+    expect(getHealthcareEquipmentRequirementCoverage).toHaveBeenCalledWith(
+      'case-1',
+      'requirement-1',
+    );
+    expect(
+      within(dialog).getByRole('option', {
+        name: 'EQ-SKU-2 · Monitor de signos vitales · Cobertura 1/1 · Completa',
+      }),
+    ).toHaveProperty('disabled', true);
+
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Requerimiento/),
+      'requirement-1',
+    );
+
+    expect(
+      within(dialog).getByText('Cobertura actual: 1/2 · Disponible: 1'),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByRole('option', {
+        name: /Torre laparoscópica · EQ-0003/,
+      }),
+    ).toBeTruthy();
+    expect(
+      within(dialog).queryByRole('option', {
+        name: /Torre laparoscópica · EQ-0001/,
+      }),
+    ).toBeNull();
+    expect(
+      within(dialog).queryByRole('option', {
+        name: /Monitor de signos vitales · EQ-0002/,
+      }),
+    ).toBeNull();
+  });
+
+  it('crea una Assignment REQUIREMENT, cierra el modal y refresca la relación', async () => {
+    const user = userEvent.setup();
+    await renderPage('WAREHOUSE');
+    vi.mocked(listHealthcareEquipmentAssignments).mockResolvedValue(
+      listResponse([assignment, createdRequirementAssignment]),
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Asignar requerimiento' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Asignar requerimiento',
+    });
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Requerimiento/),
+      'requirement-1',
+    );
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo para el requerimiento/),
+      'asset-3',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Asignar equipo' }),
+    );
+
+    await waitFor(() =>
+      expect(
+        createRequirementHealthcareEquipmentAssignment,
+      ).toHaveBeenCalledWith({
+        caseId: 'case-1',
+        equipmentAssetId: 'asset-3',
+        requirementId: 'requirement-1',
+      }),
+    );
+    const payload = vi.mocked(createRequirementHealthcareEquipmentAssignment)
+      .mock.calls[0]?.[0];
+    expect(payload).not.toHaveProperty('directAssignmentReason');
+    expect(
+      await screen.findByText('Equipo asignado al requerimiento correctamente.'),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole('dialog', { name: 'Asignar requerimiento' }),
+    ).toBeNull();
+    await waitFor(() =>
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(2),
+    );
+    const createdRow = screen
+      .getByText(/EQ-SKU-1 · EQ-0003/)
+      .closest('tr');
+    expect(createdRow).not.toBeNull();
+    expect(
+      within(createdRow as HTMLElement).getByText('Requerimiento'),
+    ).toBeTruthy();
+  });
+
+  it('mantiene CONFLICT_REVIEW_REQUIRED en el flujo de Requirement sin afirmar éxito', async () => {
+    const user = userEvent.setup();
+    await renderPage('MANAGER');
+    vi.mocked(createRequirementHealthcareEquipmentAssignment).mockResolvedValue({
+      ...conflictReview,
+      candidate: {
+        ...conflictReview.candidate,
+        requirementId: requirement.id,
+        origin: 'REQUIREMENT',
+        equipmentAsset: eligibleRequirementAsset,
+      },
+    });
+
+    await user.click(
+      screen.getByRole('button', { name: 'Asignar requerimiento' }),
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Asignar requerimiento',
+    });
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Requerimiento/),
+      'requirement-1',
+    );
+    await user.selectOptions(
+      within(dialog).getByLabelText(/^Equipo para el requerimiento/),
+      'asset-3',
+    );
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Asignar equipo' }),
+    );
+
+    expect(
+      await within(dialog).findByText('Revisión de conflicto requerida'),
+    ).toBeTruthy();
+    expect(within(dialog).getByText('Conflicto con HC-0002')).toBeTruthy();
+    expect(
+      screen.queryByText('Equipo asignado al requerimiento correctamente.'),
+    ).toBeNull();
+    expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [400, 'La solicitud no es válida.', 'La solicitud no es válida.'],
+    [
+      403,
+      'No tienes permisos para crear la asignación.',
+      'No tienes permisos para crear la asignación.',
+    ],
+    [
+      409,
+      'El requerimiento ya está cubierto.',
+      'El requerimiento ya está cubierto.',
+    ],
+    [
+      500,
+      'Request failed with status code 500',
+      'No fue posible crear la asignación por un error de persistencia.',
+    ],
+  ])(
+    'mantiene la sesión y el flujo Requirement ante HTTP %s',
+    async (status, responseMessage, expectedMessage) => {
+      const user = userEvent.setup();
+      window.localStorage.setItem('token', 'valid-token');
+      await renderPage('ADMIN');
+      vi.mocked(
+        createRequirementHealthcareEquipmentAssignment,
+      ).mockRejectedValue(
+        Object.assign(new Error(responseMessage), { response: { status } }),
+      );
+
+      await user.click(
+        screen.getByRole('button', { name: 'Asignar requerimiento' }),
+      );
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Asignar requerimiento',
+      });
+      await user.selectOptions(
+        within(dialog).getByLabelText(/^Requerimiento/),
+        'requirement-1',
+      );
+      await user.selectOptions(
+        within(dialog).getByLabelText(/^Equipo para el requerimiento/),
+        'asset-3',
+      );
+      await user.click(
+        within(dialog).getByRole('button', { name: 'Asignar equipo' }),
+      );
+
+      expect(await within(dialog).findByText(expectedMessage)).toBeTruthy();
+      expect(window.localStorage.getItem('token')).toBe('valid-token');
+      expect(
+        screen.queryByText('Equipo asignado al requerimiento correctamente.'),
+      ).toBeNull();
+      expect(listHealthcareEquipmentAssignments).toHaveBeenCalledTimes(1);
     },
   );
 
