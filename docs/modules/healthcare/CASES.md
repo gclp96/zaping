@@ -4,8 +4,8 @@ Módulo: Healthcare Cases
 Producto: Zaping Healthcare
 Versión: 1.3.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; C8 CLOSED / MERGED / ACCEPTED; C4-C2 TECHNICALLY COMPLETE / VALIDATED ON BRANCH / PENDING INTEGRATION
-Última actualización: 2026-09-23
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+Última actualización: 2026-09-27
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -1294,14 +1294,14 @@ Payer required before Preparation
 
 salvo política empresarial explícita.
 
-79. CaseKit TARGET
+79. CaseKit CONTRACT DOCUMENTED / NOT IMPLEMENTED
 
 CaseKit representa el conjunto realmente preparado para el Case.
 
 Actualmente:
 
 CaseKit
-→ NOT IMPLEMENTED
+→ HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 
 80. CaseKit ≠ JSON inside Case
 
@@ -1311,17 +1311,16 @@ HealthcareCase.caseKitJson
 
 como sustituto de un dominio CaseKit real si el workflow requiere lifecycle e integridad propios.
 
-81. CaseKit cardinality TBD
+81. CaseKit cardinality para HC-OPS-01A
 
-No se fija todavía:
+DEC-OPS01A-01 fija:
 
-one CaseKit
+one logical HealthcareCaseKit
 
-multiple CaseKits
+per HealthcareCase
 
-como cardinalidad Prisma.
-
-La estructura se decidirá en el slice correspondiente.
+Los contenedores físicos múltiples permanecen fuera de 01A y no cambian esta
+cardinalidad lógica.
 
 82. EquipmentAsset CURRENT
 
@@ -1336,7 +1335,7 @@ Debe mantenerse:
 EquipmentAsset
 → CURRENT ERP Core identity
 
-83. Equipment Assignment TARGET
+83. Equipment Assignment CURRENT
 
 Healthcare necesita relacionar:
 
@@ -1349,7 +1348,8 @@ mediante un concepto de Assignment.
 Actualmente:
 
 Equipment Assignment
-→ NOT IMPLEMENTED
+→ COMPLETE / MERGED — backend, availability, concurrency, parent integrations y
+frontend C6-A–C6-E integrados
 
 84. Equipment Assignment ≠ lifecycle
 
@@ -1377,9 +1377,10 @@ Custody
 
 Un Equipment puede estar asignado antes de ser entregado físicamente.
 
-86. Case Availability TARGET
+86. Case Availability
 
-La futura disponibilidad Healthcare podrá considerar:
+Equipment Assignment Availability ya considera lifecycle, condition, Assignment
+activa y schedule overlap. La futura Case Availability general podrá considerar:
 
 Equipment lifecycle
 
@@ -1393,9 +1394,9 @@ other blockers
 
 sin almacenar un flag contradictorio independiente.
 
-87. Equipment conflict TARGET
+87. Equipment conflict CURRENT
 
-La futura Calendar/Case Availability puede detectar:
+Equipment Assignment ya detecta:
 
 same EquipmentAsset
 +
@@ -1404,10 +1405,10 @@ overlapping Cases
 Actualmente:
 
 Equipment Assignment
-❌
+✅
 
 conflict detection
-❌
+✅
 
 88. Responsible User conflict TARGET
 
