@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-25
+Última actualización: 2026-09-27
 Responsable: Zaping Team
 
 1. Propósito
@@ -111,7 +111,9 @@ HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9
 ↓
 HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 ↓
-HC-NEXT-03C6-E Requirement-linked Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+↓
+Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -164,11 +166,10 @@ petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
 List/Detail HTTP el recálculo, no Case Update API.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
-velocidad o Commitment; C5-A quedó completado el 24-sep y C6-A/C6-B/C6-C/C6-D el
-25-sep, mediante PR #38 en `main@8a67d5a`, PR #40 en `main@4805128`, PR #42 en
-`main@9bade4d` y PR #45 en `main@99efc5a`. El Forecast del trabajo restante sigue
-pendiente. C6-E se registra sólo como siguiente candidato funcional y permanece
-NOT READY; C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
+velocidad o Commitment; C5-A quedó completado el 24-sep, C6-A/C6-B/C6-C/C6-D el
+25-sep y C6-E el 27-sep mediante PR #47 en `main@a1f0fee`. El Forecast del trabajo
+restante sigue pendiente. El siguiente incremento funcional requiere refinamiento
+y no está READY; C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
 
 También permanecen como TARGET Healthcare:
 
@@ -994,7 +995,8 @@ PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTE
 IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN
 main@8a67d5a; C6-B CREATE UI COMPLETE / MERGED IN main@4805128; C6-C RELEASE UI
 COMPLETE / MERGED IN main@9bade4d; C6-D REPLACE UI COMPLETE / MERGED IN
-main@99efc5a.
+main@99efc5a; C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED IN
+main@a1f0fee.
 
 El contrato canónico aprobado se documenta en
 `docs/modules/healthcare/EQUIPMENT_ASSIGNMENT.md`.
@@ -1067,7 +1069,7 @@ evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
 pendiente y como prerequisito de slices posteriores de C6 que requieran coverage
-pero no de C6-A/C6-B/C6-C/C6-D. C6-A está COMPLETE / MERGED mediante PR #38 en
+pero no de C6-A/C6-B/C6-C/C6-D/C6-E. C6-A está COMPLETE / MERGED mediante PR #38 en
 `main@8a67d5a`, con Actual 25-sep-2026. Vitest focal 29/29, ESLint, TypeScript,
 Next.js build y CI API/Web pasaron; la validación manual cubrió empty state,
 DIRECT/RESERVED real, Detail modal y disponibilidad “No verificable” con
@@ -1088,11 +1090,15 @@ TypeScript Web, ESLint Web, Next.js build y CI API/Web pasaron. La validación
 manual acreditó MANAGER con Replace visible sobre RESERVED, Asset origen excluido,
 Replace desde UI, original REPLACED, sucesora RESERVED, refresh inmediato y
 disponibilidad histórica/no aplicable. No se declara validación manual de SALES.
-C6-E Requirement-linked Assignment UI queda como siguiente candidato funcional /
-NOT READY, sin SP, Forecast ni Commitment. Su objetivo futuro es crear una
-Equipment Assignment vinculada a `HealthcareCaseRequirement` con
-`origin=REQUIREMENT` y mostrar su relación/cobertura en la UI. Conflict Override
-UI permanece como candidato posterior sin número de slice asignado.
+C6-E está COMPLETE / MERGED mediante PR #47 en `main@a1f0fee`, con Actual
+27-sep-2026: Vitest focal 42/42, TypeScript Web, ESLint Web, Next.js build y CI
+API/Web pasaron. La validación manual acreditó el flujo REQUIREMENT separado de
+DIRECT, la exclusión de Requirements QUANTITY, un Requirement ASSET disponible,
+la asignación de EquipmentAsset compatible desde UI, `origin=REQUIREMENT` y la
+relación con Requirement visibles en List, cobertura 1/1 y refresh automático. No
+se declara validación manual de SALES ni Detail. El mojibake de datos de desarrollo
+permanece como known non-blocker. El siguiente incremento funcional queda pendiente
+de refinamiento y no se declara READY ni se numera todavía.
 Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
@@ -2846,7 +2852,9 @@ HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9
 
 HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 
-HC-NEXT-03C6-E Requirement-linked Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+
+Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -3003,7 +3011,9 @@ HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9
 ↓
 HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 ↓
-HC-NEXT-03C6-E Requirement-linked Assignment UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+↓
+Siguiente incremento funcional — PENDING REFINEMENT / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓

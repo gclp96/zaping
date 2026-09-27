@@ -14,8 +14,8 @@
 **Estado HC-NEXT-03C2:** ASSIGNMENT BACKEND BASE — COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** AVAILABILITY / CONFLICT REVIEW / CONCURRENCY — COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI AND C6-D REPLACE UI COMPLETE / MERGED; C6-E NEXT FUNCTIONAL CANDIDATE / NOT READY; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-**Última actualización:** 2026-09-25
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+**Última actualización:** 2026-09-27
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -816,11 +816,10 @@ Evidencia técnica C5-A:
 - PR #36 y #37 integrados en `main@5ec9f67`; Actual C5-A: 24-sep-2026.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin conversión a
-velocidad ni Commitment. C5-A se completó el 24-sep y C6-A/C6-B/C6-C/C6-D el
-25-sep, mediante PR #38 en `main@8a67d5a`, PR #40 en `main@4805128`, PR #42 en
-`main@9bade4d` y PR #45 en `main@99efc5a`. El Forecast del trabajo restante
-permanece pendiente. C6-E queda como candidato funcional NOT READY; B0 conserva
-sus 3 SP y estado NOT READY.
+velocidad ni Commitment. C5-A se completó el 24-sep, C6-A/C6-B/C6-C/C6-D el
+25-sep y C6-E el 27-sep mediante PR #47 en `main@a1f0fee`. El Forecast del trabajo
+restante permanece pendiente. El siguiente incremento funcional requiere
+refinamiento y no está READY; B0 conserva sus 3 SP y estado NOT READY.
 
 ### C5-B — contrato y preparación pendiente
 
@@ -895,7 +894,7 @@ interna expuesta.
 ### HC-NEXT-03C5-COVERAGE
 
 **Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND
-ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C/C6-D.
+ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C/C6-D/C6-E.
 
 El contrato pendiente debe definir lectura agregada `PENDING` / `PARTIAL` /
 `UNAVAILABLE` / `CONFLICT`, registro y resolución de CoverageNotes, tenant scope,
@@ -981,13 +980,26 @@ estática UTF-8 es correcta.
 
 ### HC-NEXT-03C6-E — Requirement-linked Assignment UI
 
-**Estado:** NEXT FUNCTIONAL CANDIDATE / NOT READY.
+**Estado:** COMPLETE / MERGED — PR #47 — `main@a1f0fee` — Actual 27-sep-2026.
 
-Se registra únicamente como siguiente candidato funcional. Requiere refinamiento
-y DoR; no tiene SP, Forecast ni Commitment asignados. Su objetivo futuro es crear
-una Equipment Assignment vinculada a `HealthcareCaseRequirement` con
-`origin=REQUIREMENT` y mostrar su relación/cobertura en la UI. Conflict Override
-UI permanece como candidato posterior sin número de slice asignado.
+El quinto slice visual separa la creación REQUIREMENT de DIRECT. Permite elegir un
+Requirement ASSET activo del Case y un EquipmentAsset compatible, crea mediante el
+backend integrado y refresca List con `origin=REQUIREMENT`, relación al Requirement
+y cobertura actualizada.
+
+Evidencia de cierre: Vitest focal 42/42 PASS; TypeScript Web, ESLint Web, Next.js
+build y CI API/Web PASS. La validación manual acreditó flujo REQUIREMENT separado
+de DIRECT, Requirement QUANTITY no ofrecido, Requirement ASSET disponible,
+EquipmentAsset compatible asignado desde UI, `origin=REQUIREMENT` visible,
+relación con Requirement visible en List, cobertura 1/1 y refresh automático.
+No se declara validación manual de SALES ni Detail.
+
+El mojibake de datos de desarrollo permanece como known non-blocker; la UI
+estática UTF-8 es correcta.
+
+### Siguiente incremento funcional
+
+**Estado:** PENDING REFINEMENT / NOT READY. No se asigna todavía un número de slice.
 
 ---
 
@@ -1032,7 +1044,8 @@ Equipment Assignment implementation
 → C6-B CREATE ASSIGNMENT UI COMPLETE / MERGED — PR #40 — main@4805128 — ACTUAL 25-sep-2026
 → C6-C RELEASE ASSIGNMENT UI COMPLETE / MERGED — PR #42 — main@9bade4d — ACTUAL 25-sep-2026
 → C6-D REPLACE ASSIGNMENT UI COMPLETE / MERGED — PR #45 — main@99efc5a — ACTUAL 25-sep-2026
-→ C6-E REQUIREMENT-LINKED ASSIGNMENT UI — NEXT FUNCTIONAL CANDIDATE / NOT READY
+→ C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee — ACTUAL 27-sep-2026
+→ SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
 
