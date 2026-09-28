@@ -7,6 +7,7 @@ import {
 import { Test } from '@nestjs/testing';
 import {
   EquipmentCondition,
+  HealthcareCaseKitItemLifecycle,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
@@ -34,6 +35,9 @@ import {
 import { HealthcareCaseFolioService } from '../src/healthcare/cases/healthcare-case-folio.service';
 import { HealthcareCaseService } from '../src/healthcare/cases/healthcare-case.service';
 import { HealthcareCasesController } from '../src/healthcare/cases/healthcare-cases.controller';
+import { HealthcareCaseKitItemSourceType } from '../src/healthcare/case-kits/dto/add-healthcare-case-kit-item.dto';
+import { HealthcareCaseKitsRepository } from '../src/healthcare/case-kits/healthcare-case-kits.repository';
+import { HealthcareCaseKitsService } from '../src/healthcare/case-kits/healthcare-case-kits.service';
 import { HealthcareEquipmentAssignmentsController } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller';
 import { HealthcareEquipmentAssignmentsRepository } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
 import { HealthcareEquipmentAssignmentsService } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
@@ -68,6 +72,8 @@ const requiredTables = [
   'HealthcareEquipmentRequirementCoverageNote',
   'HealthcareEquipmentAssignmentSettings',
   'IdempotencyRecord',
+  'HealthcareCaseKit',
+  'HealthcareCaseKitItem',
 ] as const;
 
 const requiredRowLockPrivileges = [
@@ -80,6 +86,26 @@ const requiredRowLockPrivileges = [
     lockColumn: 'companyId',
   },
   { tableName: 'Product', lockColumn: 'id' },
+  { tableName: 'HealthcareCaseKit', lockColumn: 'id' },
+  { tableName: 'HealthcareCaseKitItem', lockColumn: 'id' },
+] as const;
+
+const requiredCaseKitDmlTables = [
+  'HealthcareCaseKit',
+  'HealthcareCaseKitItem',
+] as const;
+
+const requiredCaseKitItemUpdateColumns = [
+  'id',
+  'lifecycle',
+  'excludedById',
+  'excludedAt',
+  'exclusionReason',
+] as const;
+
+const requiredCaseKitTypes = [
+  'HealthcareCaseKitStatus',
+  'HealthcareCaseKitItemLifecycle',
 ] as const;
 
 const requiredCaseCancelUpdateColumns = [
@@ -117,6 +143,12 @@ type Scenario = {
   caseId: string;
   requirementIds: string[];
   equipmentAssetIds: string[];
+};
+
+type CaseKitFixture = {
+  scenario: Scenario;
+  caseKitId: string;
+  itemId: string;
 };
 
 type ControlledTransaction = {
@@ -176,6 +208,10 @@ describePostgreSql(
     let assignmentService: HealthcareEquipmentAssignmentsService;
     let requirementService: HealthcareRequirementsService;
     let caseService: HealthcareCaseService;
+    let caseKitRepositoryA: HealthcareCaseKitsRepository;
+    let caseKitRepositoryB: HealthcareCaseKitsRepository;
+    let caseKitServiceA: HealthcareCaseKitsService;
+    let caseKitServiceB: HealthcareCaseKitsService;
     let httpRepository: HealthcareEquipmentAssignmentsRepository;
     let httpService: HealthcareEquipmentAssignmentsService;
     let httpCaseService: HealthcareCaseService;
@@ -250,6 +286,7 @@ describePostgreSql(
       await assertExpectedSchema(setupPrisma);
       await assertRequiredRowLockPrivileges(setupPrisma);
       await assertRequiredCaseCancelUpdatePrivileges(setupPrisma);
+      await assertRequiredCaseKitPrivileges(setupPrisma);
       await assertExclusiveTargetAvailability(observerPrisma, clients);
       databaseReady = true;
 
@@ -270,6 +307,16 @@ describePostgreSql(
         casePrisma,
         createUnusedCaseFolioService(),
         assignmentService,
+        policy,
+      );
+      caseKitRepositoryA = new HealthcareCaseKitsRepository(assignmentPrisma);
+      caseKitRepositoryB = new HealthcareCaseKitsRepository(requirementPrisma);
+      caseKitServiceA = new HealthcareCaseKitsService(
+        caseKitRepositoryA,
+        policy,
+      );
+      caseKitServiceB = new HealthcareCaseKitsService(
+        caseKitRepositoryB,
         policy,
       );
       httpRepository = new HealthcareEquipmentAssignmentsRepository(httpPrisma);
@@ -440,6 +487,7 @@ describePostgreSql(
         requestedQty?: number;
         assetCount?: number;
         requirementCount?: number;
+        inventoryTracking?: ProductInventoryTracking;
       } = {},
     ): Promise<Scenario> {
       const userId = userForCompany(companyId);
@@ -467,7 +515,8 @@ describePostgreSql(
           companyId,
           sku: `HC-L2H-${id}`,
           name: `HC-LOCK-02 2H Product ${index}`,
-          inventoryTracking: ProductInventoryTracking.ASSET,
+          inventoryTracking:
+            options.inventoryTracking ?? ProductInventoryTracking.ASSET,
         })),
       });
       await setupPrisma.healthcareCase.create({
@@ -493,15 +542,17 @@ describePostgreSql(
           createdById: userId,
         })),
       });
-      await setupPrisma.equipmentAsset.createMany({
-        data: equipmentAssetIds.map((id) => ({
-          id,
-          companyId,
-          productId: productIds[0],
-          assetCode: `HC-L2H-${id}`,
-          condition: EquipmentCondition.GOOD,
-        })),
-      });
+      if (equipmentAssetIds.length > 0) {
+        await setupPrisma.equipmentAsset.createMany({
+          data: equipmentAssetIds.map((id) => ({
+            id,
+            companyId,
+            productId: productIds[0],
+            assetCode: `HC-L2H-${id}`,
+            condition: EquipmentCondition.GOOD,
+          })),
+        });
+      }
 
       return {
         companyId,
@@ -510,6 +561,38 @@ describePostgreSql(
         caseId,
         requirementIds,
         equipmentAssetIds,
+      };
+    }
+
+    async function createCaseKitFixture(
+      service = caseKitServiceA,
+    ): Promise<CaseKitFixture> {
+      const scenario = await createScenario(companyAId, {
+        assetCount: 0,
+        inventoryTracking: ProductInventoryTracking.QUANTITY,
+      });
+      const kit = await service.create(
+        scenario.companyId,
+        scenario.userId,
+        scenario.caseId,
+        trackKey('case-kit-create'),
+      );
+      const item = await service.addItem(
+        scenario.companyId,
+        scenario.userId,
+        kit.data.id,
+        trackKey('case-kit-item-add'),
+        {
+          sourceType: HealthcareCaseKitItemSourceType.REQUIREMENT,
+          requirementId: scenario.requirementIds[0],
+          preparedQuantity: 1,
+        },
+      );
+
+      return {
+        scenario,
+        caseKitId: kit.data.id,
+        itemId: item.data.id,
       };
     }
 
@@ -3612,6 +3695,276 @@ describePostgreSql(
       );
     });
 
+    describe('HC-OPS-01A.1 CaseKit item exclusion', () => {
+      it('enforces ACTIVE-only source uniqueness and permits re-add after exclusion', async () => {
+        const fixture = await createCaseKitFixture();
+        const indexRows = await setupPrisma.$queryRaw<
+          Array<{ indexName: string; indexDefinition: string }>
+        >(Prisma.sql`
+          SELECT indexname AS "indexName", indexdef AS "indexDefinition"
+          FROM pg_indexes
+          WHERE schemaname = 'public'
+            AND indexname IN (
+              'HealthcareCaseKitItem_requirement_source_key',
+              'HealthcareCaseKitItem_assignment_source_key'
+            )
+          ORDER BY indexname
+        `);
+
+        const expectedSourceByIndex = {
+          HealthcareCaseKitItem_assignment_source_key: 'equipmentAssignmentId',
+          HealthcareCaseKitItem_requirement_source_key: 'requirementId',
+        } as const;
+        expect(indexRows.map(({ indexName }) => indexName)).toEqual(
+          Object.keys(expectedSourceByIndex),
+        );
+        for (const indexRow of indexRows) {
+          const sourceColumn =
+            expectedSourceByIndex[
+              indexRow.indexName as keyof typeof expectedSourceByIndex
+            ];
+          const normalizedDefinition = indexRow.indexDefinition
+            .replaceAll('"', '')
+            .replace(/\s+/gu, ' ')
+            .trim();
+
+          expect(normalizedDefinition).toMatch(/\bCREATE UNIQUE INDEX\b/iu);
+          expect(normalizedDefinition).toMatch(
+            /\bON public\.HealthcareCaseKitItem\b/iu,
+          );
+          expect(normalizedDefinition).toMatch(
+            new RegExp(
+              `\\(\\s*companyId\\s*,\\s*caseKitId\\s*,\\s*${sourceColumn}\\s*\\)`,
+              'iu',
+            ),
+          );
+          expect(normalizedDefinition).toMatch(
+            new RegExp(`${sourceColumn}\\s+IS\\s+NOT\\s+NULL`, 'iu'),
+          );
+          expect(normalizedDefinition).toMatch(
+            /lifecycle\s*=\s*'ACTIVE'(?:::[A-Za-z0-9_.]+)?/iu,
+          );
+        }
+
+        await expect(
+          setupPrisma.healthcareCaseKitItem.create({
+            data: {
+              id: randomUUID(),
+              companyId: fixture.scenario.companyId,
+              caseId: fixture.scenario.caseId,
+              caseKitId: fixture.caseKitId,
+              requirementId: fixture.scenario.requirementIds[0],
+              preparedQuantity: 1,
+              addedById: fixture.scenario.userId,
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'P2002' });
+
+        await expect(
+          caseKitServiceA.excludeItem(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            fixture.itemId,
+            trackKey('case-kit-item-exclude'),
+            { reason: 'Fuente corregida' },
+          ),
+        ).resolves.toMatchObject({
+          replay: false,
+          data: {
+            lifecycle: HealthcareCaseKitItemLifecycle.EXCLUDED,
+            exclusionReason: 'Fuente corregida',
+          },
+        });
+
+        const replacement = await caseKitServiceA.addItem(
+          fixture.scenario.companyId,
+          fixture.scenario.userId,
+          fixture.caseKitId,
+          trackKey('case-kit-item-readd'),
+          {
+            sourceType: HealthcareCaseKitItemSourceType.REQUIREMENT,
+            requirementId: fixture.scenario.requirementIds[0],
+            preparedQuantity: 1,
+          },
+        );
+
+        expect(replacement.data.id).not.toBe(fixture.itemId);
+        await expect(
+          setupPrisma.healthcareCaseKitItem.count({
+            where: {
+              companyId: fixture.scenario.companyId,
+              caseKitId: fixture.caseKitId,
+              requirementId: fixture.scenario.requirementIds[0],
+              lifecycle: HealthcareCaseKitItemLifecycle.ACTIVE,
+            },
+          }),
+        ).resolves.toBe(1);
+        await expect(
+          setupPrisma.healthcareCaseKitItem.count({
+            where: {
+              companyId: fixture.scenario.companyId,
+              caseKitId: fixture.caseKitId,
+              requirementId: fixture.scenario.requirementIds[0],
+              lifecycle: HealthcareCaseKitItemLifecycle.EXCLUDED,
+            },
+          }),
+        ).resolves.toBe(1);
+      });
+
+      it('serializes concurrent exclusions and leaves only the winning claim and audit', async () => {
+        const fixture = await createCaseKitFixture();
+        const firstPid = await getBackendPid(assignmentPrisma);
+        const secondPid = await getBackendPid(requirementPrisma);
+        const firstReachedCompletion = deferred<void>();
+        const allowFirstCompletion = deferred<void>();
+        const completion = jest
+          .spyOn(caseKitRepositoryA, 'completeIdempotencyClaim')
+          .mockImplementation((async (
+            transaction: Prisma.TransactionClient,
+            claimId: string,
+            resourceId: string,
+          ) => {
+            firstReachedCompletion.resolve(undefined);
+            await allowFirstCompletion.promise;
+            return transaction.idempotencyRecord.update({
+              where: { id: claimId },
+              data: { resourceId },
+              select: { id: true },
+            });
+          }) as never);
+        const firstKey = trackKey('case-kit-exclude-winner');
+        const secondKey = trackKey('case-kit-exclude-replay');
+        let first: ReturnType<HealthcareCaseKitsService['excludeItem']> | null =
+          null;
+        let second: ReturnType<
+          HealthcareCaseKitsService['excludeItem']
+        > | null = null;
+
+        try {
+          first = caseKitServiceA.excludeItem(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            fixture.itemId,
+            firstKey,
+            { reason: 'Duplicado operativo' },
+          );
+          await withTimeout(
+            firstReachedCompletion.promise,
+            5_000,
+            'CaseKit exclusion winner reached claim completion',
+          );
+          second = caseKitServiceB.excludeItem(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            fixture.itemId,
+            secondKey,
+            { reason: 'Duplicado operativo' },
+          );
+          await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+          allowFirstCompletion.resolve(undefined);
+
+          const results = await withTimeout(
+            Promise.all([first, second]),
+            8_000,
+            'concurrent CaseKit exclusions',
+          );
+          expect(results.map((result) => result.replay).sort()).toEqual([
+            false,
+            true,
+          ]);
+          await expect(
+            setupPrisma.idempotencyRecord.count({
+              where: {
+                companyId: fixture.scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_EXCLUDE,
+                key: { in: [firstKey, secondKey] },
+              },
+            }),
+          ).resolves.toBe(1);
+          const persistedItem =
+            await setupPrisma.healthcareCaseKitItem.findUnique({
+              where: { id: fixture.itemId },
+              select: {
+                lifecycle: true,
+                excludedById: true,
+                excludedAt: true,
+                exclusionReason: true,
+              },
+            });
+          expect(persistedItem).toMatchObject({
+            lifecycle: HealthcareCaseKitItemLifecycle.EXCLUDED,
+            excludedById: fixture.scenario.userId,
+            exclusionReason: 'Duplicado operativo',
+          });
+          expect(persistedItem?.excludedAt).toBeInstanceOf(Date);
+        } finally {
+          allowFirstCompletion.resolve(undefined);
+          await Promise.allSettled(
+            [first, second].filter(
+              (
+                operation,
+              ): operation is ReturnType<
+                HealthcareCaseKitsService['excludeItem']
+              > => operation !== null,
+            ),
+          );
+          completion.mockRestore();
+        }
+      });
+
+      it('rolls back lifecycle, audit and claim when claim completion fails', async () => {
+        const fixture = await createCaseKitFixture();
+        const key = trackKey('case-kit-exclude-rollback');
+        const completion = jest
+          .spyOn(caseKitRepositoryA, 'completeIdempotencyClaim')
+          .mockRejectedValue(new Error('Injected CaseKit completion failure'));
+
+        try {
+          await expect(
+            caseKitServiceA.excludeItem(
+              fixture.scenario.companyId,
+              fixture.scenario.userId,
+              fixture.caseKitId,
+              fixture.itemId,
+              key,
+              { reason: 'Rollback controlado' },
+            ),
+          ).rejects.toThrow('Injected CaseKit completion failure');
+        } finally {
+          completion.mockRestore();
+        }
+
+        await expect(
+          setupPrisma.healthcareCaseKitItem.findUnique({
+            where: { id: fixture.itemId },
+            select: {
+              lifecycle: true,
+              excludedById: true,
+              excludedAt: true,
+              exclusionReason: true,
+            },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareCaseKitItemLifecycle.ACTIVE,
+          excludedById: null,
+          excludedAt: null,
+          exclusionReason: null,
+        });
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: fixture.scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_EXCLUDE,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+      });
+    });
+
     async function assertNoCreateWrites(
       companyId: string,
       caseId: string,
@@ -3894,6 +4247,123 @@ async function assertRequiredCaseCancelUpdatePrivileges(
   }
 }
 
+async function assertRequiredCaseKitPrivileges(
+  client: ExplicitPrismaService,
+): Promise<void> {
+  const tableRows = await client.$queryRaw<
+    Array<{
+      tableName: string;
+      canSelect: boolean;
+      canInsert: boolean;
+      canDelete: boolean;
+    }>
+  >(Prisma.sql`
+    SELECT
+      required."tableName",
+      COALESCE(
+        has_table_privilege(current_user, relation.oid, 'SELECT'), false
+      ) AS "canSelect",
+      COALESCE(
+        has_table_privilege(current_user, relation.oid, 'INSERT'), false
+      ) AS "canInsert",
+      COALESCE(
+        has_table_privilege(current_user, relation.oid, 'DELETE'), false
+      ) AS "canDelete"
+    FROM (
+      VALUES ${Prisma.join(
+        requiredCaseKitDmlTables.map((tableName) => Prisma.sql`(${tableName})`),
+      )}
+    ) AS required("tableName")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_class AS relation
+      ON relation.relnamespace = namespace.oid
+      AND relation.relname = required."tableName"
+  `);
+  const missingTablePrivileges = tableRows
+    .filter((row) => !row.canSelect || !row.canInsert || !row.canDelete)
+    .map((row) => {
+      const privileges = [
+        ...(row.canSelect ? [] : ['SELECT']),
+        ...(row.canInsert ? [] : ['INSERT']),
+        ...(row.canDelete ? [] : ['DELETE']),
+      ];
+      return `${row.tableName} [${privileges.join(', ')}]`;
+    });
+
+  const updateRows = await client.$queryRaw<
+    Array<{ columnName: string; canUpdate: boolean }>
+  >(Prisma.sql`
+    SELECT
+      required."columnName",
+      COALESCE(
+        has_column_privilege(
+          current_user,
+          relation.oid,
+          attribute.attnum,
+          'UPDATE'
+        ),
+        false
+      ) AS "canUpdate"
+    FROM (
+      VALUES ${Prisma.join(
+        requiredCaseKitItemUpdateColumns.map(
+          (columnName) => Prisma.sql`(${columnName})`,
+        ),
+      )}
+    ) AS required("columnName")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_class AS relation
+      ON relation.relnamespace = namespace.oid
+      AND relation.relname = 'HealthcareCaseKitItem'
+    LEFT JOIN pg_attribute AS attribute
+      ON attribute.attrelid = relation.oid
+      AND attribute.attname = required."columnName"
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+  `);
+  const missingUpdatePrivileges = updateRows
+    .filter((row) => !row.canUpdate)
+    .map((row) => row.columnName);
+
+  const typeRows = await client.$queryRaw<
+    Array<{ typeName: string; canUse: boolean }>
+  >(Prisma.sql`
+    SELECT
+      required."typeName",
+      COALESCE(
+        has_type_privilege(current_user, type.oid, 'USAGE'), false
+      ) AS "canUse"
+    FROM (
+      VALUES ${Prisma.join(
+        requiredCaseKitTypes.map((typeName) => Prisma.sql`(${typeName})`),
+      )}
+    ) AS required("typeName")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_type AS type
+      ON type.typnamespace = namespace.oid
+      AND type.typname = required."typeName"
+  `);
+  const missingTypePrivileges = typeRows
+    .filter((row) => !row.canUse)
+    .map((row) => row.typeName);
+
+  if (
+    tableRows.length !== requiredCaseKitDmlTables.length ||
+    missingTablePrivileges.length > 0 ||
+    updateRows.length !== requiredCaseKitItemUpdateColumns.length ||
+    missingUpdatePrivileges.length > 0 ||
+    typeRows.length !== requiredCaseKitTypes.length ||
+    missingTypePrivileges.length > 0
+  ) {
+    throw new Error(
+      `HC-OPS-01A.1 CaseKit privilege preflight failed for tables: ${missingTablePrivileges.join(', ') || 'none'}; UPDATE columns: ${missingUpdatePrivileges.join(', ') || 'none'}; types: ${missingTypePrivileges.join(', ') || 'none'}.`,
+    );
+  }
+}
+
 async function assertExclusiveTargetAvailability(
   observer: ExplicitPrismaService,
   clients: ExplicitPrismaService[],
@@ -4154,6 +4624,14 @@ async function cleanupRunFixtures(
   const companyIds = [...registry.companyIds];
   const operations: Array<() => Promise<unknown>> = [
     () =>
+      prisma.healthcareCaseKitItem.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
+      prisma.healthcareCaseKit.deleteMany({
+        where: { companyId: { in: companyIds } },
+      }),
+    () =>
       prisma.healthcareEquipmentAssignmentConflictOverride.deleteMany({
         where: { companyId: { in: companyIds } },
       }),
@@ -4211,6 +4689,12 @@ async function assertNoRunOwnedRecords(
 ): Promise<void> {
   const companyIds = [...registry.companyIds];
   const counts = await Promise.all([
+    prisma.healthcareCaseKitItem.count({
+      where: { companyId: { in: companyIds } },
+    }),
+    prisma.healthcareCaseKit.count({
+      where: { companyId: { in: companyIds } },
+    }),
     prisma.healthcareEquipmentAssignmentConflictOverride.count({
       where: { companyId: { in: companyIds } },
     }),

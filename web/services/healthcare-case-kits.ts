@@ -20,6 +20,7 @@ export type HealthcareCaseKitWarning = {
 
 export type HealthcareCaseKitItem = {
   id: string;
+  lifecycle: 'ACTIVE' | 'EXCLUDED';
   sourceType: 'REQUIREMENT' | 'EQUIPMENT_ASSIGNMENT';
   preparedQuantity: number | null;
   requirement: {
@@ -50,6 +51,9 @@ export type HealthcareCaseKitItem = {
   stale: boolean;
   warnings: HealthcareCaseKitWarning[];
   addedBy: HealthcareCaseKitUser;
+  excludedBy: HealthcareCaseKitUser | null;
+  excludedAt: string | null;
+  exclusionReason: string | null;
   createdAt: string;
 };
 
@@ -108,6 +112,23 @@ export async function addHealthcareCaseKitItem(
     {
       headers: {
         'Idempotency-Key': `hc-case-kit-item-${globalThis.crypto.randomUUID()}`,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function excludeHealthcareCaseKitItem(
+  caseKitId: string,
+  itemId: string,
+  reason: string,
+): Promise<HealthcareCaseKitItem> {
+  const response = await api.post<HealthcareCaseKitItem>(
+    `/healthcare/case-kits/${caseKitId}/items/${itemId}/exclude`,
+    { reason },
+    {
+      headers: {
+        'Idempotency-Key': `hc-case-kit-item-exclude-${globalThis.crypto.randomUUID()}`,
       },
     },
   );

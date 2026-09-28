@@ -40,3 +40,17 @@ export function createHealthcareCaseKitItemRequestHash(
         : null,
   });
 }
+
+export function createHealthcareCaseKitItemExclusionRequestHash(
+  caseKitId: string,
+  itemId: string,
+  reason: string,
+): string {
+  return hash({
+    version: 1,
+    command: 'HEALTHCARE_CASE_KIT_ITEM_EXCLUDE',
+    caseKitId,
+    itemId,
+    reason,
+  });
+}

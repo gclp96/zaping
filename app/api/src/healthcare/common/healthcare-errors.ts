@@ -56,6 +56,9 @@ export const HEALTHCARE_ERROR_CODES = {
   caseKitItemAlreadyExists: 'CASE_KIT_ITEM_ALREADY_EXISTS',
   invalidPreparedQuantity: 'INVALID_PREPARED_QUANTITY',
   caseKitSourceNotEligible: 'CASE_KIT_SOURCE_NOT_ELIGIBLE',
+  caseKitItemNotFound: 'CASE_KIT_ITEM_NOT_FOUND',
+  invalidCaseKitItemExclusionReason: 'INVALID_CASE_KIT_ITEM_EXCLUSION_REASON',
+  caseKitItemAlreadyExcluded: 'CASE_KIT_ITEM_ALREADY_EXCLUDED',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
   concurrencyTimeout: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
@@ -405,6 +408,27 @@ export function caseKitSourceNotEligibleException(): ConflictException {
   return healthcareConflictWithCode(
     HEALTHCARE_ERROR_CODES.caseKitSourceNotEligible,
     'La fuente ya no es elegible para el maletín',
+  );
+}
+
+export function caseKitItemNotFoundException(): NotFoundException {
+  return healthcareNotFoundWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitItemNotFound,
+    'Contenido del maletín no encontrado',
+  );
+}
+
+export function invalidCaseKitItemExclusionReasonException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.invalidCaseKitItemExclusionReason,
+    'La razón de exclusión no es válida',
+  );
+}
+
+export function caseKitItemAlreadyExcludedException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitItemAlreadyExcluded,
+    'El contenido ya fue excluido con una razón diferente',
   );
 }
 

@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { IdempotencyScope, Prisma } from '@prisma/client';
+import {
+  HealthcareCaseKitItemLifecycle,
+  IdempotencyScope,
+  Prisma,
+} from '@prisma/client';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -11,10 +15,16 @@ export const healthcareCaseKitItemSelect = {
   requirementId: true,
   equipmentAssignmentId: true,
   preparedQuantity: true,
+  lifecycle: true,
   createdAt: true,
   addedBy: {
     select: { id: true, firstName: true, lastName: true },
   },
+  excludedBy: {
+    select: { id: true, firstName: true, lastName: true },
+  },
+  excludedAt: true,
+  exclusionReason: true,
   requirement: {
     select: {
       id: true,
@@ -203,7 +213,13 @@ export class HealthcareCaseKitsRepository {
       where: { id: itemId, companyId },
       select: {
         ...healthcareCaseKitItemSelect,
-        caseKit: { select: { healthcareCase: { select: { status: true } } } },
+        caseKit: {
+          select: {
+            id: true,
+            status: true,
+            healthcareCase: { select: { status: true } },
+          },
+        },
       },
     });
   }
@@ -216,6 +232,22 @@ export class HealthcareCaseKitsRepository {
     const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
       SELECT "id" FROM "HealthcareCaseRequirement"
       WHERE "id" = ${requirementId} AND "companyId" = ${companyId}
+      FOR UPDATE
+    `);
+    return rows.length === 1;
+  }
+
+  async lockItem(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseKitId: string,
+    itemId: string,
+  ): Promise<boolean> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareCaseKitItem"
+      WHERE "id" = ${itemId}
+        AND "companyId" = ${companyId}
+        AND "caseKitId" = ${caseKitId}
       FOR UPDATE
     `);
     return rows.length === 1;
@@ -278,8 +310,40 @@ export class HealthcareCaseKitsRepository {
     client: DatabaseClient = this.prisma,
   ) {
     return client.healthcareCaseKitItem.findFirst({
-      where: { companyId, caseKitId, ...source },
+      where: {
+        companyId,
+        caseKitId,
+        lifecycle: HealthcareCaseKitItemLifecycle.ACTIVE,
+        ...source,
+      },
       select: { id: true },
+    });
+  }
+
+  excludeItem(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseKitId: string;
+      itemId: string;
+      excludedById: string;
+      excludedAt: Date;
+      exclusionReason: string;
+    },
+  ) {
+    return transaction.healthcareCaseKitItem.updateMany({
+      where: {
+        id: data.itemId,
+        companyId: data.companyId,
+        caseKitId: data.caseKitId,
+        lifecycle: HealthcareCaseKitItemLifecycle.ACTIVE,
+      },
+      data: {
+        lifecycle: HealthcareCaseKitItemLifecycle.EXCLUDED,
+        excludedById: data.excludedById,
+        excludedAt: data.excludedAt,
+        exclusionReason: data.exclusionReason,
+      },
     });
   }
 

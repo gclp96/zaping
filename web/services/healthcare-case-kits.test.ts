@@ -4,6 +4,7 @@ import { api } from './api';
 import {
   addHealthcareCaseKitItem,
   createHealthcareCaseKit,
+  excludeHealthcareCaseKitItem,
   getHealthcareCaseKit,
   type HealthcareCaseKit,
 } from './healthcare-case-kits';
@@ -52,6 +53,24 @@ describe('healthcare-case-kits service', () => {
       {
         headers: {
           'Idempotency-Key': expect.stringMatching(/^hc-case-kit-item-/),
+        },
+      },
+    );
+  });
+
+  it('excludes an item with the normalized API payload and its own key', async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { id: 'item-1' } });
+
+    await excludeHealthcareCaseKitItem('kit-1', 'item-1', 'No requerido');
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/healthcare/case-kits/kit-1/items/item-1/exclude',
+      { reason: 'No requerido' },
+      {
+        headers: {
+          'Idempotency-Key': expect.stringMatching(
+            /^hc-case-kit-item-exclude-/,
+          ),
         },
       },
     );

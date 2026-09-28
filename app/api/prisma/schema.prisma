@@ -145,6 +145,7 @@ enum IdempotencyScope {
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE
   HEALTHCARE_CASE_KIT_CREATE
   HEALTHCARE_CASE_KIT_ITEM_ADD
+  HEALTHCARE_CASE_KIT_ITEM_EXCLUDE
 }
 
 enum EquipmentLifecycle {
@@ -454,6 +455,11 @@ enum HealthcareCaseKitStatus {
   DRAFT
 }
 
+enum HealthcareCaseKitItemLifecycle {
+  ACTIVE
+  EXCLUDED
+}
+
 model User {
   id           String   @id @default(uuid())
   companyId    String
@@ -491,6 +497,7 @@ model User {
   resolvedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteResolvedBy")
   createdHealthcareCaseKits              HealthcareCaseKit[]                             @relation("HealthcareCaseKitCreatedBy")
   addedHealthcareCaseKitItems            HealthcareCaseKitItem[]                         @relation("HealthcareCaseKitItemAddedBy")
+  excludedHealthcareCaseKitItems         HealthcareCaseKitItem[]                         @relation("HealthcareCaseKitItemExcludedBy")
 
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
@@ -836,24 +843,31 @@ model HealthcareCaseKit {
 }
 
 model HealthcareCaseKitItem {
-  id                    String   @id @default(uuid())
+  id                    String                         @id @default(uuid())
   companyId             String
   caseId                String
   caseKitId             String
   requirementId         String?
   equipmentAssignmentId String?
   preparedQuantity      Int?
+  lifecycle             HealthcareCaseKitItemLifecycle @default(ACTIVE)
   addedById             String
-  createdAt             DateTime @default(now())
+  excludedById          String?
+  excludedAt            DateTime?
+  exclusionReason       String?
+  createdAt             DateTime                       @default(now())
 
   caseKit             HealthcareCaseKit              @relation(fields: [caseKitId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
   requirement         HealthcareCaseRequirement?     @relation(fields: [requirementId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
   equipmentAssignment HealthcareEquipmentAssignment? @relation(fields: [equipmentAssignmentId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict, map: "HealthcareCaseKitItem_equipmentAssignment_case_fkey")
   addedBy             User                           @relation("HealthcareCaseKitItemAddedBy", fields: [addedById, companyId], references: [id, companyId], onDelete: Restrict)
+  excludedBy          User?                          @relation("HealthcareCaseKitItemExcludedBy", fields: [excludedById, companyId], references: [id, companyId], onDelete: Restrict)
 
   @@unique([id, companyId])
   @@index([companyId, caseKitId])
+  @@index([companyId, caseKitId, lifecycle, createdAt])
   @@index([companyId, caseId])
+  @@index([companyId, excludedById])
 }
 
 model HealthcareEquipmentRequirementCoverageNote {

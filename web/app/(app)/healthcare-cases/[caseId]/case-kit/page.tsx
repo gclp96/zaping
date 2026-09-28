@@ -1,7 +1,7 @@
 'use client';
 
 import axios from 'axios';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Ban, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,6 +21,7 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import {
   addHealthcareCaseKitItem,
   createHealthcareCaseKit,
+  excludeHealthcareCaseKitItem,
   getHealthcareCaseKit,
   type AddHealthcareCaseKitItemPayload,
   type HealthcareCaseKit,
@@ -51,7 +52,13 @@ function personLabel(person: { firstName: string; lastName: string }) {
   return `${person.firstName} ${person.lastName}`;
 }
 
-function KitItemCard({ item }: { item: HealthcareCaseKitItem }) {
+function KitItemCard({
+  item,
+  onExclude,
+}: {
+  item: HealthcareCaseKitItem;
+  onExclude?: (item: HealthcareCaseKitItem) => void;
+}) {
   const title = item.requirement
     ? `${item.requirement.product.sku} — ${item.requirement.product.name}`
     : item.equipmentAssignment
@@ -76,10 +83,34 @@ function KitItemCard({ item }: { item: HealthcareCaseKitItem }) {
             </p>
           )}
         </div>
-        <StatusBadge
-          label={item.stale ? 'Requiere revisión' : 'Vigente'}
-          tone={item.stale ? 'warning' : 'success'}
-        />
+        <div className="flex items-center gap-2">
+          <StatusBadge
+            label={
+              item.lifecycle === 'EXCLUDED'
+                ? 'Excluido'
+                : item.stale
+                  ? 'Requiere revisión'
+                  : 'Vigente'
+            }
+            tone={
+              item.lifecycle === 'EXCLUDED'
+                ? 'neutral'
+                : item.stale
+                  ? 'warning'
+                  : 'success'
+            }
+          />
+          {onExclude ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onExclude(item)}
+            >
+              <Ban aria-hidden="true" size={16} /> Excluir
+            </Button>
+          ) : null}
+        </div>
       </div>
       {item.warnings.length ? (
         <ul className="mt-3 space-y-1 text-sm text-amber-900" role="alert">
@@ -91,6 +122,15 @@ function KitItemCard({ item }: { item: HealthcareCaseKitItem }) {
       <p className="mt-3 text-xs text-text-muted">
         Agregado por {personLabel(item.addedBy)}
       </p>
+      {item.lifecycle === 'EXCLUDED' && item.excludedBy && item.excludedAt ? (
+        <div className="mt-3 border-t border-gray-200 pt-3 text-sm text-text-muted">
+          <p>
+            Excluido por {personLabel(item.excludedBy)} el{' '}
+            {new Date(item.excludedAt).toLocaleString('es-MX')}.
+          </p>
+          <p>Motivo: {item.exclusionReason}</p>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -122,6 +162,11 @@ export default function HealthcareCaseKitPage() {
   const [preparedQuantity, setPreparedQuantity] = useState('1');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  const [exclusionItem, setExclusionItem] =
+    useState<HealthcareCaseKitItem | null>(null);
+  const [exclusionReason, setExclusionReason] = useState('');
+  const [exclusionSaving, setExclusionSaving] = useState(false);
+  const [exclusionError, setExclusionError] = useState('');
 
   const load = useCallback(async () => {
     const current = ++requestId.current;
@@ -163,13 +208,25 @@ export default function HealthcareCaseKitPage() {
   }, [load, session.status]);
 
   const materialItems = useMemo(
-    () => kit?.items.filter((item) => item.sourceType === 'REQUIREMENT') ?? [],
+    () =>
+      kit?.items.filter(
+        (item) =>
+          item.lifecycle === 'ACTIVE' && item.sourceType === 'REQUIREMENT',
+      ) ?? [],
     [kit],
   );
   const equipmentItems = useMemo(
     () =>
       kit?.items.filter((item) => item.sourceType === 'EQUIPMENT_ASSIGNMENT') ??
       [],
+    [kit],
+  );
+  const activeEquipmentItems = useMemo(
+    () => equipmentItems.filter((item) => item.lifecycle === 'ACTIVE'),
+    [equipmentItems],
+  );
+  const excludedItems = useMemo(
+    () => kit?.items.filter((item) => item.lifecycle === 'EXCLUDED') ?? [],
     [kit],
   );
   const existingRequirementIds = useMemo(
@@ -182,11 +239,11 @@ export default function HealthcareCaseKitPage() {
   const existingAssignmentIds = useMemo(
     () =>
       new Set(
-        equipmentItems
+        activeEquipmentItems
           .map((item) => item.equipmentAssignment?.id)
           .filter(Boolean),
       ),
-    [equipmentItems],
+    [activeEquipmentItems],
   );
   const materialCandidates = requirements.filter(
     (item) =>
@@ -278,6 +335,35 @@ export default function HealthcareCaseKitPage() {
     } finally {
       submitInFlight.current = false;
       setSaving(false);
+    }
+  }
+
+  function openExclusionModal(item: HealthcareCaseKitItem) {
+    setExclusionItem(item);
+    setExclusionReason('');
+    setExclusionError('');
+  }
+
+  async function excludeItem() {
+    const reason = exclusionReason.trim();
+    if (!kit || !exclusionItem || !reason || exclusionSaving) return;
+    setExclusionSaving(true);
+    setExclusionError('');
+    try {
+      await excludeHealthcareCaseKitItem(kit.id, exclusionItem.id, reason);
+      setExclusionItem(null);
+      setExclusionReason('');
+      setNotice('Contenido excluido; el historial se conservó.');
+      await load();
+    } catch (requestError) {
+      setExclusionError(
+        getApiErrorMessage(
+          requestError,
+          'No fue posible excluir el contenido.',
+        ),
+      );
+    } finally {
+      setExclusionSaving(false);
     }
   }
 
@@ -375,7 +461,17 @@ export default function HealthcareCaseKitPage() {
               <div className="space-y-3">
                 {materialItems.length ? (
                   materialItems.map((item) => (
-                    <KitItemCard key={item.id} item={item} />
+                    <KitItemCard
+                      key={item.id}
+                      item={item}
+                      onExclude={
+                        canMutate &&
+                        kit.status === 'DRAFT' &&
+                        healthcareCase?.status !== 'CANCELLED'
+                          ? openExclusionModal
+                          : undefined
+                      }
+                    />
                   ))
                 ) : (
                   <p className="text-sm text-text-muted">
@@ -389,9 +485,19 @@ export default function HealthcareCaseKitPage() {
               description="Asignaciones RESERVED ya vinculadas al caso."
             >
               <div className="space-y-3">
-                {equipmentItems.length ? (
-                  equipmentItems.map((item) => (
-                    <KitItemCard key={item.id} item={item} />
+                {activeEquipmentItems.length ? (
+                  activeEquipmentItems.map((item) => (
+                    <KitItemCard
+                      key={item.id}
+                      item={item}
+                      onExclude={
+                        canMutate &&
+                        kit.status === 'DRAFT' &&
+                        healthcareCase?.status !== 'CANCELLED'
+                          ? openExclusionModal
+                          : undefined
+                      }
+                    />
                   ))
                 ) : (
                   <p className="text-sm text-text-muted">
@@ -400,6 +506,18 @@ export default function HealthcareCaseKitPage() {
                 )}
               </div>
             </Section>
+            {excludedItems.length ? (
+              <Section
+                title="Historial excluido"
+                description="Estos elementos se conservan para trazabilidad y no forman parte del contenido activo."
+              >
+                <div className="space-y-3">
+                  {excludedItems.map((item) => (
+                    <KitItemCard key={item.id} item={item} />
+                  ))}
+                </div>
+              </Section>
+            ) : null}
           </div>
         )}
       </PageContainer>
@@ -495,6 +613,57 @@ export default function HealthcareCaseKitPage() {
             </Button>
             <Button type="submit" loading={saving} disabled={!selectedSourceId}>
               Agregar
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(exclusionItem)}
+        title="Excluir contenido"
+        onClose={() => !exclusionSaving && setExclusionItem(null)}
+      >
+        <form
+          className="space-y-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void excludeItem();
+          }}
+        >
+          <p className="text-sm text-gray-700">
+            El contenido dejará de formar parte del maletín activo, pero su
+            historial, actor, fecha y motivo permanecerán visibles.
+          </p>
+          <label className="block text-sm font-medium text-gray-700">
+            Motivo
+            <textarea
+              required
+              maxLength={1000}
+              className="mt-1 min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2"
+              value={exclusionReason}
+              onChange={(event) => setExclusionReason(event.target.value)}
+            />
+          </label>
+          {exclusionError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {exclusionError}
+            </p>
+          ) : null}
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={exclusionSaving}
+              onClick={() => setExclusionItem(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={exclusionSaving}
+              disabled={!exclusionReason.trim()}
+            >
+              Excluir
             </Button>
           </div>
         </form>
