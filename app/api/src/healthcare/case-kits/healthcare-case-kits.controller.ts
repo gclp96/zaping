@@ -24,6 +24,7 @@ import {
 } from '../common/healthcare-errors';
 import { AddHealthcareCaseKitItemDto } from './dto/add-healthcare-case-kit-item.dto';
 import { CreateHealthcareCaseKitDto } from './dto/create-healthcare-case-kit.dto';
+import { ExcludeHealthcareCaseKitItemDto } from './dto/exclude-healthcare-case-kit-item.dto';
 import { HealthcareCaseKitsService } from './healthcare-case-kits.service';
 
 const readRoles = [
@@ -84,6 +85,28 @@ export class HealthcareCaseKitsController {
       dto,
     );
     response.status(result.replay ? HttpStatus.OK : HttpStatus.CREATED);
+    return result.data;
+  }
+
+  @Post('case-kits/:caseKitId/items/:itemId/exclude')
+  @Roles(...mutationRoles)
+  async excludeItem(
+    @Req() request: AuthenticatedRequest,
+    @Param('caseKitId', ParseUUIDPipe) caseKitId: string,
+    @Param('itemId', ParseUUIDPipe) itemId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ExcludeHealthcareCaseKitItemDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.service.excludeItem(
+      request.user.companyId,
+      request.user.id,
+      caseKitId,
+      itemId,
+      this.validateIdempotencyKey(key),
+      dto,
+    );
+    response.status(HttpStatus.OK);
     return result.data;
   }
 

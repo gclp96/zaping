@@ -7,6 +7,7 @@ import {
   HealthcareCaseKitItemSourceType,
 } from './add-healthcare-case-kit-item.dto';
 import { CreateHealthcareCaseKitDto } from './create-healthcare-case-kit.dto';
+import { ExcludeHealthcareCaseKitItemDto } from './exclude-healthcare-case-kit-item.dto';
 
 describe('Healthcare CaseKit DTO allowlists', () => {
   const pipe = new ValidationPipe({
@@ -46,6 +47,27 @@ describe('Healthcare CaseKit DTO allowlists', () => {
       pipe.transform(
         { ...payload, companyId: 'protected' },
         { type: 'body', metatype: AddHealthcareCaseKitItemDto },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('normalizes and allowlists the required exclusion reason', async () => {
+    await expect(
+      pipe.transform(
+        { reason: '  Selección   incorrecta  ' },
+        { type: 'body', metatype: ExcludeHealthcareCaseKitItemDto },
+      ),
+    ).resolves.toEqual({ reason: 'Selección   incorrecta' });
+    await expect(
+      pipe.transform(
+        { reason: '   ' },
+        { type: 'body', metatype: ExcludeHealthcareCaseKitItemDto },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      pipe.transform(
+        { reason: 'Válida', lifecycle: 'EXCLUDED' },
+        { type: 'body', metatype: ExcludeHealthcareCaseKitItemDto },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

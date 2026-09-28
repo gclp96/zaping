@@ -12,6 +12,7 @@ describe('HealthcareCaseKitsController', () => {
     get: jest.fn(),
     create: jest.fn(),
     addItem: jest.fn(),
+    excludeItem: jest.fn(),
   };
   const controller = new HealthcareCaseKitsController(
     service as unknown as HealthcareCaseKitsService,
@@ -36,6 +37,11 @@ describe('HealthcareCaseKitsController', () => {
       UserRole.WAREHOUSE,
     ]);
     expect(Reflect.getMetadata('roles', controller.addItem)).toEqual([
+      UserRole.ADMIN,
+      UserRole.MANAGER,
+      UserRole.WAREHOUSE,
+    ]);
+    expect(Reflect.getMetadata('roles', controller.excludeItem)).toEqual([
       UserRole.ADMIN,
       UserRole.MANAGER,
       UserRole.WAREHOUSE,
@@ -90,4 +96,29 @@ describe('HealthcareCaseKitsController', () => {
       expect(response.status).toHaveBeenCalledWith(status);
     },
   );
+
+  it('excludes with the normalized key and direct HTTP 200 response', async () => {
+    const data = { id: 'item-id', lifecycle: 'EXCLUDED' };
+    service.excludeItem.mockResolvedValue({ replay: false, data });
+
+    await expect(
+      controller.excludeItem(
+        request as never,
+        'kit-id',
+        'item-id',
+        '  exclusion-key  ',
+        { reason: 'Selección incorrecta' },
+        response as never,
+      ),
+    ).resolves.toBe(data);
+    expect(service.excludeItem).toHaveBeenCalledWith(
+      'company-id',
+      'user-id',
+      'kit-id',
+      'item-id',
+      'exclusion-key',
+      { reason: 'Selección incorrecta' },
+    );
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.OK);
+  });
 });

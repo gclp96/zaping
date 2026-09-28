@@ -3,6 +3,7 @@ import { ConfigType } from '@nestjs/config';
 import {
   EquipmentCondition,
   EquipmentLifecycle,
+  HealthcareCaseKitItemLifecycle,
   HealthcareCaseKitStatus,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
@@ -18,6 +19,8 @@ import { HealthcareCompanyLockTimeoutError } from '../common/healthcare-company-
 import {
   caseKitAlreadyExistsException,
   caseKitItemAlreadyExistsException,
+  caseKitItemAlreadyExcludedException,
+  caseKitItemNotFoundException,
   caseKitNotFoundException,
   caseKitNotMutableException,
   caseKitSourceNotEligibleException,
@@ -28,15 +31,19 @@ import {
   healthcarePersistenceException,
   idempotencyKeyReusedException,
   invalidCaseKitSourceException,
+  invalidCaseKitItemExclusionReasonException,
   invalidPreparedQuantityException,
   resourceStateChangedException,
 } from '../common/healthcare-errors';
 import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
+import { normalizeHealthcareOptionalText } from '../common/healthcare-normalization';
 import {
   AddHealthcareCaseKitItemDto,
   HealthcareCaseKitItemSourceType,
 } from './dto/add-healthcare-case-kit-item.dto';
+import { ExcludeHealthcareCaseKitItemDto } from './dto/exclude-healthcare-case-kit-item.dto';
 import {
+  createHealthcareCaseKitItemExclusionRequestHash,
   createHealthcareCaseKitItemRequestHash,
   createHealthcareCaseKitRequestHash,
 } from './healthcare-case-kit-request-hash';
@@ -48,6 +55,7 @@ import {
 
 const CREATE_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_CREATE;
 const ADD_ITEM_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_ADD;
+const EXCLUDE_ITEM_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_EXCLUDE;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -67,12 +75,16 @@ export type HealthcareCaseKitItemResponse = {
   id: string;
   sourceType: HealthcareCaseKitItemSourceType;
   preparedQuantity: number | null;
+  lifecycle: HealthcareCaseKitItemLifecycle;
   requirement: HealthcareCaseKitItemRecord['requirement'];
   equipmentAssignment: HealthcareCaseKitItemRecord['equipmentAssignment'];
   sourceValid: boolean;
   stale: boolean;
   warnings: Warning[];
   addedBy: UserSummary;
+  excludedBy: UserSummary | null;
+  excludedAt: Date | null;
+  exclusionReason: string | null;
   createdAt: Date;
 };
 
@@ -361,6 +373,173 @@ export class HealthcareCaseKitsService {
     }
   }
 
+  async excludeItem(
+    companyId: string,
+    excludedById: string,
+    caseKitId: string,
+    itemId: string,
+    idempotencyKey: string,
+    dto: ExcludeHealthcareCaseKitItemDto,
+  ): Promise<HealthcareCaseKitCommandResult<HealthcareCaseKitItemResponse>> {
+    const exclusionReason = normalizeHealthcareOptionalText(dto.reason);
+    if (!exclusionReason) {
+      throw invalidCaseKitItemExclusionReasonException();
+    }
+    const requestHash = createHealthcareCaseKitItemExclusionRequestHash(
+      caseKitId,
+      itemId,
+      exclusionReason,
+    );
+
+    try {
+      const replay = await this.findCompletedItemExclusionReplay(
+        companyId,
+        idempotencyKey,
+        requestHash,
+        caseKitId,
+      );
+      if (replay) return { replay: true, data: replay };
+
+      const discoveredKit = await this.repository.findKit(companyId, caseKitId);
+      if (!discoveredKit) throw caseKitNotFoundException();
+
+      const discoveredItem = await this.repository.findItem(companyId, itemId);
+      if (!discoveredItem || discoveredItem.caseKitId !== caseKitId) {
+        throw caseKitItemNotFoundException();
+      }
+
+      return await this.repository.runInTransaction(async (transaction) => {
+        await this.acquireCompanyProtocol(transaction, companyId);
+        if (
+          !(await this.repository.lockCase(
+            transaction,
+            companyId,
+            discoveredKit.caseId,
+          ))
+        ) {
+          throw caseKitItemNotFoundException();
+        }
+        if (
+          !(await this.repository.lockKit(transaction, companyId, caseKitId))
+        ) {
+          throw caseKitNotFoundException();
+        }
+        if (
+          !(await this.repository.lockItem(
+            transaction,
+            companyId,
+            caseKitId,
+            itemId,
+          ))
+        ) {
+          throw caseKitItemNotFoundException();
+        }
+
+        const transactionalReplay = await this.findCompletedItemExclusionReplay(
+          companyId,
+          idempotencyKey,
+          requestHash,
+          caseKitId,
+          transaction,
+        );
+        if (transactionalReplay) {
+          return { replay: true, data: transactionalReplay };
+        }
+
+        const item = await this.repository.findItem(
+          companyId,
+          itemId,
+          transaction,
+        );
+        if (!item || item.caseKitId !== caseKitId) {
+          throw caseKitItemNotFoundException();
+        }
+        if (item.lifecycle === HealthcareCaseKitItemLifecycle.EXCLUDED) {
+          return this.resolveExcludedItemReplay(item, exclusionReason);
+        }
+        if (item.caseKit.status !== HealthcareCaseKitStatus.DRAFT) {
+          throw caseKitNotMutableException();
+        }
+        if (
+          item.caseKit.healthcareCase.status === HealthcareCaseStatus.CANCELLED
+        ) {
+          throw caseNotEligibleException();
+        }
+
+        const excludedAt = new Date();
+        const update = await this.repository.excludeItem(transaction, {
+          companyId,
+          caseKitId,
+          itemId,
+          excludedById,
+          excludedAt,
+          exclusionReason,
+        });
+        if (update.count !== 1) {
+          const winner = await this.repository.findItem(
+            companyId,
+            itemId,
+            transaction,
+          );
+          if (
+            winner &&
+            winner.caseKitId === caseKitId &&
+            winner.lifecycle === HealthcareCaseKitItemLifecycle.EXCLUDED
+          ) {
+            return this.resolveExcludedItemReplay(winner, exclusionReason);
+          }
+          throw resourceStateChangedException();
+        }
+
+        const claim = await this.repository.createIdempotencyClaim(
+          transaction,
+          companyId,
+          idempotencyKey,
+          EXCLUDE_ITEM_SCOPE,
+          requestHash,
+        );
+        const excludedItem = await this.repository.findItem(
+          companyId,
+          itemId,
+          transaction,
+        );
+        if (!excludedItem || excludedItem.caseKitId !== caseKitId) {
+          throw healthcarePersistenceException();
+        }
+        await this.repository.completeIdempotencyClaim(
+          transaction,
+          claim.id,
+          itemId,
+        );
+
+        return {
+          replay: false,
+          data: this.mapItem(
+            excludedItem,
+            excludedItem.caseKit.healthcareCase.status,
+          ),
+        };
+      }, this.transactionOptions());
+    } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+      if (this.isIdempotencyUniqueViolation(error)) {
+        const replay = await this.findCompletedItemExclusionReplay(
+          companyId,
+          idempotencyKey,
+          requestHash,
+          caseKitId,
+        );
+        if (replay) return { replay: true, data: replay };
+      }
+      if (this.isForeignKeyViolation(error)) {
+        throw resourceStateChangedException();
+      }
+      this.rethrowPersistenceError(error);
+    }
+  }
+
   private async validateSource(
     transaction: Prisma.TransactionClient,
     companyId: string,
@@ -525,6 +704,50 @@ export class HealthcareCaseKitsService {
     return this.mapItem(item, item.caseKit.healthcareCase.status);
   }
 
+  private async findCompletedItemExclusionReplay(
+    companyId: string,
+    key: string,
+    requestHash: string,
+    caseKitId: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<HealthcareCaseKitItemResponse | null> {
+    const record = await this.repository.findIdempotencyRecord(
+      companyId,
+      key,
+      EXCLUDE_ITEM_SCOPE,
+      client,
+    );
+    if (!record) return null;
+    if (record.requestHash !== requestHash) {
+      throw idempotencyKeyReusedException();
+    }
+    if (!record.resourceId) return null;
+    const item = await this.repository.findItem(
+      companyId,
+      record.resourceId,
+      client,
+    );
+    if (!item || item.caseKitId !== caseKitId) {
+      throw healthcarePersistenceException();
+    }
+    return this.mapItem(item, item.caseKit.healthcareCase.status);
+  }
+
+  private resolveExcludedItemReplay(
+    item: NonNullable<
+      Awaited<ReturnType<HealthcareCaseKitsRepository['findItem']>>
+    >,
+    exclusionReason: string,
+  ): HealthcareCaseKitCommandResult<HealthcareCaseKitItemResponse> {
+    if (item.exclusionReason !== exclusionReason) {
+      throw caseKitItemAlreadyExcludedException();
+    }
+    return {
+      replay: true,
+      data: this.mapItem(item, item.caseKit.healthcareCase.status),
+    };
+  }
+
   private mapKit(record: HealthcareCaseKitRecord): HealthcareCaseKitResponse {
     return {
       id: record.id,
@@ -607,12 +830,16 @@ export class HealthcareCaseKitsService {
         ? HealthcareCaseKitItemSourceType.REQUIREMENT
         : HealthcareCaseKitItemSourceType.EQUIPMENT_ASSIGNMENT,
       preparedQuantity: item.preparedQuantity,
+      lifecycle: item.lifecycle,
       requirement: item.requirement,
       equipmentAssignment: item.equipmentAssignment,
       sourceValid: warnings.length === 0,
       stale: warnings.length > 0,
       warnings,
       addedBy: item.addedBy,
+      excludedBy: item.excludedBy,
+      excludedAt: item.excludedAt,
+      exclusionReason: item.exclusionReason,
       createdAt: item.createdAt,
     };
   }

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { HealthcareCaseKitItemSourceType } from './dto/add-healthcare-case-kit-item.dto';
 import {
+  createHealthcareCaseKitItemExclusionRequestHash,
   createHealthcareCaseKitItemRequestHash,
   createHealthcareCaseKitRequestHash,
 } from './healthcare-case-kit-request-hash';
@@ -27,5 +28,34 @@ describe('Healthcare CaseKit request hashes', () => {
       equipmentAssignmentId: 'assignment-id',
     });
     expect(requirement).not.toBe(assignment);
+  });
+
+  it('scopes Exclude Item to Kit, item and normalized reason', () => {
+    const hash = createHealthcareCaseKitItemExclusionRequestHash(
+      'kit-id',
+      'item-id',
+      'Motivo normalizado',
+    );
+    expect(hash).toBe(
+      createHealthcareCaseKitItemExclusionRequestHash(
+        'kit-id',
+        'item-id',
+        'Motivo normalizado',
+      ),
+    );
+    expect(hash).not.toBe(
+      createHealthcareCaseKitItemExclusionRequestHash(
+        'kit-id',
+        'item-id',
+        'Otro motivo',
+      ),
+    );
+    expect(hash).not.toBe(
+      createHealthcareCaseKitItemExclusionRequestHash(
+        'kit-id',
+        'other-item',
+        'Motivo normalizado',
+      ),
+    );
   });
 });
