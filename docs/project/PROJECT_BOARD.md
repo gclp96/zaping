@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-27
 Responsable: Zaping Team
 
@@ -189,7 +189,10 @@ HC-NEXT-03C6-E — Requirement-linked Assignment UI
         → COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 
 HC-OPS-01A — CaseKit Draft & Contents
-        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+        → COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+
+HC-OPS-01B — Preparation Confirmation & Readiness
+        → PENDING REFINEMENT / NOT READY — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2301,7 +2304,8 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-C Release Assignment UI — COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
 → HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
-→ HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+→ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+→ HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2538,7 +2542,8 @@ Healthcare Equipment Assignment implementation
 → C6-C RELEASE UI COMPLETE / MERGED — PR #42 — main@9bade4d
 → C6-D REPLACE UI COMPLETE / MERGED — PR #45 — main@99efc5a
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
-→ HC-OPS-01A CASEKIT DRAFT & CONTENTS — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+→ HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — PENDING REFINEMENT / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -3230,7 +3235,7 @@ correcta.
 
 #### HC-OPS-01A — CaseKit Draft & Contents
 
-Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+Estado: COMPLETE / MERGED — PR #50 — `main@bb530e8` — Actual 27-sep-2026
 
 Contrato canónico: `docs/modules/healthcare/CASE_KITS.md`, sección 231.
 
@@ -3243,11 +3248,26 @@ Alcance: crear/consultar el Maletín y agregar Requirements QUANTITY o Assignmen
 RESERVED ya vinculadas al Case. La UI debe advertir que no decrementa stock, no
 modifica batches, no crea InventoryMovement y no garantiza disponibilidad física.
 
-DoR: COMPLETE. No se asignan SP, Forecast ni Commitment. Update/remove,
-PREPARED, batches/seriales, reserva física, Dispatch, Custody, Return, Inspection
-y Reconciliation permanecen fuera de 01A y requieren contratos posteriores.
+Evidencia: API focal/regression 382/382 PASS; Web focal 26/26 PASS; Prisma validate,
+TypeScript API/Web, ESLint API/Web, API build, Next.js build y CI API/Web PASS.
+
+Validación manual acreditada para MANAGER: Create CaseKit, estado `DRAFT`, banner
+no reservante, Requirement `QUANTITY` agregado, Equipment Assignment `RESERVED`
+agregado y Materials/Equipment renderizados correctamente. No se registra
+validación manual de SALES.
+
+El cierre mantiene Create/Get/Add only y `DRAFT` only. Update/Remove Item,
+`InventoryMovement`, reserva o decremento de stock, Dispatch, Custody, Return e
+Inspection permanecen fuera de 01A.
 
 Persisten como trabajos independientes C5-B, C5-COVERAGE, Case Availability
 general, permission-based RBAC y despliegue staging/productivo. HC-OPS-01A no
 implementa Dispatch, Return, Custody, Inventory Movement ni disponibilidad física,
 y no declara Healthcare Core terminado.
+
+#### HC-OPS-01B — Preparation Confirmation & Readiness
+
+Estado: PENDING REFINEMENT / NOT READY.
+
+Se registra únicamente como siguiente candidato funcional. No tiene SP, Forecast
+ni Commitment y no amplía el alcance aceptado de HC-OPS-01A.

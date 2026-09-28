@@ -2,9 +2,9 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.3.0
+Versión: 1.4.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 Última actualización: 2026-09-27
 Responsable: Zaping Healthcare Team
 
@@ -1294,14 +1294,27 @@ Payer required before Preparation
 
 salvo política empresarial explícita.
 
-79. CaseKit CONTRACT DOCUMENTED / NOT IMPLEMENTED
+79. CaseKit COMPLETE / MERGED
 
 CaseKit representa el conjunto realmente preparado para el Case.
 
 Actualmente:
 
 CaseKit
-→ HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+→ HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+
+La implementación aceptada permanece limitada a Create/Get/Add y al estado
+`DRAFT`. La preparación de material `QUANTITY` es lógica y no reservante: no crea
+`InventoryMovement` ni reserva o decrementa stock. Tampoco expone Update/Remove
+Item, Dispatch, Custody, Return o Inspection.
+
+La validación manual acreditó para MANAGER la creación del CaseKit, el estado
+`DRAFT`, el banner no reservante, el agregado de Requirement `QUANTITY` y de
+Equipment Assignment `RESERVED`, y el render correcto de Materials/Equipment. No
+se registra validación manual de SALES.
+
+HC-OPS-01B — Preparation Confirmation & Readiness queda como siguiente candidato,
+PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
 
 80. CaseKit ≠ JSON inside Case
 
