@@ -181,6 +181,13 @@ export default function HealthcareCasesPage() {
           );
         },
       },
+      {
+        id: 'viewCaseKit',
+        label: 'Ver maletín',
+        onSelect: (healthcareCase: HealthcareCase) => {
+          router.push(`/healthcare-cases/${healthcareCase.id}/case-kit`);
+        },
+      },
       ...(canEdit
         ? [
             {

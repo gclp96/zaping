@@ -143,6 +143,8 @@ enum IdempotencyScope {
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_RELEASE
+  HEALTHCARE_CASE_KIT_CREATE
+  HEALTHCARE_CASE_KIT_ITEM_ADD
 }
 
 enum EquipmentLifecycle {
@@ -359,6 +361,7 @@ model Company {
   healthcareEquipmentConflictOverrides  HealthcareEquipmentAssignmentConflictOverride[]
   healthcareEquipmentCoverageNotes      HealthcareEquipmentRequirementCoverageNote[]
   healthcareEquipmentAssignmentSettings HealthcareEquipmentAssignmentSettings?
+  healthcareCaseKits                    HealthcareCaseKit[]
   inventoryMovements                    InventoryMovement[]
   inventoryBatches                      InventoryBatch[]
   equipmentAssets                       EquipmentAsset[]
@@ -447,6 +450,10 @@ enum HealthcareEquipmentRequirementCoverageNoteKind {
   PARTIAL_CONTEXT
 }
 
+enum HealthcareCaseKitStatus {
+  DRAFT
+}
+
 model User {
   id           String   @id @default(uuid())
   companyId    String
@@ -482,6 +489,8 @@ model User {
   approvedHealthcareEquipmentOverrides   HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentAssignmentOverrideApprovedBy")
   recordedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteRecordedBy")
   resolvedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteResolvedBy")
+  createdHealthcareCaseKits              HealthcareCaseKit[]                             @relation("HealthcareCaseKitCreatedBy")
+  addedHealthcareCaseKitItems            HealthcareCaseKitItem[]                         @relation("HealthcareCaseKitItemAddedBy")
 
   createdSaleReturns   SaleReturn[] @relation("SaleReturnCreatedBy")
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
@@ -624,6 +633,7 @@ model HealthcareCase {
 
   requirements         HealthcareCaseRequirement[]
   equipmentAssignments HealthcareEquipmentAssignment[]
+  caseKits             HealthcareCaseKit[]
 
   @@unique([companyId, folio])
   @@unique([id, companyId])
@@ -669,6 +679,7 @@ model HealthcareCaseRequirement {
 
   equipmentAssignments   HealthcareEquipmentAssignment[]
   equipmentCoverageNotes HealthcareEquipmentRequirementCoverageNote[]
+  caseKitItems           HealthcareCaseKitItem[]
 
   @@unique([id, companyId])
   @@unique([id, companyId, caseId])
@@ -769,8 +780,10 @@ model HealthcareEquipmentAssignment {
 
   conflictOverrides            HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentAssignmentOverride")
   conflictingAssignmentReviews HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentConflictingAssignmentOverride")
+  caseKitItems                 HealthcareCaseKitItem[]
 
   @@unique([id, companyId])
+  @@unique([id, companyId, caseId])
   @@unique([companyId, replacesAssignmentId])
   @@index([companyId, caseId, lifecycle])
   @@index([companyId, equipmentAssetId, lifecycle])
@@ -800,6 +813,47 @@ model HealthcareEquipmentAssignmentConflictOverride {
   @@unique([id, companyId])
   @@index([companyId, assignmentId, createdAt])
   @@index([companyId, conflictingAssignmentId, createdAt])
+}
+
+model HealthcareCaseKit {
+  id          String                  @id @default(uuid())
+  companyId   String
+  caseId      String
+  status      HealthcareCaseKitStatus @default(DRAFT)
+  createdById String
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  company        Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  healthcareCase HealthcareCase          @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
+  createdBy      User                    @relation("HealthcareCaseKitCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict)
+  items          HealthcareCaseKitItem[]
+
+  @@unique([id, companyId])
+  @@unique([id, companyId, caseId])
+  @@unique([companyId, caseId])
+  @@index([companyId, status, updatedAt])
+}
+
+model HealthcareCaseKitItem {
+  id                    String   @id @default(uuid())
+  companyId             String
+  caseId                String
+  caseKitId             String
+  requirementId         String?
+  equipmentAssignmentId String?
+  preparedQuantity      Int?
+  addedById             String
+  createdAt             DateTime @default(now())
+
+  caseKit             HealthcareCaseKit              @relation(fields: [caseKitId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+  requirement         HealthcareCaseRequirement?     @relation(fields: [requirementId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict)
+  equipmentAssignment HealthcareEquipmentAssignment? @relation(fields: [equipmentAssignmentId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict, map: "HealthcareCaseKitItem_equipmentAssignment_case_fkey")
+  addedBy             User                           @relation("HealthcareCaseKitItemAddedBy", fields: [addedById, companyId], references: [id, companyId], onDelete: Restrict)
+
+  @@unique([id, companyId])
+  @@index([companyId, caseKitId])
+  @@index([companyId, caseId])
 }
 
 model HealthcareEquipmentRequirementCoverageNote {
