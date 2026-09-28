@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-09-27
+Última actualización: 2026-09-28
 Responsable: Zaping Team
 
 1. Propósito
@@ -115,7 +115,7 @@ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47
 ↓
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 ↓
-HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓
@@ -1103,11 +1103,14 @@ relación con Requirement visibles en List, cobertura 1/1 y refresh automático.
 se declara validación manual de SALES ni Detail. El mojibake de datos de desarrollo
 permanece como known non-blocker. HC-OPS-01A CaseKit Draft & Contents está
 COMPLETE / MERGED mediante PR #50 en `main@bb530e8`, con Actual 27-sep-2026.
-HC-OPS-01A.1 Draft Item Exclusion está CONTRACT DOCUMENTED / READY / NOT
-IMPLEMENTED: formaliza exclusión auditada de items `ACTIVE` sólo en Kit `DRAFT`,
-sin hard delete y con re-agregado posterior de la misma fuente.
+HC-OPS-01A.1 Draft Item Exclusion está COMPLETE / MERGED mediante PR #53 en
+`main@54a5d79`, con Actual 28-sep-2026: implementa exclusión auditada de items
+`ACTIVE` sólo en Kit `DRAFT`, sin hard delete y con re-agregado posterior de la
+misma fuente.
 HC-OPS-01B Preparation Confirmation & Readiness queda como siguiente candidato,
-PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
+PENDING REFINEMENT / NOT READY. Su blocker previo de items stale queda resuelto
+por HC-OPS-01A.1; falta formalizar su contrato canónico. No tiene SP, Forecast ni
+Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
@@ -1190,8 +1193,9 @@ validación manual acreditó para MANAGER Create CaseKit, `DRAFT`, banner no
 reservante, Requirement `QUANTITY`, Equipment Assignment `RESERVED` y render de
 Materials/Equipment. No se registra validación manual de SALES.
 
-HC-OPS-01A.1 Draft Item Exclusion está CONTRACT DOCUMENTED / READY / NOT
-IMPLEMENTED. Añade lifecycle de item `ACTIVE | EXCLUDED`, auditoría tenant-safe e
+HC-OPS-01A.1 Draft Item Exclusion está COMPLETE / MERGED mediante PR #53 en
+`main@54a5d79`, con Actual 28-sep-2026. Añade lifecycle de item
+`ACTIVE | EXCLUDED`, auditoría tenant-safe e
 índices únicos parciales para fuentes `ACTIVE`. La exclusión usa POST específico,
 razón e Idempotency-Key obligatorios, Company-first y una transacción atómica. GET
 conserva historia; Add, duplicate detection y readiness/coverage futuros ignoran
@@ -1201,6 +1205,16 @@ ADMIN, MANAGER y WAREHOUSE pueden excluir en `DRAFT`; SALES permanece read-only.
 No incluye PREPARED, update/restore/hard delete, Dispatch/Custody/Return ni efectos
 de Inventory, stock o Assignment. DoR: COMPLETE. No tiene SP, Forecast ni
 Commitment.
+
+Evidencia de cierre: Prisma validate/generate PASS; API focal 36/36 y Web focal
+12/12 PASS; TypeScript y ESLint API/Web, API build, Next.js build y
+`git diff --check` PASS; harness PostgreSQL 2H completo 45/45 PASS, 0 skipped. La
+validación manual acreditó como MANAGER la exclusión de un item `ACTIVE`, la
+historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la misma fuente y la
+coexistencia histórica `EXCLUDED` + nueva `ACTIVE`. No se registra validación
+manual de SALES. El blocker stale-item de HC-OPS-01B queda resuelto; 01B sigue
+PENDING REFINEMENT / NOT READY hasta formalizar su contrato canónico, sin SP,
+Forecast ni Commitment.
 
 Puede contener conceptualmente:
 
@@ -2896,7 +2910,7 @@ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47
 
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 
-HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 
@@ -3059,7 +3073,7 @@ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47
 ↓
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 ↓
-HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓

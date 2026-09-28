@@ -2,10 +2,10 @@
 
 **Módulo:** Healthcare Case Kits
 **Producto:** Zaping Healthcare
-**Versión:** 2.3.0
+**Versión:** 2.3.1
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
-**Última actualización:** 2026-09-27
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+**Última actualización:** 2026-09-28
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -3410,19 +3410,22 @@ Dispatch/Custody/Return/Inspection ni otros efectos físicos.
 
 ## 231.16 Evolución inmediata
 
-HC-OPS-01A.1 formaliza la exclusión auditada de items `DRAFT` antes de abordar la
-confirmación de preparación. El contrato normativo se define en la sección 232.
+HC-OPS-01A.1 implementa la exclusión auditada de items `DRAFT` antes de abordar
+la confirmación de preparación. El contrato normativo y su cierre se definen en
+la sección 232.
 
 ## 231.17 Siguiente candidato
 
 **HC-OPS-01B — Preparation Confirmation & Readiness** queda como candidato
-**PENDING REFINEMENT / NOT READY**, sin SP, Forecast ni Commitment.
+**PENDING REFINEMENT / NOT READY**, sin SP, Forecast ni Commitment. El blocker
+previo de corrección de items stale queda resuelto por HC-OPS-01A.1; aún falta
+formalizar el contrato canónico de 01B.
 
 ---
 
 # 232. HC-OPS-01A.1 — Draft Item Exclusion
 
-**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+**Estado:** COMPLETE / MERGED — PR #53 — `main@54a5d79` — Actual 28-sep-2026.
 
 ## 232.1 Objetivo y decisión
 
@@ -3611,7 +3614,7 @@ razón normalizada.
 - errores estables, RBAC, UI, AC y exclusiones documentados;
 - no depende de implementar PREPARED, Dispatch o reserva física.
 
-**Resultado DoR:** COMPLETE. HC-OPS-01A.1 está READY para implementación.
+**Resultado DoR:** COMPLETE antes de la implementación aceptada en PR #53.
 
 ## 232.12 Definition of Done
 
@@ -3625,6 +3628,16 @@ razón normalizada.
   Prettier, builds y `git diff --check` PASS;
 - validación manual acredita exclusión, historial visible y re-agregado sin efectos
   físicos.
+
+**Evidencia de cierre:** Prisma validate/generate PASS; API focal 36/36 PASS;
+Web focal 12/12 PASS; TypeScript API/Web, ESLint API/Web, API build y Next.js
+build PASS; harness PostgreSQL 2H completo 45/45 PASS, 0 skipped; y
+`git diff --check` PASS.
+
+La validación manual acreditó como MANAGER la exclusión de un item `ACTIVE`, la
+preservación de la historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la
+misma fuente y la coexistencia del histórico `EXCLUDED` con el nuevo `ACTIVE`.
+No se registra validación manual de SALES.
 
 ## 232.13 Límites explícitos
 
