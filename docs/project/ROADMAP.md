@@ -115,6 +115,8 @@ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47
 ↓
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 ↓
+HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+↓
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -1101,6 +1103,9 @@ relación con Requirement visibles en List, cobertura 1/1 y refresh automático.
 se declara validación manual de SALES ni Detail. El mojibake de datos de desarrollo
 permanece como known non-blocker. HC-OPS-01A CaseKit Draft & Contents está
 COMPLETE / MERGED mediante PR #50 en `main@bb530e8`, con Actual 27-sep-2026.
+HC-OPS-01A.1 Draft Item Exclusion está CONTRACT DOCUMENTED / READY / NOT
+IMPLEMENTED: formaliza exclusión auditada de items `ACTIVE` sólo en Kit `DRAFT`,
+sin hard delete y con re-agregado posterior de la misma fuente.
 HC-OPS-01B Preparation Confirmation & Readiness queda como siguiente candidato,
 PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
@@ -1184,6 +1189,18 @@ TypeScript API/Web, ESLint API/Web, API build, Next.js build y CI API/Web PASS. 
 validación manual acreditó para MANAGER Create CaseKit, `DRAFT`, banner no
 reservante, Requirement `QUANTITY`, Equipment Assignment `RESERVED` y render de
 Materials/Equipment. No se registra validación manual de SALES.
+
+HC-OPS-01A.1 Draft Item Exclusion está CONTRACT DOCUMENTED / READY / NOT
+IMPLEMENTED. Añade lifecycle de item `ACTIVE | EXCLUDED`, auditoría tenant-safe e
+índices únicos parciales para fuentes `ACTIVE`. La exclusión usa POST específico,
+razón e Idempotency-Key obligatorios, Company-first y una transacción atómica. GET
+conserva historia; Add, duplicate detection y readiness/coverage futuros ignoran
+`EXCLUDED`; la misma fuente puede volver a agregarse.
+
+ADMIN, MANAGER y WAREHOUSE pueden excluir en `DRAFT`; SALES permanece read-only.
+No incluye PREPARED, update/restore/hard delete, Dispatch/Custody/Return ni efectos
+de Inventory, stock o Assignment. DoR: COMPLETE. No tiene SP, Forecast ni
+Commitment.
 
 Puede contener conceptualmente:
 
@@ -2879,6 +2896,8 @@ HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47
 
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 
+HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -3039,6 +3058,8 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 ↓
 HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+↓
+HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 ↓
 HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓
