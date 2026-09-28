@@ -2,9 +2,9 @@
 
 **Módulo:** Healthcare Case Kits
 **Producto:** Zaping Healthcare
-**Versión:** 2.2.0
+**Versión:** 2.3.0
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 **Última actualización:** 2026-09-27
 **Responsable:** Zaping Healthcare Team
 
@@ -3408,7 +3408,228 @@ El cierre conserva estrictamente Create/Get/Add y `DRAFT` only. No incorpora
 Update/Remove Item, `InventoryMovement`, reserva o decremento de stock,
 Dispatch/Custody/Return/Inspection ni otros efectos físicos.
 
-## 231.16 Siguiente candidato
+## 231.16 Evolución inmediata
+
+HC-OPS-01A.1 formaliza la exclusión auditada de items `DRAFT` antes de abordar la
+confirmación de preparación. El contrato normativo se define en la sección 232.
+
+## 231.17 Siguiente candidato
 
 **HC-OPS-01B — Preparation Confirmation & Readiness** queda como candidato
 **PENDING REFINEMENT / NOT READY**, sin SP, Forecast ni Commitment.
+
+---
+
+# 232. HC-OPS-01A.1 — Draft Item Exclusion
+
+**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+
+## 232.1 Objetivo y decisión
+
+Un item incorrecto o stale de un CaseKit `DRAFT` debe poder excluirse sin hard
+delete ni pérdida de trazabilidad. HC-OPS-01A.1 introduce únicamente exclusión
+auditada; no permite editar, restaurar o eliminar físicamente el item.
+
+## 232.2 Delta Prisma
+
+```prisma
+enum HealthcareCaseKitItemLifecycle {
+  ACTIVE
+  EXCLUDED
+}
+
+model HealthcareCaseKitItem {
+  lifecycle       HealthcareCaseKitItemLifecycle @default(ACTIVE)
+  excludedById    String?
+  excludedAt      DateTime?
+  exclusionReason String?
+
+  excludedBy User? @relation(
+    "HealthcareCaseKitItemExcludedBy",
+    fields: [excludedById, companyId],
+    references: [id, companyId],
+    onDelete: Restrict
+  )
+}
+```
+
+La relación con User es tenant-safe y requiere la relación inversa correspondiente.
+Las filas existentes migran a `ACTIVE`. `IdempotencyScope` añade exclusivamente:
+
+```text
+HEALTHCARE_CASE_KIT_ITEM_EXCLUDE
+```
+
+HC-OPS-01A.1 no añade `PREPARED` al enum del CaseKit.
+
+## 232.3 Auditoría, constraints e índices
+
+La integridad de auditoría exige:
+
+```text
+ACTIVE
+→ excludedById, excludedAt y exclusionReason son NULL
+
+EXCLUDED
+→ excludedById, excludedAt y exclusionReason son NOT NULL
+→ exclusionReason normalizada tiene entre 1 y 1000 caracteres
+```
+
+Los índices únicos actuales por fuente se sustituyen por índices parciales:
+
+```sql
+UNIQUE ("companyId", "caseKitId", "requirementId")
+WHERE "requirementId" IS NOT NULL AND "lifecycle" = 'ACTIVE';
+
+UNIQUE ("companyId", "caseKitId", "equipmentAssignmentId")
+WHERE "equipmentAssignmentId" IS NOT NULL AND "lifecycle" = 'ACTIVE';
+```
+
+Filas históricas `EXCLUDED` de la misma fuente pueden coexistir. Se conservan los
+índices vigentes y se añaden `(companyId, caseKitId, lifecycle, createdAt)` y
+`(companyId, excludedById)`.
+
+## 232.4 API
+
+```http
+POST /healthcare/case-kits/:caseKitId/items/:itemId/exclude
+Idempotency-Key: <required>
+
+{ "reason": "Motivo normalizado" }
+```
+
+- `reason` es obligatorio, normalizado y de 1 a 1000 caracteres;
+- la primera exclusión y todos los replays válidos devuelven HTTP 200;
+- la respuesta es `HealthcareCaseKitItemResponse` directa, sin outcome/data
+  wrapper;
+- la respuesta añade `lifecycle`, `excludedBy`, `excludedAt` y
+  `exclusionReason`.
+
+## 232.5 Reglas tenant, lifecycle y transacción
+
+- sólo un item `ACTIVE` dentro de un CaseKit `DRAFT` puede excluirse por primera
+  vez;
+- cualquier item incorrecto o stale puede excluirse; no es necesario que ya tenga
+  warnings;
+- un Case `CANCELLED` rechaza una exclusión nueva con `CASE_NOT_ELIGIBLE`;
+- `companyId` y actor proceden del JWT, nunca del body;
+- item, CaseKit y Case deben pertenecer al mismo tenant y conservar sus relaciones
+  compuestas; un identificador foreign-tenant se presenta como missing;
+- no existe hard delete ni mutación de Requirement, Assignment, Inventory o stock;
+- un futuro CaseKit `PREPARED` será inmutable porque el comando exige exactamente
+  `DRAFT`.
+
+Cada primera exclusión usa una sola transacción:
+
+```text
+Company advisory lock
+→ subsequent timeouts
+→ Case FOR UPDATE
+→ CaseKit FOR UPDATE
+→ CaseKitItem FOR UPDATE
+→ key/state/lifecycle decision
+→ conditional exclusion + idempotency claim completion
+```
+
+Exclusión, auditoría, claim y completion son atómicos. Si el update condicional
+afecta cero filas, el servicio debe hacer readback y clasificar el estado ganador;
+nunca puede asumir éxito.
+
+## 232.6 Idempotencia y replay
+
+- misma key + mismo CaseKit/item/razón normalizada: HTTP 200 replay;
+- misma key con payload distinto: 409 `IDEMPOTENCY_KEY_REUSED`;
+- item ya `EXCLUDED` + key nueva + misma razón normalizada: HTTP 200 zero-write,
+  sin consumir la key nueva y preservando actor, timestamp y razón originales;
+- item ya `EXCLUDED` + razón normalizada distinta: 409
+  `CASE_KIT_ITEM_ALREADY_EXCLUDED`; nunca sobrescribe auditoría;
+- un replay completado prevalece sobre cambios posteriores del Case o CaseKit;
+- las colisiones concurrentes del claim recuperan al ganador de forma segura.
+
+El fingerprint SHA-256 estable incluye versión, comando, `caseKitId`, `itemId` y
+razón normalizada.
+
+## 232.7 Lectura, duplicados y readiness futuro
+
+- GET devuelve items `ACTIVE` y `EXCLUDED`;
+- los excluidos permanecen visibles como historia con badge, actor, fecha y razón;
+- duplicate detection y Add consideran únicamente filas `ACTIVE`;
+- readiness y coverage futuros consideran únicamente filas `ACTIVE`;
+- la misma Requirement o Assignment puede agregarse de nuevo después de excluir
+  la fila anterior;
+- los warnings actuales pueden seguir derivándose sobre la fila histórica, pero
+  una fila `EXCLUDED` no contribuye al contenido operativo.
+
+## 232.8 Errores estables
+
+| HTTP | Code | Uso |
+|---|---|---|
+| 400 | `IDEMPOTENCY_KEY_REQUIRED` | Falta el header obligatorio. |
+| 400 | `INVALID_IDEMPOTENCY_KEY` | Header vacío o mayor a 128 caracteres. |
+| 400 | `INVALID_CASE_KIT_ITEM_EXCLUSION_REASON` | Razón ausente o inválida. |
+| 403 | `FORBIDDEN` | Rol no autorizado. |
+| 404 | `CASE_KIT_NOT_FOUND` | CaseKit ausente o foreign-tenant. |
+| 404 | `CASE_KIT_ITEM_NOT_FOUND` | Item ausente, foreign-tenant o ajeno al CaseKit. |
+| 409 | `CASE_NOT_ELIGIBLE` | Case cancelado. |
+| 409 | `CASE_KIT_NOT_MUTABLE` | CaseKit distinto de DRAFT. |
+| 409 | `CASE_KIT_ITEM_ALREADY_EXCLUDED` | Replay de estado con razón distinta. |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | Misma key con payload distinto. |
+| 409 | `RESOURCE_STATE_CHANGED` | La transición condicional perdió la carrera. |
+| 503 | `HEALTHCARE_CONCURRENCY_TIMEOUT` | Sólo timeout de adquisición del Company lock. |
+| 500 | `HEALTHCARE_PERSISTENCE_ERROR` | Error de persistencia sanitizado. |
+
+## 232.9 RBAC y UI mínima
+
+- ADMIN, MANAGER y WAREHOUSE pueden excluir;
+- SALES conserva lectura únicamente;
+- la acción `Excluir` aparece sólo para item `ACTIVE`, CaseKit `DRAFT` y rol
+  autorizado;
+- el modal exige razón e informa que el historial se conservará;
+- el éxito refresca el CaseKit y mueve visualmente el item a su historia excluida;
+- no existen restore, edit, hard-delete ni controles de logística física.
+
+## 232.10 Acceptance Criteria
+
+- una exclusión válida persiste lifecycle y auditoría originales de forma atómica;
+- no se elimina ninguna fila y GET conserva la historia;
+- los índices parciales impiden duplicados `ACTIVE` y permiten re-agregar la fuente
+  después de excluirla;
+- Add, duplicate detection y futuros cálculos de readiness/coverage ignoran
+  `EXCLUDED`;
+- tenant/case/kit mismatch, Case cancelado, rol no autorizado y Kit no DRAFT se
+  rechazan sin writes;
+- replay, conflicto de payload/razón y concurrencia cumplen la sección 232.6;
+- cualquier fallo revierte item, auditoría y claim;
+- no existen efectos sobre Inventory, stock, Requirements o Assignments;
+- Web presenta acción, confirmación, feedback e historia sin ofrecer edición o
+  restauración.
+
+## 232.11 Definition of Ready
+
+- modelo, constraints, índices parciales, endpoint y response cerrados;
+- reglas de tenant, lifecycle, transacción, idempotencia y replay cerradas;
+- errores estables, RBAC, UI, AC y exclusiones documentados;
+- no depende de implementar PREPARED, Dispatch o reserva física.
+
+**Resultado DoR:** COMPLETE. HC-OPS-01A.1 está READY para implementación.
+
+## 232.12 Definition of Done
+
+- schema y migration implementan lifecycle, auditoría, FK tenant-safe, checks e
+  índices parciales revisados;
+- DTO, hash, controller, service, repository, responses y cliente/UI implementados;
+- pruebas cubren happy path, razón, tenant/case/kit, RBAC, replay, razón distinta,
+  colisión concurrente, conditional update, rollback, historia y re-agregado;
+- PostgreSQL focal acredita índices parciales, atomicidad y concurrencia real;
+- Prisma validate/generate, Jest/Vitest focal, TypeScript API/Web, ESLint,
+  Prettier, builds y `git diff --check` PASS;
+- validación manual acredita exclusión, historial visible y re-agregado sin efectos
+  físicos.
+
+## 232.13 Límites explícitos
+
+HC-OPS-01A.1 no implementa `PREPARED`, update de item, restore, hard delete,
+Dispatch, Custody, Return, Inventory Movement, reserva/decremento de stock ni
+mutación de Equipment Assignment. No introduce versioning genérico de items.
+
+No se asignan SP, Forecast ni Commitment.

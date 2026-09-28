@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-27
 Responsable: Zaping Team
 
@@ -190,6 +190,9 @@ HC-NEXT-03C6-E — Requirement-linked Assignment UI
 
 HC-OPS-01A — CaseKit Draft & Contents
         → COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+
+HC-OPS-01A.1 — Draft Item Exclusion
+        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 
 HC-OPS-01B — Preparation Confirmation & Readiness
         → PENDING REFINEMENT / NOT READY — no SP, Forecast or Commitment
@@ -2305,6 +2308,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+→ HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 → HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
@@ -2543,6 +2547,7 @@ Healthcare Equipment Assignment implementation
 → C6-D REPLACE UI COMPLETE / MERGED — PR #45 — main@99efc5a
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+→ HC-OPS-01A.1 DRAFT ITEM EXCLUSION — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 → HC-OPS-01B PREPARATION CONFIRMATION & READINESS — PENDING REFINEMENT / NOT READY
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
@@ -3264,6 +3269,48 @@ Persisten como trabajos independientes C5-B, C5-COVERAGE, Case Availability
 general, permission-based RBAC y despliegue staging/productivo. HC-OPS-01A no
 implementa Dispatch, Return, Custody, Inventory Movement ni disponibilidad física,
 y no declara Healthcare Core terminado.
+
+#### HC-OPS-01A.1 — Draft Item Exclusion
+
+Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+
+Contrato canónico: `docs/modules/healthcare/CASE_KITS.md`, sección 232.
+
+Objetivo: corregir un item incorrecto o stale de un CaseKit `DRAFT` sin perder
+trazabilidad. Añade lifecycle `ACTIVE | EXCLUDED`, default `ACTIVE`, y auditoría
+opcional `excludedById`, `excludedAt`, `exclusionReason`, con relación User
+tenant-safe. El check exige auditoría nula para `ACTIVE` y completa para `EXCLUDED`;
+la razón se normaliza y admite 1..1000 caracteres.
+
+Los unique por Requirement/Assignment pasan a índices parciales limitados a
+`ACTIVE`. Las filas históricas `EXCLUDED` coexisten y la misma fuente puede volver
+a agregarse. GET conserva ambas; Add, duplicate detection y readiness/coverage
+futuros consideran sólo `ACTIVE`.
+
+API: `POST /healthcare/case-kits/:caseKitId/items/:itemId/exclude`, body
+`{ reason }`, Idempotency-Key obligatorio y HTTP 200 con item directo. Sólo un item
+`ACTIVE` de Kit `DRAFT` puede excluirse por primera vez; Case `CANCELLED` rechaza
+la mutación. Actor/tenant vienen del JWT. Company-first, locks de Case/Kit/item,
+revalidación, exclusión, auditoría y claim comparten una transacción; update cero
+requiere readback.
+
+Replay: misma key/payload y estado ya excluido con key nueva/misma razón retornan
+200 preservando auditoría; la key nueva no se consume en state replay. Payload
+distinto usa `IDEMPOTENCY_KEY_REUSED`; razón distinta usa
+`CASE_KIT_ITEM_ALREADY_EXCLUDED`. El replay completado prevalece sobre estado
+posterior y las colisiones concurrentes recuperan al ganador.
+
+RBAC/UI: ADMIN, MANAGER y WAREHOUSE excluyen; SALES read-only. La acción aparece
+sólo para `ACTIVE + DRAFT`, exige razón, explica que conserva historia y muestra
+badge/actor/fecha/razón después del refresh. Sin restore, edit o hard delete.
+
+DoR: COMPLETE. AC y DoD exigen tenant isolation, replay, concurrencia, rollback,
+índices parciales, historia legible, re-agregado y ausencia de efectos físicos,
+con pruebas focales API/Web/PostgreSQL y gates estáticos/build aplicables.
+
+Fuera: PREPARED, item update, restore, hard delete, versioning genérico,
+Dispatch/Custody/Return e Inventory/stock/Assignment mutation. No se asignan SP,
+Forecast ni Commitment.
 
 #### HC-OPS-01B — Preparation Confirmation & Readiness
 

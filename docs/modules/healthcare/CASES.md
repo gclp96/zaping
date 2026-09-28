@@ -2,9 +2,9 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.4.0
+Versión: 1.5.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
 Última actualización: 2026-09-27
 Responsable: Zaping Healthcare Team
 
@@ -1312,6 +1312,21 @@ La validación manual acreditó para MANAGER la creación del CaseKit, el estado
 `DRAFT`, el banner no reservante, el agregado de Requirement `QUANTITY` y de
 Equipment Assignment `RESERVED`, y el render correcto de Materials/Equipment. No
 se registra validación manual de SALES.
+
+HC-OPS-01A.1 — Draft Item Exclusion queda CONTRACT DOCUMENTED / READY / NOT
+IMPLEMENTED. Permite excluir de forma auditada un item `ACTIVE` sólo mientras el
+CaseKit permanece `DRAFT`; conserva la fila `EXCLUDED`, actor, fecha y razón, y
+nunca ejecuta hard delete. Un Case `CANCELLED` rechaza una exclusión nueva.
+
+Add, duplicate detection y futuros cálculos de readiness/coverage consideran sólo
+items `ACTIVE`. Los índices únicos por fuente se limitan a `ACTIVE`, por lo que la
+misma Requirement o Assignment puede agregarse nuevamente tras una exclusión. La
+mutación exige Idempotency-Key, Company-first y atomicidad de exclusión/auditoría/
+claim. ADMIN, MANAGER y WAREHOUSE mutan; SALES conserva lectura.
+
+El contrato completo, incluidos replay, errores, AC, DoR y DoD, está en
+`CASE_KITS.md`, sección 232. No implementa PREPARED, update/restore/hard delete,
+Dispatch/Custody/Return ni efectos sobre Inventory, stock o Assignments.
 
 HC-OPS-01B — Preparation Confirmation & Readiness queda como siguiente candidato,
 PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
