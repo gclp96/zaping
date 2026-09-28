@@ -2,9 +2,9 @@
 
 **Módulo:** Healthcare Case Kits
 **Producto:** Zaping Healthcare
-**Versión:** 2.3.1
+**Versión:** 2.4.0
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 **Última actualización:** 2026-09-28
 **Responsable:** Zaping Healthcare Team
 
@@ -563,17 +563,15 @@ La estructura exacta no está aprobada como Prisma.
 
 La preparación necesita distinguir su progreso.
 
-Una semántica conceptual puede ser:
+Para HC-OPS-01B la semántica aprobada es:
 
 ```text
 DRAFT
 ↓
-IN_PREPARATION
-↓
 PREPARED
 ```
 
-con posibles estados como:
+`IN_PREPARATION` no se incorpora. Posibles estados posteriores como:
 
 ```text
 CANCELLED
@@ -583,11 +581,10 @@ si se requiere.
 
 ---
 
-# 41. No copiar a Prisma todavía
+# 41. Llevar a Prisma sólo estados aprobados
 
-Estos nombres describen comportamiento.
-
-El enum definitivo se resolverá durante diseño técnico.
+HC-OPS-01B añade exclusivamente `PREPARED` al enum vigente. Otros estados
+conceptuales requieren contrato propio.
 
 ---
 
@@ -599,7 +596,7 @@ Representa requerimientos todavía modificables.
 
 # 43. IN_PREPARATION
 
-Representa que Warehouse está preparando físicamente los recursos.
+Permanece como concepto futuro y no se implementa en HC-OPS-01B.
 
 ---
 
@@ -3417,9 +3414,9 @@ la sección 232.
 ## 231.17 Siguiente candidato
 
 **HC-OPS-01B — Preparation Confirmation & Readiness** queda como candidato
-**PENDING REFINEMENT / NOT READY**, sin SP, Forecast ni Commitment. El blocker
-previo de corrección de items stale queda resuelto por HC-OPS-01A.1; aún falta
-formalizar el contrato canónico de 01B.
+**CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED**, con DoR COMPLETE y sin SP,
+Forecast ni Commitment. El blocker previo de corrección de items stale quedó
+resuelto por HC-OPS-01A.1.
 
 ---
 
@@ -3644,5 +3641,250 @@ No se registra validación manual de SALES.
 HC-OPS-01A.1 no implementa `PREPARED`, update de item, restore, hard delete,
 Dispatch, Custody, Return, Inventory Movement, reserva/decremento de stock ni
 mutación de Equipment Assignment. No introduce versioning genérico de items.
+
+No se asignan SP, Forecast ni Commitment.
+
+---
+
+# 233. HC-OPS-01B — Preparation Confirmation & Readiness
+
+**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+
+**Prerequisito:** HC-OPS-01A.1 COMPLETE / MERGED; el blocker de corrección de
+items stale está RESOLVED.
+
+## 233.1 Lifecycle y semántica
+
+- `HealthcareCaseKitStatus` añade únicamente `PREPARED`; no se introduce
+  `IN_PREPARATION`;
+- la única transición nueva es `DRAFT -> PREPARED`;
+- `PREPARED` confirma preparación lógica y readiness, pero no reserva inventario,
+  no representa Dispatch ni salida de Warehouse;
+- el contenido de un CaseKit `PREPARED` es inmutable: Add y Exclude siguen
+  exigiendo exactamente `DRAFT`;
+- no existe reapertura a `DRAFT` en 01B;
+- repetir Confirm Preparation sobre `PREPARED` retorna HTTP 200 zero-write y
+  preserva `preparedBy` y `preparedAt` originales.
+
+## 233.2 Delta de persistencia
+
+```prisma
+enum HealthcareCaseKitStatus {
+  DRAFT
+  PREPARED
+}
+
+model HealthcareCaseKit {
+  preparedById String?
+  preparedAt   DateTime?
+
+  preparedBy User? @relation(
+    "HealthcareCaseKitPreparedBy",
+    fields: [preparedById, companyId],
+    references: [id, companyId],
+    onDelete: Restrict
+  )
+}
+```
+
+La relación User es tenant-safe y requiere su relación inversa. La migration debe
+añadir `HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION` a `IdempotencyScope`, el índice
+`(companyId, preparedById)` y el CHECK
+`HealthcareCaseKit_preparation_audit_check`:
+
+```text
+DRAFT    => preparedById y preparedAt son NULL
+PREPARED => preparedById y preparedAt son NOT NULL
+```
+
+01B no persiste `readinessStatus`, blockers ni snapshot de readiness.
+
+## 233.3 Readiness derivado
+
+GET y Confirm exponen siempre:
+
+```text
+preparationReadiness: {
+  status: PASS | BLOCKED,
+  blockers: Array<{
+    code,
+    requirementId?,
+    caseKitItemId?
+  }>
+}
+```
+
+Los blockers se derivan del estado actual; los IDs opcionales identifican la fuente
+cuando aplica. Para la primera confirmación deben cumplirse todas estas reglas:
+
+- Case exactamente `SCHEDULED`, con `scheduledStart` y `scheduledEnd` presentes;
+- ningún item `ACTIVE` stale/inválido ni con warning bloqueante;
+- cada Requirement `ACTIVE + REQUIRED` con tracking `QUANTITY` tiene su item
+  `ACTIVE` y `preparedQuantity == requestedQty`;
+- cada Requirement `ACTIVE + REQUIRED` con tracking `ASSET` tiene al menos
+  `requestedQty` items `ACTIVE`, cada uno originado en una Equipment Assignment
+  `REQUIREMENT + RESERVED` vinculada a ese Requirement;
+- un Requirement `ACTIVE + REQUIRED` con tracking `SERIALIZED` bloquea 01B;
+- la ausencia de un Requirement `BACKUP` no bloquea; si se incluye, su fuente debe
+  seguir siendo válida;
+- una Assignment `DIRECT` válida puede estar incluida, pero no cubre Requirements;
+- un Kit vacío puede confirmar sólo cuando no existen Requirements
+  `ACTIVE + REQUIRED`.
+
+Blockers estables propios de readiness:
+
+- `CASE_KIT_CASE_NOT_SCHEDULED`;
+- `CASE_KIT_CASE_SCHEDULE_INCOMPLETE`;
+- `CASE_KIT_REQUIRED_QUANTITY_NOT_COVERED`;
+- `CASE_KIT_REQUIRED_ASSET_NOT_COVERED`;
+- `CASE_KIT_SERIALIZED_REQUIREMENT_UNSUPPORTED`.
+
+Los warnings estables de fuente definidos en 231.6 también actúan como blockers
+cuando pertenecen a un item `ACTIVE`. Los items `EXCLUDED` no participan en
+readiness ni coverage.
+
+## 233.4 Invalidación posterior
+
+Si después de confirmar se retira un Requirement, se libera o reemplaza una
+Assignment, o se cancela el Case:
+
+- el CaseKit permanece `PREPARED`;
+- `preparedBy` y `preparedAt` originales permanecen intactos;
+- el read-model recalcula `preparationReadiness=BLOCKED` y expone el warning o
+  blocker actual;
+- no se elimina, excluye, repara ni reemplaza automáticamente ninguna fuente.
+
+## 233.5 Contrato HTTP
+
+```http
+POST /healthcare/case-kits/:caseKitId/confirm-preparation
+Idempotency-Key: <required>
+
+{}
+```
+
+- body vacío y allowlisted;
+- primera confirmación válida: HTTP 200;
+- replay válido: HTTP 200;
+- respuesta `HealthcareCaseKitResponse` directa, sin wrapper outcome/data;
+- la respuesta incluye `status`, `preparedBy`, `preparedAt` y
+  `preparationReadiness`;
+- blockers de readiness: 409 `CASE_KIT_PREPARATION_BLOCKED`, zero-write y sin
+  consumir la key.
+
+## 233.6 Tenant, transacción e idempotencia
+
+- `companyId` y actor provienen del JWT; un CaseKit foreign-tenant se presenta
+  como missing;
+- la primera confirmación usa una transacción y las primitivas Healthcare
+  compartidas: Company advisory lock primero, subsequent timeouts, locks y
+  revalidación tenant-safe de Case, CaseKit, items `ACTIVE` y fuentes antes de la
+  decisión;
+- ningún row lock precede al Company lock; las colecciones se procesan en orden
+  determinista por ID;
+- la transición condicional, auditoría, claim y completion son atómicos;
+- si el update condicional afecta cero filas, el readback clasifica el estado
+  ganador; nunca se asume éxito;
+- fingerprint SHA-256 estable: versión, comando y `caseKitId`; el body es vacío;
+- misma key y mismo CaseKit: HTTP 200 replay, incluso si el estado posterior ahora
+  genera blockers;
+- misma key reutilizada para otro CaseKit: 409 `IDEMPOTENCY_KEY_REUSED` antes de
+  cualquier state replay;
+- `PREPARED` con key nueva: HTTP 200 zero-write, preserva auditoría, no crea claim
+  ni consume la key;
+- colisiones concurrentes de claim recuperan al ganador de forma segura.
+
+## 233.7 Errores estables
+
+| HTTP | Code | Uso |
+|---|---|---|
+| 400 | `IDEMPOTENCY_KEY_REQUIRED` | Falta el header obligatorio. |
+| 400 | `INVALID_IDEMPOTENCY_KEY` | Header vacío o mayor a 128 caracteres. |
+| 400 | `INVALID_REQUEST_BODY` | El body no está vacío. |
+| 403 | `FORBIDDEN` | Rol no autorizado. |
+| 404 | `CASE_KIT_NOT_FOUND` | CaseKit ausente o foreign-tenant. |
+| 409 | `CASE_KIT_PREPARATION_BLOCKED` | Readiness derivado BLOCKED; retorna `blockers[]`. |
+| 409 | `CASE_KIT_NOT_MUTABLE` | Estado distinto de DRAFT/PREPARED o mutación incompatible. |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | Misma key reutilizada para otro CaseKit. |
+| 409 | `RESOURCE_STATE_CHANGED` | La transición condicional perdió la carrera y el readback no permite replay. |
+| 503 | `HEALTHCARE_CONCURRENCY_TIMEOUT` | Sólo timeout de adquisición del Company lock. |
+| 500 | `HEALTHCARE_PERSISTENCE_ERROR` | Error de persistencia sanitizado. |
+
+## 233.8 Materiales y efectos físicos
+
+`QUANTITY` continúa siendo preparación lógica no reservante. Confirmar:
+
+- no selecciona batches, lotes o seriales;
+- no decrementa `Product.stock`;
+- no modifica `InventoryBatch.availableQuantity`;
+- no crea `InventoryMovement`;
+- no garantiza disponibilidad física.
+
+## 233.9 RBAC y UI mínima
+
+- READ: ADMIN, MANAGER, SALES y WAREHOUSE;
+- CONFIRM: ADMIN, MANAGER y WAREHOUSE;
+- SALES permanece read-only;
+- la pantalla muestra checklist y blockers derivados;
+- `Confirmar preparación` aparece sólo para `DRAFT` y rol autorizado;
+- la confirmación advierte explícitamente que no reserva inventario;
+- el éxito refresca el Kit y muestra badge `PREPARED`, actor y fecha; Add y Exclude
+  quedan ocultos;
+- una invalidación posterior conserva el badge `PREPARED` y muestra readiness
+  `BLOCKED`;
+- no existen controles de Dispatch.
+
+## 233.10 Acceptance Criteria
+
+- sólo un CaseKit `DRAFT` propio y con Case `SCHEDULED` completo puede ejecutar la
+  primera confirmación;
+- las reglas REQUIRED QUANTITY/ASSET/SERIALIZED, BACKUP, DIRECT, empty Kit e items
+  `EXCLUDED` producen exactamente el readiness documentado;
+- ningún blocker permite writes ni consume una key nueva;
+- una confirmación válida persiste `PREPARED`, actor y timestamp de forma atómica;
+- replays por key y estado preservan la auditoría original y respetan conflictos
+  de scope/payload;
+- Add y Exclude rechazan contenido `PREPARED`; no existe reopen;
+- invalidaciones posteriores conservan estado/auditoría y cambian sólo el
+  read-model derivado a `BLOCKED`;
+- tenant isolation, RBAC, respuesta directa, timeout exclusivo de Company y
+  errores sanitizados permanecen intactos;
+- no se producen writes de Inventory, stock, batches, Assignments ni movimientos;
+- Web presenta checklist, confirmación, feedback, auditoría y estado posterior sin
+  controles físicos.
+
+## 233.11 Definition of Ready
+
+- lifecycle, transición, inmutabilidad y replay cerrados;
+- reglas de readiness y blockers estables cerrados;
+- delta Prisma, auditoría y read-model cerrados;
+- endpoint, response, idempotencia, transacción, tenant y errores cerrados;
+- RBAC, UI, AC, DoD y límites documentados;
+- HC-OPS-01A.1 está COMPLETE / MERGED y resolvió la corrección de items stale.
+
+**Resultado DoR:** COMPLETE. HC-OPS-01B está READY para implementación.
+
+## 233.12 Definition of Done
+
+- schema/migration implementan `PREPARED`, auditoría tenant-safe, CHECK, índice y
+  scope idempotente revisados;
+- controller/service/repository, DTO/read-model y cliente/UI implementan sólo el
+  contrato 233;
+- pruebas API/Web cubren todas las reglas de readiness, RBAC, tenant, response,
+  inmutabilidad, replay y errores;
+- PostgreSQL focal acredita constraint, lock order, colisión concurrente, update
+  condicional, rollback atómico y cero efectos físicos;
+- pruebas de invalidación acreditan Requirement retire, Assignment release/replace
+  y Case cancel sin modificar estado/auditoría PREPARED;
+- Prisma validate/generate, tests focales, TypeScript API/Web, ESLint, Prettier,
+  builds API/Web y `git diff --check` PASS;
+- validación manual acredita checklist, confirmación, badge/auditoría,
+  inmutabilidad y BLOCKED derivado posterior.
+
+## 233.13 Límites explícitos
+
+HC-OPS-01B no implementa `IN_PREPARATION`, reopen, mutación de items después de
+`PREPARED`, Dispatch, Custody, Return, reserva física, lotes, seriales,
+`InventoryMovement`, decremento de stock ni arquitectura no relacionada.
 
 No se asignan SP, Forecast ni Commitment.

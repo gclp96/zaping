@@ -2,9 +2,9 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.5.1
+Versión: 1.6.0
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 Última actualización: 2026-09-28
 Responsable: Zaping Healthcare Team
 
@@ -1336,10 +1336,26 @@ historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la misma fuente y 
 coexistencia de la fila histórica `EXCLUDED` con la nueva `ACTIVE`. No se registra
 validación manual de SALES.
 
-HC-OPS-01B — Preparation Confirmation & Readiness queda como siguiente candidato,
-PENDING REFINEMENT / NOT READY. El blocker previo de corrección de items stale
-queda resuelto por HC-OPS-01A.1; falta formalizar el contrato canónico de 01B. No
-se asignan SP, Forecast ni Commitment.
+HC-OPS-01B — Preparation Confirmation & Readiness queda CONTRACT DOCUMENTED /
+READY / NOT IMPLEMENTED, con DoR COMPLETE. El blocker previo de corrección de
+items stale fue resuelto por HC-OPS-01A.1.
+
+01B añade exclusivamente `PREPARED` y permite sólo `DRAFT -> PREPARED`. La primera
+confirmación exige Case `SCHEDULED` con `scheduledStart + scheduledEnd`, ninguna
+fuente `ACTIVE` inválida y cobertura completa de Requirements `ACTIVE + REQUIRED`:
+QUANTITY exacta, suficientes Assignments `REQUIREMENT + RESERVED` para ASSET y
+bloqueo de SERIALIZED. BACKUP ausente no bloquea; DIRECT no satisface Requirements.
+
+La confirmación persiste actor/fecha una sola vez. Repetir sobre `PREPARED` retorna
+HTTP 200 zero-write y preserva la auditoría. Requirement retire, Assignment
+release/replace o Case cancel conservan estado y auditoría `PREPARED`, pero el
+read-model derivado cambia a `preparationReadiness=BLOCKED`; no existe reemplazo
+automático.
+
+El contrato canónico completo de lifecycle, modelo, API, blockers, Company-first,
+idempotencia, RBAC, UI, AC, DoR y DoD está en `CASE_KITS.md`, sección 233. 01B no
+implementa reserva física, lotes/seriales, Dispatch/Custody/Return, reopen ni
+mutación de contenido `PREPARED`. No se asignan SP, Forecast ni Commitment.
 
 80. CaseKit ≠ JSON inside Case
 
