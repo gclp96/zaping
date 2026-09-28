@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-Última actualización: 2026-09-27
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Última actualización: 2026-09-28
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -192,10 +192,10 @@ HC-OPS-01A — CaseKit Draft & Contents
         → COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 
 HC-OPS-01A.1 — Draft Item Exclusion
-        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+        → COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B — Preparation Confirmation & Readiness
-        → PENDING REFINEMENT / NOT READY — no SP, Forecast or Commitment
+        → PENDING REFINEMENT / NOT READY — stale-item blocker RESOLVED by 01A.1; canonical contract pending — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2308,8 +2308,8 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
-→ HC-OPS-01A.1 Draft Item Exclusion — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
-→ HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
+→ HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+→ HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY — stale-item blocker RESOLVED; canonical contract pending
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2547,8 +2547,8 @@ Healthcare Equipment Assignment implementation
 → C6-D REPLACE UI COMPLETE / MERGED — PR #45 — main@99efc5a
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
-→ HC-OPS-01A.1 DRAFT ITEM EXCLUSION — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
-→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — PENDING REFINEMENT / NOT READY
+→ HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — PENDING REFINEMENT / NOT READY — STALE-ITEM BLOCKER RESOLVED; CANONICAL CONTRACT PENDING
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -3272,7 +3272,7 @@ y no declara Healthcare Core terminado.
 
 #### HC-OPS-01A.1 — Draft Item Exclusion
 
-Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+Estado: COMPLETE / MERGED — PR #53 — `main@54a5d79` — Actual 28-sep-2026.
 
 Contrato canónico: `docs/modules/healthcare/CASE_KITS.md`, sección 232.
 
@@ -3308,6 +3308,14 @@ DoR: COMPLETE. AC y DoD exigen tenant isolation, replay, concurrencia, rollback,
 índices parciales, historia legible, re-agregado y ausencia de efectos físicos,
 con pruebas focales API/Web/PostgreSQL y gates estáticos/build aplicables.
 
+Evidencia de cierre: Prisma validate/generate PASS; API focal 36/36 y Web focal
+12/12 PASS; TypeScript y ESLint API/Web, API build, Next.js build y
+`git diff --check` PASS; harness PostgreSQL 2H completo 45/45 PASS, 0 skipped. La
+validación manual acreditó como MANAGER la exclusión de un item `ACTIVE`, la
+preservación de la historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la
+misma fuente y la coexistencia de la fila histórica `EXCLUDED` con la nueva
+`ACTIVE`. No se registra validación manual de SALES.
+
 Fuera: PREPARED, item update, restore, hard delete, versioning genérico,
 Dispatch/Custody/Return e Inventory/stock/Assignment mutation. No se asignan SP,
 Forecast ni Commitment.
@@ -3316,5 +3324,6 @@ Forecast ni Commitment.
 
 Estado: PENDING REFINEMENT / NOT READY.
 
-Se registra únicamente como siguiente candidato funcional. No tiene SP, Forecast
-ni Commitment y no amplía el alcance aceptado de HC-OPS-01A.
+El blocker previo de corrección de items stale queda RESOLVED por HC-OPS-01A.1.
+Permanece NOT READY hasta formalizar su contrato canónico. No tiene SP, Forecast
+ni Commitment y no amplía el alcance aceptado de HC-OPS-01A/01A.1.

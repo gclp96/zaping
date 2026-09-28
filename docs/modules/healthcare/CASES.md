@@ -2,10 +2,10 @@ Healthcare Cases — Zaping
 
 Módulo: Healthcare Cases
 Producto: Zaping Healthcare
-Versión: 1.5.0
+Versión: 1.5.1
 Estado: Aprobado
-Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
-Última actualización: 2026-09-27
+Estado de implementación: CASE FOUNDATION + DOCTOR/HOSPITAL WORKFLOW IMPLEMENTED / VALIDATED — HC-NEXT-01 CLOSED / ACCEPTED; EQUIPMENT ASSIGNMENT C1–C6-E COMPLETE / MERGED; HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+Última actualización: 2026-09-28
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -1313,8 +1313,8 @@ La validación manual acreditó para MANAGER la creación del CaseKit, el estado
 Equipment Assignment `RESERVED`, y el render correcto de Materials/Equipment. No
 se registra validación manual de SALES.
 
-HC-OPS-01A.1 — Draft Item Exclusion queda CONTRACT DOCUMENTED / READY / NOT
-IMPLEMENTED. Permite excluir de forma auditada un item `ACTIVE` sólo mientras el
+HC-OPS-01A.1 — Draft Item Exclusion está COMPLETE / MERGED mediante PR #53 en
+`main@54a5d79`, con Actual 28-sep-2026. Permite excluir de forma auditada un item `ACTIVE` sólo mientras el
 CaseKit permanece `DRAFT`; conserva la fila `EXCLUDED`, actor, fecha y razón, y
 nunca ejecuta hard delete. Un Case `CANCELLED` rechaza una exclusión nueva.
 
@@ -1328,8 +1328,18 @@ El contrato completo, incluidos replay, errores, AC, DoR y DoD, está en
 `CASE_KITS.md`, sección 232. No implementa PREPARED, update/restore/hard delete,
 Dispatch/Custody/Return ni efectos sobre Inventory, stock o Assignments.
 
+Evidencia de cierre: Prisma validate/generate PASS; API focal 36/36 y Web focal
+12/12 PASS; TypeScript y ESLint API/Web, API build, Next.js build y
+`git diff --check` PASS; harness PostgreSQL 2H completo 45/45 PASS, 0 skipped. La
+validación manual acreditó como MANAGER la exclusión de un item `ACTIVE`, la
+historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la misma fuente y la
+coexistencia de la fila histórica `EXCLUDED` con la nueva `ACTIVE`. No se registra
+validación manual de SALES.
+
 HC-OPS-01B — Preparation Confirmation & Readiness queda como siguiente candidato,
-PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
+PENDING REFINEMENT / NOT READY. El blocker previo de corrección de items stale
+queda resuelto por HC-OPS-01A.1; falta formalizar el contrato canónico de 01B. No
+se asignan SP, Forecast ni Commitment.
 
 80. CaseKit ≠ JSON inside Case
 
