@@ -117,7 +117,7 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 ↓
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
-HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
+HC-OPS-01B Preparation Confirmation & Readiness — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -1107,10 +1107,9 @@ HC-OPS-01A.1 Draft Item Exclusion está COMPLETE / MERGED mediante PR #53 en
 `main@54a5d79`, con Actual 28-sep-2026: implementa exclusión auditada de items
 `ACTIVE` sólo en Kit `DRAFT`, sin hard delete y con re-agregado posterior de la
 misma fuente.
-HC-OPS-01B Preparation Confirmation & Readiness queda como siguiente candidato,
-PENDING REFINEMENT / NOT READY. Su blocker previo de items stale queda resuelto
-por HC-OPS-01A.1; falta formalizar su contrato canónico. No tiene SP, Forecast ni
-Commitment.
+HC-OPS-01B Preparation Confirmation & Readiness queda CONTRACT DOCUMENTED / READY
+/ NOT IMPLEMENTED, con DoR COMPLETE. Su blocker previo de items stale fue resuelto
+por HC-OPS-01A.1. No tiene SP, Forecast ni Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
@@ -1212,9 +1211,25 @@ Evidencia de cierre: Prisma validate/generate PASS; API focal 36/36 y Web focal
 validación manual acreditó como MANAGER la exclusión de un item `ACTIVE`, la
 historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la misma fuente y la
 coexistencia histórica `EXCLUDED` + nueva `ACTIVE`. No se registra validación
-manual de SALES. El blocker stale-item de HC-OPS-01B queda resuelto; 01B sigue
-PENDING REFINEMENT / NOT READY hasta formalizar su contrato canónico, sin SP,
-Forecast ni Commitment.
+manual de SALES. El blocker stale-item de HC-OPS-01B queda resuelto.
+
+HC-OPS-01B está CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED, con DoR COMPLETE.
+Añade exclusivamente `PREPARED` y `DRAFT -> PREPARED`; confirma preparación
+lógica, vuelve inmutable el contenido y no implica reserva física ni Dispatch. La
+primera confirmación requiere Case `SCHEDULED` con ventana completa, fuentes
+`ACTIVE` válidas y cobertura total de Requirements `ACTIVE + REQUIRED`: QUANTITY
+exacta, ASSET con Assignments `REQUIREMENT + RESERVED` y SERIALIZED bloqueado.
+BACKUP ausente no bloquea, DIRECT no cubre Requirements y un Kit vacío es válido
+si no existen Requirements obligatorios.
+
+El endpoint POST de confirmación exige Idempotency-Key y retorna CaseKit directa.
+Readiness `BLOCKED` responde 409 zero-write sin consumir key; replay sobre
+`PREPARED` preserva actor/fecha. Requirement retire, Assignment release/replace o
+Case cancel mantienen `PREPARED` y su auditoría, y cambian sólo el read-model
+derivado a `BLOCKED`. ADMIN/MANAGER/WAREHOUSE confirman; SALES es read-only. No
+incluye `IN_PREPARATION`, reopen, mutación posterior, lotes/seriales,
+Dispatch/Custody/Return ni efectos de Inventory. No tiene SP, Forecast ni
+Commitment.
 
 Puede contener conceptualmente:
 
@@ -1228,8 +1243,9 @@ Equipment
 
 preparation state
 La cardinalidad de 01A es uno a uno lógico. El schema mínimo utiliza
-`HealthcareCaseKit` y `HealthcareCaseKitItem`; contenedores físicos, templates,
-PREPARED y logística permanecen posteriores.
+`HealthcareCaseKit` y `HealthcareCaseKitItem`; contenedores físicos, templates y
+logística permanecen posteriores. `PREPARED` queda contratado en HC-OPS-01B, aún
+no implementado.
 
 Debe mantenerse:
 
@@ -2912,7 +2928,7 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
-HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
+HC-OPS-01B Preparation Confirmation & Readiness — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -3075,7 +3091,7 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 ↓
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
-HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
+HC-OPS-01B Preparation Confirmation & Readiness — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓

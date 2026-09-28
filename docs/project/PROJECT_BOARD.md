@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 Última actualización: 2026-09-28
 Responsable: Zaping Team
 
@@ -195,7 +195,7 @@ HC-OPS-01A.1 — Draft Item Exclusion
         → COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B — Preparation Confirmation & Readiness
-        → PENDING REFINEMENT / NOT READY — stale-item blocker RESOLVED by 01A.1; canonical contract pending — no SP, Forecast or Commitment
+        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2309,7 +2309,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY — stale-item blocker RESOLVED; canonical contract pending
+→ HC-OPS-01B Preparation Confirmation & Readiness — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2548,7 +2548,7 @@ Healthcare Equipment Assignment implementation
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — PENDING REFINEMENT / NOT READY — STALE-ITEM BLOCKER RESOLVED; CANONICAL CONTRACT PENDING
+→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DOR COMPLETE
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -3322,8 +3322,42 @@ Forecast ni Commitment.
 
 #### HC-OPS-01B — Preparation Confirmation & Readiness
 
-Estado: PENDING REFINEMENT / NOT READY.
+Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE.
 
-El blocker previo de corrección de items stale queda RESOLVED por HC-OPS-01A.1.
-Permanece NOT READY hasta formalizar su contrato canónico. No tiene SP, Forecast
-ni Commitment y no amplía el alcance aceptado de HC-OPS-01A/01A.1.
+Prerequisito satisfecho: HC-OPS-01A.1 está COMPLETE / MERGED y resolvió el blocker
+de corrección de items stale.
+
+Contrato canónico: `docs/modules/healthcare/CASE_KITS.md`, sección 233, y
+`docs/modules/healthcare/CASES.md`, sección 79.
+
+Alcance: añadir sólo `PREPARED` y `DRAFT -> PREPARED`, sin `IN_PREPARATION` ni
+reopen. `PREPARED` confirma preparación lógica, vuelve inmutable el contenido y no
+representa reserva física, Dispatch o salida de Warehouse. Persiste actor/fecha;
+readiness y blockers se derivan sin snapshot persistido.
+
+La primera confirmación exige Case `SCHEDULED` con ventana completa, items `ACTIVE`
+válidos y cobertura de todos los Requirements `ACTIVE + REQUIRED`: QUANTITY exacta,
+ASSET cubierto con Assignments `REQUIREMENT + RESERVED` y SERIALIZED bloqueado.
+BACKUP ausente no bloquea; DIRECT no cubre Requirements; empty Kit es válido sin
+Requirements obligatorios.
+
+API: `POST /healthcare/case-kits/:caseKitId/confirm-preparation`, body vacío,
+Idempotency-Key obligatorio y HTTP 200 con response CaseKit directa. Readiness
+BLOCKED retorna `CASE_KIT_PREPARATION_BLOCKED`/409 zero-write sin consumir key.
+Replay por key o estado preserva auditoría; key reutilizada para otro Kit retorna
+`IDEMPOTENCY_KEY_REUSED`/409. La primera transición usa Company-first, revalidación
+y atomicidad de status/auditoría/claim.
+
+Invalidaciones posteriores por Requirement retire, Assignment release/replace o
+Case cancel conservan `PREPARED` y auditoría, pero recalculan readiness `BLOCKED`;
+no reparan ni reemplazan fuentes. ADMIN/MANAGER/WAREHOUSE confirman; SALES es
+read-only. La UI muestra checklist/blockers, warning no reservante, confirmación,
+badge/auditoría e inmutabilidad, sin controles de Dispatch.
+
+AC/DoD: cubrir reglas de readiness, tenant/RBAC, replay, colisión, rollback,
+conditional update, invalidaciones posteriores, UI y ausencia de writes físicos;
+schema/gates API/Web/PostgreSQL y validación manual aplicables deben pasar.
+
+Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,
+reserva física, Inventory Movement, Dispatch/Custody/Return y arquitectura no
+relacionada. No se asignan SP, Forecast ni Commitment.
