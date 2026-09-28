@@ -113,7 +113,9 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 ↓
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 ↓
-HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+↓
+HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓
@@ -1097,8 +1099,10 @@ DIRECT, la exclusión de Requirements QUANTITY, un Requirement ASSET disponible,
 la asignación de EquipmentAsset compatible desde UI, `origin=REQUIREMENT` y la
 relación con Requirement visibles en List, cobertura 1/1 y refresh automático. No
 se declara validación manual de SALES ni Detail. El mojibake de datos de desarrollo
-permanece como known non-blocker. HC-OPS-01A CaseKit Draft & Contents queda
-CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED, sin SP, Forecast ni Commitment.
+permanece como known non-blocker. HC-OPS-01A CaseKit Draft & Contents está
+COMPLETE / MERGED mediante PR #50 en `main@bb530e8`, con Actual 27-sep-2026.
+HC-OPS-01B Preparation Confirmation & Readiness queda como siguiente candidato,
+PENDING REFINEMENT / NOT READY, sin SP, Forecast ni Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
 
 Debe mantenerse:
@@ -1168,11 +1172,18 @@ commercial Inventory OUT
 9.10 CaseKit / Maletín
 CaseKit representa la preparación real de material para un Case específico.
 
-HC-OPS-01A está CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED. Implementará un
-único CaseKit lógico `DRAFT` por Case y permitirá agregar material QUANTITY no
+HC-OPS-01A está COMPLETE / MERGED mediante PR #50 en `main@bb530e8`, con Actual
+27-sep-2026. Implementa un
+único CaseKit lógico `DRAFT` por Case y permite agregar material QUANTITY no
 reservante o Equipment Assignments RESERVED ya vinculadas al Case. Una fuente que
 después pierda elegibilidad permanece visible como stale mediante warnings
 derivados. Create/Add exigen Idempotency-Key.
+
+Evidencia: API focal/regression 382/382 PASS; Web focal 26/26 PASS; Prisma validate,
+TypeScript API/Web, ESLint API/Web, API build, Next.js build y CI API/Web PASS. La
+validación manual acreditó para MANAGER Create CaseKit, `DRAFT`, banner no
+reservante, Requirement `QUANTITY`, Equipment Assignment `RESERVED` y render de
+Materials/Equipment. No se registra validación manual de SALES.
 
 Puede contener conceptualmente:
 
@@ -2866,7 +2877,9 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 
-HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+
+HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 
@@ -3025,7 +3038,9 @@ HC-NEXT-03C6-D Replace Assignment UI — COMPLETE / MERGED — PR #45 — main@9
 ↓
 HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 ↓
-HC-OPS-01A CaseKit Draft & Contents — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+↓
+HC-OPS-01B Preparation Confirmation & Readiness — PENDING REFINEMENT / NOT READY
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 ↓

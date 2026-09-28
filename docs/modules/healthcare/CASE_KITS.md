@@ -2,9 +2,9 @@
 
 **Módulo:** Healthcare Case Kits
 **Producto:** Zaping Healthcare
-**Versión:** 2.1.0
+**Versión:** 2.2.0
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 **Última actualización:** 2026-09-27
 **Responsable:** Zaping Healthcare Team
 
@@ -3073,9 +3073,9 @@ Reconciliation
 
 # 231. HC-OPS-01A — CaseKit Draft & Contents
 
-**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+**Estado:** COMPLETE / MERGED — PR #50 — `main@bb530e8` — Actual 27-sep-2026.
 
-HC-OPS-01A implementará el primer slice visible de Maletín. Su alcance termina en
+HC-OPS-01A implementa el primer slice visible de Maletín. Su alcance termina en
 la creación de un único CaseKit lógico `DRAFT` por HealthcareCase y el agregado de
 contenido ya vinculado al Case. No confirma preparación ni produce hechos físicos.
 
@@ -3383,3 +3383,32 @@ Custody, Return, Inspection y Reconciliation. No bloquean 01A porque ninguno es
 necesario para Create/Add/Read del borrador aprobado.
 
 No se asignan SP, Forecast ni Commitment.
+
+## 231.15 Cierre técnico
+
+HC-OPS-01A quedó COMPLETE / MERGED mediante PR #50 sobre `main@bb530e8`, con
+Actual 27-sep-2026.
+
+Evidencia acreditada:
+
+- API focal/regression: 382/382 PASS;
+- Web focal: 26/26 PASS;
+- Prisma validate: PASS;
+- TypeScript API/Web: PASS;
+- ESLint API/Web: PASS;
+- API build y Next.js build: PASS;
+- CI API/Web: PASS.
+
+Validación manual acreditada para MANAGER: creación de CaseKit, estado `DRAFT`,
+banner de no reservación, agregado de Requirement `QUANTITY`, agregado de Equipment
+Assignment `RESERVED` y render correcto de las secciones Materials/Equipment. No se
+registra validación manual de SALES.
+
+El cierre conserva estrictamente Create/Get/Add y `DRAFT` only. No incorpora
+Update/Remove Item, `InventoryMovement`, reserva o decremento de stock,
+Dispatch/Custody/Return/Inspection ni otros efectos físicos.
+
+## 231.16 Siguiente candidato
+
+**HC-OPS-01B — Preparation Confirmation & Readiness** queda como candidato
+**PENDING REFINEMENT / NOT READY**, sin SP, Forecast ni Commitment.
