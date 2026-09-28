@@ -21,6 +21,7 @@ import { HealthcareDoctorsModule } from './healthcare/doctors/healthcare-doctors
 import { HealthcareHospitalsModule } from './healthcare/hospitals/healthcare-hospitals.module';
 import { HealthcareRequirementsModule } from './healthcare/requirements/healthcare-requirements.module';
 import { HealthcareEquipmentAssignmentsModule } from './healthcare/equipment-assignments/healthcare-equipment-assignments.module';
+import { HealthcareCaseKitsModule } from './healthcare/case-kits/healthcare-case-kits.module';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { validateEnvironment } from './config/env.validation';
@@ -55,6 +56,7 @@ import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/c
     HealthcareHospitalsModule,
     HealthcareRequirementsModule,
     HealthcareEquipmentAssignmentsModule,
+    HealthcareCaseKitsModule,
   ],
 })
 export class AppModule {}

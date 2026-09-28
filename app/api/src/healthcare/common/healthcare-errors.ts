@@ -45,6 +45,17 @@ export const HEALTHCARE_ERROR_CODES = {
   invalidConflictReviewConfirmation: 'INVALID_CONFLICT_REVIEW_CONFIRMATION',
   conflictOverrideReasonRequired: 'CONFLICT_OVERRIDE_REASON_REQUIRED',
   idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
+  idempotencyKeyRequired: 'IDEMPOTENCY_KEY_REQUIRED',
+  invalidIdempotencyKey: 'INVALID_IDEMPOTENCY_KEY',
+  caseKitNotFound: 'CASE_KIT_NOT_FOUND',
+  caseKitSourceNotFound: 'CASE_KIT_SOURCE_NOT_FOUND',
+  caseKitAlreadyExists: 'CASE_KIT_ALREADY_EXISTS',
+  caseKitNotMutable: 'CASE_KIT_NOT_MUTABLE',
+  caseNotEligible: 'CASE_NOT_ELIGIBLE',
+  invalidCaseKitSource: 'INVALID_CASE_KIT_SOURCE',
+  caseKitItemAlreadyExists: 'CASE_KIT_ITEM_ALREADY_EXISTS',
+  invalidPreparedQuantity: 'INVALID_PREPARED_QUANTITY',
+  caseKitSourceNotEligible: 'CASE_KIT_SOURCE_NOT_ELIGIBLE',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
   concurrencyTimeout: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
@@ -320,6 +331,83 @@ export function idempotencyKeyReusedException(): ConflictException {
   );
 }
 
+export function idempotencyKeyRequiredException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.idempotencyKeyRequired,
+    'Se requiere el header Idempotency-Key',
+  );
+}
+
+export function invalidIdempotencyKeyException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.invalidIdempotencyKey,
+    'La clave Idempotency-Key no es válida',
+  );
+}
+
+export function caseKitNotFoundException(): NotFoundException {
+  return healthcareNotFoundWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitNotFound,
+    'Maletín no encontrado',
+  );
+}
+
+export function caseKitSourceNotFoundException(): NotFoundException {
+  return healthcareNotFoundWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitSourceNotFound,
+    'Fuente del maletín no encontrada',
+  );
+}
+
+export function caseKitAlreadyExistsException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitAlreadyExists,
+    'El caso ya tiene un maletín',
+  );
+}
+
+export function caseKitNotMutableException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitNotMutable,
+    'El maletín ya no admite cambios',
+  );
+}
+
+export function caseNotEligibleException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseNotEligible,
+    'El caso no es elegible para esta operación',
+  );
+}
+
+export function invalidCaseKitSourceException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.invalidCaseKitSource,
+    'La fuente del contenido no es válida',
+  );
+}
+
+export function caseKitItemAlreadyExistsException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitItemAlreadyExists,
+    'La fuente ya pertenece al maletín',
+  );
+}
+
+export function invalidPreparedQuantityException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.invalidPreparedQuantity,
+    'La cantidad preparada no es válida',
+  );
+}
+
+export function caseKitSourceNotEligibleException(): ConflictException {
+  return healthcareConflictWithCode(
+    HEALTHCARE_ERROR_CODES.caseKitSourceNotEligible,
+    'La fuente ya no es elegible para el maletín',
+  );
+}
+
 export function resourceStateChangedException(): ConflictException {
   return new ConflictException({
     statusCode: HttpStatus.CONFLICT,
@@ -414,6 +502,42 @@ function equipmentAssignmentConflictException(
     | typeof HEALTHCARE_ERROR_CODES.requirementOverCoverage
     | typeof HEALTHCARE_ERROR_CODES.assignmentAlreadyReserved
     | typeof HEALTHCARE_ERROR_CODES.idempotencyKeyReused,
+  message: string,
+): ConflictException {
+  return new ConflictException({
+    statusCode: HttpStatus.CONFLICT,
+    error: 'Conflict',
+    code,
+    message,
+  });
+}
+
+function healthcareBadRequestException(
+  code: string,
+  message: string,
+): BadRequestException {
+  return new BadRequestException({
+    statusCode: HttpStatus.BAD_REQUEST,
+    error: 'Bad Request',
+    code,
+    message,
+  });
+}
+
+function healthcareNotFoundWithCode(
+  code: string,
+  message: string,
+): NotFoundException {
+  return new NotFoundException({
+    statusCode: HttpStatus.NOT_FOUND,
+    error: 'Not Found',
+    code,
+    message,
+  });
+}
+
+function healthcareConflictWithCode(
+  code: string,
   message: string,
 ): ConflictException {
   return new ConflictException({
