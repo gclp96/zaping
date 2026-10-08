@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
 Última actualización: 2026-10-08
 Responsable: Zaping Team
 
@@ -198,7 +198,7 @@ HC-OPS-01B — Preparation Confirmation & Readiness
         → COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED
+        → OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
         → CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
@@ -2310,7 +2310,7 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
-→ HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED
+→ HC-NEXT-03C5-B Integrated Backend Validation — OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
@@ -2549,7 +2549,7 @@ Healthcare Equipment Assignment implementation
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DOR COMPLETE
-→ C5-B PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
+→ C5-B OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2991,7 +2991,7 @@ Sprint 1:
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED
+Estado: OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
 
 Estimación total: 16 SP. Los SP expresan complejidad relativa y no se convierten
 en horas ni Commitment.
@@ -3053,7 +3053,7 @@ se conservan; B1 registra a continuación la aceptación adicional de List/Detai
 
 ##### C5-B1 — List/Detail HTTP Readback — 5 SP
 
-Estado: COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS
+Estado: COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS
 
 DoR: COMPLETE. Refinamiento aprobado sobre main@1be994d. Suite focal
 `app/api/test/healthcare-equipment-assignments.c5b-list-detail.postgres.e2e-spec.ts`
@@ -3074,29 +3074,50 @@ pendientes según la evidencia aceptada. Checklist y comando en
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.2](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34522-b1--listdetail-http-readback--5-sp).
 Este cierre usa la evidencia aportada, no reejecuta PostgreSQL ni tests.
 
-B2 es NEXT / BLOCKED UNTIL B1 MERGED / NOT IMPLEMENTED; B3 permanece pendiente
-y C5-B abierto. Fuera de B1: B2/B3, INSERT de ConflictOverride salvo selección
-explícita por B2, formato histórico y output/tmp. Siguiente acción: revisión
-humana final del diff antes de staging; B1 y documentación UNCOMMITTED.
+B1 está MERGED mediante PR #58 en main@9504cdd. Su alcance y evidencia
+se conservan; la aceptación de Create se registra a continuación.
 
 ##### C5-B2 — Create HTTP/JWT — 5 SP
 
-Estado: NEXT / BLOCKED UNTIL B1 MERGED / NOT IMPLEMENTED
+Estado: COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS
 
-DoR: B0 MERGED, B1 MERGED y DEC-C5B-02 aceptada; merge de B1 pendiente.
-AC: ADMIN/MANAGER/WAREHOUSE 201; SALES 403;
-401 sin JWT válido; Company A/B y foreign igual a missing; Assignment/claim
-persistidos atómicamente; wrapper público `outcome/data`; error HTTP representativo
-sanitizado sin afirmar concurrencia PostgreSQL real. DoD: E2E focales PASS,
-rechazos zero-write y cleanup propio acreditado. Riesgos: confundir evidencia
-compuesta con una prueba PG+JWT del mismo fallo o duplicar idempotencia/locks de
-HC-LOCK-04.
+DoR: COMPLETE. Refinamiento sobre main@9504cdd; B0/B1 MERGED. Suite focal
+`app/api/test/healthcare-equipment-assignments.c5b-create.postgres.e2e-spec.ts`
+reutiliza B0 sin cambios ni harness paralelo. POST real con JWT y transacción
+PostgreSQL: ADMIN/MANAGER/WAREHOUSE 201, SALES 403, sin JWT 401; REQUIREMENT y
+DIRECT, relaciones/auditoría, JSON outcome/data exacto, tenant A/B y foreign igual
+a missing. Rechazos de compatibilidad no dejan Assignment/claim. Idempotencia:
+primer éxito/claim finalizado, replay 201 sin duplicados, request distinto 409
+y key aislada por Company. Availability completa, propia incompleta y relacionada
+incompleta; solapamiento devuelve review 200 con fingerprint dinámico sin writes.
+
+DEC-C5B-02: fallo Prisma INYECTADO en completeIdempotencyClaim con HTTP/JWT y
+transacción reales; 500 sanitizado, rollback, spy restaurado en finally y retry
+con la misma key 201. No es evidencia de fallo nativo PostgreSQL. Product/stock,
+Assets y Assignments preexistentes sin cambios por readback permitido; no se
+afirma readback directo Inventory/Purchases/Sales. Sin cambios productivos,
+Prisma/schema/migraciones, Web o ACL. Confirmación persistida ConflictOverride
+DEFERRED / NOT APPLICABLE TO B2; INSERT sigue prohibido.
+
+DoD: PASS. Estática focal/disabled mode/diff/scope PASS aceptados. Runtime:
+1 suite / 1 test PASS, 0 snapshots, exit 0, ~8 s (~7.5 s de escenario), PG16;
+cleanup/zero-residue B0 PASS. Sin HIGH/BLOCKER pendientes en evidencia aceptada.
+Checklist y comando en
+[EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34523-b2--create-httpjwt--5-sp).
+Este cierre es documental, sin reejecución de DB/tests ni cambios a la suite.
+
+B3 NEXT / BLOCKED UNTIL B2 MERGED; C5-B OPEN. Pendientes: decisión explícita de
+B3 sobre aceptación persistida ConflictOverride y posible INSERT mínimo, gate
+B0/B1/B2 y cierre C5-B. Formato histórico y output/tmp fuera. Siguiente acción:
+revisión humana final del diff antes de staging; B2/documentación UNCOMMITTED.
 
 ##### C5-B3 — Integrated Gate & Closeout — 3 SP
 
-Estado: PLANNED / BLOCKED BY B1+B2 / NOT IMPLEMENTED
+Estado: NEXT / BLOCKED UNTIL B2 MERGED / NOT IMPLEMENTED
 
-DoR: B1 y B2 verdes. AC: nueva matriz C5-B, regresiones focales C1–C4 y full API
+DoR: B1 y B2 verdes y B2 MERGED (merge pendiente). B3 debe decidir explícitamente
+si añade aceptación persistida ConflictOverride antes de cerrar C5-B.
+AC: nueva matriz C5-B, regresiones focales C1–C4 y full API
 sin reejecutar HC-LOCK-04 por defecto. DoD: Prisma validate/generate, lint,
 typecheck, build y `git diff --check` verdes; reporte de selected/skipped/no
 ejecutados, identidad no sensible y cleanup propio. Riesgos: flakiness no explicada
@@ -3377,8 +3398,8 @@ PASS. Checklist y alcance preciso de cada evidencia en
 [CASE_KITS, secciones 233.14–233.15](../modules/healthcare/CASE_KITS.md).
 No quedan findings HIGH/BLOCKER de 01B. COMPLETE significa terminado y validado;
 quedó MERGED mediante PR #56 en main@478e0f0; no se declara deployment. M-HC1 continúa abierto.
-Siguiente trabajo registrado: HC-NEXT-03C5-B2 Create HTTP/JWT Acceptance,
-NEXT / BLOCKED UNTIL B1 MERGED; B0 está MERGED y B1 validado con DoD PASS. No se modifican SP, Forecast, Commitment ni fechas de
+Siguiente trabajo registrado: HC-NEXT-03C5-B3 Integrated Gate & Closeout,
+NEXT / BLOCKED UNTIL B2 MERGED; B0/B1 están MERGED y B2 validado con DoD PASS. No se modifican SP, Forecast, Commitment ni fechas de
 sprint.
 
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,
