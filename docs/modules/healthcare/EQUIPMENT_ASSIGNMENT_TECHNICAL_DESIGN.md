@@ -12,7 +12,7 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED
 **Última actualización:** 2026-10-08
 **Responsable:** Zaping Healthcare Team
 
@@ -1903,13 +1903,13 @@ comprueba al inicio, pero no está garantizada durante toda la ejecución.
 **Sprint 1:** 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
 velocidad o Commitment. C5-A se completó el 24-sep, C6-A/C6-B/C6-C/C6-D el
 25-sep y C6-E el 27-sep mediante PR #47 en `main@a1f0fee`. El Forecast del trabajo
-restante permanece pendiente. B0 conserva sus 3 SP dentro de C5-B: COMPLETE /
-VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS. B1 es NEXT / BLOCKED
-UNTIL B0 MERGED; no se añade Commitment.
+restante permanece pendiente. B0 conserva sus 3 SP y está COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS.
+B1 conserva sus 5 SP: COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS.
+B2 es NEXT / BLOCKED UNTIL B1 MERGED; no se añade Commitment.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
-**Estado:** PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED.
+**Estado:** PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED.
 
 **Slicing y estimación:** B0 Safe Integrated Harness, 3 SP; B1 List/Detail HTTP
 Readback, 5 SP; B2 Create HTTP/JWT, 5 SP; B3 Integrated Gate & Closeout, 3 SP.
@@ -1924,7 +1924,7 @@ Replace, Manual Release y Parent Integrations se reutilizan sin rediseño.
 
 #### 34.5.2.1 B0 — Safe Integrated Harness — 3 SP
 
-**DoR: COMPLETE. Estado:** COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS.
+**DoR: COMPLETE. Estado:** COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS.
 Refinamiento aprobado el 08-oct-2026 sobre `main@478e0f0` (HC-OPS-01B,
 PR #56). DEC-C5B-01/02/03 aprobadas; provisioning y ejecución posteriores
 aceptados en el checkpoint de cierre.
@@ -2060,23 +2060,99 @@ aceptada; no quedan findings HIGH/BLOCKER abiertos.
 | Findings HIGH/BLOCKER | PASS | Ninguno pendiente según el checkpoint aceptado. |
 | Cambios productivos, schema/migraciones, Web | NOT APPLICABLE | B0 es infraestructura de tests; no requeridos para su DoD. |
 
-**Próximo ticket:** HC-NEXT-03C5-B1 — List/Detail HTTP Readback — NEXT / BLOCKED
-UNTIL B0 MERGED / NOT IMPLEMENTED. B2/B3 siguen NOT IMPLEMENTED; C5-B y M-HC1
-permanecen abiertos. Fuera de B0: matrices B1/B2, gate B3, INSERT de
-ConflictOverride salvo selección explícita posterior por B2, formato histórico,
-output/ y tmp/. Siguiente acción: revisión humana del diff antes de staging.
+B0 quedó MERGED mediante PR #57 en main@1be994d. Su smoke conserva
+su alcance original; la aceptación List/Detail se registra a continuación.
 
 #### 34.5.2.2 B1 — List/Detail HTTP Readback — 5 SP
 
-**Estado:** NEXT / BLOCKED UNTIL B0 MERGED / NOT IMPLEMENTED. **AC:** JWT real para cuatro
-roles, Company A/B, filtros/paginación, históricos, foreign igual a missing,
-respuesta pública y DEC-C5B-03. **DoD:** E2E PG/HTTP focales verdes, readback
-persistido, lecturas zero-write y cleanup acreditado. **Riesgos:** combinatoria y
-orden/paginación frágiles.
+**DoR: COMPLETE. Estado:** COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS.
+Refinamiento aprobado sobre main@1be994d; implementación en
+`app/api/test/healthcare-equipment-assignments.c5b-list-detail.postgres.e2e-spec.ts`.
+Reutiliza `withC5bHarness`, su cliente Prisma, app Nest, owners, token y
+`checkBoundary()`; no añade un harness paralelo ni modifica el helper B0.
+
+**Contrato final:** List y Detail HTTP sobre persistencia PostgreSQL con
+JwtStrategy/JwtAuthGuard/RolesGuard reales, ValidationPipe y controller/service/
+repository de producción. ADMIN/MANAGER/SALES/WAREHOUSE acceden con JWT real;
+sin autenticación, ambos endpoints devuelven 401. Company A/B quedan aisladas;
+foreign y missing comparten 404 público en Detail y filtros Case/Requirement/Asset.
+List acredita defaults RESERVED, status/origin, filtros individuales y combinados,
+orden createdAt DESC/id ASC con empate, paginación, vacío, página fuera de rango
+y validación 400. Detail acredita UUID inválido y los tres estados, incluidos
+RELEASED/REPLACED con auditoría y availability=null. Comparaciones completas del
+JSON validan actors, asset/product, release/replacement, availability y
+conflictOverrides=[] sin campos privados ni relaciones crudas.
+
+**DEC-C5B-03:** Dynamic A pasa de fullyVerifiable=false/conflictFree=null y
+INCOMPLETE_CASE_SCHEDULE a true/true/warnings=[] tras completar directamente
+el horario persistido de C1. Dynamic B reprograma sólo C1 desde ventanas sin
+solapamiento hasta true/false/CURRENT_ASSIGNMENT_CONFLICT, sin
+CONFLICT_OVERRIDE_CONFIRMED ni RELATED_RESERVATION_SCHEDULE_INCOMPLETE.
+List y Detail recalculan en ambos casos. Las únicas dos mutaciones de horario
+afectan scheduledStart, scheduledEnd y updatedAt; los Assignments conservan todos
+sus campos persistidos, relaciones, auditoría y timestamps antes/después de las
+fases HTTP y las mutaciones. No se invocan Case Update, Create, Release ni Replace.
+
+**Límites:** sin cambios productivos, Prisma/schema/migraciones, Web o ACL.
+Sin fixtures Settings, ConflictOverride o IdempotencyRecord. Ownership, cleanup
+y prueba independiente de cero residuos reutilizan B0 sin ampliar permisos.
+La prueba acredita estado persistido de Assignments sin cambios; no constituye
+un nuevo gate de concurrencia ni cierra C5-B.
+
+**Evidencia aceptada de cierre:** TypeScript focal/noEmit, ESLint/Prettier de la
+suite, disabled-mode seguro, git diff --check y scope PASS antes del runtime.
+Desde app/api se ejecutó:
+
+```text
+npx jest --config ./test/jest-e2e.json --runInBand test/healthcare-equipment-assignments.c5b-list-detail.postgres.e2e-spec.ts
+```
+
+Resultado aportado y aceptado: 1 suite / 1 test passed; 0 snapshots; ~24 s total,
+~23.4 s de escenario. PostgreSQL 16, base zaping_spike_test, rol dedicado
+zaping_hc_c5b y cliente B0 controlado; cleanup y zero-residue PASS. La evidencia
+corresponde a un escenario integrado con múltiples aserciones, no a tests
+independientes por celda. Este cierre sólo actualiza documentación: no reejecuta
+PostgreSQL ni tests, y no registra secretos ni URL de conexión.
+
+**DoD final B1: PASS.**
+
+| Criterio | Resultado | Evidencia |
+| --- | --- | --- |
+| Refinamiento aprobado | PASS | Baseline main@1be994d y scope B1 aprobado. |
+| Implementación completa | PASS | Suite focal preservada; matriz integrada 1/1 PASS. |
+| B0 reutilizado / sin harness paralelo | PASS | withC5bHarness y contexto compartido; helper sin cambios. |
+| Sin cambios productivos | PASS | Sólo suite de aceptación y documentación. |
+| Sin Prisma/schema/migraciones | PASS | Ningún cambio requerido. |
+| Sin delta ACL | PASS | Manifest B0 intacto; horario usa tres columnas ya autorizadas. |
+| JWT real | PASS | Estrategia y guards reales sobre usuarios persistidos. |
+| Autorización de cuatro roles | PASS | List/Detail 200 para ADMIN/MANAGER/SALES/WAREHOUSE. |
+| Sin autenticación | PASS | List/Detail 401. |
+| Tenant isolation | PASS | Fixtures A/B y lecturas propias separadas. |
+| Foreign igual a missing | PASS | Detail y tres filtros de relación: mismo 404 público. |
+| Filtros List | PASS | Status/origin/Case/Requirement/Asset y combinación. |
+| Paginación/orden | PASS | Empate createdAt, id ASC, páginas, vacío y fuera de rango. |
+| Detail | PASS | Propio RESERVED y UUID inválido 400. |
+| JSON público | PASS | Igualdad completa de mapping y objetos anidados. |
+| Históricos | PASS | RELEASED/REPLACED, auditoría pública y availability=null. |
+| Dynamic A | PASS | Horario incompleto a verificable/sin conflicto por ambos GET. |
+| Dynamic B | PASS | Reprogramación a conflicto actual por ambos GET. |
+| Assignments sin mutación | PASS | Comparación completa de filas antes/después de fases y updates Case. |
+| Cleanup | PASS | Teardown B0 acreditado en el runtime aceptado. |
+| Cero residuos | PASS | Readback independiente de fixtures propios B0. |
+| Validación estática | PASS | TypeScript, ESLint, Prettier, disabled mode y scope/diff aceptados. |
+| PostgreSQL/HTTP real | PASS | Suite focal 1/1, escenario 1/1; PG16 y JWT real. |
+| Documentación sincronizada | PASS | Diseño, board y roadmap del cierre B1. |
+| Findings HIGH/BLOCKER pendientes | PASS | Ninguno comunicado en la evidencia aceptada ni identificado en este cierre. |
+
+**Próximo ticket:** HC-NEXT-03C5-B2 — Create HTTP/JWT Acceptance — NEXT /
+BLOCKED UNTIL B1 MERGED / NOT IMPLEMENTED. B3 pendiente; C5-B y M-HC1 abiertos.
+Fuera de B1: B2/B3, INSERT de ConflictOverride salvo selección explícita por B2,
+formato histórico y output/tmp. Siguiente acción: revisión humana final del diff
+antes de staging. B1 y su documentación permanecen UNCOMMITTED.
 
 #### 34.5.2.3 B2 — Create HTTP/JWT — 5 SP
 
-**Estado:** PLANNED / BLOCKED BY B0 / NOT IMPLEMENTED. **AC:** 201 para
+**Estado:** NEXT / BLOCKED UNTIL B1 MERGED / NOT IMPLEMENTED. **AC:** 201 para
 ADMIN/MANAGER/WAREHOUSE, 403 SALES, 401 sin JWT válido, tenant/foreign=missing,
 Assignment y claim atómicos, wrapper público `outcome/data` y DEC-C5B-02. **DoD:**
 E2E focales verdes, rechazos zero-write y cleanup acreditado. **Riesgos:**
@@ -2628,5 +2704,5 @@ Equipment Assignment implementation
 → C6-D REPLACE ASSIGNMENT UI COMPLETE / MERGED — PR #45 — main@99efc5a — ACTUAL 25-sep-2026
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee — ACTUAL 27-sep-2026
 → SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
-→ C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
+→ C5-B PLANNED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B2/B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```
