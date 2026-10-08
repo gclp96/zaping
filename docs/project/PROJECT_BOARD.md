@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-Última actualización: 2026-09-28
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Última actualización: 2026-10-07
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -195,7 +195,7 @@ HC-OPS-01A.1 — Draft Item Exclusion
         → COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B — Preparation Confirmation & Readiness
-        → CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
+        → COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
         → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
@@ -2309,7 +2309,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B Preparation Confirmation & Readiness — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
+→ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -2548,7 +2548,7 @@ Healthcare Equipment Assignment implementation
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DOR COMPLETE
+→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DOR COMPLETE
 → C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
@@ -3322,7 +3322,7 @@ Forecast ni Commitment.
 
 #### HC-OPS-01B — Preparation Confirmation & Readiness
 
-Estado: CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE.
+Estado: COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE.
 
 Prerequisito satisfecho: HC-OPS-01A.1 está COMPLETE / MERGED y resolvió el blocker
 de corrección de items stale.
@@ -3348,6 +3348,11 @@ Replay por key o estado preserva auditoría; key reutilizada para otro Kit retor
 `IDEMPOTENCY_KEY_REUSED`/409. La primera transición usa Company-first, revalidación
 y atomicidad de status/auditoría/claim.
 
+La frontera de confirmación bloquea además Product y EquipmentAsset de fuentes
+ACTIVE, en orden determinista tenant-safe, y relee el Kit antes de decidir la
+transición. Web vuelve a consultar Case/Kit tras conflictos de readiness/estado,
+conserva el error y oculta readiness anterior si falla el refresh.
+
 Invalidaciones posteriores por Requirement retire, Assignment release/replace o
 Case cancel conservan `PREPARED` y auditoría, pero recalculan readiness `BLOCKED`;
 no reparan ni reemplazan fuentes. ADMIN/MANAGER/WAREHOUSE confirman; SALES es
@@ -3357,6 +3362,17 @@ badge/auditoría e inmutabilidad, sin controles de Dispatch.
 AC/DoD: cubrir reglas de readiness, tenant/RBAC, replay, colisión, rollback,
 conditional update, invalidaciones posteriores, UI y ausencia de writes físicos;
 schema/gates API/Web/PostgreSQL y validación manual aplicables deben pasar.
+
+DoD final: PASS. Evidencia aceptada: API unit 69/69, HTTP/JWT 9/9, Web 20/20,
+PostgreSQL integrado 52/52 en `zaping_spike_test` PostgreSQL 16; Prisma
+validate/generate, typecheck/lint focal, formato delta, builds API/Web y QA manual
+PASS. Checklist y alcance preciso de cada evidencia en
+[CASE_KITS, secciones 233.14–233.15](../modules/healthcare/CASE_KITS.md).
+No quedan findings HIGH/BLOCKER de 01B. COMPLETE significa terminado y validado;
+permanece UNCOMMITTED, sin PR/merge/deployment declarado. M-HC1 continúa abierto.
+Siguiente trabajo registrado: HC-NEXT-03C5-B, primero B0 Safe Integrated Harness,
+que conserva NOT READY. No se modifican SP, Forecast, Commitment ni fechas de
+sprint.
 
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,
 reserva física, Inventory Movement, Dispatch/Custody/Return y arquitectura no

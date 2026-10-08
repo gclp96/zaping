@@ -54,3 +54,13 @@ export function createHealthcareCaseKitItemExclusionRequestHash(
     reason,
   });
 }
+
+export function createHealthcareCaseKitPreparationRequestHash(
+  caseKitId: string,
+): string {
+  return hash({
+    version: 1,
+    command: 'HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION',
+    caseKitId,
+  });
+}

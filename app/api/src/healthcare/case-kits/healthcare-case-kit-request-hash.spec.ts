@@ -4,6 +4,7 @@ import { HealthcareCaseKitItemSourceType } from './dto/add-healthcare-case-kit-i
 import {
   createHealthcareCaseKitItemExclusionRequestHash,
   createHealthcareCaseKitItemRequestHash,
+  createHealthcareCaseKitPreparationRequestHash,
   createHealthcareCaseKitRequestHash,
 } from './healthcare-case-kit-request-hash';
 
@@ -56,6 +57,15 @@ describe('Healthcare CaseKit request hashes', () => {
         'other-item',
         'Motivo normalizado',
       ),
+    );
+  });
+
+  it('scopes Confirm Preparation to the CaseKit', () => {
+    expect(createHealthcareCaseKitPreparationRequestHash('kit-a')).toBe(
+      createHealthcareCaseKitPreparationRequestHash('kit-a'),
+    );
+    expect(createHealthcareCaseKitPreparationRequestHash('kit-a')).not.toBe(
+      createHealthcareCaseKitPreparationRequestHash('kit-b'),
     );
   });
 });

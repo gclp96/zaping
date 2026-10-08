@@ -7,7 +7,10 @@ import {
 import { Test } from '@nestjs/testing';
 import {
   EquipmentCondition,
+  EquipmentLifecycle,
+  EquipmentRetirementReason,
   HealthcareCaseKitItemLifecycle,
+  HealthcareCaseKitStatus,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
@@ -45,6 +48,9 @@ import { HealthcareRequirementsController } from '../src/healthcare/requirements
 import { HealthcareRequirementsService } from '../src/healthcare/requirements/healthcare-requirements.service';
 import { NoopRequirementOperationalEvidencePolicy } from '../src/healthcare/requirements/requirement-operational-evidence-policy';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ProductsService } from '../src/products/products.service';
+import { EquipmentService } from '../src/equipment/equipment.service';
+import { EquipmentAssetCodeService } from '../src/equipment/equipment-asset-code.service';
 
 jest.setTimeout(30_000);
 
@@ -74,6 +80,70 @@ const requiredTables = [
   'IdempotencyRecord',
   'HealthcareCaseKit',
   'HealthcareCaseKitItem',
+  'InventoryBatch',
+  'InventoryMovement',
+] as const;
+
+// Setup/service inserts; every entry is also deleted by run-owned cleanup.
+const requiredFixtureInsertTables = [
+  'Company',
+  'User',
+  'Product',
+  'HealthcareCase',
+  'HealthcareCaseRequirement',
+  'EquipmentAsset',
+  'HealthcareEquipmentAssignment',
+  'HealthcareEquipmentAssignmentConflictOverride',
+  'IdempotencyRecord',
+] as const;
+
+// Settings and coverage notes are read/cleaned up, but never inserted here.
+const requiredFixtureReadDeleteTables = [
+  ...requiredFixtureInsertTables,
+  'HealthcareEquipmentRequirementCoverageNote',
+  'HealthcareEquipmentAssignmentSettings',
+] as const;
+
+const requiredSuiteUpdateColumns = {
+  Product: ['isActive', 'updatedAt'],
+  EquipmentAsset: [
+    'lifecycle',
+    'retiredAt',
+    'retiredById',
+    'retiredReason',
+    'retirementNotes',
+    'updatedAt',
+  ],
+  IdempotencyRecord: ['resourceId', 'updatedAt'],
+  HealthcareCaseRequirement: [
+    'requestedQty',
+    'lifecycle',
+    'retiredAt',
+    'retiredById',
+    'retirementReason',
+    'reactivatedAt',
+    'reactivatedById',
+    'sortOrder',
+    'updatedAt',
+  ],
+  HealthcareEquipmentAssignment: [
+    'lifecycle',
+    'releasedAt',
+    'releasedById',
+    'releaseCause',
+    'releaseReason',
+    'replacedAt',
+    'replacedById',
+    'replacementReason',
+    'updatedAt',
+  ],
+} as const;
+
+// Assertion projection plus predicate columns; no inventory DML is needed.
+const requiredInventoryMovementSelectColumns = [
+  'id',
+  'companyId',
+  'productId',
 ] as const;
 
 const requiredRowLockPrivileges = [
@@ -101,6 +171,14 @@ const requiredCaseKitItemUpdateColumns = [
   'excludedById',
   'excludedAt',
   'exclusionReason',
+] as const;
+
+const requiredCaseKitUpdateColumns = [
+  'id',
+  'status',
+  'preparedById',
+  'preparedAt',
+  'updatedAt',
 ] as const;
 
 const requiredCaseKitTypes = [
@@ -284,6 +362,8 @@ describePostgreSql(
       }
 
       await assertExpectedSchema(setupPrisma);
+      await assertNonAdministrativeRole(setupPrisma);
+      await assertRequiredSuitePrivileges(setupPrisma);
       await assertRequiredRowLockPrivileges(setupPrisma);
       await assertRequiredCaseCancelUpdatePrivileges(setupPrisma);
       await assertRequiredCaseKitPrivileges(setupPrisma);
@@ -582,6 +662,43 @@ describePostgreSql(
         scenario.userId,
         kit.data.id,
         trackKey('case-kit-item-add'),
+        {
+          sourceType: HealthcareCaseKitItemSourceType.REQUIREMENT,
+          requirementId: scenario.requirementIds[0],
+          preparedQuantity: 1,
+        },
+      );
+
+      return {
+        scenario,
+        caseKitId: kit.data.id,
+        itemId: item.data.id,
+      };
+    }
+
+    async function createReadyCaseKitFixture(
+      service = caseKitServiceA,
+    ): Promise<CaseKitFixture> {
+      const scenario = await createScenario(companyAId, {
+        requestedQty: 1,
+        assetCount: 0,
+        inventoryTracking: ProductInventoryTracking.QUANTITY,
+      });
+      await setupPrisma.healthcareCase.update({
+        where: { id: scenario.caseId },
+        data: { status: HealthcareCaseStatus.SCHEDULED },
+      });
+      const kit = await service.create(
+        scenario.companyId,
+        scenario.userId,
+        scenario.caseId,
+        trackKey('case-kit-ready-create'),
+      );
+      const item = await service.addItem(
+        scenario.companyId,
+        scenario.userId,
+        kit.data.id,
+        trackKey('case-kit-ready-item-add'),
         {
           sourceType: HealthcareCaseKitItemSourceType.REQUIREMENT,
           requirementId: scenario.requirementIds[0],
@@ -3965,6 +4082,532 @@ describePostgreSql(
       });
     });
 
+    describe('HC-OPS-01B CaseKit preparation confirmation', () => {
+      async function createSourceRaceFixture(source: 'product' | 'equipment') {
+        if (source === 'product') return createReadyCaseKitFixture();
+        const scenario = await createScenario(companyAId, {
+          requestedQty: 1,
+          assetCount: 1,
+        });
+        await setupPrisma.healthcareCase.update({
+          where: { id: scenario.caseId },
+          data: { status: HealthcareCaseStatus.SCHEDULED },
+        });
+        const assignment = await createRequirementSource(
+          scenario,
+          scenario.equipmentAssetIds[0],
+        );
+        const kit = await caseKitServiceA.create(
+          scenario.companyId,
+          scenario.userId,
+          scenario.caseId,
+          trackKey('case-kit-asset-race-create'),
+        );
+        const item = await caseKitServiceA.addItem(
+          scenario.companyId,
+          scenario.userId,
+          kit.data.id,
+          trackKey('case-kit-asset-race-add'),
+          {
+            sourceType: HealthcareCaseKitItemSourceType.EQUIPMENT_ASSIGNMENT,
+            equipmentAssignmentId: assignment.id,
+          },
+        );
+        return { scenario, caseKitId: kit.data.id, itemId: item.data.id };
+      }
+
+      function invalidateSource(
+        source: 'product' | 'equipment',
+        scenario: Scenario,
+      ): Promise<unknown> {
+        if (source === 'product') {
+          return new ProductsService(requirementPrisma).remove(
+            scenario.companyId,
+            scenario.productIds[0],
+          );
+        }
+        const unusedCodes = {
+          allocateNextAvailableAssetCode: () => {
+            throw new Error('Asset allocation is outside the retirement race.');
+          },
+        } as unknown as EquipmentAssetCodeService;
+        return new EquipmentService(requirementPrisma, unusedCodes).retire(
+          scenario.companyId,
+          scenario.userId,
+          scenario.equipmentAssetIds[0],
+          {
+            retiredReason: EquipmentRetirementReason.OTHER,
+            retirementNotes: 'HC-OPS-01B readiness source race',
+          },
+        );
+      }
+
+      async function physicalState(scenario: Scenario) {
+        return Promise.all([
+          setupPrisma.product.findMany({
+            where: {
+              companyId: scenario.companyId,
+              id: { in: scenario.productIds },
+            },
+            select: { id: true, stock: true },
+            orderBy: { id: 'asc' },
+          }),
+          setupPrisma.inventoryBatch.findMany({
+            where: {
+              companyId: scenario.companyId,
+              productId: { in: scenario.productIds },
+            },
+            select: { id: true, availableQuantity: true },
+            orderBy: { id: 'asc' },
+          }),
+          setupPrisma.inventoryMovement.findMany({
+            where: {
+              companyId: scenario.companyId,
+              productId: { in: scenario.productIds },
+            },
+            select: { id: true },
+            orderBy: { id: 'asc' },
+          }),
+          setupPrisma.healthcareEquipmentAssignment.findMany({
+            where: { companyId: scenario.companyId, caseId: scenario.caseId },
+            orderBy: { id: 'asc' },
+          }),
+        ]);
+      }
+
+      it.each(['product', 'equipment'] as const)(
+        'revalidates BLOCKED when %s mutation wins after confirmation starts',
+        async (source) => {
+          const fixture = await createSourceRaceFixture(source);
+          const before = await physicalState(fixture.scenario);
+          const reachedSources = deferred<void>();
+          const allowSources = deferred<void>();
+          const original = caseKitRepositoryA.lockActiveItemProducts.bind(
+            caseKitRepositoryA,
+          ) as HealthcareCaseKitsRepository['lockActiveItemProducts'];
+          const gate = jest
+            .spyOn(caseKitRepositoryA, 'lockActiveItemProducts')
+            .mockImplementation(async (...args) => {
+              reachedSources.resolve(undefined);
+              await allowSources.promise;
+              return original(...args);
+            });
+          const key = trackKey(`case-kit-${source}-mutation-first`);
+          const confirmation = caseKitServiceA.confirmPreparation(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            key,
+          );
+          void confirmation.catch(() => undefined);
+          let mutation: Promise<unknown> | null = null;
+          try {
+            await withTimeout(
+              reachedSources.promise,
+              5_000,
+              'confirmation before source locks',
+            );
+            // The production mutation commits while confirmation holds its parent locks.
+            mutation = invalidateSource(source, fixture.scenario);
+            await withTimeout(
+              mutation,
+              OPERATION_TIMEOUT_MS,
+              'source mutation before preparation',
+            );
+            allowSources.resolve(undefined);
+            await expect(confirmation).rejects.toMatchObject({
+              response: {
+                code: 'CASE_KIT_PREPARATION_BLOCKED',
+                details: {
+                  blockers: expect.arrayContaining([
+                    expect.objectContaining({
+                      code:
+                        source === 'product'
+                          ? 'CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE'
+                          : 'CASE_KIT_EQUIPMENT_NOT_ACTIVE',
+                    }),
+                  ]) as unknown,
+                },
+              },
+            });
+            await expect(
+              setupPrisma.healthcareCaseKit.findUniqueOrThrow({
+                where: { id: fixture.caseKitId },
+                select: { status: true, preparedById: true, preparedAt: true },
+              }),
+            ).resolves.toEqual({
+              status: 'DRAFT',
+              preparedById: null,
+              preparedAt: null,
+            });
+            await expect(
+              setupPrisma.idempotencyRecord.count({
+                where: {
+                  companyId: fixture.scenario.companyId,
+                  scope:
+                    IdempotencyScope.HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION,
+                  key,
+                },
+              }),
+            ).resolves.toBe(0);
+            expect(await physicalState(fixture.scenario)).toEqual(before);
+          } finally {
+            allowSources.resolve(undefined);
+            try {
+              await withTimeout(
+                Promise.allSettled([
+                  confirmation,
+                  ...(mutation ? [mutation] : []),
+                ]),
+                CLEANUP_TIMEOUT_MS,
+                'mutation-first confirmation cleanup',
+              );
+            } finally {
+              gate.mockRestore();
+            }
+          }
+        },
+      );
+
+      it.each(['product', 'equipment'] as const)(
+        'holds %s mutation until the ready confirmation commits',
+        async (source) => {
+          const fixture = await createSourceRaceFixture(source);
+          const before = await physicalState(fixture.scenario);
+          const confirmationPid = await getBackendPid(assignmentPrisma);
+          const mutationPid = await getBackendPid(requirementPrisma);
+          const reachedTransition = deferred<void>();
+          const allowTransition = deferred<void>();
+          const original = caseKitRepositoryA.confirmPreparation.bind(
+            caseKitRepositoryA,
+          ) as HealthcareCaseKitsRepository['confirmPreparation'];
+          const gate = jest
+            .spyOn(caseKitRepositoryA, 'confirmPreparation')
+            .mockImplementation((async (
+              ...args: Parameters<typeof original>
+            ) => {
+              reachedTransition.resolve(undefined);
+              await allowTransition.promise;
+              return original(...args);
+            }) as never);
+          const confirmation = caseKitServiceA.confirmPreparation(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            trackKey(`case-kit-${source}-confirmation-first`),
+          );
+          void confirmation.catch(() => undefined);
+          let mutation: Promise<unknown> | null = null;
+          try {
+            await withTimeout(
+              reachedTransition.promise,
+              5_000,
+              'locked readiness before transition',
+            );
+            mutation = invalidateSource(source, fixture.scenario);
+            void mutation.catch(() => undefined);
+            // Observe an actual PostgreSQL wait, not elapsed time or a mocked write.
+            await waitUntilBlockedBy(
+              observerPrisma,
+              mutationPid,
+              confirmationPid,
+            );
+            await expect(
+              setupPrisma.healthcareCaseKit.findUniqueOrThrow({
+                where: { id: fixture.caseKitId },
+                select: { status: true },
+              }),
+            ).resolves.toEqual({ status: 'DRAFT' });
+            allowTransition.resolve(undefined);
+            const [prepared] = await withTimeout(
+              Promise.all([confirmation, mutation]),
+              OPERATION_TIMEOUT_MS,
+              'confirmation then source mutation',
+            );
+            expect(prepared).toMatchObject({
+              replay: false,
+              data: {
+                status: 'PREPARED',
+                preparationReadiness: { status: 'PASS', blockers: [] },
+              },
+            });
+            const after = await caseKitServiceA.get(
+              fixture.scenario.companyId,
+              fixture.scenario.caseId,
+            );
+            expect(after).toMatchObject({
+              status: 'PREPARED',
+              preparedBy: prepared.data.preparedBy,
+              preparedAt: prepared.data.preparedAt,
+              preparationReadiness: { status: 'BLOCKED' },
+            });
+            if (source === 'product') {
+              await expect(
+                setupPrisma.product.findUniqueOrThrow({
+                  where: { id: fixture.scenario.productIds[0] },
+                  select: { isActive: true },
+                }),
+              ).resolves.toEqual({ isActive: false });
+            } else {
+              await expect(
+                setupPrisma.equipmentAsset.findUniqueOrThrow({
+                  where: { id: fixture.scenario.equipmentAssetIds[0] },
+                  select: { lifecycle: true, condition: true },
+                }),
+              ).resolves.toEqual({
+                lifecycle: EquipmentLifecycle.RETIRED,
+                condition: EquipmentCondition.GOOD,
+              });
+            }
+            expect(await physicalState(fixture.scenario)).toEqual(before);
+          } finally {
+            allowTransition.resolve(undefined);
+            try {
+              await withTimeout(
+                Promise.allSettled([
+                  confirmation,
+                  ...(mutation ? [mutation] : []),
+                ]),
+                CLEANUP_TIMEOUT_MS,
+                'confirmation-first source cleanup',
+              );
+            } finally {
+              gate.mockRestore();
+            }
+          }
+        },
+      );
+
+      it('enforces the PREPARED audit constraint without changing the DRAFT Kit', async () => {
+        const fixture = await createReadyCaseKitFixture();
+
+        let constraintError: unknown;
+        try {
+          await setupPrisma.healthcareCaseKit.update({
+            where: { id: fixture.caseKitId },
+            data: { status: HealthcareCaseKitStatus.PREPARED },
+          });
+        } catch (error) {
+          constraintError = error;
+        }
+
+        expect(constraintError).toBeInstanceOf(
+          Prisma.PrismaClientUnknownRequestError,
+        );
+        const constraintMessage =
+          constraintError instanceof Error ? constraintError.message : '';
+        expect(constraintMessage).toContain('23514');
+        expect(constraintMessage).toContain(
+          'HealthcareCaseKit_preparation_audit_check',
+        );
+
+        await expect(
+          setupPrisma.healthcareCaseKit.findUniqueOrThrow({
+            where: { id: fixture.caseKitId },
+            select: { status: true, preparedById: true, preparedAt: true },
+          }),
+        ).resolves.toEqual({
+          status: HealthcareCaseKitStatus.DRAFT,
+          preparedById: null,
+          preparedAt: null,
+        });
+      });
+
+      it('serializes concurrent confirmations and preserves one winning audit and claim', async () => {
+        const fixture = await createReadyCaseKitFixture();
+        const firstPid = await getBackendPid(assignmentPrisma);
+        const secondPid = await getBackendPid(requirementPrisma);
+        const blocker = await startCaseRowBlocker(
+          blockerPrisma,
+          fixture.scenario.companyId,
+          fixture.scenario.caseId,
+        );
+        const firstKey = trackKey('case-kit-prepare-winner');
+        const secondKey = trackKey('case-kit-prepare-replay');
+        const stockBefore = await setupPrisma.product.findUniqueOrThrow({
+          where: { id: fixture.scenario.productIds[0] },
+          select: { stock: true },
+        });
+        const movementsBefore = await setupPrisma.inventoryMovement.count({
+          where: {
+            companyId: fixture.scenario.companyId,
+            productId: fixture.scenario.productIds[0],
+          },
+        });
+        let first: ReturnType<
+          HealthcareCaseKitsService['confirmPreparation']
+        > | null = null;
+        let second: ReturnType<
+          HealthcareCaseKitsService['confirmPreparation']
+        > | null = null;
+
+        try {
+          first = caseKitServiceA.confirmPreparation(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            firstKey,
+          );
+          await waitUntilBlockedBy(observerPrisma, firstPid, blocker.pid);
+          second = caseKitServiceB.confirmPreparation(
+            fixture.scenario.companyId,
+            fixture.scenario.userId,
+            fixture.caseKitId,
+            secondKey,
+          );
+          await waitUntilBlockedBy(observerPrisma, secondPid, firstPid);
+          blocker.release();
+
+          const results = await withTimeout(
+            Promise.all([first, second]),
+            OPERATION_TIMEOUT_MS,
+            'concurrent CaseKit preparation confirmations',
+          );
+          await withTimeout(
+            blocker.done,
+            OPERATION_TIMEOUT_MS,
+            'CaseKit preparation Case blocker completion',
+          );
+          expect(results.map((result) => result.replay).sort()).toEqual([
+            false,
+            true,
+          ]);
+          expect(results[0].data.preparedBy).toEqual(
+            results[1].data.preparedBy,
+          );
+          expect(results[0].data.preparedAt).toEqual(
+            results[1].data.preparedAt,
+          );
+          await expect(
+            setupPrisma.idempotencyRecord.count({
+              where: {
+                companyId: fixture.scenario.companyId,
+                scope: IdempotencyScope.HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION,
+                key: { in: [firstKey, secondKey] },
+              },
+            }),
+          ).resolves.toBe(1);
+          const persistedKit =
+            await setupPrisma.healthcareCaseKit.findUniqueOrThrow({
+              where: { id: fixture.caseKitId },
+              select: { status: true, preparedById: true, preparedAt: true },
+            });
+          expect(persistedKit).toMatchObject({
+            status: HealthcareCaseKitStatus.PREPARED,
+            preparedById: fixture.scenario.userId,
+          });
+          expect(persistedKit.preparedAt).toBeInstanceOf(Date);
+          await expect(
+            setupPrisma.product.findUniqueOrThrow({
+              where: { id: fixture.scenario.productIds[0] },
+              select: { stock: true },
+            }),
+          ).resolves.toEqual(stockBefore);
+          await expect(
+            setupPrisma.inventoryMovement.count({
+              where: {
+                companyId: fixture.scenario.companyId,
+                productId: fixture.scenario.productIds[0],
+              },
+            }),
+          ).resolves.toBe(movementsBefore);
+        } catch (error) {
+          blocker.release();
+          const cleanupErrors = await settleForCleanup([
+            blocker.done,
+            ...[first, second].filter(
+              (
+                operation,
+              ): operation is ReturnType<
+                HealthcareCaseKitsService['confirmPreparation']
+              > => operation !== null,
+            ),
+          ]);
+          throwWithCleanupErrors(
+            error,
+            cleanupErrors,
+            'concurrent CaseKit preparation confirmations',
+          );
+        }
+      });
+
+      it('rolls back PREPARED audit and claim when claim completion fails', async () => {
+        const fixture = await createReadyCaseKitFixture();
+        const key = trackKey('case-kit-prepare-rollback');
+        const stockBefore = await setupPrisma.product.findUniqueOrThrow({
+          where: { id: fixture.scenario.productIds[0] },
+          select: { stock: true },
+        });
+        const movementsBefore = await setupPrisma.inventoryMovement.count({
+          where: {
+            companyId: fixture.scenario.companyId,
+            productId: fixture.scenario.productIds[0],
+          },
+        });
+        const completion = jest
+          .spyOn(caseKitRepositoryA, 'completeIdempotencyClaim')
+          .mockRejectedValue(
+            new Error('Injected CaseKit preparation completion failure'),
+          );
+
+        try {
+          await expect(
+            caseKitServiceA.confirmPreparation(
+              fixture.scenario.companyId,
+              fixture.scenario.userId,
+              fixture.caseKitId,
+              key,
+            ),
+          ).rejects.toThrow('Injected CaseKit preparation completion failure');
+        } finally {
+          completion.mockRestore();
+        }
+
+        await expect(
+          setupPrisma.healthcareCaseKit.findUniqueOrThrow({
+            where: { id: fixture.caseKitId },
+            select: { status: true, preparedById: true, preparedAt: true },
+          }),
+        ).resolves.toEqual({
+          status: HealthcareCaseKitStatus.DRAFT,
+          preparedById: null,
+          preparedAt: null,
+        });
+        await expect(
+          setupPrisma.idempotencyRecord.count({
+            where: {
+              companyId: fixture.scenario.companyId,
+              scope: IdempotencyScope.HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION,
+              key,
+            },
+          }),
+        ).resolves.toBe(0);
+        await expect(
+          setupPrisma.healthcareCaseKitItem.findUniqueOrThrow({
+            where: { id: fixture.itemId },
+            select: { lifecycle: true, preparedQuantity: true },
+          }),
+        ).resolves.toEqual({
+          lifecycle: HealthcareCaseKitItemLifecycle.ACTIVE,
+          preparedQuantity: 1,
+        });
+        await expect(
+          setupPrisma.product.findUniqueOrThrow({
+            where: { id: fixture.scenario.productIds[0] },
+            select: { stock: true },
+          }),
+        ).resolves.toEqual(stockBefore);
+        await expect(
+          setupPrisma.inventoryMovement.count({
+            where: {
+              companyId: fixture.scenario.companyId,
+              productId: fixture.scenario.productIds[0],
+            },
+          }),
+        ).resolves.toBe(movementsBefore);
+      });
+    });
+
     async function assertNoCreateWrites(
       companyId: string,
       caseId: string,
@@ -4135,6 +4778,166 @@ async function assertExpectedSchema(
   }
 }
 
+async function assertNonAdministrativeRole(
+  client: RawQueryClient,
+): Promise<void> {
+  const rows = await client
+    .$queryRaw<
+      Array<{
+        rolcanlogin: boolean;
+        rolsuper: boolean;
+        rolcreatedb: boolean;
+        rolcreaterole: boolean;
+        rolreplication: boolean;
+        rolbypassrls: boolean;
+      }>
+    >(
+      Prisma.sql`
+      SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole,
+             rolreplication, rolbypassrls
+      FROM pg_catalog.pg_roles
+      WHERE rolname = current_user AND rolname = ${EXPECTED_USER}
+    `,
+    )
+    .catch(() => {
+      throw new Error(
+        'HC-LOCK-02 2H role preflight could not verify pg_roles attributes; external role verification is required. No additional catalog grants are authorized.',
+      );
+    });
+  const role = rows[0];
+  if (rows.length !== 1 || role?.rolcanlogin !== true) {
+    throw new Error(
+      'HC-LOCK-02 2H role preflight requires the dedicated LOGIN role.',
+    );
+  }
+  const prohibited = [
+    ['SUPERUSER', role.rolsuper],
+    ['CREATEDB', role.rolcreatedb],
+    ['CREATEROLE', role.rolcreaterole],
+    ['REPLICATION', role.rolreplication],
+    ['BYPASSRLS', role.rolbypassrls],
+  ] as const;
+  const invalid = prohibited
+    .filter(([, enabled]) => enabled !== false)
+    .map(([capability]) => capability);
+  if (invalid.length > 0) {
+    throw new Error(
+      `HC-LOCK-02 2H role preflight requires verified absence of: ${invalid.join(', ')}.`,
+    );
+  }
+}
+
+async function assertRequiredSuitePrivileges(
+  client: RawQueryClient,
+): Promise<void> {
+  const tableChecks = [
+    ...requiredFixtureReadDeleteTables.flatMap((tableName) =>
+      ['SELECT', 'DELETE'].map((operation) => ({ tableName, operation })),
+    ),
+    ...requiredFixtureInsertTables.map((tableName) => ({
+      tableName,
+      operation: 'INSERT',
+    })),
+    // EquipmentService.retire includes batch: true (all scalar columns).
+    { tableName: 'InventoryBatch', operation: 'SELECT' },
+  ];
+  const columnChecks = [
+    ...Object.entries<readonly string[]>(requiredSuiteUpdateColumns).flatMap(
+      ([tableName, columns]) =>
+        columns.map((columnName) => ({
+          tableName,
+          columnName,
+          operation: 'UPDATE',
+        })),
+    ),
+    ...requiredInventoryMovementSelectColumns.map((columnName) => ({
+      tableName: 'InventoryMovement',
+      columnName,
+      operation: 'SELECT',
+    })),
+  ];
+  const tableRows = await client
+    .$queryRaw<
+      Array<{ tableName: string; operation: string; allowed: boolean }>
+    >(
+      Prisma.sql`
+      SELECT required."tableName", required.operation,
+        COALESCE(pg_catalog.has_table_privilege(
+          current_user, relation.oid, required.operation
+        ), false) AS allowed
+      FROM (VALUES ${Prisma.join(
+        tableChecks.map(
+          ({ tableName, operation }) =>
+            Prisma.sql`(${tableName}, ${operation})`,
+        ),
+      )}) AS required("tableName", operation)
+      LEFT JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.nspname = 'public'
+      LEFT JOIN pg_catalog.pg_class AS relation
+        ON relation.relnamespace = namespace.oid
+        AND relation.relname = required."tableName"
+    `,
+    )
+    .catch(() => {
+      throw new Error(
+        'HC-LOCK-02 2H fixture/inventory table SELECT/INSERT/DELETE privilege verification failed.',
+      );
+    });
+  const columnRows = await client
+    .$queryRaw<
+      Array<{
+        tableName: string;
+        columnName: string;
+        operation: string;
+        allowed: boolean;
+      }>
+    >(
+      Prisma.sql`
+      SELECT required."tableName", required."columnName", required.operation,
+        COALESCE(pg_catalog.has_column_privilege(
+          current_user, relation.oid, attribute.attnum, required.operation
+        ), false) AS allowed
+      FROM (VALUES ${Prisma.join(
+        columnChecks.map(
+          ({ tableName, columnName, operation }) =>
+            Prisma.sql`(${tableName}, ${columnName}, ${operation})`,
+        ),
+      )}) AS required("tableName", "columnName", operation)
+      LEFT JOIN pg_catalog.pg_namespace AS namespace
+        ON namespace.nspname = 'public'
+      LEFT JOIN pg_catalog.pg_class AS relation
+        ON relation.relnamespace = namespace.oid
+        AND relation.relname = required."tableName"
+      LEFT JOIN pg_catalog.pg_attribute AS attribute
+        ON attribute.attrelid = relation.oid
+        AND attribute.attname = required."columnName"
+        AND attribute.attnum > 0 AND NOT attribute.attisdropped
+    `,
+    )
+    .catch(() => {
+      throw new Error(
+        'HC-LOCK-02 2H mutation/inventory column UPDATE/SELECT privilege verification failed.',
+      );
+    });
+  const missing = [
+    ...tableRows
+      .filter((row) => row.allowed !== true)
+      .map((row) => `${row.tableName} [${row.operation}]`),
+    ...columnRows
+      .filter((row) => row.allowed !== true)
+      .map((row) => `${row.tableName} [${row.operation}(${row.columnName})]`),
+  ];
+  if (
+    tableRows.length !== tableChecks.length ||
+    columnRows.length !== columnChecks.length ||
+    missing.length > 0
+  ) {
+    throw new Error(
+      `HC-LOCK-02 2H suite privilege preflight failed for: ${missing.join(', ') || 'incomplete table/column privilege results'}.`,
+    );
+  }
+}
+
 async function assertRequiredRowLockPrivileges(
   client: ExplicitPrismaService,
 ): Promise<void> {
@@ -4291,7 +5094,7 @@ async function assertRequiredCaseKitPrivileges(
       return `${row.tableName} [${privileges.join(', ')}]`;
     });
 
-  const updateRows = await client.$queryRaw<
+  const itemUpdateRows = await client.$queryRaw<
     Array<{ columnName: string; canUpdate: boolean }>
   >(Prisma.sql`
     SELECT
@@ -4323,7 +5126,43 @@ async function assertRequiredCaseKitPrivileges(
       AND attribute.attnum > 0
       AND NOT attribute.attisdropped
   `);
-  const missingUpdatePrivileges = updateRows
+  const missingItemUpdatePrivileges = itemUpdateRows
+    .filter((row) => !row.canUpdate)
+    .map((row) => row.columnName);
+
+  const kitUpdateRows = await client.$queryRaw<
+    Array<{ columnName: string; canUpdate: boolean }>
+  >(Prisma.sql`
+    SELECT
+      required."columnName",
+      COALESCE(
+        has_column_privilege(
+          current_user,
+          relation.oid,
+          attribute.attnum,
+          'UPDATE'
+        ),
+        false
+      ) AS "canUpdate"
+    FROM (
+      VALUES ${Prisma.join(
+        requiredCaseKitUpdateColumns.map(
+          (columnName) => Prisma.sql`(${columnName})`,
+        ),
+      )}
+    ) AS required("columnName")
+    LEFT JOIN pg_namespace AS namespace
+      ON namespace.nspname = 'public'
+    LEFT JOIN pg_class AS relation
+      ON relation.relnamespace = namespace.oid
+      AND relation.relname = 'HealthcareCaseKit'
+    LEFT JOIN pg_attribute AS attribute
+      ON attribute.attrelid = relation.oid
+      AND attribute.attname = required."columnName"
+      AND attribute.attnum > 0
+      AND NOT attribute.attisdropped
+  `);
+  const missingKitUpdatePrivileges = kitUpdateRows
     .filter((row) => !row.canUpdate)
     .map((row) => row.columnName);
 
@@ -4353,13 +5192,15 @@ async function assertRequiredCaseKitPrivileges(
   if (
     tableRows.length !== requiredCaseKitDmlTables.length ||
     missingTablePrivileges.length > 0 ||
-    updateRows.length !== requiredCaseKitItemUpdateColumns.length ||
-    missingUpdatePrivileges.length > 0 ||
+    itemUpdateRows.length !== requiredCaseKitItemUpdateColumns.length ||
+    missingItemUpdatePrivileges.length > 0 ||
+    kitUpdateRows.length !== requiredCaseKitUpdateColumns.length ||
+    missingKitUpdatePrivileges.length > 0 ||
     typeRows.length !== requiredCaseKitTypes.length ||
     missingTypePrivileges.length > 0
   ) {
     throw new Error(
-      `HC-OPS-01A.1 CaseKit privilege preflight failed for tables: ${missingTablePrivileges.join(', ') || 'none'}; UPDATE columns: ${missingUpdatePrivileges.join(', ') || 'none'}; types: ${missingTypePrivileges.join(', ') || 'none'}.`,
+      `HC-OPS-01A.1/01B CaseKit privilege preflight failed for tables: ${missingTablePrivileges.join(', ') || 'none'}; item UPDATE columns: ${missingItemUpdatePrivileges.join(', ') || 'none'}; kit UPDATE columns: ${missingKitUpdatePrivileges.join(', ') || 'none'}; types: ${missingTypePrivileges.join(', ') || 'none'}.`,
     );
   }
 }
@@ -4368,15 +5209,26 @@ async function assertExclusiveTargetAvailability(
   observer: ExplicitPrismaService,
   clients: ExplicitPrismaService[],
 ): Promise<void> {
+  if (clients.length !== CLIENT_COUNT || !clients.includes(observer)) {
+    throw new Error(
+      'HC-LOCK-02 2H exclusivity requires the complete run-owned client set, including the observer.',
+    );
+  }
   const ownedPids = await Promise.all(clients.map(getBackendPid));
+  if (new Set(ownedPids).size !== CLIENT_COUNT) {
+    throw new Error(
+      'HC-LOCK-02 2H exclusivity requires distinct run-owned backend PIDs.',
+    );
+  }
+  // Foreign activity details may be NULL for the restricted role. Only
+  // database identity and explicitly owned PIDs can exempt a visible row.
   const otherSessions = await observer.$queryRaw<
-    Array<{ pid: number }>
+    Array<{ pid: number | null }>
   >(Prisma.sql`
     SELECT pid::int AS "pid"
     FROM pg_stat_activity
     WHERE datname = ${EXPECTED_DATABASE}
-      AND backend_type = 'client backend'
-      AND pid NOT IN (${Prisma.join(ownedPids)})
+      AND (pid IS NULL OR pid NOT IN (${Prisma.join(ownedPids)}))
   `);
 
   if (otherSessions.length > 0) {

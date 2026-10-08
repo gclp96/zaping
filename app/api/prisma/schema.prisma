@@ -146,6 +146,7 @@ enum IdempotencyScope {
   HEALTHCARE_CASE_KIT_CREATE
   HEALTHCARE_CASE_KIT_ITEM_ADD
   HEALTHCARE_CASE_KIT_ITEM_EXCLUDE
+  HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION
 }
 
 enum EquipmentLifecycle {
@@ -453,6 +454,7 @@ enum HealthcareEquipmentRequirementCoverageNoteKind {
 
 enum HealthcareCaseKitStatus {
   DRAFT
+  PREPARED
 }
 
 enum HealthcareCaseKitItemLifecycle {
@@ -496,6 +498,7 @@ model User {
   recordedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteRecordedBy")
   resolvedHealthcareEquipmentNotes       HealthcareEquipmentRequirementCoverageNote[]    @relation("HealthcareEquipmentCoverageNoteResolvedBy")
   createdHealthcareCaseKits              HealthcareCaseKit[]                             @relation("HealthcareCaseKitCreatedBy")
+  preparedHealthcareCaseKits             HealthcareCaseKit[]                             @relation("HealthcareCaseKitPreparedBy")
   addedHealthcareCaseKitItems            HealthcareCaseKitItem[]                         @relation("HealthcareCaseKitItemAddedBy")
   excludedHealthcareCaseKitItems         HealthcareCaseKitItem[]                         @relation("HealthcareCaseKitItemExcludedBy")
 
@@ -828,18 +831,22 @@ model HealthcareCaseKit {
   caseId      String
   status      HealthcareCaseKitStatus @default(DRAFT)
   createdById String
+  preparedById String?
+  preparedAt   DateTime?
   createdAt   DateTime                @default(now())
   updatedAt   DateTime                @updatedAt
 
   company        Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
   healthcareCase HealthcareCase          @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
   createdBy      User                    @relation("HealthcareCaseKitCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict)
+  preparedBy     User?                   @relation("HealthcareCaseKitPreparedBy", fields: [preparedById, companyId], references: [id, companyId], onDelete: Restrict)
   items          HealthcareCaseKitItem[]
 
   @@unique([id, companyId])
   @@unique([id, companyId, caseId])
   @@unique([companyId, caseId])
   @@index([companyId, status, updatedAt])
+  @@index([companyId, preparedById])
 }
 
 model HealthcareCaseKitItem {

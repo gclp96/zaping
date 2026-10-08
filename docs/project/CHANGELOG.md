@@ -3,8 +3,41 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.5.0
 **Estado:** Activo
-**Última actualización:** 2026-09-20
+**Última actualización:** 2026-10-07
 **Responsable:** Zaping Team
+
+---
+
+# 2026-10-07 — HC-OPS-01B Preparation Confirmation & Readiness — cierre documental
+
+**Estado:** COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS.
+
+CaseKit permite DRAFT → PREPARED con preparedBy/preparedAt originales e
+inmutabilidad del contenido. Readiness/blockers se derivan del estado actual;
+la preparación es lógica y no reservante, sin stock, batches, movimientos,
+Assignment mutation ni Dispatch. Confirmación HTTP 200 directa, body vacío y
+key obligatoria; blockers 409 sin writes/claim; replay por key/estado conserva
+auditoría, incluso con blockers posteriores, y key reuse para otro Kit es 409.
+Tenant JWT y RBAC ADMIN/MANAGER/WAREHOUSE; SALES read-only.
+
+Company-first adquiere también row locks de Products/EquipmentAssets como fuentes
+de readiness y relee el Kit antes de la transición. PostgreSQL acredita ambas
+precedencias de invalidación/preparación, confirmaciones concurrentes y rollback.
+Web refetch tras conflicto de readiness/estado conserva el error y oculta
+readiness obsoleta si falla el refresh.
+
+Evidencia aceptada: API unit 69/69; HTTP/JWT E2E 9/9; Web 20/20; PostgreSQL
+integrado 52/52 en `zaping_spike_test`, PostgreSQL 16. Prisma validate/generate,
+production typecheck, ESLint focal API/Web, Prettier delta, builds API/Web y QA
+manual PASS. Build Web usó temporalmente
+`NEXT_PUBLIC_API_URL=https://api.example.test`, retirado después. Este cierre
+registra el checkpoint aceptado; no vuelve a ejecutar tests/builds/manual QA.
+Detalle y checklist: [CASE_KITS, secciones 233.14–233.15](../modules/healthcare/CASE_KITS.md).
+
+Sin nueva versión de release, métricas de sprint, commit, merge ni deployment.
+M-HC1 continúa abierto; el siguiente trabajo registrado es HC-NEXT-03C5-B/B0,
+todavía NOT READY. Los known follow-ups de formato, entorno Windows, hardening del
+rol aislado y encoding de fixtures permanecen fuera de HC-OPS-01B.
 
 ---
 

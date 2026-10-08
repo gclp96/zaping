@@ -1,5 +1,8 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
-import { HealthcareCaseKitItemLifecycle } from '@prisma/client';
+import {
+  HealthcareCaseKitItemLifecycle,
+  HealthcareCaseKitStatus,
+} from '@prisma/client';
 
 import { HealthcareCaseKitsRepository } from './healthcare-case-kits.repository';
 
@@ -80,5 +83,116 @@ describe('HealthcareCaseKitsRepository', () => {
     expect(query.strings.join('')).toContain('FOR UPDATE');
     expect(query.strings.join('')).toContain('"caseKitId" = ');
     expect(query.values).toEqual([itemId, companyId, caseKitId]);
+  });
+
+  it.each([
+    ['lockActiveItems', 'HealthcareCaseKitItem'],
+    ['lockCaseRequirements', 'HealthcareCaseRequirement'],
+    ['lockActiveItemAssignments', 'HealthcareEquipmentAssignment'],
+  ] as const)(
+    'locks preparation sources deterministically with %s',
+    async (method, table) => {
+      const queryRaw = jest.fn().mockResolvedValue([]);
+      const repository = new HealthcareCaseKitsRepository({} as never);
+
+      if (method === 'lockCaseRequirements') {
+        await repository[method](
+          { $queryRaw: queryRaw } as never,
+          companyId,
+          'case-id',
+        );
+      } else {
+        await repository[method](
+          { $queryRaw: queryRaw } as never,
+          companyId,
+          caseKitId,
+        );
+      }
+
+      const sql = queryRaw.mock.calls[0][0].strings.join('');
+      expect(sql).toContain(`"${table}"`);
+      expect(sql).toContain('ORDER BY "id"');
+      expect(sql).toContain('FOR UPDATE');
+    },
+  );
+
+  it.each([
+    [
+      'lockActiveItemProducts',
+      'Product',
+      'HealthcareCaseRequirement',
+      'productId',
+      'requirementId',
+    ],
+    [
+      'lockActiveItemEquipmentAssets',
+      'EquipmentAsset',
+      'HealthcareEquipmentAssignment',
+      'equipmentAssetId',
+      'equipmentAssignmentId',
+    ],
+  ] as const)(
+    '%s locks distinct ACTIVE item sources in tenant-scoped ID order',
+    async (method, table, sourceTable, sourceId, itemSourceId) => {
+      const queryRaw = jest
+        .fn()
+        .mockResolvedValue([{ id: 'source-a' }, { id: 'source-b' }]);
+      const repository = new HealthcareCaseKitsRepository({} as never);
+
+      await expect(
+        repository[method](
+          { $queryRaw: queryRaw } as never,
+          companyId,
+          caseKitId,
+        ),
+      ).resolves.toEqual(['source-a', 'source-b']);
+
+      const query = queryRaw.mock.calls[0][0];
+      const sql = query.strings.join('');
+      expect(sql).toContain(`SELECT "id" FROM "${table}"`);
+      // IN keeps duplicates in the source join from multiplying locked rows.
+      expect(sql).toContain('AND "id" IN (');
+      expect(sql).toContain(`JOIN "${sourceTable}"`);
+      expect(sql).toContain(`."${sourceId}"`);
+      expect(sql).toContain(`item."${itemSourceId}"`);
+      expect(sql).toContain('WHERE "companyId" = ');
+      expect(sql).toContain('WHERE item."companyId" = ');
+      expect(sql).toContain('= item."companyId"');
+      expect(sql).toContain('= item."caseId"');
+      expect(sql).toContain('item."caseKitId" = ');
+      expect(sql).toContain('item."lifecycle" = \'ACTIVE\'');
+      expect(sql).toContain('ORDER BY "id"');
+      expect(sql).toContain('FOR UPDATE');
+      expect(query.values).toEqual([companyId, companyId, caseKitId]);
+    },
+  );
+
+  it('uses a tenant-scoped conditional DRAFT to PREPARED update', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    const repository = new HealthcareCaseKitsRepository({} as never);
+    const preparedAt = new Date('2026-09-28T12:00:00.000Z');
+
+    await repository.confirmPreparation(
+      { healthcareCaseKit: { updateMany } } as never,
+      {
+        companyId,
+        caseKitId,
+        preparedById: excludedById,
+        preparedAt,
+      },
+    );
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        id: caseKitId,
+        companyId,
+        status: HealthcareCaseKitStatus.DRAFT,
+      },
+      data: {
+        status: HealthcareCaseKitStatus.PREPARED,
+        preparedById: excludedById,
+        preparedAt,
+      },
+    });
   });
 });

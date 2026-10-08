@@ -18,6 +18,18 @@ export type HealthcareCaseKitWarning = {
   message: string;
 };
 
+export type HealthcareCaseKitReadinessBlocker = {
+  code:
+    | HealthcareCaseKitWarning['code']
+    | 'CASE_KIT_CASE_NOT_SCHEDULED'
+    | 'CASE_KIT_CASE_SCHEDULE_INCOMPLETE'
+    | 'CASE_KIT_REQUIRED_QUANTITY_NOT_COVERED'
+    | 'CASE_KIT_REQUIRED_ASSET_NOT_COVERED'
+    | 'CASE_KIT_SERIALIZED_REQUIREMENT_UNSUPPORTED';
+  requirementId?: string;
+  caseKitItemId?: string;
+};
+
 export type HealthcareCaseKitItem = {
   id: string;
   lifecycle: 'ACTIVE' | 'EXCLUDED';
@@ -60,8 +72,14 @@ export type HealthcareCaseKitItem = {
 export type HealthcareCaseKit = {
   id: string;
   caseId: string;
-  status: 'DRAFT';
+  status: 'DRAFT' | 'PREPARED';
   createdBy: HealthcareCaseKitUser;
+  preparedBy: HealthcareCaseKitUser | null;
+  preparedAt: string | null;
+  preparationReadiness: {
+    status: 'PASS' | 'BLOCKED';
+    blockers: HealthcareCaseKitReadinessBlocker[];
+  };
   createdAt: string;
   updatedAt: string;
   items: HealthcareCaseKitItem[];
@@ -129,6 +147,21 @@ export async function excludeHealthcareCaseKitItem(
     {
       headers: {
         'Idempotency-Key': `hc-case-kit-item-exclude-${globalThis.crypto.randomUUID()}`,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function confirmHealthcareCaseKitPreparation(
+  caseKitId: string,
+): Promise<HealthcareCaseKit> {
+  const response = await api.post<HealthcareCaseKit>(
+    `/healthcare/case-kits/${caseKitId}/confirm-preparation`,
+    {},
+    {
+      headers: {
+        'Idempotency-Key': `hc-case-kit-confirm-${globalThis.crypto.randomUUID()}`,
       },
     },
   );

@@ -7,6 +7,11 @@
 **Fecha de decisión:** 2026-09-21
 **Responsable:** Zaping Architecture Team
 
+**Nota de sincronización 2026-10-07:** HC-OPS-01B está COMPLETE / VALIDATED /
+READY FOR FINAL REVIEW — UNCOMMITTED, con el protocolo descrito en 6.3. El estado
+histórico de implementación general de este ADR no se reevalúa aquí; esta nota
+no aprueba producción ni rollout.
+
 ---
 
 # 1. Contexto
@@ -148,6 +153,7 @@ El orden principal aprobado es:
 | Requirement Retire | Company → Case → Requirement. |
 | Requirement Reactivate | Company → Case → Product → Requirement. |
 | Requirement Reorder | Company → Case → Requirements en orden determinista por ID. |
+| CaseKit Confirm Preparation (HC-OPS-01B) | Company → Case → CaseKit → items ACTIVE → Requirements → Assignments de items ACTIVE → Products → EquipmentAssets → reread autoritativo. |
 
 Se conservan las reglas detalladas existentes:
 
@@ -179,6 +185,30 @@ Los releases por Case Cancel y Requirement Retire son un entregable funcional
 separado. Este ADR no afirma que estén implementados.
 
 ---
+
+## 6.3 CaseKit Confirm Preparation — HC-OPS-01B
+
+Confirm usa el helper Company-first antes de cualquier row lock. Después aplica
+los límites de trabajo posteriores y bloquea Case, CaseKit, items ACTIVE,
+Requirements del Case, Assignments de items ACTIVE, Products de materiales y
+EquipmentAssets incluidos. Los locks son tenant-scoped `FOR UPDATE` y las
+colecciones se adquieren por ID determinista. El reread autoritativo del Kit
+precede a readiness y a la transición condicional DRAFT → PREPARED.
+
+Product y EquipmentAsset son fuentes de readiness cuyas mutaciones actuales no
+participan en el Company advisory lock; sus row locks coordinan la confirmación
+con esas mutaciones sin cambiar sus reglas de negocio. Esta extensión es el
+protocolo aceptado para 01B, no una adopción global del Company lock por esos
+dominios. Si la mutación gana, Confirm responde BLOCKED sin writes/claim. Si la
+preparación gana, la mutación espera al commit; GET posterior conserva PREPARED y
+auditoría y deriva BLOCKED.
+
+Evidencia aceptada: suite PostgreSQL integrada 52/52 en `zaping_spike_test`,
+PostgreSQL 16, incluyendo ambas precedencias Product/Equipment, confirmaciones
+concurrentes, rollback tras fallo de completion y frontera física sin writes.
+No queda finding de concurrencia sin resolver para HC-OPS-01B. El detalle y los
+límites están en [CASE_KITS, sección 233](../../modules/healthcare/CASE_KITS.md).
+El cierre no implica merge, deployment ni rollout.
 
 # 7. Política de timeouts
 

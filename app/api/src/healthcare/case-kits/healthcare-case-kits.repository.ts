@@ -45,6 +45,8 @@ export const healthcareCaseKitItemSelect = {
   equipmentAssignment: {
     select: {
       id: true,
+      origin: true,
+      requirementId: true,
       lifecycle: true,
       equipmentAsset: {
         select: {
@@ -67,10 +69,28 @@ export const healthcareCaseKitSelect = {
   companyId: true,
   caseId: true,
   status: true,
+  preparedAt: true,
   createdAt: true,
   updatedAt: true,
-  healthcareCase: { select: { status: true } },
+  healthcareCase: {
+    select: {
+      status: true,
+      scheduledStart: true,
+      scheduledEnd: true,
+      requirements: {
+        select: {
+          id: true,
+          requestedQty: true,
+          type: true,
+          lifecycle: true,
+          product: { select: { inventoryTracking: true } },
+        },
+        orderBy: { id: 'asc' },
+      },
+    },
+  },
   createdBy: { select: { id: true, firstName: true, lastName: true } },
+  preparedBy: { select: { id: true, firstName: true, lastName: true } },
   items: {
     select: healthcareCaseKitItemSelect,
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
@@ -142,7 +162,12 @@ export class HealthcareCaseKitsRepository {
   ) {
     return client.healthcareCase.findFirst({
       where: { id: caseId, companyId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        scheduledStart: true,
+        scheduledEnd: true,
+      },
     });
   }
 
@@ -194,6 +219,109 @@ export class HealthcareCaseKitsRepository {
     return rows.length === 1;
   }
 
+  async lockActiveItems(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseKitId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareCaseKitItem"
+      WHERE "companyId" = ${companyId}
+        AND "caseKitId" = ${caseKitId}
+        AND "lifecycle" = 'ACTIVE'
+      ORDER BY "id"
+      FOR UPDATE
+    `);
+    return rows.map((row) => row.id);
+  }
+
+  async lockCaseRequirements(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareCaseRequirement"
+      WHERE "companyId" = ${companyId} AND "caseId" = ${caseId}
+      ORDER BY "id"
+      FOR UPDATE
+    `);
+    return rows.map((row) => row.id);
+  }
+
+  async lockActiveItemAssignments(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseKitId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareEquipmentAssignment"
+      WHERE "companyId" = ${companyId}
+        AND "id" IN (
+          SELECT "equipmentAssignmentId"
+          FROM "HealthcareCaseKitItem"
+          WHERE "companyId" = ${companyId}
+            AND "caseKitId" = ${caseKitId}
+            AND "lifecycle" = 'ACTIVE'
+            AND "equipmentAssignmentId" IS NOT NULL
+        )
+      ORDER BY "id"
+      FOR UPDATE
+    `);
+    return rows.map((row) => row.id);
+  }
+
+  async lockActiveItemProducts(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseKitId: string,
+  ): Promise<string[]> {
+    // The outer primary-key scan locks each source once, even if items share it.
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "Product"
+      WHERE "companyId" = ${companyId}
+        AND "id" IN (
+          SELECT requirement."productId"
+          FROM "HealthcareCaseKitItem" AS item
+          JOIN "HealthcareCaseRequirement" AS requirement
+            ON requirement."id" = item."requirementId"
+            AND requirement."companyId" = item."companyId"
+            AND requirement."caseId" = item."caseId"
+          WHERE item."companyId" = ${companyId}
+            AND item."caseKitId" = ${caseKitId}
+            AND item."lifecycle" = 'ACTIVE'
+        )
+      ORDER BY "id"
+      FOR UPDATE
+    `);
+    return rows.map((row) => row.id);
+  }
+
+  async lockActiveItemEquipmentAssets(
+    transaction: Prisma.TransactionClient,
+    companyId: string,
+    caseKitId: string,
+  ): Promise<string[]> {
+    const rows = await transaction.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "EquipmentAsset"
+      WHERE "companyId" = ${companyId}
+        AND "id" IN (
+          SELECT assignment."equipmentAssetId"
+          FROM "HealthcareCaseKitItem" AS item
+          JOIN "HealthcareEquipmentAssignment" AS assignment
+            ON assignment."id" = item."equipmentAssignmentId"
+            AND assignment."companyId" = item."companyId"
+            AND assignment."caseId" = item."caseId"
+          WHERE item."companyId" = ${companyId}
+            AND item."caseKitId" = ${caseKitId}
+            AND item."lifecycle" = 'ACTIVE'
+        )
+      ORDER BY "id"
+      FOR UPDATE
+    `);
+    return rows.map((row) => row.id);
+  }
+
   createKit(
     transaction: Prisma.TransactionClient,
     data: { companyId: string; caseId: string; createdById: string },
@@ -201,6 +329,29 @@ export class HealthcareCaseKitsRepository {
     return transaction.healthcareCaseKit.create({
       data,
       select: healthcareCaseKitSelect,
+    });
+  }
+
+  confirmPreparation(
+    transaction: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      caseKitId: string;
+      preparedById: string;
+      preparedAt: Date;
+    },
+  ) {
+    return transaction.healthcareCaseKit.updateMany({
+      where: {
+        id: data.caseKitId,
+        companyId: data.companyId,
+        status: 'DRAFT',
+      },
+      data: {
+        status: 'PREPARED',
+        preparedById: data.preparedById,
+        preparedAt: data.preparedAt,
+      },
     });
   }
 

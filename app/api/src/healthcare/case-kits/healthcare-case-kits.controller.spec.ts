@@ -13,6 +13,7 @@ describe('HealthcareCaseKitsController', () => {
     create: jest.fn(),
     addItem: jest.fn(),
     excludeItem: jest.fn(),
+    confirmPreparation: jest.fn(),
   };
   const controller = new HealthcareCaseKitsController(
     service as unknown as HealthcareCaseKitsService,
@@ -46,6 +47,9 @@ describe('HealthcareCaseKitsController', () => {
       UserRole.MANAGER,
       UserRole.WAREHOUSE,
     ]);
+    expect(Reflect.getMetadata('roles', controller.confirmPreparation)).toEqual(
+      [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+    );
   });
 
   it('requires Idempotency-Key with stable errors', async () => {
@@ -120,5 +124,59 @@ describe('HealthcareCaseKitsController', () => {
       { reason: 'Selección incorrecta' },
     );
     expect(response.status).toHaveBeenCalledWith(HttpStatus.OK);
+  });
+
+  it('confirms preparation with a normalized key and direct HTTP 200 response', async () => {
+    const data = { id: 'kit-id', status: 'PREPARED' };
+    service.confirmPreparation.mockResolvedValue({ replay: false, data });
+
+    await expect(
+      controller.confirmPreparation(
+        request as never,
+        'kit-id',
+        '  confirm-key  ',
+        {},
+        response as never,
+      ),
+    ).resolves.toBe(data);
+    expect(service.confirmPreparation).toHaveBeenCalledWith(
+      'company-id',
+      'user-id',
+      'kit-id',
+      'confirm-key',
+    );
+    expect(response.status).toHaveBeenCalledWith(HttpStatus.OK);
+  });
+
+  it('requires Idempotency-Key for preparation confirmation', async () => {
+    await expect(
+      controller.confirmPreparation(
+        request as never,
+        'kit-id',
+        undefined,
+        {},
+        response as never,
+      ),
+    ).rejects.toMatchObject({
+      status: HttpStatus.BAD_REQUEST,
+      response: { code: 'IDEMPOTENCY_KEY_REQUIRED' },
+    });
+    expect(service.confirmPreparation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-empty preparation body with the stable error', async () => {
+    await expect(
+      controller.confirmPreparation(
+        request as never,
+        'kit-id',
+        'confirm-key',
+        { status: 'PREPARED' },
+        response as never,
+      ),
+    ).rejects.toMatchObject({
+      status: HttpStatus.BAD_REQUEST,
+      response: { code: 'INVALID_REQUEST_BODY' },
+    });
+    expect(service.confirmPreparation).not.toHaveBeenCalled();
   });
 });
