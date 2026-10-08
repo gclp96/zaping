@@ -23,6 +23,7 @@ import {
   caseKitItemNotFoundException,
   caseKitNotFoundException,
   caseKitNotMutableException,
+  caseKitPreparationBlockedException,
   caseKitSourceNotEligibleException,
   caseKitSourceNotFoundException,
   caseNotEligibleException,
@@ -45,8 +46,15 @@ import { ExcludeHealthcareCaseKitItemDto } from './dto/exclude-healthcare-case-k
 import {
   createHealthcareCaseKitItemExclusionRequestHash,
   createHealthcareCaseKitItemRequestHash,
+  createHealthcareCaseKitPreparationRequestHash,
   createHealthcareCaseKitRequestHash,
 } from './healthcare-case-kit-request-hash';
+import {
+  deriveHealthcareCaseKitItemWarningCodes,
+  evaluateHealthcareCaseKitReadiness,
+  HealthcareCaseKitPreparationReadiness,
+  HealthcareCaseKitWarningCode,
+} from './healthcare-case-kit-readiness';
 import {
   HealthcareCaseKitItemRecord,
   HealthcareCaseKitRecord,
@@ -56,17 +64,10 @@ import {
 const CREATE_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_CREATE;
 const ADD_ITEM_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_ADD;
 const EXCLUDE_ITEM_SCOPE = IdempotencyScope.HEALTHCARE_CASE_KIT_ITEM_EXCLUDE;
+const CONFIRM_PREPARATION_SCOPE =
+  IdempotencyScope.HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export type HealthcareCaseKitWarningCode =
-  | 'CASE_KIT_CASE_CANCELLED'
-  | 'CASE_KIT_REQUIREMENT_NOT_ACTIVE'
-  | 'CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE'
-  | 'CASE_KIT_PREPARED_QUANTITY_EXCEEDS_REQUESTED'
-  | 'CASE_KIT_ASSIGNMENT_NOT_RESERVED'
-  | 'CASE_KIT_EQUIPMENT_NOT_ACTIVE'
-  | 'CASE_KIT_EQUIPMENT_NOT_GOOD';
 
 type UserSummary = { id: string; firstName: string; lastName: string };
 type Warning = { code: HealthcareCaseKitWarningCode; message: string };
@@ -93,6 +94,9 @@ export type HealthcareCaseKitResponse = {
   caseId: string;
   status: HealthcareCaseKitStatus;
   createdBy: UserSummary;
+  preparedBy: UserSummary | null;
+  preparedAt: Date | null;
+  preparationReadiness: HealthcareCaseKitPreparationReadiness;
   createdAt: Date;
   updatedAt: Date;
   items: HealthcareCaseKitItemResponse[];
@@ -540,6 +544,164 @@ export class HealthcareCaseKitsService {
     }
   }
 
+  async confirmPreparation(
+    companyId: string,
+    preparedById: string,
+    caseKitId: string,
+    idempotencyKey: string,
+  ): Promise<HealthcareCaseKitCommandResult<HealthcareCaseKitResponse>> {
+    const requestHash =
+      createHealthcareCaseKitPreparationRequestHash(caseKitId);
+
+    try {
+      const replay = await this.findCompletedPreparationReplay(
+        companyId,
+        idempotencyKey,
+        requestHash,
+        caseKitId,
+      );
+      if (replay) return { replay: true, data: replay };
+
+      const discoveredKit = await this.repository.findKit(companyId, caseKitId);
+      if (!discoveredKit) throw caseKitNotFoundException();
+
+      return await this.repository.runInTransaction(async (transaction) => {
+        await this.acquireCompanyProtocol(transaction, companyId);
+        if (
+          !(await this.repository.lockCase(
+            transaction,
+            companyId,
+            discoveredKit.caseId,
+          ))
+        ) {
+          throw caseKitNotFoundException();
+        }
+        if (
+          !(await this.repository.lockKit(transaction, companyId, caseKitId))
+        ) {
+          throw caseKitNotFoundException();
+        }
+        await this.repository.lockActiveItems(
+          transaction,
+          companyId,
+          caseKitId,
+        );
+        await this.repository.lockCaseRequirements(
+          transaction,
+          companyId,
+          discoveredKit.caseId,
+        );
+        await this.repository.lockActiveItemAssignments(
+          transaction,
+          companyId,
+          caseKitId,
+        );
+        // Product/Equipment mutations use row locks without the Company protocol.
+        // Lock their sources after Assignments and before the authoritative read.
+        await this.repository.lockActiveItemProducts(
+          transaction,
+          companyId,
+          caseKitId,
+        );
+        await this.repository.lockActiveItemEquipmentAssets(
+          transaction,
+          companyId,
+          caseKitId,
+        );
+
+        const transactionalReplay = await this.findCompletedPreparationReplay(
+          companyId,
+          idempotencyKey,
+          requestHash,
+          caseKitId,
+          transaction,
+        );
+        if (transactionalReplay) {
+          return { replay: true, data: transactionalReplay };
+        }
+
+        const kit = await this.repository.findKit(
+          companyId,
+          caseKitId,
+          transaction,
+        );
+        if (!kit || kit.caseId !== discoveredKit.caseId) {
+          throw caseKitNotFoundException();
+        }
+        if (kit.status === HealthcareCaseKitStatus.PREPARED) {
+          return { replay: true, data: this.mapKit(kit) };
+        }
+        if (kit.status !== HealthcareCaseKitStatus.DRAFT) {
+          throw caseKitNotMutableException();
+        }
+
+        const readiness = evaluateHealthcareCaseKitReadiness(kit);
+        if (readiness.status === 'BLOCKED') {
+          throw caseKitPreparationBlockedException(readiness.blockers);
+        }
+
+        const preparedAt = new Date();
+        const update = await this.repository.confirmPreparation(transaction, {
+          companyId,
+          caseKitId,
+          preparedById,
+          preparedAt,
+        });
+        if (update.count !== 1) {
+          const winner = await this.repository.findKit(
+            companyId,
+            caseKitId,
+            transaction,
+          );
+          if (winner?.status === HealthcareCaseKitStatus.PREPARED) {
+            return { replay: true, data: this.mapKit(winner) };
+          }
+          throw resourceStateChangedException();
+        }
+
+        const claim = await this.repository.createIdempotencyClaim(
+          transaction,
+          companyId,
+          idempotencyKey,
+          CONFIRM_PREPARATION_SCOPE,
+          requestHash,
+        );
+        const prepared = await this.repository.findKit(
+          companyId,
+          caseKitId,
+          transaction,
+        );
+        if (!prepared || prepared.status !== HealthcareCaseKitStatus.PREPARED) {
+          throw healthcarePersistenceException();
+        }
+        await this.repository.completeIdempotencyClaim(
+          transaction,
+          claim.id,
+          caseKitId,
+        );
+
+        return { replay: false, data: this.mapKit(prepared) };
+      }, this.transactionOptions());
+    } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError) {
+        throw healthcareConcurrencyTimeoutException();
+      }
+      if (this.isIdempotencyUniqueViolation(error)) {
+        const replay = await this.findCompletedPreparationReplay(
+          companyId,
+          idempotencyKey,
+          requestHash,
+          caseKitId,
+        );
+        if (replay) return { replay: true, data: replay };
+      }
+      if (this.isForeignKeyViolation(error)) {
+        throw resourceStateChangedException();
+      }
+      this.rethrowPersistenceError(error);
+    }
+  }
+
   private async validateSource(
     transaction: Prisma.TransactionClient,
     companyId: string,
@@ -733,6 +895,35 @@ export class HealthcareCaseKitsService {
     return this.mapItem(item, item.caseKit.healthcareCase.status);
   }
 
+  private async findCompletedPreparationReplay(
+    companyId: string,
+    key: string,
+    requestHash: string,
+    caseKitId: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<HealthcareCaseKitResponse | null> {
+    const record = await this.repository.findIdempotencyRecord(
+      companyId,
+      key,
+      CONFIRM_PREPARATION_SCOPE,
+      client,
+    );
+    if (!record) return null;
+    if (record.requestHash !== requestHash) {
+      throw idempotencyKeyReusedException();
+    }
+    if (!record.resourceId) return null;
+    const kit = await this.repository.findKit(
+      companyId,
+      record.resourceId,
+      client,
+    );
+    if (!kit || kit.id !== caseKitId) {
+      throw healthcarePersistenceException();
+    }
+    return this.mapKit(kit);
+  }
+
   private resolveExcludedItemReplay(
     item: NonNullable<
       Awaited<ReturnType<HealthcareCaseKitsRepository['findItem']>>
@@ -754,6 +945,9 @@ export class HealthcareCaseKitsService {
       caseId: record.caseId,
       status: record.status,
       createdBy: record.createdBy,
+      preparedBy: record.preparedBy,
+      preparedAt: record.preparedAt,
+      preparationReadiness: evaluateHealthcareCaseKitReadiness(record),
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
       items: record.items.map((item) =>
@@ -766,64 +960,10 @@ export class HealthcareCaseKitsService {
     item: HealthcareCaseKitItemRecord,
     caseStatus: HealthcareCaseStatus,
   ): HealthcareCaseKitItemResponse {
-    const warnings: Warning[] = [];
-    if (caseStatus === HealthcareCaseStatus.CANCELLED) {
-      warnings.push({
-        code: 'CASE_KIT_CASE_CANCELLED',
-        message: 'El caso está cancelado.',
-      });
-    }
-    if (item.requirement) {
-      if (
-        item.requirement.lifecycle !== HealthcareRequirementLifecycle.ACTIVE
-      ) {
-        warnings.push({
-          code: 'CASE_KIT_REQUIREMENT_NOT_ACTIVE',
-          message: 'El requerimiento ya no está activo.',
-        });
-      }
-      if (!item.requirement.product.isActive) {
-        warnings.push({
-          code: 'CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE',
-          message: 'El producto del requerimiento está inactivo.',
-        });
-      }
-      if ((item.preparedQuantity ?? 0) > item.requirement.requestedQty) {
-        warnings.push({
-          code: 'CASE_KIT_PREPARED_QUANTITY_EXCEEDS_REQUESTED',
-          message: 'La cantidad preparada excede la cantidad solicitada.',
-        });
-      }
-    }
-    if (item.equipmentAssignment) {
-      if (
-        item.equipmentAssignment.lifecycle !==
-        HealthcareEquipmentAssignmentLifecycle.RESERVED
-      ) {
-        warnings.push({
-          code: 'CASE_KIT_ASSIGNMENT_NOT_RESERVED',
-          message: 'La asignación ya no está reservada.',
-        });
-      }
-      if (
-        item.equipmentAssignment.equipmentAsset.lifecycle !==
-        EquipmentLifecycle.ACTIVE
-      ) {
-        warnings.push({
-          code: 'CASE_KIT_EQUIPMENT_NOT_ACTIVE',
-          message: 'El equipo ya no está activo.',
-        });
-      }
-      if (
-        item.equipmentAssignment.equipmentAsset.condition !==
-        EquipmentCondition.GOOD
-      ) {
-        warnings.push({
-          code: 'CASE_KIT_EQUIPMENT_NOT_GOOD',
-          message: 'El equipo ya no está en condición disponible.',
-        });
-      }
-    }
+    const warnings: Warning[] = deriveHealthcareCaseKitItemWarningCodes(
+      item,
+      caseStatus,
+    ).map((code) => ({ code, message: this.warningMessage(code) }));
     return {
       id: item.id,
       sourceType: item.requirement
@@ -842,6 +982,22 @@ export class HealthcareCaseKitsService {
       exclusionReason: item.exclusionReason,
       createdAt: item.createdAt,
     };
+  }
+
+  private warningMessage(code: HealthcareCaseKitWarningCode): string {
+    const messages: Record<HealthcareCaseKitWarningCode, string> = {
+      CASE_KIT_CASE_CANCELLED: 'El caso está cancelado.',
+      CASE_KIT_REQUIREMENT_NOT_ACTIVE: 'El requerimiento ya no está activo.',
+      CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE:
+        'El producto del requerimiento está inactivo.',
+      CASE_KIT_PREPARED_QUANTITY_EXCEEDS_REQUESTED:
+        'La cantidad preparada excede la cantidad solicitada.',
+      CASE_KIT_ASSIGNMENT_NOT_RESERVED: 'La asignación ya no está reservada.',
+      CASE_KIT_EQUIPMENT_NOT_ACTIVE: 'El equipo ya no está activo.',
+      CASE_KIT_EQUIPMENT_NOT_GOOD:
+        'El equipo ya no está en condición disponible.',
+    };
+    return messages[code];
   }
 
   private isIdempotencyUniqueViolation(error: unknown): boolean {

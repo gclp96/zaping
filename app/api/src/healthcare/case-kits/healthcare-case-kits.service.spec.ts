@@ -8,7 +8,9 @@ import {
   HealthcareCaseKitStatus,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
+  HealthcareEquipmentAssignmentOrigin,
   HealthcareRequirementLifecycle,
+  Prisma,
   ProductInventoryTracking,
 } from '@prisma/client';
 
@@ -37,9 +39,16 @@ function kitRecord(overrides: Record<string, unknown> = {}) {
     companyId,
     caseId,
     status: HealthcareCaseKitStatus.DRAFT,
+    preparedBy: null,
+    preparedAt: null,
     createdAt: now,
     updatedAt: now,
-    healthcareCase: { status: HealthcareCaseStatus.SCHEDULED },
+    healthcareCase: {
+      status: HealthcareCaseStatus.SCHEDULED,
+      scheduledStart: new Date('2026-09-28T12:00:00.000Z'),
+      scheduledEnd: new Date('2026-09-28T14:00:00.000Z'),
+      requirements: [],
+    },
     createdBy: { id: userId, firstName: 'Ana', lastName: 'López' },
     items: [],
     ...overrides,
@@ -99,12 +108,20 @@ describe('HealthcareCaseKitsService', () => {
       findCase: jest.fn().mockResolvedValue({
         id: caseId,
         status: HealthcareCaseStatus.SCHEDULED,
+        scheduledStart: new Date('2026-09-28T12:00:00.000Z'),
+        scheduledEnd: new Date('2026-09-28T14:00:00.000Z'),
       }),
       lockCase: jest.fn().mockResolvedValue(true),
       findKitByCase: jest.fn().mockResolvedValue(null),
       findKit: jest.fn().mockResolvedValue(kitRecord()),
       lockKit: jest.fn().mockResolvedValue(true),
+      lockActiveItems: jest.fn().mockResolvedValue([]),
+      lockCaseRequirements: jest.fn().mockResolvedValue([]),
+      lockActiveItemAssignments: jest.fn().mockResolvedValue([]),
+      lockActiveItemProducts: jest.fn().mockResolvedValue([]),
+      lockActiveItemEquipmentAssets: jest.fn().mockResolvedValue([]),
       createKit: jest.fn().mockResolvedValue(kitRecord()),
+      confirmPreparation: jest.fn().mockResolvedValue({ count: 1 }),
       findItem: jest.fn().mockResolvedValue(itemRecord()),
       lockItem: jest.fn().mockResolvedValue(true),
       lockRequirement: jest.fn().mockResolvedValue(true),
@@ -263,7 +280,12 @@ describe('HealthcareCaseKitsService', () => {
   it('rejects mutation of a cancelled Case without writes', async () => {
     repository.findKit.mockResolvedValue(
       kitRecord({
-        healthcareCase: { status: HealthcareCaseStatus.CANCELLED },
+        healthcareCase: {
+          status: HealthcareCaseStatus.CANCELLED,
+          scheduledStart: new Date('2026-09-28T12:00:00.000Z'),
+          scheduledEnd: new Date('2026-09-28T14:00:00.000Z'),
+          requirements: [],
+        },
       }) as never,
     );
     await expect(
@@ -304,6 +326,8 @@ describe('HealthcareCaseKitsService', () => {
       requirement: null,
       equipmentAssignment: {
         id: assignmentId,
+        origin: HealthcareEquipmentAssignmentOrigin.DIRECT,
+        requirementId: null,
         lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
         equipmentAsset: {
           id: 'asset-id',
@@ -362,7 +386,12 @@ describe('HealthcareCaseKitsService', () => {
   it('keeps invalidated sources and derives warnings without writes', async () => {
     repository.findKitByCase.mockResolvedValue(
       kitRecord({
-        healthcareCase: { status: HealthcareCaseStatus.CANCELLED },
+        healthcareCase: {
+          status: HealthcareCaseStatus.CANCELLED,
+          scheduledStart: new Date('2026-09-28T12:00:00.000Z'),
+          scheduledEnd: new Date('2026-09-28T14:00:00.000Z'),
+          requirements: [],
+        },
         items: [
           {
             id: 'stale-item',
@@ -726,5 +755,333 @@ describe('HealthcareCaseKitsService', () => {
     ).rejects.toMatchObject({ response: { code: 'CASE_KIT_NOT_FOUND' } });
     expect(repository.findItem).not.toHaveBeenCalled();
     expect(repository.runInTransaction).not.toHaveBeenCalled();
+  });
+
+  it('confirms a ready DRAFT kit atomically in Company-first order', async () => {
+    const prepared = kitRecord({
+      status: HealthcareCaseKitStatus.PREPARED,
+      preparedBy: { id: userId, firstName: 'Ana', lastName: 'López' },
+      preparedAt: now,
+    });
+    repository.findKit
+      .mockResolvedValueOnce(kitRecord() as never)
+      .mockResolvedValueOnce(kitRecord() as never)
+      .mockResolvedValueOnce(prepared as never);
+
+    const result = await service.confirmPreparation(
+      companyId,
+      userId,
+      kitId,
+      'confirm-key',
+    );
+
+    expect(result).toMatchObject({
+      replay: false,
+      data: {
+        status: HealthcareCaseKitStatus.PREPARED,
+        preparedBy: { id: userId },
+        preparedAt: now,
+        preparationReadiness: { status: 'PASS', blockers: [] },
+      },
+    });
+    expect(repository.lockCase.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.lockKit.mock.invocationCallOrder[0],
+    );
+    expect(repository.lockKit.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.lockActiveItems.mock.invocationCallOrder[0],
+    );
+    expect(repository.lockActiveItems.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.lockCaseRequirements.mock.invocationCallOrder[0],
+    );
+    expect(
+      repository.lockCaseRequirements.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      repository.lockActiveItemAssignments.mock.invocationCallOrder[0],
+    );
+    expect(repository.confirmPreparation).toHaveBeenCalledWith(
+      transaction,
+      expect.objectContaining({
+        companyId,
+        caseKitId: kitId,
+        preparedById: userId,
+        preparedAt: repository.confirmPreparation.mock.calls[0][1].preparedAt,
+      }),
+    );
+    const lockOrder = [
+      jest.mocked(acquireHealthcareCompanyLock),
+      jest.mocked(applyHealthcareSubsequentTransactionTimeouts),
+      repository.lockCase,
+      repository.lockKit,
+      repository.lockActiveItems,
+      repository.lockCaseRequirements,
+      repository.lockActiveItemAssignments,
+      repository.lockActiveItemProducts,
+      repository.lockActiveItemEquipmentAssets,
+    ].map((mock) => mock.mock.invocationCallOrder[0]);
+    for (let index = 1; index < lockOrder.length; index += 1) {
+      expect(lockOrder[index - 1]).toBeLessThan(lockOrder[index]);
+    }
+    expect(lockOrder[lockOrder.length - 1]).toBeLessThan(
+      repository.findKit.mock.invocationCallOrder[1],
+    );
+    expect(
+      repository.confirmPreparation.mock.calls[0][1].preparedAt,
+    ).toBeInstanceOf(Date);
+    expect(
+      repository.confirmPreparation.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      repository.createIdempotencyClaim.mock.invocationCallOrder[0],
+    );
+    expect(
+      repository.createIdempotencyClaim.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      repository.completeIdempotencyClaim.mock.invocationCallOrder[0],
+    );
+  });
+
+  it.each(['product', 'equipment'] as const)(
+    'revalidates %s after source locks instead of using the valid discovery snapshot',
+    async (source) => {
+      const material = itemRecord();
+      const validItem =
+        source === 'product'
+          ? material
+          : itemRecord({
+              requirementId: null,
+              requirement: null,
+              preparedQuantity: null,
+              equipmentAssignmentId: assignmentId,
+              equipmentAssignment: {
+                id: assignmentId,
+                lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+                equipmentAsset: {
+                  lifecycle: EquipmentLifecycle.ACTIVE,
+                  condition: EquipmentCondition.GOOD,
+                },
+              },
+            });
+      const invalidItem =
+        source === 'product'
+          ? {
+              ...material,
+              requirement: {
+                ...material.requirement,
+                product: { ...material.requirement.product, isActive: false },
+              },
+            }
+          : {
+              ...validItem,
+              equipmentAssignment: {
+                id: assignmentId,
+                lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+                equipmentAsset: {
+                  lifecycle: EquipmentLifecycle.RETIRED,
+                  condition: EquipmentCondition.GOOD,
+                },
+              },
+            };
+      repository.findKit
+        .mockResolvedValueOnce(kitRecord({ items: [validItem] }) as never)
+        .mockResolvedValueOnce(kitRecord({ items: [invalidItem] }) as never);
+
+      await expect(
+        service.confirmPreparation(
+          companyId,
+          userId,
+          kitId,
+          'source-changed-key',
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          code: 'CASE_KIT_PREPARATION_BLOCKED',
+          details: {
+            blockers: expect.arrayContaining([
+              expect.objectContaining({
+                code:
+                  source === 'product'
+                    ? 'CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE'
+                    : 'CASE_KIT_EQUIPMENT_NOT_ACTIVE',
+              }),
+            ]) as unknown,
+          },
+        },
+      });
+      expect(
+        repository.lockActiveItemEquipmentAssets.mock.invocationCallOrder[0],
+      ).toBeLessThan(repository.findKit.mock.invocationCallOrder[1]);
+      expect(repository.findKit).toHaveBeenNthCalledWith(
+        2,
+        companyId,
+        kitId,
+        transaction,
+      );
+      expect(repository.confirmPreparation).not.toHaveBeenCalled();
+      expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+      expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+    },
+  );
+
+  it('returns readiness blockers without transition or key writes', async () => {
+    repository.findKit.mockResolvedValue(
+      kitRecord({
+        healthcareCase: {
+          status: HealthcareCaseStatus.DRAFT,
+          scheduledStart: null,
+          scheduledEnd: null,
+          requirements: [],
+        },
+      }) as never,
+    );
+
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'blocked-key'),
+    ).rejects.toMatchObject({
+      response: {
+        code: 'CASE_KIT_PREPARATION_BLOCKED',
+        details: {
+          blockers: [{ code: 'CASE_KIT_CASE_NOT_SCHEDULED' }],
+        },
+      },
+    });
+    expect(repository.confirmPreparation).not.toHaveBeenCalled();
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+    expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+  });
+
+  it('presents a foreign-tenant Kit as missing before confirmation writes', async () => {
+    repository.findKit.mockResolvedValue(null);
+
+    await expect(
+      service.confirmPreparation(
+        'other-company',
+        userId,
+        kitId,
+        'foreign-confirm-key',
+      ),
+    ).rejects.toMatchObject({ response: { code: 'CASE_KIT_NOT_FOUND' } });
+    expect(repository.runInTransaction).not.toHaveBeenCalled();
+    expect(repository.confirmPreparation).not.toHaveBeenCalled();
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+  });
+
+  it('maps a preparation Company-lock timeout to the sanitized 503 before row locks', async () => {
+    jest
+      .mocked(acquireHealthcareCompanyLock)
+      .mockRejectedValueOnce(
+        new HealthcareCompanyLockTimeoutError(new Error('internal cause')),
+      );
+
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'timeout-key'),
+    ).rejects.toMatchObject({
+      status: 503,
+      response: { code: 'HEALTHCARE_CONCURRENCY_TIMEOUT' },
+    });
+    expect(repository.lockCase).not.toHaveBeenCalled();
+    expect(repository.confirmPreparation).not.toHaveBeenCalled();
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+  });
+
+  it('sanitizes an unexpected preparation persistence failure', async () => {
+    repository.runInTransaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('sensitive native detail', {
+        code: 'P2025',
+        clientVersion: '6.19.3',
+      }),
+    );
+
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'failure-key'),
+    ).rejects.toMatchObject({
+      status: 500,
+      response: {
+        code: 'HEALTHCARE_PERSISTENCE_ERROR',
+        message: 'No fue posible completar la operación',
+      },
+    });
+  });
+
+  it('replays PREPARED state with a new key without changing original audit or consuming the key', async () => {
+    const prepared = kitRecord({
+      status: HealthcareCaseKitStatus.PREPARED,
+      preparedBy: { id: userId, firstName: 'Ana', lastName: 'López' },
+      preparedAt: now,
+    });
+    repository.findKit.mockResolvedValue(prepared as never);
+
+    const result = await service.confirmPreparation(
+      companyId,
+      'different-user',
+      kitId,
+      'new-key',
+    );
+
+    expect(result).toMatchObject({
+      replay: true,
+      data: { preparedBy: { id: userId }, preparedAt: now },
+    });
+    expect(repository.confirmPreparation).not.toHaveBeenCalled();
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+    expect(repository.completeIdempotencyClaim).not.toHaveBeenCalled();
+  });
+
+  it('returns a completed preparation replay before discovery and rejects key reuse for another Kit', async () => {
+    const { createHealthcareCaseKitPreparationRequestHash } =
+      await import('./healthcare-case-kit-request-hash');
+    repository.findIdempotencyRecord.mockResolvedValue({
+      requestHash: createHealthcareCaseKitPreparationRequestHash(kitId),
+      resourceId: kitId,
+    });
+
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'same-key'),
+    ).resolves.toMatchObject({ replay: true, data: { id: kitId } });
+    expect(repository.runInTransaction).not.toHaveBeenCalled();
+
+    repository.findIdempotencyRecord.mockResolvedValue({
+      requestHash: createHealthcareCaseKitPreparationRequestHash('other-kit'),
+      resourceId: 'other-kit',
+    });
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'same-key'),
+    ).rejects.toMatchObject({ response: { code: 'IDEMPOTENCY_KEY_REUSED' } });
+  });
+
+  it('performs readback when the conditional preparation update affects zero rows', async () => {
+    const prepared = kitRecord({
+      status: HealthcareCaseKitStatus.PREPARED,
+      preparedBy: { id: userId, firstName: 'Ana', lastName: 'López' },
+      preparedAt: now,
+    });
+    repository.confirmPreparation.mockResolvedValue({ count: 0 });
+    repository.findKit
+      .mockResolvedValueOnce(kitRecord() as never)
+      .mockResolvedValueOnce(kitRecord() as never)
+      .mockResolvedValueOnce(prepared as never);
+
+    await expect(
+      service.confirmPreparation(companyId, userId, kitId, 'loser-key'),
+    ).resolves.toMatchObject({ replay: true, data: { status: 'PREPARED' } });
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
+  });
+
+  it('rejects adding content to a PREPARED Kit without writes', async () => {
+    repository.findKit.mockResolvedValue(
+      kitRecord({
+        status: HealthcareCaseKitStatus.PREPARED,
+        preparedBy: { id: userId, firstName: 'Ana', lastName: 'López' },
+        preparedAt: now,
+      }) as never,
+    );
+
+    await expect(
+      service.addItem(companyId, userId, kitId, 'prepared-add-key', {
+        sourceType: HealthcareCaseKitItemSourceType.REQUIREMENT,
+        requirementId,
+        preparedQuantity: 2,
+      }),
+    ).rejects.toMatchObject({ response: { code: 'CASE_KIT_NOT_MUTABLE' } });
+    expect(repository.createItem).not.toHaveBeenCalled();
+    expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
   });
 });

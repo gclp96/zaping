@@ -21,8 +21,10 @@ import { AuthenticatedRequest } from '../../auth/interfaces/authenticated-reques
 import {
   idempotencyKeyRequiredException,
   invalidIdempotencyKeyException,
+  invalidRequestBodyException,
 } from '../common/healthcare-errors';
 import { AddHealthcareCaseKitItemDto } from './dto/add-healthcare-case-kit-item.dto';
+import { ConfirmHealthcareCaseKitPreparationDto } from './dto/confirm-healthcare-case-kit-preparation.dto';
 import { CreateHealthcareCaseKitDto } from './dto/create-healthcare-case-kit.dto';
 import { ExcludeHealthcareCaseKitItemDto } from './dto/exclude-healthcare-case-kit-item.dto';
 import { HealthcareCaseKitsService } from './healthcare-case-kits.service';
@@ -108,6 +110,40 @@ export class HealthcareCaseKitsController {
     );
     response.status(HttpStatus.OK);
     return result.data;
+  }
+
+  @Post('case-kits/:caseKitId/confirm-preparation')
+  @Roles(...mutationRoles)
+  async confirmPreparation(
+    @Req() request: AuthenticatedRequest,
+    @Param('caseKitId', ParseUUIDPipe) caseKitId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.validateEmptyPreparationBody(body);
+    const result = await this.service.confirmPreparation(
+      request.user.companyId,
+      request.user.id,
+      caseKitId,
+      this.validateIdempotencyKey(key),
+    );
+    response.status(HttpStatus.OK);
+    return result.data;
+  }
+
+  private validateEmptyPreparationBody(
+    value: unknown,
+  ): ConfirmHealthcareCaseKitPreparationDto {
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      Object.keys(value).length === 0
+    ) {
+      return {};
+    }
+    throw invalidRequestBodyException();
   }
 
   private validateIdempotencyKey(value: string | undefined): string {

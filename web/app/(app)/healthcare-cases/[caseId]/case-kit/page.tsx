@@ -1,7 +1,7 @@
 'use client';
 
 import axios from 'axios';
-import { ArrowLeft, Ban, Plus } from 'lucide-react';
+import { ArrowLeft, Ban, CheckCircle2, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -20,12 +20,14 @@ import { api } from '@/services/api';
 import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import {
   addHealthcareCaseKitItem,
+  confirmHealthcareCaseKitPreparation,
   createHealthcareCaseKit,
   excludeHealthcareCaseKitItem,
   getHealthcareCaseKit,
   type AddHealthcareCaseKitItemPayload,
   type HealthcareCaseKit,
   type HealthcareCaseKitItem,
+  type HealthcareCaseKitReadinessBlocker,
 } from '@/services/healthcare-case-kits';
 import {
   listHealthcareEquipmentAssignments,
@@ -51,6 +53,33 @@ function isCaseKitMissing(error: unknown): boolean {
 function personLabel(person: { firstName: string; lastName: string }) {
   return `${person.firstName} ${person.lastName}`;
 }
+
+const readinessMessages: Record<
+  HealthcareCaseKitReadinessBlocker['code'],
+  string
+> = {
+  CASE_KIT_CASE_CANCELLED: 'El caso está cancelado.',
+  CASE_KIT_CASE_NOT_SCHEDULED: 'El caso todavía no está programado.',
+  CASE_KIT_CASE_SCHEDULE_INCOMPLETE:
+    'La programación del caso no tiene inicio y fin completos.',
+  CASE_KIT_REQUIREMENT_NOT_ACTIVE:
+    'Un requerimiento incluido ya no está activo.',
+  CASE_KIT_REQUIREMENT_PRODUCT_INACTIVE:
+    'El producto de un requerimiento incluido está inactivo.',
+  CASE_KIT_PREPARED_QUANTITY_EXCEEDS_REQUESTED:
+    'Una cantidad preparada excede la cantidad solicitada.',
+  CASE_KIT_ASSIGNMENT_NOT_RESERVED:
+    'Una asignación incluida ya no está reservada.',
+  CASE_KIT_EQUIPMENT_NOT_ACTIVE: 'Un equipo incluido ya no está activo.',
+  CASE_KIT_EQUIPMENT_NOT_GOOD:
+    'Un equipo incluido ya no está en condición disponible.',
+  CASE_KIT_REQUIRED_QUANTITY_NOT_COVERED:
+    'Falta cubrir exactamente la cantidad de un requerimiento obligatorio.',
+  CASE_KIT_REQUIRED_ASSET_NOT_COVERED:
+    'Faltan equipos reservados para un requerimiento obligatorio.',
+  CASE_KIT_SERIALIZED_REQUIREMENT_UNSUPPORTED:
+    'Los requerimientos SERIALIZED aún no pueden confirmarse.',
+};
 
 function KitItemCard({
   item,
@@ -167,6 +196,8 @@ export default function HealthcareCaseKitPage() {
   const [exclusionReason, setExclusionReason] = useState('');
   const [exclusionSaving, setExclusionSaving] = useState(false);
   const [exclusionError, setExclusionError] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmationError, setConfirmationError] = useState('');
 
   const load = useCallback(async () => {
     const current = ++requestId.current;
@@ -367,6 +398,37 @@ export default function HealthcareCaseKitPage() {
     }
   }
 
+  async function confirmPreparation() {
+    if (!kit || kit.status !== 'DRAFT' || !canMutate || confirming) return;
+    setConfirming(true);
+    setConfirmationError('');
+    try {
+      await confirmHealthcareCaseKitPreparation(kit.id);
+      setNotice('Preparación confirmada correctamente.');
+      await load();
+    } catch (requestError) {
+      setConfirmationError(
+        getApiErrorMessage(
+          requestError,
+          'No fue posible confirmar la preparación.',
+        ),
+      );
+      if (
+        axios.isAxiosError<{ code?: string }>(requestError) &&
+        requestError.response?.status === 409 &&
+        [
+          'CASE_KIT_PREPARATION_BLOCKED',
+          'CASE_KIT_NOT_MUTABLE',
+          'RESOURCE_STATE_CHANGED',
+        ].includes(requestError.response.data?.code ?? '')
+      ) {
+        await load();
+      }
+    } finally {
+      setConfirming(false);
+    }
+  }
+
   const candidates =
     sourceType === 'REQUIREMENT' ? materialCandidates : equipmentCandidates;
 
@@ -382,7 +444,9 @@ export default function HealthcareCaseKitPage() {
           }
           action={
             <div className="flex flex-wrap gap-3">
-              {canMutate && kit && healthcareCase?.status !== 'CANCELLED' ? (
+              {canMutate &&
+              kit?.status === 'DRAFT' &&
+              healthcareCase?.status !== 'CANCELLED' ? (
                 <Button type="button" onClick={() => void openAddModal()}>
                   <Plus aria-hidden="true" size={18} /> Agregar contenido
                 </Button>
@@ -398,9 +462,9 @@ export default function HealthcareCaseKitPage() {
         />
 
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-          <strong>Preparación lógica no reservante.</strong> Las cantidades no
-          descuentan stock ni lotes, no crean movimientos de inventario y no
-          garantizan disponibilidad física.
+          <strong>Preparación lógica no reservante.</strong> Agregar contenido o
+          confirmar la preparación no reserva ni descuenta stock o lotes, no
+          crea movimientos de inventario y no garantiza disponibilidad física.
         </div>
         {notice ? (
           <p
@@ -408,6 +472,11 @@ export default function HealthcareCaseKitPage() {
             className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-900"
           >
             {notice}
+          </p>
+        ) : null}
+        {confirmationError ? (
+          <p role="alert" className="text-sm text-red-700">
+            {confirmationError}
           </p>
         ) : null}
         {loading ? (
@@ -448,12 +517,71 @@ export default function HealthcareCaseKitPage() {
           </Section>
         ) : (
           <div className="space-y-6">
-            <div className="flex items-center gap-3">
-              <StatusBadge label="Borrador" tone="neutral" />
+            <div className="flex flex-wrap items-center gap-3">
+              <StatusBadge
+                label={kit.status === 'PREPARED' ? 'Preparado' : 'Borrador'}
+                tone={kit.status === 'PREPARED' ? 'success' : 'neutral'}
+              />
               <span className="text-sm text-text-muted">
                 Creado por {personLabel(kit.createdBy)}
               </span>
+              {kit.status === 'PREPARED' && kit.preparedBy && kit.preparedAt ? (
+                <span className="text-sm text-text-muted">
+                  Preparado por {personLabel(kit.preparedBy)} el{' '}
+                  {new Date(kit.preparedAt).toLocaleString('es-MX')}
+                </span>
+              ) : null}
             </div>
+            <Section
+              title="Readiness de preparación"
+              description="Validación derivada del caso, sus requerimientos y las fuentes activas del maletín."
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <StatusBadge
+                    label={
+                      kit.preparationReadiness.status === 'PASS'
+                        ? 'Listo para confirmar'
+                        : 'Bloqueado'
+                    }
+                    tone={
+                      kit.preparationReadiness.status === 'PASS'
+                        ? 'success'
+                        : 'warning'
+                    }
+                  />
+                  {canMutate && kit.status === 'DRAFT' ? (
+                    <Button
+                      type="button"
+                      loading={confirming}
+                      onClick={() => void confirmPreparation()}
+                    >
+                      <CheckCircle2 aria-hidden="true" size={18} /> Confirmar
+                      preparación
+                    </Button>
+                  ) : null}
+                </div>
+                {kit.preparationReadiness.blockers.length ? (
+                  <ul className="space-y-1 text-sm text-amber-900" role="alert">
+                    {kit.preparationReadiness.blockers.map((blocker, index) => (
+                      <li
+                        key={`${blocker.code}-${blocker.requirementId ?? ''}-${blocker.caseKitItemId ?? ''}-${index}`}
+                      >
+                        {readinessMessages[blocker.code]}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-green-800">
+                    El contenido cumple las reglas lógicas de preparación.
+                  </p>
+                )}
+                <p className="text-sm text-text-muted">
+                  Confirmar no reserva ni descuenta inventario y no representa
+                  una salida de almacén.
+                </p>
+              </div>
+            </Section>
             <Section
               title="Materiales"
               description="Cantidades planeadas de requerimientos QUANTITY."

@@ -47,6 +47,7 @@ export const HEALTHCARE_ERROR_CODES = {
   idempotencyKeyReused: 'IDEMPOTENCY_KEY_REUSED',
   idempotencyKeyRequired: 'IDEMPOTENCY_KEY_REQUIRED',
   invalidIdempotencyKey: 'INVALID_IDEMPOTENCY_KEY',
+  invalidRequestBody: 'INVALID_REQUEST_BODY',
   caseKitNotFound: 'CASE_KIT_NOT_FOUND',
   caseKitSourceNotFound: 'CASE_KIT_SOURCE_NOT_FOUND',
   caseKitAlreadyExists: 'CASE_KIT_ALREADY_EXISTS',
@@ -59,6 +60,7 @@ export const HEALTHCARE_ERROR_CODES = {
   caseKitItemNotFound: 'CASE_KIT_ITEM_NOT_FOUND',
   invalidCaseKitItemExclusionReason: 'INVALID_CASE_KIT_ITEM_EXCLUSION_REASON',
   caseKitItemAlreadyExcluded: 'CASE_KIT_ITEM_ALREADY_EXCLUDED',
+  caseKitPreparationBlocked: 'CASE_KIT_PREPARATION_BLOCKED',
   resourceStateChanged: 'RESOURCE_STATE_CHANGED',
   relatedResourceChanged: 'RELATED_RESOURCE_CHANGED',
   concurrencyTimeout: 'HEALTHCARE_CONCURRENCY_TIMEOUT',
@@ -430,6 +432,25 @@ export function caseKitItemAlreadyExcludedException(): ConflictException {
     HEALTHCARE_ERROR_CODES.caseKitItemAlreadyExcluded,
     'El contenido ya fue excluido con una razón diferente',
   );
+}
+
+export function invalidRequestBodyException(): BadRequestException {
+  return healthcareBadRequestException(
+    HEALTHCARE_ERROR_CODES.invalidRequestBody,
+    'El cuerpo de la solicitud no es válido',
+  );
+}
+
+export function caseKitPreparationBlockedException(
+  blockers: readonly unknown[],
+): ConflictException {
+  return new ConflictException({
+    statusCode: HttpStatus.CONFLICT,
+    error: 'Conflict',
+    code: HEALTHCARE_ERROR_CODES.caseKitPreparationBlocked,
+    message: 'El maletín tiene bloqueos de preparación pendientes',
+    details: { blockers },
+  });
 }
 
 export function resourceStateChangedException(): ConflictException {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from './api';
 import {
   addHealthcareCaseKitItem,
+  confirmHealthcareCaseKitPreparation,
   createHealthcareCaseKit,
   excludeHealthcareCaseKitItem,
   getHealthcareCaseKit,
@@ -71,6 +72,24 @@ describe('healthcare-case-kits service', () => {
           'Idempotency-Key': expect.stringMatching(
             /^hc-case-kit-item-exclude-/,
           ),
+        },
+      },
+    );
+  });
+
+  it('confirms preparation with an empty body and a dedicated key', async () => {
+    vi.mocked(api.post).mockResolvedValue({
+      data: { ...kit, status: 'PREPARED' },
+    });
+
+    await confirmHealthcareCaseKitPreparation('kit-1');
+
+    expect(api.post).toHaveBeenCalledWith(
+      '/healthcare/case-kits/kit-1/confirm-preparation',
+      {},
+      {
+        headers: {
+          'Idempotency-Key': expect.stringMatching(/^hc-case-kit-confirm-/),
         },
       },
     );

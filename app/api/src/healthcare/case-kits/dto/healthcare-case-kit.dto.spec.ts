@@ -8,6 +8,7 @@ import {
 } from './add-healthcare-case-kit-item.dto';
 import { CreateHealthcareCaseKitDto } from './create-healthcare-case-kit.dto';
 import { ExcludeHealthcareCaseKitItemDto } from './exclude-healthcare-case-kit-item.dto';
+import { ConfirmHealthcareCaseKitPreparationDto } from './confirm-healthcare-case-kit-preparation.dto';
 
 describe('Healthcare CaseKit DTO allowlists', () => {
   const pipe = new ValidationPipe({
@@ -27,6 +28,27 @@ describe('Healthcare CaseKit DTO allowlists', () => {
       pipe.transform(
         { status: 'DRAFT' },
         { type: 'body', metatype: CreateHealthcareCaseKitDto },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('accepts only the empty Confirm Preparation body', async () => {
+    await expect(
+      pipe.transform(
+        {},
+        {
+          type: 'body',
+          metatype: ConfirmHealthcareCaseKitPreparationDto,
+        },
+      ),
+    ).resolves.toEqual({});
+    await expect(
+      pipe.transform(
+        { status: 'PREPARED' },
+        {
+          type: 'body',
+          metatype: ConfirmHealthcareCaseKitPreparationDto,
+        },
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });

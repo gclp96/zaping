@@ -4,8 +4,8 @@
 **Producto:** Zaping Healthcare
 **Versión:** 2.4.0
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED — DoR COMPLETE
-**Última actualización:** 2026-09-28
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
+**Última actualización:** 2026-10-07
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -3411,10 +3411,10 @@ HC-OPS-01A.1 implementa la exclusión auditada de items `DRAFT` antes de abordar
 la confirmación de preparación. El contrato normativo y su cierre se definen en
 la sección 232.
 
-## 231.17 Siguiente candidato
+## 231.17 Evolución implementada
 
-**HC-OPS-01B — Preparation Confirmation & Readiness** queda como candidato
-**CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED**, con DoR COMPLETE y sin SP,
+**HC-OPS-01B — Preparation Confirmation & Readiness** está implementado y validado:
+**COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS**, con DoR COMPLETE y sin SP,
 Forecast ni Commitment. El blocker previo de corrección de items stale quedó
 resuelto por HC-OPS-01A.1.
 
@@ -3648,7 +3648,7 @@ No se asignan SP, Forecast ni Commitment.
 
 # 233. HC-OPS-01B — Preparation Confirmation & Readiness
 
-**Estado:** CONTRACT DOCUMENTED / READY / NOT IMPLEMENTED.
+**Estado:** COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS.
 
 **Prerequisito:** HC-OPS-01A.1 COMPLETE / MERGED; el blocker de corrección de
 items stale está RESOLVED.
@@ -3794,6 +3794,20 @@ Idempotency-Key: <required>
   ni consume la key;
 - colisiones concurrentes de claim recuperan al ganador de forma segura.
 
+La frontera implementada de confirmación es Company advisory lock → límites de
+trabajo posteriores → Case → CaseKit → items ACTIVE → Requirements del Case →
+Assignments de items ACTIVE → Products de materiales ACTIVE → EquipmentAssets de
+items ACTIVE. Los row locks son tenant-scoped `FOR UPDATE`, con colecciones en
+orden determinista por ID. Después se relee el Kit autoritativamente antes de
+evaluar readiness y ejecutar la transición condicional.
+
+Product y EquipmentAsset se bloquean como fuentes de readiness porque sus
+mutaciones vigentes no adquieren el Company lock. El protocolo aceptado de 01B
+no cambia esas mutaciones ni sus reglas de negocio. Si la invalidación gana,
+Confirm responde BLOCKED sin writes ni claim; si Confirm gana, la mutación espera
+al commit y el GET posterior deriva el blocker sin reescribir PREPARED ni su
+auditoría. Véase [ADR-HC-LOCK-001, sección 6.3](../../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md).
+
 ## 233.7 Errores estables
 
 | HTTP | Code | Uso |
@@ -3834,6 +3848,14 @@ Idempotency-Key: <required>
   `BLOCKED`;
 - no existen controles de Dispatch.
 
+Tras un 409 `CASE_KIT_PREPARATION_BLOCKED`, `CASE_KIT_NOT_MUTABLE` o
+`RESOURCE_STATE_CHANGED`, Web vuelve a consultar Case/CaseKit y presenta readiness
+y blockers autoritativos. Conserva el error de confirmación durante el refresh;
+si la consulta falla, oculta la readiness anterior y ofrece Reintentar. No recarga
+la página del navegador ni replica reglas de readiness en el cliente. La lista
+derivada de blockers y los warnings por item satisfacen la UI mínima; no se exige
+un checklist adicional ni mostrar IDs de fuente.
+
 ## 233.10 Acceptance Criteria
 
 - sólo un CaseKit `DRAFT` propio y con Case `SCHEDULED` completo puede ejecutar la
@@ -3862,7 +3884,7 @@ Idempotency-Key: <required>
 - RBAC, UI, AC, DoD y límites documentados;
 - HC-OPS-01A.1 está COMPLETE / MERGED y resolvió la corrección de items stale.
 
-**Resultado DoR:** COMPLETE. HC-OPS-01B está READY para implementación.
+**Resultado DoR:** COMPLETE. Implementación y validación completadas; DoD PASS.
 
 ## 233.12 Definition of Done
 
@@ -3888,3 +3910,67 @@ HC-OPS-01B no implementa `IN_PREPARATION`, reopen, mutación de items después d
 `InventoryMovement`, decremento de stock ni arquitectura no relacionada.
 
 No se asignan SP, Forecast ni Commitment.
+
+## 233.14 Evidencia de cierre
+
+Cierre documental: 2026-10-07. Baseline de revisión:
+`feat/hc-ops-01b-preparation`, HEAD
+`5865c63f605a74fcdc00a2590e4ab843b9df7a33`, implementación sin commit. COMPLETE
+significa implementado y validado; no afirma merge, deployment, release ni cierre
+del milestone M-HC1.
+
+La evidencia siguiente procede del checkpoint aceptado de cierre proporcionado
+por el usuario y de las validaciones focales del delta anterior. Los builds,
+PostgreSQL y QA manual no se repitieron durante este cierre documental. Prisma
+validate/generate PASS fue confirmado adicionalmente por el usuario.
+
+| Categoría | Evidencia aceptada | Resultado |
+| --- | --- | --- |
+| API unit | 6 suites Case Kit, 69/69 tests: readiness, tenant, response, inmutabilidad, replay y errores. | PASS |
+| HTTP E2E autenticado | `healthcare-case-kits.http.e2e-spec.ts`, 9/9: JWT/role guard reales, ADMIN/MANAGER/WAREHOUSE 200, SALES 403, sin autenticación 401, tenant ajeno 404, validación 400, blockers 409 y replay/key reuse. Controller y service reales; persistencia/locks con doubles. | PASS |
+| Web | Tests de service Case Kits y página Case Kit, 20/20: estados, auditoría, controles y refresh autoritativo tras conflicto, fallo de refresh y retry. | PASS |
+| PostgreSQL real | Suite integrada `healthcare-company-lock.consumers.postgres.e2e-spec.ts`, 52/52 en `zaping_spike_test`, PostgreSQL 16. | PASS |
+| Carreras de fuentes | Product invalidation y Equipment retirement ganando; preparación ganando antes de ambas mutaciones. | PASS |
+| Atomicidad | Confirmaciones concurrentes, constraint PREPARED, readback condicional y rollback tras fallo de completion del claim. | PASS |
+| Frontera física | Comparaciones de stock, InventoryBatch, InventoryMovement y Assignments sin efectos de confirmación. | PASS |
+| Invalidación posterior | Unit readiness: Requirement retire, Assignment RELEASED/REPLACED y Case cancel; PostgreSQL: Product/Equipment después de preparación, preservando estado/auditoría. | PASS |
+| Prisma | Validate/generate; migrations separan enum y campos, CHECK de auditoría, índice y FK compuesta tenant-safe revisados. | PASS |
+| Calidad API/Web | Production typecheck, ESLint focal API/Web y Prettier limitado a los archivos del delta UI/HTTP. | PASS |
+| Build API | Production build. | PASS |
+| Build Web | Production build con `NEXT_PUBLIC_API_URL=https://api.example.test` temporal, retirado después según el checkpoint. | PASS |
+| QA manual | DRAFT carga; readiness/blockers/warnings; confirmación BLOCKED rechazada, conserva DRAFT, error y refetch; cantidades REQUIRED completas; Case scheduled/ready; confirmación exitosa; PREPARED/auditoría y controles por rol/estado correctos. | PASS |
+| Git | `git diff --check`; trabajo sin stage ni commit. | PASS |
+
+## 233.15 Evaluación final de DoD
+
+Evaluación contra 233.12 y [Project Board, sección 23](../../project/PROJECT_BOARD.md).
+
+| Criterio | Resultado | Evidencia |
+| --- | --- | --- |
+| Contrato aprobado | PASS | Sección 233; DoR COMPLETE. |
+| Implementación completa | PASS | DRAFT → PREPARED, auditoría, readiness, HTTP y Web implementados. |
+| Arquitectura respetada | PASS | Company-first, locks de fuentes y reread; sin efectos físicos ni ampliación de scope. |
+| Tenant isolation | PASS | Unit/repository, JWT tenant propagation HTTP y FK compuesta de auditoría. |
+| RBAC / revisión de acceso | PASS | HTTP E2E roles reales y tenant boundary; SALES read-only. No se declara auditoría de seguridad global. |
+| Migrations revisadas | PASS | Enum/scope separados de campos/CHECK/índice/FK; Prisma validate/generate y constraint PostgreSQL. |
+| API validation | PASS | Body vacío, key obligatoria, UUID, respuesta directa y errores estables; HTTP 9/9. |
+| Frontend states | PASS | Web 20/20 y QA manual; loading, errors, blockers, refetch, audit e inmutabilidad. |
+| Idempotencia | PASS | Replays por key/estado zero-write, auditoría original y key reuse 409. |
+| Concurrencia | PASS | PostgreSQL 52/52, ambas precedencias Product/Equipment y concurrent confirmations. |
+| Rollback | PASS | Fallo de completion revierte PREPARED, auditoría y claim. |
+| Unit / integración / E2E | PASS | API 69/69, HTTP 9/9, Web 20/20 y PostgreSQL real 52/52. |
+| Typecheck / lint / formato | PASS | Gates focales aceptados; no se afirma Prettier global. |
+| Production builds | PASS | API/Web builds aceptados. |
+| Manual QA | PASS | Flujo y estados validados en el checkpoint manual aceptado. |
+| Documentación / changelog | PASS | CASE_KITS, CASES, ROADMAP, PROJECT_BOARD, CHANGELOG y ADR sincronizados. |
+| Git health | PASS | Diff-check, implementación preservada, sin stage/commit. |
+| Blockers / HIGH sin resolver | PASS | Ninguno pendiente dentro de HC-OPS-01B. |
+| Release / deployment / métricas nuevas | NOT APPLICABLE | No se crea versión, PR, merge, SP, Forecast ni Commitment. |
+
+**Resultado:** DoD PASS — COMPLETE / VALIDATED / READY FOR FINAL REVIEW —
+UNCOMMITTED. Siguiente paso: revisión humana del diff antes de staging.
+
+Fuera del ticket: drift Prettier en los cuatro archivos preexistentes de DTOs y
+module, warnings LF/CRLF del entorno Windows, `output/`, `tmp/`, oportunidades de
+hardening least-privilege del rol aislado HC_LOCK_2H y encoding de fixtures/datos.
+No bloquean este cierre ni fueron corregidos.
