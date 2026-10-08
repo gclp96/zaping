@@ -12,8 +12,8 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-**Última actualización:** 2026-09-27
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
+**Última actualización:** 2026-10-08
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -1834,14 +1834,15 @@ Decisiones aprobadas:
   completarse antes de cualquier slice C6 que dependa de cobertura.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
-- **DEC-C5B-01:** se diseña la identidad dedicada `zaping_hc_c5b`. Esta decisión
-  no autoriza crear el rol, establecer credenciales ni modificar ACL.
-- **DEC-C5B-02:** la aceptación del error sanitizado será compuesta. Los unitarios
+- **DEC-C5B-01:** APROBADA: se usa la identidad dedicada `zaping_hc_c5b`. El refinamiento por sí mismo
+  no autorizó provisioning; el checkpoint posterior acredita rol/ACL mínimos y
+  gate real PASS.
+- **DEC-C5B-02:** APROBADA: la aceptación del error sanitizado será compuesta. Los unitarios
   prueban el mapping Prisma; 2H prueba fallos PostgreSQL reales y HTTP sanitizado
   usando un auth guard de test; C5-B agrega una comprobación HTTP representativa
   con JWT real y un error Prisma controlado. No acredita un fallo PostgreSQL nativo
   más JWT real dentro de la misma petición ni repite los timeouts de HC-LOCK-04.
-- **DEC-C5B-03:** el test modifica directamente el fixture persistido de Case y
+- **DEC-C5B-03:** APROBADA: el test modifica directamente el fixture persistido de Case y
   hace readback por List/Detail HTTP. Acredita recálculo desde estado vigente, no
   Case Update API ni coordinación concurrente con la reprogramación.
 - HC-LOCK-04 permanece CLOSED / ACCEPTED; no se reabre su protocolo ni su
@@ -1902,13 +1903,13 @@ comprueba al inicio, pero no está garantizada durante toda la ejecución.
 **Sprint 1:** 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
 velocidad o Commitment. C5-A se completó el 24-sep, C6-A/C6-B/C6-C/C6-D el
 25-sep y C6-E el 27-sep mediante PR #47 en `main@a1f0fee`. El Forecast del trabajo
-restante permanece pendiente. El siguiente incremento funcional requiere
-refinamiento y no está READY; B0 conserva sus 3 SP y estado NOT READY dentro del
-backlog C5-B.
+restante permanece pendiente. B0 conserva sus 3 SP dentro de C5-B: COMPLETE /
+VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS. B1 es NEXT / BLOCKED
+UNTIL B0 MERGED; no se añade Commitment.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
-**Estado:** PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED.
+**Estado:** PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED.
 
 **Slicing y estimación:** B0 Safe Integrated Harness, 3 SP; B1 List/Detail HTTP
 Readback, 5 SP; B2 Create HTTP/JWT, 5 SP; B3 Integrated Gate & Closeout, 3 SP.
@@ -1923,71 +1924,151 @@ Replace, Manual Release y Parent Integrations se reutilizan sin rediseño.
 
 #### 34.5.2.1 B0 — Safe Integrated Harness — 3 SP
 
-**Estado:** NOT READY / CANDIDATE FOR SPRINT 1.
+**DoR: COMPLETE. Estado:** COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS.
+Refinamiento aprobado el 08-oct-2026 sobre `main@478e0f0` (HC-OPS-01B,
+PR #56). DEC-C5B-01/02/03 aprobadas; provisioning y ejecución posteriores
+aceptados en el checkpoint de cierre.
 
-**DoR de identidad y configuración:** aprobar el diseño de `zaping_hc_c5b`, el
-target propuesto `zaping_spike_test` vía `127.0.0.1:5434` (servidor 5432),
-`RUN_HC_C5B_POSTGRES_TESTS=1` y `HC_C5B_DATABASE_URL`, sin dotenv, `.env`,
-`DATABASE_URL` genérica ni fallback. La URL debe ser PostgreSQL, sin query/hash,
-con contraseña no vacía; ningún valor sensible se imprime. Falta acreditar
-existencia del rol, mecanismo de entrega de la URL, identidad conectada y ACL; no
-existe autorización de provisioning.
+**Superficie:**
+`app/api/test/healthcare-equipment-assignments.c5b.postgres.e2e-spec.ts` contiene
+un único smoke List autorizado con JWT real; el helper
+`app/api/test/helpers/healthcare-c5b-harness.ts` expone `withC5bHarness` para
+reutilizar el ciclo seguro en B1/B2. No implementa sus matrices de aceptación.
 
-**Operaciones SQL en scope:** `SELECT` para JWT, List/Detail, assertions y
-disponibilidad; `INSERT` para fixtures, Assignment y claim; `UPDATE` sólo para
-locks, horario del Case y completion del claim; `DELETE` sólo para cleanup propio;
-`FOR UPDATE`/`FOR SHARE`, advisory locks y configuración local de timeouts. No se
-requieren secuencias, DDL, migraciones ni operaciones administrativas.
+**Configuración:** sólo `RUN_HC_C5B_POSTGRES_TESTS=1` permite leer
+`HC_C5B_DATABASE_URL`; usuario `zaping_hc_c5b`, PostgreSQL 16,
+`127.0.0.1:5434/zaping_spike_test`, servidor 5432 y schema `public`.
+URL sin query/hash y con contraseña no vacía. Sin dotenv, fallback ni impresión
+de secretos. Deshabilitado no importa el helper ni construye Prisma/Nest.
+Un cliente registrado antes de conectar, datasource explícito,
+`connection_limit=1`, connect/pool 5 s y socket 10 s; PID positivo y estable.
 
-**Manifiesto mínimo por objeto, pendiente de verificación efectiva:**
-- `CONNECT` en `zaping_spike_test` y `USAGE` en `public`;
-- `SELECT/INSERT/DELETE` en `Company`, `User`, `Product`, `HealthcareCase`,
-  `HealthcareCaseRequirement`, `EquipmentAsset`,
-  `HealthcareEquipmentAssignment` e `IdempotencyRecord`;
-- `SELECT` en `HealthcareEquipmentAssignmentConflictOverride` y
-  `HealthcareEquipmentAssignmentSettings`;
-- row locks: `UPDATE(id)` en Case, Requirement y Asset, y `UPDATE(companyId)` en
-  Settings;
-- DEC-C5B-03: `UPDATE(scheduledStart, scheduledEnd, updatedAt)` en Case;
-- claim: `UPDATE(resourceId, updatedAt)` en `IdempotencyRecord`;
-- `USAGE` de enums efectivamente usados, incluido `IdempotencyScope`;
-- `EXECUTE` de `btrim(text)`, `current_setting(text)`,
-  `set_config(text,text,boolean)`, advisory locks y funciones de identidad/ACL del
-  preflight. No se conceden privilegios administrativos, globales o de secuencia.
+**Preflight:** identidad conectada y session user, LOGIN sin atributos
+administrativos, sin membresías ni ownership; tipos/nullabilidad de columnas,
+enum labels, FK tenant con orden de columnas y acciones, doce CHECK de
+lifecycle/origin/auditoría y 36 definiciones de índices/keys requeridos. Compara
+estructura booleana de CHECK y predicado RESERVED, no sólo nombres. Verifica
+ACL positivas y prohibidas efectivas y funciones/catálogos usados. Exclusividad
+por PID propio completo, sin filtros backend_type/query/state ni
+pg_read_all_stats, al terminar preflight, antes de inserts, JWT/HTTP y cleanup.
+Cada comprobación es puntual; no reserva la base frente a conexiones futuras.
 
-**Preflight antes del primer DML:** validar identidad de URL y conexión efectiva,
-PostgreSQL 16, base/usuario/host, puerto host y servidor, schema `public`, PID,
-rol LOGIN no administrativo y backend consistente; verificar tablas, columnas,
-constraints, índices, ACL de tabla/columna, enums y funciones; exigir sólo las
-sesiones propias esperadas y no terminar sesiones. Cualquier mismatch falla
-cerrado y sanitizado.
+**Manifiesto mínimo exacto, verificado por código y preflight PostgreSQL PASS:**
 
-**JWT e inyección:** capturar la existencia y valor previo de `JWT_SECRET` sin
-mostrarlo, instalar un secreto efímero antes de construir `JwtStrategy`, mantener
-`ignoreEnvFile: true`, registrar JWT explícitamente, inyectar el mismo Prisma
-aislado y restaurar exactamente el estado anterior incluso si setup, app close o
-teardown fallan.
+- `CONNECT` en `zaping_spike_test`; `USAGE` en `public`.
+- `SELECT/INSERT/DELETE`: Company, User, Product, HealthcareCase,
+  HealthcareCaseRequirement, EquipmentAsset, HealthcareEquipmentAssignment e
+  IdempotencyRecord.
+- ConflictOverride: `SELECT/DELETE` para readback/cleanup; INSERT diferido.
+- Settings: `SELECT`; `UPDATE(companyId)` para row lock.
+- Asset y Requirement: `UPDATE(id)` para row lock.
+- Case: `UPDATE(scheduledStart, scheduledEnd, updatedAt)` para DEC-C5B-03 y
+  row locks; no UPDATE(id) adicional.
+- IdempotencyRecord: `UPDATE(resourceId, updatedAt)`.
+- `EXECUTE`: btrim(text), current_setting(text),
+  set_config(text,text,boolean), pg_advisory_xact_lock(bigint),
+  pg_advisory_xact_lock_shared(bigint), y firmas de identidad/ACL/introspección
+  enumeradas en `functionSignatures` del helper. El acceso al catálogo se
+  comprueba ejecutando sus consultas de preflight.
 
-**Propiedad y cleanup:** preasignar Company A/B; antes de escribir comprobar sus
-IDs en todas las tablas tocadas; usar marcadores `id/name/rfc`; reacreditar
-propiedad tras cada INSERT incluso ante resultado incierto. Cleanup sólo para IDs
-acreditados, en orden referencial, con conteos cero por IDs/keys propios y
-`AggregateError` que conserve errores funcionales, de app close, cleanup y
-disconnect. Un fixture no acreditado se reporta y nunca se borra.
+Sin UPDATE de Assignment, INSERT de ConflictOverride, DML adicional,
+secuencias, TRUNCATE, CREATE/TEMPORARY, grant options o funciones definidas por
+el usuario con SECURITY DEFINER ejecutable. No se exige enum USAGE para DML.
+TEMPORARY fue revocado de PUBLIC en el target durante el hardening aceptado.
+La excepción histórica de C5-A describe evidencia anterior; no se aplica a B0.
+Cualquier acceso efectivo prohibido sigue causando fallo cerrado del gate.
 
-**AC:** fail-closed anterior al DML, cero configuración implícita o filtración de
-secretos, permisos mínimos exactos, ninguna limpieza de datos ajenos y ciclo JWT
-aislado. **DoD:** implementación/revisión focal, preflight PostgreSQL autorizado
-PASS, teardown propio con conteos cero y TypeScript/ESLint/Prettier/
-`git diff --check` verdes.
+**Ownership:** IDs Company A/B y User, nombres/RFC/emails exclusivos, collision
+check previo en todas las tablas del contrato. Registrar intento antes de
+INSERT; acreditar id/name/rfc persistidos incluso tras resultado incierto y
+reacreditar antes de cleanup. Un UUID conocido no autoriza DELETE.
 
-**Pendiente para completar DoR:** rol/URL, ACL efectivas, schema/catálogo,
-funciones/enums, sesiones, collision check, ciclo JWT, ownership y cleanup todavía
-no han sido acreditados. B0 no está READY.
+**JWT:** secreto aleatorio antes de JwtStrategy; Passport, JwtAuthGuard,
+RolesGuard y ValidationPipe reales, actor ADMIN activo persistido y token con
+company/role/authVersion leídos de DB. Providers productivos de Assignment y
+el Prisma exacto, sin AuthModule/login ni credenciales QA. Configuración de
+timeouts explícita sin ConfigModule/dotenv. Cierre HTTP antes de cleanup;
+el cliente de test neutraliza sólo hooks Nest de conexión, y el harness realiza
+la única desconexión final. JWT_SECRET recupera presencia/valor previo incluso
+ante error de setup o app close.
+
+**Cleanup:** sólo owners acreditados; Override → Assignments (sucesores antes
+de predecesores) → Idempotency → Requirements → Cases → Assets → Products →
+Users → Companies. No borra Settings, CoverageNote, kits ni Inventory.
+Dependencias inesperadas fallan. Readback de residuos independiente aun con
+fallos de borrado; AggregateError conserva etapas funcionales, cierre, cleanup,
+readback y disconnect con diagnósticos sanitizados, sin raw Prisma/HTTP errors.
+
+**Evidencia runtime aceptada (cierre 08-oct-2026): PASS.** El rol dedicado
+fue aprovisionado con privilegios mínimos. Se revocó TEMPORARY de PUBLIC en
+zaping_spike_test; zaping_hc_c5b tiene LOGIN/CONNECT, sin SUPERUSER, CREATEDB,
+CREATEROLE, REPLICATION, BYPASSRLS, TEMPORARY ni CREATE de base. La búsqueda
+reportada en el repositorio no encontró dependencia de tablas TEMP/TEMPORARY.
+Esta acción posterior reemplaza para el target la excepción histórica de C5-A;
+no se cambian grants durante este cierre.
+
+Comando habilitado aceptado:
+
+`npx jest --config ./test/jest-e2e.json --runInBand test/healthcare-equipment-assignments.c5b.postgres.e2e-spec.ts`
+
+Resultado final: 1 suite passed / 1 total; 1 test passed / 1 total; aproximadamente
+30 s. Identidad validada: zaping_spike_test, zaping_hc_c5b, public, PostgreSQL 16,
+puerto servidor 5432. Preflight de rol/schema/ACL/funciones/PID y colisiones,
+Company A/B acreditadas, smoke autenticado con JWT real y teardown con
+verificación independiente de cero residuos propios PASS. No declara la base
+globalmente vacía ni cubre las matrices B1/B2.
+
+Dos defectos del harness se corrigieron antes del PASS: el mensaje exterior de
+AggregateError ahora incluye diagnósticos seguros por etapa y estados de app
+close/cleanup/readback/disconnect, manteniendo originales privados; la dirección
+interna de PostgreSQL admite una IP válida con máscara CIDR opcional y conserva
+la comparación de estabilidad durante el run. La URL externa sigue limitada a
+127.0.0.1:5434; ninguna IP/subred Docker está fijada. No se registran secretos.
+
+Evidencia estática aceptada: TypeScript focal/noEmit, ESLint y Prettier de TS,
+gating deshabilitado, pruebas puras URL/CHECK y git diff --check PASS. Diagnóstico:
+7 pruebas PASS; identidad + diagnóstico: 46 PASS (incluye las 7), con B0
+deshabilitado skipped de forma segura. El skipped sólo acredita gating.
+El formato preexistente de documentos queda fuera del ticket; no es un finding
+HIGH/BLOCKER de B0. Este cierre documental no reejecuta PostgreSQL ni tests.
+
+**DoD final B0: PASS.** Evaluación sobre implementación preservada y evidencia
+aceptada; no quedan findings HIGH/BLOCKER abiertos.
+
+| Criterio | Resultado | Evidencia |
+| --- | --- | --- |
+| Refinamiento aprobado | PASS | DEC-C5B-01/02/03 aprobadas. |
+| Implementación completa | PASS | Suite B0 y helper reutilizable; dos deltas corregidos. |
+| Sin cambios productivos | PASS | B0 contiene sólo test infrastructure; código preservado en este cierre. |
+| Opt-in dedicado | PASS | RUN_HC_C5B_POSTGRES_TESTS y HC_C5B_DATABASE_URL exclusivos. |
+| Target exacto | PASS | URL externa estricta y validación de identidad; pruebas puras y runtime. |
+| Sin dotenv/fallback | PASS | Contrato explícito sin DATABASE_URL. |
+| Rol de privilegio mínimo | PASS | Provisioning/hardening aceptado y preflight real. |
+| Contrato de schema | PASS | Columnas/enums/FK/CHECK/índices verificados en el gate. |
+| ACL positivas/prohibidas | PASS | Manifiesto mínimo y preflight real; sin TEMPORARY/CREATE. |
+| Exclusividad de PID | PASS | Un cliente, PID propio positivo/estable y comprobaciones fail-closed. |
+| Protección de colisiones | PASS | Checks previos al fixture DML en el gate real. |
+| Ownership acreditado | PASS | Company A/B por ID y marcadores persistidos; reacreditación de cleanup. |
+| JWT real | PASS | JwtStrategy/JwtAuthGuard/RolesGuard, actor persistido y Prisma exacto. |
+| Restauración JWT | PASS | Ciclo aceptado y rutas de teardown del helper. |
+| Cleanup propio | PASS | Orden referencial y ownership verificados en el escenario runtime. |
+| Cero residuos | PASS | Readback independiente de fixtures propios, gate 1/1 PASS. |
+| Diagnósticos seguros | PASS | Mensaje exterior visible; 7 pruebas de formato/agregación/redacción. |
+| Validación estática | PASS | TypeScript/ESLint/Prettier TS/gating/URL/CHECK/diff aceptados. |
+| PostgreSQL/JWT real | PASS | Gate final: 1 suite / 1 test passed, aproximadamente 30 s. |
+| Documentación sincronizada | PASS | Diseño, board y roadmap actualizados en este cierre. |
+| Findings HIGH/BLOCKER | PASS | Ninguno pendiente según el checkpoint aceptado. |
+| Cambios productivos, schema/migraciones, Web | NOT APPLICABLE | B0 es infraestructura de tests; no requeridos para su DoD. |
+
+**Próximo ticket:** HC-NEXT-03C5-B1 — List/Detail HTTP Readback — NEXT / BLOCKED
+UNTIL B0 MERGED / NOT IMPLEMENTED. B2/B3 siguen NOT IMPLEMENTED; C5-B y M-HC1
+permanecen abiertos. Fuera de B0: matrices B1/B2, gate B3, INSERT de
+ConflictOverride salvo selección explícita posterior por B2, formato histórico,
+output/ y tmp/. Siguiente acción: revisión humana del diff antes de staging.
 
 #### 34.5.2.2 B1 — List/Detail HTTP Readback — 5 SP
 
-**Estado:** PLANNED / BLOCKED BY B0 / NOT IMPLEMENTED. **AC:** JWT real para cuatro
+**Estado:** NEXT / BLOCKED UNTIL B0 MERGED / NOT IMPLEMENTED. **AC:** JWT real para cuatro
 roles, Company A/B, filtros/paginación, históricos, foreign igual a missing,
 respuesta pública y DEC-C5B-03. **DoD:** E2E PG/HTTP focales verdes, readback
 persistido, lecturas zero-write y cleanup acreditado. **Riesgos:** combinatoria y
@@ -2547,5 +2628,5 @@ Equipment Assignment implementation
 → C6-D REPLACE ASSIGNMENT UI COMPLETE / MERGED — PR #45 — main@99efc5a — ACTUAL 25-sep-2026
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee — ACTUAL 27-sep-2026
 → SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
-→ C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
+→ C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 ```

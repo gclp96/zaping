@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
-Última actualización: 2026-10-07
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
+Última actualización: 2026-10-08
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -195,10 +195,10 @@ HC-OPS-01A.1 — Draft Item Exclusion
         → COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B — Preparation Confirmation & Readiness
-        → COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
+        → COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+        → PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
         → CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
@@ -1808,7 +1808,7 @@ Assignment Backend Base, HC-NEXT-03C3 Availability / Conflict Review /
 Concurrency y HC-NEXT-03C4 Replace / Release / Parent Integrations están COMPLETE
 / MERGED. El protocolo Company-first, ambas Parent Integrations y HC-LOCK-04
 final están integrados/aceptados; C6-A–C6-E están COMPLETE / MERGED y C5-B
-permanece pendiente con B0 NOT READY.
+permanece pendiente con B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS.
 
 Secuencia planeada de alto nivel para M-HC1:
 
@@ -2309,8 +2309,8 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C6-E Requirement-linked Assignment UI — COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
-→ HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+→ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
+→ HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
@@ -2548,8 +2548,8 @@ Healthcare Equipment Assignment implementation
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
-→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DOR COMPLETE
-→ C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
+→ HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DOR COMPLETE
+→ C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2886,15 +2886,16 @@ Decisiones aprobadas:
   contrato funcional aún está pendiente.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
-- **DEC-C5B-01:** C5-B diseña un rol dedicado `zaping_hc_c5b`. La decisión no
-  autoriza crear el rol, establecer credenciales ni modificar ACL.
-- **DEC-C5B-02:** el error sanitizado se acredita con evidencia compuesta: los
+- **DEC-C5B-01:** APROBADA: C5-B usa un rol dedicado `zaping_hc_c5b`. El refinamiento por sí
+  mismo no autorizó provisioning; el checkpoint posterior acredita rol y ACL
+  mínimos y gate real PASS.
+- **DEC-C5B-02:** APROBADA: el error sanitizado se acredita con evidencia compuesta: los
   unitarios prueban el mapping Prisma estable; 2H prueba fallos PostgreSQL reales
   y su respuesta HTTP sanitizada con auth guard de test; una prueba C5-B
   representativa probará el pipeline HTTP con JWT real y un error Prisma
   controlado. La combinación no demuestra un fallo PostgreSQL nativo y JWT real
   en la misma petición ni reabre los timeouts de HC-LOCK-04.
-- **DEC-C5B-03:** el harness actualizará directamente el fixture persistido de
+- **DEC-C5B-03:** APROBADA: el harness actualizará directamente el fixture persistido de
   Case y verificará por List/Detail HTTP el recálculo de disponibilidad. No usa ni
   acredita Case Update API o concurrencia durante la reprogramación.
 - HC-LOCK-04 permanece CLOSED / ACCEPTED y no se reabre sin un defecto concreto.
@@ -2982,7 +2983,7 @@ Sprint 1:
   MERGED mediante PR #47 en `main@a1f0fee`, con Actual 27-sep-2026;
 - Actual C6-A, C6-B, C6-C y C6-D: 25-sep-2026. El 07-oct-2026 continúa siendo el
   cierre de la ventana, no un Commitment retroactivo;
-- B0 conserva sus 3 SP y estado NOT READY dentro del trabajo pendiente de C5-B;
+- B0 conserva sus 3 SP; DoR COMPLETE y DoD PASS; validación runtime aceptada;
 - Actual C5-A: 24-sep-2026 — completado antes del Target;
 - Forecast: pendiente de estimar para el trabajo restante;
 - Commitment: pendiente; el siguiente incremento funcional requiere refinamiento
@@ -2990,83 +2991,75 @@ Sprint 1:
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+Estado: PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 
 Estimación total: 16 SP. Los SP expresan complejidad relativa y no se convierten
 en horas ni Commitment.
 
 ##### C5-B0 — Safe Integrated Harness — 3 SP
 
-Estado: NOT READY / CANDIDATE FOR SPRINT 1
+Estado: COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS
 
-Dependencias y DoR:
-- C5-A COMPLETE / MERGED y HC-LOCK-04 CLOSED / ACCEPTED: satisfecho;
-- aprobar la identidad diseñada `zaping_hc_c5b`,
-  `RUN_HC_C5B_POSTGRES_TESTS=1`, `HC_C5B_DATABASE_URL` y el target propuesto
-  `zaping_spike_test` vía `127.0.0.1:5434` (servidor 5432); pendiente, sin
-  autorización de provisioning;
-- inventariar y aprobar las operaciones SQL de fixtures, JWT, List/Detail/Create,
-  actualización del horario, locks, assertions y cleanup;
-- aprobar y verificar efectivamente `CONNECT`, `USAGE`, DML por tabla,
-  `UPDATE` por columna sólo para row locks, horario y claim, `USAGE` de enums y
-  `EXECUTE` de funciones; sin secuencias ni privilegios administrativos/globales;
-- aprobar el preflight, JWT efímero, aislamiento de sesiones, propiedad de
-  fixtures y cleanup antes de ejecutar PostgreSQL.
+DoR: COMPLETE. DEC-C5B-01/02/03 aprobadas el 08-oct-2026 sobre
+`main@478e0f0`. C5-A y HC-LOCK-04 mantienen su evidencia aceptada;
+HC-OPS-01B está MERGED mediante PR #56.
 
-Manifiesto mínimo diseñado, aún no acreditado:
-- `CONNECT` en `zaping_spike_test` y `USAGE` en `public`;
-- `SELECT/INSERT/DELETE` en `Company`, `User`, `Product`, `HealthcareCase`,
-  `HealthcareCaseRequirement`, `EquipmentAsset`,
-  `HealthcareEquipmentAssignment` e `IdempotencyRecord`;
-- `SELECT` en `HealthcareEquipmentAssignmentConflictOverride` y
-  `HealthcareEquipmentAssignmentSettings`;
-- `UPDATE(id)` en `HealthcareCase`, `HealthcareCaseRequirement` y
-  `EquipmentAsset`, y `UPDATE(companyId)` en Settings, exclusivamente para
-  `FOR SHARE`/`FOR UPDATE`;
-- `UPDATE(scheduledStart, scheduledEnd, updatedAt)` en Case para DEC-C5B-03 y
-  `UPDATE(resourceId, updatedAt)` en `IdempotencyRecord` para completar el claim;
-- `USAGE` de los enums usados, incluido `IdempotencyScope`, y `EXECUTE` de
-  `btrim`, `current_setting`, `set_config`, advisory locks y funciones de
-  introspección del preflight. No se requieren secuencias.
+Implementación focal: suite
+`app/api/test/healthcare-equipment-assignments.c5b.postgres.e2e-spec.ts` y helper
+`app/api/test/helpers/healthcare-c5b-harness.ts`. Opt-in exclusivo, un cliente
+Prisma explícito compartido con Nest, preflight de identidad/schema/ACL/PID,
+Company A/B con marcadores acreditados, un smoke List con JWT real y cleanup
+propio con readback independiente y errores agregados sanitizados. El helper
+`withC5bHarness` centraliza el ciclo reutilizable para B1/B2.
 
-Preflight y seguridad requeridos antes del primer DML:
-- flag/URL exclusivos, sin dotenv/fallback; URL válida sin query/hash, contraseña
-  no vacía y sin imprimir valores sensibles;
-- identidad de URL y conexión efectiva, PostgreSQL 16, schema `public`, puertos,
-  PID, rol LOGIN no administrativo y backend consistente;
-- presencia de tablas/columnas/constraints/índices, ACL efectivas, enums,
-  funciones y ausencia de sesiones ajenas; no terminar sesiones;
-- JWT efímero instalado antes de `JwtStrategy`, `ignoreEnvFile: true`, Prisma
-  aislado compartido por Nest y restauración exacta aun ante setup/teardown fallido;
-- IDs Company A/B preasignados; collision check en todas las tablas tocadas;
-  marcadores `id/name/rfc`, reacreditación posterior al INSERT y cleanup sólo de
-  IDs con propiedad demostrada;
-- cleanup referencial, conteos cero por IDs/keys propios y `AggregateError` que
-  preserve fallos funcionales, de app close, cleanup y disconnect.
+Contrato: rol `zaping_hc_c5b`, flag `RUN_HC_C5B_POSTGRES_TESTS=1`, URL
+`HC_C5B_DATABASE_URL`, PostgreSQL 16, `127.0.0.1:5434`, servidor 5432,
+`zaping_spike_test`, schema `public`; sin dotenv ni fallback.
 
-Falta acreditar: existencia e identidad del rol, URL segura, ACL efectivas,
-catálogo/schema, funciones/enums, exclusividad de sesiones, ausencia de colisiones,
-ciclo JWT, ownership y cleanup reales. Hasta entonces B0 no está READY.
+ACL exacta: `CONNECT` de base y `USAGE` de schema; `SELECT/INSERT/DELETE`
+en Company, User, Product, HealthcareCase, HealthcareCaseRequirement,
+EquipmentAsset, HealthcareEquipmentAssignment e IdempotencyRecord;
+`SELECT/DELETE` en ConflictOverride y sólo `SELECT` en Settings.
+`UPDATE(id)` en Asset/Requirement; `UPDATE(scheduledStart, scheduledEnd,
+updatedAt)` en Case; `UPDATE(companyId)` en Settings;
+`UPDATE(resourceId, updatedAt)` en IdempotencyRecord. Sin UPDATE de Assignment,
+INSERT de ConflictOverride, DML de CoverageNote/CaseKit/Inventory, secuencias,
+DDL, TRUNCATE, membresías, ownership ni grant options. La excepción PUBLIC
+TEMPORARY de C5-A no se hereda. Se verifican etiquetas enum, sin exigir USAGE
+para DML, y EXECUTE de las firmas efectivamente usadas.
 
-Acceptance Criteria:
-- cualquier mismatch falla cerrado antes del primer write y sin filtrar secretos;
-- ninguna ruta de error puede autorizar cleanup sobre IDs no acreditados;
-- el harness no carga configuración implícita ni amplía permisos por conveniencia.
+Cierre B0 (08-oct-2026): DoD PASS. Rol aprovisionado con mínimo privilegio;
+TEMPORARY revocado de PUBLIC en zaping_spike_test, sin TEMPORARY/CREATE ni
+atributos administrativos para zaping_hc_c5b. Preflight real PASS de identidad,
+schema, ACL positivas/prohibidas, funciones/PID y colisiones; JWT real y Company
+A/B acreditadas; cleanup propio y readback cero PASS.
 
-Definition of Done:
-- harness focal implementado y revisado estáticamente;
-- preflight autorizado PASS antes de fixtures y teardown propio con conteos cero;
-- TypeScript, ESLint, Prettier y `git diff --check` verdes, con evidencia sin
-  secretos. El DoD no autoriza por sí mismo infraestructura posterior.
+Gate habilitado aceptado: 1 suite / 1 test passed, aproximadamente 30 s, mediante
+`npx jest --config ./test/jest-e2e.json --runInBand test/healthcare-equipment-assignments.c5b.postgres.e2e-spec.ts`.
+Target validado: zaping_spike_test, zaping_hc_c5b, public, PG16, servidor 5432;
+URL externa estricta 127.0.0.1:5434. La dirección interna válida/estable admite
+CIDR opcional, sin IP/subred Docker fija.
 
-Riesgos: privilegios insuficientes para row locks/claim, sesiones concurrentes,
-colisión de fixture, fuga de JWT/configuración y cleanup parcial.
+Deltas cerrados: diagnósticos sanitizados visibles en el mensaje exterior de
+AggregateError con originales privados, y validación de dirección interna con
+CIDR. Evidencia estática aceptada PASS: TypeScript focal/noEmit, ESLint/Prettier
+TS, gating deshabilitado, pruebas URL/CHECK y diff check. Diagnósticos 7 PASS;
+identidad + diagnósticos 46 PASS (incluye las 7). No quedan HIGH/BLOCKER de B0.
+Checklist detallado y evidencia en
+[EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.1](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34521-b0--safe-integrated-harness--3-sp).
+
+B1 es NEXT / BLOCKED UNTIL B0 MERGED / NOT IMPLEMENTED. B2/B3 y C5-B general
+siguen pendientes. Fuera de B0: aceptación B1/B2, gate B3, INSERT de
+ConflictOverride salvo selección explícita por B2, formato histórico y artefactos
+output/tmp. La aceptación runtime procede del checkpoint aportado; este cierre
+sólo modifica documentación y no conecta DB. Siguiente acción: revisión humana
+del diff antes de staging. Todo permanece UNCOMMITTED.
 
 ##### C5-B1 — List/Detail HTTP Readback — 5 SP
 
-Estado: PLANNED / BLOCKED BY B0 / NOT IMPLEMENTED
+Estado: NEXT / BLOCKED UNTIL B0 MERGED / NOT IMPLEMENTED
 
-DoR: B0 DONE; fixtures A/B e históricos aprobados. AC: JWT real para los cuatro
+DoR: B0 MERGED; fixtures A/B e históricos aprobados. AC: JWT real para los cuatro
 roles; tenant isolation; filtros/paginación; foreign igual a missing; forma pública;
 y DEC-C5B-03 para completar/reprogramar el fixture y observar el recálculo por
 List/Detail. DoD: E2E PostgreSQL/HTTP focales PASS, readback persistido, cero writes
@@ -3322,7 +3315,7 @@ Forecast ni Commitment.
 
 #### HC-OPS-01B — Preparation Confirmation & Readiness
 
-Estado: COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE.
+Estado: COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE.
 
 Prerequisito satisfecho: HC-OPS-01A.1 está COMPLETE / MERGED y resolvió el blocker
 de corrección de items stale.
@@ -3369,9 +3362,9 @@ validate/generate, typecheck/lint focal, formato delta, builds API/Web y QA manu
 PASS. Checklist y alcance preciso de cada evidencia en
 [CASE_KITS, secciones 233.14–233.15](../modules/healthcare/CASE_KITS.md).
 No quedan findings HIGH/BLOCKER de 01B. COMPLETE significa terminado y validado;
-permanece UNCOMMITTED, sin PR/merge/deployment declarado. M-HC1 continúa abierto.
-Siguiente trabajo registrado: HC-NEXT-03C5-B, primero B0 Safe Integrated Harness,
-que conserva NOT READY. No se modifican SP, Forecast, Commitment ni fechas de
+quedó MERGED mediante PR #56 en main@478e0f0; no se declara deployment. M-HC1 continúa abierto.
+Siguiente trabajo registrado: HC-NEXT-03C5-B1 List/Detail HTTP Readback,
+NEXT / BLOCKED UNTIL B0 MERGED; B0 tiene DoR COMPLETE y DoD PASS. No se modifican SP, Forecast, Commitment ni fechas de
 sprint.
 
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,

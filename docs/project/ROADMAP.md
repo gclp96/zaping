@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-10-07
+Última actualización: 2026-10-08
 Responsable: Zaping Team
 
 1. Propósito
@@ -117,9 +117,9 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 ↓
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
-HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
+HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 ↓
 HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -150,7 +150,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
 Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
 `main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
 DEC-C5-02 divide HC-NEXT-03C5: C5-A queda COMPLETE / MERGED mediante PR #36 y #37
-en `main@5ec9f67`; C5-B queda PLANNED con B0 NOT READY y B1–B3 NOT IMPLEMENTED.
+en `main@5ec9f67`; C5-B queda PLANNED con B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS y B1–B3 NOT IMPLEMENTED.
 C5-A ejecutó PostgreSQL real
 27/27 PASS, 0 skipped, exit 0, con preflight y teardown sin errores reportados;
 el harness está contenido en `85b480d` y `02d7a6e`. La identidad dedicada y los
@@ -162,18 +162,28 @@ DEC-C5-01 separa CoverageNote y cobertura agregada en HC-NEXT-03C5-COVERAGE,
 ticket backend independiente con contrato pendiente y requerido antes de slices
 posteriores de C6 que dependan de coverage; no bloquea C6-A/C6-B.
 
-DEC-C5B-01 diseña el rol dedicado `zaping_hc_c5b`, sin autorizar su creación ni
-cambios ACL. DEC-C5B-02 acepta evidencia compuesta del error sanitizado: mapping
+DEC-C5B-01 aprobada: rol dedicado `zaping_hc_c5b`; provisioning/ACL mínimos
+y ejecución posteriores aceptados para B0. DEC-C5B-02 aprobada: acepta evidencia compuesta del error sanitizado: mapping
 unitario, fallo PostgreSQL/HTTP real 2H con auth guard de test y una comprobación
 HTTP C5-B representativa con JWT real; no demuestra PG+JWT real en la misma
-petición. DEC-C5B-03 actualiza directamente el fixture Case y acredita por
+petición. DEC-C5B-03 aprobada: actualiza directamente el fixture Case y acredita por
 List/Detail HTTP el recálculo, no Case Update API.
 
 Sprint 1: 24-sep–07-oct-2026; capacidad bruta 20 h/semana, sin equivalencia a
 velocidad o Commitment; C5-A quedó completado el 24-sep, C6-A/C6-B/C6-C/C6-D el
 25-sep y C6-E el 27-sep mediante PR #47 en `main@a1f0fee`. El Forecast del trabajo
-restante sigue pendiente. El siguiente incremento funcional requiere refinamiento
-y no está READY; C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP, con B0 NOT READY.
+restante sigue pendiente. C5-B conserva B0/B1/B2/B3 por 3/5/5/3 SP. B0 queda
+COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS (cierre 08-oct-2026).
+Rol mínimo aprovisionado, TEMPORARY revocado de PUBLIC en zaping_spike_test y
+preflight PostgreSQL/JWT/cleanup cero PASS: 1 suite / 1 test passed, ~30 s.
+Target validado PG16/public/servidor 5432 con rol zaping_hc_c5b y URL externa
+127.0.0.1:5434; dirección interna válida/estable con CIDR opcional, sin Docker IP
+fija. Diagnósticos seguros 7 PASS; identidad + diagnóstico 46 PASS (incluye las
+7); validación estática focal y gating deshabilitado PASS. El formato histórico
+queda fuera del ticket. Evidencia y DoD en el diseño §34.5.2.1.
+B1 es NEXT / BLOCKED UNTIL B0 MERGED / NOT IMPLEMENTED; B2/B3 siguen pendientes.
+C5-B y M-HC1 permanecen abiertos; siguiente acción: revisión humana del diff
+antes de staging. Este cierre no reejecuta PostgreSQL.
 
 También permanecen como TARGET Healthcare:
 
@@ -995,7 +1005,7 @@ COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03
 COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
 ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5ec9f67 VIA
-PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED — PARTIALLY
+PR #36 + #37 — HC-NEXT-03C5-B PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED — PARTIALLY
 IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN
 main@8a67d5a; C6-B CREATE UI COMPLETE / MERGED IN main@4805128; C6-C RELEASE UI
 COMPLETE / MERGED IN main@9bade4d; C6-D REPLACE UI COMPLETE / MERGED IN
@@ -1067,8 +1077,8 @@ COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
 ACCEPTED sobre `main@be73bc4`. DEC-C5-02 divide hardening en C5-A Contract
 Alignment & Safe PostgreSQL Harness y C5-B Integrated Backend Validation. C5-A
 está COMPLETE / MERGED mediante PR #36 y #37 en `main@5ec9f67`; C5-B está
-planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 NOT READY y B1–B3 NOT
-IMPLEMENTED. DEC-C5B-01/02/03 fijan rol dedicado sin autorización de provisioning,
+planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS y B1–B3 NOT
+IMPLEMENTED. DEC-C5B-01/02/03 fijan rol dedicado (provisioning posterior aceptado para B0),
 evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
@@ -1107,7 +1117,7 @@ HC-OPS-01A.1 Draft Item Exclusion está COMPLETE / MERGED mediante PR #53 en
 `main@54a5d79`, con Actual 28-sep-2026: implementa exclusión auditada de items
 `ACTIVE` sólo en Kit `DRAFT`, sin hard delete y con re-agregado posterior de la
 misma fuente.
-HC-OPS-01B Preparation Confirmation & Readiness queda COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS, con DoR COMPLETE. Su blocker previo de items stale fue resuelto
+HC-OPS-01B Preparation Confirmation & Readiness queda COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS, con DoR COMPLETE. Su blocker previo de items stale fue resuelto
 por HC-OPS-01A.1. No tiene SP, Forecast ni Commitment.
 Este corte no declara Healthcare Core ni producción terminados.
 
@@ -1212,7 +1222,7 @@ historia `EXCLUDED` con actor/fecha/razón, el re-agregado de la misma fuente y 
 coexistencia histórica `EXCLUDED` + nueva `ACTIVE`. No se registra validación
 manual de SALES. El blocker stale-item de HC-OPS-01B queda resuelto.
 
-HC-OPS-01B está COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS, con DoR COMPLETE.
+HC-OPS-01B está COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS, con DoR COMPLETE.
 Añade exclusivamente `PREPARED` y `DRAFT -> PREPARED`; confirma preparación
 lógica, vuelve inmutable el contenido y no implica reserva física ni Dispatch. La
 primera confirmación requiere Case `SCHEDULED` con ventana completa, fuentes
@@ -1235,10 +1245,11 @@ API unit 69/69, HTTP/JWT 9/9, Web 20/20 y PostgreSQL integrado 52/52 PASS;
 Prisma validate/generate, typecheck/lint focal, formato delta, builds API/Web y
 QA manual PASS según el checkpoint aceptado. Company-first incluye row locks de
 Product/EquipmentAsset y reread antes de la transición; Web refresca readiness
-tras conflictos de estado. Este cierre no declara merge, deployment ni M-HC1
-completo. El siguiente trabajo registrado es HC-NEXT-03C5-B Integrated Backend
-Validation, comenzando por B0 Safe Integrated Harness: continúa NOT READY y no se
-implementa durante este cierre. No se añaden métricas ni compromisos de sprint.
+tras conflictos de estado. El cierre documental precedió al merge PR #56 en
+main@478e0f0. Al cierre 08-oct-2026, B0 tiene DoR COMPLETE y DoD PASS,
+con runtime PostgreSQL/JWT y cleanup cero aceptados; B1 es NEXT / BLOCKED UNTIL
+B0 MERGED. No se declara deployment ni M-HC1 completo; no se añaden
+métricas ni compromisos de sprint.
 
 Puede contener conceptualmente:
 
@@ -1254,7 +1265,7 @@ preparation state
 La cardinalidad de 01A es uno a uno lógico. El schema mínimo utiliza
 `HealthcareCaseKit` y `HealthcareCaseKitItem`; contenedores físicos, templates y
 logística permanecen posteriores. `PREPARED` está implementado y validado en
-HC-OPS-01B, pendiente de revisión final y sin commit.
+HC-OPS-01B, posteriormente MERGED mediante PR #56 en main@478e0f0.
 
 Debe mantenerse:
 
@@ -2937,9 +2948,9 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
-HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
+HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 
-HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 
 HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -3100,9 +3111,9 @@ HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb
 ↓
 HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 ↓
-HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
+HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 NOT READY; B1–B3 NOT IMPLEMENTED
+HC-NEXT-03C5-B Integrated Backend Validation — PLANNED — B0 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B1–B3 NOT IMPLEMENTED
 ↓
 HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
