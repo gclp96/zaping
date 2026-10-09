@@ -28,6 +28,7 @@ const writableTables = [
   'IdempotencyRecord',
 ] as const;
 const overrideTable = 'HealthcareEquipmentAssignmentConflictOverride';
+const insertTables: readonly string[] = [...writableTables, overrideTable];
 const settingsTable = 'HealthcareEquipmentAssignmentSettings';
 const tables: readonly string[] = [
   ...writableTables,
@@ -294,6 +295,88 @@ export function c5bValidateIdentity(rows: readonly Identity[]): Identity {
   return row;
 }
 type RegisteredClient = { prisma: C5bPrisma; identity?: Identity };
+type SessionMetadata = {
+  pid: unknown;
+  role: unknown;
+  backendType: unknown;
+  state: unknown;
+  backendStart: unknown;
+};
+
+// Classification is diagnostic only. Even a dedicated-role/internal/idle row
+// selected by the unchanged conflict predicate must still fail the boundary.
+export function c5bRejectUnexpectedSessions(
+  foreign: readonly SessionMetadata[],
+): void {
+  if (foreign.length === 0) return;
+  const details = foreign.map((row) => ({
+    pid:
+      Number.isSafeInteger(row.pid) && (row.pid as number) > 0
+        ? row.pid
+        : 'unavailable',
+    pidClassification: 'unexpected',
+    role:
+      typeof row.role !== 'string' || row.role.length === 0
+        ? 'unavailable'
+        : row.role === role
+          ? 'dedicated_role'
+          : 'other_role',
+    backendType:
+      row.backendType === 'client backend'
+        ? 'client_backend'
+        : [
+              'autovacuum launcher',
+              'autovacuum worker',
+              'logical replication launcher',
+              'logical replication worker',
+              'parallel worker',
+              'background writer',
+              'checkpointer',
+              'archiver',
+              'startup',
+              'walreceiver',
+              'walsender',
+              'walwriter',
+            ].includes(row.backendType as string)
+          ? 'postgres_internal'
+          : row.backendType === 'standalone backend'
+            ? 'other_known'
+            : 'unavailable',
+    state:
+      row.state === 'active'
+        ? 'active'
+        : row.state === 'idle'
+          ? 'idle'
+          : row.state === 'idle in transaction'
+            ? 'idle_in_transaction'
+            : [
+                  'idle in transaction (aborted)',
+                  'fastpath function call',
+                  'disabled',
+                ].includes(row.state as string)
+              ? 'other_known'
+              : 'unavailable',
+    backendStart:
+      row.backendStart instanceof Date &&
+      Number.isFinite(row.backendStart.getTime())
+        ? row.backendStart.toISOString()
+        : 'unavailable',
+  }));
+  throw new C5bError(
+    `C5B target has unowned or unknown sessions\nSession metadata: ${JSON.stringify(details)}`,
+  );
+}
+
+export function c5bAssertSessionIdentity(
+  current: Identity,
+  accreditedIdentity: Identity | undefined,
+): void {
+  requireC5b(
+    JSON.stringify(current) === JSON.stringify(accreditedIdentity),
+    'backend identity changed',
+  );
+}
+
 async function boundary(clients: readonly RegisteredClient[]): Promise<void> {
   requireC5b(clients.length === 1, 'one registered client required');
   const owned = clients.map((client) => client.identity?.pid);
@@ -304,17 +387,13 @@ async function boundary(clients: readonly RegisteredClient[]): Promise<void> {
   );
   const client = clients[0];
   const current = await identity(client.prisma);
-  requireC5b(
-    JSON.stringify(current) === JSON.stringify(client.identity),
-    'backend identity changed',
-  );
-  const foreign = await client.prisma.$queryRaw<
-    Array<{ pid: number | null }>
-  >(Prisma.sql`
-    SELECT pid::int AS pid FROM pg_catalog.pg_stat_activity
+  c5bAssertSessionIdentity(current, client.identity);
+  const foreign = await client.prisma.$queryRaw<SessionMetadata[]>(Prisma.sql`
+    SELECT pid::int AS pid, usename AS role, backend_type AS "backendType",
+      state, backend_start AS "backendStart" FROM pg_catalog.pg_stat_activity
     WHERE datname = ${database} AND (pid IS NULL OR pid NOT IN (${Prisma.join(owned)}))
   `);
-  requireC5b(foreign.length === 0, 'target has unowned or unknown sessions');
+  c5bRejectUnexpectedSessions(foreign);
 }
 
 async function checkRole(prisma: PrismaService): Promise<void> {
@@ -444,8 +523,7 @@ async function checkAcl(prisma: PrismaService): Promise<void> {
       scoped &&
       (row.privilege === 'SELECT' ||
         (row.privilege === 'DELETE' && row.table !== settingsTable) ||
-        (row.privilege === 'INSERT' &&
-          (writableTables as readonly string[]).includes(row.table)));
+        (row.privilege === 'INSERT' && insertTables.includes(row.table)));
     requireC5b(
       row.allowed === expected && !row.delegable,
       'table ACL differs from exact manifest',
@@ -483,8 +561,7 @@ async function checkAcl(prisma: PrismaService): Promise<void> {
     const expected =
       scoped &&
       (row.privilege === 'SELECT' ||
-        (row.privilege === 'INSERT' &&
-          (writableTables as readonly string[]).includes(row.table)) ||
+        (row.privilege === 'INSERT' && insertTables.includes(row.table)) ||
         (row.privilege === 'UPDATE' &&
           (updates[row.table] ?? []).includes(row.column)));
     requireC5b(

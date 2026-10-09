@@ -3,8 +3,39 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.5.0
 **Estado:** Activo
-**Última actualización:** 2026-10-07
+**Última actualización:** 2026-10-08
 **Responsable:** Zaping Team
+
+---
+
+# 2026-10-08 — HC-NEXT-03C5-B3 / C5-B — cierre local DoD
+
+**Estado:** B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED;
+C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW. B0/B1/B2 MERGED (PR #57/#58/#59).
+CI: PENDING — FUTURE COMMIT / PR; merge B3 pendiente. Sin release/deployment.
+
+Aceptación HTTP/JWT/PostgreSQL de Create ConflictOverride: revisión inicial y
+stale sin writes, confirmación vigente, 1 Assignment + 2 Overrides + 1 claim
+atómicos, rollback de fallo Prisma INYECTADO/retry, replay/reuse, List/Detail y
+JSON público. Reserva lógica sin efectos físicos; cleanup/zero-residue propios.
+Operador añadió sólo Override INSERT al rol aislado: SELECT/INSERT/DELETE,
+sin UPDATE/grant options ni nuevos permisos auxiliares; sin provisioning productivo.
+
+Gates del delta final: foco Equipment Assignments 8 suites/250 tests, full API
+100 suites/1616 tests, Prisma validate/generate (Client v6.19.3), lint:check sin
+fix, typecheck, production build y diff-check PASS. Diagnósticos 17 tests PASS;
+focales B0/B1/B2/B3 con ACL final PASS, 1/1 cada uno.
+
+Incidente histórico http.sessions: rechazo de PID no acreditado, teardown PASS;
+identidad extra no capturada y causa raíz desconocida. Diagnósticos sanitizados
+conservan el predicado fail-closed, sin retry/sleep/relajación u observador nuevo.
+Una reproducción controlada B0 → B1 → B2 PASS — INCIDENT NOT REPRODUCED.
+No se declara defecto lifecycle corregido ni ejecución reverse.
+
+Este cierre registra evidencia aportada; no reejecuta gates ni conecta DB.
+Sin cambios API productiva, Prisma/schema/migraciones o Web. M-HC1 sigue OPEN;
+siguiente candidato HC-NEXT-03C5-COVERAGE, CONTRACT PENDING / NOT READY.
+Checklist: [diseño, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
 
 ---
 
