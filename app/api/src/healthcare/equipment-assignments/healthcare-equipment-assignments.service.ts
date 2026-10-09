@@ -62,6 +62,7 @@ import {
   equipmentAssignmentWindowsOverlap,
   OperationalWindow,
   resolveEquipmentAssignmentBuffers,
+  equipmentAssignmentAssetIsEligible,
 } from './healthcare-equipment-assignment-availability';
 
 import { createHealthcareEquipmentAssignmentReplaceRequestHash } from './healthcare-equipment-assignment-replace-request-hash';
@@ -75,6 +76,8 @@ import {
   HealthcareEquipmentAssignmentsRepository,
   HealthcareEquipmentReservationAvailabilityRecord,
 } from './healthcare-equipment-assignments.repository';
+
+import { currentConflictOverrideMatches } from './healthcare-equipment-coverage-availability';
 
 const CREATE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE;
 const REPLACE_SCOPE = IdempotencyScope.HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE;
@@ -102,7 +105,7 @@ type AvailabilityWarning = {
   message: string;
 };
 
-type EquipmentAssignmentAvailability = {
+export type EquipmentAssignmentAvailability = {
   fullyVerifiable: boolean;
   conflictFree: boolean | null;
   warnings: AvailabilityWarning[];
@@ -1591,10 +1594,7 @@ export class HealthcareEquipmentAssignmentsService {
     lifecycle: EquipmentLifecycle;
     condition: EquipmentCondition;
   }): void {
-    if (
-      equipmentAsset.lifecycle !== EquipmentLifecycle.ACTIVE ||
-      equipmentAsset.condition !== EquipmentCondition.GOOD
-    ) {
+    if (!equipmentAssignmentAssetIsEligible(equipmentAsset)) {
       throw equipmentAssetNotEligibleException();
     }
   }
@@ -2108,16 +2108,52 @@ export class HealthcareEquipmentAssignmentsService {
 
       return (
         conflict !== undefined &&
-        override.assignmentWindowStart.getTime() ===
-          evaluation.candidateWindow?.start.getTime() &&
-        override.assignmentWindowEnd.getTime() ===
-          evaluation.candidateWindow.end.getTime() &&
-        override.conflictingWindowStart.getTime() ===
-          conflict.window.start.getTime() &&
-        override.conflictingWindowEnd.getTime() ===
-          conflict.window.end.getTime()
+        currentConflictOverrideMatches(
+          override,
+          evaluation.candidateWindow!,
+          conflict,
+        )
       );
     });
+  }
+
+  evaluateCoverageAssignment(
+    record: HealthcareEquipmentAssignmentRecord,
+    buffers: EquipmentAssignmentBuffers,
+    reservations: (HealthcareEquipmentReservationAvailabilityRecord & {
+      equipmentAssetId: string;
+    })[],
+  ) {
+    const related = reservations.filter(
+      (reservation) =>
+        reservation.equipmentAssetId === record.equipmentAsset.id &&
+        reservation.id !== record.id,
+    );
+    const initial = this.evaluateAvailability(
+      record.healthcareCase,
+      buffers,
+      related,
+    );
+    const confirmed = this.hasCurrentConfirmedOverride(record, initial);
+    return {
+      availability: this.evaluateAvailability(
+        record.healthcareCase,
+        buffers,
+        related,
+        confirmed,
+      ).availability,
+      currentConflicts: initial.conflicts.map((conflict) => ({
+        confirmed:
+          initial.candidateWindow !== null &&
+          record.conflictOverrides.some((override) =>
+            currentConflictOverrideMatches(
+              override,
+              initial.candidateWindow!,
+              conflict,
+            ),
+          ),
+      })),
+    };
   }
 
   private mapResponse(

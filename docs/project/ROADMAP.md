@@ -121,7 +121,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
-HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — REFINED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -225,25 +225,38 @@ Gates finales: foco 8 suites/250 tests; full API 100 suites/1616 tests; Prisma
 validate/generate (Client v6.19.3), lint:check sin fix, typecheck, production
 build y diff-check PASS. CI PASS: push API/Web y PR API/Web. PR #60 MERGED.
 DoD/evidencia en diseño §34.5.2.4.
-M-HC1 sigue abierto; con C5-B MERGED, sigue refinamiento
-HC-NEXT-03C5-COVERAGE (REFINED / CONTRACT APPROVED).
-Sin cambios productivos, releases ni lifecycle especulativo. Este cierre no
-reejecuta PostgreSQL, tests, builds o Prisma.
+M-HC1 sigue OPEN; después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está
+PARTIALLY IMPLEMENTED. R localmente validado, sin merge; N sin implementar.
+Este cierre documental no reejecuta PostgreSQL, tests, builds o Prisma; sin release.
 
-HC-NEXT-03C5-COVERAGE: REFINED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–04).
+HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–05).
 Cantidad separada de certainty; COVERED puede coexistir con incertidumbre/conflicto.
 Notes explícitas, inmutables y context-restricted; stale visibles hasta resolución.
 V1 informacional: sin gates Case/CaseKit/Dispatch. Contrato derivado por Requirement;
 sin coverageStatus persistido ni cambios de capacity Create.
-Siguiente: HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — READY — 5 SP;
+HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read —
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
 GET summary e historia, tenant/RBAC, snapshot, states/Availability separados y JSON.
 Después: HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — DEFINED /
-BLOCKED BY COVERAGE-R — 5 SP; POST create/resolve, audit, context, idempotency,
+BLOCKED BY COVERAGE-R MERGE — 5 SP; POST create/resolve, audit, context, idempotency,
 concurrencia/rollback y readback R. R exige unit/HTTP/JWT/PostgreSQL pertinente,
 invariantes/gates/docs/CI/merge; N añade migration scopes y pruebas de mutación.
-DoR R READY tras contrato sincronizado; N requiere R merged y revisión de
-scopes/migration/ACL. Sin implementation en este cierre. Details/AC/DoD en diseño
-§34.5.3 y PROJECT_BOARD. M-HC1 sigue OPEN; no es campaña de tests adicionales.
+N requiere R merged y revisión de scopes/migration/ACL; permanece bloqueado.
+Details/AC/DoD en diseño §34.5.3 y PROJECT_BOARD. M-HC1 sigue OPEN;
+capability funcional, sin redefinirla como campaña de tests adicionales.
+
+Evidencia local acreditada: focal Equipment Assignments PASS (305 tests / 11 suites),
+full API PASS (1671 tests / 103 suites), lint/typecheck/build PASS, TypeScript focal
+noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 test)
+con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
+fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
+zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
+no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
+Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
+un TransactionClient para todos los inputs, sin Company advisory/write locks ni
+writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
 También permanecen como TARGET Healthcare:
 
@@ -1141,7 +1154,7 @@ planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 COMPLETE / MERGED — PR #57 �
 evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
-aprobado (DEC-C5-COV-01–04) y como prerequisito de slices posteriores de C6 que requieran coverage
+aprobado (DEC-C5-COV-01–05) y como prerequisito de slices posteriores de C6 que requieran coverage
 pero no de C6-A/C6-B/C6-C/C6-D/C6-E. C6-A está COMPLETE / MERGED mediante PR #38 en
 `main@8a67d5a`, con Actual 25-sep-2026. Vitest focal 29/29, ESLint, TypeScript,
 Next.js build y CI API/Web pasaron; la validación manual cubrió empty state,
@@ -3012,7 +3025,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
-HC-NEXT-03C5-COVERAGE — REFINED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Case Availability
 
@@ -3175,7 +3188,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
-HC-NEXT-03C5-COVERAGE — REFINED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial

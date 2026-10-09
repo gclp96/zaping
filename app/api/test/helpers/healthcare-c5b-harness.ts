@@ -11,6 +11,8 @@ import { App } from 'supertest/types';
 import { JwtStrategy } from '../../src/auth/strategies/jwt.strategy';
 import { healthcareCompanyTransactionTimeoutConfiguration } from '../../src/healthcare/common/healthcare-company-transaction-timeout.config';
 import { HealthcareEquipmentAssignmentsController } from '../../src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller';
+import { HealthcareEquipmentCoverageController } from '../../src/healthcare/equipment-assignments/healthcare-equipment-coverage.controller';
+import { HealthcareEquipmentCoverageService } from '../../src/healthcare/equipment-assignments/healthcare-equipment-coverage.service';
 import { HealthcareEquipmentAssignmentsRepository } from '../../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
 import { HealthcareEquipmentAssignmentsService } from '../../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -28,11 +30,17 @@ const writableTables = [
   'IdempotencyRecord',
 ] as const;
 const overrideTable = 'HealthcareEquipmentAssignmentConflictOverride';
-const insertTables: readonly string[] = [...writableTables, overrideTable];
+const coverageNoteTable = 'HealthcareEquipmentRequirementCoverageNote';
+const insertTables: readonly string[] = [
+  ...writableTables,
+  overrideTable,
+  coverageNoteTable,
+];
 const settingsTable = 'HealthcareEquipmentAssignmentSettings';
 const tables: readonly string[] = [
   ...writableTables,
   overrideTable,
+  coverageNoteTable,
   settingsTable,
 ];
 const updates: Readonly<Record<string, readonly string[]>> = {
@@ -975,6 +983,7 @@ async function cleanup(
   });
   for (const table of [
     'IdempotencyRecord',
+    'HealthcareEquipmentRequirementCoverageNote',
     'HealthcareCaseRequirement',
     'HealthcareCase',
     'EquipmentAsset',
@@ -1121,8 +1130,12 @@ export async function withC5bHarness(
           PassportModule.register({ defaultStrategy: 'jwt' }),
           JwtModule.register({ secret, signOptions: { expiresIn: '10m' } }),
         ],
-        controllers: [HealthcareEquipmentAssignmentsController],
+        controllers: [
+          HealthcareEquipmentAssignmentsController,
+          HealthcareEquipmentCoverageController,
+        ],
         providers: [
+          HealthcareEquipmentCoverageService,
           JwtStrategy,
           HealthcareEquipmentAssignmentsService,
           HealthcareEquipmentAssignmentsRepository,
@@ -1281,6 +1294,17 @@ export async function runC5bHarnessSmoke(): Promise<void> {
 // Prisma unique keys at 478e0f0; no migration file is loaded during a run.
 const requiredChecks = [
   {
+    table: coverageNoteTable,
+    name: 'HealthcareEquipmentRequirementCoverageNote_comment_check',
+    expression: 'btrim("comment") <> \'\'',
+  },
+  {
+    table: coverageNoteTable,
+    name: 'HealthcareEquipmentRequirementCoverageNote_resolution_check',
+    expression:
+      '("resolvedAt" IS NULL AND "resolvedById" IS NULL) OR ("resolvedAt" IS NOT NULL AND "resolvedById" IS NOT NULL)',
+  },
+  {
     table: 'HealthcareCaseRequirement',
     name: 'HealthcareCaseRequirement_requestedQty_positive_check',
     expression: '"requestedQty" > 0',
@@ -1356,6 +1380,19 @@ const requiredIndexes: Array<{
   unique: boolean;
   predicate: string | null;
 }> = [
+  {
+    table: coverageNoteTable,
+    name: 'HealthcareEquipmentRequirementCoverageNote_open_kind_key',
+    columns: ['companyId', 'requirementId', 'kind'],
+    unique: true,
+    predicate: '"resolvedAt" IS NULL',
+  },
+  {
+    table: coverageNoteTable,
+    columns: ['companyId', 'requirementId', 'createdAt'],
+    unique: false,
+    predicate: null,
+  },
   {
     table: 'HealthcareCaseRequirement',
     columns: ['companyId', 'caseId', 'lifecycle', 'sortOrder'],
