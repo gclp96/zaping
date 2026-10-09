@@ -1,7 +1,7 @@
 Producto: Zaping Platform
 Versión del documento: 1.3.0
 Estado: Activo
-Última actualización: 2026-10-08
+Última actualización: 2026-10-09
 Responsable: Zaping Team
 
 1. Propósito
@@ -119,7 +119,7 @@ HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5
 ↓
 HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
 HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -150,7 +150,7 @@ HC-NEXT-03C4 Replace / Release / Parent Integrations está COMPLETE / MERGED:
 Manual Release, Replace, Requirement Retire C4-C1 y Case Cancel C4-C2 están en
 `main`; HC-LOCK-04 final está CLOSED / ACCEPTED en `main@be73bc4`.
 DEC-C5-02 divide HC-NEXT-03C5: C5-A queda COMPLETE / MERGED mediante PR #36 y #37
-en `main@5ec9f67`; C5-B queda LOCAL DoD PASS / READY FOR FINAL REVIEW con B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED.
+en `main@5ec9f67`; C5-B queda COMPLETE / DoD PASS / MERGED con B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS.
 C5-A ejecutó PostgreSQL real
 27/27 PASS, 0 skipped, exit 0, con preflight y teardown sin errores reportados;
 el harness está contenido en `85b480d` y `02d7a6e`. La identidad dedicada y los
@@ -204,7 +204,14 @@ aportada aceptada: estática focal/disabled mode PASS; 1 suite / 1 test PASS,
 0 snapshots, exit 0, ~8 s (~7.5 s de escenario), cleanup/zero-residue PASS.
 DoD PASS; sin HIGH/BLOCKER pendientes; detalle en diseño §34.5.2.3.
 Confirmación persistida ConflictOverride fue DEFERRED / NOT APPLICABLE TO B2.
-B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED:
+B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS:
+Sincronización post-merge (09-oct-2026): PR #60 — test(healthcare): complete
+C5-B integrated closeout; feature commit fae381c; merge commit
+ad19dcf7ba0971dcb0d67f21658ca229237f5620. Push checks API/Web PASS y PR checks
+API/Web PASS. La evidencia local anterior se conserva como antecedente; el
+estado vigente es B3 COMPLETE / VALIDATED / MERGED y C5-B COMPLETE / DoD PASS /
+MERGED. M-HC1 permanece OPEN; no se declara release ni deployment.
+
 Create confirmado persiste 1 Assignment + 2 Overrides + 1 claim atómicos;
 stale review sin writes, rollback INYECTADO/retry, replay/reuse y List/Detail.
 Operador añadió sólo ConflictOverride INSERT; manifest SELECT/INSERT/DELETE,
@@ -213,12 +220,12 @@ Diagnósticos cerrados/sanitizados conservan exclusividad, cleanup y zero-residu
 Incidente histórico http.sessions sin causa raíz establecida; una reproducción
 controlada B0 → B1 → B2 PASS — INCIDENT NOT REPRODUCED. También B0 → B1 → B3 PASS.
 No se afirma reverse ni una única secuencia de cuatro suites; no son gates
-explícitos del contrato canónico. C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW.
+explícitos del contrato canónico. C5-B COMPLETE / DoD PASS / MERGED.
 Gates finales: foco 8 suites/250 tests; full API 100 suites/1616 tests; Prisma
 validate/generate (Client v6.19.3), lint:check sin fix, typecheck, production
-build y diff-check PASS. CI: PENDING — FUTURE COMMIT / PR; merge B3 pendiente.
+build y diff-check PASS. CI PASS: push API/Web y PR API/Web. PR #60 MERGED.
 DoD/evidencia en diseño §34.5.2.4.
-M-HC1 sigue abierto; tras cierre/merge C5-B, sigue refinamiento
+M-HC1 sigue abierto; con C5-B MERGED, sigue refinamiento
 HC-NEXT-03C5-COVERAGE (CONTRACT PENDING / NOT READY).
 Sin cambios productivos, releases ni lifecycle especulativo. Este cierre no
 reejecuta PostgreSQL, tests, builds o Prisma.
@@ -1043,7 +1050,7 @@ COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03
 COMPLETE / MERGED — HC-NEXT-03C4 COMPLETE / MERGED: MANUAL RELEASE, REPLACE,
 REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN — HC-LOCK-04 FINAL CLOSED /
 ACCEPTED IN main@be73bc4 — HC-NEXT-03C5-A COMPLETE / MERGED IN main@5ec9f67 VIA
-PR #36 + #37 — HC-NEXT-03C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — PARTIALLY
+PR #36 + #37 — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS — PARTIALLY
 IMPLEMENTED: BACKEND C1–C4 COMPLETE; C6-A READ-ONLY VIEW COMPLETE / MERGED IN
 main@8a67d5a; C6-B CREATE UI COMPLETE / MERGED IN main@4805128; C6-C RELEASE UI
 COMPLETE / MERGED IN main@9bade4d; C6-D REPLACE UI COMPLETE / MERGED IN
@@ -1115,7 +1122,7 @@ COMPLETE / MERGED, incluidas C4-C1 y C4-C2. HC-LOCK-04 final está CLOSED /
 ACCEPTED sobre `main@be73bc4`. DEC-C5-02 divide hardening en C5-A Contract
 Alignment & Safe PostgreSQL Harness y C5-B Integrated Backend Validation. C5-A
 está COMPLETE / MERGED mediante PR #36 y #37 en `main@5ec9f67`; C5-B está
-planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED. DEC-C5B-01/02/03 fijan rol dedicado (provisioning posterior aceptado para B0),
+planificado como B0/B1/B2/B3 (3/5/5/3 SP), con B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS. DEC-C5B-01/02/03 fijan rol dedicado (provisioning posterior aceptado para B0),
 evidencia compuesta del error sanitizado y readback tras mutar el fixture Case.
 DEC-C5-01 deja CoverageNote
 y cobertura agregada fuera de C5 en HC-NEXT-03C5-COVERAGE, con contrato funcional
@@ -1286,7 +1293,7 @@ tras conflictos de estado. El cierre documental precedió al merge PR #56 en
 main@478e0f0. Al cierre 08-oct-2026, B0 tiene DoR COMPLETE y DoD PASS,
 con runtime PostgreSQL/JWT y cleanup cero aceptados, y está MERGED por PR #57.
 B1 está COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 está COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS;
-B3 está COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED. No se declara deployment ni M-HC1 completo; no se añaden
+B3 está COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS. No se declara deployment ni M-HC1 completo; no se añaden
 métricas ni compromisos de sprint.
 
 Puede contener conceptualmente:
@@ -2988,7 +2995,7 @@ HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5
 
 HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 
-HC-NEXT-03C5-B Integrated Backend Validation — LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
@@ -3151,7 +3158,7 @@ HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5
 ↓
 HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 ↓
-HC-NEXT-03C5-B Integrated Backend Validation — LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
 HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 

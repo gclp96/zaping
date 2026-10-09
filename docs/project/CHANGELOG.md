@@ -3,16 +3,23 @@
 **Documento:** Historial consolidado del proyecto
 **Versión:** 1.5.0
 **Estado:** Activo
-**Última actualización:** 2026-10-08
+**Última actualización:** 2026-10-09
 **Responsable:** Zaping Team
 
 ---
 
-# 2026-10-08 — HC-NEXT-03C5-B3 / C5-B — cierre local DoD
+# 2026-10-08 — HC-NEXT-03C5-B3 / C5-B — cierre DoD / MERGED
 
-**Estado:** B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED;
-C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW. B0/B1/B2 MERGED (PR #57/#58/#59).
-CI: PENDING — FUTURE COMMIT / PR; merge B3 pendiente. Sin release/deployment.
+**Estado:** B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS;
+C5-B COMPLETE / DoD PASS / MERGED. B0/B1/B2 MERGED (PR #57/#58/#59).
+CI PASS: push API/Web y PR API/Web. PR #60 MERGED. Sin release/deployment.
+
+Sincronización post-merge (09-oct-2026): PR #60 — test(healthcare): complete
+C5-B integrated closeout; feature commit fae381c; merge commit
+ad19dcf7ba0971dcb0d67f21658ca229237f5620. Push checks API/Web PASS y PR checks
+API/Web PASS. La evidencia local anterior se conserva como antecedente; el
+estado vigente es B3 COMPLETE / VALIDATED / MERGED y C5-B COMPLETE / DoD PASS /
+MERGED. M-HC1 permanece OPEN; no se declara release ni deployment.
 
 Aceptación HTTP/JWT/PostgreSQL de Create ConflictOverride: revisión inicial y
 stale sin writes, confirmación vigente, 1 Assignment + 2 Overrides + 1 claim
