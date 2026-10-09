@@ -288,15 +288,19 @@ Una Assignment cuenta cuando:
 - pertenece al mismo Case/Company;
 - el EquipmentAsset corresponde al mismo Product;
 - lifecycle es `RESERVED`;
-- el activo conserva elegibilidad;
-- no tiene un conflicto actual sin revisar/confirmar para las ventanas vigentes.
+- el activo conserva elegibilidad.
+
+DEC-C5-COV-01 separa cantidad de certeza: conflicto o schedule incierto no
+reduce por sí solo la suficiencia cuantitativa; se informa mediante Availability.
+Esta decisión supersede la condición anterior de ausencia de conflicto para
+declarar COVERED. No cambia capacity prevention de Create.
 
 `RELEASED`, `REPLACED` y `DIRECT` no cuentan para esa Requirement.
 
 La respuesta puede derivar, sin persistir un único status:
 
 ```text
-assigned >= required and no unresolved conflict → COVERED
+assigned >= required                           → COVERED (quantity only)
 0 < assigned < required                        → PARTIAL
 assigned = 0 and no unavailable declaration    → PENDING
 assigned = 0 and open unavailable note         → UNAVAILABLE
@@ -331,8 +335,9 @@ especializado e histórico:
 
 La nota no persiste `COVERED/PARTIAL` como verdad. `UNAVAILABLE` registra la
 declaración requerida por negocio; `PARTIAL_CONTEXT` explica una cobertura
-parcial derivada. Una nueva situación cierra la nota vigente y conserva la
-historia, en vez de sobrescribirla.
+parcial derivada. DEC-C5-COV-02 exige resolución explícita: una nueva situación
+no cierra automáticamente la note. Corregir implica resolver explícitamente la
+anterior y crear otra, conservando historia en vez de sobrescribirla.
 
 Se permite como máximo una nota abierta por Company + Requirement + kind mediante
 un partial unique index `WHERE resolvedAt IS NULL`.
@@ -1830,8 +1835,8 @@ fabricada o parent command degradado a best-effort silencioso.
 Decisiones aprobadas:
 
 - **DEC-C5-01:** CoverageNote y cobertura agregada quedan fuera de C5. El ticket
-  backend independiente HC-NEXT-03C5-COVERAGE debe definir su contrato y
-  completarse antes de cualquier slice C6 que dependa de cobertura.
+  backend independiente HC-NEXT-03C5-COVERAGE tiene contrato aprobado mediante
+  DEC-C5-COV-01–04 y debe completarse antes de cualquier slice C6 dependiente.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
 - **DEC-C5B-01:** APROBADA: se usa la identidad dedicada `zaping_hc_c5b`. El refinamiento por sí mismo
@@ -2384,17 +2389,163 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
 Con C5-B MERGED, el siguiente trabajo registrado es el refinamiento
-de HC-NEXT-03C5-COVERAGE, CONTRACT PENDING / NOT READY.
+de HC-NEXT-03C5-COVERAGE, REFINED / CONTRACT APPROVED.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
-**Estado:** CONTRACT PENDING / NOT READY — PREREQUISITE FOR C6 SLICES THAT DEPEND
-ON COVERAGE; NOT A BLOCKER FOR C6-A/C6-B/C6-C/C6-D/C6-E.
+**Estado:** REFINED / CONTRACT APPROVED — decisiones explícitas de Leo,
+09-oct-2026. Implementación pendiente. R READY (5 SP); N DEFINED / BLOCKED BY
+COVERAGE-R (5 SP). M-HC1 OPEN. Fuera de C5-A/C5-B y requisito para futuros
+slices C6 que dependan de esta capability; no bloquea C6-A/B/C/D/E ya merged.
+No es una campaña de cobertura de tests.
 
-Ticket backend independiente para lectura agregada `PENDING` / `PARTIAL` /
-`UNAVAILABLE` / `CONFLICT` y commands de registro/resolución de CoverageNotes.
-Debe decidir contrato HTTP, tenant, RBAC, auditoría, concurrencia, replay y
-pruebas. No forma parte de C5-A/C5-B.
+#### Decisiones de producto aprobadas
+
+- **DEC-C5-COV-01:** quantity y certainty son dimensiones distintas. COVERED
+  sólo significa suficiencia cuantitativa; puede coexistir con fullyVerifiable=false,
+  warnings y conflictFree=false/null. No certifica readiness, preparación,
+  disponibilidad física ni ausencia de conflicto.
+- **DEC-C5-COV-02:** notes se resuelven exclusivamente por command explícito.
+  GET, recomputación y cambios de Assignments jamás las resuelven. Notes stale
+  permanecen como contexto operacional/auditoría hasta resolución explícita.
+- **DEC-C5-COV-03:** crear UNAVAILABLE sólo con assignedQty=0; PARTIAL_CONTEXT
+  sólo con 0<assignedQty<requestedQty. No son comentarios genéricos. Si cambia
+  el contexto, no se borran/resuelven automáticamente ni alteran cantidades.
+- **DEC-C5-COV-04:** coverage/notes son informacionales en V1: no bloquean
+  lifecycle Case, CaseKit preparation, Dispatch/Custody u otros workflows.
+  Cualquier gate futuro necesita otro incremento y aprobación explícita.
+
+#### Agregado, proyección y cantidades
+
+Owner: HealthcareCaseRequirement de equipo dentro de su Case y Company.
+Persistir Requirements/Assignments existentes, notes/auditoría y claims de
+commands. Derivar requestedQty, nominalAssignedQty, assignedQty, missingQty,
+quantityState, availability y notes activas/historia. Sin coverageStatus cache,
+segunda tabla CoverageNote ni enum agregado persistido.
+
+nominalAssignedQty representa las reservas REQUIREMENT vinculadas al mismo
+Case/Requirement/Company antes de reevaluar elegibilidad; assignedQty aplica
+además compatibilidad Product y elegibilidad EquipmentAsset (§9.1).
+DIRECT/RELEASED/REPLACED no cuentan. missingQty=max(requestedQty-assignedQty,0).
+Conflicto/incertidumbre no se colapsan en quantityState. El conteo de capacity
+para prevenir over-coverage en Create permanece separado y sin cambios.
+Resumen operacional: Requirements activas de equipo; historial de notes separado.
+
+| quantityState | Condición exacta | Efecto |
+|---|---|---|
+| PENDING | assignedQty=0 sin UNAVAILABLE activa | Alerta informacional |
+| UNAVAILABLE | assignedQty=0 con UNAVAILABLE activa | Declaración humana; nunca inferida por stock |
+| PARTIAL | 0<assignedQty<requestedQty | Déficit; PARTIAL_CONTEXT no cambia la matemática |
+| COVERED | assignedQty>=requestedQty | Suficiencia cuantitativa exclusivamente |
+
+CONFLICT es dimensión de atención/Availability separada. Reutilizar
+fullyVerifiable, conflictFree y warnings existentes, incluyendo schedule
+incompleto y conflicto/override vigente. Una UNAVAILABLE stale con cantidad
+positiva permanece visible pero no sustituye PARTIAL/COVERED. Cada GET recompone
+la proyección, sin modificar notes ni certificar disponibilidad física.
+
+#### CoverageNote y auditoría
+
+Reutilizar HealthcareEquipmentRequirementCoverageNote: id/companyId/requirementId,
+kind (UNAVAILABLE/PARTIAL_CONTEXT), comment obligatorio normalizado no blank,
+recordedById/createdAt y resolvedById/resolvedAt. Kind, comment y auditoría de
+registro inmutables. Resolver escribe el primer actor/fecha una sola vez;
+repetir preserva ese resultado. Resolver note antigua nunca resuelve su sucesora.
+Correcciones: resolve anterior + create nueva explícitos. Sin PUT genérico ni
+DELETE API. Como máximo una activa por Company+Requirement+kind; tipos distintos
+pueden coexistir sólo según contexto aprobado, incluso si uno quedó stale.
+Resolución sólo cierra contexto activo y recomputa lectura; no altera Assignments
+ni cantidades. Mantener FK tenant-safe, CHECK de comment/resolución e índice
+unique parcial existentes. No se añade resolución automática al retiro/cancel.
+
+#### HTTP / tenant / RBAC aprobados
+
+| Método/path | Roles | DTO y resultado | Idempotency-Key |
+|---|---|---|---|
+| GET /healthcare/cases/:caseId/equipment-coverage | ADMIN/MANAGER/SALES/WAREHOUSE | Proyección por Requirement activa: requirementId, product, requestedQty, nominalAssignedQty, assignedQty, missingQty, quantityState, availability {fullyVerifiable,conflictFree,warnings}, activeNotes | No |
+| GET /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes | Los cuatro roles | Historia paginada y orden determinista | No |
+| POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes | ADMIN/MANAGER/WAREHOUSE | {kind,comment}; note con auditoría pública | Obligatoria |
+| POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes/:noteId/resolve | ADMIN/MANAGER/WAREHOUSE | Body vacío; note resuelta, auditoría preservada | Obligatoria |
+
+Company exclusivamente JWT; Case/Requirement/note/actores del mismo tenant.
+Nunca aceptar ownership o actor/timestamps del cliente. SALES mutador 403;
+sin JWT 401. 404 público idéntico missing/foreign/relación inválida; 400 DTO,
+comment o key inválidos; 409 duplicate active kind, contexto inválido, lifecycle
+no editable o key reused con command normalizado diferente. Persistencia
+sanitizada según convenciones existentes. JSON sin companyId, hashes, claims ni
+relaciones Prisma privadas. No se inventan códigos de error o naming alternativo
+por este cierre; implementación sigue convenciones y sólo permite ajuste nominal.
+
+#### Transacciones e idempotencia
+
+GET usa snapshot consistente de Requirements/Assignments/notes/inputs de
+availability, sin Company advisory lock sólo por leer. Commands: una transacción
+para claim, lifecycle/context vigente, create/resolve y finalización del claim;
+Company → Case → Requirement → Note, sin Asset locks para commands de notes.
+Unique parcial es defensa final de notas activas duplicadas.
+
+Create: misma key+command normalizado reproduce note; distinto command 409.
+Keys diferentes concurrentes para mismo tipo activo: una creación, un conflicto.
+Resolve: replay mismo resultado; repetición nunca sobrescribe primer actor/fecha.
+Note identity inmutable: sin fingerprint Availability para resolver. No claims
+parciales tras rollback. GET/commands no mutan Assignments ni inventario.
+
+#### Persistencia y harness: impactos futuros, no implementados
+
+Modelo existente reutilizado. Commands requieren extender IdempotencyScope con
+scopes explícitos de note create/resolve y migration mínima revisada. No nueva
+tabla ni status persistido. Reutilizar withC5bHarness, zaping_hc_c5b,
+zaping_spike_test, JWT, ownership, preflight, exclusividad, diagnóstico y cleanup.
+Sin segundo harness. Delta futuro CoverageNote: SELECT; INSERT/DELETE para
+fixtures acreditados/cleanup; UPDATE sólo resolvedAt/resolvedById para resolución.
+Incluir note en manifest/residue y borrar antes de Requirements/Users, sin
+ampliar ownership ni permisos ajenos de tablas/funciones/schema.
+
+#### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
+
+**Estado/DoR:** READY tras esta sincronización documental. Goal: proyección
+derivada y readback de notes; dependencia de C5-B merged y contrato aprobado.
+Scope: los dos GET, cantidades nominales/aplicables/déficit, cuatro quantity
+states, Availability independiente, notes activas/historia paginada, tenant,
+cuatro roles, orden y snapshot consistente. Prisma: sin agregado persistido;
+modelo note existente. Sin mutaciones ni locks Company para GET.
+
+**AC:** (1) reglas de conteo correctas; (2) DIRECT/RELEASED/REPLACED excluidos;
+(3) COVERED con fullyVerifiable=false; (4) conflicto independiente; (5) UNAVAILABLE
+activa transforma cero PENDING a UNAVAILABLE; (6) PARTIAL_CONTEXT no altera counts;
+(7) foreign=missing; (8) cuatro roles lectores; (9) schedule incierto sin falsa
+certificación; (10) release/replace/reschedule recomputan; (11) JSON sin campos
+privados; (12) sin writes físicos; (13) sin coverageStatus persistido.
+
+**Non-goals:** note commands, blocking Case, cambios CaseKit/inventario,
+semántica nueva de override y frontend. **DoD:** unit de derivación + HTTP/JWT/
+PostgreSQL pertinente, tenant/RBAC, recomputación/snapshot, invariantes físicas,
+ACL/cleanup/residue, gates estáticos/generales aplicables, docs, CI y merge.
+Fixtures: Requirements y reservas de lifecycle/origin/eligibilidad diversos,
+Cases completos/incompletos y notes activas/resueltas, owners A/B acreditados.
+
+#### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
+
+**Estado:** DEFINED / BLOCKED BY COVERAGE-R. Goal: create/resolve explícitos con
+auditoría. Scope: dos POST, contexto, inmutabilidad, unicidad activa, idempotencia,
+replay/reuse, concurrencia, rollback, tenant/RBAC y readback R.
+**Dependencias/DoR:** R merged; scopes de IdempotencyScope implementados y migration
+revisada como parte del incremento N; delta ACL exacto revisado antes de runtime.
+No requiere otro ticket genérico de persistencia.
+
+**AC:** (1) UNAVAILABLE sólo assignedQty=0; (2) PARTIAL_CONTEXT sólo 0<assignedQty<q;
+(3) contexto inválido zero-write; (4) jamás auto-resolve; (5) una activa/kind;
+(6) coexistencia según reglas aprobadas; (7) create idempotente; (8) resolve
+idempotente; (9) primer resolved audit inmutable; (10) antigua no resuelve sucesora;
+(11) duplicate create concurrente seguro; (12) rollback sin note/claim residual;
+(13) SALES rechazado; (14) foreign=missing; (15) readback R; (16) sin mutación
+Assignment/inventario. Non-goals: PUT/DELETE API, notes genéricas, automatismos,
+blocking workflows, frontend o nuevo status persistido.
+
+**DoD:** migration mínima, unit, HTTP/JWT/PostgreSQL, concurrencia material,
+rollback/idempotencia, cleanup/residue, invariantes físicas, gates estáticos/
+generales, docs, CI y merge. Fixtures: Requirements cero/parcial/suficiente,
+notes históricas/sucesoras, actores A/B, carreras create/resolve y parent lifecycle.
 
 ## 34.6 HC-NEXT-03C6 — Frontend Equipment Assignment
 
@@ -2911,5 +3062,5 @@ Equipment Assignment implementation
 → C6-D REPLACE ASSIGNMENT UI COMPLETE / MERGED — PR #45 — main@99efc5a — ACTUAL 25-sep-2026
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee — ACTUAL 27-sep-2026
 → SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
-→ C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; C5-COVERAGE CONTRACT PENDING
+→ C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; C5-COVERAGE REFINED / CONTRACT APPROVED
 ```
