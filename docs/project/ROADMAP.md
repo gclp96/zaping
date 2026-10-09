@@ -226,7 +226,7 @@ validate/generate (Client v6.19.3), lint:check sin fix, typecheck, production
 build y diff-check PASS. CI PASS: push API/Web y PR API/Web. PR #60 MERGED.
 DoD/evidencia en diseño §34.5.2.4.
 M-HC1 sigue OPEN; después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está
-PARTIALLY IMPLEMENTED. R localmente validado, sin merge; N sin implementar.
+PARTIALLY IMPLEMENTED. R COMPLETE / MERGED mediante PR #63; N READY, sin implementar.
 Este cierre documental no reejecuta PostgreSQL, tests, builds o Prisma; sin release.
 
 HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–05).
@@ -235,13 +235,15 @@ Notes explícitas, inmutables y context-restricted; stale visibles hasta resoluc
 V1 informacional: sin gates Case/CaseKit/Dispatch. Contrato derivado por Requirement;
 sin coverageStatus persistido ni cambios de capacity Create.
 HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read —
-IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
+COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS — 5 SP; CI PASS.
+CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
+Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
 GET summary e historia, tenant/RBAC, snapshot, states/Availability separados y JSON.
-Después: HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — DEFINED /
-BLOCKED BY COVERAGE-R MERGE — 5 SP; POST create/resolve, audit, context, idempotency,
+Después: HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — READY — 5 SP; POST create/resolve, audit, context, idempotency,
 concurrencia/rollback y readback R. R exige unit/HTTP/JWT/PostgreSQL pertinente,
 invariantes/gates/docs/CI/merge; N añade migration scopes y pruebas de mutación.
-N requiere R merged y revisión de scopes/migration/ACL; permanece bloqueado.
+N tiene la dependencia R merge satisfecha y contrato/DoR aprobados; listo para
+implementación. Scopes/migration/ACL se revisarán dentro de N antes de su runtime.
 Details/AC/DoD en diseño §34.5.3 y PROJECT_BOARD. M-HC1 sigue OPEN;
 capability funcional, sin redefinirla como campaña de tests adicionales.
 
@@ -251,11 +253,13 @@ noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 tes
 con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
 fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
 zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
-no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+no UPDATE. ACL exclusivo del rol de test C5-B; no autoriza producción.
+Sin cambio Prisma schema/migration ni actividad staging/producción.
 DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
 Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
 un TransactionClient para todos los inputs, sin Company advisory/write locks ni
-writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+writes en GET. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+Este cierre registra
 la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
 También permanecen como TARGET Healthcare:
