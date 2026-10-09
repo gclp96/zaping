@@ -2,7 +2,7 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
 Última actualización: 2026-10-08
 Responsable: Zaping Team
 
@@ -198,7 +198,7 @@ HC-OPS-01B — Preparation Confirmation & Readiness
         → COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
+        → LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
         → CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
@@ -2310,7 +2310,7 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
-→ HC-NEXT-03C5-B Integrated Backend Validation — OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
+→ HC-NEXT-03C5-B Integrated Backend Validation — LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
@@ -2549,7 +2549,7 @@ Healthcare Equipment Assignment implementation
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DOR COMPLETE
-→ C5-B OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED; C5-COVERAGE CONTRACT PENDING
+→ C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2991,7 +2991,7 @@ Sprint 1:
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: OPEN — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS; B3 NEXT / BLOCKED UNTIL B2 MERGED
+Estado: LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
 
 Estimación total: 16 SP. Los SP expresan complejidad relativa y no se convierten
 en horas ni Commitment.
@@ -3079,7 +3079,7 @@ se conservan; la aceptación de Create se registra a continuación.
 
 ##### C5-B2 — Create HTTP/JWT — 5 SP
 
-Estado: COMPLETE / VALIDATED / READY FOR REVIEW — UNCOMMITTED — DoD PASS
+Estado: COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS
 
 DoR: COMPLETE. Refinamiento sobre main@9504cdd; B0/B1 MERGED. Suite focal
 `app/api/test/healthcare-equipment-assignments.c5b-create.postgres.e2e-spec.ts`
@@ -3106,39 +3106,41 @@ Checklist y comando en
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34523-b2--create-httpjwt--5-sp).
 Este cierre es documental, sin reejecución de DB/tests ni cambios a la suite.
 
-B3 NEXT / BLOCKED UNTIL B2 MERGED; C5-B OPEN. Pendientes: decisión explícita de
-B3 sobre aceptación persistida ConflictOverride y posible INSERT mínimo, gate
-B0/B1/B2 y cierre C5-B. Formato histórico y output/tmp fuera. Siguiente acción:
-revisión humana final del diff antes de staging; B2/documentación UNCOMMITTED.
+B2 MERGED mediante PR #59 en main@dac9794. El INSERT prohibido y la
+confirmación diferida describen exclusivamente el cierre histórico B2; B3 añade
+la aceptación y el permiso mínimo siguientes.
 
 ##### C5-B3 — Integrated Gate & Closeout — 3 SP
 
-Estado: NEXT / BLOCKED UNTIL B2 MERGED / NOT IMPLEMENTED
+Estado: COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED.
+DoR COMPLETE: B0/B1/B2 MERGED. C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW.
+Gates sobre delta final: foco Equipment Assignments 8 suites/250 tests y full
+API 100 suites/1616 tests PASS; Prisma validate/generate (Client v6.19.3),
+lint:check sin fix, typecheck, production build y diff-check PASS.
+CI: PENDING — FUTURE COMMIT / PR; merge B3 pendiente, sin deployment declarado.
 
-DoR: B1 y B2 verdes y B2 MERGED (merge pendiente). B3 debe decidir explícitamente
-si añade aceptación persistida ConflictOverride antes de cerrar C5-B.
-AC: nueva matriz C5-B, regresiones focales C1–C4 y full API
-sin reejecutar HC-LOCK-04 por defecto. DoD: Prisma validate/generate, lint,
-typecheck, build y `git diff --check` verdes; reporte de selected/skipped/no
-ejecutados, identidad no sensible y cleanup propio. Riesgos: flakiness no explicada
-o ampliar scope para corregir defectos no demostrados.
+Create confirmado: fingerprint vigente/stale, razón normalizada, JWT/RBAC,
+tenant, 1 Assignment + 2 Overrides + 1 claim atómicos, rollback INYECTADO/retry,
+replay/reuse, JSON exacto y List/Detail. B3 focal PASS (1 suite/1 test, exit 0),
+frontera física, cleanup y zero-residue propios acreditados. B0/B1/B2/B3 focales
+PASS con ACL final. Operador añadió sólo ConflictOverride INSERT;
+SELECT/INSERT/DELETE, sin UPDATE, grant options ni permisos auxiliares nuevos.
 
-Alcance consolidado:
-- E2E HTTP/PostgreSQL faltantes de GET list/detail y POST Create con JWT real,
-  Company A/B y los cuatro roles;
-- filtros/paginación, historical reads, foreign igual a missing, schedule
-  reevaluado y error de persistencia sanitizado;
-- regresión de focales C1–C4 y full API sobre la baseline integrada. Los escenarios
-  de locks, parent integrations, Manual Release y Replace ya acreditados se
-  reutilizan; no se rediseñan ni duplican.
+Incidente histórico http.sessions: PID no acreditado, teardown PASS; causa raíz
+no establecida. Diagnóstico sanitizado añadido sin cambiar el rechazo ni añadir
+retry/sleep, exclusiones o cliente observador. 17 tests diagnósticos y estática
+focal PASS; B0/B3 disabled safely skipped. Una reproducción controlada
+B0 → B1 → B2 PASS — INCIDENT NOT REPRODUCED; también B0 → B1 → B3 PASS.
+No se afirma ejecución de las cuatro suites en una secuencia ni reverse; el
+contrato canónico no exige estos comandos adicionales. Ningún defecto productivo
+HIGH/BLOCKER establecido; no se recomienda una corrección lifecycle especulativa.
 
-Acceptance Criteria / Definition of Done:
-- cobertura faltante y suites focales C1–C4 verdes sobre la disposable aprobada;
-- full API, Prisma validate/generate, lint, typecheck, build y `git diff --check`
-  verdes, sin flakiness no explicada ni información PostgreSQL/Prisma expuesta;
-- evidencia distingue tests seleccionados, skipped y no ejecutados, e incluye el
-  resultado de cleanup propio; cualquier defecto productivo exige un cambio
-  focal separado y no amplía capability por inferencia.
+Checklist y evidencia exacta:
+[EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
+Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
+documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
+Siguiente trabajo tras cierre/merge C5-B: refinamiento HC-NEXT-03C5-COVERAGE,
+CONTRACT PENDING / NOT READY. No se modifican SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
@@ -3399,7 +3401,7 @@ PASS. Checklist y alcance preciso de cada evidencia en
 No quedan findings HIGH/BLOCKER de 01B. COMPLETE significa terminado y validado;
 quedó MERGED mediante PR #56 en main@478e0f0; no se declara deployment. M-HC1 continúa abierto.
 Siguiente trabajo registrado: HC-NEXT-03C5-B3 Integrated Gate & Closeout,
-NEXT / BLOCKED UNTIL B2 MERGED; B0/B1 están MERGED y B2 validado con DoD PASS. No se modifican SP, Forecast, Commitment ni fechas de
+COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; B0/B1/B2 MERGED. No se modifican SP, Forecast, Commitment ni fechas de
 sprint.
 
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,
