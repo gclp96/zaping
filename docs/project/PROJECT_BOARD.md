@@ -2,8 +2,8 @@ Project Board — Zaping
 
 Producto: Zaping Platform
 Estado: Desarrollo activo
-Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
-Última actualización: 2026-10-08
+Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
+Última actualización: 2026-10-09
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -198,7 +198,7 @@ HC-OPS-01B — Preparation Confirmation & Readiness
         → COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+        → COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
         → CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
@@ -2310,7 +2310,7 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01A CaseKit Draft & Contents — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
-→ HC-NEXT-03C5-B Integrated Backend Validation — LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+→ HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 → HC-NEXT-03C5-COVERAGE — CONTRACT PENDING / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
@@ -2549,7 +2549,7 @@ Healthcare Equipment Assignment implementation
 → HC-OPS-01A CASEKIT DRAFT & CONTENTS — COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 → HC-OPS-01A.1 DRAFT ITEM EXCLUSION — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B PREPARATION CONFIRMATION & READINESS — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DOR COMPLETE
-→ C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; C5-COVERAGE CONTRACT PENDING
+→ C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; C5-COVERAGE CONTRACT PENDING
 
 OPS-RC-B5C real staging acceptance
 → DEFERRED / READY WHEN NEEDED
@@ -2991,7 +2991,7 @@ Sprint 1:
 
 #### HC-NEXT-03C5-B — Integrated Backend Validation
 
-Estado: LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
+Estado: COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 Estimación total: 16 SP. Los SP expresan complejidad relativa y no se convierten
 en horas ni Commitment.
@@ -3112,12 +3112,19 @@ la aceptación y el permiso mínimo siguientes.
 
 ##### C5-B3 — Integrated Gate & Closeout — 3 SP
 
-Estado: COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED.
-DoR COMPLETE: B0/B1/B2 MERGED. C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW.
+Estado: COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS.
+DoR COMPLETE: B0/B1/B2 MERGED. C5-B COMPLETE / DoD PASS / MERGED.
 Gates sobre delta final: foco Equipment Assignments 8 suites/250 tests y full
 API 100 suites/1616 tests PASS; Prisma validate/generate (Client v6.19.3),
 lint:check sin fix, typecheck, production build y diff-check PASS.
-CI: PENDING — FUTURE COMMIT / PR; merge B3 pendiente, sin deployment declarado.
+CI PASS: push API/Web y PR API/Web. PR #60 MERGED; sin deployment declarado.
+
+Sincronización post-merge (09-oct-2026): PR #60 — test(healthcare): complete
+C5-B integrated closeout; feature commit fae381c; merge commit
+ad19dcf7ba0971dcb0d67f21658ca229237f5620. Push checks API/Web PASS y PR checks
+API/Web PASS. La evidencia local anterior se conserva como antecedente; el
+estado vigente es B3 COMPLETE / VALIDATED / MERGED y C5-B COMPLETE / DoD PASS /
+MERGED. M-HC1 permanece OPEN; no se declara release ni deployment.
 
 Create confirmado: fingerprint vigente/stale, razón normalizada, JWT/RBAC,
 tenant, 1 Assignment + 2 Overrides + 1 claim atómicos, rollback INYECTADO/retry,
@@ -3139,7 +3146,7 @@ Checklist y evidencia exacta:
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
 Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
 documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
-Siguiente trabajo tras cierre/merge C5-B: refinamiento HC-NEXT-03C5-COVERAGE,
+Siguiente trabajo tras C5-B MERGED: refinamiento HC-NEXT-03C5-COVERAGE,
 CONTRACT PENDING / NOT READY. No se modifican SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
@@ -3401,7 +3408,7 @@ PASS. Checklist y alcance preciso de cada evidencia en
 No quedan findings HIGH/BLOCKER de 01B. COMPLETE significa terminado y validado;
 quedó MERGED mediante PR #56 en main@478e0f0; no se declara deployment. M-HC1 continúa abierto.
 Siguiente trabajo registrado: HC-NEXT-03C5-B3 Integrated Gate & Closeout,
-COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; B0/B1/B2 MERGED. No se modifican SP, Forecast, Commitment ni fechas de
+COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; B0/B1/B2 MERGED. No se modifican SP, Forecast, Commitment ni fechas de
 sprint.
 
 Fuera: `IN_PREPARATION`, reopen, mutación de items `PREPARED`, lotes/seriales,

@@ -12,8 +12,8 @@
 **Estado HC-NEXT-03C2:** COMPLETE / MERGED
 **Estado HC-NEXT-03C3:** COMPLETE / MERGED
 **Estado HC-NEXT-03C4:** COMPLETE / MERGED — MANUAL RELEASE HC-LOCK-03B, REPLACE, REQUIREMENT RETIRE C4-C1 AND CASE CANCEL C4-C2 IN MAIN; HC-LOCK-04 FINAL CLOSED / ACCEPTED
-**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED
-**Última actualización:** 2026-10-08
+**Estado de implementación:** PARTIALLY IMPLEMENTED — BACKEND C1–C4 COMPLETE / MERGED; C5-A COMPLETE / MERGED; C6-A READ-ONLY CASE VIEW, C6-B CREATE UI, C6-C RELEASE UI, C6-D REPLACE UI AND C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED; C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
+**Última actualización:** 2026-10-09
 **Responsable:** Zaping Healthcare Team
 
 ---
@@ -1906,11 +1906,11 @@ velocidad o Commitment. C5-A se completó el 24-sep, C6-A/C6-B/C6-C/C6-D el
 restante permanece pendiente. B0 conserva sus 3 SP y está COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS.
 B1 conserva sus 5 SP: COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS.
 B2 conserva sus 5 SP: COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS.
-B3 está COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; no se añade Commitment.
+B3 está COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; no se añade Commitment.
 
 ### 34.5.2 C5-B — Integrated Backend Validation
 
-**Estado:** LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED.
+**Estado:** COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS.
 
 **Slicing y estimación:** B0 Safe Integrated Harness, 3 SP; B1 List/Detail HTTP
 Readback, 5 SP; B2 Create HTTP/JWT, 5 SP; B3 Integrated Gate & Closeout, 3 SP.
@@ -2270,10 +2270,16 @@ fuera de B2, se acredita en B3; no se modifica la evidencia histórica de B2.
 
 #### 34.5.2.4 B3 — Integrated Gate & Closeout — 3 SP
 
-**DoR:** COMPLETE. **Estado:** COMPLETE / VALIDATED / READY FOR FINAL REVIEW —
-UNCOMMITTED. C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW. Base: main@dac9794;
-B0/B1/B2 MERGED. CI: PENDING — FUTURE COMMIT / PR. Merge B3/C5-B pendiente;
+**DoR:** COMPLETE. **Estado:** COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS. C5-B COMPLETE / DoD PASS / MERGED. Base: main@dac9794;
+B0/B1/B2 MERGED. B3/C5-B MERGED mediante PR #60; CI PASS (push y PR: API/Web);
 no se declara deployment ni cierre de M-HC1.
+
+Sincronización post-merge (09-oct-2026): PR #60 — test(healthcare): complete
+C5-B integrated closeout; feature commit fae381c; merge commit
+ad19dcf7ba0971dcb0d67f21658ca229237f5620. Push checks API/Web PASS y PR checks
+API/Web PASS. La evidencia local anterior se conserva como antecedente; el
+estado vigente es B3 COMPLETE / VALIDATED / MERGED y C5-B COMPLETE / DoD PASS /
+MERGED. M-HC1 permanece OPEN; no se declara release ni deployment.
 
 **Decisión de contrato:** persisted Create ConflictOverride REQUIRED BEFORE
 C5-B CLOSEOUT. Suite:
@@ -2365,7 +2371,7 @@ cierre documental. El aviso de Prisma 8 es informativo; no se actualizan deps.
 | Prisma validate/generate | PASS | Schema válido; Client v6.19.3 generado sobre delta final |
 | Lint/typecheck/build generales | PASS | lint:check sin fix, typecheck y Nest build sobre delta final |
 | Documentación y diff | PASS | Sincronización documental; diff-check de este cierre |
-| CI del futuro commit/PR B3 | PENDING | Trabajo UNCOMMITTED; comprobar después de crear PR |
+| CI y merge B3/C5-B | PASS | PR #60, main@ad19dcf; push API/Web y PR API/Web PASS |
 | API productiva/Prisma schema/migraciones/Web | NOT APPLICABLE | Ningún cambio requerido ni incluido |
 | Findings HIGH/BLOCKER productivos | PASS | Ninguno establecido; gates locales canónicos PASS |
 
@@ -2377,7 +2383,7 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 **Fuera de alcance:** rutas/capabilities nuevas, CoverageNote/cobertura agregada,
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
-Tras el cierre y merge de C5-B, el siguiente trabajo registrado es el refinamiento
+Con C5-B MERGED, el siguiente trabajo registrado es el refinamiento
 de HC-NEXT-03C5-COVERAGE, CONTRACT PENDING / NOT READY.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
@@ -2905,5 +2911,5 @@ Equipment Assignment implementation
 → C6-D REPLACE ASSIGNMENT UI COMPLETE / MERGED — PR #45 — main@99efc5a — ACTUAL 25-sep-2026
 → C6-E REQUIREMENT-LINKED ASSIGNMENT UI COMPLETE / MERGED — PR #47 — main@a1f0fee — ACTUAL 27-sep-2026
 → SIGUIENTE INCREMENTO FUNCIONAL — PENDING REFINEMENT / NOT READY
-→ C5-B LOCAL DoD PASS / READY FOR FINAL REVIEW — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED; C5-COVERAGE CONTRACT PENDING
+→ C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS; C5-COVERAGE CONTRACT PENDING
 ```
