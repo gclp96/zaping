@@ -3146,13 +3146,13 @@ Checklist y evidencia exacta:
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
 Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
 documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
-Después de C5-B MERGED: COVERAGE parcialmente implementado; R localmente validado,
-PR pendiente; N bloqueado por el merge de R. Sin cambios SP, Forecast o Commitment.
+Después de C5-B MERGED: COVERAGE parcialmente implementado; R COMPLETE / MERGED
+mediante PR #63; N READY — 5 SP. Sin cambios SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
 Estado: PARTIALLY IMPLEMENTED / CONTRACT APPROVED — DEC-C5-COV-01–05 aprobadas por Leo.
-R localmente implementado y validado, aún sin merge; N sin implementar.
+R COMPLETE / MERGED; N READY, sin implementar.
 Capability de dominio fuera de C5-A/B; no campaña de test coverage. M-HC1 OPEN.
 Cantidad y certainty separadas; COVERED no certifica readiness/availability.
 Notes sólo se resuelven explícitamente; stale conservadas sin cambiar counts.
@@ -3163,7 +3163,10 @@ Contrato completo/API/errores/transactions:
 
 ##### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
 
-Estado: IMPLEMENTED / LOCAL DoD PASS / PR PENDING; C5-B merged.
+Estado: COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
+Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
+C5-B merged.
 Scope: GET Case coverage y GET Requirement note history, snapshot consistente,
 nominalAssignedQty/assignedQty/missingQty, PENDING/PARTIAL/UNAVAILABLE/COVERED,
 Availability/warnings independientes, notes activas/historia paginada, orden,
@@ -3183,18 +3186,21 @@ noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 tes
 con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
 fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
 zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
-no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+no UPDATE. ACL exclusivo del rol de test C5-B; no autoriza producción.
+Sin cambio Prisma schema/migration ni actividad staging/producción.
 DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
 Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
 un TransactionClient para todos los inputs, sin Company advisory/write locks ni
-writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+writes en GET. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+Este cierre registra
 la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
 ##### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-Estado: DEFINED / BLOCKED BY COVERAGE-R MERGE. Goal: create/resolve auditable explícito.
-Dependencias/DoR: R merged; scopes create/resolve y migration mínima revisados/
-implementados dentro de N; ACL exacto revisado antes de runtime. Scope: dos POST,
+Estado: READY — 5 SP; dependencia R merge satisfecha por PR #63. Goal: create/resolve auditable explícito.
+Dependencias/DoR: R merged y contrato aprobado; listo para implementación.
+Scopes create/resolve y migration mínima se revisarán/implementarán dentro de N;
+ACL exacto debe revisarse antes de runtime. Scope: dos POST,
 contexto/kind/comment, auditoría inmutable, active uniqueness, replay/reuse,
 concurrencia/rollback, tenant/RBAC y readback R. AC: UNAVAILABLE sólo cero;
 PARTIAL_CONTEXT sólo parcial; contexto inválido zero-write; nunca auto-resolve;

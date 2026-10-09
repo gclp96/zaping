@@ -10,10 +10,12 @@
 
 ## Unreleased
 
-### HC-NEXT-03C5-COVERAGE-R — implementación y validación local
+### HC-NEXT-03C5-COVERAGE-R — cierre DoD / MERGED
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP. Sin PR existente,
-sin merge ni resultado CI; no constituye release ni deployment.
+**Estado:** COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS — 5 SP. CI PASS.
+CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
+Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
+No constituye release ni deployment.
 
 Implementados GET /healthcare/cases/:caseId/equipment-coverage y
 GET /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes
@@ -32,15 +34,17 @@ noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 tes
 con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
 fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
 zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
-no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+no UPDATE. ACL exclusivo del rol de test C5-B; no autoriza producción.
+Sin cambio Prisma schema/migration ni actividad staging/producción.
 DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
 Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
 un TransactionClient para todos los inputs, sin Company advisory/write locks ni
-writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+writes en GET. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+Este cierre registra
 la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
-HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N: DEFINED / BLOCKED BY
-COVERAGE-R MERGE — 5 SP, sin implementar. M-HC1 OPEN.
+HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N: READY — 5 SP,
+sin implementar; dependencia R merge satisfecha. M-HC1 OPEN.
 Contrato y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
 
 ---

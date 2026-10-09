@@ -2389,13 +2389,13 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
 Después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está PARTIALLY IMPLEMENTED:
-COVERAGE-R IMPLEMENTED / LOCAL DoD PASS / PR PENDING; N bloqueado por el merge de R.
+COVERAGE-R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS. N READY — 5 SP.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
 **Estado:** PARTIALLY IMPLEMENTED / CONTRACT APPROVED — decisiones explícitas de Leo,
-09-oct-2026. R IMPLEMENTED / LOCAL DoD PASS / PR PENDING (5 SP);
-N DEFINED / BLOCKED BY COVERAGE-R MERGE (5 SP), sin implementar. M-HC1 OPEN.
+09-oct-2026. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS (5 SP); CI PASS.
+N READY (5 SP), sin implementar; dependencia R merge satisfecha. M-HC1 OPEN.
 Fuera de C5-A/C5-B y requisito para futuros
 slices C6 que dependan de esta capability; no bloquea C6-A/B/C/D/E ya merged.
 No es una campaña de cobertura de tests.
@@ -2419,7 +2419,7 @@ No es una campaña de cobertura de tests.
 #### DEC-C5-COV-05 — Requirement Availability Aggregation
 
 Decisión explícita aprobada por Leo; 05.5 final sustituye la formulación previa.
-05.1–05.5 implementadas y validadas localmente en COVERAGE-R.
+05.1–05.5 IMPLEMENTED / VALIDATED en COVERAGE-R, ahora COMPLETE / MERGED.
 
 - **05.1 Population:** sólo Assignments que cuentan en assignedQty: mismo
   Company/Case/Requirement, REQUIREMENT, RESERVED, Product compatible y Asset
@@ -2534,13 +2534,17 @@ protecciones zero-residue. Notes incluidas en manifest/residue y eliminadas
 antes de Requirements/Users; sin segundo harness ni ampliación de ownership.
 Delta ACL aplicado al rol de test: SELECT, INSERT y DELETE sobre
 public."HealthcareEquipmentRequirementCoverageNote". **No UPDATE**.
+ACL exclusivo del rol de test C5-B; no implica autorización de producción.
 N requiere scopes explícitos de IdempotencyScope para create/resolve y migration
 mínima revisada. UPDATE sólo resolvedAt/resolvedById es una necesidad futura de
 N, sujeta a revisión de ACL; no forma parte del delta aplicado de R.
 
 #### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING. C5-B merged y contrato
+**Estado:** COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS. CI PASS.
+CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
+Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
+C5-B merged y contrato
 aprobado. Implementados GET /healthcare/cases/:caseId/equipment-coverage y
 GET /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes.
 Lectores: ADMIN, MANAGER, SALES y WAREHOUSE. Proyección por Requirement con
@@ -2579,16 +2583,18 @@ ACL de R descritas arriba. DEC-C5-COV-05.1–05.5 validadas, incluida confirmaci
 parcial que emite CURRENT únicamente; semántica individual de Assignment intacta.
 Evidencia proporcionada por el checkpoint; este cierre documental no reejecuta
 tests ni conecta DB. Sin actividad staging/producción ni deployment.
-R permanece sin commit/PR/merge y sin resultado CI; CI y merge del DoD final
-siguen pendientes. Umbrella PARTIALLY IMPLEMENTED; N sin implementar; M-HC1 OPEN.
+R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+La evidencia local anterior al merge se conserva. Umbrella PARTIALLY IMPLEMENTED;
+N READY, sin implementar; M-HC1 OPEN.
 
 #### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-**Estado:** DEFINED / BLOCKED BY COVERAGE-R MERGE. Goal: create/resolve explícitos con
+**Estado:** READY — 5 SP; dependencia R merge satisfecha mediante PR #63. Goal: create/resolve explícitos con
 auditoría. Scope: dos POST, contexto, inmutabilidad, unicidad activa, idempotencia,
 replay/reuse, concurrencia, rollback, tenant/RBAC y readback R.
-**Dependencias/DoR:** R merged; scopes de IdempotencyScope implementados y migration
-revisada como parte del incremento N; delta ACL exacto revisado antes de runtime.
+**Dependencias/DoR:** R merged y contrato aprobado; listo para implementación.
+Scopes de IdempotencyScope y migration se implementarán/revisarán como parte de
+N; delta ACL exacto debe revisarse antes de su runtime.
 No requiere otro ticket genérico de persistencia.
 
 **AC:** (1) UNAVAILABLE sólo assignedQty=0; (2) PARTIAL_CONTEXT sólo 0<assignedQty<q;
