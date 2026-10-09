@@ -1836,7 +1836,7 @@ Decisiones aprobadas:
 
 - **DEC-C5-01:** CoverageNote y cobertura agregada quedan fuera de C5. El ticket
   backend independiente HC-NEXT-03C5-COVERAGE tiene contrato aprobado mediante
-  DEC-C5-COV-01–04 y debe completarse antes de cualquier slice C6 dependiente.
+  DEC-C5-COV-01–05 y debe completarse antes de cualquier slice C6 dependiente.
 - **DEC-C5-02:** C5 se divide en C5-A Contract Alignment & Safe PostgreSQL
   Harness y C5-B Integrated Backend Validation.
 - **DEC-C5B-01:** APROBADA: se usa la identidad dedicada `zaping_hc_c5b`. El refinamiento por sí mismo
@@ -2388,14 +2388,15 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 **Fuera de alcance:** rutas/capabilities nuevas, CoverageNote/cobertura agregada,
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
-Con C5-B MERGED, el siguiente trabajo registrado es el refinamiento
-de HC-NEXT-03C5-COVERAGE, REFINED / CONTRACT APPROVED.
+Después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está PARTIALLY IMPLEMENTED:
+COVERAGE-R IMPLEMENTED / LOCAL DoD PASS / PR PENDING; N bloqueado por el merge de R.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
-**Estado:** REFINED / CONTRACT APPROVED — decisiones explícitas de Leo,
-09-oct-2026. Implementación pendiente. R READY (5 SP); N DEFINED / BLOCKED BY
-COVERAGE-R (5 SP). M-HC1 OPEN. Fuera de C5-A/C5-B y requisito para futuros
+**Estado:** PARTIALLY IMPLEMENTED / CONTRACT APPROVED — decisiones explícitas de Leo,
+09-oct-2026. R IMPLEMENTED / LOCAL DoD PASS / PR PENDING (5 SP);
+N DEFINED / BLOCKED BY COVERAGE-R MERGE (5 SP), sin implementar. M-HC1 OPEN.
+Fuera de C5-A/C5-B y requisito para futuros
 slices C6 que dependan de esta capability; no bloquea C6-A/B/C/D/E ya merged.
 No es una campaña de cobertura de tests.
 
@@ -2414,6 +2415,37 @@ No es una campaña de cobertura de tests.
 - **DEC-C5-COV-04:** coverage/notes son informacionales en V1: no bloquean
   lifecycle Case, CaseKit preparation, Dispatch/Custody u otros workflows.
   Cualquier gate futuro necesita otro incremento y aprobación explícita.
+
+#### DEC-C5-COV-05 — Requirement Availability Aggregation
+
+Decisión explícita aprobada por Leo; 05.5 final sustituye la formulación previa.
+05.1–05.5 implementadas y validadas localmente en COVERAGE-R.
+
+- **05.1 Population:** sólo Assignments que cuentan en assignedQty: mismo
+  Company/Case/Requirement, REQUIREMENT, RESERVED, Product compatible y Asset
+  elegible. Nominales incompatibles/ineligibles y DIRECT/RELEASED/REPLACED no
+  participan ni aportan warnings.
+- **05.2 Empty:** sin Assignments aplicables, availability es
+  `{fullyVerifiable:false, conflictFree:null, warnings:[]}`. Sin warning nuevo.
+- **05.3 Scalars:** fullyVerifiable=true sólo si todos los aplicables son
+  fullyVerifiable=true. conflictFree usa precedencia false > null > true;
+  vacío permanece null. true/false es una combinación válida.
+- **05.4 Warnings:** deduplicar por código estable, conservando mensajes públicos
+  existentes. Orden: INCOMPLETE_CASE_SCHEDULE,
+  RELATED_RESERVATION_SCHEDULE_INCOMPLETE, CURRENT_ASSIGNMENT_CONFLICT,
+  CONFLICT_OVERRIDE_CONFIRMED.
+- **05.5 Current conflicts / overrides:** agregar instancias actuales de conflicto,
+  no inferir confirmación completa desde combinaciones de warnings públicos.
+  Para cada conflicto, reutilizar matching exacto de conflictingAssignmentId y
+  snapshots start/end de ambas ventanas operacionales vigentes. Emitir CURRENT
+  si existe al menos un conflicto actual. Emitir OVERRIDE únicamente si existe
+  conflicto actual y **todos** los conflictos de **todos** los Assignments
+  aplicables tienen override vigente coincidente. Un solo conflicto sin confirmar
+  (incluso en un Assignment con otro conflicto confirmado) suprime OVERRIDE.
+  Overrides stale/históricos no cuentan; sin conflictos no se emite ninguno.
+  Incertidumbre puede coexistir con CURRENT + OVERRIDE cuando todos los conflictos
+  actuales están confirmados. El comportamiento individual existente (CURRENT +
+  OVERRIDE cuando al menos un conflicto está confirmado) permanece intacto.
 
 #### Agregado, proyección y cantidades
 
@@ -2478,8 +2510,10 @@ por este cierre; implementación sigue convenciones y sólo permite ajuste nomin
 
 #### Transacciones e idempotencia
 
-GET usa snapshot consistente de Requirements/Assignments/notes/inputs de
-availability, sin Company advisory lock sólo por leer. Commands: una transacción
+GET implementado sigue Controller → Service → Repository → Prisma. Usa
+RepeatableRead y el mismo TransactionClient para todos los inputs materiales de
+Requirements/Assignments/notes/availability. Sin Company advisory lock, write
+locks ni writes en GET. Commands futuros de N: una transacción
 para claim, lifecycle/context vigente, create/resolve y finalización del claim;
 Company → Case → Requirement → Note, sin Asset locks para commands de notes.
 Unique parcial es defensa final de notas activas duplicadas.
@@ -2490,25 +2524,30 @@ Resolve: replay mismo resultado; repetición nunca sobrescribe primer actor/fech
 Note identity inmutable: sin fingerprint Availability para resolver. No claims
 parciales tras rollback. GET/commands no mutan Assignments ni inventario.
 
-#### Persistencia y harness: impactos futuros, no implementados
+#### Persistencia y harness: R validado; impactos futuros de N
 
-Modelo existente reutilizado. Commands requieren extender IdempotencyScope con
-scopes explícitos de note create/resolve y migration mínima revisada. No nueva
-tabla ni status persistido. Reutilizar withC5bHarness, zaping_hc_c5b,
-zaping_spike_test, JWT, ownership, preflight, exclusividad, diagnóstico y cleanup.
-Sin segundo harness. Delta futuro CoverageNote: SELECT; INSERT/DELETE para
-fixtures acreditados/cleanup; UPDATE sólo resolvedAt/resolvedById para resolución.
-Incluir note en manifest/residue y borrar antes de Requirements/Users, sin
-ampliar ownership ni permisos ajenos de tablas/funciones/schema.
+R reutiliza el modelo existente, sin cambio de Prisma schema ni migration,
+sin nueva tabla ni status persistido. Acceptance PASS con withC5bHarness,
+zaping_hc_c5b y zaping_spike_test: HTTP/JWT reales, tenant/RBAC, fixtures
+persistidos, ownership, preflight, exclusividad, diagnóstico, cleanup y
+protecciones zero-residue. Notes incluidas en manifest/residue y eliminadas
+antes de Requirements/Users; sin segundo harness ni ampliación de ownership.
+Delta ACL aplicado al rol de test: SELECT, INSERT y DELETE sobre
+public."HealthcareEquipmentRequirementCoverageNote". **No UPDATE**.
+N requiere scopes explícitos de IdempotencyScope para create/resolve y migration
+mínima revisada. UPDATE sólo resolvedAt/resolvedById es una necesidad futura de
+N, sujeta a revisión de ACL; no forma parte del delta aplicado de R.
 
 #### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
 
-**Estado/DoR:** READY tras esta sincronización documental. Goal: proyección
-derivada y readback de notes; dependencia de C5-B merged y contrato aprobado.
-Scope: los dos GET, cantidades nominales/aplicables/déficit, cuatro quantity
-states, Availability independiente, notes activas/historia paginada, tenant,
-cuatro roles, orden y snapshot consistente. Prisma: sin agregado persistido;
-modelo note existente. Sin mutaciones ni locks Company para GET.
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING. C5-B merged y contrato
+aprobado. Implementados GET /healthcare/cases/:caseId/equipment-coverage y
+GET /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes.
+Lectores: ADMIN, MANAGER, SALES y WAREHOUSE. Proyección por Requirement con
+requestedQty, nominalAssignedQty, assignedQty, missingQty, quantityState,
+Requirement-level availability y activeNotes; historia paginada y orden estable.
+Estados PENDING/UNAVAILABLE/PARTIAL/COVERED; coverage derivada, no persistida.
+Tenant/RBAC y snapshot RepeatableRead según la arquitectura descrita arriba.
 
 **AC:** (1) reglas de conteo correctas; (2) DIRECT/RELEASED/REPLACED excluidos;
 (3) COVERED con fullyVerifiable=false; (4) conflicto independiente; (5) UNAVAILABLE
@@ -2524,9 +2563,28 @@ ACL/cleanup/residue, gates estáticos/generales aplicables, docs, CI y merge.
 Fixtures: Requirements y reservas de lifecycle/origin/eligibilidad diversos,
 Cases completos/incompletos y notes activas/resueltas, owners A/B acreditados.
 
+**Evidencia de cierre local acreditada (09-oct-2026):**
+
+| Gate | Resultado |
+|---|---|
+| Focal Equipment Assignments | PASS — 305 tests / 11 suites |
+| Full API | PASS — 1671 tests / 103 suites |
+| Lint / typecheck / build | PASS / PASS / PASS |
+| TypeScript focal noEmit | PASS |
+| git diff --check | PASS |
+| PostgreSQL COVERAGE-R acceptance | PASS — 1 suite / 1 test |
+
+Acceptance sobre la DB dedicada y harness existentes, con las protecciones y
+ACL de R descritas arriba. DEC-C5-COV-05.1–05.5 validadas, incluida confirmación
+parcial que emite CURRENT únicamente; semántica individual de Assignment intacta.
+Evidencia proporcionada por el checkpoint; este cierre documental no reejecuta
+tests ni conecta DB. Sin actividad staging/producción ni deployment.
+R permanece sin commit/PR/merge y sin resultado CI; CI y merge del DoD final
+siguen pendientes. Umbrella PARTIALLY IMPLEMENTED; N sin implementar; M-HC1 OPEN.
+
 #### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-**Estado:** DEFINED / BLOCKED BY COVERAGE-R. Goal: create/resolve explícitos con
+**Estado:** DEFINED / BLOCKED BY COVERAGE-R MERGE. Goal: create/resolve explícitos con
 auditoría. Scope: dos POST, contexto, inmutabilidad, unicidad activa, idempotencia,
 replay/reuse, concurrencia, rollback, tenant/RBAC y readback R.
 **Dependencias/DoR:** R merged; scopes de IdempotencyScope implementados y migration

@@ -1,4 +1,15 @@
 import { createHash } from 'node:crypto';
+import { EquipmentCondition, EquipmentLifecycle } from '@prisma/client';
+
+export function equipmentAssignmentAssetIsEligible(asset: {
+  lifecycle: EquipmentLifecycle;
+  condition: EquipmentCondition;
+}): boolean {
+  return (
+    asset.lifecycle === EquipmentLifecycle.ACTIVE &&
+    asset.condition === EquipmentCondition.GOOD
+  );
+}
 
 export const SYSTEM_PRE_CASE_BUFFER_MINUTES = 120;
 export const SYSTEM_POST_CASE_BUFFER_MINUTES = 180;

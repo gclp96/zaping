@@ -3,8 +3,10 @@ import {
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
   HealthcareEquipmentAssignmentReleaseCause,
+  HealthcareRequirementLifecycle,
   IdempotencyScope,
   Prisma,
+  ProductInventoryTracking,
 } from '@prisma/client';
 import { createHash } from 'node:crypto';
 
@@ -146,9 +148,113 @@ export type HealthcareEquipmentReservationAvailabilityRecord =
     select: typeof healthcareEquipmentReservationAvailabilitySelect;
   }>;
 
+export const coverageNotePublicSelect = {
+  id: true,
+  requirementId: true,
+  kind: true,
+  comment: true,
+  createdAt: true,
+  resolvedAt: true,
+  recordedBy: { select: { id: true, firstName: true, lastName: true } },
+  resolvedBy: { select: { id: true, firstName: true, lastName: true } },
+} satisfies Prisma.HealthcareEquipmentRequirementCoverageNoteSelect;
+
 @Injectable()
 export class HealthcareEquipmentAssignmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  runInReadSnapshot<T>(
+    operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(operation, {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
+  }
+
+  findCoverageRequirements(
+    companyId: string,
+    caseId: string,
+    client: Prisma.TransactionClient,
+  ) {
+    return client.healthcareCaseRequirement.findMany({
+      where: {
+        companyId,
+        caseId,
+        lifecycle: HealthcareRequirementLifecycle.ACTIVE,
+        product: { inventoryTracking: ProductInventoryTracking.ASSET },
+      },
+      select: {
+        id: true,
+        requestedQty: true,
+        product: {
+          select: { id: true, sku: true, name: true, isActive: true },
+        },
+        equipmentCoverageNotes: {
+          where: { companyId, resolvedAt: null },
+          select: coverageNotePublicSelect,
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
+  findCoverageAssignments(
+    companyId: string,
+    caseId: string,
+    requirementIds: string[],
+    client: Prisma.TransactionClient,
+  ) {
+    return client.healthcareEquipmentAssignment.findMany({
+      where: {
+        companyId,
+        caseId,
+        requirementId: { in: requirementIds },
+        origin: HealthcareEquipmentAssignmentOrigin.REQUIREMENT,
+        lifecycle: HealthcareEquipmentAssignmentLifecycle.RESERVED,
+      },
+      select: healthcareEquipmentAssignmentResponseSelect,
+      orderBy: { id: 'asc' },
+    });
+  }
+
+  findCoverageRequirement(
+    companyId: string,
+    caseId: string,
+    requirementId: string,
+    client: Prisma.TransactionClient,
+  ) {
+    return client.healthcareCaseRequirement.findFirst({
+      where: { id: requirementId, companyId, caseId },
+      select: { id: true },
+    });
+  }
+
+  countCoverageNotes(
+    companyId: string,
+    requirementId: string,
+    client: Prisma.TransactionClient,
+  ) {
+    return client.healthcareEquipmentRequirementCoverageNote.count({
+      where: { companyId, requirementId },
+    });
+  }
+
+  findCoverageNotes(
+    companyId: string,
+    requirementId: string,
+    page: number,
+    pageSize: number,
+    client: Prisma.TransactionClient,
+  ) {
+    return client.healthcareEquipmentRequirementCoverageNote.findMany({
+      where: { companyId, requirementId },
+      select: coverageNotePublicSelect,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    });
+  }
 
   runInTransaction<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,
@@ -691,8 +797,9 @@ export class HealthcareEquipmentAssignmentsRepository {
   findReservedAssignmentsForAssets(
     companyId: string,
     equipmentAssetIds: string[],
+    client: HealthcareEquipmentAssignmentDatabaseClient = this.prisma,
   ) {
-    return this.prisma.healthcareEquipmentAssignment.findMany({
+    return client.healthcareEquipmentAssignment.findMany({
       where: {
         companyId,
         equipmentAssetId: { in: equipmentAssetIds },

@@ -56,6 +56,81 @@ describe('HealthcareEquipmentAssignmentsRepository', () => {
     jest.clearAllMocks();
   });
 
+  it('runs every coverage/history read through the same RepeatableRead transaction client without root reads or writes', async () => {
+    const tx = {
+      healthcareCase: { findFirst: jest.fn() },
+      healthcareCaseRequirement: { findMany: jest.fn(), findFirst: jest.fn() },
+      healthcareEquipmentAssignment: { findMany: jest.fn() },
+      healthcareEquipmentAssignmentSettings: { findUnique: jest.fn() },
+      healthcareEquipmentRequirementCoverageNote: {
+        count: jest.fn(),
+        findMany: jest.fn(),
+      },
+    };
+    prisma.$transaction.mockImplementationOnce(
+      (operation: (client: Prisma.TransactionClient) => Promise<unknown>) =>
+        operation(tx as never),
+    );
+    await repository.runInReadSnapshot(async (client) => {
+      expect(client).toBe(tx);
+      await repository.findCase(companyId, caseId, client);
+      await repository.findCoverageRequirements(companyId, caseId, client);
+      await repository.findCoverageAssignments(
+        companyId,
+        caseId,
+        [requirementId],
+        client,
+      );
+      await repository.findSettings(companyId, client);
+      await repository.findReservedAssignmentsForAssets(
+        companyId,
+        [equipmentAssetId],
+        client,
+      );
+      await repository.findCoverageRequirement(
+        companyId,
+        caseId,
+        requirementId,
+        client,
+      );
+      await repository.countCoverageNotes(companyId, requirementId, client);
+      await repository.findCoverageNotes(
+        companyId,
+        requirementId,
+        1,
+        25,
+        client,
+      );
+    });
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
+    });
+    expect(tx.healthcareCase.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.healthcareCaseRequirement.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.healthcareCaseRequirement.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.healthcareEquipmentAssignment.findMany).toHaveBeenCalledTimes(2);
+    expect(
+      tx.healthcareEquipmentAssignmentSettings.findUnique,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      tx.healthcareEquipmentRequirementCoverageNote.count,
+    ).toHaveBeenCalledTimes(1);
+    expect(
+      tx.healthcareEquipmentRequirementCoverageNote.findMany,
+    ).toHaveBeenCalledTimes(1);
+    for (const rootRead of [
+      prisma.healthcareCase.findFirst,
+      prisma.healthcareCaseRequirement.findFirst,
+      prisma.healthcareEquipmentAssignment.findMany,
+      prisma.healthcareEquipmentAssignmentSettings.findUnique,
+      prisma.$queryRaw,
+    ]) {
+      expect(rootRead).not.toHaveBeenCalled();
+    }
+    // tx exposes only read delegates: raw SQL/locks and mutations are absent.
+  });
+
   it('keeps Case, Requirement, EquipmentAsset and Assignment lookups tenant-scoped', async () => {
     await repository.findCase(companyId, caseId);
     await repository.findRequirement(companyId, requirementId);

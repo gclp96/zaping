@@ -201,7 +201,7 @@ HC-NEXT-03C5-B — Integrated Backend Validation
         → COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
-        → REFINED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+        → PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
@@ -2311,7 +2311,7 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
-→ HC-NEXT-03C5-COVERAGE — REFINED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+→ HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
@@ -3146,12 +3146,13 @@ Checklist y evidencia exacta:
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
 Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
 documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
-Siguiente trabajo tras C5-B MERGED: refinamiento HC-NEXT-03C5-COVERAGE,
-REFINED / CONTRACT APPROVED. No se modifican SP, Forecast o Commitment.
+Después de C5-B MERGED: COVERAGE parcialmente implementado; R localmente validado,
+PR pendiente; N bloqueado por el merge de R. Sin cambios SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
-Estado: REFINED / CONTRACT APPROVED — DEC-C5-COV-01–04 aprobadas por Leo.
+Estado: PARTIALLY IMPLEMENTED / CONTRACT APPROVED — DEC-C5-COV-01–05 aprobadas por Leo.
+R localmente implementado y validado, aún sin merge; N sin implementar.
 Capability de dominio fuera de C5-A/B; no campaña de test coverage. M-HC1 OPEN.
 Cantidad y certainty separadas; COVERED no certifica readiness/availability.
 Notes sólo se resuelven explícitamente; stale conservadas sin cambiar counts.
@@ -3162,7 +3163,7 @@ Contrato completo/API/errores/transactions:
 
 ##### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
 
-Estado/DoR: READY tras contrato sincronizado; C5-B merged.
+Estado: IMPLEMENTED / LOCAL DoD PASS / PR PENDING; C5-B merged.
 Scope: GET Case coverage y GET Requirement note history, snapshot consistente,
 nominalAssignedQty/assignedQty/missingQty, PENDING/PARTIAL/UNAVAILABLE/COVERED,
 Availability/warnings independientes, notes activas/historia paginada, orden,
@@ -3176,9 +3177,22 @@ CaseKit/inventario, override nuevo o Web. DoD: unit/HTTP/JWT/PostgreSQL pertinen
 recomputación, tenant/RBAC/invariantes, ACL/cleanup/residue, gates aplicables,
 docs, CI y merge. AC numerados completos en diseño §34.5.3.
 
+Evidencia local acreditada: focal Equipment Assignments PASS (305 tests / 11 suites),
+full API PASS (1671 tests / 103 suites), lint/typecheck/build PASS, TypeScript focal
+noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 test)
+con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
+fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
+zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
+no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
+Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
+un TransactionClient para todos los inputs, sin Company advisory/write locks ni
+writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
+
 ##### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-Estado: DEFINED / BLOCKED BY COVERAGE-R. Goal: create/resolve auditable explícito.
+Estado: DEFINED / BLOCKED BY COVERAGE-R MERGE. Goal: create/resolve auditable explícito.
 Dependencias/DoR: R merged; scopes create/resolve y migration mínima revisados/
 implementados dentro de N; ACL exacto revisado antes de runtime. Scope: dos POST,
 contexto/kind/comment, auditoría inmutable, active uniqueness, replay/reuse,
@@ -3191,11 +3205,10 @@ inventario. Non-goals: PUT/DELETE API, notes genéricas, blocking o frontend.
 DoD: migration, unit/HTTP/JWT/PostgreSQL, concurrencia material, rollback/replay,
 cleanup/residue/invariantes, gates generales/estáticos, docs, CI y merge.
 
-Impactos futuros únicamente: modelo CoverageNote reutilizado; scopes nuevos de
-IdempotencyScope, sin status cache ni tabla nueva. Reusar B0 target/rol/JWT/
-ownership/preflight/exclusividad/diagnósticos/cleanup, sin otro harness.
-ACL note SELECT, fixture INSERT/DELETE, UPDATE sólo resolvedAt/resolvedById.
-No se ejecutan grants ni se implementan estos tickets en este cierre.
+R reutiliza CoverageNote y harness C5-B; ACL SELECT/INSERT/DELETE aplicado, sin
+UPDATE. Impactos futuros de N: scopes nuevos de IdempotencyScope y migration
+mínima revisada; UPDATE sólo resolvedAt/resolvedById requiere revisión futura.
+Sin status cache ni tabla nueva. Este cierre documental no ejecuta grants ni N.
 Orden: R → N → futuros slices C6 que requieran coverage. Estimaciones 5+5 SP,
 sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
 

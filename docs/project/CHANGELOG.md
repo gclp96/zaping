@@ -8,6 +8,43 @@
 
 ---
 
+## Unreleased
+
+### HC-NEXT-03C5-COVERAGE-R — implementación y validación local
+
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP. Sin PR existente,
+sin merge ni resultado CI; no constituye release ni deployment.
+
+Implementados GET /healthcare/cases/:caseId/equipment-coverage y
+GET /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes
+para ADMIN/MANAGER/SALES/WAREHOUSE. Coverage derivada por Requirement:
+requestedQty, nominalAssignedQty, assignedQty, missingQty, quantityState,
+availability y activeNotes; estados PENDING/UNAVAILABLE/PARTIAL/COVERED e historia
+paginada. DEC-C5-COV-05.1–05.5: población aplicable; vacío false/null/[];
+fullyVerifiable exige todos, conflictFree false > null > true; warnings deduplicados
+en orden aprobado; CURRENT con cualquier conflicto exacto vigente y OVERRIDE sólo
+si todos tienen override vigente coincidente. Confirmación parcial emite CURRENT
+únicamente; Availability individual existente permanece intacta.
+
+Evidencia local acreditada: focal Equipment Assignments PASS (305 tests / 11 suites),
+full API PASS (1671 tests / 103 suites), lint/typecheck/build PASS, TypeScript focal
+noEmit PASS y git diff --check PASS. PostgreSQL acceptance PASS (1 suite / 1 test)
+con harness C5-B existente, zaping_spike_test, HTTP/JWT reales, tenant/RBAC,
+fixtures persistidos, cleanup y protecciones zero-residue. ACL aplicado al rol
+zaping_hc_c5b: SELECT/INSERT/DELETE en public."HealthcareEquipmentRequirementCoverageNote";
+no UPDATE. Sin cambio Prisma schema/migration ni actividad staging/producción.
+DEC-C5-COV-05.1–05.5 implementadas/validadas; semántica individual intacta.
+Arquitectura Controller → Service → Repository → Prisma; RepeatableRead con
+un TransactionClient para todos los inputs, sin Company advisory/write locks ni
+writes en GET. R sin commit, PR o merge y sin resultado CI. Este cierre registra
+la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
+
+HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N: DEFINED / BLOCKED BY
+COVERAGE-R MERGE — 5 SP, sin implementar. M-HC1 OPEN.
+Contrato y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
+
+---
+
 # 2026-10-08 — HC-NEXT-03C5-B3 / C5-B — cierre DoD / MERGED
 
 **Estado:** B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS;
