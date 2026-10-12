@@ -2388,16 +2388,16 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 **Fuera de alcance:** rutas/capabilities nuevas, CoverageNote/cobertura agregada,
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
-Después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está PARTIALLY IMPLEMENTED:
+Después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está COMPLETE / MERGED:
 COVERAGE-R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
-N IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
+N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
-**Estado:** PARTIALLY IMPLEMENTED / CONTRACT APPROVED — decisiones explícitas de Leo,
+**Estado:** COMPLETE / MERGED / CONTRACT APPROVED — decisiones explícitas de Leo,
 09-oct-2026. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS (5 SP); CI PASS.
-N IMPLEMENTED / LOCAL DoD PASS / PR PENDING (5 SP); dependencia R merge satisfecha.
-Umbrella pendiente de merge de N; no COMPLETE / MERGED. M-HC1 OPEN.
+N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS (5 SP); dependencia R merge satisfecha.
+Umbrella COMPLETE / MERGED — R PR #63 y N PR #65; DoD PASS; CI PASS. M-HC1 OPEN.
 Fuera de C5-A/C5-B y requisito para futuros
 slices C6 que dependan de esta capability; no bloquea C6-A/B/C/D/E ya merged.
 No es una campaña de cobertura de tests.
@@ -2605,13 +2605,16 @@ parcial que emite CURRENT únicamente; semántica individual de Assignment intac
 Evidencia proporcionada por el checkpoint; este cierre documental no reejecuta
 tests ni conecta DB. Sin actividad staging/producción ni deployment.
 R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
-La evidencia local anterior al merge se conserva. Umbrella PARTIALLY IMPLEMENTED;
-N IMPLEMENTED / LOCAL DoD PASS / PR PENDING; M-HC1 OPEN.
+La evidencia local anterior al merge se conserva. Umbrella COMPLETE / MERGED;
+N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS; M-HC1 OPEN.
 
 #### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
-dependencia R merge satisfecha mediante PR #63. Goal: create/resolve explícitos con
+**Estado:** COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
+CI PASS. Feature commit N: ff4124d99afcc04d0607ca3f813a154cb754c180.
+Merge commit N en main: 2fa5927e239998d52e0004f14fdfeb5a312ff28a.
+Merge mediante PR #65; sin migración ni deployment de producción acreditados.
+Dependencia R merge satisfecha mediante PR #63. Goal: create/resolve explícitos con
 auditoría. Scope: dos POST, contexto, inmutabilidad, unicidad activa, idempotencia,
 replay/reuse, concurrencia, rollback, tenant/RBAC y readback R.
 **Dependencias/DoR:** R merged y contrato aprobado; implementación y aceptación
@@ -2634,7 +2637,7 @@ notes históricas/sucesoras, actores A/B, carreras create/resolve y parent lifec
 
 #### COVERAGE-N — implementación y aceptación PostgreSQL validadas
 
-IMPLEMENTED / LOCAL DoD PASS / PR PENDING. Los dos POST reutilizan la proyección
+COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS. Los dos POST reutilizan la proyección
 pública de notes de R. CREATE responde
 201 (también replay), RESOLVE 200. Comment usa trim existente, sin máximo nuevo.
 Controller → Service → Repository → Prisma; Company advisory lock y presupuestos
@@ -2749,10 +2752,9 @@ HC_C5B_DATABASE_URL y HC_C5B_OPERATOR_DATABASE_URL ausentes.
 La aceptación utilizó sólo 127.0.0.1:5434/zaping_spike_test. Este cierre registra
 la evidencia suministrada; no reejecuta gates costosos ni aceptación PostgreSQL.
 **Actividad de base de datos durante este cierre: NONE.**
-R COMPLETE / MERGED; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING.
-Umbrella PARTIALLY IMPLEMENTED / CONTRACT APPROVED, pendiente de merge de N;
-M-HC1 OPEN. Siguiente acción: revisión humana → staging selectivo → commit → PR.
-No declarar N ni umbrella COMPLETE / MERGED hasta merge de PR.
+R COMPLETE / MERGED; N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS.
+Umbrella COMPLETE / MERGED / CONTRACT APPROVED — R PR #63 y N PR #65; CI PASS;
+M-HC1 OPEN. Cierre documental post-merge; sin release ni deployment.
 
 ## 34.6 HC-NEXT-03C6 — Frontend Equipment Assignment
 
