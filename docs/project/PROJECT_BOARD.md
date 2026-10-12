@@ -2312,6 +2312,9 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 → HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+→ HC-CASE-AVL — Case Availability — CONTRACT APPROVED / READY FOR IMPLEMENTATION
+→ HC-CASE-AVL-R — Derived Case Availability Read — Backend — READY — TARGET 5 SP — CURRENT READY BACKEND ITEM
+→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — DEFINED / BLOCKED BY HC-CASE-AVL-R — TARGET 3 SP
 
 DEFERRED
 
@@ -3239,6 +3242,26 @@ Sin status cache ni tabla nueva. Actividad DB durante cierre: NONE. M-HC1 OPEN.
 N y umbrella MERGED; DoD PASS; CI PASS. Sin release ni deployment.
 Orden: R → N → futuros slices C6 que requieran coverage. Estimaciones 5+5 SP,
 sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
+
+#### HC-CASE-AVL — Case Availability
+
+Estado: CONTRACT APPROVED / READY FOR IMPLEMENTATION. M-HC1 OPEN.
+Identificadores canónicos aprobados; implementación no iniciada.
+
+| Slice | Estado | Estimación |
+|---|---|---|
+| HC-CASE-AVL-R — Derived Case Availability Read — Backend | READY — current READY backend item | TARGET 5 SP |
+| HC-CASE-AVL-UI — Case Availability Summary — Frontend | DEFINED / BLOCKED BY HC-CASE-AVL-R | TARGET 3 SP |
+
+Contrato aprobado y autoridad DEC-CASE-AVL-01/02/03:
+[CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
+Proyección derivada e informacional, sin enum general, workflow gate o estado
+persistido. Equipment diagnostica RESERVED REQUIREMENT + RESERVED DIRECT;
+RELEASED/REPLACED fuera. Coverage conserva R sin DIRECT. Ausencia de Requirements/
+CaseKit explícita, sin inferir readiness ni aplicabilidad. Snapshot RepeatableRead,
+TransactionClient compartido, zero-write y reuse de fórmulas existentes.
+TARGET exclusivamente; sin Forecast, Commitment, Actual o fechas asignados.
+Siguiente acción documental: revisión humana → staging selectivo → commit → docs PR.
 
 #### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 
