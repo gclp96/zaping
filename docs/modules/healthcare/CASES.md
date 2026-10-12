@@ -1455,6 +1455,296 @@ other blockers
 
 sin almacenar un flag contradictorio independiente.
 
+### 86.1 Contrato aprobado V1 — Case-level projection
+
+**HC-CASE-AVL — Case Availability umbrella capability.**
+**Estado: CONTRACT APPROVED / READY FOR IMPLEMENTATION — NOT IMPLEMENTED.**
+Discovery documental sobre `docs/hc-case-availability-contract`, base
+`25d6017cdedc0036cf981acc095a48151a856533`. COVERAGE-R COMPLETE / MERGED
+(PR #63), COVERAGE-N COMPLETE / MERGED (PR #65), umbrella COVERAGE COMPLETE /
+MERGED; M-HC1 OPEN. DEC-CASE-AVL-01/02/03 aprobadas por producto y registradas
+como autoridad del contrato V1. DEC-C5-COV-01..06 permanecen sin cambios;
+Coverage sigue informacional. Este cierre sólo finaliza documentación.
+
+Identificadores canónicos aprobados por producto:
+
+| Identificador | Capability / slice | Estado | Estimación |
+|---|---|---|---|
+| HC-CASE-AVL | Case Availability umbrella capability | CONTRACT APPROVED / READY FOR IMPLEMENTATION | — |
+| HC-CASE-AVL-R | Derived Case Availability Read — Backend | READY | TARGET 5 SP |
+| HC-CASE-AVL-UI | Case Availability Summary — Frontend | DEFINED / BLOCKED BY HC-CASE-AVL-R | TARGET 3 SP |
+
+HC-NEXT-03C3 y HC-NEXT-03B.1 corresponden a Equipment Assignment Availability,
+no a este agregado. `CASE_AVAILABILITY.md` aparece como referencia futura en
+documentos de dominio, pero no existe como archivo. Se usa esta sección existente
+sin asignar Forecast, Commitment, Actual o fechas. La aprobación de identificadores
+cierra la brecha de naming; no implica implementación iniciada. Los encabezados históricos
+de CASES/CASE_KITS aún describen checkpoints antiguos de HC-OPS-01B; para su estado
+merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actuales.
+
+### 86.2 Evidencia y significado CURRENT
+
+| Fuente inspeccionada | Hecho relevante |
+|---|---|
+| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | Case Availability sigue como capability posterior a COVERAGE; M-HC1 OPEN. Discovery inicial sin contrato agregado; §86 registra ahora el contrato V1 aprobado, aún sin implementación. |
+| [ARCHITECTURE §50](../../architecture/ARCHITECTURE.md), [HEALTHCARE §54](HEALTHCARE.md), [DOMAIN_MODEL §60](DOMAIN_MODEL.md) | Availability contextual al Case/horario pertenece a Healthcare; custody, maintenance, calibration y turnaround son evolución cuando existan. |
+| [EQUIPMENT ERP §49](../erp/EQUIPMENT.md), [evaluator Core](../../../app/api/src/equipment/equipment-availability.evaluator.ts) | Current Asset Availability usa lifecycle/condition; ACTIVE + GOOD no acredita disponibilidad contextual ni física para un Case. |
+| [Case service](../../../app/api/src/healthcare/cases/healthcare-case.service.ts), schema y su spec | Sólo DRAFT/SCHEDULED/CANCELLED. scheduledStart basta para SCHEDULED; scheduledEnd puede faltar. End sin start y end <= start se rechazan. No COMPLETED/CLOSED actual. |
+| [Requirements service](../../../app/api/src/healthcare/requirements/healthcare-requirements.service.ts), schema | ACTIVE/RETIRED y REQUIRED/BACKUP son ejes distintos. Retire libera reservas vinculadas; reactivar no implica reasignación. Sin catálogo de procedimiento no puede detectarse un Requirement que nunca fue declarado. |
+| [Coverage design §34.5.3](EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage), [Coverage service](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-coverage.service.ts), [repository](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository.ts) | R incluye Requirements ACTIVE con Product ASSET, tanto REQUIRED como BACKUP. nominal cuenta REQUIREMENT/RESERVED; efectivo exige Product compatible y Asset ACTIVE/GOOD. DIRECT/RELEASED/REPLACED no aportan coverage. |
+| [Assignment availability helpers](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-assignment-availability.ts), [service](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-assignments.service.ts) | Ventana start-preBuffer/end+postBuffer; defaults 120/180 minutos, settings Company prevalecen. Solapamiento estricto: extremos adyacentes no colisionan. Horarios incompletos generan incertidumbre. |
+| [Coverage availability helper/spec](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-coverage-availability.ts), [Coverage service spec](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-coverage.service.spec.ts) | Vacío false/null/[]; conflictFree false > null > true. fullyVerifiable no significa conflictFree. Overrides requieren identidad y ambas ventanas actuales; confirmación parcial no emite override agregado. Notes stale visibles; cantidades y certainty independientes. |
+| [Kit readiness/helper](../../../app/api/src/healthcare/case-kits/healthcare-case-kit-readiness.ts), [spec](../../../app/api/src/healthcare/case-kits/healthcare-case-kit-readiness.spec.ts), [Kit service](../../../app/api/src/healthcare/case-kits/healthcare-case-kits.service.ts) | PASS/BLOCKED deriva elegibilidad para confirmar preparación lógica; PREPARED persiste actor/fecha, no disponibilidad física. Kit vacío scheduled sin REQUIRED puede PASS. PREPARED puede después BLOCKED. |
+| [CASE_KITS](CASE_KITS.md), [CASE_LOGISTICS](CASE_LOGISTICS.md), [CASE_CALENDAR](CASE_CALENDAR.md) | Kit lógico no equivale a stock reservado ni custodia. Dispatch/Return/Custody no implementados; Calendar organiza el schedule, no crea otra verdad temporal. |
+
+Búsqueda de discovery en app/web/docs/scripts/public y README: Case Availability,
+availability, readiness, ready, coverage, CaseKit, Preparation, dispatch, custody,
+scheduledStart, scheduledEnd, fullyVerifiable y conflictFree. Se inspeccionaron
+implementaciones, selectores, lifecycle y specs pertinentes; no se ejecutaron tests.
+Los conceptos TARGET en diseños amplios no se consideran capabilities CURRENT.
+
+### 86.3 Definición canónica y dimensiones
+
+V1 responde: «¿Qué evidencia actual de planificación, cobertura de equipo y
+preparación lógica tiene este Case, qué falta y qué requiere revisión?».
+Permite evaluar preparación material con los hechos disponibles; no certifica
+que el material esté físicamente listo para el procedimiento. No hay fuentes
+CURRENT de custodia, lotes/seriales preparados, traslado, esterilidad o turnaround
+que permitan emitir esa certificación.
+
+| Dimensión | Fuente | Clasificación V1 | Interpretación |
+|---|---|---|---|
+| Schedule | HealthcareCase scheduledStart/End | WARNING si incompleto; resto INFORMATIONAL | Completo exige ambos extremos; SCHEDULED no basta. No evaluar staffing ni scheduling engine. |
+| Requirements | ACTIVE y type | INFORMATIONAL | Contar ACTIVE, REQUIRED/BACKUP de todos los tracking. Cero significa ausencia registrada, nunca «no necesarios». RETIRED fuera del resumen actual. |
+| Coverage | R: PENDING/UNAVAILABLE/PARTIAL/COVERED | WARNING por déficit cuantitativo; COVERED INFORMATIONAL | Conservar counts por estado; no transformar déficit en gate. No sumar unidades de Products distintos como disponibilidad global. |
+| Equipment | Todas las Assignments RESERVED del Case, REQUIREMENT y DIRECT; horarios/settings/overrides | WARNING por conflicto/incertidumbre | Conflicto confirmado permanece conflicto. RELEASED/REPLACED excluidas; sin filtro de elegibilidad de Coverage en esta población diagnóstica. |
+| CaseKit / Preparation | Kit, items ACTIVE y readiness existente | INFORMATIONAL con blockers locales de preparación | BLOCKING sólo en confirm-preparation, como ya existe. No nuevo bloqueo Case/Dispatch. Ausencia explícita sin inferir aplicabilidad. |
+| CoverageNotes | Notes activas de Requirements ASSET ACTIVE | INFORMATIONAL | Contar contexto; UNAVAILABLE sólo modifica quantityState a cero como R. Stale no resta coverage ni resuelve automáticamente. Historia via GET existente. |
+| Case lifecycle | DRAFT/SCHEDULED/CANCELLED | INFORMATIONAL | CANCELLED identifica Case fuera de planificación vigente; lectura aún 200, sin convertirlo a AVAILABLE ni ocultar historial. |
+| Custody/Dispatch/Return/stock físico | Sin fuentes operacionales implementadas | NOT PART OF V1 | No flags sintéticos que impliquen readiness física. |
+
+**BLOCKING nuevo en Case Availability: ninguno.** Los blockers existentes del kit
+se exponen únicamente bajo preparation y conservan alcance de confirm-preparation.
+Un gate nuevo por Coverage/availability exige decisión explícita adicional y otro
+scope; DEC-C5-COV-04 permanece intacta.
+
+### 86.4 Modelo de estado aprobado
+
+| Alternativa | Evaluación |
+|---|---|
+| A: AVAILABLE/PARTIALLY_AVAILABLE/UNAVAILABLE/UNKNOWN | No adoptada en V1: «parcial» mezcla déficit e incertidumbre y requiere precedencia nueva. |
+| B: READY/NOT_READY/NOT_VERIFIABLE | No adoptada en V1: confunde confirmación de kit con veredicto material del Case. |
+| C: dimensiones sin enum global | APPROVED — DEC-CASE-AVL-01: proyección derivada e informacional; cada dimensión conserva su semántica. |
+
+Omitir availabilityState, blockers y fullyVerifiable de nivel raíz. Verificabilidad
+permanece en equipment y se refiere exclusivamente al análisis temporal de la
+población explícita, no al Case completo. Un Case puede tener coverage COVERED,
+equipment fullyVerifiable=true/conflictFree=false y kit PREPARED/readiness BLOCKED.
+V1 no colapsa estas dimensiones en un veredicto único. Un futuro veredicto requiere
+otra decisión explícita sobre completitud, precedencia y reglas de bloqueo.
+No AVAILABLE/PARTIALLY_AVAILABLE/UNAVAILABLE/READY/NOT_READY/NOT_VERIFIABLE canónico
+de Case; UNAVAILABLE sigue siendo válido exclusivamente en Coverage/notes.
+
+### 86.5 Endpoint propuesto y public response V1 final
+
+`GET /healthcare/cases/:caseId/availability`, siguiendo controllers Healthcare
+con JWT, RolesGuard y ParseUUIDPipe. No ruta existente equivalente encontrada.
+ADMIN/MANAGER/SALES/WAREHOUSE, como Coverage y CaseKit GET; Company sólo de JWT.
+401 sin JWT, 403 rol no permitido, 400 UUID inválido, mismo 404 público para Case
+missing/foreign; fallos persistence sanitizados. Sin body, query companyId,
+Idempotency-Key o writes. Kit ausente no vuelve 404 un Case válido.
+
+Ejemplo contractual: Case SCHEDULED con horario completo, sin Requirements,
+reservas ni kit. Vacío no se interpreta como listo:
+
+```json
+{
+  "caseId": "11111111-1111-4111-8111-111111111111",
+  "caseStatus": "SCHEDULED",
+  "schedule": {
+    "scheduledStart": "2026-10-13T16:00:00.000Z",
+    "scheduledEnd": "2026-10-13T18:00:00.000Z",
+    "complete": true,
+    "warnings": []
+  },
+  "requirements": {
+    "activeCount": 0,
+    "requiredCount": 0,
+    "backupCount": 0
+  },
+  "coverage": {
+    "requirementCount": 0,
+    "coveredCount": 0,
+    "partialCount": 0,
+    "pendingCount": 0,
+    "unavailableCount": 0,
+    "activeNoteCount": 0
+  },
+  "equipment": {
+    "reservedAssignmentCount": 0,
+    "fullyVerifiable": false,
+    "conflictFree": null,
+    "warnings": []
+  },
+  "preparation": {
+    "caseKitId": null,
+    "status": null,
+    "readiness": null
+  }
+}
+```
+
+Public contract: caseStatus enum CURRENT; schedule.complete boolean; timestamps
+ISO UTC/null. Counts enteros >=0, inicializar todos, incluso a cero.
+requirements.activeCount = requiredCount + backupCount, para todas las Requirements
+ACTIVE, independientemente de tracking. coverage.requirementCount cuenta sólo la
+población R: ACTIVE con Product ASSET, tanto REQUIRED como BACKUP.
+coveredCount/partialCount/pendingCount/unavailableCount cuentan Requirements en
+COVERED/PARTIAL/PENDING/UNAVAILABLE; su suma es requirementCount.
+activeNoteCount suma notes activas de esa misma población, sin historial resuelto.
+Coverage resume R, sin payload completo ni nueva matemática; desglose de tracking
+y REQUIRED/BACKUP disponible mediante Requirements drill-down.
+No afirmar revisión completa de Requirements sólo porque activeCount>0.
+equipment.reservedAssignmentCount cuenta todas las reservas actuales del Case
+del mismo tenant con origin REQUIREMENT o DIRECT. Excluir RELEASED/REPLACED;
+no filtrar DIRECT ni aplicar el filtro de Asset elegible de quantitative Coverage.
+Cada reserva participa en diagnóstico temporal con la semántica existente de
+Assignment Availability. DIRECT puede cambiar fullyVerifiable, conflictFree y
+warnings, pero jamás assignedQty ni cantidades de Requirement Coverage.
+Sin reservas: fullyVerifiable=false, conflictFree=null, warnings=[]. Con reservas,
+agregar verificabilidad con every y conflictFree false > null > true como R.
+Los flags sólo describen diagnóstico temporal de esa población: no garantizan
+aptitud física del Asset, cantidades suficientes ni preparación.
+
+Con kit: caseKitId público, status DRAFT/PREPARED y readiness
+`{status:"PASS"|"BLOCKED",blockers:[{code,requirementId?}]}`. Resumir blockers
+deduplicando code+requirementId; detalle de item y auditoría en GET CaseKit.
+Sin kit: tres null, no fabricar PASS/BLOCKED. PREPARED es confirmación histórica;
+readiness se recalcula incluso si ya está PREPARED. No replicar items ni audit.
+No exponer companyId, hashes, claims, FKs privados, lock internals o Prisma records.
+caseId/caseKitId/requirementId son identidades públicas existentes para drill-down.
+
+Warnings schedule: reutilizar INCOMPLETE_CASE_SCHEDULE con mensaje público
+existente incluso si no hay Assignments. Equipment reutiliza orden estable de R:
+INCOMPLETE_CASE_SCHEDULE, RELATED_RESERVATION_SCHEDULE_INCOMPLETE,
+CURRENT_ASSIGNMENT_CONFLICT, CONFLICT_OVERRIDE_CONFIRMED. Deduplicar por code
+dentro de cada dimensión; no añadir lista raíz que duplique ambos scopes.
+Usar instancias de conflictos actuales, nunca OR de flags/warnings por Requirement.
+OVERRIDE agregado sólo con al menos un conflicto y todos los conflictos evaluados
+confirmados por identidad/ventanas exactas. No vuelve conflictFree=true.
+Sin códigos nuevos EQUIPMENT_REQUIREMENT_UNCOVERED/PARTIAL, EQUIPMENT_CONFLICT,
+EQUIPMENT_AVAILABILITY_UNVERIFIABLE o CASEKIT_NOT_READY: counts/flags/readiness
+existentes explican esas situaciones. Blockers CASE_KIT_* conservan su significado.
+
+### 86.6 Derivación, snapshot y reuse
+
+Controller → Service → Repository → Prisma. Un snapshot RepeatableRead, como R,
+con un solo TransactionClient para Case, Requirements, Product/Asset, Assignments,
+reservas relacionadas del mismo tenant (incluidos otros Cases que comparten Asset),
+settings de buffers, ConflictOverrides, CoverageNotes y Kit/items/fuentes readiness.
+Conservar filtros CURRENT de reservas relacionadas y relaciones tenant-safe.
+No Company advisory lock, FOR UPDATE, claims, auto-resolve, mutaciones de inventario,
+snapshot persistido o flag nuevo en HealthcareCase. GET refleja hechos actuales
+consistentes, no promete que permanezcan vigentes después de la respuesta.
+
+R hoy abre su propia transacción en findCoverage; no llamar sus endpoints HTTP ni
+combinar GET independientes. La implementación futura debe extraer/reusar su
+proyección interna con tx recibido, manteniendo el wrapper GET R y su contrato.
+Para quantitative Coverage, reusar applicableCoverageAssignments y deriveCoverageQuantities;
+para ambas dimensiones, reusar
+evaluateCoverageAssignment, buffers/window/overlap y aggregateRequirementAvailability.
+Para equipment Case-level, el agregado opera sobre inputs reales de la población
+aprobada (todas las RESERVED REQUIREMENT/DIRECT del Case); no sobre warnings ya
+resumidos de Requirements (pierden cardinalidad
+y confirmación parcial). No duplicar fórmula ni cambiar semántica de R/Assignment.
+Un mismo Assignment se evalúa una vez en el Case-level summary; mismo Asset en
+varias reservas conserva sus hechos de conflicto sin contar Assets como unidades
+de Requirements distintas. No añadir certificación stock o Asset nueva.
+
+CaseKitRepository ya admite tx en findKitByCase. KitService.get actualmente lee
+Case y Kit por separado sin wrapper RepeatableRead: no reutilizar ese GET como
+si fuera snapshot común. Usar repository con el tx compartido y el helper puro
+evaluateHealthcareCaseKitReadiness; no reproducir sus reglas.
+No evidencia de necesidad de persistencia V1: auditoría existe en fuentes de
+commands y confirmación; auditoría de un futuro veredicto/autorización sería otra
+capability. Errores de lectura no se convierten a counts cero o null silenciosos.
+
+### 86.7 CaseKit: límites de la dimensión preparation
+
+Readiness exige SCHEDULED y ambos extremos; valida items ACTIVE y omite EXCLUDED.
+Sólo Requirements ACTIVE REQUIRED exigen cobertura: QUANTITY debe tener item con
+cantidad exacta y sin warnings; ASSET debe contar suficientes items con Assignment
+REQUIREMENT/RESERVED y Asset válido; SERIALIZED REQUIRED bloquea por unsupported.
+BACKUP ausente no bloquea, pero un item BACKUP incluido inválido sí. Product
+inactivo, Requirement retirado, exceso preparado y Assignment/Asset inválido
+pueden bloquear. El helper no evalúa conflictos temporales ni stock físico.
+Un Kit PREPARED puede pasar a readiness BLOCKED por cambios posteriores sin perder
+auditoría/status. PASS no implica PREPARED; PREPARED no implica PASS vigente.
+Estos resultados se muestran junto a equipment, sin convertir preparation en
+segunda fórmula de coverage ni extrapolar sus blockers a Case/Dispatch.
+
+### 86.8 Decisiones de producto aprobadas — autoridad V1
+
+**DEC-CASE-AVL-01 — Multidimensional Case Availability V1 — APPROVED.**
+Case Availability V1 es una proyección DERIVED, INFORMATIONAL a nivel Case.
+No persiste un status general de availability/readiness, no expone un veredicto
+canónico AVAILABLE/UNAVAILABLE/READY/NOT_READY y no introduce workflow gates para
+Case, CaseKit, Dispatch o Custody. Cada dimensión conserva su semántica de dominio.
+Un futuro veredicto general requiere una decisión de producto explícita separada
+que defina completeness, precedence y blocking rules. No inferirlas en V1.
+DEC-C5-COV-01..06 permanecen sin cambios; Coverage sigue informacional.
+
+**DEC-CASE-AVL-02 — Case Equipment diagnostic population — APPROVED WITH EXACT DISTINCTION.**
+Coverage conserva íntegramente COVERAGE-R: DIRECT nunca se añade a assignedQty
+ni a quantitative Coverage. La dimensión EQUIPMENT diagnóstica evalúa Assignments
+actuales RESERVED pertenecientes al Case de ambos origins: REQUIREMENT y DIRECT.
+Excluir RELEASED y REPLACED. Su propósito es diagnóstico temporal, de conflicto
+y verificabilidad, no cobertura de Requirements. Una reserva DIRECT puede afectar
+equipment.fullyVerifiable, conflictFree y warnings sin aumentar jamás cantidades
+de Requirement Coverage. Reusar la semántica existente de Assignment Availability;
+no crear una segunda fórmula. La selección diagnóstica no se reduce a efectivos R.
+
+**DEC-CASE-AVL-03 — Explicit absence without readiness inference — APPROVED.**
+Representar explícitamente ausencia de Requirements y CaseKit. Cero Requirements
+ACTIVE no significa «no equipment required», ready ni not applicable.
+caseKitId=null no significa preparation ready, preparation not required ni not
+applicable. V1 sólo reporta ausencia; no inventa semántica de aplicabilidad.
+
+No quedan decisiones de producto ni identificadores pendientes para este contrato
+V1. HC-CASE-AVL, HC-CASE-AVL-R y HC-CASE-AVL-UI están aprobados según §86.1;
+su registro no modifica semántica ni implica implementación iniciada.
+
+### 86.9 Slices aprobados, UI mínima y aceptación futura
+
+HC-CASE-AVL-R — Derived Case Availability Read — Backend: READY — TARGET 5 SP.
+HC-CASE-AVL-UI — Case Availability Summary — Frontend:
+DEFINED / BLOCKED BY HC-CASE-AVL-R — TARGET 3 SP.
+Son targets provisionales exclusivamente; sin fechas ni valores
+FORECAST/COMMITMENT/ACTUAL asignados. Backend incluye reuse con tx compartido y contratos de
+población/agregación; no separar persistence porque no hay estado nuevo persistido.
+
+UI mínima futura en Case detail: lifecycle, schedule completo/incompleto, counts
+de estados Coverage, conflictos/incertidumbre Equipment, kit status/readiness y
+blockers locales, notes count; enlaces a Requirements, Coverage/notes, Assignments
+y CaseKit. Etiquetar ausencia «sin información registrada»; sin badge global verde
+ni CTA de Dispatch. Errores/refresh no deben conservar datos stale como vigentes.
+
+Aceptación futura: tenant/RBAC/foreign=missing; UUID y public JSON; snapshot común
+incluyendo Kit y cambios concurrentes; cero writes/locks; cero Requirements/kit/
+reservas; start sin end; REQUIRED/BACKUP y tracking distintos; DIRECT con conflicto
+o incertidumbre afecta sólo Equipment y nunca Coverage; RELEASED/REPLACED excluidas;
+Asset no elegible no reduce población diagnóstica, pero sí coverage efectiva;
+nominal vs efectivo; notes stale y no auto-resolve; COVERED incierto o
+conflictivo; override parcial/stale/completo; cancel/retire/reactivate; PREPARED
+con readiness BLOCKED; SERIALIZED y EXCLUDED. Regresión de R y helper readiness.
+Tests/HTTP/JWT/PostgreSQL pertinentes se planifican para implementación; no se
+ejecutan ni se declaran PASS durante esta finalización documental.
+
+**Actividad DB durante discovery/finalización: NONE.** Sólo documentación;
+siguiente acción: revisión humana → staging selectivo → commit → docs PR.
+HC-CASE-AVL-R queda READY para posterior planificación de implementación backend. ROADMAP y
+CHANGELOG no se actualizan; no se declara capability COMPLETE ni se cierra M-HC1.
+
 87. Equipment conflict CURRENT
 
 Equipment Assignment ya detecta:
