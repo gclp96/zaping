@@ -1,4 +1,7 @@
+import { HealthcareEquipmentCoverageNotesController } from '../../src/healthcare/equipment-assignments/healthcare-equipment-coverage-notes.controller';
+import { HealthcareEquipmentCoverageNotesService } from '../../src/healthcare/equipment-assignments/healthcare-equipment-coverage-notes.service';
 import { randomUUID } from 'node:crypto';
+import { createC5bControl, C5bControl } from './healthcare-c5b-control';
 import { isIP } from 'node:net';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
@@ -49,6 +52,7 @@ const updates: Readonly<Record<string, readonly string[]>> = {
   HealthcareCase: ['scheduledStart', 'scheduledEnd', 'updatedAt'],
   HealthcareEquipmentAssignmentSettings: ['companyId'],
   IdempotencyRecord: ['resourceId', 'updatedAt'],
+  HealthcareEquipmentRequirementCoverageNote: ['resolvedAt', 'resolvedById'],
 };
 
 // These messages contain only code-owned stage/object identifiers. Never attach
@@ -167,7 +171,10 @@ type TeardownStatus =
 type TeardownReport = Record<
   'app.close' | 'cleanup' | 'cleanup.zero-residue' | 'prisma.disconnect',
   TeardownStatus
->;
+> &
+  Partial<
+    Record<'control.disconnect' | 'concurrency.disconnect', TeardownStatus>
+  >;
 export function c5bFailure(
   errors: readonly unknown[],
   teardown: TeardownReport,
@@ -195,6 +202,15 @@ export function c5bFailure(
     (name) =>
       `[${name}] ${statuses.includes(teardown[name]) ? teardown[name] : 'UNKNOWN'}`,
   );
+  for (const name of [
+    'control.disconnect',
+    'concurrency.disconnect',
+  ] as const) {
+    if (teardown[name])
+      lines.push(
+        `[${name}] ${statuses.includes(teardown[name]) ? teardown[name] : 'UNKNOWN'}`,
+      );
+  }
   return new AggregateError(
     safeErrors,
     `C5B harness failed:\n${safeErrors.map((error) => error.message).join('\n')}\nTeardown:\n${lines.join('\n')}`,
@@ -260,14 +276,17 @@ type Identity = {
   version: string;
   pid: number;
 };
-async function identity(prisma: PrismaService): Promise<Identity> {
+async function identity(
+  prisma: PrismaService,
+  expectedRole = role,
+): Promise<Identity> {
   const rows = await prisma.$queryRaw<Identity[]>(Prisma.sql`
     SELECT current_database() AS database, current_user AS "user",
       session_user AS "sessionUser", current_schema() AS schema,
       inet_server_addr()::text AS address, inet_server_port()::int AS port,
       current_setting('server_version_num') AS version, pg_backend_pid()::int AS pid
   `);
-  return c5bValidateIdentity(rows);
+  return c5bValidateIdentity(rows, expectedRole);
 }
 
 // inet_server_addr()::text can report an inet prefix (IPv4 /32, IPv6 /128).
@@ -285,13 +304,16 @@ function validServerAddress(value: string | null): boolean {
   );
 }
 
-export function c5bValidateIdentity(rows: readonly Identity[]): Identity {
+export function c5bValidateIdentity(
+  rows: readonly Identity[],
+  expectedRole = role,
+): Identity {
   const row = rows[0];
   requireC5b(
     rows.length === 1 &&
       row.database === database &&
-      row.user === role &&
-      row.sessionUser === role &&
+      row.user === expectedRole &&
+      row.sessionUser === expectedRole &&
       row.schema === 'public' &&
       validServerAddress(row.address) &&
       row.port === 5432 &&
@@ -302,7 +324,40 @@ export function c5bValidateIdentity(rows: readonly Identity[]): Identity {
   );
   return row;
 }
-type RegisteredClient = { prisma: C5bPrisma; identity?: Identity };
+type RegisteredClient = {
+  prisma: C5bPrisma;
+  identity?: Identity;
+  kind?: 'concurrency' | 'control';
+  expectedRole?: string;
+  closed?: boolean;
+};
+
+export function c5bOperatorConnectionUrl(value: string | undefined): string {
+  try {
+    requireC5b(value, 'operator URL required');
+    const url = new URL(value);
+    requireC5b(
+      ['postgres:', 'postgresql:'].includes(url.protocol) &&
+        url.hostname === '127.0.0.1' &&
+        url.port === '5434' &&
+        url.pathname === '/zaping_spike_test' &&
+        !value.includes('?') &&
+        !value.includes('#') &&
+        decodeURIComponent(url.username).trim().length > 0 &&
+        decodeURIComponent(url.username) !== role &&
+        decodeURIComponent(url.password).trim().length > 0,
+      'operator target mismatch',
+    );
+    url.searchParams.set('connection_limit', '1');
+    url.searchParams.set('connect_timeout', '5');
+    url.searchParams.set('pool_timeout', '5');
+    url.searchParams.set('socket_timeout', '10');
+    url.searchParams.set('schema', 'public');
+    return url.toString();
+  } catch {
+    throw new C5bError('C5B invalid operator URL');
+  }
+}
 type SessionMetadata = {
   pid: unknown;
   role: unknown;
@@ -385,8 +440,18 @@ export function c5bAssertSessionIdentity(
   );
 }
 
-async function boundary(clients: readonly RegisteredClient[]): Promise<void> {
-  requireC5b(clients.length === 1, 'one registered client required');
+async function boundary(
+  clients: readonly RegisteredClient[],
+  controlled = false,
+): Promise<void> {
+  requireC5b(
+    controlled
+      ? clients.length === 3 &&
+          clients[1].kind === 'concurrency' &&
+          clients[2].kind === 'control'
+      : clients.length === 1 && !clients[0].kind,
+    'expected registered topology required',
+  );
   const owned = clients.map((client) => client.identity?.pid);
   requireC5b(
     owned.every((pid) => Number.isSafeInteger(pid) && pid! > 0) &&
@@ -394,8 +459,10 @@ async function boundary(clients: readonly RegisteredClient[]): Promise<void> {
     'invalid owned PID registry',
   );
   const client = clients[0];
-  const current = await identity(client.prisma);
-  c5bAssertSessionIdentity(current, client.identity);
+  for (const entry of clients) {
+    const current = await identity(entry.prisma, entry.expectedRole ?? role);
+    c5bAssertSessionIdentity(current, entry.identity);
+  }
   const foreign = await client.prisma.$queryRaw<SessionMetadata[]>(Prisma.sql`
     SELECT pid::int AS pid, usename AS role, backend_type AS "backendType",
       state, backend_start AS "backendStart" FROM pg_catalog.pg_stat_activity
@@ -728,7 +795,11 @@ async function checkSchema(prisma: PrismaService): Promise<void> {
   for (const name of enumNames) {
     const required =
       name === 'IdempotencyScope'
-        ? ['HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE']
+        ? [
+            'HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE',
+            'HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_CREATE',
+            'HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_RESOLVE',
+          ]
         : Prisma.dmmf.datamodel.enums
             .find((e) => e.name === name)
             ?.values.map((v) => v.name);
@@ -1037,16 +1108,25 @@ export type C5bHarnessContext = {
   owners: readonly Readonly<Owner>[];
   token: string;
   checkBoundary: () => Promise<void>;
+  control?: C5bControl;
 };
 
 // B1/B2 may reuse this lifetime without inheriting acceptance assertions from B0.
 export async function withC5bHarness(
   operation: (context: C5bHarnessContext) => Promise<void>,
+  options: { control?: boolean } = {},
 ): Promise<void> {
   // Defense in depth for direct helper callers; importing it creates no client.
   if (process.env.RUN_HC_C5B_POSTGRES_TESTS !== '1') return;
   const errors: Error[] = [];
   const clients: RegisteredClient[] = [];
+  let controlReady = false;
+  const checkSessions = () =>
+    boundary(
+      clients.filter((c) => !c.closed),
+      controlReady,
+    );
+  let control: C5bControl | undefined;
   const attempted: Owner[] = [];
   const owned: Owner[] = [];
   let app: INestApplication<App> | undefined;
@@ -1063,6 +1143,9 @@ export async function withC5bHarness(
   };
   try {
     const url = c5bConnectionUrl(process.env.HC_C5B_DATABASE_URL);
+    const operatorUrl = options.control
+      ? c5bOperatorConnectionUrl(process.env.HC_C5B_OPERATOR_DATABASE_URL)
+      : undefined;
     const prisma = await stage('client construction', () =>
       Promise.resolve(new C5bPrisma(url)),
     );
@@ -1075,11 +1158,32 @@ export async function withC5bHarness(
     await stage('ACL', () => checkAcl(prisma));
     await stage('functions', () => checkFunctions(prisma));
     await stage('exclusive preflight', () => boundary(clients));
+    if (operatorUrl) {
+      for (const kind of ['concurrency', 'control'] as const) {
+        const extra = new C5bPrisma(kind === 'control' ? operatorUrl : url);
+        const entry: RegisteredClient = {
+          prisma: extra,
+          kind,
+          expectedRole:
+            kind === 'control'
+              ? decodeURIComponent(new URL(operatorUrl).username)
+              : role,
+        };
+        clients.push(entry);
+        await stage('connect', () => extra.$connect());
+        entry.identity = await stage('identity', () =>
+          identity(extra, entry.expectedRole),
+        );
+        if (kind === 'concurrency') await stage('role', () => checkRole(extra));
+      }
+      controlReady = true;
+      await stage('exclusive preflight', checkSessions);
+    }
     const owners = fixtureOwners();
     await stage('collision checks', () => collisions(prisma, owners));
-    await stage('first INSERT boundary', () => boundary(clients));
+    await stage('first INSERT boundary', checkSessions);
     for (const owner of owners) {
-      await stage('fixture boundary', () => boundary(clients));
+      await stage('fixture boundary', checkSessions);
       attempted.push(owner);
       // Even an uncertain INSERT result must be followed by accreditation. Both
       // errors are retained; only matching persisted markers authorize cleanup.
@@ -1117,7 +1221,7 @@ export async function withC5bHarness(
         }),
       );
     }
-    await stage('JWT setup boundary', () => boundary(clients));
+    await stage('JWT setup boundary', checkSessions);
     functionalStage = 'JWT setup';
     hadSecret = Object.hasOwn(process.env, 'JWT_SECRET');
     previousSecret = process.env.JWT_SECRET;
@@ -1131,10 +1235,12 @@ export async function withC5bHarness(
           JwtModule.register({ secret, signOptions: { expiresIn: '10m' } }),
         ],
         controllers: [
+          HealthcareEquipmentCoverageNotesController,
           HealthcareEquipmentAssignmentsController,
           HealthcareEquipmentCoverageController,
         ],
         providers: [
+          HealthcareEquipmentCoverageNotesService,
           HealthcareEquipmentCoverageService,
           JwtStrategy,
           HealthcareEquipmentAssignmentsService,
@@ -1168,7 +1274,7 @@ export async function withC5bHarness(
       }),
     );
     await stage('Nest init', () => app!.init());
-    await stage('HTTP boundary', () => boundary(clients));
+    await stage('HTTP boundary', checkSessions);
     const owner = owned[0];
     const user = await stage('persisted JWT actor', () =>
       prisma.user.findFirst({
@@ -1202,14 +1308,25 @@ export async function withC5bHarness(
       authVersion: user.authVersion,
     });
     functionalStage = 'authenticated smoke';
+    if (controlReady) {
+      control = createC5bControl({
+        concurrent: clients[1].prisma,
+        operator: clients[2].prisma,
+        pids: clients.map((c) => c.identity!.pid) as [number, number, number],
+        owners: owned,
+        repository: moduleRef.get(HealthcareEquipmentAssignmentsRepository),
+        checkBoundary: checkSessions,
+      });
+    }
     await operation({
       prisma,
       app,
       owners: Object.freeze(owned.map((owner) => Object.freeze({ ...owner }))),
       token,
-      checkBoundary: () => stage('operation boundary', () => boundary(clients)),
+      control,
+      checkBoundary: () => stage('operation boundary', checkSessions),
     });
-    await stage('post-HTTP boundary', () => boundary(clients));
+    await stage('post-HTTP boundary', checkSessions);
   } catch (error) {
     errors.push(sanitized(error, functionalStage));
   } finally {
@@ -1229,11 +1346,36 @@ export async function withC5bHarness(
         else delete process.env.JWT_SECRET;
       }
     }
+    // Close additional sessions before the final one-session boundary/residue checks.
+    for (const entry of [...clients].reverse().filter((c) => c.kind)) {
+      const label =
+        entry.kind === 'control'
+          ? 'control.disconnect'
+          : 'concurrency.disconnect';
+      try {
+        await entry.prisma.$disconnect();
+        entry.closed = true;
+        teardown[label] = 'PASS';
+      } catch (error) {
+        teardown[label] = 'FAIL';
+        errors.push(sanitized(error, 'disconnect'));
+      }
+    }
+    if (options.control && clients.some((entry) => entry.kind)) {
+      process.stdout.write(
+        '[control.disconnect] ' +
+          (teardown['control.disconnect'] ?? 'SKIPPED_NO_CLIENT') +
+          '\n[concurrency.disconnect] ' +
+          (teardown['concurrency.disconnect'] ?? 'SKIPPED_NO_CLIENT') +
+          '\n',
+      );
+    }
+    controlReady = false;
     const client = clients[0];
     if (client && attempted.length) {
       let safe = false;
       try {
-        await boundary(clients);
+        await checkSessions();
         safe = true;
       } catch (error) {
         errors.push(sanitized(error, 'cleanup boundary'));
@@ -1262,7 +1404,7 @@ export async function withC5bHarness(
         errors.length > beforeResidue ? 'FAIL' : 'PASS';
     }
     if (clients.length) teardown['prisma.disconnect'] = 'PASS';
-    for (const client of clients) {
+    for (const client of clients.filter((c) => !c.closed)) {
       try {
         await client.prisma.$disconnect();
       } catch (error) {

@@ -10,6 +10,49 @@
 
 ## Unreleased
 
+### HC-NEXT-03C5-COVERAGE-N — cierre local DoD / PR pendiente
+
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
+R COMPLETE / MERGED — PR #63; umbrella PARTIALLY IMPLEMENTED / CONTRACT APPROVED,
+pendiente de merge de N. M-HC1 OPEN. Sin release ni deployment.
+
+Implementados POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes
+y POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes/:noteId/resolve.
+ADMIN/MANAGER/WAREHOUSE mutan; SALES 403, sin JWT 401. Contexto efectivo de R:
+UNAVAILABLE sólo assignedQty=0; PARTIAL_CONTEXT sólo 0<assignedQty<requestedQty.
+DEC-C5-COV-06 IMPLEMENTED / VALIDATED: CREATE exige Case no CANCELLED y Requirement
+ACTIVE, o 409 zero-write. RESOLVE permitido tras CANCELLED/RETIRED; replay completado
+misma key/command sigue disponible tras transición. Primer resolvedAt/resolvedById
+preservado en repetición/concurrencia; identidad antigua no resuelve sucesora.
+
+IdempotencyScope incorpora HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_CREATE y
+HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_RESOLVE: mismo command normalizado replay;
+distinto command 409, sin actor/timestamps en hash. Claim, validación, mutación y
+completion comparten transacción. Readback R integrado; sin mutar Assignment/inventario.
+Sólo P2002 de unicidad activa esperada es duplicate conflict; otros/malformados
+son fallo de persistencia sanitizado. Controller → Service → Repository → Prisma;
+Company advisory lock → Case → Requirement → Note FOR UPDATE, sin locks Asset.
+
+PostgreSQL acceptance N **PASS — 1 suite / 1 test (~43.247 s)**, sólo
+127.0.0.1:5434/zaping_spike_test. Migration
+20261009000000_add_coverage_note_idempotency_scopes aplicada; schema al día.
+ACL sólo rol dedicado zaping_hc_c5b: UPDATE tabla=false, resolvedAt/resolvedById=true;
+SELECT/INSERT/DELETE no delegables; sin UPDATE lifecycle ni autorización productiva.
+Concurrencia material validada con dos PID aplicación y un PID operador/control
+acreditados, bloqueo Company determinista y observación pg_stat_activity/pg_locks,
+sin prueba sólo temporal; sesiones desconocidas rechazadas. CREATE éxito + 409
+sanitizado; RESOLVE preserva primer audit. Operador sólo infraestructura de test
+y transición de fixtures; desconectado antes de checks finales, sin credenciales
+documentadas/committed. control.disconnect y concurrency.disconnect PASS.
+RUN_HC_C5B_POSTGRES_TESTS, HC_C5B_DATABASE_URL y HC_C5B_OPERATOR_DATABASE_URL ausentes después.
+
+Evidencia previa conservada: Prisma validate/generate PASS; focal 386; helpers 75;
+full API 1752 tests / 106 suites; lint/typecheck/build/noEmit PASS;
+Prettier TS modificados y git diff --check PASS; disabled-mode safe skip.
+Este cierre documental registra evidencia suministrada, sin reejecutar gates.
+**Actividad DB durante cierre: NONE.** Revisión humana → staging selectivo → commit → PR.
+Contrato, comando y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
+
 ### HC-NEXT-03C5-COVERAGE-R — cierre DoD / MERGED
 
 **Estado:** COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS — 5 SP. CI PASS.
@@ -43,8 +86,9 @@ writes en GET. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI 
 Este cierre registra
 la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
-HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N: READY — 5 SP,
-sin implementar; dependencia R merge satisfecha. M-HC1 OPEN.
+HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N:
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
+dependencia R merge satisfecha. Umbrella pendiente de merge de N. M-HC1 OPEN.
 Contrato y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
 
 ---

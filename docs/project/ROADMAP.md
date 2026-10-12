@@ -226,7 +226,8 @@ validate/generate (Client v6.19.3), lint:check sin fix, typecheck, production
 build y diff-check PASS. CI PASS: push API/Web y PR API/Web. PR #60 MERGED.
 DoD/evidencia en diseño §34.5.2.4.
 M-HC1 sigue OPEN; después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está
-PARTIALLY IMPLEMENTED. R COMPLETE / MERGED mediante PR #63; N READY, sin implementar.
+PARTIALLY IMPLEMENTED. R COMPLETE / MERGED mediante PR #63;
+N IMPLEMENTED / LOCAL DoD PASS / PR PENDING. Umbrella pendiente de merge de N.
 Este cierre documental no reejecuta PostgreSQL, tests, builds o Prisma; sin release.
 
 HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–05).
@@ -239,11 +240,28 @@ COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS — 5 SP; CI PASS.
 CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
 Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
 GET summary e historia, tenant/RBAC, snapshot, states/Availability separados y JSON.
-Después: HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — READY — 5 SP; POST create/resolve, audit, context, idempotency,
+HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit —
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP; POST create/resolve, audit, context, idempotency,
 concurrencia/rollback y readback R. R exige unit/HTTP/JWT/PostgreSQL pertinente,
 invariantes/gates/docs/CI/merge; N añade migration scopes y pruebas de mutación.
-N tiene la dependencia R merge satisfecha y contrato/DoR aprobados; listo para
-implementación. Scopes/migration/ACL se revisarán dentro de N antes de su runtime.
+N tiene la dependencia R merge satisfecha y contrato/DoR aprobados.
+Scopes create/resolve y migration 20261009000000_add_coverage_note_idempotency_scopes
+aplicados; schema al día. ACL sólo rol de aceptación zaping_hc_c5b en spike dedicado:
+UPDATE tabla=false, resolvedAt/resolvedById=true; sin UPDATE lifecycle;
+SELECT/INSERT/DELETE existentes no delegables. No autoriza producción.
+DEC-C5-COV-06 IMPLEMENTED / VALIDATED: CREATE exige Case no CANCELLED y Requirement
+ACTIVE (409 zero-write); RESOLVE y replay completado permitidos tras CANCELLED/RETIRED.
+Primer audit preservado; identidad antigua no resuelve sucesora; readback R validado.
+Evidencia N: focal 386; helpers 75; full API 1752 / 106; Prisma validate/generate,
+lint/typecheck/build/noEmit, Prettier TS y diff-check PASS; disabled-mode safe skip.
+PostgreSQL N PASS — 1 suite / 1 test (~43.247 s), con concurrencia material:
+dos PID aplicación y un control acreditados, Company advisory lock determinista,
+pg_stat_activity/pg_locks; sesiones desconocidas rechazadas. CREATE éxito + 409
+sanitizado; RESOLVE preserva primer audit. Control sólo test/fixtures, sin vía
+productiva; control.disconnect y concurrency.disconnect PASS antes de checks finales.
+Opt-in y URLs runtime/control ausentes después; credenciales no documentadas/committed.
+Actividad DB durante cierre: NONE. Siguiente: revisión humana → staging selectivo
+→ commit → PR. N y umbrella no COMPLETE / MERGED hasta merge de PR.
 Details/AC/DoD en diseño §34.5.3 y PROJECT_BOARD. M-HC1 sigue OPEN;
 capability funcional, sin redefinirla como campaña de tests adicionales.
 
