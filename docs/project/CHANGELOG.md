@@ -10,11 +10,13 @@
 
 ## Unreleased
 
-### HC-NEXT-03C5-COVERAGE-N — cierre local DoD / PR pendiente
+### HC-NEXT-03C5-COVERAGE-N — cierre DoD / MERGED
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
-R COMPLETE / MERGED — PR #63; umbrella PARTIALLY IMPLEMENTED / CONTRACT APPROVED,
-pendiente de merge de N. M-HC1 OPEN. Sin release ni deployment.
+**Estado:** COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
+CI PASS. Feature commit N: ff4124d99afcc04d0607ca3f813a154cb754c180.
+Merge commit N en main: 2fa5927e239998d52e0004f14fdfeb5a312ff28a.
+Merge mediante PR #65; sin migración ni deployment de producción acreditados.
+R COMPLETE / MERGED — PR #63; umbrella COMPLETE / MERGED / CONTRACT APPROVED; DoD PASS; CI PASS. M-HC1 OPEN. Sin release ni deployment.
 
 Implementados POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes
 y POST /healthcare/cases/:caseId/requirements/:requirementId/equipment-coverage-notes/:noteId/resolve.
@@ -50,7 +52,7 @@ Evidencia previa conservada: Prisma validate/generate PASS; focal 386; helpers 7
 full API 1752 tests / 106 suites; lint/typecheck/build/noEmit PASS;
 Prettier TS modificados y git diff --check PASS; disabled-mode safe skip.
 Este cierre documental registra evidencia suministrada, sin reejecutar gates.
-**Actividad DB durante cierre: NONE.** Revisión humana → staging selectivo → commit → PR.
+**Actividad DB durante cierre: NONE.** Cierre post-merge; DoD PASS; CI PASS.
 Contrato, comando y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
 
 ### HC-NEXT-03C5-COVERAGE-R — cierre DoD / MERGED
@@ -86,9 +88,9 @@ writes en GET. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI 
 Este cierre registra
 la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
-HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED. COVERAGE-N:
-IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
-dependencia R merge satisfecha. Umbrella pendiente de merge de N. M-HC1 OPEN.
+HC-NEXT-03C5-COVERAGE: COMPLETE / MERGED. COVERAGE-N:
+COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP;
+dependencia R merge satisfecha. Umbrella COMPLETE / MERGED — R PR #63 y N PR #65; CI PASS. M-HC1 OPEN.
 Contrato y evidencia: [diseño §34.5.3](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#3453-hc-next-03c5-coverage).
 
 ---

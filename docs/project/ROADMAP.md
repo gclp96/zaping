@@ -121,7 +121,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
-HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -226,11 +226,11 @@ validate/generate (Client v6.19.3), lint:check sin fix, typecheck, production
 build y diff-check PASS. CI PASS: push API/Web y PR API/Web. PR #60 MERGED.
 DoD/evidencia en diseño §34.5.2.4.
 M-HC1 sigue OPEN; después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está
-PARTIALLY IMPLEMENTED. R COMPLETE / MERGED mediante PR #63;
-N IMPLEMENTED / LOCAL DoD PASS / PR PENDING. Umbrella pendiente de merge de N.
+COMPLETE / MERGED. R COMPLETE / MERGED mediante PR #63;
+N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS. Umbrella COMPLETE / MERGED — R PR #63 y N PR #65; CI PASS.
 Este cierre documental no reejecuta PostgreSQL, tests, builds o Prisma; sin release.
 
-HC-NEXT-03C5-COVERAGE: PARTIALLY IMPLEMENTED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–05).
+HC-NEXT-03C5-COVERAGE: COMPLETE / MERGED / CONTRACT APPROVED (Leo, DEC-C5-COV-01–05).
 Cantidad separada de certainty; COVERED puede coexistir con incertidumbre/conflicto.
 Notes explícitas, inmutables y context-restricted; stale visibles hasta resolución.
 V1 informacional: sin gates Case/CaseKit/Dispatch. Contrato derivado por Requirement;
@@ -241,10 +241,13 @@ CI PASS. Feature commit: ba570f7cfeb2ef546d309a1e681b47e3114fadad.
 Merge commit en main: d63b8fee6956899213d75dd85c6d2bd33e52f7b5.
 GET summary e historia, tenant/RBAC, snapshot, states/Availability separados y JSON.
 HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit —
-IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP; POST create/resolve, audit, context, idempotency,
+COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP; POST create/resolve, audit, context, idempotency,
 concurrencia/rollback y readback R. R exige unit/HTTP/JWT/PostgreSQL pertinente,
 invariantes/gates/docs/CI/merge; N añade migration scopes y pruebas de mutación.
 N tiene la dependencia R merge satisfecha y contrato/DoR aprobados.
+CI PASS. Feature commit N: ff4124d99afcc04d0607ca3f813a154cb754c180.
+Merge commit N en main: 2fa5927e239998d52e0004f14fdfeb5a312ff28a.
+Merge mediante PR #65; sin migración ni deployment de producción acreditados.
 Scopes create/resolve y migration 20261009000000_add_coverage_note_idempotency_scopes
 aplicados; schema al día. ACL sólo rol de aceptación zaping_hc_c5b en spike dedicado:
 UPDATE tabla=false, resolvedAt/resolvedById=true; sin UPDATE lifecycle;
@@ -260,8 +263,8 @@ pg_stat_activity/pg_locks; sesiones desconocidas rechazadas. CREATE éxito + 409
 sanitizado; RESOLVE preserva primer audit. Control sólo test/fixtures, sin vía
 productiva; control.disconnect y concurrency.disconnect PASS antes de checks finales.
 Opt-in y URLs runtime/control ausentes después; credenciales no documentadas/committed.
-Actividad DB durante cierre: NONE. Siguiente: revisión humana → staging selectivo
-→ commit → PR. N y umbrella no COMPLETE / MERGED hasta merge de PR.
+Actividad DB durante cierre: NONE. N y umbrella MERGED; DoD PASS; CI PASS.
+Sin release ni deployment.
 Details/AC/DoD en diseño §34.5.3 y PROJECT_BOARD. M-HC1 sigue OPEN;
 capability funcional, sin redefinirla como campaña de tests adicionales.
 
@@ -3047,7 +3050,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
-HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Case Availability
 
@@ -3210,7 +3213,7 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 ↓
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
-HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 Advanced Inventory permanece DESIGNED / APPROVED / NOT IMPLEMENTED como target
 P2 y no es el milestone principal actual. SalesOrder + Delivery, Commercial
