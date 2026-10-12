@@ -12,6 +12,28 @@ type Observation = {
   waiting: boolean;
   held: boolean;
 };
+type KitItemFixture = {
+  id: string;
+  excluded?: boolean;
+} & (
+  | {
+      requirementId: string;
+      preparedQuantity: number;
+      equipmentAssignmentId?: never;
+    }
+  | {
+      equipmentAssignmentId: string;
+      requirementId?: never;
+      preparedQuantity?: never;
+    }
+);
+export type C5bKitFixture = {
+  id: string;
+  companyId: string;
+  caseId: string;
+  status?: 'DRAFT' | 'PREPARED';
+  items: readonly KitItemFixture[];
+};
 function requireControl(ok: unknown): asserts ok {
   if (!ok) throw new Error('C5B control invariant failed');
 }
@@ -37,6 +59,12 @@ export function c5bObservedContention(
 }
 
 export interface C5bControl {
+  createCaseKit(fixture: C5bKitFixture): Promise<void>;
+  cleanupCaseKits(): Promise<void>;
+  observeInventory(): Promise<{
+    batches: Prisma.InventoryBatchGetPayload<object>[];
+    movements: Prisma.InventoryMovementGetPayload<object>[];
+  }>;
   contend<T>(
     companyId: string,
     requests: readonly [() => Promise<T>, () => Promise<T>],
@@ -60,12 +88,262 @@ export function createC5bControl(input: {
   const { concurrent, operator, pids, owners, repository, checkBoundary } =
     input;
   let busy = false;
+  const kits: C5bKitFixture[] = [];
   const owned = (companyId: string) => {
     const owner = owners.find((o) => o.id === companyId);
     requireControl(owner);
     return owner;
   };
+  const accredit = async (tx: Prisma.TransactionClient, owner: Owner) => {
+    requireControl(
+      (await tx.company.count({
+        where: { id: owner.id, name: owner.name, rfc: owner.rfc },
+      })) === 1,
+    );
+    requireControl(
+      (await tx.user.count({
+        where: { id: owner.userId, companyId: owner.id },
+      })) === 1,
+    );
+  };
   return {
+    async createCaseKit(input) {
+      requireControl(!busy);
+      const owner = owned(input.companyId);
+      requireControl(
+        !kits.some(
+          (kit) =>
+            kit.id === input.id ||
+            (kit.companyId === input.companyId && kit.caseId === input.caseId),
+        ) &&
+          new Set(input.items.map((item) => item.id)).size ===
+            input.items.length &&
+          input.items.every(
+            (item) =>
+              !kits.some((kit) =>
+                kit.items.some((prior) => prior.id === item.id),
+              ),
+          ),
+      );
+      // Copy the closed input: caller mutation cannot broaden teardown predicates.
+      const fixture: C5bKitFixture = {
+        id: input.id,
+        companyId: input.companyId,
+        caseId: input.caseId,
+        status: input.status ?? 'DRAFT',
+        items: input.items.map((item) => ({ ...item })),
+      };
+      requireControl(
+        fixture.status === 'DRAFT' || fixture.status === 'PREPARED',
+      );
+      await checkBoundary();
+      busy = true;
+      try {
+        await operator.$transaction(
+          async (tx) => {
+            await accredit(tx, owner);
+            requireControl(
+              (await tx.healthcareCase.count({
+                where: {
+                  id: fixture.caseId,
+                  companyId: owner.id,
+                  createdById: owner.userId,
+                  folio: `C5AVL-${fixture.caseId}`,
+                },
+              })) === 1,
+            );
+            requireControl(
+              (await tx.healthcareCaseKit.count({
+                where: {
+                  OR: [
+                    { id: fixture.id },
+                    { companyId: owner.id, caseId: fixture.caseId },
+                  ],
+                },
+              })) === 0,
+            );
+            requireControl(
+              (await tx.healthcareCaseKitItem.count({
+                where: {
+                  id: { in: fixture.items.map((item) => item.id) },
+                },
+              })) === 0,
+            );
+            for (const item of fixture.items) {
+              if (item.requirementId !== undefined) {
+                requireControl(
+                  item.equipmentAssignmentId === undefined &&
+                    Number.isInteger(item.preparedQuantity) &&
+                    item.preparedQuantity > 0,
+                );
+                requireControl(
+                  (await tx.healthcareCaseRequirement.count({
+                    where: {
+                      id: item.requirementId,
+                      companyId: owner.id,
+                      caseId: fixture.caseId,
+                      createdById: owner.userId,
+                      product: { inventoryTracking: 'QUANTITY' },
+                    },
+                  })) === 1,
+                );
+              } else {
+                requireControl(
+                  item.equipmentAssignmentId !== undefined &&
+                    item.preparedQuantity === undefined,
+                );
+                requireControl(
+                  (await tx.healthcareEquipmentAssignment.count({
+                    where: {
+                      id: item.equipmentAssignmentId,
+                      companyId: owner.id,
+                      caseId: fixture.caseId,
+                      createdById: owner.userId,
+                    },
+                  })) === 1,
+                );
+              }
+            }
+            // Register after collision/dependency checks, before the first INSERT.
+            // An uncertain transaction result still leaves exact cleanup identifiers.
+            kits.push(fixture);
+            const audit = new Date();
+            await tx.healthcareCaseKit.create({
+              data: {
+                id: fixture.id,
+                companyId: owner.id,
+                caseId: fixture.caseId,
+                createdById: owner.userId,
+                status: fixture.status,
+                ...(fixture.status === 'PREPARED'
+                  ? { preparedById: owner.userId, preparedAt: audit }
+                  : {}),
+              },
+            });
+            for (const item of fixture.items) {
+              await tx.healthcareCaseKitItem.create({
+                data: {
+                  id: item.id,
+                  companyId: owner.id,
+                  caseId: fixture.caseId,
+                  caseKitId: fixture.id,
+                  addedById: owner.userId,
+                  requirementId: item.requirementId ?? null,
+                  equipmentAssignmentId: item.equipmentAssignmentId ?? null,
+                  preparedQuantity: item.preparedQuantity ?? null,
+                  ...(item.excluded
+                    ? {
+                        lifecycle: 'EXCLUDED',
+                        excludedById: owner.userId,
+                        excludedAt: audit,
+                        exclusionReason: 'C5AVL owned excluded fixture',
+                      }
+                    : {}),
+                },
+              });
+            }
+          },
+          { maxWait: 3000, timeout: 20000 },
+        );
+        await checkBoundary();
+      } finally {
+        busy = false;
+      }
+    },
+    async cleanupCaseKits() {
+      requireControl(!busy);
+      if (!kits.length) return;
+      await checkBoundary();
+      busy = true;
+      try {
+        await operator.$transaction(
+          async (tx) => {
+            for (const fixture of kits) {
+              const owner = owned(fixture.companyId);
+              await accredit(tx, owner);
+              requireControl(
+                (await tx.healthcareCase.count({
+                  where: {
+                    id: fixture.caseId,
+                    companyId: owner.id,
+                    createdById: owner.userId,
+                    folio: `C5AVL-${fixture.caseId}`,
+                  },
+                })) === 1,
+              );
+              const kitWhere = {
+                id: fixture.id,
+                companyId: owner.id,
+                caseId: fixture.caseId,
+                createdById: owner.userId,
+              };
+              // Fail closed if a registered identity changed ownership, or if
+              // unregistered child rows appeared. Never delete by Company alone.
+              requireControl(
+                (await tx.healthcareCaseKit.count({
+                  where: { id: fixture.id },
+                })) === (await tx.healthcareCaseKit.count({ where: kitWhere })),
+              );
+              const itemWhere = {
+                id: { in: fixture.items.map((item) => item.id) },
+                companyId: owner.id,
+                caseId: fixture.caseId,
+                caseKitId: fixture.id,
+                addedById: owner.userId,
+              };
+              const children = await tx.healthcareCaseKitItem.count({
+                where: itemWhere,
+              });
+              requireControl(
+                children ===
+                  (await tx.healthcareCaseKitItem.count({
+                    where: {
+                      OR: [
+                        { id: { in: fixture.items.map((item) => item.id) } },
+                        { caseKitId: fixture.id },
+                      ],
+                    },
+                  })),
+              );
+              await tx.healthcareCaseKitItem.deleteMany({ where: itemWhere });
+              await tx.healthcareCaseKit.deleteMany({ where: kitWhere });
+            }
+          },
+          { maxWait: 3000, timeout: 20000 },
+        );
+        await checkBoundary();
+      } finally {
+        busy = false;
+      }
+    },
+    async observeInventory() {
+      requireControl(!busy);
+      await checkBoundary();
+      busy = true;
+      try {
+        return await operator.$transaction(
+          async (tx) => {
+            for (const owner of owners) await accredit(tx, owner);
+            const where = {
+              companyId: { in: owners.map((owner) => owner.id) },
+            };
+            return {
+              batches: await tx.inventoryBatch.findMany({
+                where,
+                orderBy: { id: 'asc' },
+              }),
+              movements: await tx.inventoryMovement.findMany({
+                where,
+                orderBy: { id: 'asc' },
+              }),
+            };
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+        );
+      } finally {
+        busy = false;
+      }
+    },
     async contend<T>(
       companyId: string,
       requests: readonly [() => Promise<T>, () => Promise<T>],

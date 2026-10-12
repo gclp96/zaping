@@ -82,60 +82,69 @@ export class HealthcareEquipmentCoverageService {
   }
 
   findCoverage(companyId: string, caseId: string) {
-    return this.readSnapshot(async (tx) => {
-      await this.assertCase(tx, companyId, caseId);
-      const requirements = await this.repository.findCoverageRequirements(
-        companyId,
-        caseId,
-        tx,
-      );
-      const records = await this.repository.findCoverageAssignments(
-        companyId,
-        caseId,
-        requirements.map((r) => r.id),
-        tx,
-      );
-      const applicable = applicableCoverageAssignments(records, requirements);
-      const settings = await this.repository.findSettings(companyId, tx);
-      const reservations =
-        applicable.length === 0
-          ? []
-          : await this.repository.findReservedAssignmentsForAssets(
-              companyId,
-              [...new Set(applicable.map((r) => r.equipmentAsset.id))],
-              tx,
-            );
-      const buffers = resolveEquipmentAssignmentBuffers(settings);
-      return {
-        items: requirements.map((requirement) => {
-          const effective = applicable.filter(
-            (r) => r.requirementId === requirement.id,
+    return this.readSnapshot((tx) =>
+      this.findCoverageInSnapshot(companyId, caseId, tx),
+    );
+  }
+
+  // Caller owns the read snapshot; preserve the existing GET derivation exactly.
+  async findCoverageInSnapshot(
+    companyId: string,
+    caseId: string,
+    tx: Prisma.TransactionClient,
+  ) {
+    await this.assertCase(tx, companyId, caseId);
+    const requirements = await this.repository.findCoverageRequirements(
+      companyId,
+      caseId,
+      tx,
+    );
+    const records = await this.repository.findCoverageAssignments(
+      companyId,
+      caseId,
+      requirements.map((r) => r.id),
+      tx,
+    );
+    const applicable = applicableCoverageAssignments(records, requirements);
+    const settings = await this.repository.findSettings(companyId, tx);
+    const reservations =
+      applicable.length === 0
+        ? []
+        : await this.repository.findReservedAssignmentsForAssets(
+            companyId,
+            [...new Set(applicable.map((r) => r.equipmentAsset.id))],
+            tx,
           );
-          return {
-            requirementId: requirement.id,
-            product: requirement.product,
-            ...deriveCoverageQuantities(
-              requirement.requestedQty,
-              records.filter((r) => r.requirementId === requirement.id).length,
-              effective.length,
-              requirement.equipmentCoverageNotes.some(
-                (note) => note.kind === 'UNAVAILABLE',
+    const buffers = resolveEquipmentAssignmentBuffers(settings);
+    return {
+      items: requirements.map((requirement) => {
+        const effective = applicable.filter(
+          (r) => r.requirementId === requirement.id,
+        );
+        return {
+          requirementId: requirement.id,
+          product: requirement.product,
+          ...deriveCoverageQuantities(
+            requirement.requestedQty,
+            records.filter((r) => r.requirementId === requirement.id).length,
+            effective.length,
+            requirement.equipmentCoverageNotes.some(
+              (note) => note.kind === 'UNAVAILABLE',
+            ),
+          ),
+          availability: aggregateRequirementAvailability(
+            effective.map((record) =>
+              this.assignments.evaluateCoverageAssignment(
+                record,
+                buffers,
+                reservations,
               ),
             ),
-            availability: aggregateRequirementAvailability(
-              effective.map((record) =>
-                this.assignments.evaluateCoverageAssignment(
-                  record,
-                  buffers,
-                  reservations,
-                ),
-              ),
-            ),
-            activeNotes: requirement.equipmentCoverageNotes,
-          };
-        }),
-      };
-    });
+          ),
+          activeNotes: requirement.equipmentCoverageNotes,
+        };
+      }),
+    };
   }
 
   findNotes(

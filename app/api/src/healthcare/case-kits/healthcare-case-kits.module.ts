@@ -9,5 +9,6 @@ import { HealthcareCaseKitsService } from './healthcare-case-kits.service';
   imports: [PrismaModule],
   controllers: [HealthcareCaseKitsController],
   providers: [HealthcareCaseKitsRepository, HealthcareCaseKitsService],
+  exports: [HealthcareCaseKitsRepository],
 })
 export class HealthcareCaseKitsModule {}

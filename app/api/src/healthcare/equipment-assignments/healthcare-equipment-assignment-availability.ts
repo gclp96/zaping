@@ -14,6 +14,11 @@ export function equipmentAssignmentAssetIsEligible(asset: {
 export const SYSTEM_PRE_CASE_BUFFER_MINUTES = 120;
 export const SYSTEM_POST_CASE_BUFFER_MINUTES = 180;
 
+export const INCOMPLETE_CASE_SCHEDULE_WARNING = {
+  code: 'INCOMPLETE_CASE_SCHEDULE' as const,
+  message: 'La disponibilidad requiere revisar el horario del caso',
+};
+
 export type EquipmentAssignmentBufferSource =
   'SYSTEM_DEFAULT' | 'COMPANY_SETTINGS';
 

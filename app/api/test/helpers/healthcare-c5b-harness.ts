@@ -19,6 +19,10 @@ import { HealthcareEquipmentCoverageService } from '../../src/healthcare/equipme
 import { HealthcareEquipmentAssignmentsRepository } from '../../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
 import { HealthcareEquipmentAssignmentsService } from '../../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { HealthcareCaseAvailabilityController } from '../../src/healthcare/case-availability/healthcare-case-availability.controller';
+import { HealthcareCaseAvailabilityService } from '../../src/healthcare/case-availability/healthcare-case-availability.service';
+import { HealthcareCaseAvailabilityRepository } from '../../src/healthcare/case-availability/healthcare-case-availability.repository';
+import { HealthcareCaseKitsRepository } from '../../src/healthcare/case-kits/healthcare-case-kits.repository';
 
 const database = 'zaping_spike_test';
 const role = 'zaping_hc_c5b';
@@ -40,11 +44,17 @@ const insertTables: readonly string[] = [
   coverageNoteTable,
 ];
 const settingsTable = 'HealthcareEquipmentAssignmentSettings';
+const selectOnlyTables: readonly string[] = [
+  'HealthcareCaseKit',
+  'HealthcareCaseKitItem',
+];
+const deleteTables: readonly string[] = [...insertTables];
 const tables: readonly string[] = [
   ...writableTables,
   overrideTable,
   coverageNoteTable,
   settingsTable,
+  ...selectOnlyTables,
 ];
 const updates: Readonly<Record<string, readonly string[]>> = {
   EquipmentAsset: ['id'],
@@ -54,6 +64,26 @@ const updates: Readonly<Record<string, readonly string[]>> = {
   IdempotencyRecord: ['resourceId', 'updatedAt'],
   HealthcareEquipmentRequirementCoverageNote: ['resolvedAt', 'resolvedById'],
 };
+
+// Shared by table/column catalog verification and the pure ACL regression specs.
+export function c5bExpectedPrivilege(
+  schema: string,
+  table: string,
+  privilege: string,
+  column?: string,
+): boolean {
+  if (schema !== 'public' || !tables.includes(table)) return false;
+  return (
+    privilege === 'SELECT' ||
+    (privilege === 'INSERT' && insertTables.includes(table)) ||
+    (column === undefined &&
+      privilege === 'DELETE' &&
+      deleteTables.includes(table)) ||
+    (column !== undefined &&
+      privilege === 'UPDATE' &&
+      (updates[table] ?? []).includes(column))
+  );
+}
 
 // These messages contain only code-owned stage/object identifiers. Never attach
 // raw Prisma, HTTP or URL errors as cause: Jest recursively prints Error causes.
@@ -106,6 +136,7 @@ const diagnosticStages: Readonly<Record<string, string>> = {
   'app close': 'app.close',
   'ownership recheck': 'cleanup.ownership',
   'cleanup boundary': 'cleanup.sessions',
+  'cleanup CaseKits': 'cleanup.CaseKits',
   cleanup: 'cleanup',
   residue: 'cleanup.zero-residue',
   disconnect: 'prisma.disconnect',
@@ -593,12 +624,7 @@ async function checkAcl(prisma: PrismaService): Promise<void> {
       AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'
   `);
   for (const row of rows) {
-    const scoped = row.schema === 'public' && tables.includes(row.table);
-    const expected =
-      scoped &&
-      (row.privilege === 'SELECT' ||
-        (row.privilege === 'DELETE' && row.table !== settingsTable) ||
-        (row.privilege === 'INSERT' && insertTables.includes(row.table)));
+    const expected = c5bExpectedPrivilege(row.schema, row.table, row.privilege);
     requireC5b(
       row.allowed === expected && !row.delegable,
       'table ACL differs from exact manifest',
@@ -632,13 +658,12 @@ async function checkAcl(prisma: PrismaService): Promise<void> {
       AND n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%'
   `);
   for (const row of columns) {
-    const scoped = row.schema === 'public' && tables.includes(row.table);
-    const expected =
-      scoped &&
-      (row.privilege === 'SELECT' ||
-        (row.privilege === 'INSERT' && insertTables.includes(row.table)) ||
-        (row.privilege === 'UPDATE' &&
-          (updates[row.table] ?? []).includes(row.column)));
+    const expected = c5bExpectedPrivilege(
+      row.schema,
+      row.table,
+      row.privilege,
+      row.column,
+    );
     requireC5b(
       row.allowed === expected && !row.delegable,
       'column ACL differs from exact manifest',
@@ -677,7 +702,7 @@ async function checkAcl(prisma: PrismaService): Promise<void> {
 // and casts on literal values are normalized.
 export function c5bCheckShape(expression: string): string {
   const normalized = expression.replace(
-    /'((?:[^']|'')*)'::(?:public\.)?(?:"HealthcareEquipmentAssignmentOrigin"|"HealthcareEquipmentAssignmentLifecycle"|"HealthcareEquipmentAssignmentReleaseCause"|"HealthcareRequirementLifecycle"|text)/g,
+    /'((?:[^']|'')*)'::(?:public\.)?(?:"HealthcareEquipmentAssignmentOrigin"|"HealthcareEquipmentAssignmentLifecycle"|"HealthcareEquipmentAssignmentReleaseCause"|"HealthcareRequirementLifecycle"|"HealthcareCaseKitStatus"|"HealthcareCaseKitItemLifecycle"|text)/g,
     "'$1'",
   );
   const tokens =
@@ -1235,11 +1260,15 @@ export async function withC5bHarness(
           JwtModule.register({ secret, signOptions: { expiresIn: '10m' } }),
         ],
         controllers: [
+          HealthcareCaseAvailabilityController,
           HealthcareEquipmentCoverageNotesController,
           HealthcareEquipmentAssignmentsController,
           HealthcareEquipmentCoverageController,
         ],
         providers: [
+          HealthcareCaseAvailabilityService,
+          HealthcareCaseAvailabilityRepository,
+          HealthcareCaseKitsRepository,
           HealthcareEquipmentCoverageNotesService,
           HealthcareEquipmentCoverageService,
           JwtStrategy,
@@ -1346,6 +1375,42 @@ export async function withC5bHarness(
         else delete process.env.JWT_SECRET;
       }
     }
+    // Keep accredited control sessions alive until their SELECT-only fixtures
+    // and the existing dependent fixtures have been removed.
+    const cleanupClient = clients[0];
+    if (cleanupClient && attempted.length) {
+      let safe = false;
+      try {
+        requireC5b(
+          teardown['app.close'] !== 'FAIL',
+          'HTTP close failed; cleanup unsafe',
+        );
+        await checkSessions();
+        safe = true;
+      } catch (error) {
+        errors.push(sanitized(error, 'cleanup boundary'));
+      }
+      if (safe) {
+        const beforeCleanup = errors.length;
+        try {
+          // Failure stops dependent cleanup; do not report a partial cleanup PASS.
+          const fixtureControl = control;
+          if (fixtureControl)
+            await stage('cleanup CaseKits', () =>
+              fixtureControl.cleanupCaseKits(),
+            );
+          await cleanup(cleanupClient.prisma, owned, errors);
+        } catch (error) {
+          errors.push(sanitized(error, 'cleanup'));
+        }
+        teardown.cleanup =
+          errors.length > beforeCleanup
+            ? 'FAIL'
+            : owned.length
+              ? 'PASS'
+              : 'SKIPPED_NO_OWNERS';
+      } else teardown.cleanup = 'SKIPPED_BOUNDARY';
+    }
     // Close additional sessions before the final one-session boundary/residue checks.
     for (const entry of [...clients].reverse().filter((c) => c.kind)) {
       const label =
@@ -1373,27 +1438,11 @@ export async function withC5bHarness(
     controlReady = false;
     const client = clients[0];
     if (client && attempted.length) {
-      let safe = false;
       try {
         await checkSessions();
-        safe = true;
       } catch (error) {
         errors.push(sanitized(error, 'cleanup boundary'));
       }
-      if (safe) {
-        const beforeCleanup = errors.length;
-        try {
-          await cleanup(client.prisma, owned, errors);
-        } catch (error) {
-          errors.push(sanitized(error, 'cleanup'));
-        }
-        teardown.cleanup =
-          errors.length > beforeCleanup
-            ? 'FAIL'
-            : owned.length
-              ? 'PASS'
-              : 'SKIPPED_NO_OWNERS';
-      } else teardown.cleanup = 'SKIPPED_BOUNDARY';
       const beforeResidue = errors.length;
       try {
         await residue(client.prisma, attempted, errors);
@@ -1432,9 +1481,29 @@ export async function runC5bHarnessSmoke(): Promise<void> {
   });
 }
 
-// Pinned from the checked-in requirement/assignment migrations and current
-// Prisma unique keys at 478e0f0; no migration file is loaded during a run.
+// Pinned from checked-in requirement/assignment/CaseKit migrations and Prisma
+// unique keys; no migration file is loaded during a run.
 const requiredChecks = [
+  {
+    table: 'HealthcareCaseKit',
+    name: 'HealthcareCaseKit_preparation_audit_check',
+    expression: `("status" = 'DRAFT' AND "preparedById" IS NULL AND "preparedAt" IS NULL)
+      OR ("status" = 'PREPARED' AND "preparedById" IS NOT NULL AND "preparedAt" IS NOT NULL)`,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    name: 'HealthcareCaseKitItem_source_shape_check',
+    expression: `("requirementId" IS NOT NULL AND "equipmentAssignmentId" IS NULL AND "preparedQuantity" > 0)
+      OR ("requirementId" IS NULL AND "equipmentAssignmentId" IS NOT NULL AND "preparedQuantity" IS NULL)`,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    name: 'HealthcareCaseKitItem_exclusion_audit_check',
+    expression: `("lifecycle" = 'ACTIVE' AND "excludedById" IS NULL AND "excludedAt" IS NULL AND "exclusionReason" IS NULL)
+      OR ("lifecycle" = 'EXCLUDED' AND "excludedById" IS NOT NULL AND "excludedAt" IS NOT NULL
+        AND "exclusionReason" IS NOT NULL AND (char_length(btrim("exclusionReason")) >= 1
+        AND char_length(btrim("exclusionReason")) <= 1000))`,
+  },
   {
     table: coverageNoteTable,
     name: 'HealthcareEquipmentRequirementCoverageNote_comment_check',
@@ -1522,6 +1591,50 @@ const requiredIndexes: Array<{
   unique: boolean;
   predicate: string | null;
 }> = [
+  {
+    table: 'HealthcareCaseKit',
+    columns: ['companyId', 'caseId'],
+    unique: true,
+    predicate: null,
+  },
+  {
+    table: 'HealthcareCaseKit',
+    columns: ['id', 'companyId', 'caseId'],
+    unique: true,
+    predicate: null,
+  },
+  {
+    table: 'HealthcareCaseKit',
+    columns: ['companyId', 'status', 'updatedAt'],
+    unique: false,
+    predicate: null,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    columns: ['id', 'companyId'],
+    unique: true,
+    predicate: null,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    name: 'HealthcareCaseKitItem_requirement_source_key',
+    columns: ['companyId', 'caseKitId', 'requirementId'],
+    unique: true,
+    predicate: `"requirementId" IS NOT NULL AND "lifecycle" = 'ACTIVE'`,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    name: 'HealthcareCaseKitItem_assignment_source_key',
+    columns: ['companyId', 'caseKitId', 'equipmentAssignmentId'],
+    unique: true,
+    predicate: `"equipmentAssignmentId" IS NOT NULL AND "lifecycle" = 'ACTIVE'`,
+  },
+  {
+    table: 'HealthcareCaseKitItem',
+    columns: ['companyId', 'caseKitId', 'lifecycle', 'createdAt'],
+    unique: false,
+    predicate: null,
+  },
   {
     table: coverageNoteTable,
     name: 'HealthcareEquipmentRequirementCoverageNote_open_kind_key',

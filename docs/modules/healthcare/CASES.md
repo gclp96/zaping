@@ -1440,45 +1440,38 @@ Un Equipment puede estar asignado antes de ser entregado físicamente.
 
 86. Case Availability
 
-Equipment Assignment Availability ya considera lifecycle, condition, Assignment
-activa y schedule overlap. La futura Case Availability general podrá considerar:
-
-Equipment lifecycle
-
-Equipment condition
-
-active Assignment
-
-schedule overlap
-
-other blockers
-
-sin almacenar un flag contradictorio independiente.
+Case Availability V1 implementa una proyección derivada e informacional de
+schedule, requirements, coverage, equipment y preparation. Reutiliza Equipment
+Assignment Availability y CaseKit readiness sin almacenar un flag independiente
+ni emitir un veredicto global de disponibilidad o readiness.
 
 ### 86.1 Contrato aprobado V1 — Case-level projection
 
 **HC-CASE-AVL — Case Availability umbrella capability.**
-**Estado: CONTRACT APPROVED / READY FOR IMPLEMENTATION — NOT IMPLEMENTED.**
-Discovery documental sobre `docs/hc-case-availability-contract`, base
+**Estado: PARTIALLY IMPLEMENTED.** HC-CASE-AVL-R está
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING sobre `feat/hc-case-avl-r`, base HEAD
+`d7ce3cade2302e4f2bc75388f2183fa2fc2eef5e`; implementación unstaged/uncommitted.
+El contrato se aprobó en `docs/hc-case-availability-contract`, base
 `25d6017cdedc0036cf981acc095a48151a856533`. COVERAGE-R COMPLETE / MERGED
 (PR #63), COVERAGE-N COMPLETE / MERGED (PR #65), umbrella COVERAGE COMPLETE /
 MERGED; M-HC1 OPEN. DEC-CASE-AVL-01/02/03 aprobadas por producto y registradas
 como autoridad del contrato V1. DEC-C5-COV-01..06 permanecen sin cambios;
-Coverage sigue informacional. Este cierre sólo finaliza documentación.
+Coverage sigue informacional. Este cierre sincroniza documentación y evidencia
+local; no declara R COMPLETE/MERGED ni release/deployment.
 
 Identificadores canónicos aprobados por producto:
 
 | Identificador | Capability / slice | Estado | Estimación |
 |---|---|---|---|
-| HC-CASE-AVL | Case Availability umbrella capability | CONTRACT APPROVED / READY FOR IMPLEMENTATION | — |
-| HC-CASE-AVL-R | Derived Case Availability Read — Backend | READY | TARGET 5 SP |
-| HC-CASE-AVL-UI | Case Availability Summary — Frontend | DEFINED / BLOCKED BY HC-CASE-AVL-R | TARGET 3 SP |
+| HC-CASE-AVL | Case Availability umbrella capability | PARTIALLY IMPLEMENTED | — |
+| HC-CASE-AVL-R | Derived Case Availability Read — Backend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 5 SP |
+| HC-CASE-AVL-UI | Case Availability Summary — Frontend | DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE | TARGET 3 SP |
 
 HC-NEXT-03C3 y HC-NEXT-03B.1 corresponden a Equipment Assignment Availability,
 no a este agregado. `CASE_AVAILABILITY.md` aparece como referencia futura en
 documentos de dominio, pero no existe como archivo. Se usa esta sección existente
 sin asignar Forecast, Commitment, Actual o fechas. La aprobación de identificadores
-cierra la brecha de naming; no implica implementación iniciada. Los encabezados históricos
+cierra la brecha de naming; el estado de implementación vigente es el de la tabla anterior. Los encabezados históricos
 de CASES/CASE_KITS aún describen checkpoints antiguos de HC-OPS-01B; para su estado
 merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actuales.
 
@@ -1486,7 +1479,7 @@ merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actu
 
 | Fuente inspeccionada | Hecho relevante |
 |---|---|
-| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | Case Availability sigue como capability posterior a COVERAGE; M-HC1 OPEN. Discovery inicial sin contrato agregado; §86 registra ahora el contrato V1 aprobado, aún sin implementación. |
+| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | HC-CASE-AVL PARTIALLY IMPLEMENTED; R IMPLEMENTED / LOCAL DoD PASS / PR PENDING; UI bloqueada por R MERGE. M-HC1 OPEN. Contrato aprobado y evidencia local en §86. |
 | [ARCHITECTURE §50](../../architecture/ARCHITECTURE.md), [HEALTHCARE §54](HEALTHCARE.md), [DOMAIN_MODEL §60](DOMAIN_MODEL.md) | Availability contextual al Case/horario pertenece a Healthcare; custody, maintenance, calibration y turnaround son evolución cuando existan. |
 | [EQUIPMENT ERP §49](../erp/EQUIPMENT.md), [evaluator Core](../../../app/api/src/equipment/equipment-availability.evaluator.ts) | Current Asset Availability usa lifecycle/condition; ACTIVE + GOOD no acredita disponibilidad contextual ni física para un Case. |
 | [Case service](../../../app/api/src/healthcare/cases/healthcare-case.service.ts), schema y su spec | Sólo DRAFT/SCHEDULED/CANCELLED. scheduledStart basta para SCHEDULED; scheduledEnd puede faltar. End sin start y end <= start se rechazan. No COMPLETED/CLOSED actual. |
@@ -1497,10 +1490,11 @@ merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actu
 | [Kit readiness/helper](../../../app/api/src/healthcare/case-kits/healthcare-case-kit-readiness.ts), [spec](../../../app/api/src/healthcare/case-kits/healthcare-case-kit-readiness.spec.ts), [Kit service](../../../app/api/src/healthcare/case-kits/healthcare-case-kits.service.ts) | PASS/BLOCKED deriva elegibilidad para confirmar preparación lógica; PREPARED persiste actor/fecha, no disponibilidad física. Kit vacío scheduled sin REQUIRED puede PASS. PREPARED puede después BLOCKED. |
 | [CASE_KITS](CASE_KITS.md), [CASE_LOGISTICS](CASE_LOGISTICS.md), [CASE_CALENDAR](CASE_CALENDAR.md) | Kit lógico no equivale a stock reservado ni custodia. Dispatch/Return/Custody no implementados; Calendar organiza el schedule, no crea otra verdad temporal. |
 
-Búsqueda de discovery en app/web/docs/scripts/public y README: Case Availability,
+Antecedente de discovery en app/web/docs/scripts/public y README: Case Availability,
 availability, readiness, ready, coverage, CaseKit, Preparation, dispatch, custody,
 scheduledStart, scheduledEnd, fullyVerifiable y conflictFree. Se inspeccionaron
-implementaciones, selectores, lifecycle y specs pertinentes; no se ejecutaron tests.
+implementaciones, selectores, lifecycle y specs pertinentes; durante ese discovery
+no se ejecutaron tests. La validación posterior de R se registra en §86.10.
 Los conceptos TARGET en diseños amplios no se consideran capabilities CURRENT.
 
 ### 86.3 Definición canónica y dimensiones
@@ -1545,10 +1539,10 @@ otra decisión explícita sobre completitud, precedencia y reglas de bloqueo.
 No AVAILABLE/PARTIALLY_AVAILABLE/UNAVAILABLE/READY/NOT_READY/NOT_VERIFIABLE canónico
 de Case; UNAVAILABLE sigue siendo válido exclusivamente en Coverage/notes.
 
-### 86.5 Endpoint propuesto y public response V1 final
+### 86.5 Endpoint implementado y public response V1 final
 
 `GET /healthcare/cases/:caseId/availability`, siguiendo controllers Healthcare
-con JWT, RolesGuard y ParseUUIDPipe. No ruta existente equivalente encontrada.
+con JWT, RolesGuard y ParseUUIDPipe, implementado por HC-CASE-AVL-R.
 ADMIN/MANAGER/SALES/WAREHOUSE, como Coverage y CaseKit GET; Company sólo de JWT.
 401 sin JWT, 403 rol no permitido, 400 UUID inválido, mismo 404 público para Case
 missing/foreign; fallos persistence sanitizados. Sin body, query companyId,
@@ -1647,9 +1641,9 @@ No Company advisory lock, FOR UPDATE, claims, auto-resolve, mutaciones de invent
 snapshot persistido o flag nuevo en HealthcareCase. GET refleja hechos actuales
 consistentes, no promete que permanezcan vigentes después de la respuesta.
 
-R hoy abre su propia transacción en findCoverage; no llamar sus endpoints HTTP ni
-combinar GET independientes. La implementación futura debe extraer/reusar su
-proyección interna con tx recibido, manteniendo el wrapper GET R y su contrato.
+R mantiene su propia transacción en findCoverage. Case Availability reutiliza
+findCoverageInSnapshot con el tx compartido; no llama endpoints HTTP ni combina
+GET independientes. El wrapper GET R y su contrato permanecen intactos.
 Para quantitative Coverage, reusar applicableCoverageAssignments y deriveCoverageQuantities;
 para ambas dimensiones, reusar
 evaluateCoverageAssignment, buffers/window/overlap y aggregateRequirementAvailability.
@@ -1712,13 +1706,14 @@ applicable. V1 sólo reporta ausencia; no inventa semántica de aplicabilidad.
 
 No quedan decisiones de producto ni identificadores pendientes para este contrato
 V1. HC-CASE-AVL, HC-CASE-AVL-R y HC-CASE-AVL-UI están aprobados según §86.1;
-su registro no modifica semántica ni implica implementación iniciada.
+su semántica se conserva y el estado vigente de implementación se registra en §86.1.
 
-### 86.9 Slices aprobados, UI mínima y aceptación futura
+### 86.9 Slices aprobados y UI mínima pendiente
 
-HC-CASE-AVL-R — Derived Case Availability Read — Backend: READY — TARGET 5 SP.
+HC-CASE-AVL-R — Derived Case Availability Read — Backend:
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP.
 HC-CASE-AVL-UI — Case Availability Summary — Frontend:
-DEFINED / BLOCKED BY HC-CASE-AVL-R — TARGET 3 SP.
+DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP.
 Son targets provisionales exclusivamente; sin fechas ni valores
 FORECAST/COMMITMENT/ACTUAL asignados. Backend incluye reuse con tx compartido y contratos de
 población/agregación; no separar persistence porque no hay estado nuevo persistido.
@@ -1729,21 +1724,66 @@ blockers locales, notes count; enlaces a Requirements, Coverage/notes, Assignmen
 y CaseKit. Etiquetar ausencia «sin información registrada»; sin badge global verde
 ni CTA de Dispatch. Errores/refresh no deben conservar datos stale como vigentes.
 
-Aceptación futura: tenant/RBAC/foreign=missing; UUID y public JSON; snapshot común
-incluyendo Kit y cambios concurrentes; cero writes/locks; cero Requirements/kit/
-reservas; start sin end; REQUIRED/BACKUP y tracking distintos; DIRECT con conflicto
-o incertidumbre afecta sólo Equipment y nunca Coverage; RELEASED/REPLACED excluidas;
-Asset no elegible no reduce población diagnóstica, pero sí coverage efectiva;
-nominal vs efectivo; notes stale y no auto-resolve; COVERED incierto o
-conflictivo; override parcial/stale/completo; cancel/retire/reactivate; PREPARED
-con readiness BLOCKED; SERIALIZED y EXCLUDED. Regresión de R y helper readiness.
-Tests/HTTP/JWT/PostgreSQL pertinentes se planifican para implementación; no se
-ejecutan ni se declaran PASS durante esta finalización documental.
+La aceptación persistida de R valida la proyección integrada con HTTP/JWT reales,
+dos tenants, horarios completos/incompletos, ACTIVE REQUIRED/BACKUP y RETIRED
+excluidos; Coverage COVERED/PARTIAL/PENDING/UNAVAILABLE y notes activas/resueltas,
+con comparación contra COVERAGE-R. Incluye RESERVED REQUIREMENT/DIRECT,
+RELEASED/REPLACED excluidas, conflicto temporal con override vigente e
+incertidumbre; DIRECT afecta Equipment y nunca cantidades Coverage. Kit/Items
+persistidos acreditan readiness PASS/BLOCKED, EXCLUDED y ausencia de Kit;
+cero Requirements se representa con counts cero. No hay claim de concurrencia.
 
-**Actividad DB durante discovery/finalización: NONE.** Sólo documentación;
-siguiente acción: revisión humana → staging selectivo → commit → docs PR.
-HC-CASE-AVL-R queda READY para posterior planificación de implementación backend. ROADMAP y
-CHANGELOG no se actualizan; no se declara capability COMPLETE ni se cierra M-HC1.
+### 86.10 HC-CASE-AVL-R — Local DoD / PR pending
+
+**IMPLEMENTED / LOCAL DoD PASS / PR PENDING.** Snapshot RepeatableRead único,
+TransactionClient compartido para todos los inputs materiales, reuse de
+Coverage-R, Assignment Availability y evaluateHealthcareCaseKitReadiness sin
+fórmulas duplicadas. Sin advisory lock, FOR UPDATE, writes o auto-resolution.
+JSON compacto de cinco dimensiones, sin campos privados de persistencia.
+
+Evidencia previa conservada, sin reruns durante este cierre:
+
+- Focal inicial Availability/Coverage/Assignment/readiness: 202 tests / 10 suites PASS.
+- Availability: 34 tests / 2 suites PASS; helpers puros C5-B: 94 tests / 4 suites PASS.
+- Full API: 1786 tests / 108 suites PASS.
+- lint:check, typecheck, build, Prisma validate/generate, focal noEmit,
+  Prettier y git diff --check PASS; disabled-mode safe skip PASS.
+- PostgreSQL HC-CASE-AVL-R: 1 suite / 1 test PASS, aproximadamente 27 s total.
+
+Comando focal acreditado desde `app/api`:
+
+```sh
+npm run test:e2e -- --runInBand test/healthcare-case-availability.c5b.postgres.e2e-spec.ts
+```
+
+Suite: `HC-CASE-AVL-R HTTP/JWT persisted read (no concurrency claim)`.
+Test: `projects owned persisted dimensions, isolates tenants and performs zero writes`.
+Sólo DB dedicada `127.0.0.1:5434/zaping_spike_test`, rol aplicación `zaping_hc_c5b`.
+ACL adicional: SELECT únicamente en HealthcareCaseKit y HealthcareCaseKitItem;
+sin INSERT/UPDATE/DELETE ni otros write privileges de aplicación en esas tablas.
+La ACL previa de CoverageNote permanece sin cambios. No implica migración ni
+deployment productivo.
+
+Harness C5-B existente, sin segundo harness. Operador/control acreditado crea y
+limpia sólo fixtures propios; no representa autorización de aplicación ni
+expansión de privilegios para setup. Cleanup: CaseKitItem → CaseKit → dependencias
+existentes; sesiones desconocidas siguen rechazándose. Tras desconectar control,
+checks finales de sesiones y zero-residue. Teardown acreditado:
+`[control.disconnect] PASS`, `[concurrency.disconnect] PASS`.
+
+Comparación persistida antes/después acredita zero-write en Case, Requirements,
+Assignments, ConflictOverrides, CoverageNotes, CaseKit/Items, Assets e
+IdempotencyRecord, además de Product/stock y settings. InventoryBatch y
+InventoryMovement observados por control sin nuevos grants de aplicación.
+Sin mutaciones de inventario ni resolución automática de notes.
+
+Después del runtime, RUN_HC_C5B_POSTGRES_TESTS, HC_C5B_DATABASE_URL y
+HC_C5B_OPERATOR_DATABASE_URL ausentes; los tres Test-Path devolvieron False.
+Este cierre registra la evidencia suministrada, sin reejecutar gates ni conectar DB.
+**Actividad DB durante este cierre: NONE.**
+HC-CASE-AVL PARTIALLY IMPLEMENTED; UI DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE;
+M-HC1 OPEN. Siguiente acción: revisión humana → staging selectivo → commit → PR.
+R permanece PR PENDING hasta merge; no se declara COMPLETE/MERGED.
 
 87. Equipment conflict CURRENT
 

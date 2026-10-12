@@ -57,6 +57,7 @@ import {
 import {
   createEquipmentAssignmentConflictReviewFingerprint,
   deriveEquipmentAssignmentOperationalWindow,
+  INCOMPLETE_CASE_SCHEDULE_WARNING,
   EquipmentAssignmentBuffers,
   createEquipmentAssignmentReplaceConflictReviewFingerprint,
   equipmentAssignmentWindowsOverlap,
@@ -1858,12 +1859,7 @@ export class HealthcareEquipmentAssignmentsService {
       return {
         fullyVerifiable: false,
         conflictFree: null,
-        warnings: [
-          {
-            code: 'INCOMPLETE_CASE_SCHEDULE',
-            message: 'La disponibilidad requiere revisar el horario del caso',
-          },
-        ],
+        warnings: [{ ...INCOMPLETE_CASE_SCHEDULE_WARNING }],
       };
     }
 
