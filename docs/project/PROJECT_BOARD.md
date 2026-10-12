@@ -2313,8 +2313,8 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 → HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 → HC-CASE-AVL — Case Availability — PARTIALLY IMPLEMENTED
-→ HC-CASE-AVL-R — Derived Case Availability Read — Backend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP
-→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP
+→ HC-CASE-AVL-R — Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
+→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — READY — TARGET 3 SP
 
 DEFERRED
 
@@ -3246,14 +3246,15 @@ sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
 #### HC-CASE-AVL — Case Availability
 
 Estado: PARTIALLY IMPLEMENTED. M-HC1 OPEN.
-R IMPLEMENTED / LOCAL DoD PASS / PR PENDING; sin declarar COMPLETE/MERGED.
-Rama `feat/hc-case-avl-r`, base HEAD `d7ce3cade2302e4f2bc75388f2183fa2fc2eef5e`;
-implementación unstaged/uncommitted. UI pendiente del merge de R.
+R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS.
+Feature commit: `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`;
+merge en main: `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
+HC-CASE-AVL-UI READY — TARGET 3 SP, implementación no iniciada.
 
 | Slice | Estado | Estimación |
 |---|---|---|
-| HC-CASE-AVL-R — Derived Case Availability Read — Backend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 5 SP |
-| HC-CASE-AVL-UI — Case Availability Summary — Frontend | DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE | TARGET 3 SP |
+| HC-CASE-AVL-R — Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
+| HC-CASE-AVL-UI — Case Availability Summary — Frontend | READY | TARGET 3 SP |
 
 Contrato aprobado y autoridad DEC-CASE-AVL-01/02/03:
 [CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
@@ -3276,10 +3277,11 @@ en CaseKit/Item, sin write privileges de aplicación. Fixtures propios mediante
 control acreditado; cleanup Item → Kit → dependencias, sesiones desconocidas
 rechazadas, control.disconnect/concurrency.disconnect PASS y zero-residue.
 Opt-in y URLs aplicación/operador ausentes después (tres Test-Path False).
-Comando, alcance y evidencia en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--local-dod--pr-pending).
+Comando, alcance y evidencia en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--post-merge-closeout).
 Actividad DB durante cierre: NONE; sin reruns ni deployment.
+Sólo backend read merged; sin cambio de schema, migration o ACL de producción.
 TARGET exclusivamente; sin Forecast, Commitment, Actual o fechas asignados.
-Siguiente acción: revisión humana → staging selectivo → commit → PR.
+Siguiente acción documental: revisión humana → staging selectivo → commit → docs PR.
 
 #### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 

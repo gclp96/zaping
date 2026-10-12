@@ -125,9 +125,9 @@ HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — COMPLETE / 
 ↓
 HC-CASE-AVL Case Availability — PARTIALLY IMPLEMENTED
 ↓
-HC-CASE-AVL-R Derived Case Availability Read — Backend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP
+HC-CASE-AVL-R Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
 ↓
-HC-CASE-AVL-UI Case Availability Summary — Frontend — DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP
+HC-CASE-AVL-UI Case Availability Summary — Frontend — READY — TARGET 3 SP
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -1236,10 +1236,12 @@ Assignment
 Custody
 9.8 Case Availability
 HC-CASE-AVL: PARTIALLY IMPLEMENTED; M-HC1 OPEN.
-HC-CASE-AVL-R: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP.
-HC-CASE-AVL-UI: DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP.
-No se declara R ni umbrella COMPLETE/MERGED; sin Forecast/Commitment/Actual
-o fechas asignados.
+HC-CASE-AVL-R: COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
+HC-CASE-AVL-UI: READY — TARGET 3 SP.
+CI de R PASS; umbrella permanece PARTIALLY IMPLEMENTED porque UI sigue pendiente.
+UI READY, implementación no iniciada; sin Forecast/Commitment/Actual o fechas asignados.
+R merged mediante PR #69; feature commit `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`,
+merge commit `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
 
 R implementa GET /healthcare/cases/:caseId/availability: proyección derivada e
 informacional de schedule, requirements, coverage, equipment y preparation.
@@ -1253,9 +1255,10 @@ DoD local y PostgreSQL focal HC-CASE-AVL-R 1 suite / 1 test PASS (~27 s),
 sin claim de concurrencia. Sólo spike 127.0.0.1:5434/zaping_spike_test:
 SELECT-only CaseKit/Item para zaping_hc_c5b; fixtures/cleanup propios mediante
 operador acreditado, sin ampliar permisos de escritura de aplicación.
-Evidencia completa y comando en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--local-dod--pr-pending)
-y estado operativo en PROJECT_BOARD. UI espera merge de R.
+Evidencia completa y comando en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--post-merge-closeout)
+y estado operativo en PROJECT_BOARD. Dependencia R merge satisfecha; UI READY — TARGET 3 SP.
 Actividad DB durante cierre documental: NONE; sin reruns, release ni deployment.
+Sin cambio de schema/migration ni ACL de producción.
 
 Current Equipment Availability ya está implementado en ERP Core.
 

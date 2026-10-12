@@ -10,13 +10,15 @@
 
 ## Unreleased
 
-### HC-CASE-AVL-R — cierre Local DoD / PR PENDING
+### HC-CASE-AVL-R — cierre DoD / MERGED
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP.
-HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI DEFINED / BLOCKED BY
-HC-CASE-AVL-R MERGE — TARGET 3 SP. M-HC1 OPEN. Implementación unstaged/uncommitted
-en `feat/hc-case-avl-r`, base `d7ce3cade2302e4f2bc75388f2183fa2fc2eef5e`.
-Sin declarar COMPLETE/MERGED, release o deployment.
+**Estado:** COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
+CI PASS. Merge mediante PR #69; feature commit
+`6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`, merge commit en main
+`59d5aae1efa02aa53153bd0de03552d0679df7d6`.
+HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI READY — TARGET 3 SP,
+implementación no iniciada. M-HC1 OPEN. Sólo backend read COMPLETE / MERGED;
+sin release, deployment, cambio de schema/migration ni ACL de producción.
 
 Implementado GET /healthcare/cases/:caseId/availability con summaries compactos
 schedule, requirements, coverage, equipment y preparation. ADMIN/MANAGER/SALES/
