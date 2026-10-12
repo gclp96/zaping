@@ -3147,12 +3147,14 @@ Checklist y evidencia exacta:
 Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
 documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
 Después de C5-B MERGED: COVERAGE parcialmente implementado; R COMPLETE / MERGED
-mediante PR #63; N READY — 5 SP. Sin cambios SP, Forecast o Commitment.
+mediante PR #63; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
+Sin cambios SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
 Estado: PARTIALLY IMPLEMENTED / CONTRACT APPROVED — DEC-C5-COV-01–05 aprobadas por Leo.
-R COMPLETE / MERGED; N READY, sin implementar.
+R COMPLETE / MERGED; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING.
+Umbrella pendiente de merge de N; no COMPLETE / MERGED.
 Capability de dominio fuera de C5-A/B; no campaña de test coverage. M-HC1 OPEN.
 Cantidad y certainty separadas; COVERED no certifica readiness/availability.
 Notes sólo se resuelven explícitamente; stale conservadas sin cambiar counts.
@@ -3197,10 +3199,11 @@ la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
 ##### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-Estado: READY — 5 SP; dependencia R merge satisfecha por PR #63. Goal: create/resolve auditable explícito.
-Dependencias/DoR: R merged y contrato aprobado; listo para implementación.
-Scopes create/resolve y migration mínima se revisarán/implementarán dentro de N;
-ACL exacto debe revisarse antes de runtime. Scope: dos POST,
+Estado: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
+dependencia R merge satisfecha por PR #63. Goal: create/resolve auditable explícito.
+Dependencias/DoR: R merged y contrato aprobado; aceptación PostgreSQL PASS.
+Scopes create/resolve y migration mínima aplicados; ACL de aceptación validado.
+Scope: dos POST,
 contexto/kind/comment, auditoría inmutable, active uniqueness, replay/reuse,
 concurrencia/rollback, tenant/RBAC y readback R. AC: UNAVAILABLE sólo cero;
 PARTIAL_CONTEXT sólo parcial; contexto inválido zero-write; nunca auto-resolve;
@@ -3211,10 +3214,26 @@ inventario. Non-goals: PUT/DELETE API, notes genéricas, blocking o frontend.
 DoD: migration, unit/HTTP/JWT/PostgreSQL, concurrencia material, rollback/replay,
 cleanup/residue/invariantes, gates generales/estáticos, docs, CI y merge.
 
-R reutiliza CoverageNote y harness C5-B; ACL SELECT/INSERT/DELETE aplicado, sin
-UPDATE. Impactos futuros de N: scopes nuevos de IdempotencyScope y migration
-mínima revisada; UPDATE sólo resolvedAt/resolvedById requiere revisión futura.
-Sin status cache ni tabla nueva. Este cierre documental no ejecuta grants ni N.
+R reutiliza CoverageNote y harness C5-B. N incorpora los scopes
+HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_CREATE y HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_RESOLVE;
+migration 20261009000000_add_coverage_note_idempotency_scopes aplicada, schema al día.
+ACL sólo zaping_hc_c5b en 127.0.0.1:5434/zaping_spike_test: UPDATE de tabla=false,
+resolvedAt/resolvedById=true; SELECT/INSERT/DELETE no delegables, sin UPDATE lifecycle.
+DEC-C5-COV-06 IMPLEMENTED / VALIDATED: CREATE exige Case no CANCELLED y Requirement
+ACTIVE (409 zero-write); RESOLVE y replay completado siguen permitidos tras
+CANCELLED/RETIRED. Primer audit preservado; note antigua no resuelve sucesora.
+Concurrencia material PASS: dos PID de aplicación y un PID control acreditados,
+Company advisory lock determinista observado con pg_stat_activity/pg_locks;
+sesiones desconocidas rechazadas. CREATE: éxito + 409 sanitizado; RESOLVE: primer audit.
+Control sólo infraestructura de test/fixtures, sin autorización productiva;
+desconectado antes de checks finales, sin credenciales documentadas/committed.
+Evidencia acreditada: focal 386; helpers 75; full API 1752 tests / 106 suites;
+Prisma validate/generate, lint/typecheck/build, noEmit, Prettier TS y diff-check PASS;
+disabled-mode safe skip; PostgreSQL N PASS — 1 suite / 1 test (~43.247 s).
+control.disconnect y concurrency.disconnect PASS; opt-in y URLs de runtime/control
+ausentes después. Evidencia detallada/comando en diseño §34.5.3; sin reruns.
+Sin status cache ni tabla nueva. Actividad DB durante cierre: NONE. M-HC1 OPEN.
+Siguiente: revisión humana → staging selectivo → commit → PR; merge aún pendiente.
 Orden: R → N → futuros slices C6 que requieran coverage. Estimaciones 5+5 SP,
 sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
 

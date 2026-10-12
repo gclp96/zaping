@@ -2389,13 +2389,15 @@ Prisma ni PostgreSQL. No se recomienda corrección especulativa de lifecycle.
 frontend, Case Availability general, fuzzy search, permission-based RBAC,
 Dispatch/Custody, efectos físicos y staging/producción. M-HC1 sigue abierto.
 Después de C5-B MERGED, HC-NEXT-03C5-COVERAGE está PARTIALLY IMPLEMENTED:
-COVERAGE-R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS. N READY — 5 SP.
+COVERAGE-R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
+N IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
 
 ### 34.5.3 HC-NEXT-03C5-COVERAGE
 
 **Estado:** PARTIALLY IMPLEMENTED / CONTRACT APPROVED — decisiones explícitas de Leo,
 09-oct-2026. R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS (5 SP); CI PASS.
-N READY (5 SP), sin implementar; dependencia R merge satisfecha. M-HC1 OPEN.
+N IMPLEMENTED / LOCAL DoD PASS / PR PENDING (5 SP); dependencia R merge satisfecha.
+Umbrella pendiente de merge de N; no COMPLETE / MERGED. M-HC1 OPEN.
 Fuera de C5-A/C5-B y requisito para futuros
 slices C6 que dependan de esta capability; no bloquea C6-A/B/C/D/E ya merged.
 No es una campaña de cobertura de tests.
@@ -2446,6 +2448,22 @@ Decisión explícita aprobada por Leo; 05.5 final sustituye la formulación prev
   Incertidumbre puede coexistir con CURRENT + OVERRIDE cuando todos los conflictos
   actuales están confirmados. El comportamiento individual existente (CURRENT +
   OVERRIDE cuando al menos un conflicto está confirmado) permanece intacto.
+
+#### DEC-C5-COV-06 — CoverageNote Parent Lifecycle
+
+**Estado: IMPLEMENTED / VALIDATED.** CREATE requiere Case distinto de CANCELLED y
+Requirement ACTIVE; de lo contrario 409 sanitizado sin note ni claim completado
+ni efectos Assignment/inventario. RESOLVE permanece permitido con Case CANCELLED
+o Requirement RETIRED, validando tenant y relación exacta Case → Requirement →
+Note. Missing/foreign/relación inválida conservan el mismo 404 público.
+Registro y primer resolvedAt/resolvedById son inmutables; resolver una note
+antigua no afecta a su sucesora.
+
+Un replay COMPLETED con la misma key y command normalizado devuelve el resultado
+original aunque luego cambie el lifecycle. Se validan tenant/relaciones sin
+permitir replay cross-tenant. Key reutilizada con command distinto: 409.
+Nueva key CREATE tras cancelación/retiro: 409; nueva key RESOLVE sigue permitida.
+Acceptance de N validó ambos padres, zero-write, replays, audit y relaciones.
 
 #### Agregado, proyección y cantidades
 
@@ -2513,9 +2531,10 @@ por este cierre; implementación sigue convenciones y sólo permite ajuste nomin
 GET implementado sigue Controller → Service → Repository → Prisma. Usa
 RepeatableRead y el mismo TransactionClient para todos los inputs materiales de
 Requirements/Assignments/notes/availability. Sin Company advisory lock, write
-locks ni writes en GET. Commands futuros de N: una transacción
+locks ni writes en GET. Commands implementados de N: una transacción
 para claim, lifecycle/context vigente, create/resolve y finalización del claim;
-Company → Case → Requirement → Note, sin Asset locks para commands de notes.
+Company advisory lock → Case FOR UPDATE → Requirement FOR UPDATE → Note FOR UPDATE
+cuando corresponde, sin Asset locks para commands de notes.
 Unique parcial es defensa final de notas activas duplicadas.
 
 Create: misma key+command normalizado reproduce note; distinto command 409.
@@ -2524,7 +2543,7 @@ Resolve: replay mismo resultado; repetición nunca sobrescribe primer actor/fech
 Note identity inmutable: sin fingerprint Availability para resolver. No claims
 parciales tras rollback. GET/commands no mutan Assignments ni inventario.
 
-#### Persistencia y harness: R validado; impactos futuros de N
+#### Persistencia y harness: R y N validados
 
 R reutiliza el modelo existente, sin cambio de Prisma schema ni migration,
 sin nueva tabla ni status persistido. Acceptance PASS con withC5bHarness,
@@ -2535,9 +2554,11 @@ antes de Requirements/Users; sin segundo harness ni ampliación de ownership.
 Delta ACL aplicado al rol de test: SELECT, INSERT y DELETE sobre
 public."HealthcareEquipmentRequirementCoverageNote". **No UPDATE**.
 ACL exclusivo del rol de test C5-B; no implica autorización de producción.
-N requiere scopes explícitos de IdempotencyScope para create/resolve y migration
-mínima revisada. UPDATE sólo resolvedAt/resolvedById es una necesidad futura de
-N, sujeta a revisión de ACL; no forma parte del delta aplicado de R.
+N incorpora los scopes explícitos de IdempotencyScope para create/resolve y la
+migration aplicada `20261009000000_add_coverage_note_idempotency_scopes`.
+El delta posterior de N concede UPDATE sólo en resolvedAt/resolvedById al rol
+de aceptación dedicado; UPDATE de tabla sigue false, sin permisos de lifecycle.
+SELECT/INSERT/DELETE existentes permanecen no delegables. No autoriza producción.
 
 #### HC-NEXT-03C5-COVERAGE-R — Derived Requirement Coverage Read — 5 SP
 
@@ -2585,16 +2606,16 @@ Evidencia proporcionada por el checkpoint; este cierre documental no reejecuta
 tests ni conecta DB. Sin actividad staging/producción ni deployment.
 R COMPLETE / MERGED — PR #63 — main@d63b8fe — DoD PASS; CI PASS.
 La evidencia local anterior al merge se conserva. Umbrella PARTIALLY IMPLEMENTED;
-N READY, sin implementar; M-HC1 OPEN.
+N IMPLEMENTED / LOCAL DoD PASS / PR PENDING; M-HC1 OPEN.
 
 #### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-**Estado:** READY — 5 SP; dependencia R merge satisfecha mediante PR #63. Goal: create/resolve explícitos con
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
+dependencia R merge satisfecha mediante PR #63. Goal: create/resolve explícitos con
 auditoría. Scope: dos POST, contexto, inmutabilidad, unicidad activa, idempotencia,
 replay/reuse, concurrencia, rollback, tenant/RBAC y readback R.
-**Dependencias/DoR:** R merged y contrato aprobado; listo para implementación.
-Scopes de IdempotencyScope y migration se implementarán/revisarán como parte de
-N; delta ACL exacto debe revisarse antes de su runtime.
+**Dependencias/DoR:** R merged y contrato aprobado; implementación y aceptación
+PostgreSQL locales validadas, scopes/migration y delta ACL de aceptación aplicados.
 No requiere otro ticket genérico de persistencia.
 
 **AC:** (1) UNAVAILABLE sólo assignedQty=0; (2) PARTIAL_CONTEXT sólo 0<assignedQty<q;
@@ -2610,6 +2631,128 @@ blocking workflows, frontend o nuevo status persistido.
 rollback/idempotencia, cleanup/residue, invariantes físicas, gates estáticos/
 generales, docs, CI y merge. Fixtures: Requirements cero/parcial/suficiente,
 notes históricas/sucesoras, actores A/B, carreras create/resolve y parent lifecycle.
+
+#### COVERAGE-N — implementación y aceptación PostgreSQL validadas
+
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING. Los dos POST reutilizan la proyección
+pública de notes de R. CREATE responde
+201 (también replay), RESOLVE 200. Comment usa trim existente, sin máximo nuevo.
+Controller → Service → Repository → Prisma; Company advisory lock y presupuestos
+de transacción existentes, después Case → Requirement → Note cuando corresponde.
+Contexto usa la misma población efectiva y derivación de cantidades de R.
+No locks Asset ni mutaciones físicas. Invalid context/lifecycle no crea claim.
+Claims y mutación/finalización están en una sola transacción; índice unique
+parcial sigue siendo defensa final, con conflicto sanitizado.
+
+Scopes: HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_CREATE y
+HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_RESOLVE. Hash SHA-256 del command normalizado:
+CREATE {caseId,requirementId,kind,comment}; RESOLVE {caseId,requirementId,noteId}.
+Actor y timestamps no participan. resourceId identifica el resultado completado
+según la convención existente. Replay CREATE recompone el registro original con
+resolvedAt/resolvedBy null, incluso tras resolución; RESOLVE devuelve el primer
+audit preservado. Ambos validan tenant/relaciones antes de devolver el recurso.
+
+Migration aplicada: `20261009000000_add_coverage_note_idempotency_scopes`, sólo
+dos ALTER TYPE ADD VALUE. Prisma: **Database schema is up to date.**
+IdempotencyScope contiene exactamente los dos valores nuevos de N indicados arriba.
+No nueva tabla ni cambio de CoverageNote.
+El manifest C5-B exige ambos scopes y UPDATE únicamente en resolvedAt/resolvedById;
+no relaja ownership, exclusividad, diagnóstico, cleanup o residue. ACL **APPLIED**
+al rol dedicado zaping_hc_c5b en 127.0.0.1:5434/zaping_spike_test exclusivamente:
+UPDATE de tabla=false; UPDATE resolvedAt=true y resolvedById=true.
+SELECT/INSERT/DELETE existentes no delegables; sin UPDATE de lifecycle.
+IdempotencyRecord conserva sus permisos existentes; ampliar etiquetas de su enum
+no requiere permisos adicionales de tabla/columnas para el rol de test.
+
+Acceptance PASS en
+`app/api/test/healthcare-equipment-coverage-notes.c5b.postgres.e2e-spec.ts`, con el
+harness C5-B existente, opt-in de control sólo para N. Dos backends de aplicación
+zaping_hc_c5b y uno de operador se acreditan con tres PID distintos, identidad
+estable y rechazo de cualquier sesión desconocida. El modo normal conserva un
+solo backend. El operador usa HC_C5B_OPERATOR_DATABASE_URL, sin credenciales
+hardcoded: PostgreSQL, 127.0.0.1:5434/zaping_spike_test, usuario distinto del rol
+aplicación, password no vacío, sin query/hash; pool=1 y schema=public impuestos.
+La identidad conectada exige database/user/session_user/schema, puerto interno
+5432, PostgreSQL 16, dirección interna válida y PID positivo/estable.
+Default/disabled no construye clientes ni requiere la URL del operador.
+
+El control adquiere el mismo advisory lock de Company derivado por producción.
+Un rendezvous de despacho exclusivo del test permite completar ambos JWT antes
+de abrir dos transacciones reales con el repositorio y lock productivos. Mediante
+pg_stat_activity/pg_locks, el operador exige ambos PID de aplicación esperando
+el bigint lock exacto y su propio lock concedido; plazo acotado, sin sleeps como
+evidencia. Sólo entonces libera el blocker. CREATE exige un 201, un 409, una note,
+claim ganador completado y ningún claim perdedor; RESOLVE simultáneo exige igual
+primer audit persistido para ambos actores y ambos claims completados.
+
+DEC-C5-COV-06 se validó con CREATE HTTP real y note/claim completado persistidos;
+el operador transiciona fixtures propios DRAFT/ACTIVE sin assignments a CANCELLED
+o RETIRED, con fecha, actor propietario existente y motivo explícito de fixture.
+Se revalida Company y relación Case/Requirement antes del cambio. Replay HTTP
+con la misma clave devuelve el resultado original; clave nueva devuelve 409 sin
+note ni claim nuevos. RESOLVE y su replay preservan el primer audit. El operador
+no ejecuta comandos, claims, RBAC ni genera respuestas de negocio.
+
+El dispatcher se restaura y requests se drenan incluso ante fallo de observación.
+Las sesiones adicionales se desconectan antes de validación final de sesiones,
+cleanup y residue; fallo de cierre se reporta sanitizado y no permite cleanup
+con exclusividad inválida. El reporte de teardown distingue control.disconnect
+y concurrency.disconnect. La ACL de aplicación no incorpora UPDATE de lifecycle.
+Inyección de fallo al finalizar claims conserva pruebas de rollback de INSERT y
+resolución. Runtime PostgreSQL **PASS — 1 suite / 1 test**, con concurrencia
+material validada: dos PID de aplicación acreditados y un PID operador/control,
+bloqueo determinista de Company observado con pg_stat_activity/pg_locks;
+sin prueba basada sólo en tiempos y con rechazo de sesiones desconocidas.
+Control exclusivo de infraestructura de test y fixtures; no es una vía de
+autorización de aplicación ni capacidad productiva. Credenciales no documentadas
+ni incorporadas al repositorio; sesiones desconectadas antes de checks finales.
+
+P2002 sólo se traduce a 409 para el índice exacto
+HealthcareEquipmentRequirementCoverageNote_open_kind_key (modelName ausente o
+el modelo CoverageNote exacto), o target de los tres campos exactos companyId,
+requirementId,kind con modelName HealthcareEquipmentRequirementCoverageNote.
+Otro constraint/modelo, target incompleto/malformado o metadatos ausentes produce
+el error de persistencia 500 sanitizado; no expone diagnóstico crudo.
+
+**Evidencia acreditada para cierre local (12-oct-2026):**
+
+| Gate | Resultado |
+|---|---|
+| Prisma validate / generate | PASS / PASS |
+| Focal Equipment Assignments | PASS — 386 tests |
+| C5-B pure helper specs | PASS — 75 tests |
+| Full API | PASS — 1752 tests / 106 suites |
+| Lint / typecheck / build | PASS / PASS / PASS |
+| TypeScript focal noEmit | PASS |
+| Prettier check de TS modificados | PASS |
+| PostgreSQL disabled-mode | Safe skip |
+| git diff --check previo | PASS |
+| PostgreSQL COVERAGE-N acceptance | PASS — 1 suite / 1 test; ~43.247 s |
+
+Comando acreditado desde app/api:
+
+```text
+npm run test:e2e -- --runInBand test/healthcare-equipment-coverage-notes.c5b.postgres.e2e-spec.ts
+```
+
+Test: `HC-NEXT-03C5-COVERAGE-N HTTP/JWT persisted commands` — atomic notes,
+idempotency, concurrent duplicate requests, tenant/RBAC, audit y R readback.
+CREATE duplicate race: un éxito y un 409 sanitizado. RESOLVE concurrente/repetido
+preserva primer resolvedAt/resolvedById; una note antigua nunca cierra sucesora.
+Invalid context/lifecycle: 409 zero-write; replay completado conserva resultado
+tras CANCELLED/RETIRED. RESOLVE sigue permitido tras ambos cambios de lifecycle.
+
+Teardown acreditado: `[control.disconnect] PASS` y
+`[concurrency.disconnect] PASS`. Cleanup posterior: RUN_HC_C5B_POSTGRES_TESTS,
+HC_C5B_DATABASE_URL y HC_C5B_OPERATOR_DATABASE_URL ausentes.
+
+La aceptación utilizó sólo 127.0.0.1:5434/zaping_spike_test. Este cierre registra
+la evidencia suministrada; no reejecuta gates costosos ni aceptación PostgreSQL.
+**Actividad de base de datos durante este cierre: NONE.**
+R COMPLETE / MERGED; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING.
+Umbrella PARTIALLY IMPLEMENTED / CONTRACT APPROVED, pendiente de merge de N;
+M-HC1 OPEN. Siguiente acción: revisión humana → staging selectivo → commit → PR.
+No declarar N ni umbrella COMPLETE / MERGED hasta merge de PR.
 
 ## 34.6 HC-NEXT-03C6 — Frontend Equipment Assignment
 

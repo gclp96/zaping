@@ -11,6 +11,10 @@ import {
 import { createHash } from 'node:crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../common/healthcare-subsequent-transaction-timeouts';
+import { HealthcareCompanyTransactionTimeoutPolicy } from '../common/healthcare-company-transaction-timeout-policy';
+import { HealthcareEquipmentRequirementCoverageNoteKind } from '@prisma/client';
 
 export const EQUIPMENT_ASSIGNMENT_SETTINGS_LOCK_NAMESPACE =
   'healthcare-equipment-assignment-settings:v1';
@@ -162,6 +166,103 @@ export const coverageNotePublicSelect = {
 @Injectable()
 export class HealthcareEquipmentAssignmentsRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  runCoverageNoteCommand<T>(
+    companyId: string,
+    policy: HealthcareCompanyTransactionTimeoutPolicy,
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ) {
+    return this.runInTransaction(
+      async (tx) => {
+        await acquireHealthcareCompanyLock(tx, companyId, {
+          acquisitionTimeoutMs: policy.companyLockAcquisitionTimeoutMs,
+        });
+        await applyHealthcareSubsequentTransactionTimeouts(tx, policy);
+        return operation(tx);
+      },
+      {
+        maxWait: policy.prismaMaxWaitMs,
+        timeout: policy.prismaTransactionTimeoutMs,
+      },
+    );
+  }
+
+  async lockCoverageCase(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    caseId: string,
+  ) {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareCase" WHERE "id" = ${caseId} AND "companyId" = ${companyId} FOR UPDATE
+    `);
+    return rows.length === 1;
+  }
+
+  async lockCoverageNote(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    requirementId: string,
+    noteId: string,
+  ) {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      SELECT "id" FROM "HealthcareEquipmentRequirementCoverageNote"
+      WHERE "id" = ${noteId} AND "companyId" = ${companyId} AND "requirementId" = ${requirementId} FOR UPDATE
+    `);
+    return rows.length === 1;
+  }
+
+  findCoverageNote(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    requirementId: string,
+    noteId: string,
+  ) {
+    return tx.healthcareEquipmentRequirementCoverageNote.findFirst({
+      where: { id: noteId, companyId, requirementId },
+      select: coverageNotePublicSelect,
+    });
+  }
+
+  findActiveCoverageNote(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    requirementId: string,
+    kind: HealthcareEquipmentRequirementCoverageNoteKind,
+  ) {
+    return tx.healthcareEquipmentRequirementCoverageNote.findFirst({
+      where: { companyId, requirementId, kind, resolvedAt: null },
+      select: { id: true },
+    });
+  }
+
+  createCoverageNote(
+    tx: Prisma.TransactionClient,
+    data: {
+      companyId: string;
+      requirementId: string;
+      kind: HealthcareEquipmentRequirementCoverageNoteKind;
+      comment: string;
+      recordedById: string;
+    },
+  ) {
+    return tx.healthcareEquipmentRequirementCoverageNote.create({
+      data,
+      select: coverageNotePublicSelect,
+    });
+  }
+
+  resolveCoverageNote(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    requirementId: string,
+    noteId: string,
+    resolvedById: string,
+  ) {
+    return tx.healthcareEquipmentRequirementCoverageNote.updateMany({
+      where: { id: noteId, companyId, requirementId, resolvedAt: null },
+      data: { resolvedAt: new Date(), resolvedById },
+    });
+  }
 
   runInReadSnapshot<T>(
     operation: (transaction: Prisma.TransactionClient) => Promise<T>,

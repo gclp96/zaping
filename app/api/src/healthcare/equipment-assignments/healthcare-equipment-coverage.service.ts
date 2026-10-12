@@ -6,13 +6,31 @@ import {
   healthcarePersistenceException,
 } from '../common/healthcare-errors';
 import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-assignments.service';
-import { HealthcareEquipmentAssignmentsRepository } from './healthcare-equipment-assignments.repository';
+import {
+  HealthcareEquipmentAssignmentsRepository,
+  HealthcareEquipmentAssignmentRecord,
+} from './healthcare-equipment-assignments.repository';
 import {
   resolveEquipmentAssignmentBuffers,
   equipmentAssignmentAssetIsEligible,
 } from './healthcare-equipment-assignment-availability';
 import { aggregateRequirementAvailability } from './healthcare-equipment-coverage-availability';
 import { HealthcareEquipmentCoverageNotesQueryDto } from './dto/healthcare-equipment-coverage-notes-query.dto';
+
+// Shared effective population for reads and note commands; nominal queries
+// already restrict Company/Case/Requirement, REQUIREMENT and RESERVED.
+export function applicableCoverageAssignments(
+  records: HealthcareEquipmentAssignmentRecord[],
+  requirements: Array<{ id: string; product: { id: string } }>,
+) {
+  const products = new Map(requirements.map((r) => [r.id, r.product.id]));
+  return records.filter(
+    (record) =>
+      products.get(record.requirementId ?? '') ===
+        record.equipmentAsset.productId &&
+      equipmentAssignmentAssetIsEligible(record.equipmentAsset),
+  );
+}
 
 export function deriveCoverageQuantities(
   requestedQty: number,
@@ -77,15 +95,7 @@ export class HealthcareEquipmentCoverageService {
         requirements.map((r) => r.id),
         tx,
       );
-      const applicable = records.filter((record) => {
-        const requirement = requirements.find(
-          (r) => r.id === record.requirementId,
-        );
-        return (
-          requirement?.product.id === record.equipmentAsset.productId &&
-          equipmentAssignmentAssetIsEligible(record.equipmentAsset)
-        );
-      });
+      const applicable = applicableCoverageAssignments(records, requirements);
       const settings = await this.repository.findSettings(companyId, tx);
       const reservations =
         applicable.length === 0

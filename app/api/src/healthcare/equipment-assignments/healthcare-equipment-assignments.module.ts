@@ -1,3 +1,5 @@
+import { HealthcareEquipmentCoverageNotesController } from './healthcare-equipment-coverage-notes.controller';
+import { HealthcareEquipmentCoverageNotesService } from './healthcare-equipment-coverage-notes.service';
 import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -10,10 +12,12 @@ import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-as
 @Module({
   imports: [PrismaModule],
   controllers: [
+    HealthcareEquipmentCoverageNotesController,
     HealthcareEquipmentAssignmentsController,
     HealthcareEquipmentCoverageController,
   ],
   providers: [
+    HealthcareEquipmentCoverageNotesService,
     HealthcareEquipmentCoverageService,
     HealthcareEquipmentAssignmentsRepository,
     HealthcareEquipmentAssignmentsService,
