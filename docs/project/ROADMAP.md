@@ -122,6 +122,12 @@ HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56
 HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 ↓
 HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+↓
+HC-CASE-AVL Case Availability — PARTIALLY IMPLEMENTED
+↓
+HC-CASE-AVL-R Derived Case Availability Read — Backend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP
+↓
+HC-CASE-AVL-UI Case Availability Summary — Frontend — DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -1229,6 +1235,28 @@ Assignment
 ≠
 Custody
 9.8 Case Availability
+HC-CASE-AVL: PARTIALLY IMPLEMENTED; M-HC1 OPEN.
+HC-CASE-AVL-R: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP.
+HC-CASE-AVL-UI: DEFINED / BLOCKED BY HC-CASE-AVL-R MERGE — TARGET 3 SP.
+No se declara R ni umbrella COMPLETE/MERGED; sin Forecast/Commitment/Actual
+o fechas asignados.
+
+R implementa GET /healthcare/cases/:caseId/availability: proyección derivada e
+informacional de schedule, requirements, coverage, equipment y preparation.
+Snapshot RepeatableRead único/TransactionClient compartido; reuse de Coverage-R,
+Assignment Availability y CaseKit readiness, sin fórmulas duplicadas ni writes.
+DEC-CASE-AVL-01/02/03 intactas: sin verdict global, workflow gate ni estado
+persistido; DIRECT diagnostica Equipment y nunca aumenta Coverage; cero
+Requirements y Kit ausente no implican readiness/aplicabilidad.
+
+DoD local y PostgreSQL focal HC-CASE-AVL-R 1 suite / 1 test PASS (~27 s),
+sin claim de concurrencia. Sólo spike 127.0.0.1:5434/zaping_spike_test:
+SELECT-only CaseKit/Item para zaping_hc_c5b; fixtures/cleanup propios mediante
+operador acreditado, sin ampliar permisos de escritura de aplicación.
+Evidencia completa y comando en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--local-dod--pr-pending)
+y estado operativo en PROJECT_BOARD. UI espera merge de R.
+Actividad DB durante cierre documental: NONE; sin reruns, release ni deployment.
+
 Current Equipment Availability ya está implementado en ERP Core.
 
 Actualmente:
@@ -1247,18 +1275,9 @@ OUT_OF_SERVICE
 
 RETIRED
 → unavailable
-Healthcare deberá extender esta evaluación hacia:
-
-Case Availability
-considerando cuando existan:
-
-Assignment conflicts
-
-Case schedule
-
-active custody
-
-other operational blockers
+Case Availability V1 ya integra Assignment conflicts y Case schedule.
+Active custody y otras fuentes operacionales quedan para evolución posterior
+cuando existan; no se infieren como disponibles en V1.
 No debe reemplazarse Availability con un boolean persistido manualmente.
 
 Maintenance, Calibration y Turnaround permanecen evoluciones posteriores.

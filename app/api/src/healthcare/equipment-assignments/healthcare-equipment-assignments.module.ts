@@ -22,6 +22,10 @@ import { HealthcareEquipmentAssignmentsService } from './healthcare-equipment-as
     HealthcareEquipmentAssignmentsRepository,
     HealthcareEquipmentAssignmentsService,
   ],
-  exports: [HealthcareEquipmentAssignmentsService],
+  exports: [
+    HealthcareEquipmentAssignmentsService,
+    HealthcareEquipmentAssignmentsRepository,
+    HealthcareEquipmentCoverageService,
+  ],
 })
 export class HealthcareEquipmentAssignmentsModule {}

@@ -10,6 +10,52 @@
 
 ## Unreleased
 
+### HC-CASE-AVL-R — cierre Local DoD / PR PENDING
+
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 5 SP.
+HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI DEFINED / BLOCKED BY
+HC-CASE-AVL-R MERGE — TARGET 3 SP. M-HC1 OPEN. Implementación unstaged/uncommitted
+en `feat/hc-case-avl-r`, base `d7ce3cade2302e4f2bc75388f2183fa2fc2eef5e`.
+Sin declarar COMPLETE/MERGED, release o deployment.
+
+Implementado GET /healthcare/cases/:caseId/availability con summaries compactos
+schedule, requirements, coverage, equipment y preparation. ADMIN/MANAGER/SALES/
+WAREHOUSE, sin JWT 401; Company sólo JWT y Case foreign igual a missing.
+Controller → Service → Repository → Prisma; un snapshot RepeatableRead y el
+mismo TransactionClient para todos los inputs materiales. Reuse de Coverage-R,
+Assignment Availability y CaseKit readiness sin duplicar fórmulas.
+Sin advisory lock, FOR UPDATE, writes ni campos privados de persistencia.
+
+DEC-CASE-AVL-01/02/03 preservadas: proyección derivada, informacional y
+multidimensional; sin enum/verdict global, workflow gate o estado persistido.
+Equipment incluye RESERVED REQUIREMENT + DIRECT, excluye RELEASED/REPLACED;
+DIRECT nunca incrementa cantidades Coverage. Ausencia de Requirements/Kit
+explícita, sin inferir ready, not required o not applicable.
+
+PostgreSQL focal **PASS — 1 suite / 1 test (~27 s total)**:
+`HC-CASE-AVL-R HTTP/JWT persisted read (no concurrency claim)`;
+`projects owned persisted dimensions, isolates tenants and performs zero writes`.
+Sólo 127.0.0.1:5434/zaping_spike_test, rol aplicación zaping_hc_c5b.
+ACL adicional SELECT únicamente en HealthcareCaseKit y HealthcareCaseKitItem,
+sin write privileges de aplicación en esas tablas; ACL CoverageNote intacta.
+Harness C5-B reutilizado, operador/control acreditado para fixtures propios y
+cleanup CaseKitItem → CaseKit → dependencias. Sesiones desconocidas rechazadas;
+control.disconnect/concurrency.disconnect PASS y checks finales de zero-residue.
+No es aceptación de concurrencia.
+
+Zero-write persistido acreditado en Case, Requirements, Assignments, Overrides,
+CoverageNotes, Kit/Items, Assets, idempotency e inventario; sin auto-resolution.
+InventoryBatch/InventoryMovement observados por control, sin nuevos grants de
+aplicación. Tras runtime, opt-in y ambas URLs ausentes (tres Test-Path False).
+
+Evidencia conservada: focal inicial 202 tests / 10 suites PASS; Availability
+34 / 2 PASS; helpers puros 94 / 4 PASS; full API 1786 / 108 PASS;
+lint:check/typecheck/build/Prisma validate/generate/focal noEmit/Prettier/
+git diff --check PASS; disabled-mode safe skip PASS.
+Este cierre registra evidencia suministrada, sin reejecutar gates.
+**Actividad DB durante cierre: NONE.** Contrato/comando/evidencia:
+[CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
+
 ### HC-NEXT-03C5-COVERAGE-N — cierre DoD / MERGED
 
 **Estado:** COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
