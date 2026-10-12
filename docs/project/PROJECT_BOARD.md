@@ -201,7 +201,7 @@ HC-NEXT-03C5-B — Integrated Backend Validation
         → COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
-        → PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+        → COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
@@ -2311,7 +2311,7 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01A.1 Draft Item Exclusion — COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
-→ HC-NEXT-03C5-COVERAGE — PARTIALLY IMPLEMENTED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+→ HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
@@ -3146,15 +3146,15 @@ Checklist y evidencia exacta:
 [EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md#34524-b3--integrated-gate--closeout--3-sp).
 Sin cambios API productiva, Prisma/schema/migraciones o Web. Este cierre es sólo
 documental y no conecta DB ni reejecuta validación runtime. M-HC1 permanece abierto.
-Después de C5-B MERGED: COVERAGE parcialmente implementado; R COMPLETE / MERGED
-mediante PR #63; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP.
+Después de C5-B MERGED: COVERAGE COMPLETE / MERGED; R COMPLETE / MERGED
+mediante PR #63; N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
 Sin cambios SP, Forecast o Commitment.
 
 #### HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
 
-Estado: PARTIALLY IMPLEMENTED / CONTRACT APPROVED — DEC-C5-COV-01–05 aprobadas por Leo.
-R COMPLETE / MERGED; N IMPLEMENTED / LOCAL DoD PASS / PR PENDING.
-Umbrella pendiente de merge de N; no COMPLETE / MERGED.
+Estado: COMPLETE / MERGED / CONTRACT APPROVED — DEC-C5-COV-01–05 aprobadas por Leo.
+R COMPLETE / MERGED; N COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS.
+Umbrella COMPLETE / MERGED — R PR #63 y N PR #65; DoD PASS; CI PASS.
 Capability de dominio fuera de C5-A/B; no campaña de test coverage. M-HC1 OPEN.
 Cantidad y certainty separadas; COVERED no certifica readiness/availability.
 Notes sólo se resuelven explícitamente; stale conservadas sin cambiar counts.
@@ -3199,8 +3199,11 @@ la evidencia del checkpoint, sin reejecutar tests ni conectar DB.
 
 ##### HC-NEXT-03C5-COVERAGE-N — CoverageNote Commands & Audit — 5 SP
 
-Estado: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — 5 SP;
-dependencia R merge satisfecha por PR #63. Goal: create/resolve auditable explícito.
+Estado: COMPLETE / MERGED — PR #65 — main@2fa5927 — DoD PASS — 5 SP.
+CI PASS. Feature commit N: ff4124d99afcc04d0607ca3f813a154cb754c180.
+Merge commit N en main: 2fa5927e239998d52e0004f14fdfeb5a312ff28a.
+Merge mediante PR #65; sin migración ni deployment de producción acreditados.
+Dependencia R merge satisfecha por PR #63. Goal: create/resolve auditable explícito.
 Dependencias/DoR: R merged y contrato aprobado; aceptación PostgreSQL PASS.
 Scopes create/resolve y migration mínima aplicados; ACL de aceptación validado.
 Scope: dos POST,
@@ -3233,7 +3236,7 @@ disabled-mode safe skip; PostgreSQL N PASS — 1 suite / 1 test (~43.247 s).
 control.disconnect y concurrency.disconnect PASS; opt-in y URLs de runtime/control
 ausentes después. Evidencia detallada/comando en diseño §34.5.3; sin reruns.
 Sin status cache ni tabla nueva. Actividad DB durante cierre: NONE. M-HC1 OPEN.
-Siguiente: revisión humana → staging selectivo → commit → PR; merge aún pendiente.
+N y umbrella MERGED; DoD PASS; CI PASS. Sin release ni deployment.
 Orden: R → N → futuros slices C6 que requieran coverage. Estimaciones 5+5 SP,
 sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
 
