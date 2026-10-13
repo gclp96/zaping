@@ -1,6 +1,10 @@
 # HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition
 
-**CONTRACT APPROVED / PR PENDING — TARGET 5 SP.**
+**COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.**
+
+Merge: `51363f566c8c6656f1653f03f11d9489ab4d082b`. 01A está TECHNICAL DESIGN
+APPROVED / PR PENDING — TARGET 8 SP; [diseño técnico](INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
+TD-INV-01A-01..20 APPROVED. Implementation NOT STARTED; autoridad dormida.
 
 Baseline: `456e5a6ddbffbbb9fdc3b2be524345c57a6bf90f`. DEC-INV-CUST-01..14 aprobadas
 por revisión humana de producto/arquitectura con refinamientos de §9. No
@@ -257,19 +261,21 @@ no claims, SQL o locks. Snapshot de custodian híbrido permanece en Dispatch.
 | DEC-INV-CUST-13 | APPROVED | owned=sum posiciones propias no terminales; available=sum elegibles; inCustody=sum propias en custodia. Futuro inspection/quarantine; no afirmar reserved/staged implementados. |
 | DEC-INV-CUST-14 | APPROVED | EquipmentAsset fuera de posiciones cuantitativas; una custodia activa por Asset. Handoff coordina material, Asset y Dispatch atómicamente; persistencia Equipment técnica posterior. |
 
-## 10. Slices definidos y estado local previo al merge
+## 10. Slices definidos y estado posterior al merge DEF
 
 | ID | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP | DEFINED / BLOCKED BY DEF MERGE |
+| HC-INVENTORY-CUSTODY-01A | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING — Implementation NOT STARTED |
 | HC-INVENTORY-CUSTODY-01B | Purchase Receipts + writers Inventory manual + proyecciones compatibles | 8 SP | DEFINED / BLOCKED BY 01A |
 | HC-INVENTORY-CUSTODY-01C | Sales shared availability + resolución outbound + concurrencia | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D | Conciliación + opening manifest + tooling backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E | Primitiva custodia Equipment + aceptación Foundation cruzada | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
 Esta división sustituye el slice integrado de 13 SP del discovery. Sin fechas,
-Forecast, Commitment ni Actual. Ningún slice se implementa aquí. Tras merge del
-contrato, HC-INVENTORY-CUSTODY-01A pasa a READY; todavía no en el estado local.
+Forecast, Commitment ni Actual. Ningún slice se implementa aquí. DEF fue merged
+mediante PR #75; 01A está TECHNICAL DESIGN APPROVED / PR PENDING, con
+TD-INV-01A-01..20 APPROVED tras las sustituciones humanas 10/14/19.
+Implementation NOT STARTED. 01B..01E siguen BLOCKED.
 
 HC-DSP-01A/B/C/D permanecen **DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION**.
 El refinamiento técnico de schema/API puede continuar posteriormente, pero la
@@ -278,6 +284,8 @@ acredita disponibilidad, atomicidad ni cutover implementados. Preservar gates
 Dispatch de correction/reversal auditado y recovery PREPARED antes de uso amplio;
 selector Assignment >100 sigue P1. M-HC1 OPEN.
 
-**Resultado: CONTRACT APPROVED / PR PENDING — HC-INVENTORY-CUSTODY-DEF.**
-Siguiente acción: revisión humana → selective staging → commit → contract PR.
-No staging ni commit en este cierre. Sin tests ni actividad de base de datos.
+**Resultado: COMPLETE / MERGED — PR #75 — main@51363f5 — HC-INVENTORY-CUSTODY-DEF.**
+Siguiente acción: revisión del delta → staging selectivo → commit de diseño → PR
+técnico. Después del merge, iniciar implementación 01A desde main actualizado;
+01A permanece dormido y no activa consumidores productivos ni backfill/cutover.
+Sin staging, commit, tests ni actividad de base de datos en esta sincronización.
