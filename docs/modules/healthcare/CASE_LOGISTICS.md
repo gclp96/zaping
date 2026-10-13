@@ -3763,3 +3763,334 @@ Equipment lifecycle
 sin duplicar ni falsificar el hecho físico.
 
 > **La cadena de custodia debe poder explicar cada unidad desde que abandona Warehouse hasta que regresa, se consume o se resuelve formalmente, sin confundir movimiento físico temporal con venta ni descontar dos veces el mismo inventario.**
+
+---
+
+# 258. HC-CASE-DISPATCH — V1 approved contract
+
+**CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.**
+
+Baseline inspeccionado: `15f062b1ff1a4f77724b489bd94abccfce7e998d`.
+Conclusión CaseKit vigente: **CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT**.
+M-HC1 permanece OPEN. DEC-DSP-01..17 fueron aprobadas por revisión humana de
+producto/arquitectura con los refinamientos de §258.7. El detalle técnico sigue
+siendo candidato: no hay schema aprobado, endpoints implementados ni autorización
+de implementación. HC-INVENTORY-CUSTODY-DEF está READY — TARGET 5 SP.
+Las secciones conceptuales anteriores conservan su valor histórico.
+
+## 258.1 CURRENT PHYSICAL INVENTORY CAPABILITIES
+
+| Capacidad actual | Evidencia / límite |
+| --- | --- |
+| Stock agregado por Product | `Product.stock: Int`; Inventory expone ese saldo, no una posición Warehouse separada de Company-owned. |
+| Movimientos | `IN`, `OUT`, `ADJUSTMENT`; createMovement suma, resta o fija stock respectivamente, con Serializable/retry. No existe tipo de transferencia interna. |
+| Lotes | InventoryBatch tiene Company/Product, lotNumber, expirationDate, initialQuantity, availableQuantity e isActive. Receipt crea/incrementa lotes y stock. |
+| Disponibilidad de lote | El campo existe, pero los caminos Sales OUT y movimiento manual examinados operan sobre Product.stock sin asignar/decrementar lotes. No es una autoridad completa de disponibilidad física por lote. |
+| Reserva / staged / custody / locations | No hay ledger ni posiciones/cantidades persistidas que separen estos conceptos. Assignment RESERVED sólo reserva lógicamente Equipment para un Case. |
+| SERIALIZED material | Existe valor del enum, pero no entidad de unidad serializada de Product ni cadena física por serial. No confundir con EquipmentAsset.serialNumber. |
+| EquipmentAsset | Identidad durable, Product, assetCode, serial opcional, lifecycle y condition; Assignment referencia el activo. No tiene custodia física implementada. |
+| Actores | User tenant con isActive y rol; Case.responsibleUserId opcional. No existe Technician/custodian independiente. Responsable del Case no implica receptor físico. |
+| Idempotencia | IdempotencyRecord único Company/scope/key, hash y resourceId; scopes Healthcare existentes, ninguno Dispatch. |
+| Healthcare | Case DRAFT/SCHEDULED/CANCELLED; Requirement ACTIVE/RETIRED; Kit DRAFT/PREPARED con items ACTIVE/EXCLUDED; Assignment RESERVED/RELEASED/REPLACED. No CaseDispatch/Custody implementado. |
+
+Evidencia de producción:
+[schema](../../../app/api/prisma/schema.prisma),
+[Inventory](../../../app/api/src/inventory/inventory.service.ts),
+[Sales](../../../app/api/src/sales/sales.service.ts),
+[receipts](../../../app/api/src/purchases-receipts/purchases-receipts.service.ts),
+[CaseKit](../../../app/api/src/healthcare/case-kits/healthcare-case-kits.service.ts),
+[Assignment](../../../app/api/src/healthcare/equipment-assignments/healthcare-equipment-assignments.service.ts).
+
+Sales usa decremento condicional `stock >= quantity` y registra OUT con referencia
+SALE. No consulta una exclusión por custodia. Crear sólo un ledger Healthcare no
+evitaría que ese stock siguiera vendiéndose. Los ajustes manuales también deben
+respetar posiciones comprometidas; no basta proteger dos confirms Healthcare.
+
+[ADR-013](../../architecture/adr/ADR-013-inventory-custody-case-logistics.md),
+ACCEPTED / PLANNED, §§9,33,38,39,56 y 75, exige disponibilidad/custodia separadas,
+identidad de lote, integración a través de Inventory y atomicidad; deja el modelo
+físico concreto sin elegir. No se encontró contradicción con CASE_LOGISTICS.
+
+## 258.2 Stop gate y opciones Inventory
+
+**Gate de implementación:** el contrato de producto está aprobado, incluyendo
+admisión y custodio híbrido. Sigue pendiente elegir la representación Inventory
+compartida en HC-INVENTORY-CUSTODY-DEF. No se aprueba una migración ni entidad
+InventoryPosition por ser candidata.
+
+Dependencia: **HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition**.
+**READY — TARGET 5 SP.** Debe definir propiedad,
+disponibilidad por Product/lote, custodia exclusiva de Asset y contrato transaccional
+compartido por Dispatch, Sales/OUT y ajustes. Inventariar todos los escritores,
+reconciliar saldos existentes y definir migración/backfill son gates de esa dependencia.
+
+| Opción | Evaluación |
+| --- | --- |
+| A. Posiciones Inventory por ubicación/estado y transferencias | Dirección recomendada para evaluación: Warehouse → Custody conserva propiedad y reduce disponibilidad origen. Requiere nuevo fundamento, no existe hoy. |
+| B. Allocation separado del stock total | Alternativa viable si todos los consumidores descuentan allocations y la disposición definitiva consume el vínculo una sola vez. Fórmula y ledger aún pendientes. |
+| C. Otra representación Inventory-native compartida | Debe ser autoridad única para todos los consumidores. Un shadow ledger Healthcare independiente está prohibido. |
+| D. Reusar IN/OUT/ADJUSTMENT como transferencia | Rechazado como atajo: cambia saldo agregado sin representar ambas posiciones y amenaza doble descuento; no equivale a internal transfer. |
+
+A no queda seleccionada. DEC-DSP-08 aprueba la autoridad compartida, no una familia
+de implementación. HC-INVENTORY-CUSTODY-DEF elegirá la representación antes de
+concretar persistence. No escribir directamente Product.stock desde Healthcare.
+La futura disposición Used/Delivery debe consumir una posición de custodia y
+registrar el OUT definitivo exactamente una vez, nunca repetir la reducción de
+disponibilidad como un segundo descuento de propiedad.
+
+## 258.3 Alcance V1 aprobado y admisión
+
+IN: crear DRAFT, seleccionar custodio, agregar/excluir items, confirmar entrega
+física, snapshot inmutable, inicio durable de custodia y lectura/historia; N
+Dispatches por Case. DRAFT no reserva stock ni capacidad y puede quedar stale.
+OUT: Return físico, used/returned/unresolved quantities, inspección, reconciliación,
+incidentes, disposición final, implicaciones Sales/Invoice, PDF, firma/acknowledgement,
+QR y transferencias posteriores de custodia. Se conservan referencias futuras seguras.
+
+Reglas aprobadas de CONFIRM, todas revalidadas dentro de la transacción:
+
+1. Company del JWT; Case mismo tenant, SCHEDULED, inicio/fin completos y ordenados,
+   no CANCELLED. No se agrega condición de fecha futura ni verdict Case READY.
+2. Kit del Case existente y PREPARED, readiness local actual PASS. Si PREPARED
+   está BLOCKED, rechazar con 409 y cero efecto físico/custodia/Inventory; nunca
+   reabrir o reparar automáticamente el Kit. PREPARED solo no es suficiente.
+3. Al menos un item ACTIVE, fuentes exclusivamente ACTIVE CaseKitItems del mismo
+   Kit/Case/Company. Material QUANTITY; Equipment vía Assignment. Product activo.
+4. Material entero positivo; suma confirmada histórica por sourceCaseKitItemId
+   más cantidad de este Dispatch <= preparedQuantity. Agrupar todos los lotes del
+   mismo source antes de comparar. No descontar ni mutar preparedQuantity.
+5. Todo material QUANTITY exige InventoryBatch exacto del mismo Company/Product,
+   disponibilidad física elegible y no vencido para despacho normal. Sin fuente
+   física respaldada por Batch y soportada por Foundation, el material no es elegible
+   para Dispatch V1, independientemente de lotTracking. No hay pool sin lote ni
+   fallback a ProductId. Foundation define disponibilidad por batch; detalles de
+   caducidad/timezone se concretan técnicamente sin relajar esta regla estricta.
+6. Equipment: Assignment RESERVED, mismo Case/Company, Asset ACTIVE + GOOD,
+   identidad física sin custodia activa. Reusar Assignment Availability para las
+   fuentes seleccionadas, sin fórmula nueva: fullyVerifiable=true y conflictFree=true
+   en V1. Conflicto actual produce 409 incluso con ConflictOverride de Assignment
+   histórico o vigente. Una excepción específica Dispatch con auditoría durable
+   sería trabajo futuro; no existe override Dispatch V1 ni doble custodia.
+7. Custodian híbrido INTERNAL_USER o EXTERNAL_PERSON con snapshot histórico de
+   nombre obligatorio. INTERNAL_USER permite FK User estable opcional; si existe,
+   validar tenant. EXTERNAL_PERSON no tiene User FK. No exigir cuenta Zaping a cada
+   custodio ni crear módulo Technician. dispatchedBy es el User JWT autorizado;
+   owner sigue siendo Company y custodian es el responsable físico.
+
+DEC-CASE-AVL-01/02/03 y DEC-C5-COV-01..06 intactas: ni resumen Availability ni
+Coverage/CoverageNote constituyen gate global o excepción. Las verificaciones
+anteriores usan hechos locales del handoff; no equivalen a evaluar un status
+informacional Coverage. Ausencia de Requirements no implica aplicabilidad global.
+
+Sourcing aprobado: estricto en V1, preparación adicional explícita futura.
+Múltiples Dispatches pueden repartir capacidad ya preparada; no pueden inventar
+extras. Con Kit PREPARED inmutable, material de emergencia no preparado queda
+fuera de V1 y exige contrato futuro de preparación adicional, no bypass silencioso.
+Returns futuros no reponen automáticamente capacidad preparada consumida.
+
+Ejemplos: preparado 10 → Dispatch 1 de 6 + Dispatch 2 de 4 es válido; preparado
+10 → Dispatch 1 de 10 + petición posterior no preparada de 3 no permite Dispatch
+2 directo de 3. DRAFT no consume capacidad física durable; Confirm resuelve la
+competencia atómicamente. No existe override de over-dispatch.
+
+Assignment permanece RESERVED al confirmar: no se inventa release ni nuevo estado.
+Release/replace, retiro de Requirement o cancelación posterior del Case no cierran
+custodia ni liberan físicamente el Asset. Foundation deberá hacer que la custodia
+activa siga excluyendo disponibilidad física aunque cambie la reserva lógica.
+
+## 258.4 Lifecycle, handoff y snapshot candidato
+
+`DRAFT -> CONFIRMED` o `DRAFT -> CANCELLED`. Sin hard delete; cancel exige razón,
+actor y timestamp. Editar DRAFT mediante cambiar custodio y excluir/reagregar
+contenido; exclusiones retienen razón/actor/fecha. No requiere generic PATCH status.
+
+Confirm representa la entrega física en ese momento, registrada por operador;
+no firma digital del receptor ni prueba independiente del evento. En una única
+transacción: revalidar, consumir disponibilidad origen mediante Inventory,
+iniciar custodia, fijar snapshot, dispatchedAt de servidor/dispatchedBy y CONFIRMED,
+completar idempotencia. Todo persiste o nada. El timestamp del cliente no establece
+el handoff; dispatchedAt del servidor establece también el inicio de custodia.
+
+| Entidad candidata | Responsabilidad / campos mínimos conceptuales |
+| --- | --- |
+| HealthcareCaseDispatch | id, Company/Case/Kit, status, custodianType/snapshot y User FK opcional sólo INTERNAL_USER, createdBy/At, revision durable de DRAFT, dispatchedBy/At, cancelledBy/At/reason. Case 1:N; sin folio/secuencia adicional aprobada. |
+| HealthcareCaseDispatchItem | id, parent tenant, sourceCaseKitItemId obligatorio, MATERIAL/EQUIPMENT, Product; material quantity y batch obligatorios; equipo Assignment/Asset y unidad implícita 1; ACTIVE/EXCLUDED con auditoría. |
+| Custody / Inventory position o allocation | Necesaria para protección física, dominio/esquema bloqueado por DEC-DSP-08. Cada efecto enlaza DispatchItem; identidad única de origen impide repetirlo. |
+| Custodian snapshot | INTERNAL_USER: nombre histórico requerido y User FK estable opcional; EXTERNAL_PERSON: nombre histórico requerido sin User FK. No requiere entidad Technician. Organization/contact opcionales sólo a evaluar técnicamente, sin CRM/person management. |
+
+Estas son entidades candidatas para Prisma, no schema final. Exigir FKs compuestas
+tenant/parent, CHECK de forma discriminada/cantidad/auditoría, exclusión de fuente
+Equipment duplicada y unicidad de efecto físico. Material admite varios lotes para
+una fuente; prohibir duplicar source+batch ACTIVE dentro de un Dispatch.
+El constraint de custodia exclusiva de Asset pertenece al fundamento elegido.
+
+FK estable conserva navegación, no congela valores. Lista mínima candidata a
+evaluar en diseño técnico (sin copiar todos los atributos):
+Case folio, horario y destino/hospital público conocido; Product sku/nombre y
+tracking; batch lotNumber/expirationDate; Asset code/serial y condición/lifecycle
+validados; Requirement requestedQty/tipo y preparedQuantity usados para el límite;
+referencias Assignment/Requirement/Kit/item; identidad/nombre de custodio y actor
+de entrega. Datos ausentes se mantienen explícitos, no inventar hospital o técnico.
+Snapshot y cantidades no cambian con rename, retiro, reschedule, release/replace,
+cambio de condición o readiness. No copiar precios, historias clínicas, passwords,
+emails privados ni todos los atributos de las entidades.
+
+Correction/reversal puede diferirse del primer slice: conservar hecho original. Una corrección
+posterior requerirá registro compensatorio vinculado y auditoría, no otro Dispatch
+para fingir devolución. **Gate antes de producción real:** aprobar e implementar
+un mecanismo auditado de corrección/reversal; no operar custodia irreversible
+sin recuperación. No se diseñan aquí tablas Return/Reconciliation: sus relaciones
+futuras partirán de IDs estables Dispatch/Item y efecto de custodia.
+
+## 258.5 API pública candidata, permisos e idempotencia
+
+Lectura ADMIN/MANAGER/SALES/WAREHOUSE; mutaciones ADMIN/MANAGER/WAREHOUSE, conforme
+CaseKit. Ser custodio no concede permisos; Company/actor vienen de JWT.
+
+| Ruta candidata | Payload / semántica |
+| --- | --- |
+| GET /healthcare/cases/:caseId/dispatches | Lista paginada, orden estable createdAt/id, metadata de paginación. |
+| GET /healthcare/dispatches/:dispatchId | Detalle público + items/historia. |
+| POST /healthcare/cases/:caseId/dispatches | `{custodian}` híbrido con type/displayName y userId opcional sólo INTERNAL_USER; Kit derivado; crea DRAFT. |
+| POST /healthcare/dispatches/:dispatchId/custodian | `{custodian, expectedRevision}`; sólo DRAFT. |
+| POST /healthcare/dispatches/:dispatchId/items | `{sourceCaseKitItemId, quantity?, batchId?, expectedRevision}`; quantity y batchId obligatorios para MATERIAL, ausentes para EQUIPMENT; tipo/Product/Asset derivados. |
+| POST /healthcare/dispatches/:dispatchId/items/:itemId/exclude | `{reason, expectedRevision}`. |
+| POST /healthcare/dispatches/:dispatchId/confirm | `{expectedRevision}`: evita confirmar contenido modificado desde la revisión humana. |
+| POST /healthcare/dispatches/:dispatchId/cancel | `{reason, expectedRevision}`; sólo DRAFT. |
+
+Todas las mutaciones usan Idempotency-Key salvo futura revisión técnica que pruebe
+una mutación específica intrínsecamente sin efectos. Trim, 1..128, scopes candidatos
+HEALTHCARE_CASE_DISPATCH_CREATE / CUSTODIAN_SET / ITEM_ADD / ITEM_EXCLUDE / CONFIRM /
+CANCEL. Hash versionado de comando + target + payload normalizado (incluye revision,
+custodio, fuente, cantidad/lote o razón aplicables); excluye actor y tiempo servidor.
+Lookup tenant+scope+key antes de validar estado/revision actual; mismatch 409.
+Claim, efecto y completion en la misma transacción. Fallo no consume key.
+Replay de CONFIRM devuelve snapshot original sin efectos ni revalidar fuentes vivas.
+Nueva key sobre CONFIRMED sólo puede devolver state replay si corresponde a la
+misma revision de confirmación; nunca confirma otro contenido. Cliente retiene key
+por intención hasta resolver respuesta perdida. No devolver secretos en replay.
+
+Create/add 201 primera ejecución, 200 replay; otros comandos 200 con recurso
+público. Aggregate: id, caseId, status, revision, custodian público, dispatchedBy/At,
+createdAt, cancel audit y items. Item: id, sourceCaseKitItemId, type, Product público,
+quantity y batch público obligatorios en material, EquipmentAsset cuando equipo,
+lifecycle y auditoría. DRAFT muestra referencias actuales y validaciones locales;
+CONFIRMED muestra snapshot etiquetado como histórico. Diagnóstico actual separado,
+sin reemplazar historia. No companyId interno, hashes/claims ni detalles de locks.
+
+## 258.6 Invariantes, concurrencia y errores candidatos
+
+1. Un Dispatch tiene exactamente Company + Case; recursos ajenos se tratan como
+   ausentes. Sin hard delete ni reescritura CONFIRMED.
+2. Cantidad material entera >0; suma CONFIRMED por fuente <= preparado, también
+   cuando varias líneas/lotes apuntan a ella. DRAFT no consume capacidad.
+3. Disponibilidad física no negativa por Product/pool/lote; Asset a lo sumo en una
+   cadena activa de custodia, incluso entre Cases y después de release lógico.
+4. Un handoff afecta disponibilidad y custodia exactamente una vez; Company conserva
+   propiedad. Confirm y claim son atómicos; retry no duplica ningún efecto.
+5. Ningún consumidor de Inventory puede ignorar custodia; ajustes y venta concurrentes
+   respetan la misma autoridad. Kit/Assignment no son el ledger físico.
+
+Healthcare ya usa serialización Company-first y locks de filas ordenados; Inventory
+manual usa Serializable/retry y Sales decremento condicional. Company lock sólo en
+Healthcare es insuficiente. Foundation debe fijar protocolo común para Company,
+Case/Dispatch/source capacity, Product/pool/Batch y Asset, con orden determinista.
+No se prescribe todavía un advisory lock universal ni aislamiento como sustituto
+de invariantes. La implementación deberá probar autoridad compartida entre dominios.
+
+Casos de aceptación requeridos, sin implementar tests aquí:
+
+- dos confirms mismo Dispatch, misma/distinta key: un handoff y auditoría original;
+- dos Dispatches compiten por capacidad del mismo Kit y por último saldo de lote:
+  suma permitida únicamente; loser sin claim/efecto parcial;
+- dos Cases compiten por Asset: una sola custodia, aunque ambos tengan reserva;
+- Sales OUT/ajuste vs confirm: no venden ni ajustan por debajo de stock comprometido;
+- edición de DRAFT vs confirm: revision vieja rechazada; ninguna línea invisible;
+- cancel Case, retire Requirement, release/replace, asset/product invalidation o
+  reschedule vs confirm: lectura autoritativa, precedencia coherente y snapshot;
+- pérdida de respuesta y retry: misma identidad física, cero duplicados;
+- fallo después de primer write físico: rollback de snapshot, saldos, custodia y claim;
+- tenant ajeno, lot mismatch, vencimiento y SERIALIZED: rechazo sin writes.
+
+| HTTP | Categorías/códigos candidatos |
+| --- | --- |
+| 400 | INVALID_REQUEST_BODY, IDEMPOTENCY_KEY_REQUIRED, INVALID_IDEMPOTENCY_KEY; UUID/cantidad/forma inválidos. |
+| 401 / 403 | Autenticación ausente / rol no autorizado, guards existentes. |
+| 404 | CASE_NOT_FOUND, DISPATCH_NOT_FOUND, DISPATCH_SOURCE_NOT_FOUND, CUSTODIAN_NOT_FOUND; incluye foreign. |
+| 409 | DISPATCH_NOT_MUTABLE, DISPATCH_ADMISSION_BLOCKED, DISPATCH_SOURCE_STALE, DISPATCH_REVISION_CONFLICT, PREPARED_CAPACITY_EXCEEDED, PHYSICAL_AVAILABILITY_INSUFFICIENT, EQUIPMENT_NOT_ELIGIBLE, EQUIPMENT_ALREADY_IN_CUSTODY, BATCH_NOT_ELIGIBLE, SERIALIZED_NOT_SUPPORTED, IDEMPOTENCY_KEY_REUSED, RESOURCE_STATE_CHANGED. |
+| 503 | HEALTHCARE_CONCURRENCY_TIMEOUT si se conserva el timeout de adquisición Company existente; no confundir con validación. |
+| 500 | Fallo inesperado sanitizado; nunca detalles Prisma/PostgreSQL/SQL. |
+
+## 258.7 Product decisions — APPROVED
+
+Revisión humana de producto/arquitectura completada. Esta tabla sustituye las
+alternativas del discovery; no aprueba entidades Prisma ni elimina la dependencia
+Inventory. El detalle técnico de API, locks y representación de revision permanece
+candidato dentro de estas decisiones vinculantes.
+
+| ID | Estado | Contrato aprobado |
+| --- | --- | --- |
+| DEC-DSP-01 | APPROVED | Case del Company, SCHEDULED con scheduledStart y scheduledEnd; Kit existente PREPARED. PREPARED solo no basta. |
+| DEC-DSP-02 | APPROVED | Recomputar readiness local inmediatamente antes de Confirm: PASS obligatorio; BLOCKED → 409, cero efecto físico/custodia/Inventory. Recovery/reopen separado. |
+| DEC-DSP-03 | APPROVED WITH V1 LIMIT | Sólo ACTIVE CaseKitItems; ningún Product/Equipment arbitrario. N Dispatches sólo sobre capacidad preparada; extras no preparados necesitan contrato futuro de amendment/additional preparation. |
+| DEC-DSP-04 | APPROVED | Cantidad >0; suma CONFIRMED por source + candidata <= preparedQuantity. Sin override ni resta al Kit. DRAFT no consume capacidad durable; Confirm resuelve concurrencia. |
+| DEC-DSP-05 | APPROVED STRICT | Todo material QUANTITY requiere InventoryBatch exacto, mismo Company/Product, disponibilidad física elegible y no vencido para despacho normal. Sin fuente Batch soportada, no elegible V1. Foundation define disponibilidad por lote. |
+| DEC-DSP-06 | APPROVED | SERIALIZED material no soportado. EquipmentAsset con identidad serial sigue soportado por su flujo Equipment. |
+| DEC-DSP-07 | APPROVED HYBRID CUSTODIAN | INTERNAL_USER o EXTERNAL_PERSON; ambos con display name histórico requerido. User FK estable opcional sólo INTERNAL_USER; EXTERNAL_PERSON sin User FK. No cuenta obligatoria ni módulo Technician. Company es owner; custodian responsable físico. |
+| DEC-DSP-08 | APPROVED ARCHITECTURAL CONSTRAINT | Autoridad Inventory compartida obligatoria para todos los consumidores competidores: existencia/propiedad, disponible físico, fuera de Warehouse bajo custodia y OUT definitivo separados. Shadow ledger Healthcare prohibido. HC-INVENTORY-CUSTODY-DEF elige representación; InventoryPosition no está elegida. Dispatch es transferencia interna; consumo definitivo afecta existencia una vez. |
+| DEC-DSP-09 | APPROVED | Case 1:N Dispatches. Cada CONFIRMED conserva identidad, timestamp, actor, custodio, items, quantity/batch, Asset y fuentes. No merge retroactivo de salidas. |
+| DEC-DSP-10 | APPROVED WITH RELEASE GATE | CONFIRMED inmutable; sin hard delete, edición ni cancelación silenciosa. Corrección/reversal puede diferirse del primer slice, pero mecanismo auditado implementado es RELEASE GATE antes de production-ready. |
+| DEC-DSP-11 | APPROVED STRICT V1 | Assignment RESERVED mismo Case/Company; Asset ACTIVE + GOOD; fullyVerifiable=true y conflictFree=true actuales. Conflicto → 409 aunque exista override histórico/vigente de reserva. Excepción Dispatch propia sólo futura. |
+| DEC-DSP-12 | APPROVED | Confirm no libera Assignment: permanece RESERVED. Release/replace posterior no borra custodia; Return/Reconciliation resolverán custodia. |
+| DEC-DSP-13 | APPROVED | Confirm es handoff físico exacto: dispatchedAt servidor/inicio custodia, dispatchedBy actor, custodio responsable, snapshot autoritativo, efecto Inventory/custodia e idempotencia atómicos. Tiempo cliente no es autoritativo. |
+| DEC-DSP-14 | APPROVED | DRAFT editable sólo por comandos; cancel antes de handoff conserva cancelledAt/By y razón adoptada en este contrato. CONFIRMED no usa cancelación DRAFT. |
+| DEC-DSP-15 | APPROVED | FKs útiles + snapshot mínimo inmutable; evaluar identidad pública Product, lote, Asset/serial, custodio y timestamp. Revision/version durable DRAFT y expected revision al confirmar obligatorios; representación exacta es diseño técnico. |
+| DEC-DSP-16 | APPROVED | Read ADMIN/MANAGER/SALES/WAREHOUSE; write ADMIN/MANAGER/WAREHOUSE. Company sólo JWT; foreign como missing. Idempotency-Key en mutaciones salvo revisión técnica futura de operación sin efectos. Replay no duplica estado, custodia, Inventory, auditoría ni hecho downstream. |
+| DEC-DSP-17 | APPROVED | V1 termina al iniciar custodia. Fuera: Used/Returned/Unresolved, Return físico, inspección, reconciliación, incidentes, disposición final, Sales/Invoice, PDF, QR, firma/acknowledgement. Sólo referencias seguras para evolución. |
+
+## 258.8 Foundation READY y slices bloqueados
+
+**HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition**
+
+**READY — TARGET 5 SP.** Define la autoridad compartida para Healthcare Dispatch,
+Sales/OUT, ajustes relevantes y futuros Return/Inspection/Reconciliation. Debe resolver:
+
+1. Significado de Product.stock cuando existe custodia.
+2. Company-owned frente a físicamente disponible.
+3. Disponibilidad por batch.
+4. Cantidad bajo custodia.
+5. Transferencia interna frente a OUT definitivo.
+6. Fuente única de verdad de disponibilidad.
+7. Integración con Sales.
+8. Integración con ajustes.
+9. Semántica de transferencia atómica.
+10. Compatibilidad con Return/Inspection futuros.
+
+Posiciones + transferencias, allocation/state ledger u otra representación
+Inventory-native son familias candidatas, no schema aprobado. Los anteriores
+HC-INVENTORY-CUSTODY-01A/01B del discovery permanecen hipótesis de implementación
+no aprobadas; su alcance se revisará después de DEF, sin promoverlas a READY.
+No se implementa Foundation en este cierre.
+
+| Slice definido | Alcance | TARGET | Estado |
+| --- | --- | --- | --- |
+| HC-DSP-01A | Persistence + read | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01B | DRAFT commands | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01C | Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01D | Frontend | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+
+Sin Forecast, Commitment, Actual ni fechas. Ningún slice Dispatch está READY.
+Cerrar DEF permite revisar dependencias y diseño técnico, no implica que la
+infraestructura elegida esté implementada ni autoriza Confirm productivo.
+
+P1 preservados: política de recovery/reopen de CaseKit PREPARED y selector de
+Equipment Assignments que carga sólo las primeras 100 antes de filtrar. Ambos
+siguen sin resolver; recovery es release gate antes de uso amplio en producción.
+Además, corrección/reversal auditado para Dispatch CONFIRMED es RELEASE GATE antes
+de declarar Dispatch production-ready. Ninguno se implementa en este cierre.
+
+**Resultado: CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.**
+M-HC1 OPEN. Siguiente acción: HC-INVENTORY-CUSTODY-DEF contract/discovery.
+Sin tests, DB, migraciones ni implementación en este cierre documental.
+
+<!-- END HC-CASE-DISPATCH V1 APPROVED CONTRACT -->

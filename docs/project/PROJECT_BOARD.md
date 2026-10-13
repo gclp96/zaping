@@ -8,6 +8,27 @@ Responsable: Zaping Team
 
 0. Snapshot vigente
 
+HC-CASE-DISPATCH — CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.
+DEC-DSP-01..17 APPROVED con refinamientos de batch obligatorio, custodio híbrido,
+Equipment estricto y autoridad Inventory compartida en
+[CASE_LOGISTICS §258](../modules/healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract).
+
+HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition —
+READY — TARGET 5 SP. Próximo trabajo: contract/discovery de autoridad compartida;
+no se eligió InventoryPosition ni otra representación Prisma concreta.
+
+| Slice | TARGET | Estado |
+| --- | --- | --- |
+| HC-DSP-01A — Persistence + read | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01B — DRAFT commands | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01D — Frontend | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+
+Ningún slice Dispatch READY. P1 abiertos: recovery/reopen de PREPARED y selector
+Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
+reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
+M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
+
 Este documento representa el estado operativo actual del proyecto.
 
 Debe responder principalmente:
