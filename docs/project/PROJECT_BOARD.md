@@ -14,21 +14,25 @@ Equipment estricto y autoridad Inventory compartida en
 [CASE_LOGISTICS §258](../modules/healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract).
 
 HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition —
-CONTRACT APPROVED / PR PENDING — TARGET 5 SP.
+COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.
 [DEC-INV-CUST-01..14 APPROVED con refinamientos](../modules/erp/INVENTORY_CUSTODY_DEFINITION.md).
 Posiciones = autoridad física actual; ledger/efectos = evidencia histórica;
 Product.stock = proyección compatible owned. Sin schema concreto ni implementación.
 
 | Foundation slice | TARGET | Estado |
 | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | DEFINED / BLOCKED BY DEF MERGE |
+| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING — Implementation NOT STARTED |
 | HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | DEFINED / BLOCKED BY 01A |
 | HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
-Tras merge del contrato DEF, sólo 01A pasa a READY; no antes. Siguiente acción:
-revisión humana → selective staging → commit → contract PR. No commit en este cierre.
+DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`; 01A está TECHNICAL DESIGN
+APPROVED / PR PENDING. [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
+APPROVED tras las sustituciones humanas 10/14/19. Implementation NOT STARTED;
+01A permanece dormido y 01B..01E BLOCKED. Siguiente acción: revisión del delta →
+staging selectivo → commit de diseño → PR técnico; tras merge iniciar implementación
+01A desde main actualizado, sin activación productiva/backfill/cutover en 01A.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |

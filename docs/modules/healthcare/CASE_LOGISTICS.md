@@ -3775,7 +3775,7 @@ Conclusión CaseKit vigente: **CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CO
 M-HC1 permanece OPEN. DEC-DSP-01..17 fueron aprobadas por revisión humana de
 producto/arquitectura con los refinamientos de §258.7. El detalle técnico sigue
 siendo candidato: no hay schema aprobado, endpoints implementados ni autorización
-de implementación. HC-INVENTORY-CUSTODY-DEF está CONTRACT APPROVED / PR PENDING — TARGET 5 SP; véase
+de implementación. HC-INVENTORY-CUSTODY-DEF está COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP; véase
 [definición Inventory](../erp/INVENTORY_CUSTODY_DEFINITION.md).
 Las secciones conceptuales anteriores conservan su valor histórico.
 
@@ -3815,7 +3815,7 @@ físico concreto sin elegir. No se encontró contradicción con CASE_LOGISTICS.
 ## 258.2 Gate de implementación y opciones históricas Inventory
 
 **Gate de implementación:** DEC-INV-CUST-01..14 están APPROVED; DEF está
-CONTRACT APPROVED / PR PENDING — TARGET 5 SP. Posiciones son autoridad física actual,
+COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP. Posiciones son autoridad física actual,
 ledger/efectos transaccionales son evidencia histórica y Product.stock proyección
 compatible owned. Es arquitectura aprobada, no schema Prisma ni implementación.
 HC-DSP-01A/B/C/D siguen DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION.
@@ -4046,16 +4046,17 @@ candidato dentro de estas decisiones vinculantes.
 | DEC-DSP-16 | APPROVED | Read ADMIN/MANAGER/SALES/WAREHOUSE; write ADMIN/MANAGER/WAREHOUSE. Company sólo JWT; foreign como missing. Idempotency-Key en mutaciones salvo revisión técnica futura de operación sin efectos. Replay no duplica estado, custodia, Inventory, auditoría ni hecho downstream. |
 | DEC-DSP-17 | APPROVED | V1 termina al iniciar custodia. Fuera: Used/Returned/Unresolved, Return físico, inspección, reconciliación, incidentes, disposición final, Sales/Invoice, PDF, QR, firma/acknowledgement. Sólo referencias seguras para evolución. |
 
-## 258.8 Foundation CONTRACT APPROVED / PR PENDING y slices bloqueados
+## 258.8 Foundation DEF MERGED y slices pendientes
 
 **HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition**
 
-**CONTRACT APPROVED / PR PENDING — TARGET 5 SP.** DEC-INV-CUST-01..14 aprobadas con
+**COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.** DEC-INV-CUST-01..14 aprobadas con
 refinamientos; autoridad física compartida para Sales/OUT, Receipts, Inventory y
 Healthcare. Slices Foundation revisados en el contrato canónico: 01A..01E, todos
-TARGET 8 SP. 01A DEFINED / BLOCKED BY DEF MERGE; 01B por 01A; 01C por 01B; 01D por
-01C; 01E por fundamento material/cutover precedente según diseño técnico. Ninguno
-READY ahora. Tras merge DEF, 01A pasa a READY. No implementación en este cierre.
+TARGET 8 SP. 01A TECHNICAL DESIGN APPROVED / PR PENDING; 01B por 01A; 01C por 01B;
+01D por 01C; 01E por fundamento material/cutover precedente según diseño técnico.
+[TD-INV-01A-01..20](../erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md) APPROVED.
+Implementation NOT STARTED; 01A dormido, 01B..01E y Dispatch siguen bloqueados.
 
 | Slice definido | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
@@ -4075,7 +4076,9 @@ Además, corrección/reversal auditado para Dispatch CONFIRMED es RELEASE GATE a
 de declarar Dispatch production-ready. Ninguno se implementa en este cierre.
 
 **Resultado: CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY INVENTORY CUSTODY FOUNDATION.**
-M-HC1 OPEN. Siguiente acción: revisión humana → selective staging → commit → contract PR DEF.
+M-HC1 OPEN. Siguiente acción: revisión del delta → staging selectivo → commit de
+diseño → PR técnico 01A. Tras merge, iniciar implementación 01A desde main actualizado;
+Dispatch permanece bloqueado por Inventory Custody Foundation.
 Sin tests, DB, migraciones ni implementación en este cierre documental.
 
 <!-- END HC-CASE-DISPATCH V1 APPROVED CONTRACT -->
