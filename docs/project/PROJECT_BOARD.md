@@ -17,21 +17,21 @@ HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definitio
 COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.
 [DEC-INV-CUST-01..14 APPROVED con refinamientos](../modules/erp/INVENTORY_CUSTODY_DEFINITION.md).
 Posiciones = autoridad física actual; ledger/efectos = evidencia histórica;
-Product.stock = proyección compatible owned futura. 01A implementa localmente el
+Product.stock = proyección compatible owned futura. 01A está COMPLETE / MERGED con el
 fundamento dormido; los writers/readers productivos conservan su comportamiento.
 
 | Foundation slice | TARGET | Estado |
 | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | IMPLEMENTED / REVIEW PENDING |
-| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | DEFINED / BLOCKED BY 01A |
+| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
+| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING |
 | HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
 DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
 [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
-APPROVED / MERGED — PR #76. Implementación 01A sobre baseline
-`196d52cc9608e2a147264dbf6e78319102bcd49a`: IMPLEMENTED / REVIEW PENDING — TARGET 8 SP.
+APPROVED / MERGED — PR #76. Implementación 01A COMPLETE / MERGED — PR #77 —
+`47fd68a409906b3a5981bd7f7cd30a48e08714b0` — TARGET 8 SP.
 InventoryPosition + PhysicalEffect/Line, cuatro UNIQUE parciales, FKs compuestas,
 CHECKs y completitud diferida de INSERT; sin triggers de inmutabilidad UPDATE/DELETE.
 Core interno creditAvailable/transfer/definitiveOut y reads Positions-only;
@@ -39,7 +39,7 @@ TransactionClient del caller, locks Product → Batch → Position, INSERT norma
 abort y clasificación fresca externa ante colisión de origen. Sin consumidores
 productivos, backfill, cutover ni cambios de saldo legacy.
 
-Validación local: contrato focal 20/20 dentro de API `npm test -- --runInBand`
+Evidencia histórica local de 01A (no reejecutada en este diseño): contrato focal 20/20 dentro de API `npm test -- --runInBand`
 1806/1806, 109 suites;
 PostgreSQL 26/26 mediante
 `node test/helpers/inventory-physical-postgres-runner.cjs --run-isolated` en
@@ -58,9 +58,17 @@ por credencial administrativa desactualizada; el runner usa socket local del
 contenedor aislado, sin cambiar credenciales existentes ni .env. El noEmit global
 de specs encontró errores en tests existentes fuera de 01A; el conjunto focal pasa.
 
-01A permanece dormido y no se marca COMPLETE/DONE. 01B..01E siguen BLOCKED;
-01B sólo será READY después de code review, QA/aceptación y merge de 01A.
-Siguiente acción: revisión humana de código → staging selectivo → commit → PR de implementación.
+01A está merged y permanece dormido. 01B está TECHNICAL DESIGN APPROVED / PR PENDING — TARGET 8 SP;
+[TD-INV-01B-01..30](../modules/erp/INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md)
+APPROVED por revisión humana. Implementation NOT STARTED; Activation DORMANT UNTIL 01D.
+OUT manual con sources explícitas y expectedRevision; COUNT_CORRECTION AVAILABLE
+con actor/razón y Effect/Line incluso delta cero, sin revision bump ni proyección cero.
+Receipt mixto admite conjuntos disjuntos: QUANTITY Positions, ASSET Equipment,
+SERIALIZED sin nueva integración física. Proyecciones compartidas y replay atómico.
+TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
+01C..01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
+Siguiente acción: staging selectivo → commit técnico → PR; después del merge,
+iniciar implementación 01B dormida. Sin Forecast/Commitment/Actual nuevos.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |
