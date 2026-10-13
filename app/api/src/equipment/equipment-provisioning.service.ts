@@ -16,10 +16,29 @@ export class EquipmentProvisioningService {
     private readonly equipmentAssetCodeService: EquipmentAssetCodeService,
   ) {}
 
+  // Dormant Receipt can reserve codes before acquiring Product roots.
+  async prepareReceiptCodes(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    quantity: number,
+  ) {
+    const codes: string[] = [];
+    for (let i = 0; i < quantity; i++) {
+      codes.push(
+        await this.equipmentAssetCodeService.allocateNextAvailableAssetCode(
+          tx,
+          companyId,
+        ),
+      );
+    }
+    return codes;
+  }
+
   async provisionFromPurchaseReceiptItem(
     tx: Prisma.TransactionClient,
     companyId: string,
     purchaseReceiptItemId: string,
+    preparedCodes?: string[],
   ): Promise<EquipmentAsset[]> {
     const receiptItem = await tx.purchaseReceiptItem.findFirst({
       where: {
@@ -51,12 +70,20 @@ export class EquipmentProvisioningService {
 
     const equipmentAssets: EquipmentAsset[] = [];
 
+    if (
+      preparedCodes &&
+      preparedCodes.length !== receiptItem.quantityReceived
+    ) {
+      throw new Error('Prepared Equipment code count mismatch');
+    }
+
     for (let index = 0; index < receiptItem.quantityReceived; index += 1) {
       const assetCode =
-        await this.equipmentAssetCodeService.allocateNextAvailableAssetCode(
+        preparedCodes?.[index] ??
+        (await this.equipmentAssetCodeService.allocateNextAvailableAssetCode(
           tx,
           companyId,
-        );
+        ));
 
       const equipmentAsset = await tx.equipmentAsset.create({
         data: {

@@ -147,6 +147,7 @@ export class InventoryService {
     );
   }
 
+  /** @deprecated No productive callers. Remove at cutover; never alias to physical authority. */
   async registerPurchaseEntry(
     tx: Prisma.TransactionClient,
     companyId: string,

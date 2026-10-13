@@ -213,7 +213,7 @@ describe('physical inventory composition and activation', () => {
           !entry.name.endsWith('.spec.ts')
         ) {
           expect(readFileSync(path, 'utf8')).not.toMatch(
-            /inventory-physical-authority|physical-inventory/,
+            /inventory-physical-authority|physical-inventory|receipt-physical-integration|inventory-compatibility-(?:projection|history)/,
           );
         }
       }
