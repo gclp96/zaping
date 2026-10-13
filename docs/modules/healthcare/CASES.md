@@ -1448,7 +1448,7 @@ ni emitir un veredicto global de disponibilidad o readiness.
 ### 86.1 Contrato aprobado V1 — Case-level projection
 
 **HC-CASE-AVL — Case Availability umbrella capability.**
-**Estado: PARTIALLY IMPLEMENTED.** HC-CASE-AVL-R está
+**Estado: COMPLETE / MERGED.** HC-CASE-AVL-R está
 COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS.
 Feature commit: `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`.
 Merge commit en main: `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
@@ -1458,16 +1458,17 @@ El contrato se aprobó en `docs/hc-case-availability-contract`, base
 MERGED; M-HC1 OPEN. DEC-CASE-AVL-01/02/03 aprobadas por producto y registradas
 como autoridad del contrato V1. DEC-C5-COV-01..06 permanecen sin cambios;
 Coverage sigue informacional. Este cierre sincroniza documentación y evidencia
-local y merge del backend read; UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
-No declara umbrella COMPLETE ni release/deployment.
+local y merge del backend read; UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
+Umbrella COMPLETE / MERGED: R PR #69 y UI PR #71. CI PASS. M-HC1 OPEN.
+No declara release/deployment.
 
 Identificadores canónicos aprobados por producto:
 
 | Identificador | Capability / slice | Estado | Estimación |
 |---|---|---|---|
-| HC-CASE-AVL | Case Availability umbrella capability | PARTIALLY IMPLEMENTED | — |
+| HC-CASE-AVL | Case Availability umbrella capability | COMPLETE / MERGED | — |
 | HC-CASE-AVL-R | Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
-| HC-CASE-AVL-UI | Case Availability Summary — Frontend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 3 SP |
+| HC-CASE-AVL-UI | Case Availability Summary — Frontend | COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS | TARGET 3 SP |
 
 HC-NEXT-03C3 y HC-NEXT-03B.1 corresponden a Equipment Assignment Availability,
 no a este agregado. `CASE_AVAILABILITY.md` aparece como referencia futura en
@@ -1481,7 +1482,7 @@ merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actu
 
 | Fuente inspeccionada | Hecho relevante |
 |---|---|
-| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | HC-CASE-AVL PARTIALLY IMPLEMENTED; R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS. UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Contrato aprobado y evidencia en §86. |
+| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | HC-CASE-AVL COMPLETE / MERGED; R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS. UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP. M-HC1 OPEN. Contrato aprobado y evidencia en §86. |
 | [ARCHITECTURE §50](../../architecture/ARCHITECTURE.md), [HEALTHCARE §54](HEALTHCARE.md), [DOMAIN_MODEL §60](DOMAIN_MODEL.md) | Availability contextual al Case/horario pertenece a Healthcare; custody, maintenance, calibration y turnaround son evolución cuando existan. |
 | [EQUIPMENT ERP §49](../erp/EQUIPMENT.md), [evaluator Core](../../../app/api/src/equipment/equipment-availability.evaluator.ts) | Current Asset Availability usa lifecycle/condition; ACTIVE + GOOD no acredita disponibilidad contextual ni física para un Case. |
 | [Case service](../../../app/api/src/healthcare/cases/healthcare-case.service.ts), schema y su spec | Sólo DRAFT/SCHEDULED/CANCELLED. scheduledStart basta para SCHEDULED; scheduledEnd puede faltar. End sin start y end <= start se rechazan. No COMPLETED/CLOSED actual. |
@@ -1715,7 +1716,7 @@ su semántica se conserva y el estado vigente de implementación se registra en 
 HC-CASE-AVL-R — Derived Case Availability Read — Backend:
 COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
 HC-CASE-AVL-UI — Case Availability Summary — Frontend:
-IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
+COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
 Son targets provisionales exclusivamente; sin fechas ni valores
 FORECAST/COMMITMENT/ACTUAL asignados. Backend incluye reuse con tx compartido y contratos de
 población/agregación; no separar persistence porque no hay estado nuevo persistido.
@@ -1788,17 +1789,21 @@ Después del runtime, RUN_HC_C5B_POSTGRES_TESTS, HC_C5B_DATABASE_URL y
 HC_C5B_OPERATOR_DATABASE_URL ausentes; los tres Test-Path devolvieron False.
 Este cierre registra la evidencia suministrada, sin reejecutar gates ni conectar DB.
 **Actividad DB durante este cierre: NONE.**
-HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Sin cambio de schema ni migration;
+HC-CASE-AVL COMPLETE / MERGED; HC-CASE-AVL-UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP. M-HC1 OPEN. Sin cambio de schema ni migration;
 sin ACL ni deployment de producción. Siguiente acción documental:
 revisión humana → staging selectivo → commit → docs PR.
 
 ### 86.11 HC-CASE-AVL-UI — Local DoD closeout
 
-**IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.**
-R COMPLETE / MERGED — PR #69; HC-CASE-AVL PARTIALLY IMPLEMENTED hasta el merge
-de UI. M-HC1 OPEN. Rama `feat/hc-case-avl-ui`, base
-`f8de10d0ebcb6f520dce320056041ddee1a08310`; sin declarar UI COMPLETE/MERGED,
-CI de UI, release ni deployment.
+**COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.**
+R COMPLETE / MERGED — PR #69; HC-CASE-AVL COMPLETE / MERGED. M-HC1 OPEN.
+UI merged mediante PR #71; CI PASS. Feature commit:
+`c66fc37fac4a36ebe7be91e84b484a59c3cb5907`; merge commit en main:
+`e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
+DoD local de UI acreditado sobre `feat/hc-case-avl-ui`, base
+`f8de10d0ebcb6f520dce320056041ddee1a08310`. Cierre final documental en
+`docs/hc-case-avl-post-merge`, base `e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
+Sin release ni deployment.
 
 Servicio API tipado mediante el cliente web existente para
 `GET /healthcare/cases/:caseId/availability`, con sólo datos públicos y errores
@@ -1846,8 +1851,8 @@ workers apuntan a contención de recursos; no prueban estabilidad bajo cualquier
 carga. No se modificaron Vitest config, timeouts, scripts ni worker defaults.
 
 Backend, API, Prisma y migraciones sin cambios por UI/cierre.
-**Actividad DB durante este cierre: NONE.** Todo permanece unstaged/uncommitted.
-Siguiente acción: revisión humana → staging selectivo → commit → PR.
+**Actividad DB durante este cierre: NONE.** Cambios documentales unstaged/uncommitted.
+Siguiente acción: revisión humana → staging selectivo → commit → docs PR.
 
 87. Equipment conflict CURRENT
 

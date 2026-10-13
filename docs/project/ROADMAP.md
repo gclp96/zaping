@@ -123,11 +123,11 @@ HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED �
 ↓
 HC-NEXT-03C5-COVERAGE CoverageNote / Aggregated Coverage Backend — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 ↓
-HC-CASE-AVL Case Availability — PARTIALLY IMPLEMENTED
+HC-CASE-AVL Case Availability — COMPLETE / MERGED
 ↓
 HC-CASE-AVL-R Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
 ↓
-HC-CASE-AVL-UI Case Availability Summary — Frontend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP
+HC-CASE-AVL-UI Case Availability Summary — Frontend — COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -1235,11 +1235,14 @@ Assignment
 ≠
 Custody
 9.8 Case Availability
-HC-CASE-AVL: PARTIALLY IMPLEMENTED; M-HC1 OPEN.
+HC-CASE-AVL: COMPLETE / MERGED; M-HC1 OPEN.
 HC-CASE-AVL-R: COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
-HC-CASE-AVL-UI: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
-CI de R PASS; umbrella permanece PARTIALLY IMPLEMENTED hasta el merge de UI.
-UI implementada con DoD local PASS y PR PENDING; sin Forecast/Commitment/Actual o fechas asignados.
+HC-CASE-AVL-UI: COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
+CI PASS; R y UI merged, umbrella COMPLETE / MERGED. M-HC1 OPEN.
+Sin Forecast/Commitment/Actual o fechas asignados.
+UI merged mediante PR #71; CI PASS. Feature commit:
+`c66fc37fac4a36ebe7be91e84b484a59c3cb5907`; merge commit en main:
+`e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
 R merged mediante PR #69; feature commit `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`,
 merge commit `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
 
@@ -1256,7 +1259,7 @@ sin claim de concurrencia. Sólo spike 127.0.0.1:5434/zaping_spike_test:
 SELECT-only CaseKit/Item para zaping_hc_c5b; fixtures/cleanup propios mediante
 operador acreditado, sin ampliar permisos de escritura de aplicación.
 Evidencia completa y comando en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--post-merge-closeout)
-y estado operativo en PROJECT_BOARD. Dependencia R merge satisfecha; UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
+y estado operativo en PROJECT_BOARD. Dependencia R merge satisfecha; UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
 Actividad DB durante cierre documental: NONE; sin reruns, release ni deployment.
 Sin cambio de schema/migration ni ACL de producción.
 

@@ -2312,9 +2312,9 @@ CURRENT ROADMAP ITEM
 → HC-OPS-01B Preparation Confirmation & Readiness — COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
 → HC-NEXT-03C5-B Integrated Backend Validation — COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 → HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
-→ HC-CASE-AVL — Case Availability — PARTIALLY IMPLEMENTED
+→ HC-CASE-AVL — Case Availability — COMPLETE / MERGED
 → HC-CASE-AVL-R — Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
-→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP
+→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP
 
 DEFERRED
 
@@ -3245,16 +3245,19 @@ sin Forecast/Commitment nuevos; C6-A/B/C/D/E ya merged no quedan bloqueados.
 
 #### HC-CASE-AVL — Case Availability
 
-Estado: PARTIALLY IMPLEMENTED. M-HC1 OPEN.
+Estado: COMPLETE / MERGED. M-HC1 OPEN.
 R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS.
 Feature commit: `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`;
 merge en main: `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
-HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
+HC-CASE-AVL-UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
+UI merged mediante PR #71; CI PASS. Feature commit:
+`c66fc37fac4a36ebe7be91e84b484a59c3cb5907`; merge commit en main:
+`e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
 
 | Slice | Estado | Estimación |
 |---|---|---|
 | HC-CASE-AVL-R — Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
-| HC-CASE-AVL-UI — Case Availability Summary — Frontend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 3 SP |
+| HC-CASE-AVL-UI — Case Availability Summary — Frontend | COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS | TARGET 3 SP |
 
 Contrato aprobado y autoridad DEC-CASE-AVL-01/02/03:
 [CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
@@ -3279,7 +3282,7 @@ rechazadas, control.disconnect/concurrency.disconnect PASS y zero-residue.
 Opt-in y URLs aplicación/operador ausentes después (tres Test-Path False).
 Comando, alcance y evidencia en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--post-merge-closeout).
 Actividad DB durante cierre: NONE; sin reruns ni deployment.
-Sólo backend read merged; sin cambio de schema, migration o ACL de producción.
+Backend read y UI merged; sin cambio de schema, migration o ACL de producción.
 TARGET exclusivamente; sin Forecast, Commitment, Actual o fechas asignados.
 UI local: resumen en «Detalle del caso» entre procedimiento y Requerimientos,
 cinco dimensiones (schedule/requirements/coverage/equipment/preparation), servicio
@@ -3297,9 +3300,9 @@ suppliers preexistentes, ninguno de HC-CASE-AVL-UI. Auditoría: ENVIRONMENTAL /
 NON-BLOCKING, sin leaks/loops/contaminación atribuibles al ticket. No se declara
 default npm test PASS; config/timeouts/scripts/worker defaults intactos.
 Evidencia completa en [CASES §86.11](../modules/healthcare/CASES.md#8611-hc-case-avl-ui--local-dod-closeout).
-UI PR PENDING; umbrella PARTIALLY IMPLEMENTED hasta UI merge; M-HC1 OPEN.
+UI COMPLETE / MERGED — PR #71; umbrella COMPLETE / MERGED; CI PASS. M-HC1 OPEN.
 Cierre sólo documental, sin reruns ni actividad DB; backend intacto.
-Siguiente acción: revisión humana → staging selectivo → commit → PR.
+Siguiente acción: revisión humana → staging selectivo → commit → docs PR.
 
 #### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 

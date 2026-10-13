@@ -10,11 +10,15 @@
 
 ## Unreleased
 
-### HC-CASE-AVL-UI — cierre DoD local / PR PENDING
+### HC-CASE-AVL-UI — cierre DoD / MERGED
 
-**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
-HC-CASE-AVL-R COMPLETE / MERGED — PR #69; HC-CASE-AVL PARTIALLY IMPLEMENTED
-hasta UI merge; M-HC1 OPEN. No declara UI COMPLETE/MERGED, release ni deployment.
+**Estado:** COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP.
+HC-CASE-AVL-R COMPLETE / MERGED — PR #69; HC-CASE-AVL COMPLETE / MERGED.
+M-HC1 OPEN. UI merged mediante PR #71; CI PASS. Feature commit:
+`c66fc37fac4a36ebe7be91e84b484a59c3cb5907`; merge commit en main:
+`e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
+DoD/CI PASS, con la limitación de default npm test conservada abajo.
+Sin release ni deployment.
 
 Case Availability Summary añadido al modal existente «Detalle del caso», después
 del procedimiento y antes de Requerimientos. Cinco dimensiones: schedule,
@@ -48,7 +52,7 @@ Cierre sólo documental, sin reruns ni cambios backend/API/Prisma/migraciones.
 CI PASS. Merge mediante PR #69; feature commit
 `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`, merge commit en main
 `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
-HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Sólo backend read COMPLETE / MERGED;
+HC-CASE-AVL COMPLETE / MERGED; HC-CASE-AVL-UI COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS — TARGET 3 SP. M-HC1 OPEN. Backend read y UI COMPLETE / MERGED;
 sin release, deployment, cambio de schema/migration ni ACL de producción.
 
 Implementado GET /healthcare/cases/:caseId/availability con summaries compactos
