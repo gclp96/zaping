@@ -23,7 +23,7 @@ fundamento dormido; los writers/readers productivos conservan su comportamiento.
 | Foundation slice | TARGET | Estado |
 | --- | --- | --- |
 | HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
-| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING |
+| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | IMPLEMENTED / REVIEW PENDING — DORMANT UNTIL 01D |
 | HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
@@ -58,17 +58,42 @@ por credencial administrativa desactualizada; el runner usa socket local del
 contenedor aislado, sin cambiar credenciales existentes ni .env. El noEmit global
 de specs encontró errores en tests existentes fuera de 01A; el conjunto focal pasa.
 
-01A está merged y permanece dormido. 01B está TECHNICAL DESIGN APPROVED / PR PENDING — TARGET 8 SP;
+01A está merged y permanece dormido. 01B está IMPLEMENTED / REVIEW PENDING — TARGET 8 SP;
 [TD-INV-01B-01..30](../modules/erp/INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md)
-APPROVED por revisión humana. Implementation NOT STARTED; Activation DORMANT UNTIL 01D.
+APPROVED / MERGED — PR #78. Baseline implementación
+`724918966d4375cf3e96e5ccab900f6ef734d752`; Activation DORMANT UNTIL 01D.
 OUT manual con sources explícitas y expectedRevision; COUNT_CORRECTION AVAILABLE
 con actor/razón y Effect/Line incluso delta cero, sin revision bump ni proyección cero.
 Receipt mixto admite conjuntos disjuntos: QUANTITY Positions, ASSET Equipment,
 SERIALIZED sin nueva integración física. Proyecciones compartidas y replay atómico.
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C..01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
-Siguiente acción: staging selectivo → commit técnico → PR; después del merge,
-iniciar implementación 01B dormida. Sin Forecast/Commitment/Actual nuevos.
+Implementación local: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
+dos migraciones (enums separados de constraints); adapter compartido de proyección
+desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
+actor y fuentes explícitas; Receipt interno mixto con reserva ASSET codes antes de
+Product roots. No controller productivo invoca la integración. Helper legacy
+registerPurchaseEntry deprecado, sin alias físico. No backfill/activación.
+
+Validación local 01B: focal 28/28; API `npm test -- --runInBand` 1814/1814,
+110 suites; typecheck/lint/build, Prisma format/validate y noEmit focal PASS.
+Aceptación `node test/helpers/inventory-integration-postgres-runner.cjs --run-isolated`:
+30/30 PASS; `prisma migrate deploy` normal PASS sólo en
+`127.0.0.1:5434 / zaping_spike_test`. Último rol temporal
+`zaping_inv01b_a721c8d2c491`: migración con privilegio administrativo temporal,
+aceptación sin superusuario; fixtures eliminados, Company residue=0 y rol eliminado.
+Una corrida ampliada tuvo 29 PASS / 1 FAIL por UPDATE no autorizado del fixture
+PurchaseItem; fixture corregido para INSERT con costo requerido, sin ampliar grants.
+`prisma generate` no PASS: DLL Windows en uso (EPERM). Harness 01A inicialmente
+detenido por checksum; se verificó que el registrado coincide exactamente con LF
+y el checkout usa CRLF. Se aceptó sólo esa equivalencia de finales de línea, sin
+modificar SQL ni metadata. Regresión PostgreSQL 01A: 26/26 PASS; rol temporal
+`zaping_inv01a_221153c22427` y fixtures eliminados.
+Prueba estática ampliada de ausencia de callers productivos: 20/20 PASS.
+
+Siguiente acción: revisión humana → staging selectivo → commit → PR implementación.
+01C sólo READY tras revisión, QA/aceptación y merge de implementación 01B.
+Sin Forecast/Commitment/Actual nuevos; 01B no se marca COMPLETE.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |

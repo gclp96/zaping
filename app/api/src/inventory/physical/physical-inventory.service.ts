@@ -7,6 +7,7 @@ import {
 } from '@prisma/client';
 import {
   Credit,
+  CountCorrection,
   Debit,
   Transfer,
   PhysicalCommand,
@@ -42,6 +43,17 @@ function positionKey(position: InventoryPosition): PositionKey {
 @Injectable()
 export class PhysicalInventoryService {
   constructor(private readonly repository: PhysicalInventoryRepository) {}
+
+  countCorrection(
+    tx: Prisma.TransactionClient,
+    command: PhysicalCommand,
+    count: CountCorrection,
+  ) {
+    return this.apply(tx, {
+      ...command,
+      operation: { kind: 'COUNT_CORRECTION', ...count },
+    });
+  }
 
   creditAvailable(
     tx: Prisma.TransactionClient,
@@ -117,18 +129,21 @@ export class PhysicalInventoryService {
     if (early) return early;
     const op = request.operation;
     const debits =
-      op.kind === 'CREDIT'
+      op.kind === 'CREDIT' || op.kind === 'COUNT_CORRECTION'
         ? []
         : op.kind === 'TRANSFER'
           ? op.transfers
           : op.debits;
     const targets =
-      op.kind === 'DEFINITIVE_OUT'
+      op.kind === 'DEFINITIVE_OUT' || op.kind === 'COUNT_CORRECTION'
         ? []
         : op.kind === 'CREDIT'
           ? op.credits.map((v) => v.target)
           : op.transfers.map((v) => v.target);
-    const sourceIds = sortedUnique(debits.map((d) => d.sourceId));
+    const sourceIds =
+      op.kind === 'COUNT_CORRECTION'
+        ? [op.sourceId]
+        : sortedUnique(debits.map((d) => d.sourceId));
     const discovered = await this.repository.findSources(
       tx,
       request.companyId,
@@ -209,7 +224,18 @@ export class PhysicalInventoryService {
         expectedRevision: existing?.expectedRevision ?? expectedRevision,
       });
     };
-    if (op.kind === 'CREDIT') {
+    if (op.kind === 'COUNT_CORRECTION') {
+      const source = byId.get(op.sourceId)!;
+      requirePhysical(
+        source.state === 'AVAILABLE',
+        'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+      );
+      add(
+        positionKey(source),
+        op.countedQuantity - source.quantity,
+        op.expectedRevision,
+      );
+    } else if (op.kind === 'CREDIT') {
       for (const credit of op.credits) add(credit.target, credit.quantity);
     } else {
       for (const debit of debits) {
@@ -250,7 +276,8 @@ export class PhysicalInventoryService {
       requirePhysical(
         Math.abs(line.delta) <= MAX_PHYSICAL_QUANTITY &&
           quantityBefore + line.delta <= MAX_PHYSICAL_QUANTITY &&
-          (line.position?.revision ?? 0) < MAX_PHYSICAL_QUANTITY,
+          (line.delta === 0 ||
+            (line.position?.revision ?? 0) < MAX_PHYSICAL_QUANTITY),
         'PHYSICAL_QUANTITY_LIMIT',
       );
       deltas.set(
@@ -290,11 +317,10 @@ export class PhysicalInventoryService {
       const position =
         line.position ??
         (await this.repository.createPosition(tx, request.companyId, line.key));
-      const result = await this.repository.mutatePosition(
-        tx,
-        position,
-        line.delta,
-      );
+      const result =
+        line.delta === 0
+          ? { count: 1 }
+          : await this.repository.mutatePosition(tx, position, line.delta);
       requirePhysical(result.count === 1, 'PHYSICAL_POSITION_CONFLICT');
       evidence.push(
         await this.repository.appendLine(tx, {
@@ -306,7 +332,7 @@ export class PhysicalInventoryService {
           quantityBefore: position.quantity,
           quantityAfter: position.quantity + line.delta,
           revisionBefore: position.revision,
-          revisionAfter: position.revision + 1,
+          revisionAfter: position.revision + (line.delta === 0 ? 0 : 1),
         }),
       );
     }

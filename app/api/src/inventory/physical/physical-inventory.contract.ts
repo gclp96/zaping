@@ -77,7 +77,13 @@ export type Debit = {
   expectedSourceRevision?: number;
 };
 export type Transfer = Debit & { target: PositionKey };
+export type CountCorrection = {
+  sourceId: string;
+  countedQuantity: number;
+  expectedRevision: number;
+};
 export type PhysicalOperation =
+  | ({ kind: 'COUNT_CORRECTION' } & CountCorrection)
   | { kind: 'CREDIT'; credits: Credit[] }
   | { kind: 'TRANSFER'; transfers: Transfer[] }
   | { kind: 'DEFINITIVE_OUT'; debits: Debit[] };
@@ -197,6 +203,23 @@ export function normalizePhysicalRequest(
     command.reason = text(request.reason.trim(), 1000);
   }
   const op = request.operation;
+  if (op.kind === 'COUNT_CORRECTION') {
+    requirePhysical(command.reason);
+    for (const value of [op.countedQuantity, op.expectedRevision]) {
+      requirePhysical(
+        Number.isInteger(value) && value >= 0 && value <= MAX_PHYSICAL_QUANTITY,
+      );
+    }
+    return {
+      ...command,
+      operation: {
+        kind: 'COUNT_CORRECTION',
+        sourceId: uuid(op.sourceId),
+        countedQuantity: op.countedQuantity,
+        expectedRevision: op.expectedRevision,
+      },
+    };
+  }
   const items =
     op.kind === 'CREDIT'
       ? op.credits

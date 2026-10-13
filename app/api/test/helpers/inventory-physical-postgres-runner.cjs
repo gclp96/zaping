@@ -82,10 +82,15 @@ try {
     'utf8',
   );
   const checksum = createHash('sha256').update(source).digest('hex');
+  // Git on Windows may check out CRLF. Accept only that exact newline-only
+  // equivalent; never change recorded migration metadata or ignore SQL drift.
+  const lfChecksum = createHash('sha256')
+    .update(source.replace(/\r\n/g, '\n'))
+    .digest('hex');
   const applied = sql(
     `SELECT checksum FROM "_prisma_migrations" WHERE migration_name='${migration}' AND finished_at IS NOT NULL AND rolled_back_at IS NULL;`,
   );
-  if (applied && applied !== checksum)
+  if (applied && applied !== checksum && applied !== lfChecksum)
     throw new Error('applied migration checksum mismatch');
   if (!applied) {
     // Apply the exact checked-in SQL and record successful application atomically.
