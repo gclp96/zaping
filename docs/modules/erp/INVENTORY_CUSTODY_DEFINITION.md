@@ -2,9 +2,12 @@
 
 **COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.**
 
-Merge: `51363f566c8c6656f1653f03f11d9489ab4d082b`. 01A está TECHNICAL DESIGN
-APPROVED / PR PENDING — TARGET 8 SP; [diseño técnico](INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
-TD-INV-01A-01..20 APPROVED. Implementation NOT STARTED; autoridad dormida.
+Merge DEF: `51363f566c8c6656f1653f03f11d9489ab4d082b`. 01A está COMPLETE / MERGED —
+PR #77 — main@47fd68a — TARGET 8 SP; [diseño técnico](INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
+TD-INV-01A-01..20 APPROVED / MERGED — PR #76. Autoridad todavía dormida.
+01B TECHNICAL DESIGN APPROVED / PR PENDING — TARGET 8 SP;
+[TD-INV-01B-01..30](INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md)
+APPROVED por revisión humana. Implementation NOT STARTED; Activation DORMANT UNTIL 01D.
 
 Baseline: `456e5a6ddbffbbb9fdc3b2be524345c57a6bf90f`. DEC-INV-CUST-01..14 aprobadas
 por revisión humana de producto/arquitectura con refinamientos de §9. No
@@ -265,17 +268,18 @@ no claims, SQL o locks. Snapshot de custodian híbrido permanece en Dispatch.
 
 | ID | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING — Implementation NOT STARTED |
-| HC-INVENTORY-CUSTODY-01B | Purchase Receipts + writers Inventory manual + proyecciones compatibles | 8 SP | DEFINED / BLOCKED BY 01A |
+| HC-INVENTORY-CUSTODY-01A | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
+| HC-INVENTORY-CUSTODY-01B | Purchase Receipts + writers Inventory manual + proyecciones compatibles | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING |
 | HC-INVENTORY-CUSTODY-01C | Sales shared availability + resolución outbound + concurrencia | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D | Conciliación + opening manifest + tooling backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E | Primitiva custodia Equipment + aceptación Foundation cruzada | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
 Esta división sustituye el slice integrado de 13 SP del discovery. Sin fechas,
 Forecast, Commitment ni Actual. Ningún slice se implementa aquí. DEF fue merged
-mediante PR #75; 01A está TECHNICAL DESIGN APPROVED / PR PENDING, con
-TD-INV-01A-01..20 APPROVED tras las sustituciones humanas 10/14/19.
-Implementation NOT STARTED. 01B..01E siguen BLOCKED.
+mediante PR #75; 01A COMPLETE / MERGED mediante PR #77 sobre
+`47fd68a409906b3a5981bd7f7cd30a48e08714b0`, con TD-INV-01A-01..20 APPROVED / MERGED
+mediante PR #76 tras las sustituciones humanas 10/14/19. 01B TECHNICAL DESIGN APPROVED / PR PENDING;
+01C..01E siguen BLOCKED. TD-INV-01B-01..30 APPROVED; TARGET 8 SP con alcance backend QUANTITY dormido, sin frontend/cutover. COUNT_CORRECTION cero conserva Effect/Line sin revision bump; Receipt mixto separa QUANTITY/ASSET/SERIALIZED. SERIALIZED físico queda deferred a decisión/slice futuro; ASSET pertenece Equipment/01E.
 
 HC-DSP-01A/B/C/D permanecen **DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION**.
 El refinamiento técnico de schema/API puede continuar posteriormente, pero la
@@ -285,7 +289,7 @@ Dispatch de correction/reversal auditado y recovery PREPARED antes de uso amplio
 selector Assignment >100 sigue P1. M-HC1 OPEN.
 
 **Resultado: COMPLETE / MERGED — PR #75 — main@51363f5 — HC-INVENTORY-CUSTODY-DEF.**
-Siguiente acción: revisión del delta → staging selectivo → commit de diseño → PR
-técnico. Después del merge, iniciar implementación 01A desde main actualizado;
-01A permanece dormido y no activa consumidores productivos ni backfill/cutover.
+Siguiente acción: staging selectivo → commit de
+diseño → PR técnico. 01A permanece dormido; 01B aprobado permanece dormido hasta
+01D, sin consumidores productivos nuevos ni backfill/cutover en este diseño.
 Sin staging, commit, tests ni actividad de base de datos en esta sincronización.
