@@ -218,7 +218,9 @@ Checklist: [diseño, §34.5.2.4](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECH
 
 # 2026-10-07 — HC-OPS-01B Preparation Confirmation & Readiness — cierre documental
 
-**Estado:** COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS.
+**Estado vigente:** COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS.
+El cierre local del 2026-10-07 fue un checkpoint pre-merge de validación y revisión;
+la evidencia siguiente se conserva como histórica, no como trabajo aún sin commit.
 
 CaseKit permite DRAFT → PREPARED con preparedBy/preparedAt originales e
 inmutabilidad del contenido. Readiness/blockers se derivan del estado actual;
@@ -242,9 +244,11 @@ manual PASS. Build Web usó temporalmente
 registra el checkpoint aceptado; no vuelve a ejecutar tests/builds/manual QA.
 Detalle y checklist: [CASE_KITS, secciones 233.14–233.15](../modules/healthcare/CASE_KITS.md).
 
-Sin nueva versión de release, métricas de sprint, commit, merge ni deployment.
-M-HC1 continúa abierto; el siguiente trabajo registrado es HC-NEXT-03C5-B/B0,
-todavía NOT READY. Los known follow-ups de formato, entorno Windows, hardening del
+En aquel cierre documental no se creó versión de release, métricas de sprint,
+commit, merge ni deployment. El siguiente trabajo registrado entonces era
+HC-NEXT-03C5-B/B0, todavía NOT READY en ese checkpoint. La sincronización post-audit
+conserva M-HC1 OPEN y registra como siguiente actividad CaseDispatch V1 Contract
+Definition, sin crear ticket de implementación. Los known follow-ups de formato, entorno Windows, hardening del
 rol aislado y encoding de fixtures permanecen fuera de HC-OPS-01B.
 
 ---
