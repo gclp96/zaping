@@ -17,22 +17,50 @@ HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definitio
 COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.
 [DEC-INV-CUST-01..14 APPROVED con refinamientos](../modules/erp/INVENTORY_CUSTODY_DEFINITION.md).
 Posiciones = autoridad física actual; ledger/efectos = evidencia histórica;
-Product.stock = proyección compatible owned. Sin schema concreto ni implementación.
+Product.stock = proyección compatible owned futura. 01A implementa localmente el
+fundamento dormido; los writers/readers productivos conservan su comportamiento.
 
 | Foundation slice | TARGET | Estado |
 | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | TECHNICAL DESIGN APPROVED / PR PENDING — Implementation NOT STARTED |
+| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | IMPLEMENTED / REVIEW PENDING |
 | HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | DEFINED / BLOCKED BY 01A |
 | HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
 | HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
-DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`; 01A está TECHNICAL DESIGN
-APPROVED / PR PENDING. [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
-APPROVED tras las sustituciones humanas 10/14/19. Implementation NOT STARTED;
-01A permanece dormido y 01B..01E BLOCKED. Siguiente acción: revisión del delta →
-staging selectivo → commit de diseño → PR técnico; tras merge iniciar implementación
-01A desde main actualizado, sin activación productiva/backfill/cutover en 01A.
+DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
+[TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
+APPROVED / MERGED — PR #76. Implementación 01A sobre baseline
+`196d52cc9608e2a147264dbf6e78319102bcd49a`: IMPLEMENTED / REVIEW PENDING — TARGET 8 SP.
+InventoryPosition + PhysicalEffect/Line, cuatro UNIQUE parciales, FKs compuestas,
+CHECKs y completitud diferida de INSERT; sin triggers de inmutabilidad UPDATE/DELETE.
+Core interno creditAvailable/transfer/definitiveOut y reads Positions-only;
+TransactionClient del caller, locks Product → Batch → Position, INSERT normal,
+abort y clasificación fresca externa ante colisión de origen. Sin consumidores
+productivos, backfill, cutover ni cambios de saldo legacy.
+
+Validación local: contrato focal 20/20 dentro de API `npm test -- --runInBand`
+1806/1806, 109 suites;
+PostgreSQL 26/26 mediante
+`node test/helpers/inventory-physical-postgres-runner.cjs --run-isolated` en
+`127.0.0.1:5434 / zaping_spike_test`. Migración
+`20261013000000_add_inventory_physical_authority` aplicada sólo allí por socket
+administrativo `postgres`, con registro/checksum transaccional; aceptación con rol
+temporal sin superusuario `zaping_inv01a_330d32e4f289`, luego eliminado. Cleanup de
+fixtures PASS, cero Company de ese run. Último saldo, creación concurrente, replay,
+mismatch entre Products distintos, rollback de transfer y FKs/CHECKs reales PASS.
+Prisma validate, typecheck, lint, build y noEmit focal PASS. Una corrida PostgreSQL
+en paralelo con la suite API agotó el timeout de 5 s de una prueba; repetición
+aislada 26/26 PASS sin modificar timeouts. `prisma generate` encontró EPERM al reemplazar
+DLL en uso: no se declara PASS; cliente actualizado usado por las pruebas y motor
+existente con SHA-256 idéntico al instalado. `prisma migrate deploy` por TCP falló
+por credencial administrativa desactualizada; el runner usa socket local del
+contenedor aislado, sin cambiar credenciales existentes ni .env. El noEmit global
+de specs encontró errores en tests existentes fuera de 01A; el conjunto focal pasa.
+
+01A permanece dormido y no se marca COMPLETE/DONE. 01B..01E siguen BLOCKED;
+01B sólo será READY después de code review, QA/aceptación y merge de 01A.
+Siguiente acción: revisión humana de código → staging selectivo → commit → PR de implementación.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |

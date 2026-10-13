@@ -47,6 +47,7 @@ model Product {
   updatedAt                  DateTime                    @updatedAt
   inventoryMovements         InventoryMovement[]
   inventoryBatches           InventoryBatch[]
+  inventoryPositions         InventoryPosition[]
   purchaseReceiptItems       PurchaseReceiptItem[]
   equipmentAssets            EquipmentAsset[]
   healthcareCaseRequirements HealthcareCaseRequirement[]
@@ -108,16 +109,95 @@ model InventoryBatch {
   company Company @relation(fields: [companyId], references: [id])
   product Product @relation(fields: [productId], references: [id])
 
-  receiptItems    PurchaseReceiptItem[]
-  movements       InventoryMovement[]
-  equipmentAssets EquipmentAsset[]
+  receiptItems       PurchaseReceiptItem[]
+  movements          InventoryMovement[]
+  equipmentAssets    EquipmentAsset[]
+  inventoryPositions InventoryPosition[]
 
   @@unique([id, companyId])
+  @@unique([id, companyId, productId])
   @@unique([companyId, productId, lotNumber])
   @@index([companyId])
   @@index([productId])
   @@index([expirationDate])
   @@index([isActive])
+}
+
+// Dormant physical authority; no productive writers/readers until later slices.
+enum InventoryPositionState {
+  AVAILABLE
+  CUSTODY
+}
+
+enum InventoryPhysicalEffectKind {
+  CREDIT
+  TRANSFER
+  DEFINITIVE_OUT
+}
+
+model InventoryPosition {
+  id               String                        @id @default(uuid())
+  companyId        String
+  productId        String
+  inventoryBatchId String?
+  state            InventoryPositionState
+  contextType      String?                       @db.VarChar(64)
+  contextId        String?                       @db.VarChar(128)
+  quantity         Int                           @default(0)
+  revision         Int                           @default(0)
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+  company          Company                       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  product          Product                       @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  batch            InventoryBatch?               @relation(fields: [inventoryBatchId, companyId, productId], references: [id, companyId, productId], onDelete: Restrict, onUpdate: Restrict)
+  lines            InventoryPhysicalEffectLine[]
+  // Four partial UNIQUE indexes and CHECKs are maintained in migration SQL.
+
+  @@unique([id, companyId])
+  @@index([companyId, productId, state])
+  @@index([companyId, inventoryBatchId, state])
+  @@index([companyId, contextType, contextId])
+}
+
+model InventoryPhysicalEffect {
+  id              String                        @id @default(uuid())
+  companyId       String
+  originType      String                        @db.VarChar(64)
+  originId        String                        @db.VarChar(128)
+  originOperation String                        @db.VarChar(64)
+  kind            InventoryPhysicalEffectKind
+  requestHash     String                        @db.Char(64)
+  lineCount       Int
+  actorId         String
+  reason          String?                       @db.VarChar(1000)
+  occurredAt      DateTime                      @default(now())
+  createdAt       DateTime                      @default(now())
+  company         Company                       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  actor           User                          @relation(fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  lines           InventoryPhysicalEffectLine[]
+
+  @@unique([id, companyId])
+  @@unique([companyId, originType, originId, originOperation], map: "InventoryPhysicalEffect_origin_key")
+  @@index([companyId, occurredAt, id])
+}
+
+model InventoryPhysicalEffectLine {
+  id             String                  @id @default(uuid())
+  companyId      String
+  effectId       String
+  positionId     String
+  sequence       Int
+  delta          Int
+  quantityBefore Int
+  quantityAfter  Int
+  revisionBefore Int
+  revisionAfter  Int
+  effect         InventoryPhysicalEffect @relation(fields: [effectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  position       InventoryPosition       @relation(fields: [positionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([effectId, sequence])
+  @@unique([effectId, positionId])
+  @@index([companyId, positionId, effectId])
 }
 
 enum InventoryMovementType {
@@ -368,6 +448,8 @@ model Company {
   healthcareCaseKits                    HealthcareCaseKit[]
   inventoryMovements                    InventoryMovement[]
   inventoryBatches                      InventoryBatch[]
+  inventoryPositions                    InventoryPosition[]
+  inventoryPhysicalEffects              InventoryPhysicalEffect[]
   equipmentAssets                       EquipmentAsset[]
   equipmentInspections                  EquipmentInspection[]
   companySequences                      CompanySequence[]
@@ -508,7 +590,8 @@ model User {
   confirmedSaleReturns SaleReturn[] @relation("SaleReturnConfirmedBy")
   cancelledSaleReturns SaleReturn[] @relation("SaleReturnCancelledBy")
 
-  passwordResetTokens PasswordResetToken[]
+  passwordResetTokens      PasswordResetToken[]
+  inventoryPhysicalEffects InventoryPhysicalEffect[]
 
   @@unique([id, companyId])
 }
