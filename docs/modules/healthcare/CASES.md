@@ -1458,7 +1458,7 @@ El contrato se aprobó en `docs/hc-case-availability-contract`, base
 MERGED; M-HC1 OPEN. DEC-CASE-AVL-01/02/03 aprobadas por producto y registradas
 como autoridad del contrato V1. DEC-C5-COV-01..06 permanecen sin cambios;
 Coverage sigue informacional. Este cierre sincroniza documentación y evidencia
-local y merge del backend read; UI READY — TARGET 3 SP, implementación no iniciada.
+local y merge del backend read; UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
 No declara umbrella COMPLETE ni release/deployment.
 
 Identificadores canónicos aprobados por producto:
@@ -1467,7 +1467,7 @@ Identificadores canónicos aprobados por producto:
 |---|---|---|---|
 | HC-CASE-AVL | Case Availability umbrella capability | PARTIALLY IMPLEMENTED | — |
 | HC-CASE-AVL-R | Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
-| HC-CASE-AVL-UI | Case Availability Summary — Frontend | READY | TARGET 3 SP |
+| HC-CASE-AVL-UI | Case Availability Summary — Frontend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 3 SP |
 
 HC-NEXT-03C3 y HC-NEXT-03B.1 corresponden a Equipment Assignment Availability,
 no a este agregado. `CASE_AVAILABILITY.md` aparece como referencia futura en
@@ -1481,7 +1481,7 @@ merged prevalecen BOARD/ROADMAP (PR #56) y para semántica, código y tests actu
 
 | Fuente inspeccionada | Hecho relevante |
 |---|---|
-| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | HC-CASE-AVL PARTIALLY IMPLEMENTED; R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS. UI READY — TARGET 3 SP, implementación no iniciada. M-HC1 OPEN. Contrato aprobado y evidencia en §86. |
+| [ROADMAP §9.8](../../project/ROADMAP.md), [PROJECT_BOARD](../../project/PROJECT_BOARD.md) | HC-CASE-AVL PARTIALLY IMPLEMENTED; R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS. UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Contrato aprobado y evidencia en §86. |
 | [ARCHITECTURE §50](../../architecture/ARCHITECTURE.md), [HEALTHCARE §54](HEALTHCARE.md), [DOMAIN_MODEL §60](DOMAIN_MODEL.md) | Availability contextual al Case/horario pertenece a Healthcare; custody, maintenance, calibration y turnaround son evolución cuando existan. |
 | [EQUIPMENT ERP §49](../erp/EQUIPMENT.md), [evaluator Core](../../../app/api/src/equipment/equipment-availability.evaluator.ts) | Current Asset Availability usa lifecycle/condition; ACTIVE + GOOD no acredita disponibilidad contextual ni física para un Case. |
 | [Case service](../../../app/api/src/healthcare/cases/healthcare-case.service.ts), schema y su spec | Sólo DRAFT/SCHEDULED/CANCELLED. scheduledStart basta para SCHEDULED; scheduledEnd puede faltar. End sin start y end <= start se rechazan. No COMPLETED/CLOSED actual. |
@@ -1710,21 +1710,23 @@ No quedan decisiones de producto ni identificadores pendientes para este contrat
 V1. HC-CASE-AVL, HC-CASE-AVL-R y HC-CASE-AVL-UI están aprobados según §86.1;
 su semántica se conserva y el estado vigente de implementación se registra en §86.1.
 
-### 86.9 Slices aprobados y UI mínima pendiente
+### 86.9 Slices aprobados y UI mínima implementada
 
 HC-CASE-AVL-R — Derived Case Availability Read — Backend:
 COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
 HC-CASE-AVL-UI — Case Availability Summary — Frontend:
-READY — TARGET 3 SP.
+IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
 Son targets provisionales exclusivamente; sin fechas ni valores
 FORECAST/COMMITMENT/ACTUAL asignados. Backend incluye reuse con tx compartido y contratos de
 población/agregación; no separar persistence porque no hay estado nuevo persistido.
 
-UI mínima futura en Case detail: lifecycle, schedule completo/incompleto, counts
-de estados Coverage, conflictos/incertidumbre Equipment, kit status/readiness y
-blockers locales, notes count; enlaces a Requirements, Coverage/notes, Assignments
-y CaseKit. Etiquetar ausencia «sin información registrada»; sin badge global verde
-ni CTA de Dispatch. Errores/refresh no deben conservar datos stale como vigentes.
+UI implementada en el modal existente «Detalle del caso»: identidad/procedimiento
+→ resumen de disponibilidad → Requerimientos. Presenta schedule completo/incompleto,
+Requirements activos/obligatorios/respaldo, counts de estados Coverage y notes activas,
+diagnósticos/warnings Equipment y kit status/readiness con blockers locales.
+Drill-down a Equipment Assignments y CaseKit; Requerimientos conserva su flujo.
+Ausencias explícitas sin inferir readiness o aplicabilidad; sin verdict global READY /
+AVAILABLE ni workflow gate. Errores/refresh no conservan datos stale como vigentes.
 
 La aceptación persistida de R valida la proyección integrada con HTTP/JWT reales,
 dos tenants, horarios completos/incompletos, ACTIVE REQUIRED/BACKUP y RETIRED
@@ -1786,10 +1788,66 @@ Después del runtime, RUN_HC_C5B_POSTGRES_TESTS, HC_C5B_DATABASE_URL y
 HC_C5B_OPERATOR_DATABASE_URL ausentes; los tres Test-Path devolvieron False.
 Este cierre registra la evidencia suministrada, sin reejecutar gates ni conectar DB.
 **Actividad DB durante este cierre: NONE.**
-HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI READY — TARGET 3 SP,
-implementación no iniciada. M-HC1 OPEN. Sin cambio de schema ni migration;
+HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Sin cambio de schema ni migration;
 sin ACL ni deployment de producción. Siguiente acción documental:
 revisión humana → staging selectivo → commit → docs PR.
+
+### 86.11 HC-CASE-AVL-UI — Local DoD closeout
+
+**IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.**
+R COMPLETE / MERGED — PR #69; HC-CASE-AVL PARTIALLY IMPLEMENTED hasta el merge
+de UI. M-HC1 OPEN. Rama `feat/hc-case-avl-ui`, base
+`f8de10d0ebcb6f520dce320056041ddee1a08310`; sin declarar UI COMPLETE/MERGED,
+CI de UI, release ni deployment.
+
+Servicio API tipado mediante el cliente web existente para
+`GET /healthcare/cases/:caseId/availability`, con sólo datos públicos y errores
+propagados. Carga únicamente al abrir el detalle, sin requests de Availability
+por fila. Una instancia por caseId/actualización y cleanup con indicador active
+impiden que respuestas tardías de un Case anterior reemplacen el resumen vigente;
+reintento/actualización consultan el Case actual. Loading y errores quedan aislados
+del detalle y de Requerimientos; 401 conserva el manejo global de sesión, 403 usa
+la convención ForbiddenState y 404 muestra ausencia sin cerrar el detalle.
+ADMIN / MANAGER / SALES / WAREHOUSE pueden leer; los controles mutantes existentes
+conservan sus role helpers. Enlaces «Ver asignaciones» y «Ver maletín» a las rutas
+existentes, sin ruta ni navegación superior nueva.
+
+DEC-CASE-AVL-01/02/03 intactas: cinco dimensiones informacionales e independientes,
+sin verdict general READY / AVAILABLE ni workflow gate. El frontend sólo presenta
+valores del backend; no rederiva Coverage, poblaciones, conflictos, verificabilidad
+ni CaseKit readiness. PASS/BLOCKED y blockers se limitan a «Preparación del maletín».
+Cero Requirements: «Sin requerimientos activos registrados»; Kit ausente:
+«Sin maletín registrado», sin inferir listo, no requerido o no aplica.
+
+Evidencia local conservada; no se reejecutan tests ni builds en este cierre:
+
+- Suite focal afectada: **69 tests PASS** (Case page, Summary, Requirements y servicio).
+- Full Web: `npm test -- --maxWorkers=2` — **855/855 tests PASS; 69/69 archivos PASS**.
+- `npm run lint`, `npm run typecheck` y `npm run build`: PASS.
+- Build con `NEXT_PUBLIC_API_URL=https://api.example.invalid`; URL de prueba,
+  sin despliegue productivo.
+- `git diff --check`: PASS.
+
+**Limitación explícita de la suite predeterminada:** `npm test` produjo
+**842 PASS / 13 FAIL / 855 tests; 63 archivos PASS / 6 FAIL / 69 archivos**.
+Los 13 fallos fueron timeouts de **5000 ms** en pantallas preexistentes ajenas:
+customers, products, quotes, purchases, users y suppliers. Ningún test de
+HC-CASE-AVL-UI falló. La primera ejecución predeterminada tuvo 8 timeouts;
+la única repetición de auditoría produjo el resultado 842/13 registrado aquí.
+**No se acredita default npm test PASS.**
+
+Auditoría pre-closeout: READY FOR LOCAL DOD CLOSEOUT; clasificación
+**ENVIRONMENTAL / NON-BLOCKING**. No se encontró fake timer leak, listener leak,
+polling, missing effect cleanup, request loop ni contaminación de estado global
+atribuible al ticket. Las promesas pendientes deliberadas de tests no mantienen
+timers/conexiones y sus consumidores se desmontan mediante cleanup. Fallos
+variables en flujos existentes intensivos en userEvent y PASS completo con dos
+workers apuntan a contención de recursos; no prueban estabilidad bajo cualquier
+carga. No se modificaron Vitest config, timeouts, scripts ni worker defaults.
+
+Backend, API, Prisma y migraciones sin cambios por UI/cierre.
+**Actividad DB durante este cierre: NONE.** Todo permanece unstaged/uncommitted.
+Siguiente acción: revisión humana → staging selectivo → commit → PR.
 
 87. Equipment conflict CURRENT
 

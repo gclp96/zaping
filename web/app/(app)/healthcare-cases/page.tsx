@@ -27,6 +27,7 @@ import { getApiErrorMessage, isForbiddenError } from '@/services/errors';
 import HealthcareCaseFormModal, {
   type HealthcareCaseSaveIntent,
 } from './components/HealthcareCaseFormModal';
+import HealthcareCaseAvailabilitySummary from './components/HealthcareCaseAvailabilitySummary';
 import HealthcareRequirementsSection from './components/HealthcareRequirementsSection';
 import type { HealthcareCase, HealthcareCaseStatus } from './types';
 
@@ -408,6 +409,7 @@ function HealthcareCaseDetail({
           {healthcareCase.procedureDescription || 'Sin descripción'}
         </p>
       </div>
+      <HealthcareCaseAvailabilitySummary caseId={healthcareCase.id} />
       <div className="border-t border-gray-200 pt-5">
         <HealthcareRequirementsSection
           healthcareCase={healthcareCase}

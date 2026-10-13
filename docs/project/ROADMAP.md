@@ -127,7 +127,7 @@ HC-CASE-AVL Case Availability — PARTIALLY IMPLEMENTED
 ↓
 HC-CASE-AVL-R Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
 ↓
-HC-CASE-AVL-UI Case Availability Summary — Frontend — READY — TARGET 3 SP
+HC-CASE-AVL-UI Case Availability Summary — Frontend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP
 
 DEFERRED — OPS-RC-B5C real staging acceptance
 → READY WHEN NEEDED; no staging deployment is claimed
@@ -1237,9 +1237,9 @@ Custody
 9.8 Case Availability
 HC-CASE-AVL: PARTIALLY IMPLEMENTED; M-HC1 OPEN.
 HC-CASE-AVL-R: COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
-HC-CASE-AVL-UI: READY — TARGET 3 SP.
-CI de R PASS; umbrella permanece PARTIALLY IMPLEMENTED porque UI sigue pendiente.
-UI READY, implementación no iniciada; sin Forecast/Commitment/Actual o fechas asignados.
+HC-CASE-AVL-UI: IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
+CI de R PASS; umbrella permanece PARTIALLY IMPLEMENTED hasta el merge de UI.
+UI implementada con DoD local PASS y PR PENDING; sin Forecast/Commitment/Actual o fechas asignados.
 R merged mediante PR #69; feature commit `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`,
 merge commit `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
 
@@ -1256,9 +1256,26 @@ sin claim de concurrencia. Sólo spike 127.0.0.1:5434/zaping_spike_test:
 SELECT-only CaseKit/Item para zaping_hc_c5b; fixtures/cleanup propios mediante
 operador acreditado, sin ampliar permisos de escritura de aplicación.
 Evidencia completa y comando en [CASES §86.10](../modules/healthcare/CASES.md#8610-hc-case-avl-r--post-merge-closeout)
-y estado operativo en PROJECT_BOARD. Dependencia R merge satisfecha; UI READY — TARGET 3 SP.
+y estado operativo en PROJECT_BOARD. Dependencia R merge satisfecha; UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
 Actividad DB durante cierre documental: NONE; sin reruns, release ni deployment.
 Sin cambio de schema/migration ni ACL de producción.
+
+UI integra el resumen en el modal «Detalle del caso», entre procedimiento y
+Requerimientos: schedule/requirements/coverage/equipment/preparation. Cliente tipado
+GET /healthcare/cases/:caseId/availability, carga sólo al abrir, sin requests por fila;
+protección stale, loading/error aislados y Requerimientos preservado. Drill-down
+a Equipment Assignments y CaseKit; ADMIN/MANAGER/SALES/WAREHOUSE. Sin verdict
+global READY/AVAILABLE, workflow gate ni rederivación de dominio frontend.
+DoD UI: focal 69 PASS; `npm test -- --maxWorkers=2` 855/855 tests / 69/69 archivos
+PASS; lint/typecheck/build y git diff --check PASS. Build con
+`NEXT_PUBLIC_API_URL=https://api.example.invalid`. Default `npm test`: 842 PASS /
+13 FAIL / 855 tests; 63 archivos PASS / 6 FAIL / 69. Los 13 fallos son timeouts
+de 5000 ms en customers/products/quotes/purchases/users/suppliers preexistentes;
+ningún test UI del ticket falló. ENVIRONMENTAL / NON-BLOCKING según auditoría,
+sin leaks/loops/contaminación atribuibles al ticket; no equivale a default npm test
+PASS. Config, timeouts, scripts y worker defaults intactos. Evidencia y alcance
+en [CASES §86.11](../modules/healthcare/CASES.md#8611-hc-case-avl-ui--local-dod-closeout).
+Cierre documental sin reruns ni actividad DB; backend sin cambios.
 
 Current Equipment Availability ya está implementado en ERP Core.
 
