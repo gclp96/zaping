@@ -5,7 +5,8 @@ Documento: Modelo de dominio transversal
 Versión: 1.4.0
 Estado: Aprobado
 Estado de implementación: DOCTORS/HOSPITALS HC-NEXT-01 CLOSED / ACCEPTED — REQUIREMENTS V1 COMPLETE / ACCEPTED — EQUIPMENT ASSIGNMENT HC-NEXT-03B COMPLETE / APPROVED — HC-NEXT-03C1 PERSISTENCE / MIGRATION COMPLETE / MERGED — HC-NEXT-03C2 BACKEND BASE COMPLETE / MERGED — HC-NEXT-03C3 COMPLETE / READY FOR REVIEW — PARTIALLY IMPLEMENTED
-Última actualización: 2026-09-17
+Estado CaseKit: HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS.
+Última actualización: 2026-10-12 (sincronización CaseKit; otros estados históricos sin revisión).
 Responsable: Zaping Healthcare Team
 
 1. Propósito
@@ -794,7 +795,11 @@ warehouse preparation
 Actualmente:
 
 Preparation workflow
-→ NOT IMPLEMENTED
+→ preparación lógica CaseKit implementada; preparación física avanzada diferida
+
+CURRENT: Requirements → inclusión manual de materiales/Assignments → CaseKit
+DRAFT → readiness local derivado → PREPARED + preparedBy/preparedAt → frontera
+con futuro CaseDispatch. Backend/API/frontend soportan el contrato actual.
 
 40. Preparation ≠ commercial OUT
 
@@ -831,14 +836,22 @@ KitTemplate
 CaseKit
 → actual prepared set for a Case
 
-43. CaseKit TARGET
+43. CaseKit CURRENT
 
-CaseKit representa el conjunto real preparado para un Case.
+CaseKit registra la preparación lógica para un Case.
 
 Actualmente:
 
 CaseKit
-→ NOT IMPLEMENTED
+→ IMPLEMENTED: DRAFT → PREPARED, contenido y exclusión histórica, auditoría
+
+PREPARED impide mutaciones de contenido con los comandos actuales. Las fuentes
+pueden invalidarse después y producir readiness BLOCKED, conservando el estado y
+la auditoría históricos. No existe reopen/review ni recuperación implementada.
+
+Readiness es local a preparación: no prueba stock físico ni Equipment libre de
+conflictos temporales. Case Availability es informacional y multidimensional,
+sin verdict global ni gate; DEC-CASE-AVL-01/02/03 permanecen intactas.
 
 Debe mantenerse:
 
@@ -846,7 +859,7 @@ CaseKit
 ≠
 automatic Inventory OUT
 
-44. CaseKit cardinality TBD
+44. CaseKit cardinality CURRENT
 
 Una estructura conceptual:
 
@@ -855,16 +868,20 @@ HealthcareCase
 
 es válida.
 
-Sin embargo la cardinalidad exacta, por ejemplo:
+La cardinalidad implementada es:
 
 1 Case
 → 0..1 CaseKit
 
-no debe considerarse todavía decisión de schema.
+con unicidad Company + Case y relaciones tenant-safe. Múltiples preparaciones
+lógicas independientes permanecen FUTURE / DEFERRED.
 
-45. CaseKit items TARGET
+45. CaseKit items CURRENT
 
-CaseKit puede requerir items de Products cuantificables.
+CaseKit incluye manualmente fuentes Requirement QUANTITY o EquipmentAssignment.
+Requirement conserva requestedQty; el item material conserva preparedQuantity.
+No existe missingQuantity persistido. Dispatched/used/returned/unresolved
+quantities pertenecen al futuro Case Logistics.
 
 Pero no debe convertirse en la única fuente de Requirements.
 
@@ -874,7 +891,23 @@ Requirement
 → what is needed
 
 CaseKitItem
-→ what is physically prepared
+→ what is logically recorded as prepared
+
+EquipmentAsset posee identidad física, lifecycle y condición; EquipmentAssignment
+posee reserva/asignación al Case; CaseKit referencia la Assignment durante
+preparación. Assignment Availability permanece en su dominio. CaseDispatch
+registrará salida física, momento, cantidad, lote/activo y custodio; Inventory
+posee efectos sobre disponibilidad/existencia. PREPARED no implica custodia,
+Dispatch ni InventoryMovement/OUT.
+
+Templates/versiones, IN_PREPARATION, reopen/review, rondas, CaseKitContainer,
+QR/barcode/sello, lotes/seriales de material y sustitución avanzada siguen
+FUTURE / DEFERRED. Véase CASE_KITS §205 para estado actual y seguimientos P1:
+recuperación de PREPARED y selector UI limitado a las primeras 100 Assignments.
+
+Conclusión de auditoría: CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT.
+Siguiente actividad: CaseDispatch V1 Contract Definition. M-HC1 sigue OPEN;
+Dispatch/Custody/Return no están implementados y no se crea ticket de implementación.
 
 46. Stock allocation TARGET
 

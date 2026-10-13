@@ -4,13 +4,20 @@
 **Producto:** Zaping Healthcare
 **Versión:** 2.4.0
 **Estado:** Aprobado
-**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS — DoR COMPLETE
-**Última actualización:** 2026-10-07
+**Estado de implementación:** HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026; HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026; HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE
+**Última actualización:** 2026-10-12
 **Responsable:** Zaping Healthcare Team
 
 ---
 
 # 1. Propósito
+
+**Lectura del documento:** las secciones conceptuales conservan la visión de
+producto; no todas sus capacidades son requisitos de Foundation ni endpoints
+actuales. El estado vigente se resume en §205 y los contratos implementados en
+§§231–233. Templates/versiones, `IN_PREPARATION`, reopen/review, múltiples
+preparaciones lógicas, rondas, CaseKitContainer, QR/barcode/sello, selección de
+lotes/seriales de material y sustitución avanzada permanecen FUTURE / DEFERRED.
 
 Case Kits administra la definición y preparación de materiales y Equipment necesarios para atender un Healthcare Case.
 
@@ -647,9 +654,14 @@ CaseKit status
 de:
 
 ```text
-Case readiness
-→ preparación integral del Case
+CaseKit preparationReadiness
+→ evaluación local derivada de preparación: PASS / BLOCKED
 ```
+
+Case Availability es informacional y multidimensional conforme a
+DEC-CASE-AVL-01/02/03; no existe verdict global Case READY / NOT READY ni gate
+derivado de ese resumen. Kit PASS no prueba stock físico ni ausencia de conflictos
+temporales de Equipment. Assignment Availability conserva su propia semántica.
 
 ---
 
@@ -668,7 +680,7 @@ Equipment unavailable
 puede resultar en:
 
 ```text
-Case NOT READY
+Diagnóstico Equipment; readiness local del Kit BLOCKED si su fuente es inválida
 ```
 
 ---
@@ -1434,11 +1446,14 @@ Case Calendar conflict detection
 Puede generar:
 
 ```text
-Case readiness
-→ BLOCKED / NOT READY
+Equipment diagnostic
+→ disponibilidad/conflictos de Assignment
+CaseKit preparationReadiness
+→ BLOCKED si una fuente incluida es inválida
 ```
 
-según regla.
+según las reglas de cada dimensión. El helper de Kit no evalúa conflictos
+temporales de Assignment y no se deriva un verdict global del Case.
 
 ---
 
@@ -1604,14 +1619,14 @@ Material Preparation Complete
 
 ---
 
-# 128. Case readiness
+# 128. Preparación local y Case Availability
 
 Pero:
 
 ```text
 Material Preparation Complete
 ≠
-Case READY
+verdict global del Case
 ```
 
 si falta:
@@ -1620,6 +1635,9 @@ si falta:
 * Hospital;
 * Equipment;
 * otra condición operacional.
+
+Este ejemplo conceptual no define un gate actual. Case Availability presenta
+dimensiones independientes; sólo la preparación del Kit usa PASS / BLOCKED.
 
 ---
 
@@ -1740,6 +1758,10 @@ Si Preparation no modifica Inventory técnicamente, la confirmación puede princ
 
 # 139. Mutabilidad
 
+CURRENT: Add y Exclude sólo se permiten en DRAFT. PREPARED es inmutable aunque
+todavía no exista Dispatch. El ejemplo siguiente describe evolución conceptual,
+no una autorización actual para editar PREPARED.
+
 Antes de Dispatch:
 
 ```text
@@ -1842,6 +1864,9 @@ sin asumir que todo se resuelve una sola vez.
 ---
 
 # 149. Reopen Preparation
+
+FUTURE / DEFERRED: hoy no existe comando de reopen/review ni recuperación de
+contenido PREPARED. Las rondas y adiciones posteriores requieren contrato futuro.
 
 Podría existir una acción:
 
@@ -1977,9 +2002,12 @@ Missing: 1
 Equipment:
 1 / 1 assigned
 
-Overall:
-NOT READY
+Preparación local:
+BLOCKED
 ```
+
+Mockup conceptual: CURRENT expone blockers, no persiste missingQuantity ni
+implementa necesariamente todos los contadores ilustrados.
 
 ---
 
@@ -2074,7 +2102,7 @@ Open CaseKit
 Desde Case Calendar:
 
 ```text
-Case NOT READY
+Preparación del Kit BLOCKED
 ↓
 [Preparar]
 ↓
@@ -2098,13 +2126,14 @@ Readiness
 
 # 170. Readiness contribution
 
-CaseKit debe aportar una evaluación como:
+CURRENT: CaseKit aporta su evaluación local derivada:
 
 ```text
-MATERIAL_READY
+preparationReadiness: PASS / BLOCKED + blockers
 ```
 
-o información equivalente al Readiness global.
+Case Availability la presenta como una dimensión informacional; no calcula un
+Readiness global ni introduce un nuevo enum del Case.
 
 ---
 
@@ -2478,33 +2507,64 @@ Tampoco convertir toda interacción UI en endpoint especial si un update normal 
 
 # 205. CURRENT
 
-Actualmente:
+**IMPLEMENTED:** un CaseKit lógico por Case y Company, items, backend/API/frontend,
+readiness derivado y confirmación auditada `DRAFT -> PREPARED`. Se implementaron
+create/get por Case, fuentes Requirement QUANTITY y EquipmentAssignment,
+semántica REQUIRED/BACKUP, exclusión con historia, JWT tenant, RBAC e idempotencia.
+La UI soporta todos los comandos actuales de CaseKit.
 
 ```text
-KitTemplate
-CaseKit
-Preparation
-→ documented domain design
+Requirements
+→ inclusión manual de materiales / Assignments
+→ CaseKit DRAFT
+→ readiness derivado local
+→ CaseKit PREPARED + preparedBy / preparedAt
+→ frontera con futuro CaseDispatch
 ```
 
-No existe evidencia de:
+CURRENT separa `Requirement.requestedQty` de `CaseKitItem.preparedQuantity` para
+materiales. La cantidad preparada se ingresa manualmente; no se copia ni sincroniza
+automáticamente. No existe persistencia `missingQuantity`. Dispatched, used,
+returned y unresolved quantities pertenecen al futuro Case Logistics.
 
-```text
-Prisma models
-backend
-API
-frontend
-reservation
-batch allocation Healthcare
-```
+PREPARED registra una confirmación histórica: no permite mutar contenido con los
+comandos actuales. Sus fuentes pueden invalidarse posteriormente y el readiness
+derivado pasar a BLOCKED sin cambiar estado, preparedBy ni preparedAt. No existe
+reopen/recovery; repetir confirmación preserva la auditoría original.
 
-implementados.
+EquipmentAsset posee identidad física, lifecycle y condición; EquipmentAssignment
+posee la reserva/asignación al Case; CaseKit referencia esa Assignment como parte
+de la preparación. No posee Assignment Availability ni custodia del activo.
+
+**FUTURE / DEFERRED, no implementado:** KitTemplate/versiones, reserva física de
+material, selección de lotes/seriales, CaseKitContainer y workflows de sustitución.
+No son endpoints pendientes del contrato Foundation implementado.
+
+**OUTSIDE CASEKIT:** Dispatch/Custody/Return, consumo y reconciliación todavía no
+están implementados en Case Logistics. CaseDispatch registrará qué sale físicamente,
+cuándo, cantidad, lote/activo y custodio. Inventory posee las consecuencias sobre
+disponibilidad/existencia. PREPARED no implica Dispatch, InventoryMovement/OUT,
+reserva física ni transferencia de custodia.
+
+**Resultado de auditoría:** CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT.
+M-HC1 permanece OPEN. Siguiente actividad: **CaseDispatch V1 Contract Definition**;
+no se crea un ticket de implementación de Dispatch.
+
+**Seguimientos P1:** la política de recuperación tras invalidación PREPARED sigue
+sin resolver y sin comando de reapertura. El selector UI carga las primeras 100
+Assignments antes de filtrar; fuentes elegibles posteriores pueden quedar fuera.
+Ambos siguen pendientes. Esta sincronización resuelve la parte documental de la
+auditoría, sin implementar esos seguimientos ni modificar el contrato.
 
 ---
 
 # 206. TARGET inicial
 
-La primera versión debería cubrir:
+Visión inicial histórica, no checklist de endpoints Foundation pendientes. Las
+capacidades implementadas están en §205 y §§231–233; template y selección de lotes
+siguen diferidos. Expose shortages no implica persistencia de faltantes ni override
+actual. La antigua referencia a Case Readiness se interpreta como preparación local
+y su dimensión informacional en Case Availability, preservando DEC-CASE-AVL-01/02/03.
 
 ```text
 Case
@@ -2525,7 +2585,7 @@ Expose shortages
 ↓
 Confirm Preparation
 ↓
-Feed Case Readiness
+Expose local preparation readiness in Case Availability
 ```
 
 ---
@@ -3414,7 +3474,7 @@ la sección 232.
 ## 231.17 Evolución implementada
 
 **HC-OPS-01B — Preparation Confirmation & Readiness** está implementado y validado:
-**COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS**, con DoR COMPLETE y sin SP,
+**COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS**, con DoR COMPLETE y sin SP,
 Forecast ni Commitment. El blocker previo de corrección de items stale quedó
 resuelto por HC-OPS-01A.1.
 
@@ -3648,7 +3708,7 @@ No se asignan SP, Forecast ni Commitment.
 
 # 233. HC-OPS-01B — Preparation Confirmation & Readiness
 
-**Estado:** COMPLETE / VALIDATED / READY FOR FINAL REVIEW — UNCOMMITTED — DoD PASS.
+**Estado:** COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS.
 
 **Prerequisito:** HC-OPS-01A.1 COMPLETE / MERGED; el blocker de corrección de
 items stale está RESOLVED.
@@ -3911,13 +3971,15 @@ HC-OPS-01B no implementa `IN_PREPARATION`, reopen, mutación de items después d
 
 No se asignan SP, Forecast ni Commitment.
 
-## 233.14 Evidencia de cierre
+## 233.14 Evidencia histórica de cierre local pre-merge
 
-Cierre documental: 2026-10-07. Baseline de revisión:
+Checkpoint histórico del 2026-10-07. Baseline de aquella revisión:
 `feat/hc-ops-01b-preparation`, HEAD
-`5865c63f605a74fcdc00a2590e4ab843b9df7a33`, implementación sin commit. COMPLETE
-significa implementado y validado; no afirma merge, deployment, release ni cierre
-del milestone M-HC1.
+`5865c63f605a74fcdc00a2590e4ab843b9df7a33`, entonces con implementación sin commit.
+En aquel checkpoint COMPLETE significaba implementado y validado. El estado
+vigente es COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS; no se declara
+deployment, release ni cierre de M-HC1. La evidencia siguiente se conserva sin
+reejecutarla durante la sincronización posterior a la auditoría.
 
 La evidencia siguiente procede del checkpoint aceptado de cierre proporcionado
 por el usuario y de las validaciones focales del delta anterior. Los builds,
@@ -3943,7 +4005,10 @@ validate/generate PASS fue confirmado adicionalmente por el usuario.
 
 ## 233.15 Evaluación final de DoD
 
-Evaluación contra 233.12 y [Project Board, sección 23](../../project/PROJECT_BOARD.md).
+Evaluación histórica pre-merge contra 233.12 y
+[Project Board, sección 23](../../project/PROJECT_BOARD.md). Las referencias a
+trabajo sin stage/commit y ausencia de merge describen ese checkpoint, no el
+estado vigente de HC-OPS-01B.
 
 | Criterio | Resultado | Evidencia |
 | --- | --- | --- |
@@ -3967,8 +4032,9 @@ Evaluación contra 233.12 y [Project Board, sección 23](../../project/PROJECT_B
 | Blockers / HIGH sin resolver | PASS | Ninguno pendiente dentro de HC-OPS-01B. |
 | Release / deployment / métricas nuevas | NOT APPLICABLE | No se crea versión, PR, merge, SP, Forecast ni Commitment. |
 
-**Resultado:** DoD PASS — COMPLETE / VALIDATED / READY FOR FINAL REVIEW —
-UNCOMMITTED. Siguiente paso: revisión humana del diff antes de staging.
+**Resultado vigente:** DoD PASS — COMPLETE / MERGED — PR #56 — main@478e0f0.
+La revisión previa a staging correspondió al cierre local histórico. La siguiente
+actividad de dominio es CaseDispatch V1 Contract Definition; M-HC1 sigue OPEN.
 
 Fuera del ticket: drift Prettier en los cuatro archivos preexistentes de DTOs y
 module, warnings LF/CRLF del entorno Windows, `output/`, `tmp/`, oportunidades de
