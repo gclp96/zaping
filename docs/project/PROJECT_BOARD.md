@@ -8,21 +8,34 @@ Responsable: Zaping Team
 
 0. Snapshot vigente
 
-HC-CASE-DISPATCH — CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.
+HC-CASE-DISPATCH — CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY INVENTORY CUSTODY FOUNDATION.
 DEC-DSP-01..17 APPROVED con refinamientos de batch obligatorio, custodio híbrido,
 Equipment estricto y autoridad Inventory compartida en
 [CASE_LOGISTICS §258](../modules/healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract).
 
 HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition —
-READY — TARGET 5 SP. Próximo trabajo: contract/discovery de autoridad compartida;
-no se eligió InventoryPosition ni otra representación Prisma concreta.
+CONTRACT APPROVED / PR PENDING — TARGET 5 SP.
+[DEC-INV-CUST-01..14 APPROVED con refinamientos](../modules/erp/INVENTORY_CUSTODY_DEFINITION.md).
+Posiciones = autoridad física actual; ledger/efectos = evidencia histórica;
+Product.stock = proyección compatible owned. Sin schema concreto ni implementación.
+
+| Foundation slice | TARGET | Estado |
+| --- | --- | --- |
+| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | DEFINED / BLOCKED BY DEF MERGE |
+| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | DEFINED / BLOCKED BY 01A |
+| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
+| HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
+| HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
+
+Tras merge del contrato DEF, sólo 01A pasa a READY; no antes. Siguiente acción:
+revisión humana → selective staging → commit → contract PR. No commit en este cierre.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |
-| HC-DSP-01A — Persistence + read | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01B — DRAFT commands | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01D — Frontend | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01A — Persistence + read | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01B — DRAFT commands | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01D — Frontend | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
 
 Ningún slice Dispatch READY. P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/

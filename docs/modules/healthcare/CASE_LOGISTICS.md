@@ -3768,14 +3768,15 @@ sin duplicar ni falsificar el hecho físico.
 
 # 258. HC-CASE-DISPATCH — V1 approved contract
 
-**CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.**
+**CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY INVENTORY CUSTODY FOUNDATION.**
 
 Baseline inspeccionado: `15f062b1ff1a4f77724b489bd94abccfce7e998d`.
 Conclusión CaseKit vigente: **CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT**.
 M-HC1 permanece OPEN. DEC-DSP-01..17 fueron aprobadas por revisión humana de
 producto/arquitectura con los refinamientos de §258.7. El detalle técnico sigue
 siendo candidato: no hay schema aprobado, endpoints implementados ni autorización
-de implementación. HC-INVENTORY-CUSTODY-DEF está READY — TARGET 5 SP.
+de implementación. HC-INVENTORY-CUSTODY-DEF está CONTRACT APPROVED / PR PENDING — TARGET 5 SP; véase
+[definición Inventory](../erp/INVENTORY_CUSTODY_DEFINITION.md).
 Las secciones conceptuales anteriores conservan su valor histórico.
 
 ## 258.1 CURRENT PHYSICAL INVENTORY CAPABILITIES
@@ -3811,18 +3812,16 @@ ACCEPTED / PLANNED, §§9,33,38,39,56 y 75, exige disponibilidad/custodia separa
 identidad de lote, integración a través de Inventory y atomicidad; deja el modelo
 físico concreto sin elegir. No se encontró contradicción con CASE_LOGISTICS.
 
-## 258.2 Stop gate y opciones Inventory
+## 258.2 Gate de implementación y opciones históricas Inventory
 
-**Gate de implementación:** el contrato de producto está aprobado, incluyendo
-admisión y custodio híbrido. Sigue pendiente elegir la representación Inventory
-compartida en HC-INVENTORY-CUSTODY-DEF. No se aprueba una migración ni entidad
-InventoryPosition por ser candidata.
-
-Dependencia: **HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition**.
-**READY — TARGET 5 SP.** Debe definir propiedad,
-disponibilidad por Product/lote, custodia exclusiva de Asset y contrato transaccional
-compartido por Dispatch, Sales/OUT y ajustes. Inventariar todos los escritores,
-reconciliar saldos existentes y definir migración/backfill son gates de esa dependencia.
+**Gate de implementación:** DEC-INV-CUST-01..14 están APPROVED; DEF está
+CONTRACT APPROVED / PR PENDING — TARGET 5 SP. Posiciones son autoridad física actual,
+ledger/efectos transaccionales son evidencia histórica y Product.stock proyección
+compatible owned. Es arquitectura aprobada, no schema Prisma ni implementación.
+HC-DSP-01A/B/C/D siguen DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION.
+La tabla siguiente conserva alternativas históricas del discovery, no opciones
+actualmente pendientes; la selección y refinamientos vinculantes están en
+[INVENTORY_CUSTODY_DEFINITION](../erp/INVENTORY_CUSTODY_DEFINITION.md).
 
 | Opción | Evaluación |
 | --- | --- |
@@ -3831,12 +3830,11 @@ reconciliar saldos existentes y definir migración/backfill son gates de esa dep
 | C. Otra representación Inventory-native compartida | Debe ser autoridad única para todos los consumidores. Un shadow ledger Healthcare independiente está prohibido. |
 | D. Reusar IN/OUT/ADJUSTMENT como transferencia | Rechazado como atajo: cambia saldo agregado sin representar ambas posiciones y amenaza doble descuento; no equivale a internal transfer. |
 
-A no queda seleccionada. DEC-DSP-08 aprueba la autoridad compartida, no una familia
-de implementación. HC-INVENTORY-CUSTODY-DEF elegirá la representación antes de
-concretar persistence. No escribir directamente Product.stock desde Healthcare.
-La futura disposición Used/Delivery debe consumir una posición de custodia y
-registrar el OUT definitivo exactamente una vez, nunca repetir la reducción de
-disponibilidad como un segundo descuento de propiedad.
+El cierre DEF aprueba posiciones + evidencia transaccional. TRANSFER es UN efecto
+atómico con débito origen y crédito destino, conserva owned y no es OUT definitivo.
+OUT consume una posición propia real una vez. Todos los writers comparten autoridad;
+tras cutover no hay writes independientes Product.stock ni Sales consumiendo custodia.
+Hasta cutover coordinado sigue CURRENT. Entidades exactas quedan en diseño técnico.
 
 ## 258.3 Alcance V1 aprobado y admisión
 
@@ -3915,7 +3913,7 @@ el handoff; dispatchedAt del servidor establece también el inicio de custodia.
 | --- | --- |
 | HealthcareCaseDispatch | id, Company/Case/Kit, status, custodianType/snapshot y User FK opcional sólo INTERNAL_USER, createdBy/At, revision durable de DRAFT, dispatchedBy/At, cancelledBy/At/reason. Case 1:N; sin folio/secuencia adicional aprobada. |
 | HealthcareCaseDispatchItem | id, parent tenant, sourceCaseKitItemId obligatorio, MATERIAL/EQUIPMENT, Product; material quantity y batch obligatorios; equipo Assignment/Asset y unidad implícita 1; ACTIVE/EXCLUDED con auditoría. |
-| Custody / Inventory position o allocation | Necesaria para protección física, dominio/esquema bloqueado por DEC-DSP-08. Cada efecto enlaza DispatchItem; identidad única de origen impide repetirlo. |
+| Custody / Inventory position o allocation | Necesaria para protección física, arquitectura aprobada por DEF; esquema técnico pendiente. Cada efecto enlaza DispatchItem; identidad única de origen impide repetirlo. |
 | Custodian snapshot | INTERNAL_USER: nombre histórico requerido y User FK estable opcional; EXTERNAL_PERSON: nombre histórico requerido sin User FK. No requiere entidad Technician. Organization/contact opcionales sólo a evaluar técnicamente, sin CRM/person management. |
 
 Estas son entidades candidatas para Prisma, no schema final. Exigir FKs compuestas
@@ -4037,7 +4035,7 @@ candidato dentro de estas decisiones vinculantes.
 | DEC-DSP-05 | APPROVED STRICT | Todo material QUANTITY requiere InventoryBatch exacto, mismo Company/Product, disponibilidad física elegible y no vencido para despacho normal. Sin fuente Batch soportada, no elegible V1. Foundation define disponibilidad por lote. |
 | DEC-DSP-06 | APPROVED | SERIALIZED material no soportado. EquipmentAsset con identidad serial sigue soportado por su flujo Equipment. |
 | DEC-DSP-07 | APPROVED HYBRID CUSTODIAN | INTERNAL_USER o EXTERNAL_PERSON; ambos con display name histórico requerido. User FK estable opcional sólo INTERNAL_USER; EXTERNAL_PERSON sin User FK. No cuenta obligatoria ni módulo Technician. Company es owner; custodian responsable físico. |
-| DEC-DSP-08 | APPROVED ARCHITECTURAL CONSTRAINT | Autoridad Inventory compartida obligatoria para todos los consumidores competidores: existencia/propiedad, disponible físico, fuera de Warehouse bajo custodia y OUT definitivo separados. Shadow ledger Healthcare prohibido. HC-INVENTORY-CUSTODY-DEF elige representación; InventoryPosition no está elegida. Dispatch es transferencia interna; consumo definitivo afecta existencia una vez. |
+| DEC-DSP-08 | APPROVED ARCHITECTURAL CONSTRAINT | Autoridad Inventory compartida obligatoria para todos los consumidores competidores: existencia/propiedad, disponible físico, fuera de Warehouse bajo custodia y OUT definitivo separados. Shadow ledger Healthcare prohibido. DEF aprobó posiciones como autoridad y ledger/efectos como historia; ninguna entidad Prisma concreta queda aprobada. Dispatch es transferencia interna; consumo definitivo afecta existencia una vez. |
 | DEC-DSP-09 | APPROVED | Case 1:N Dispatches. Cada CONFIRMED conserva identidad, timestamp, actor, custodio, items, quantity/batch, Asset y fuentes. No merge retroactivo de salidas. |
 | DEC-DSP-10 | APPROVED WITH RELEASE GATE | CONFIRMED inmutable; sin hard delete, edición ni cancelación silenciosa. Corrección/reversal puede diferirse del primer slice, pero mecanismo auditado implementado es RELEASE GATE antes de production-ready. |
 | DEC-DSP-11 | APPROVED STRICT V1 | Assignment RESERVED mismo Case/Company; Asset ACTIVE + GOOD; fullyVerifiable=true y conflictFree=true actuales. Conflicto → 409 aunque exista override histórico/vigente de reserva. Excepción Dispatch propia sólo futura. |
@@ -4048,36 +4046,23 @@ candidato dentro de estas decisiones vinculantes.
 | DEC-DSP-16 | APPROVED | Read ADMIN/MANAGER/SALES/WAREHOUSE; write ADMIN/MANAGER/WAREHOUSE. Company sólo JWT; foreign como missing. Idempotency-Key en mutaciones salvo revisión técnica futura de operación sin efectos. Replay no duplica estado, custodia, Inventory, auditoría ni hecho downstream. |
 | DEC-DSP-17 | APPROVED | V1 termina al iniciar custodia. Fuera: Used/Returned/Unresolved, Return físico, inspección, reconciliación, incidentes, disposición final, Sales/Invoice, PDF, QR, firma/acknowledgement. Sólo referencias seguras para evolución. |
 
-## 258.8 Foundation READY y slices bloqueados
+## 258.8 Foundation CONTRACT APPROVED / PR PENDING y slices bloqueados
 
 **HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition**
 
-**READY — TARGET 5 SP.** Define la autoridad compartida para Healthcare Dispatch,
-Sales/OUT, ajustes relevantes y futuros Return/Inspection/Reconciliation. Debe resolver:
-
-1. Significado de Product.stock cuando existe custodia.
-2. Company-owned frente a físicamente disponible.
-3. Disponibilidad por batch.
-4. Cantidad bajo custodia.
-5. Transferencia interna frente a OUT definitivo.
-6. Fuente única de verdad de disponibilidad.
-7. Integración con Sales.
-8. Integración con ajustes.
-9. Semántica de transferencia atómica.
-10. Compatibilidad con Return/Inspection futuros.
-
-Posiciones + transferencias, allocation/state ledger u otra representación
-Inventory-native son familias candidatas, no schema aprobado. Los anteriores
-HC-INVENTORY-CUSTODY-01A/01B del discovery permanecen hipótesis de implementación
-no aprobadas; su alcance se revisará después de DEF, sin promoverlas a READY.
-No se implementa Foundation en este cierre.
+**CONTRACT APPROVED / PR PENDING — TARGET 5 SP.** DEC-INV-CUST-01..14 aprobadas con
+refinamientos; autoridad física compartida para Sales/OUT, Receipts, Inventory y
+Healthcare. Slices Foundation revisados en el contrato canónico: 01A..01E, todos
+TARGET 8 SP. 01A DEFINED / BLOCKED BY DEF MERGE; 01B por 01A; 01C por 01B; 01D por
+01C; 01E por fundamento material/cutover precedente según diseño técnico. Ninguno
+READY ahora. Tras merge DEF, 01A pasa a READY. No implementación en este cierre.
 
 | Slice definido | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-DSP-01A | Persistence + read | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01B | DRAFT commands | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01C | Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
-| HC-DSP-01D | Frontend | 5 SP | DEFINED / BLOCKED BY HC-INVENTORY-CUSTODY-DEF |
+| HC-DSP-01A | Persistence + read | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01B | DRAFT commands | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01C | Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01D | Frontend | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
 
 Sin Forecast, Commitment, Actual ni fechas. Ningún slice Dispatch está READY.
 Cerrar DEF permite revisar dependencias y diseño técnico, no implica que la
@@ -4089,8 +4074,8 @@ siguen sin resolver; recovery es release gate antes de uso amplio en producción
 Además, corrección/reversal auditado para Dispatch CONFIRMED es RELEASE GATE antes
 de declarar Dispatch production-ready. Ninguno se implementa en este cierre.
 
-**Resultado: CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY HC-INVENTORY-CUSTODY-DEF.**
-M-HC1 OPEN. Siguiente acción: HC-INVENTORY-CUSTODY-DEF contract/discovery.
+**Resultado: CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY INVENTORY CUSTODY FOUNDATION.**
+M-HC1 OPEN. Siguiente acción: revisión humana → selective staging → commit → contract PR DEF.
 Sin tests, DB, migraciones ni implementación en este cierre documental.
 
 <!-- END HC-CASE-DISPATCH V1 APPROVED CONTRACT -->
