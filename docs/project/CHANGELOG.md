@@ -10,14 +10,45 @@
 
 ## Unreleased
 
+### HC-CASE-AVL-UI — cierre DoD local / PR PENDING
+
+**Estado:** IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
+HC-CASE-AVL-R COMPLETE / MERGED — PR #69; HC-CASE-AVL PARTIALLY IMPLEMENTED
+hasta UI merge; M-HC1 OPEN. No declara UI COMPLETE/MERGED, release ni deployment.
+
+Case Availability Summary añadido al modal existente «Detalle del caso», después
+del procedimiento y antes de Requerimientos. Cinco dimensiones: schedule,
+requirements, coverage, equipment y preparation. Cliente API tipado para
+GET /healthcare/cases/:caseId/availability; carga al abrir, sin requests por fila.
+Protección de respuestas stale al cambiar Case/cerrar/actualizar; loading/error
+aislados, reintento y Requerimientos preservado. Drill-down a Equipment Assignments
+y CaseKit. Lectura ADMIN/MANAGER/SALES/WAREHOUSE; role helpers mutantes intactos.
+DEC-CASE-AVL-01/02/03 preservadas: sin verdict global READY/AVAILABLE, workflow
+gate ni rederivación frontend; preparación PASS/BLOCKED local al maletín, ausencias
+de Requirements/Kit explícitas sin inferir readiness/aplicabilidad.
+
+Evidencia: focal **69 tests PASS**; full Web `npm test -- --maxWorkers=2`
+**855/855 tests / 69/69 archivos PASS**. lint/typecheck/build PASS; build con
+`NEXT_PUBLIC_API_URL=https://api.example.invalid`; git diff --check PASS.
+Default `npm test`: **842 PASS / 13 FAIL / 855 tests; 63 archivos PASS / 6 FAIL /
+69 archivos**. Todos los fallos fueron timeouts de **5000 ms** en pantallas
+preexistentes customers/products/quotes/purchases/users/suppliers; ningún test
+HC-CASE-AVL-UI falló. Clasificación de auditoría **ENVIRONMENTAL / NON-BLOCKING**;
+sin fake timer leak, listener leak, polling, missing effect cleanup, request loop
+ni contaminación de estado global atribuible al ticket. No se declara default
+npm test PASS. Config Vitest, timeouts, scripts y worker defaults sin cambios.
+
+Cierre sólo documental, sin reruns ni cambios backend/API/Prisma/migraciones.
+**Actividad DB: NONE.** Evidencia completa:
+[CASES §86.11](../modules/healthcare/CASES.md#8611-hc-case-avl-ui--local-dod-closeout).
+
 ### HC-CASE-AVL-R — cierre DoD / MERGED
 
 **Estado:** COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP.
 CI PASS. Merge mediante PR #69; feature commit
 `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`, merge commit en main
 `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
-HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI READY — TARGET 3 SP,
-implementación no iniciada. M-HC1 OPEN. Sólo backend read COMPLETE / MERGED;
+HC-CASE-AVL PARTIALLY IMPLEMENTED; HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP. M-HC1 OPEN. Sólo backend read COMPLETE / MERGED;
 sin release, deployment, cambio de schema/migration ni ACL de producción.
 
 Implementado GET /healthcare/cases/:caseId/availability con summaries compactos

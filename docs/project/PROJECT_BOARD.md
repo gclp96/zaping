@@ -2314,7 +2314,7 @@ CURRENT ROADMAP ITEM
 → HC-NEXT-03C5-COVERAGE — COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 → HC-CASE-AVL — Case Availability — PARTIALLY IMPLEMENTED
 → HC-CASE-AVL-R — Derived Case Availability Read — Backend — COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS — TARGET 5 SP
-→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — READY — TARGET 3 SP
+→ HC-CASE-AVL-UI — Case Availability Summary — Frontend — IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP
 
 DEFERRED
 
@@ -3249,12 +3249,12 @@ Estado: PARTIALLY IMPLEMENTED. M-HC1 OPEN.
 R COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS; CI PASS.
 Feature commit: `6b1ae85d0f7ff4fd81bd0d0e42403975e4db6c9e`;
 merge en main: `59d5aae1efa02aa53153bd0de03552d0679df7d6`.
-HC-CASE-AVL-UI READY — TARGET 3 SP, implementación no iniciada.
+HC-CASE-AVL-UI IMPLEMENTED / LOCAL DoD PASS / PR PENDING — TARGET 3 SP.
 
 | Slice | Estado | Estimación |
 |---|---|---|
 | HC-CASE-AVL-R — Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
-| HC-CASE-AVL-UI — Case Availability Summary — Frontend | READY | TARGET 3 SP |
+| HC-CASE-AVL-UI — Case Availability Summary — Frontend | IMPLEMENTED / LOCAL DoD PASS / PR PENDING | TARGET 3 SP |
 
 Contrato aprobado y autoridad DEC-CASE-AVL-01/02/03:
 [CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
@@ -3281,7 +3281,25 @@ Comando, alcance y evidencia en [CASES §86.10](../modules/healthcare/CASES.md#8
 Actividad DB durante cierre: NONE; sin reruns ni deployment.
 Sólo backend read merged; sin cambio de schema, migration o ACL de producción.
 TARGET exclusivamente; sin Forecast, Commitment, Actual o fechas asignados.
-Siguiente acción documental: revisión humana → staging selectivo → commit → docs PR.
+UI local: resumen en «Detalle del caso» entre procedimiento y Requerimientos,
+cinco dimensiones (schedule/requirements/coverage/equipment/preparation), servicio
+tipado GET /healthcare/cases/:caseId/availability sin requests por fila, protección
+de respuestas stale y loading/errores aislados. Requerimientos preservado;
+drill-down a Equipment Assignments y CaseKit. ADMIN/MANAGER/SALES/WAREHOUSE.
+Sin verdict global READY/AVAILABLE, gate ni rederivación frontend.
+
+DoD UI: focal 69 PASS; `npm test -- --maxWorkers=2` 855/855 tests y 69/69 archivos
+PASS; lint/typecheck/build PASS, build con
+`NEXT_PUBLIC_API_URL=https://api.example.invalid`; git diff --check PASS.
+Default `npm test`: 842 PASS / 13 FAIL / 855 tests; 63 archivos PASS / 6 FAIL / 69.
+Todos los fallos: timeouts de 5000 ms en customers/products/quotes/purchases/users/
+suppliers preexistentes, ninguno de HC-CASE-AVL-UI. Auditoría: ENVIRONMENTAL /
+NON-BLOCKING, sin leaks/loops/contaminación atribuibles al ticket. No se declara
+default npm test PASS; config/timeouts/scripts/worker defaults intactos.
+Evidencia completa en [CASES §86.11](../modules/healthcare/CASES.md#8611-hc-case-avl-ui--local-dod-closeout).
+UI PR PENDING; umbrella PARTIALLY IMPLEMENTED hasta UI merge; M-HC1 OPEN.
+Cierre sólo documental, sin reruns ni actividad DB; backend intacto.
+Siguiente acción: revisión humana → staging selectivo → commit → PR.
 
 #### HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
 

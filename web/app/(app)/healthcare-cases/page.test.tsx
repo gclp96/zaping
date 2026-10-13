@@ -7,6 +7,8 @@ import {
   type UserRole,
 } from '@/app/auth-session';
 import { api } from '@/services/api';
+import { getHealthcareCaseAvailability } from '@/services/healthcare-case-availability';
+import { availabilityFixture } from '@/services/healthcare-case-availability.fixture';
 import type { HealthcareRequirement } from '@/services/healthcare-requirements';
 
 import HealthcareCasesPage from './page';
@@ -30,7 +32,13 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
+vi.mock('@/services/healthcare-case-availability', () => ({
+  getHealthcareCaseAvailability: vi.fn(),
+}));
+
 vi.mock('@/services/errors', () => ({
+  getApiErrorStatus: (error: unknown) =>
+    (error as { response?: { status?: number } })?.response?.status,
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
   isForbiddenError: (error: unknown) =>
@@ -228,6 +236,7 @@ describe('HealthcareCasesPage', () => {
   beforeEach(() => {
     clearAuthenticatedSessionCache();
     vi.clearAllMocks();
+    vi.mocked(getHealthcareCaseAvailability).mockResolvedValue(availabilityFixture());
     window.localStorage.clear();
   });
 
@@ -235,6 +244,127 @@ describe('HealthcareCasesPage', () => {
     cleanup();
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE'] as const)(
+    'loads availability only inside the detail modal for %s and preserves Requirements',
+    async (role) => {
+      const user = userEvent.setup();
+      await renderCases(role, [healthcareCase], [activeRequirement]);
+      expect(getHealthcareCaseAvailability).not.toHaveBeenCalled();
+      await user.click(
+        screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+      );
+      await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+      const dialog = await screen.findByRole('dialog', {
+        name: 'Detalle del caso',
+      });
+      expect(await within(dialog).findByText('Horario completo')).toBeTruthy();
+      expect(getHealthcareCaseAvailability).toHaveBeenCalledExactlyOnceWith(
+        'case-1',
+      );
+      expect(within(dialog).getByText('Procedimiento programado')).toBeTruthy();
+      expect(
+        await within(dialog).findByText('Implante principal'),
+      ).toBeTruthy();
+      const summary = within(dialog).getByRole('region', {
+        name: 'Resumen de disponibilidad',
+      });
+      const requirements = within(dialog).getByRole('heading', {
+        name: 'Requerimientos',
+      });
+      expect(
+        summary.compareDocumentPosition(requirements) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        within(dialog)
+          .getByText('Procedimiento programado')
+          .compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    },
+  );
+
+  it('availability failure leaves identity, procedure and Requirement editing usable', async () => {
+    const user = userEvent.setup();
+    await renderCases('ADMIN', [healthcareCase], [activeRequirement]);
+    vi.mocked(getHealthcareCaseAvailability).mockRejectedValueOnce(
+      new Error('Resumen temporalmente inaccesible'),
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Detalle del caso',
+    });
+    expect(
+      await within(dialog).findByText('Resumen temporalmente inaccesible'),
+    ).toBeTruthy();
+    expect(within(dialog).getByText('Procedimiento programado')).toBeTruthy();
+    expect(await within(dialog).findByText('Implante principal')).toBeTruthy();
+    await user.click(
+      within(dialog).getByRole('button', {
+        name: 'Acciones del requerimiento SKU-001',
+      }),
+    );
+    await user.click(within(dialog).getByRole('menuitem', { name: 'Editar' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Editar requerimiento' }),
+    ).toBeTruthy();
+  });
+
+  it('closing A and opening B starts a new request and ignores a late A response', async () => {
+    const user = userEvent.setup();
+    const caseB = {
+      ...healthcareCase,
+      id: 'case-2',
+      folio: 'HC-0002',
+      title: 'Segundo caso',
+    };
+    await renderCases('ADMIN', [healthcareCase, caseB]);
+    let resolveA!: (value: ReturnType<typeof availabilityFixture>) => void;
+    let resolveB!: (value: ReturnType<typeof availabilityFixture>) => void;
+    vi.mocked(getHealthcareCaseAvailability)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveA = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveB = resolve;
+        }),
+      );
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0001' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0002' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+    resolveA(availabilityFixture());
+    await waitFor(() =>
+      expect(getHealthcareCaseAvailability).toHaveBeenLastCalledWith('case-2'),
+    );
+    expect(screen.queryByText('Horario completo')).toBeNull();
+    resolveB(availabilityFixture('case-2'));
+    expect(await screen.findByText('Horario completo')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Ver asignaciones' })
+        .getAttribute('href'),
+    ).toContain('case-2');
+    await user.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Acciones del caso HC-0002' }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Ver detalle' }));
+    await waitFor(() =>
+      expect(getHealthcareCaseAvailability).toHaveBeenCalledTimes(3),
+    );
   });
 
   it.each([
