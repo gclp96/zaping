@@ -248,6 +248,9 @@ describe('Sales physical replay and outer retry', () => {
         findFirst: jest.fn().mockResolvedValue(sale()),
         updateMany: jest.fn(),
       },
+      inventoryCutoverLegacySale: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
       inventoryPhysicalEffect: {
         findUnique: jest.fn().mockResolvedValue(effect()),
       },
@@ -300,6 +303,15 @@ describe('Sales physical replay and outer retry', () => {
       expect.objectContaining({ isolationLevel: 'ReadCommitted' }),
     );
   });
+  it('rejects certified membership even on the coherent Effect replay path', async () => {
+    const f = setup();
+    f.tx.inventoryCutoverLegacySale.findFirst.mockResolvedValue({ saleId });
+    await expect(
+      f.service.approve(companyId, actorId, saleId),
+    ).rejects.toMatchObject({ code: 'SALE_PHYSICAL_STATE_INCONSISTENT' });
+    expect(f.tx.sale.updateMany).not.toHaveBeenCalled();
+    expect(f.physical.definitiveOut).not.toHaveBeenCalled();
+  });
   it('different actor preserves business rejection without checking historical activity', async () => {
     const f = setup();
     await expect(
@@ -322,6 +334,17 @@ describe('Sales physical replay and outer retry', () => {
     await expect(
       f.service.approve(companyId, actorId, saleId),
     ).rejects.toMatchObject({ code: 'SALE_PHYSICAL_STATE_INCONSISTENT' });
+  });
+  it('does not confirm a DRAFT with contradictory certified membership', async () => {
+    const f = setup();
+    f.tx.sale.findFirst.mockResolvedValue({ ...sale(), status: 'DRAFT' });
+    f.tx.inventoryPhysicalEffect.findUnique.mockResolvedValue(null);
+    f.tx.inventoryCutoverLegacySale.findFirst.mockResolvedValue({ saleId });
+    await expect(f.service.approve(companyId, actorId, saleId)).rejects.toThrow(
+      'SALE_PHYSICAL_STATE_INCONSISTENT',
+    );
+    expect(f.resolver.resolve).not.toHaveBeenCalled();
+    expect(f.tx.sale.updateMany).not.toHaveBeenCalled();
   });
   it('checks immutable allocations rather than current revision', async () => {
     const f = setup();

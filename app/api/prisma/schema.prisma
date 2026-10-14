@@ -26,6 +26,8 @@ model Category {
 }
 
 model Product {
+  inventoryCutoverProducts InventoryCutoverProduct[]
+
   id          String  @id @default(uuid())
   companyId   String
   sku         String
@@ -161,6 +163,8 @@ model InventoryPosition {
 }
 
 model InventoryPhysicalEffect {
+  openingCutoverProduct InventoryCutoverProduct? @relation("CutoverProductOpeningEffect")
+
   id              String                        @id @default(uuid())
   companyId       String
   originType      String                        @db.VarChar(64)
@@ -299,6 +303,8 @@ enum PurchaseStatus {
 }
 
 model Quote {
+  inventoryCutoverLegacySales InventoryCutoverLegacySale[]
+
   id              String         @id @default(uuid())
   companyId       String
   customerId      String
@@ -316,6 +322,8 @@ model Quote {
   items    QuoteItem[]
 
   sale Sale?
+
+  @@unique([id, companyId])
 }
 
 model QuoteItem {
@@ -427,6 +435,8 @@ model PurchaseReceiptItem {
 }
 
 model Company {
+  inventoryCutover InventoryCutover?
+
   id                                    String                                          @id @default(uuid())
   name                                  String
   tradeName                             String?
@@ -549,6 +559,10 @@ enum HealthcareCaseKitItemLifecycle {
 }
 
 model User {
+  initiatedInventoryCutovers InventoryCutover[] @relation("InventoryCutoverInitiator")
+  approvedInventoryCutovers  InventoryCutover[] @relation("InventoryCutoverApprover")
+  activatedInventoryCutovers InventoryCutover[] @relation("InventoryCutoverActivator")
+
   id           String   @id @default(uuid())
   companyId    String
   firstName    String
@@ -913,15 +927,15 @@ model HealthcareEquipmentAssignmentConflictOverride {
 }
 
 model HealthcareCaseKit {
-  id          String                  @id @default(uuid())
-  companyId   String
-  caseId      String
-  status      HealthcareCaseKitStatus @default(DRAFT)
-  createdById String
+  id           String                  @id @default(uuid())
+  companyId    String
+  caseId       String
+  status       HealthcareCaseKitStatus @default(DRAFT)
+  createdById  String
   preparedById String?
   preparedAt   DateTime?
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
 
   company        Company                 @relation(fields: [companyId], references: [id], onDelete: Restrict)
   healthcareCase HealthcareCase          @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict)
@@ -1044,6 +1058,8 @@ enum ReturnItemCondition {
 }
 
 model Sale {
+  inventoryCutoverLegacySales InventoryCutoverLegacySale[]
+
   id String @id @default(uuid())
 
   companyId String
@@ -1181,4 +1197,90 @@ model Supplier {
 
   @@unique([companyId, name])
   @@index([companyId])
+}
+
+enum InventoryCutoverStatus {
+  PRECHECK
+  WRITERS_FROZEN
+  DRY_RUN_REVIEWED
+  OPENING_APPLYING
+  OPENING_APPLIED
+  VERIFIED
+  PHYSICAL_ACTIVE
+  RECOVERY_REQUIRED
+}
+
+enum InventoryCutoverProductStatus {
+  PLANNED
+  APPLIED
+  VERIFIED
+}
+
+model InventoryCutover {
+  id                  String                       @id @default(uuid())
+  companyId           String                       @unique
+  status              InventoryCutoverStatus       @default(PRECHECK)
+  revision            Int                          @default(0)
+  manifestDigest      String?                      @db.Char(64)
+  snapshotFingerprint String?                      @db.Char(64)
+  baselineBuild       String?                      @db.VarChar(128)
+  manifestLockedAt    DateTime?
+  recoveryFromStatus  InventoryCutoverStatus?
+  initiatedBy         String
+  approvedBy          String?
+  activatedBy         String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  activatedAt         DateTime?
+  company             Company                      @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  initiator           User                         @relation("InventoryCutoverInitiator", fields: [initiatedBy, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  approver            User?                        @relation("InventoryCutoverApprover", fields: [approvedBy, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  activator           User?                        @relation("InventoryCutoverActivator", fields: [activatedBy, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  products            InventoryCutoverProduct[]
+  legacySales         InventoryCutoverLegacySale[]
+
+  @@unique([id, companyId])
+  @@index([initiatedBy, companyId])
+  @@index([approvedBy, companyId])
+  @@index([activatedBy, companyId])
+}
+
+model InventoryCutoverProduct {
+  cutoverId                  String
+  companyId                  String
+  productId                  String
+  manifestProductFingerprint String                        @db.Char(64)
+  status                     InventoryCutoverProductStatus @default(PLANNED)
+  expectedOwned              Int
+  expectedAvailable          Int
+  expectedCustody            Int
+  projectionEvidence         Json                          @db.JsonB
+  openingEffectId            String?
+  appliedAt                  DateTime?
+  verifiedAt                 DateTime?
+  cutover                    InventoryCutover              @relation(fields: [cutoverId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  product                    Product                       @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  openingEffect              InventoryPhysicalEffect?      @relation("CutoverProductOpeningEffect", fields: [openingEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([cutoverId, productId])
+  @@unique([openingEffectId, companyId])
+  @@index([companyId, productId])
+  @@index([companyId, cutoverId, status])
+}
+
+model InventoryCutoverLegacySale {
+  cutoverId       String
+  companyId       String
+  saleId          String
+  saleFingerprint String           @db.Char(64)
+  quoteId         String?
+  statusAtFreeze  DocumentStatus
+  capturedAt      DateTime         @default(now())
+  cutover         InventoryCutover @relation(fields: [cutoverId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  sale            Sale             @relation(fields: [saleId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  quote           Quote?           @relation(fields: [quoteId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@id([cutoverId, saleId])
+  @@index([companyId, saleId])
+  @@index([quoteId, companyId])
 }

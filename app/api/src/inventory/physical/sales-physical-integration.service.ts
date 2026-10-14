@@ -21,6 +21,7 @@ import {
   requirePhysical,
 } from './physical-inventory.contract';
 import { SalesLegacyClassifier } from './sales-legacy-classifier';
+import { assertSalesPhysicalEvidence } from './sales-physical-evidence';
 
 const saleInclude = {
   customer: true,
@@ -250,7 +251,10 @@ export class SalesPhysicalIntegrationService {
     if (effect && sale.status !== 'CONFIRMED')
       sale = await this.getSale(tx, companyId, sale.id);
     if (!effect) {
-      if (sale.status === 'DRAFT' && mode === 'approve') return null;
+      if (sale.status === 'DRAFT' && mode === 'approve') {
+        await this.legacy.assertNoMembership(tx, companyId, sale.id);
+        return null;
+      }
       if (sale.status === 'CANCELLED' && mode === 'approve')
         throw new BadRequestException(
           'No se puede aprobar una venta cancelada',
@@ -262,64 +266,8 @@ export class SalesPhysicalIntegrationService {
         this.duplicate(mode);
       throw new PhysicalInventoryError('SALE_PHYSICAL_STATE_INCONSISTENT');
     }
-    requirePhysical(
-      sale.status === 'CONFIRMED',
-      'SALE_PHYSICAL_STATE_INCONSISTENT',
-    );
-    if (sale.quoteId)
-      requirePhysical(
-        sale.quote?.companyId === companyId &&
-          sale.quote.status === 'CONFIRMED' &&
-          sale.quote.convertedToSale,
-        'SALE_PHYSICAL_STATE_INCONSISTENT',
-      );
-    const mismatch = 'SALE_PHYSICAL_EFFECT_MISMATCH' as const;
-    requirePhysical(
-      effect.kind === 'DEFINITIVE_OUT' &&
-        effect.companyId === companyId &&
-        effect.originType === 'SALE' &&
-        effect.originId === sale.id &&
-        effect.originOperation === 'CONFIRM' &&
-        effect.lines.length > 0 &&
-        effect.lines.length === effect.lineCount,
-      mismatch,
-    );
-    const totals = new Map<string, number>();
-    const positions = new Set<string>();
-    effect.lines.forEach((line, index) => {
-      const p = line.position;
-      requirePhysical(
-        line.companyId === companyId &&
-          line.effectId === effect.id &&
-          p.companyId === companyId &&
-          p.state === 'AVAILABLE' &&
-          p.inventoryBatchId === null &&
-          p.contextType === null &&
-          p.contextId === null &&
-          !positions.has(p.id) &&
-          line.sequence === index + 1 &&
-          line.delta < 0 &&
-          line.quantityAfter === line.quantityBefore + line.delta &&
-          line.quantityAfter >= 0 &&
-          line.revisionAfter === line.revisionBefore + 1,
-        mismatch,
-      );
-      positions.add(p.id);
-      totals.set(p.productId, (totals.get(p.productId) ?? 0) - line.delta);
-    });
-    requirePhysical(
-      sale.items.length > 0 &&
-        new Set(sale.items.map((i) => i.productId)).size ===
-          sale.items.length &&
-        totals.size === sale.items.length &&
-        sale.items.every(
-          (i) =>
-            Number.isInteger(i.quantity) &&
-            i.quantity > 0 &&
-            totals.get(i.productId) === i.quantity,
-        ),
-      mismatch,
-    );
+    await this.legacy.assertNoMembership(tx, companyId, sale.id);
+    assertSalesPhysicalEvidence(companyId, sale, effect);
     if (effect.actorId !== actorId) this.duplicate(mode);
     return sale;
   }
