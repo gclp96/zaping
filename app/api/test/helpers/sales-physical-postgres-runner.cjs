@@ -95,6 +95,7 @@ try {
     '20261013000000_add_inventory_physical_authority',
     '20261014000000_inventory_count_enums',
     '20261014000100_inventory_count_constraints',
+    '20261014000200_add_inventory_cutover_control',
   ];
   for (const name of required) {
     if (
@@ -114,6 +115,7 @@ try {
   sql(`GRANT CONNECT ON DATABASE ${database} TO ${role};
     GRANT USAGE ON SCHEMA public TO ${role};
     GRANT SELECT,INSERT,DELETE ON ${tableList} TO ${role};
+    GRANT SELECT ON "InventoryCutover","InventoryCutoverLegacySale" TO ${role};
     GRANT UPDATE ON "Company","User","Product","InventoryBatch","Purchase","IdempotencyRecord","CompanySequence","Sale","Quote" TO ${role};
     GRANT UPDATE (quantity,revision,"updatedAt") ON "InventoryPosition" TO ${role};`);
   console.log('Existing schema verified; migrations: NONE');
@@ -190,6 +192,7 @@ try {
         throw new Error('fixture residue');
       console.log('Fixture cleanup: PASS; company residue=0');
       sql(`REASSIGN OWNED BY ${role} TO postgres; REVOKE ALL ON ${tableList},"InventoryMovement" FROM ${role};
+        REVOKE SELECT ON "InventoryCutover","InventoryCutoverLegacySale" FROM ${role};
         REVOKE UPDATE (quantity,revision,"updatedAt") ON "InventoryPosition" FROM ${role};
         REVOKE ALL ON SCHEMA public FROM ${role};
         REVOKE ALL ON DATABASE ${database} FROM ${role}; DROP ROLE ${role};`);
