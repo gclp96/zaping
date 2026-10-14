@@ -14,6 +14,31 @@ import {
 
 @Injectable()
 export class PhysicalInventoryRepository {
+  // Internal cutover primitive, deliberately absent from PhysicalRequest.
+  claimOpeningEffect(
+    tx: Prisma.TransactionClient,
+    input: {
+      companyId: string;
+      cutoverId: string;
+      productId: string;
+      actorId: string;
+      requestHash: string;
+      lineCount: number;
+    },
+  ) {
+    return tx.inventoryPhysicalEffect.create({
+      data: {
+        companyId: input.companyId,
+        actorId: input.actorId,
+        kind: 'OPENING',
+        originType: 'INVENTORY_OPENING',
+        originId: input.cutoverId,
+        originOperation: `OPEN_${input.productId}`,
+        requestHash: input.requestHash,
+        lineCount: input.lineCount,
+      },
+    });
+  }
   findEffect(tx: Prisma.TransactionClient, request: PhysicalRequest) {
     return tx.inventoryPhysicalEffect.findUnique({
       where: {

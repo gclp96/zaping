@@ -132,6 +132,7 @@ enum InventoryPositionState {
 }
 
 enum InventoryPhysicalEffectKind {
+  OPENING
   CREDIT
   TRANSFER
   DEFINITIVE_OUT
