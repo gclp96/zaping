@@ -18,11 +18,19 @@ export type PhysicalErrorCode =
   | 'PHYSICAL_EFFECT_CLAIM_CONFLICT'
   | 'PHYSICAL_QUANTITY_LIMIT'
   | 'PHYSICAL_CONCURRENCY_TIMEOUT'
+  | 'SALE_PHYSICAL_SOURCE_REQUIRED'
+  | 'SALE_PHYSICAL_SOURCE_INVALID'
+  | 'SALE_PHYSICAL_EFFECT_MISMATCH'
+  | 'SALE_PHYSICAL_STATE_INCONSISTENT'
   | 'INVENTORY_PHYSICAL_PERSISTENCE_ERROR';
 
 // No HTTP mapping or raw database cause crosses this internal domain boundary.
 export class PhysicalInventoryError extends Error {
-  constructor(readonly code: PhysicalErrorCode) {
+  constructor(
+    readonly code: PhysicalErrorCode,
+    // Internal classification only; never retain raw database diagnostics.
+    readonly transactionAborted = false,
+  ) {
     super(code);
     this.name = 'PhysicalInventoryError';
   }
@@ -40,10 +48,16 @@ export function physicalPersistenceError(
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (
       error.code === 'P2034' ||
+      error.meta?.code === '40001' ||
       error.meta?.code === '55P03' ||
       error.meta?.code === '40P01'
     ) {
-      return new PhysicalInventoryError('PHYSICAL_CONCURRENCY_TIMEOUT');
+      return new PhysicalInventoryError(
+        'PHYSICAL_CONCURRENCY_TIMEOUT',
+        error.code === 'P2034' ||
+          error.meta?.code === '40001' ||
+          error.meta?.code === '40P01',
+      );
     }
   }
   return new PhysicalInventoryError('INVENTORY_PHYSICAL_PERSISTENCE_ERROR');
