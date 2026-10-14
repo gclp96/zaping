@@ -23,8 +23,8 @@ fundamento dormido; los writers/readers productivos conservan su comportamiento.
 | Foundation slice | TARGET | Estado |
 | --- | --- | --- |
 | HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
-| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | IMPLEMENTED / REVIEW PENDING — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | DEFINED / BLOCKED BY 01B |
+| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D |
+| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: COMPLETE / IMPLEMENTED / TESTED — DORMANT UNTIL 01D |
 | HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
 | HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
 
@@ -58,7 +58,7 @@ por credencial administrativa desactualizada; el runner usa socket local del
 contenedor aislado, sin cambiar credenciales existentes ni .env. El noEmit global
 de specs encontró errores en tests existentes fuera de 01A; el conjunto focal pasa.
 
-01A está merged y permanece dormido. 01B está IMPLEMENTED / REVIEW PENDING — TARGET 8 SP;
+01A está merged y permanece dormido. 01B está COMPLETE / MERGED — PR #79 — TARGET 8 SP;
 [TD-INV-01B-01..30](../modules/erp/INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md)
 APPROVED / MERGED — PR #78. Baseline implementación
 `724918966d4375cf3e96e5ccab900f6ef734d752`; Activation DORMANT UNTIL 01D.
@@ -67,7 +67,7 @@ con actor/razón y Effect/Line incluso delta cero, sin revision bump ni proyecci
 Receipt mixto admite conjuntos disjuntos: QUANTITY Positions, ASSET Equipment,
 SERIALIZED sin nueva integración física. Proyecciones compartidas y replay atómico.
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
-01C..01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
+01C TECHNICAL DESIGN APPROVED — IMPLEMENTATION COMPLETE / IMPLEMENTED / TESTED — TARGET 8 SP. 01D/01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
 Implementación local: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -75,7 +75,7 @@ actor y fuentes explícitas; Receipt interno mixto con reserva ASSET codes antes
 Product roots. No controller productivo invoca la integración. Helper legacy
 registerPurchaseEntry deprecado, sin alias físico. No backfill/activación.
 
-Validación local 01B: focal 28/28; API `npm test -- --runInBand` 1814/1814,
+Evidencia histórica local 01B (no reejecutada en el diseño 01C): focal 28/28; API `npm test -- --runInBand` 1814/1814,
 110 suites; typecheck/lint/build, Prisma format/validate y noEmit focal PASS.
 Aceptación `node test/helpers/inventory-integration-postgres-runner.cjs --run-isolated`:
 30/30 PASS; `prisma migrate deploy` normal PASS sólo en
@@ -91,9 +91,20 @@ modificar SQL ni metadata. Regresión PostgreSQL 01A: 26/26 PASS; rol temporal
 `zaping_inv01a_221153c22427` y fixtures eliminados.
 Prueba estática ampliada de ausencia de callers productivos: 20/20 PASS.
 
-Siguiente acción: revisión humana → staging selectivo → commit → PR implementación.
-01C sólo READY tras revisión, QA/aceptación y merge de implementación 01B.
-Sin Forecast/Commitment/Actual nuevos; 01B no se marca COMPLETE.
+01B COMPLETE / MERGED — PR #79; se satisface la dependencia de diseño 01C.
+[TD-INV-01C-01..36](../modules/erp/INVENTORY_CUSTODY_01C_TECHNICAL_DESIGN.md):
+APPROVED con restricciones vinculantes: OPTIONAL Candidate C sólo unbatched;
+replay lógico ZERO WRITES sólo mismo actor original con autorización actual, otro actor conserva error histórico.
+Sin Idempotency-Key; actor histórico no necesita permanecer activo.
+Gates01D: accesibilidad OPTIONAL, reaudit global locks y manifest legacy; no bloquean implementación dormida01C.
+01C implementado/testeado permanece DORMANT UNTIL 01D; Sales productivo conserva routing legacy.
+Evidencia local01C: 133/133 pruebas focales (6 suites), typecheck/lint/build PASS;
+PostgreSQL12/12 PASS en 127.0.0.1:5434 / zaping_spike_test, rol temporal sin superusuario
+y fixtures eliminados; cero migraciones. Resolver Candidate C, replay mismo actor,
+orquestación interna y history compartido; guard de dormancia y controllers legacy verificados.
+Detalle y límites en §F del diseño01C; no se declara cutover ni merge01C.
+Siguiente acción: revisión humana → staging selectivo → commit → PR de implementación01C dormida.
+Sin Forecast/Commitment/Actual ni fechas nuevos; TARGET 8 SP permanece.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |

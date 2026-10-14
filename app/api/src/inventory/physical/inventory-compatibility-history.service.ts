@@ -13,6 +13,91 @@ export type ReceiptHistoryItem = {
 
 @Injectable()
 export class InventoryCompatibilityHistoryService {
+  // Candidate C only: exact physical allocations remain in EffectLines.
+  async writeSale(
+    tx: Prisma.TransactionClient,
+    result: PhysicalResult,
+    items: {
+      id: string;
+      productId: string;
+      quantity: number;
+      unitCost: number;
+    }[],
+    notes: string,
+  ) {
+    requireTransaction(tx);
+    if (result.replay) return;
+    const effect = result.effect;
+    requirePhysical(
+      effect.kind === 'DEFINITIVE_OUT' &&
+        effect.originType === 'SALE' &&
+        effect.originOperation === 'CONFIRM',
+      'SALE_PHYSICAL_EFFECT_MISMATCH',
+    );
+    const facts = await tx.inventoryPhysicalEffectLine.findMany({
+      where: { effectId: effect.id, companyId: effect.companyId },
+      include: { position: true },
+    });
+    requirePhysical(
+      facts.length === effect.lineCount && facts.length > 0,
+      'SALE_PHYSICAL_EFFECT_MISMATCH',
+    );
+    const totals = new Map<string, number>();
+    for (const f of facts) {
+      requirePhysical(
+        f.delta < 0 &&
+          f.position.companyId === effect.companyId &&
+          f.position.state === 'AVAILABLE' &&
+          f.position.inventoryBatchId === null,
+        'SALE_PHYSICAL_EFFECT_MISMATCH',
+      );
+      totals.set(
+        f.position.productId,
+        (totals.get(f.position.productId) ?? 0) - f.delta,
+      );
+    }
+    requirePhysical(
+      new Set(items.map((i) => i.productId)).size === items.length &&
+        totals.size === items.length &&
+        items.every(
+          (i) =>
+            Number.isInteger(i.quantity) &&
+            i.quantity > 0 &&
+            totals.get(i.productId) === i.quantity,
+        ),
+      'SALE_PHYSICAL_EFFECT_MISMATCH',
+    );
+    const products = await tx.product.findMany({
+      where: {
+        companyId: effect.companyId,
+        id: { in: items.map((i) => i.productId) },
+      },
+    });
+    requirePhysical(
+      products.length === items.length,
+      'SALE_PHYSICAL_EFFECT_MISMATCH',
+    );
+    for (const item of [...items].sort((a, b) =>
+      a.productId < b.productId ? -1 : 1,
+    )) {
+      await tx.inventoryMovement.create({
+        data: {
+          companyId: effect.companyId,
+          productId: item.productId,
+          batchId: null,
+          movementType: 'OUT',
+          quantity: item.quantity,
+          balance: products.find((p) => p.id === item.productId)!.stock,
+          unitCost: item.unitCost,
+          referenceType: 'SALE',
+          referenceId: effect.originId,
+          createdBy: effect.actorId,
+          notes,
+        },
+      });
+    }
+  }
+
   async write(
     tx: Prisma.TransactionClient,
     result: PhysicalResult,
