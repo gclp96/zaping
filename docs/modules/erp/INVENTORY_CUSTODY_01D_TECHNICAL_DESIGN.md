@@ -3,7 +3,7 @@
 ## A. Executive summary
 
 TECHNICAL DESIGN: APPROVED — TD-INV-01D-01..32, 32/32 human approved.
-IMPLEMENTATION: 01D-A IMPLEMENTED / TESTED — pending human review/merge — NON-ACTIVATING. 01D-B/C NOT STARTED.
+IMPLEMENTATION: 01D-A COMPLETE / MERGED — PR #82; 01D-B IMPLEMENTED / TESTED — pending human review/merge — NON-ACTIVATING; 01D-C BLOCKED.
 DESIGN APPROVED no significa CUTOVER READY.
 Baseline: `c3d0824e64152ae26c0d891d203b5fa8ebb80899`, rama
 `docs/hc-inventory-custody-01d-technical-design`; DEF/01A/B/C merged PR#75/#77/#79/#80.
@@ -20,7 +20,7 @@ Router único Company LEGACY/FROZEN/PHYSICAL desde control durable; sin fallback
 Membership Sales DB exacto; UNKNOWN falla cerrado; sin replay OUT histórico.
 OPTIONAL accessibility y discrepancias reales bloquean toda Company.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:01D-A5 +01D-B8 +01D-C8 =21SP.
-01D-A IMPLEMENTED / TESTED — pending human review/merge;01D-B BLOCKED BY aceptación/merge01D-A;01D-C BLOCKED BY01D-B. Sin fechas/Forecast/Commitment/Actual.
+01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C BLOCKED hasta aceptación/merge01D-B. Sin fechas/Forecast/Commitment/Actual.
 Writer certification, manifest real, reconciliation y freeze son gates futuros, no TD pendientes.
 DATABASE ACTIVITY: sólo aceptación en DB efímera vacía; migración nueva schema-only.
 01D ACTIVATION: NOT STARTED; no DB dev/qa/producción ni apertura real.
@@ -66,8 +66,53 @@ ocupada (EPERM); tipos generados y motor existente ejecutaron la aceptación rea
 El SHA-256 del motor DLL existente coincide con el motor instalado de Prisma.
 No se detuvieron procesos ajenos; no afirmar generate PASS.
 
-01D-A IMPLEMENTED / TESTED — pending human review/merge;01D-B BLOCKED hasta
-aceptación/merge01D-A;01D-C BLOCKED.01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
+01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C BLOCKED hasta aceptación/merge01D-B.01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
+
+## A.2 Implementación local01D-B y evidencia de validación
+
+01D-A COMPLETE / MERGED — PR #82. 01D-B IMPLEMENTED / TESTED — pending human review/merge.
+TARGET 8 SP — CONFIRMED. Baseline `351bbc9272740cdea9042ad5ceb7448648045c99`,
+rama `feat/hc-inventory-custody-01d-b-opening-baseline`. 01D-C BLOCKED hasta aceptación/merge01D-B.
+
+- OPENING interno en InventoryPhysicalEffectKind; migraciones separadas
+  `20261014000300_inventory_opening_enum` y `20261014000400_inventory_opening_constraints`.
+  Función/trigger diferido conserva CREDIT/TRANSFER/DEFINITIVE_OUT/COUNT_CORRECTION;
+  valida namespace, Product único, delta positivo, cantidades0→delta y revisiones0→1.
+  Sin backfill, apertura real ni activación. Workflow autorizado en aplicación, no trigger.
+- Reconciliación con evidencia durable explícita: stock/counters/historia no inventan
+  pools, lineage o custodia. Manifest estricto canónico SHA-256, Products QUANTITY completos
+  incluidos ceros/inactivos; ADJUSTMENT absoluto y Receipt/Movement no se duplican.
+  OPTIONAL batched históricamente vendible o ambiguo bloquea dry-run y VERIFY.
+- Preview/finalDryRun en transacción PostgreSQL READ ONLY; final exige WRITERS_FROZEN
+  y adapter de evidencia de freeze. Review separado, import completo atómico01D-A;
+  reemplazo completo CAS sólo antes del lock y sin opening; nunca edición de hijos.
+- Registry CUSTODY vacío por defecto; namespace requiere resolver real registrado.
+  Tests usan resolver TEST_ONLY inyectado; ningún namespace ficticio queda habilitado
+  en producción. Providers de evidencia/freeze son contratos internos explícitos,
+  sin adapter permisivo ni infraestructura freeze incluida.
+- APPLY secuencial por Product ID, transacción por Product; locks control→checkpoint→
+  Product→todos batches ASC→Positions ASC. Un Effect por Product positivo; cero sin
+  Effect/Position. Stock sin UPDATE; batch AVAILABLE-state guardado old→expected;
+  initialQuantity/metadatos intactos; ningún InventoryMovement/IN económico.
+- Replay exige evidencia física/checkpoint/proyección exacta y cero writes/timestamps.
+  VERIFY recarga manifest por digest en lectura nueva y certifica mediante CAS separado;
+  sólo OPENING_APPLIED y VERIFIED. Transiciones finales viven en servicio opening/verify
+  para no exponer un setter o transición01D-A sin validación de hechos.
+- Servicios internos no registrados en módulos/callers productivos. Harness opt-in
+  `node test/helpers/inventory-opening-postgres-runner.cjs --run-isolated`; Company,
+  cutover, manifest/digest explícitos en cada operación de fixture. Artefactos reales
+  sólo ruta absoluta externa indicada por operador; sin default repo/output/tmp.
+
+Validación: focal77/77 en3 suites; full API1918/1918 en114 suites; PostgreSQL43/43,
+incluye conexiones independientes, fault injection, response loss/resume, no doble
+stock, contextos/tenant, manifest incompleto, VERIFY/tampering y regresiones SQL.
+Prisma format/validate/generate, typecheck, lint TS tocados y build PASS.
+Generate inicialmente EPERM por DLL Windows ocupada; reintento posterior PASS, sin borrar motores.
+Última aceptación: `127.0.0.1:60595/zaping_opening_test`, PostgreSQL16 nuevo,
+loopback/tmpfs, DB vacía verificada, rol opening_test no superuser;39 migraciones.
+Run `2b5b5d4b-89fb-421a-b802-668bc22f682b`. Cleanup contenedor/fixtures/tmpfs PASS.
+Sin DB dev/QA/producción/prior spike; .env sin cambios. No deployment.
+01A/01B/01C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN. No CUTOVER READY.
 
 ## B. Current-state evidence map
 
@@ -479,7 +524,7 @@ Implementación01D-A local completada; B/C NOT STARTED. Las referencias E01..E19
 - **Rollback/recovery impact:** Control y before/expected evidence sobreviven crash; resume mismo epoch y matriz I.
 - **Scope impact:** Incluido en01D-A TARGET5SP; exactos Prisma, FKs, indexes y migration se diseñan/implementan tras autorización.
 - **Test implications:** CAS stale, dos epochs activos, digest mutation, ceros, checkpoints atómicos y membership immutable.
-- **Open question:** Resuelta: DEDICATED CUTOVER PERSISTENCE aprobada. Schema01D-A implementado localmente; pending human review/merge.
+- **Open question:** Resuelta: DEDICATED CUTOVER PERSISTENCE aprobada. Schema01D-A COMPLETE / MERGED — PR #82.
 - **Status:** APPROVED WITH DEDICATED CUTOVER PERSISTENCE
 
 ### TD-INV-01D-13 — Dry-run obligatorio read-only
@@ -935,11 +980,11 @@ Implementación01D-A local completada; B/C NOT STARTED. Las referencias E01..E19
 - **01A compatibility:** Core aprobado permanece DORMANT hasta corte coordinado.
 - **01B compatibility:** Receipt/manual/proyecciones permanecen DORMANT hasta01D-C autorizado.
 - **01C compatibility:** Candidate C/replay/legacy gates aprobados preservados, DORMANT hasta corte.
-- **Cutover dependency:** 01D-A IMPLEMENTED / TESTED (pending review/merge)→01D-B BLOCKED BY01D-A→01D-C BLOCKED BY01D-B;01E sigue bloqueado por completion/activation01D.
+- **Cutover dependency:** 01D-A COMPLETE / MERGED PR #82→01D-B IMPLEMENTED / TESTED (pending review/merge)→01D-C BLOCKED hasta aceptación/merge01D-B;01E sigue bloqueado por completion/activation01D.
 - **Rollback/recovery impact:** Matriz I obligatoria, opening-only resume y forward-fix después de business Effect.
 - **Scope impact:** A5+B8+C8=21SP TARGET; scopes detallados K; sin frontend/FEFO/Delivery/SalesOrder/Dispatch/Return.
 - **Test implications:** Focused control/classifier tests A; isolated PostgreSQL opening/verify B; ensayo operacional completo C.
-- **Open question:** Resuelta por reestimación y split humanos. 01D-A IMPLEMENTED / TESTED — pending human review/merge; B/C NOT STARTED.
+- **Open question:** Resuelta por reestimación y split humanos. 01D-A COMPLETE / MERGED — PR #82; 01D-B IMPLEMENTED / TESTED — pending human review/merge; 01D-C BLOCKED.
 - **Status:** APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP
 
 ## E. Reconciliation model
@@ -1379,8 +1424,8 @@ Revised TOTAL01D TARGET: **21 SP**; sólo TARGET, sin Forecast/Commitment/Actual
 
 | Slice | Título | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation | 5 SP | IMPLEMENTED / TESTED — pending human review/merge — NON-ACTIVATING |
-| HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-A — IMPLEMENTATION: NOT STARTED — NO PRODUCTIVE ACTIVATION |
+| HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation | 5 SP | COMPLETE / MERGED — PR #82 — NON-ACTIVATING |
+| HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification | 8 SP | IMPLEMENTED / TESTED — pending human review/merge — NO PRODUCTIVE ACTIVATION |
 | HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-B — IMPLEMENTATION: NOT STARTED |
 | HC-INVENTORY-CUSTODY-01D umbrella | Re-estimated implementation split | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A IMPLEMENTED / TESTED; B/C BLOCKED |
 
@@ -1404,8 +1449,8 @@ writer barrier/runbook, activation transitions, stale runtime protection,
 acceptance y gates de rollback/forward-recovery con ensayo operacional completo.
 Sin frontend, FEFO/FIFO comercial, lot picker, Delivery, SalesOrder, Dispatch o Return.
 
-**HC-INVENTORY-CUSTODY-01D-A IMPLEMENTED / TESTED — pending human review/merge.**
-01D-B continúa BLOCKED hasta aceptación/merge de01D-A;01D-C continúa BLOCKED.
+**HC-INVENTORY-CUSTODY-01D-A COMPLETE / MERGED — PR #82.**
+01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C continúa BLOCKED hasta aceptación/merge01D-B.
 01E sigue BLOCKED por completion/activation01D según sus dependencias; Dispatch
 también permanece bloqueado por el fundamento correspondiente. No marcar ningún
 slice de implementación IN PROGRESS/COMPLETE por aprobación del diseño.
@@ -1429,8 +1474,8 @@ slice de implementación IN PROGRESS/COMPLETE por aprobación del diseño.
 WARN sólo documentación histórica no esencial que no afecte quantity, identity,
 authority o seguridad del corte. No override de BLOCK.
 
-Estado final: TECHNICAL DESIGN APPROVED32/32;01D-A IMPLEMENTED / TESTED — pending human review/merge;
+Estado final: TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;
 01A/01B/01C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Schema-only migration y pruebas01D-A completadas sólo en entorno efímero aislado.
-Sin reconciliation/APPLY/VERIFY, activation, staging, commit ni push.
-Próximo paso: revisión humana → staging selectivo → commit → PR01D-A.
+Migraciones y pruebas01D-A/B completadas sólo en entornos efímeros aislados.
+Reconciliation/APPLY/VERIFY internos implementados; sin activation, staging, commit ni push.
+Próximo paso: revisión humana → staging selectivo → commit → PR01D-B.
