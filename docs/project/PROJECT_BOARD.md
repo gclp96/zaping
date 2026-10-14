@@ -24,9 +24,12 @@ fundamento dormido; los writers/readers productivos conservan su comportamiento.
 | --- | --- | --- |
 | HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
 | HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: COMPLETE / IMPLEMENTED / TESTED — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01D — Reconciliation + opening manifest + backfill/cutover | 8 SP | DEFINED / BLOCKED BY 01C |
-| HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY preceding material foundation/cutover as technical design confirms |
+| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D |
+| HC-INVENTORY-CUSTODY-01D — Reconciliation + opening baseline + coordinated cutover umbrella | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: NOT STARTED; original8SP SUPERSEDED |
+| HC-INVENTORY-CUSTODY-01D-A — Durable Cutover Control & Legacy Classification Foundation | 5 SP | READY — IMPLEMENTATION: NOT STARTED — NON-ACTIVATING |
+| HC-INVENTORY-CUSTODY-01D-B — Reconciliation, Opening Baseline & Verification | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-A — IMPLEMENTATION: NOT STARTED — NO PRODUCTIVE ACTIVATION |
+| HC-INVENTORY-CUSTODY-01D-C — Authority Cutover, Writer Wiring & Operational Activation | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-B — IMPLEMENTATION: NOT STARTED |
+| HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D |
 
 DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
 [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
@@ -67,7 +70,9 @@ con actor/razón y Effect/Line incluso delta cero, sin revision bump ni proyecci
 Receipt mixto admite conjuntos disjuntos: QUANTITY Positions, ASSET Equipment,
 SERIALIZED sin nueva integración física. Proyecciones compartidas y replay atómico.
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
-01C TECHNICAL DESIGN APPROVED — IMPLEMENTATION COMPLETE / IMPLEMENTED / TESTED — TARGET 8 SP. 01D/01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
+01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
+01D TECHNICAL DESIGN APPROVED32/32; IMPLEMENTATION NOT STARTED;01D-A READY.
+01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
 Implementación local: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -102,9 +107,31 @@ Evidencia local01C: 133/133 pruebas focales (6 suites), typecheck/lint/build PAS
 PostgreSQL12/12 PASS en 127.0.0.1:5434 / zaping_spike_test, rol temporal sin superusuario
 y fixtures eliminados; cero migraciones. Resolver Candidate C, replay mismo actor,
 orquestación interna y history compartido; guard de dormancia y controllers legacy verificados.
-Detalle y límites en §F del diseño01C; no se declara cutover ni merge01C.
-Siguiente acción: revisión humana → staging selectivo → commit → PR de implementación01C dormida.
-Sin Forecast/Commitment/Actual ni fechas nuevos; TARGET 8 SP permanece.
+Detalle y límites en §F del diseño01C; merge mediante PR #80 sobre
+`c3d0824e64152ae26c0d891d203b5fa8ebb80899`, sin activación ni deployment declarado.
+
+HC-INVENTORY-CUSTODY-01D — TECHNICAL DESIGN: APPROVED.
+[TD-INV-01D-01..32](../modules/erp/INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md):
+32/32 human approved con restricciones vinculantes; DOC DELTA incorporado.
+IMPLEMENTATION: NOT STARTED; ACTIVATION: NOT STARTED; DESIGN APPROVED ≠ CUTOVER READY.
+Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION.
+01D-A TARGET5SP READY;01D-B TARGET8SP BLOCKED BY01D-A;
+01D-C TARGET8SP BLOCKED BY01D-B; TOTAL01D TARGET21SP =5+8+8.
+01D-A: DB control dedicado, CAS/digest/checkpoints/membership/classifier y resolver
+foundation non-activating.01D-B: reconciliation/manifest/dry-run, initializer opening-only,
+adapter baseline, apply por Product/resume/VERIFY; no productive activation.
+01D-C: router único Company, wiring conjunto Receipt/manual/Sales, readers compatibles,
+barrera/activación/ensayo/recovery; backend-only, sin frontend ni fulfillment nuevo.
+Apertura conserva owned vencido/inactivo sin hacerlo elegible y CUSTODY sólo con
+contexto durable válido representable. Stock no se duplica; initialQuantity intacto.
+Manifest externo seguro, no Git real por defecto; operador técnico separado del actor User.
+Certificación KNOWN WRITERS=COMPLETE / UNKNOWN WRITERS=0 y freeze tenant demostrado
+o GLOBAL APPLICATION WRITE FREEZE son gates. OPTIONAL inaccesible/ambiguo, discrepancias,
+UNKNOWN legacy, parity/idempotency/tenant/barrier fallidos bloquean toda Company.
+01A/01B/01C DORMANT;01E depende de completion/activation01D;M-HC1 OPEN.
+Sin código, Prisma/migraciones, DB, tests, reconciliation/apply ni activación en este delta.
+Siguiente slice01D-A READY, no iniciado; requiere tarea de implementación autorizada.
+Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice | TARGET | Estado |
 | --- | --- | --- |
