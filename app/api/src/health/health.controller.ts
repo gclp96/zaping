@@ -19,6 +19,6 @@ export class HealthController {
       return { status: 'unavailable' };
     }
 
-    return { status: 'ok' };
+    return { status: 'ok', inventory: this.healthService.inventoryIdentity() };
   }
 }

@@ -1,3 +1,12 @@
+import { InventoryAuthorityTransactionService } from './physical/inventory-authority-transaction.service';
+import {
+  InventoryAuthorityError,
+  inventoryWriterError,
+} from './physical/inventory-authority-error';
+import {
+  ManualPhysicalInventoryService,
+  ManualPhysicalInput,
+} from './physical/manual-physical-inventory.service';
 import {
   Injectable,
   NotFoundException,
@@ -10,7 +19,11 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authority: InventoryAuthorityTransactionService,
+    private readonly manual: ManualPhysicalInventoryService,
+  ) {}
 
   async findInventory(companyId: string) {
     return this.prisma.product.findMany({
@@ -59,9 +72,13 @@ export class InventoryService {
   }
 
   async createMovement(companyId: string, data: CreateMovementDto) {
-    return this.executeSerializableWithRetry(async (tx) => {
-      // Re-read the product inside every Serializable attempt so retries never
-      // reuse a stock value from an aborted transaction.
+    return this.authority.run(companyId, async (tx, authority) => {
+      if (authority !== 'LEGACY')
+        throw new InventoryAuthorityError('PHYSICAL_AUTHORITY_REQUIRED');
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Product" WHERE id=${data.productId} AND "companyId"=${companyId} FOR UPDATE`,
+      );
+      // Product root is locked before reading the current legacy balance.
       const product = await tx.product.findFirst({
         where: {
           id: data.productId,
@@ -120,88 +137,50 @@ export class InventoryService {
     });
   }
 
-  private async executeSerializableWithRetry<T>(
-    operation: (tx: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T> {
-    const maxAttempts = 3;
-
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      try {
-        return await this.prisma.$transaction(operation, {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        });
-      } catch (error: unknown) {
-        if (!this.isSerializableConflict(error) || attempt === maxAttempts) {
-          throw error;
+  async createPhysicalMovement(input: ManualPhysicalInput) {
+    const execute = () =>
+      this.authority.run(input.companyId, async (tx, authority) => {
+        if (authority !== 'PHYSICAL')
+          throw new InventoryAuthorityError('LEGACY_AUTHORITY_REQUIRED');
+        return this.manual.execute(tx, input);
+      });
+    try {
+      return await execute();
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002' &&
+        Array.isArray(error.meta?.target) &&
+        ['companyId', 'scope', 'key'].every((k) =>
+          (error.meta!.target as string[]).includes(k),
+        )
+      ) {
+        try {
+          return await execute();
+        } catch (readError) {
+          inventoryWriterError(readError);
         }
       }
+      inventoryWriterError(error);
     }
-
-    throw new Error('Serializable transaction retry loop exhausted');
   }
 
-  private isSerializableConflict(error: unknown): boolean {
-    return (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === 'P2034'
-    );
-  }
-
-  /** @deprecated No productive callers. Remove at cutover; never alias to physical authority. */
-  async registerPurchaseEntry(
-    tx: Prisma.TransactionClient,
-    companyId: string,
-    data: {
-      productId: string;
-      quantity: number;
-      unitCost: number;
-      referenceId: string;
-      notes: string;
-    },
-  ) {
-    const product = await tx.product.findFirst({
-      where: {
-        id: data.productId,
-        companyId,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Producto no encontrado');
-    }
-
-    const updatedProduct = await tx.product.update({
-      where: {
-        id_companyId: {
-          id: data.productId,
-          companyId,
-        },
-      },
-      data: {
-        stock: {
-          increment: data.quantity,
-        },
-      },
-      select: {
-        stock: true,
-      },
-    });
-
-    return tx.inventoryMovement.create({
-      data: {
-        companyId,
-        productId: data.productId,
-        movementType: 'IN',
-        quantity: data.quantity,
-        balance: updatedProduct.stock,
-        unitCost: data.unitCost,
-        referenceType: 'PURCHASE',
-        referenceId: data.referenceId,
-        notes: data.notes,
-      },
+  findPhysicalPositions(companyId: string, productId: string) {
+    return this.authority.run(companyId, async (tx, authority) => {
+      if (authority !== 'PHYSICAL')
+        throw new InventoryAuthorityError('LEGACY_AUTHORITY_REQUIRED');
+      return tx.$queryRaw(Prisma.sql`
+        SELECT pos.id, pos."productId", pos."inventoryBatchId", pos.state,
+          pos.quantity, pos.revision,
+          (pos.state='AVAILABLE' AND p."isActive" AND
+            (pos."inventoryBatchId" IS NULL OR (b."isActive" AND
+              (b."expirationDate" IS NULL OR b."expirationDate">CURRENT_TIMESTAMP)))) AS eligible
+        FROM "InventoryPosition" pos
+        JOIN "Product" p ON p.id=pos."productId" AND p."companyId"=pos."companyId"
+        LEFT JOIN "InventoryBatch" b ON b.id=pos."inventoryBatchId" AND b."companyId"=pos."companyId" AND b."productId"=pos."productId"
+        WHERE pos."companyId"=${companyId} AND pos."productId"=${productId}
+        ORDER BY pos.id
+      `);
     });
   }
 

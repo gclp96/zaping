@@ -1,3 +1,6 @@
+import { InventoryAuthorityTransactionService } from './inventory-authority-transaction.service';
+import { InventoryAuthorityError } from './inventory-authority-error';
+import { HttpException } from '@nestjs/common';
 import {
   BadRequestException,
   ForbiddenException,
@@ -33,7 +36,7 @@ type Mode = 'approve' | 'quote';
 class ConversionRace extends Error {}
 
 @Injectable()
-// DORMANT: not registered in AppModule, SalesModule, or any controller.
+// One transaction owner for both authority branches; physical algorithm stays here.
 export class SalesPhysicalIntegrationService {
   constructor(
     private readonly prisma: PrismaService,
@@ -42,24 +45,28 @@ export class SalesPhysicalIntegrationService {
     private readonly physical: PhysicalInventoryService,
     private readonly projections: InventoryCompatibilityProjectionService,
     private readonly history: InventoryCompatibilityHistoryService,
+    private readonly authority: InventoryAuthorityTransactionService,
     @Optional()
     private readonly legacy: SalesLegacyClassifier = new SalesLegacyClassifier(),
   ) {}
 
-  approve(companyId: string, actorId: string, saleId: string) {
-    return this.run(companyId, actorId, saleId, 'approve');
+  approve(
+    companyId: string,
+    actorId: string,
+    saleId: string,
+    legacy?: (tx: Prisma.TransactionClient) => Promise<Sale>,
+  ) {
+    return this.run(companyId, actorId, saleId, 'approve', legacy);
   }
-  createFromQuote(companyId: string, actorId: string, quoteId: string) {
-    return this.run(companyId, actorId, quoteId, 'quote');
+  createFromQuote(
+    companyId: string,
+    actorId: string,
+    quoteId: string,
+    legacy?: (tx: Prisma.TransactionClient) => Promise<Sale>,
+  ) {
+    return this.run(companyId, actorId, quoteId, 'quote', legacy);
   }
 
-  private transaction<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>) {
-    return this.prisma.$transaction(fn, {
-      isolationLevel: 'ReadCommitted',
-      maxWait: 5000,
-      timeout: 15000,
-    });
-  }
   private async authorize(
     tx: Prisma.TransactionClient,
     companyId: string,
@@ -76,49 +83,60 @@ export class SalesPhysicalIntegrationService {
     actorId: string,
     id: string,
     mode: Mode,
+    legacy?: (tx: Prisma.TransactionClient) => Promise<Sale>,
   ) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const sale = await this.transaction(async (tx) => {
-          await this.authorize(tx, companyId, actorId);
-          // Coherent committed retries perform no writes, including folio allocation.
-          const replay = await this.readReplay(
-            tx,
-            companyId,
-            actorId,
-            id,
-            mode,
-          );
-          if (replay) return replay;
-          if (mode === 'quote') return this.convert(tx, companyId, actorId, id);
-          await tx.$queryRaw(
-            Prisma.sql`SELECT id FROM "Sale" WHERE id=${id} AND "companyId"=${companyId} FOR UPDATE`,
-          );
-          const lockedReplay = await this.readReplay(
-            tx,
-            companyId,
-            actorId,
-            id,
-            mode,
-          );
-          if (lockedReplay) return lockedReplay;
-          const sale = await this.getSale(tx, companyId, id);
-          if (sale.status !== 'DRAFT')
-            throw new BadRequestException(
-              'No se puede aprobar una venta cancelada',
+        const sale = await this.authority.run(
+          companyId,
+          async (tx, authority) => {
+            if (authority === 'LEGACY') {
+              if (!legacy)
+                throw new InventoryAuthorityError('LEGACY_AUTHORITY_REQUIRED');
+              return legacy(tx);
+            }
+            await this.authorize(tx, companyId, actorId);
+            // Coherent committed retries perform no writes, including folio allocation.
+            const replay = await this.readReplay(
+              tx,
+              companyId,
+              actorId,
+              id,
+              mode,
             );
-          const claim = await tx.sale.updateMany({
-            where: { id, companyId, status: 'DRAFT' },
-            data: { status: 'CONFIRMED' },
-          });
-          requirePhysical(
-            claim.count === 1,
-            'SALE_PHYSICAL_STATE_INCONSISTENT',
-          );
-          return this.fulfill(tx, companyId, actorId, sale);
-        });
+            if (replay) return replay;
+            if (mode === 'quote')
+              return this.convert(tx, companyId, actorId, id);
+            await tx.$queryRaw(
+              Prisma.sql`SELECT id FROM "Sale" WHERE id=${id} AND "companyId"=${companyId} FOR UPDATE`,
+            );
+            const lockedReplay = await this.readReplay(
+              tx,
+              companyId,
+              actorId,
+              id,
+              mode,
+            );
+            if (lockedReplay) return lockedReplay;
+            const sale = await this.getSale(tx, companyId, id);
+            if (sale.status !== 'DRAFT')
+              throw new BadRequestException(
+                'No se puede aprobar una venta cancelada',
+              );
+            const claim = await tx.sale.updateMany({
+              where: { id, companyId, status: 'DRAFT' },
+              data: { status: 'CONFIRMED' },
+            });
+            requirePhysical(
+              claim.count === 1,
+              'SALE_PHYSICAL_STATE_INCONSISTENT',
+            );
+            return this.fulfill(tx, companyId, actorId, sale);
+          },
+        );
         return this.response(sale, mode);
       } catch (error) {
+        if (error instanceof HttpException) throw error;
         if (
           error instanceof BadRequestException ||
           error instanceof ForbiddenException ||
@@ -149,18 +167,22 @@ export class SalesPhysicalIntegrationService {
           domain.code === 'PHYSICAL_EFFECT_CLAIM_CONFLICT' ||
           !(error instanceof PhysicalInventoryError)
         ) {
-          const replay = await this.transaction(async (tx) => {
-            await this.authorize(tx, companyId, actorId);
-            return this.readReplay(tx, companyId, actorId, id, mode);
-          }).catch((readError) => {
-            if (
-              readError instanceof BadRequestException ||
-              readError instanceof ForbiddenException ||
-              readError instanceof NotFoundException
-            )
-              throw readError;
-            throw physicalPersistenceError(readError);
-          });
+          const replay = await this.authority
+            .run(companyId, async (tx, authority) => {
+              if (authority !== 'PHYSICAL')
+                throw new InventoryAuthorityError('LEGACY_AUTHORITY_REQUIRED');
+              await this.authorize(tx, companyId, actorId);
+              return this.readReplay(tx, companyId, actorId, id, mode);
+            })
+            .catch((readError) => {
+              if (
+                readError instanceof BadRequestException ||
+                readError instanceof ForbiddenException ||
+                readError instanceof NotFoundException
+              )
+                throw readError;
+              throw physicalPersistenceError(readError);
+            });
           if (replay) return this.response(replay, mode);
         }
         if (domain.code === 'PHYSICAL_EFFECT_MISMATCH')

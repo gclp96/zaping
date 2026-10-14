@@ -39,7 +39,6 @@ const createSaleDto: CreateSaleDto = {
     {
       productId,
       quantity: 2,
-      price: 150,
     },
   ],
 };
@@ -196,7 +195,11 @@ describe('SalesController', () => {
       saleId,
     );
 
-    expect(salesServiceMock.approve).toHaveBeenCalledWith(companyId, saleId);
+    expect(salesServiceMock.approve).toHaveBeenCalledWith(
+      companyId,
+      saleId,
+      '22222222-2222-4222-8222-222222222222',
+    );
 
     expect(result).toEqual(confirmedSale);
   });
@@ -236,6 +239,7 @@ describe('SalesController', () => {
     expect(salesServiceMock.createFromQuote).toHaveBeenCalledWith(
       companyId,
       quoteId,
+      '22222222-2222-4222-8222-222222222222',
     );
 
     expect(result).toEqual(convertedSale);

@@ -1,3 +1,4 @@
+import { InventoryAuthorityTransactionService } from './inventory-authority-transaction.service';
 /* Jest assertions inspect mock method references; they do not call unbound methods. */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { BadRequestException } from '@nestjs/common';
@@ -271,6 +272,12 @@ describe('Sales physical replay and outer retry', () => {
       physical as unknown as PhysicalInventoryService,
       projections,
       history as unknown as InventoryCompatibilityHistoryService,
+      {
+        run: (
+          _company: string,
+          fn: (t: typeof tx, a: string) => Promise<unknown>,
+        ) => transaction((t) => fn(t, 'PHYSICAL')),
+      } as unknown as InventoryAuthorityTransactionService,
     );
     return {
       service,
@@ -298,10 +305,7 @@ describe('Sales physical replay and outer retry', () => {
       f.folios.allocateNextAvailableFolio,
     ])
       expect(spy).not.toHaveBeenCalled();
-    expect(f.transaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      expect.objectContaining({ isolationLevel: 'ReadCommitted' }),
-    );
+    expect(f.transaction).toHaveBeenCalledWith(expect.any(Function));
   });
   it('rejects certified membership even on the coherent Effect replay path', async () => {
     const f = setup();

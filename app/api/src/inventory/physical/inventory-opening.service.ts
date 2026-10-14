@@ -1,3 +1,4 @@
+import { inventoryAuthorityFence } from './inventory-authority-fence';
 import { InventoryCutover, Prisma, PrismaClient } from '@prisma/client';
 import { cutoverAssert, CutoverExpected } from './inventory-cutover.contract';
 import { InventoryCutoverRepository } from './inventory-cutover.repository';
@@ -54,6 +55,7 @@ export class InventoryOpeningService {
     );
     return db.$transaction(
       async (tx) => {
+        await inventoryAuthorityFence(tx, m.companyId, 'exclusive');
         await this.authorize(tx, m.companyId, actorId);
         const c = await this.controlRepo.lock(tx, m.companyId, m.cutoverId);
         cutoverAssert(c, 'NOT_FOUND');
@@ -135,7 +137,7 @@ export class InventoryOpeningService {
           control: await this.controlRepo.find(tx, m.companyId, m.cutoverId),
         };
       },
-      { timeout: 60000 },
+      { isolationLevel: 'ReadCommitted', timeout: 60000 },
     );
   }
   async lockProduct(
@@ -224,6 +226,7 @@ export class InventoryOpeningService {
     cutoverAssert(p, 'NOT_FOUND');
     return db.$transaction(
       async (tx) => {
+        await inventoryAuthorityFence(tx, m.companyId, 'exclusive');
         const c = this.assertControl(
           await this.controlRepo.lock(tx, m.companyId, m.cutoverId),
           m,
@@ -325,7 +328,7 @@ export class InventoryOpeningService {
         await assertOpeningProduct(tx, m, p, true);
         return 'APPLIED' as const;
       },
-      { timeout: 60000 },
+      { isolationLevel: 'ReadCommitted', timeout: 60000 },
     );
   }
   async apply(db: PrismaClient, m: OpeningManifest, actorId: string) {
@@ -342,6 +345,7 @@ export class InventoryOpeningService {
     validateManifest(m);
     return db.$transaction(
       async (tx) => {
+        await inventoryAuthorityFence(tx, m.companyId, 'exclusive');
         const c = this.assertControl(
           await this.controlRepo.lock(tx, m.companyId, m.cutoverId),
           m,
@@ -383,7 +387,7 @@ export class InventoryOpeningService {
         );
         return 'APPLIED';
       },
-      { timeout: 60000 },
+      { isolationLevel: 'ReadCommitted', timeout: 60000 },
     );
   }
 }

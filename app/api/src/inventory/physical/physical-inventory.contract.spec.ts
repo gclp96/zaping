@@ -201,7 +201,7 @@ describe('physical inventory composition and activation', () => {
     ).rejects.toMatchObject({ code: 'PHYSICAL_EFFECT_MISMATCH' });
     expect(repo.lockProducts).not.toHaveBeenCalled();
   });
-  it('has no productive import, controller, transaction owner or history mutation API', () => {
+  it('restricts physical integration to the approved productive writer boundaries', () => {
     const src = join(__dirname, '../..');
     function inspect(dir: string): void {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -210,7 +210,16 @@ describe('physical inventory composition and activation', () => {
         if (entry.isDirectory()) inspect(path);
         else if (
           entry.name.endsWith('.ts') &&
-          !entry.name.endsWith('.spec.ts')
+          !entry.name.endsWith('.spec.ts') &&
+          ![
+            'create-physical-movement.dto.ts',
+            'inventory.service.ts',
+            'inventory.module.ts',
+            'purchases-receipts.service.ts',
+            'purchases-receipts.module.ts',
+            'sales.service.ts',
+            'sales.module.ts',
+          ].includes(entry.name)
         ) {
           expect(readFileSync(path, 'utf8')).not.toMatch(
             /inventory-cutover|inventory-authority-resolver|inventory-physical-authority|physical-inventory|receipt-physical-integration|sales-physical|sales-legacy-classifier|inventory-compatibility-(?:projection|history)/,

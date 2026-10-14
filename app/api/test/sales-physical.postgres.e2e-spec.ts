@@ -1,3 +1,5 @@
+import { InventoryAuthorityTransactionService } from '../src/inventory/physical/inventory-authority-transaction.service';
+import { InventoryAuthorityResolver } from '../src/inventory/physical/inventory-authority-resolver';
 import { randomUUID } from 'node:crypto';
 import { Prisma, PrismaClient, ProductLotTracking } from '@prisma/client';
 import { SalesPhysicalIntegrationService } from '../src/inventory/physical/sales-physical-integration.service';
@@ -62,6 +64,21 @@ suite('Sales01C isolated PostgreSQL acceptance', () => {
       phys,
       proj,
       hist,
+      // Historical 01C algorithm-only fixtures pin PHYSICAL explicitly. Full
+      // DB-backed routing is covered by the new isolated 01D-C acceptance suite.
+      new InventoryAuthorityTransactionService(
+        client as PrismaService,
+        {
+          resolve: () => Promise.resolve('PHYSICAL'),
+        } as unknown as InventoryAuthorityResolver,
+        {
+          identity: () => ({
+            protocol: 'inventory-authority-v1',
+            build: '01c-fixture',
+            environment: 'isolated-test',
+          }),
+        },
+      ),
     );
   beforeAll(async () => {
     const raw = process.env.INVENTORY_PHYSICAL_TEST_DATABASE_URL;
@@ -465,7 +482,7 @@ suite('Sales01C isolated PostgreSQL acceptance', () => {
     const approved = await sale([p.id], 3);
     await integration().approve(companyId, actorId, approved.id);
     await expect(
-      new SalesService(db as PrismaService, folios).cancel(
+      new SalesService(db as PrismaService, folios, integration()).cancel(
         companyId,
         approved.id,
       ),
@@ -749,10 +766,10 @@ suite('Sales01C isolated PostgreSQL acceptance', () => {
     ).rejects.toThrow('requiere selección de lote');
     await assertOut(s.id, 3);
   });
-  it('12 production controllers remain legacy; create/cancel no physical effects', async () => {
+  it('12 controllers with explicit PHYSICAL fixture authority; create/cancel no physical effects', async () => {
     const p = await opening();
     const controller = new SalesController(
-      new SalesService(db as PrismaService, folios),
+      new SalesService(db as PrismaService, folios, integration()),
     );
     const req = {
       user: {
@@ -773,11 +790,11 @@ suite('Sales01C isolated PostgreSQL acceptance', () => {
     await controller.approve(req, s.id);
     const q = await quote([p.id], 2);
     const converted = await controller.createFromQuote(req, q.id);
-    expect((await facts(s.id)).effects).toHaveLength(0);
-    expect((await facts(converted.id)).effects).toHaveLength(0);
+    expect((await facts(s.id)).effects).toHaveLength(1);
+    expect((await facts(converted.id)).effects).toHaveLength(1);
     expect(
       await db.inventoryPosition.findUnique({ where: { id: p.positionId } }),
-    ).toMatchObject({ quantity: 10, revision: 1 });
+    ).toMatchObject({ quantity: 5, revision: 3 });
     expect(await db.product.findUnique({ where: { id: p.id } })).toMatchObject({
       stock: 5,
     });

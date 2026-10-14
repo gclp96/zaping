@@ -20,16 +20,16 @@ Posiciones = autoridad física actual; ledger/efectos = evidencia histórica;
 Product.stock = proyección compatible owned futura. 01A está COMPLETE / MERGED con el
 fundamento dormido; los writers/readers productivos conservan su comportamiento.
 
-| Foundation slice | TARGET | Estado |
-| --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
-| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections | 8 SP | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency | 8 SP | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01D — Reconciliation + opening baseline + coordinated cutover umbrella | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A MERGED PR #82; 01D-B IMPLEMENTED / TESTED, pending review/merge; 01D-C BLOCKED; original8SP SUPERSEDED |
-| HC-INVENTORY-CUSTODY-01D-A — Durable Cutover Control & Legacy Classification Foundation | 5 SP | COMPLETE / MERGED — PR #82 — NON-ACTIVATING |
-| HC-INVENTORY-CUSTODY-01D-B — Reconciliation, Opening Baseline & Verification | 8 SP | IMPLEMENTED / TESTED — pending human review/merge — NO PRODUCTIVE ACTIVATION |
-| HC-INVENTORY-CUSTODY-01D-C — Authority Cutover, Writer Wiring & Operational Activation | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-B — IMPLEMENTATION: NOT STARTED |
-| HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance | 8 SP | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D |
+| Foundation slice                                                                            | TARGET            | Estado                                                                                                                               |
+| ------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| HC-INVENTORY-CUSTODY-01A — Core authority + ledger/effects + read model                     | 8 SP              | COMPLETE / MERGED — PR #77 — main@47fd68a                                                                                            |
+| HC-INVENTORY-CUSTODY-01B — Receipts + manual Inventory + projections                        | 8 SP              | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D                                                                                       |
+| HC-INVENTORY-CUSTODY-01C — Sales + outbound source resolution + concurrency                 | 8 SP              | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D                                                                        |
+| HC-INVENTORY-CUSTODY-01D — Reconciliation + opening baseline + coordinated cutover umbrella | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A MERGED PR #82; 01D-B COMPLETE / MERGED PR #83; 01D-C IMPLEMENTED / TESTED; original8SP SUPERSEDED |
+| HC-INVENTORY-CUSTODY-01D-A — Durable Cutover Control & Legacy Classification Foundation     | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
+| HC-INVENTORY-CUSTODY-01D-B — Reconciliation, Opening Baseline & Verification                | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
+| HC-INVENTORY-CUSTODY-01D-C — Authority Cutover, Writer Wiring & Operational Activation      | 8 SP              | IMPLEMENTED / TESTED — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
+| HC-INVENTORY-CUSTODY-01E — Equipment custody + cross-domain acceptance                      | 8 SP              | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D                                                  |
 
 DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
 [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
@@ -71,14 +71,14 @@ Receipt mixto admite conjuntos disjuntos: QUANTITY Positions, ASSET Equipment,
 SERIALIZED sin nueva integración física. Proyecciones compartidas y replay atómico.
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
-01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge.
+01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
 01E y HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
 Implementación local: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
 actor y fuentes explícitas; Receipt interno mixto con reserva ASSET codes antes de
 Product roots. No controller productivo invoca la integración. Helper legacy
-registerPurchaseEntry deprecado, sin alias físico. No backfill/activación.
+registerPurchaseEntry retirado en01D-C, sin alias físico. No backfill/activación real.
 
 Evidencia histórica local 01B (no reejecutada en el diseño 01C): focal 28/28; API `npm test -- --runInBand` 1814/1814,
 110 suites; typecheck/lint/build, Prisma format/validate y noEmit focal PASS.
@@ -113,11 +113,11 @@ Detalle y límites en §F del diseño01C; merge mediante PR #80 sobre
 HC-INVENTORY-CUSTODY-01D — TECHNICAL DESIGN: APPROVED.
 [TD-INV-01D-01..32](../modules/erp/INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md):
 32/32 human approved con restricciones vinculantes; DOC DELTA incorporado.
-01D-A COMPLETE / MERGED — PR #82; 01D-B IMPLEMENTED / TESTED — pending human review/merge; 01D-C BLOCKED.
+01D-A COMPLETE / MERGED — PR #82; 01D-B COMPLETE / MERGED — PR #83; 01D-C IMPLEMENTED / TESTED.
 ACTIVATION: NOT STARTED; DESIGN APPROVED ≠ CUTOVER READY.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION.
-01D-A TARGET5SP COMPLETE / MERGED — PR #82;01D-B TARGET8SP IMPLEMENTED / TESTED — pending human review/merge;
-01D-C TARGET8SP BLOCKED BY01D-B; TOTAL01D TARGET21SP =5+8+8.
+01D-A TARGET5SP COMPLETE / MERGED — PR #82;01D-B TARGET8SP COMPLETE / MERGED — PR #83;
+01D-C TARGET8SP IMPLEMENTED / TESTED; TOTAL01D TARGET21SP =5+8+8.
 01D-A: DB control dedicado, CAS/digest/checkpoints/membership/classifier y resolver
 foundation non-activating.01D-B: reconciliation/manifest/dry-run, initializer opening-only,
 adapter baseline, apply por Product/resume/VERIFY; no productive activation.
@@ -136,22 +136,28 @@ Validación histórica01D-A: full API1896 tests/113 suites PASS; PostgreSQL16/16
 loopback/tmpfs (DB zaping_cutover_test), cleanup PASS; Prisma validate/typecheck/lint/build PASS.
 Prisma generate: DLL Windows ocupada; no declarar PASS. noEmit global tests:70 diagnósticos
 preexistentes, cero nuevos; detalle en §A.1 del diseño01D.
-01D-B IMPLEMENTED / TESTED — pending human review/merge — TARGET8SP.
+01D-C IMPLEMENTED / TESTED — TARGET 8 SP; pendiente revisión humana/merge.
+Full API1935/1935 (116 suites), Web106/106 (8 archivos), PostgreSQL aislado27/27 PASS.
+Fence compartido/exclusivo y router único cableados; CLI interna exige adapter de evidencia.
+ACTUAL CUTOVER NOT EXECUTED; 01D ACTIVATION NOT PERFORMED AGAINST REAL COMPANY.
+EXTERNAL FENCE NOT CERTIFIED. [Runbook](../modules/erp/INVENTORY_CUSTODY_01D_CUTOVER_RUNBOOK.md).
+
+Evidencia histórica 01D-B COMPLETE / MERGED — PR #83 — TARGET8SP.
 Focal77/77, full API1918/114 suites, PostgreSQL43/43 PASS; Prisma format/validate/generate,
 typecheck, lint tocado y build PASS. Aceptación sólo DB nueva efímera zaping_opening_test,
 loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APPLY/VERIFY;
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
-Detalle y límites en §A.2 del diseño01D.01D-C BLOCKED hasta aceptación/merge01D-B.
+Detalle y límites en §A.2 del diseño01D.01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Siguiente acción: revisión humana → staging selectivo → commit → PR01D-B.
+Siguiente acción: revisión humana → staging selectivo → commit → PR01D-C.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
-| Slice | TARGET | Estado |
-| --- | --- | --- |
-| HC-DSP-01A — Persistence + read | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01B — DRAFT commands | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01D — Frontend | 5 SP | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| Slice                                           | TARGET | Estado                                            |
+| ----------------------------------------------- | ------ | ------------------------------------------------- |
+| HC-DSP-01A — Persistence + read                 | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01B — DRAFT commands                     | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01D — Frontend                           | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
 
 Ningún slice Dispatch READY. P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
@@ -223,11 +229,11 @@ ERP Core
 ├── Authenticated App Shell
 ├── Navigation
 ├── UX-01 App Shell v2 / frontend foundations
-│   ├── semantic tokens
-│   ├── layout primitives
-│   ├── responsive Sidebar / AppHeader
-│   ├── authenticated Home V1
-│   └── Categories normalization
+│ ├── semantic tokens
+│ ├── layout primitives
+│ ├── responsive Sidebar / AppHeader
+│ ├── authenticated Home V1
+│ └── Categories normalization
 ├── Dashboard 2.0
 ├── Customers V1
 ├── Suppliers V1
@@ -237,23 +243,23 @@ ERP Core
 ├── Quotes V1
 ├── Sales V1
 ├── Purchases V1
-│   ├── Purchase 360 canonical detail
-│   ├── folio navigation to /purchases/:id
-│   ├── timezone-aware date filters
-│   └── legacy purchaseId compatibility redirect
+│ ├── Purchase 360 canonical detail
+│ ├── folio navigation to /purchases/:id
+│ ├── timezone-aware date filters
+│ └── legacy purchaseId compatibility redirect
 ├── Purchase Receipts V1
-│   ├── partial / full receiving
-│   ├── lot tracking
-│   ├── idempotency
-│   ├── Inventory IN
-│   ├── Equipment provisioning
-│   └── cross-module traceability
+│ ├── partial / full receiving
+│ ├── lot tracking
+│ ├── idempotency
+│ ├── Inventory IN
+│ ├── Equipment provisioning
+│ └── cross-module traceability
 ├── Secure password recovery
 ├── Authorization + Tenant Isolation V1
-│   ├── fixed-role ERP Core authorization
-│   ├── tenant-safe reads and mutations
-│   ├── cross-company relation hardening
-│   └── frontend role-aware UX / 403 handling
+│ ├── fixed-role ERP Core authorization
+│ ├── tenant-safe reads and mutations
+│ ├── cross-company relation hardening
+│ └── frontend role-aware UX / 403 handling
 └── Healthcare Case Foundation
 
 CURRENT
@@ -261,12 +267,12 @@ CURRENT
 M-HC1 — Healthcare Operations Foundation
 
 ├── HC-NEXT-03A — Healthcare Equipment Assignment Domain Discovery
-│   └── COMPLETE / DOCUMENTED
+│ └── COMPLETE / DOCUMENTED
 └── HC-NEXT-03B — Healthcare Equipment Assignment Technical Design
-    ├── COMPLETE / APPROVED
-    ├── HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
-    ├── HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
-    └── HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUMENTED
+├── COMPLETE / APPROVED
+├── HC-NEXT-03B.1 Persistence & Availability Design — APPROVED / DOCUMENTED
+├── HC-NEXT-03B.2 API / DTO / Authorization Contract — APPROVED / DOCUMENTED
+└── HC-NEXT-03B.3 Implementation Slicing / Acceptance Contract — APPROVED / DOCUMENTED
 
 HC-NEXT-03C1 — Equipment Assignment Persistence / Migration
 └── COMPLETE / MERGED
@@ -277,86 +283,86 @@ HC-NEXT-03C2 — Assignment Backend Base
 RECENTLY COMPLETED
 
 └── Requirements
-    ├── DOMAIN DISCOVERY COMPLETE / DOCUMENTED
-    ├── TECHNICAL DESIGN APPROVED
-    ├── PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED
-    └── ACCEPTANCE COMPLETE / ACCEPTED
+├── DOMAIN DISCOVERY COMPLETE / DOCUMENTED
+├── TECHNICAL DESIGN APPROVED
+├── PERSISTENCE / BACKEND / FRONTEND COMPLETE / MERGED
+└── ACCEPTANCE COMPLETE / ACCEPTED
 
 Frontend UX workstream
 
 ├── UX-01 Foundations / App Shell v2
-│   └── COMPLETED / VALIDATED
+│ └── COMPLETED / VALIDATED
 │
 └── UX-02 DataTable / operational lists
-    ├── COMPLETE / VALIDATED
-    ├── DataTable para listas operativas
-    └── StaticTable para detalle/documentación
+├── COMPLETE / VALIDATED
+├── DataTable para listas operativas
+└── StaticTable para detalle/documentación
 
 CURRENT
 
 HC-NEXT-03C3 — Availability / Conflict Review / Concurrency
-        → COMPLETE / MERGED
+→ COMPLETE / MERGED
 
 HC-NEXT-03C4 — Replace / Release / Parent Integrations
-        → COMPLETE / MERGED
-        → Manual Release HC-LOCK-03B COMPLETE / MERGED IN main@8a3b189
-        → Replace backend COMPLETE / MERGED
-        → Requirement Retire C4-C1 COMPLETE / MERGED IN main@3e1810f
-        → Case Cancel C4-C2 COMPLETE / MERGED IN main@f429e9f
+→ COMPLETE / MERGED
+→ Manual Release HC-LOCK-03B COMPLETE / MERGED IN main@8a3b189
+→ Replace backend COMPLETE / MERGED
+→ Requirement Retire C4-C1 COMPLETE / MERGED IN main@3e1810f
+→ Case Cancel C4-C2 COMPLETE / MERGED IN main@f429e9f
 
 HC-LOCK-01 — Company Lock Protocol ADR
-        → ARCHITECTURE ACCEPTED
-        → DONE — ARCHITECTURE / DOCUMENTATION ACCEPTED
-        → V1 IMPLEMENTATION COMPLETE THROUGH HC-LOCK-02/03/04
-        → STAGING / PRODUCTION APPROVAL NOT CLAIMED
+→ ARCHITECTURE ACCEPTED
+→ DONE — ARCHITECTURE / DOCUMENTATION ACCEPTED
+→ V1 IMPLEMENTATION COMPLETE THROUGH HC-LOCK-02/03/04
+→ STAGING / PRODUCTION APPROVAL NOT CLAIMED
 
 RECENTLY COMPLETED / NEXT
 
 HC-LOCK-02 / HC-LOCK-03B / HC-LOCK-04
-        → PROTOCOL CONSOLIDATED / MANUAL RELEASE MERGED
-        → HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
+→ PROTOCOL CONSOLIDATED / MANUAL RELEASE MERGED
+→ HC-LOCK-04 FINAL CLOSED / ACCEPTED IN main@be73bc4
 
 HC-NEXT-03C4-C parent integrations
-        → C4-C1 REQUIREMENT RETIRE COMPLETE / MERGED IN main@3e1810f
-        → C4-C2 CASE CANCEL COMPLETE / MERGED IN main@f429e9f
+→ C4-C1 REQUIREMENT RETIRE COMPLETE / MERGED IN main@3e1810f
+→ C4-C2 CASE CANCEL COMPLETE / MERGED IN main@f429e9f
 
 HC-NEXT-03C5-A — Contract Alignment & Safe PostgreSQL Harness
-        → COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
+→ COMPLETE / MERGED — PR #36 + #37 — main@5ec9f67
 
 HC-NEXT-03C6-A — Case Equipment Assignments Read-only View
-        → COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
+→ COMPLETE / MERGED — PR #38 — main@8a67d5a — Actual 25-sep-2026
 
 HC-NEXT-03C6-B — Create Assignment UI
-        → COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
+→ COMPLETE / MERGED — PR #40 — main@4805128 — Actual 25-sep-2026
 
 HC-NEXT-03C6-C — Release Assignment UI
-        → COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
+→ COMPLETE / MERGED — PR #42 — main@9bade4d — Actual 25-sep-2026
 
 HC-NEXT-03C6-D — Replace Assignment UI
-        → COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
+→ COMPLETE / MERGED — PR #45 — main@99efc5a — Actual 25-sep-2026
 
 HC-NEXT-03C6-E — Requirement-linked Assignment UI
-        → COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
+→ COMPLETE / MERGED — PR #47 — main@a1f0fee — Actual 27-sep-2026
 
 HC-OPS-01A — CaseKit Draft & Contents
-        → COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
+→ COMPLETE / MERGED — PR #50 — main@bb530e8 — Actual 27-sep-2026
 
 HC-OPS-01A.1 — Draft Item Exclusion
-        → COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
+→ COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026
 
 HC-OPS-01B — Preparation Confirmation & Readiness
-        → COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
+→ COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — stale-item blocker RESOLVED by 01A.1 — no SP, Forecast or Commitment
 
 HC-NEXT-03C5-B — Integrated Backend Validation
-        → COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
+→ COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
 
 HC-NEXT-03C5-COVERAGE — CoverageNote / Aggregated Coverage Backend
-        → COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
+→ COMPLETE / MERGED / CONTRACT APPROVED / REQUIRED BEFORE C6 SLICES THAT DEPEND ON COVERAGE
 
 DEFERRED
 
 OPS-RC-B5C — real staging acceptance
-        → READY WHEN NEEDED; not executed by this baseline
+→ READY WHEN NEEDED; not executed by this baseline
 
 PRE-PILOT / PRE-PRODUCTION OPERATIONAL GATES
 
@@ -414,24 +420,24 @@ El Project Board no debe convertirse en un historial de implementación.
 Zaping Platform
 │
 ├── ERP Core
-│   ├── Foundation estable
-│   ├── Comercial V1 operativo
-│   ├── Compras / Recepciones operativas
-│   ├── Inventario transaccional
-│   ├── Equipment Core
-│   ├── trazabilidad entre módulos
-│   └── V1 CLOSED / ACCEPTED — local baseline
+│ ├── Foundation estable
+│ ├── Comercial V1 operativo
+│ ├── Compras / Recepciones operativas
+│ ├── Inventario transaccional
+│ ├── Equipment Core
+│ ├── trazabilidad entre módulos
+│ └── V1 CLOSED / ACCEPTED — local baseline
 │
 ├── Healthcare
-│   ├── Case Foundation implementado
-│   ├── Equipment boundary definido
-│   └── operational workflows TARGET
+│ ├── Case Foundation implementado
+│ ├── Equipment boundary definido
+│ └── operational workflows TARGET
 │
 ├── Radar
-│   └── producto futuro
+│ └── producto futuro
 │
 └── AI
-    └── evolución futura
+└── evolución futura
 
 3. ERP Core — Estado actual
 
@@ -584,10 +590,8 @@ dedicated frontend
 
 Contrato idempotente:
 
-Idempotency-Key
-+
-companyId
-+
+Idempotency-Key +
+companyId +
 PURCHASE_RECEIPT_CREATE
 
 Comportamiento:
@@ -713,9 +717,9 @@ Estado: ✅ IMPLEMENTED / VALIDATED
 Lifecycle:
 
 active by default
-        ↓
+↓
 DELETE
-        ↓
+↓
 isActive = false
 
 DELETE representa desactivación y no hard delete.
@@ -748,9 +752,9 @@ Estado: ✅ IMPLEMENTED / VALIDATED
 Lifecycle equivalente:
 
 active
-  ↓
+↓
 deactivate
-  ↓
+↓
 isActive = false
 
 Las Purchases históricas conservan su Supplier.
@@ -957,11 +961,11 @@ folio
 Frontend handoff:
 
 Quote
-  ↓
+↓
 Convert to Sale
-  ↓
+↓
 Venta creada correctamente
-  ↓
+↓
 /sales?saleId=<Sale.id>
 
 Deuda vigente:
@@ -1138,15 +1142,15 @@ docs/modules/erp/PURCHASE_RECEIPTS.md
 Flujo:
 
 Purchase CONFIRMED / PARTIALLY_RECEIVED
-        ↓
+↓
 PurchaseReceipt
-        ↓
+↓
 PurchaseReceiptItem
-        ├── Product.stock increment
-        ├── InventoryMovement IN
-        ├── InventoryBatch when applicable
-        └── EquipmentAsset for ASSET Product
-        ↓
+├── Product.stock increment
+├── InventoryMovement IN
+├── InventoryBatch when applicable
+└── EquipmentAsset for ASSET Product
+↓
 Purchase PARTIALLY_RECEIVED / RECEIVED
 
 Lot tracking implementado:
@@ -1375,7 +1379,6 @@ password change authVersion invalidation
 JWT revocation after password change/reset
 
 safe response semantics
-
 
 no account enumeration
 
@@ -1628,13 +1631,13 @@ Returns no es blocker P0 para el cierre funcional del ERP Core V1 actual.
 Debe evolucionar coordinadamente con la futura separación:
 
 SalesOrder
-        ↓
+↓
 Delivery
-        ↓
+↓
 Commercial Return
-        ↓
+↓
 Inspection / Disposition
-        ↓
+↓
 Inventory
 
 Debe distinguirse siempre:
@@ -1655,11 +1658,11 @@ Prioridad: P1 estratégica
 Arquitectura objetivo:
 
 Quote
-  ↓ optional
+↓ optional
 SalesOrder
-  ↓
+↓
 Delivery
-  ↓
+↓
 Inventory OUT
 
 Debe separar:
@@ -1758,21 +1761,21 @@ docs/modules/erp/ADVANCED_INVENTORY.md
 
 Backlog aprobado:
 
-| ID | Item | Estado |
-| --- | --- | --- |
-| INV-WH-001 | Branch / Warehouse foundation | 🎯 TARGET |
-| INV-LOC-001 | Storage Locations | 🎯 TARGET |
-| INV-LOC-002 | Inventory by Location | 🎯 TARGET |
-| INV-LOC-003 | Preferred Storage Location | 🎯 TARGET |
-| INV-LOC-004 | Receipt Put-away | 🎯 TARGET |
-| INV-LOC-005 | Internal Relocation | 🎯 TARGET |
-| INV-TRF-001 | Warehouse Transfers | 🎯 TARGET |
-| INV-RES-001 | Inventory Reservations | 🎯 TARGET |
-| INV-CNT-001 | Physical / Cycle Counts | 🎯 TARGET |
-| INV-SCN-001 | Location QR / Barcode | 🎯 TARGET |
-| INV-LED-001 | Inventory Ledger V2 | 🎯 TARGET |
-| EQ-AVL-001 | Derived Equipment Availability | ✅ IMPLEMENTED / VALIDATED in Core; location/custody evolution remains TARGET |
-| EQ-MNT-001 | Equipment Maintenance | 🎯 TARGET |
+| ID          | Item                           | Estado                                                                        |
+| ----------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| INV-WH-001  | Branch / Warehouse foundation  | 🎯 TARGET                                                                     |
+| INV-LOC-001 | Storage Locations              | 🎯 TARGET                                                                     |
+| INV-LOC-002 | Inventory by Location          | 🎯 TARGET                                                                     |
+| INV-LOC-003 | Preferred Storage Location     | 🎯 TARGET                                                                     |
+| INV-LOC-004 | Receipt Put-away               | 🎯 TARGET                                                                     |
+| INV-LOC-005 | Internal Relocation            | 🎯 TARGET                                                                     |
+| INV-TRF-001 | Warehouse Transfers            | 🎯 TARGET                                                                     |
+| INV-RES-001 | Inventory Reservations         | 🎯 TARGET                                                                     |
+| INV-CNT-001 | Physical / Cycle Counts        | 🎯 TARGET                                                                     |
+| INV-SCN-001 | Location QR / Barcode          | 🎯 TARGET                                                                     |
+| INV-LED-001 | Inventory Ledger V2            | 🎯 TARGET                                                                     |
+| EQ-AVL-001  | Derived Equipment Availability | ✅ IMPLEMENTED / VALIDATED in Core; location/custody evolution remains TARGET |
+| EQ-MNT-001  | Equipment Maintenance          | 🎯 TARGET                                                                     |
 
 Estos items no implican ejecución inmediata, versión ni fecha de entrega.
 
@@ -1856,9 +1859,9 @@ API:
 
 POST /healthcare/cases
 
-GET  /healthcare/cases
+GET /healthcare/cases
 
-GET  /healthcare/cases/:id
+GET /healthcare/cases/:id
 
 PATCH /healthcare/cases/:id
 
@@ -2287,7 +2290,7 @@ Mitigación:
 
 defer operational expansion
 
-+
+-
 
 coordinate with SalesOrder / Delivery evolution
 
@@ -2297,7 +2300,7 @@ Actualmente existen:
 
 Product.stock
 
-+
+-
 
 EquipmentAsset records
 
@@ -2330,7 +2333,7 @@ Prioridad actual:
 
 stable ERP Core
 
-+
+-
 
 differentiated Healthcare workflows after Core closure
 
@@ -2445,7 +2448,7 @@ ERP Core V1 CLOSED / ACCEPTED; M-HC1 ACTIVE.
 → Requirements Persistence / Backend / Frontend COMPLETE / MERGED
 
 → Requirements Acceptance COMPLETE / ACCEPTED — ADMIN / MANAGER / SALES /
-  WAREHOUSE PASS
+WAREHOUSE PASS
 
 CURRENT ROADMAP ITEM
 
@@ -2735,6 +2738,7 @@ Liberar de forma atómica las reservas lógicas aplicables cuando se
 cancela un Healthcare Case o se retira una Requirement.
 
 Alcance:
+
 - Case cancellation: liberar Assignments RESERVED del Case con
   releaseCause = CASE_CANCELLED.
 - Requirement retire: liberar sólo Assignments RESERVED de origen
@@ -2747,6 +2751,7 @@ Alcance:
 - No crear InventoryMovement, Return ni cambios de Custody.
 
 Dependencias de Definition of Ready:
+
 - [ADR-HC-LOCK-001](../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md)
   aprobado como arquitectura; no como implementación o readiness productiva.
 - HC-LOCK-02 consolidó el protocolo V1 y sus timeouts.
@@ -2779,6 +2784,7 @@ Assignments `RESERVED` de origen `REQUIREMENT`, preservando historial y el
 contrato público existente.
 
 Scope:
+
 - Reutilizar el `Prisma.TransactionClient` del comando padre.
 - Orden obligatorio: `Company → Case → Requirement → Assignments por ID ASC`.
 - Revalidar tenant, Case, Requirement, origin y lifecycle bajo lock.
@@ -2790,6 +2796,7 @@ Scope:
 - No crear idempotency claims de Assignment ni efectos físicos.
 
 Dependencias / DoR:
+
 - HC-LOCK-02 y HC-LOCK-03 integrados en `main`.
 - HC-LOCK-04 prerequisite checkpoint acreditado.
 - Enum, relaciones e índice tenant-scoped existentes; no requiere migración.
@@ -2798,6 +2805,7 @@ Dependencias / DoR:
 - DoR: READY.
 
 Acceptance Criteria:
+
 - Una, múltiples o cero reservas aplicables se resuelven atómicamente.
 - `DIRECT`, otros parents/tenants y filas históricas permanecen intactas.
 - Replay no escribe ni sobrescribe auditoría.
@@ -2808,6 +2816,7 @@ Acceptance Criteria:
 - No hay Inventory Movement, Return ni Custody.
 
 Pruebas requeridas:
+
 - Unitarias focales de Requirements y Assignment service/repository.
 - Regresiones controller/RBAC y respuesta pública.
 - PostgreSQL E2E determinista de transición, replay, aislamiento, rollback y
@@ -2816,6 +2825,7 @@ Pruebas requeridas:
 - Typecheck, lint, Prettier, build y `git diff --check`.
 
 Evidencia de cierre técnico:
+
 - Jest focal: 429/429 PASS.
 - Typecheck, ESLint, Prettier focal, API build y `git diff --check`: PASS.
 - PostgreSQL E2E C4-C1: 13/13 PASS, exit 0; 14 pruebas skipped por el filtro;
@@ -2828,6 +2838,7 @@ Evidencia de cierre técnico:
   efectos físicos nuevos.
 
 Definition of Done:
+
 - Implementación transaction-bound sin nested transaction ni llamada HTTP
   interna.
 - AC y gates locales/PostgreSQL PASS con evidencia verificable.
@@ -2856,6 +2867,7 @@ Assignments `RESERVED`, tanto `DIRECT` como `REQUIREMENT`, preservando historia 
 el contrato público existente.
 
 Scope:
+
 - Reutilizar el `Prisma.TransactionClient` del comando padre y las primitivas
   internas de C4-C1; sin nested transaction ni llamada a Manual Release público.
 - Orden obligatorio: `Company → Case → Assignments por ID ASC`.
@@ -2868,6 +2880,7 @@ Scope:
 - Cero reservas aplicables es válido; no crear claims ni efectos físicos.
 
 Dependencias / DoR:
+
 - C4-C1 y sus primitivas están integradas en `main@3e1810f`.
 - HC-LOCK-02 y HC-LOCK-03 están integrados.
 - HC-LOCK-04 prerequisite estaba acreditado para el DoR; el checkpoint final está
@@ -2878,6 +2891,7 @@ Dependencias / DoR:
 - DoR: READY.
 
 Acceptance Criteria:
+
 - Una, múltiples o cero reservas `DIRECT`/`REQUIREMENT` se liberan atómicamente
   con la auditoría aprobada.
 - Otros Cases/tenants y filas `RELEASED`/`REPLACED` permanecen intactas.
@@ -2890,6 +2904,7 @@ Acceptance Criteria:
 - No hay claims, Inventory Movement, Return, Custody ni cambios físicos.
 
 Pruebas requeridas:
+
 - Unitarias focales de Cases y Assignment service/repository.
 - Regresiones controller/RBAC, validación, status y respuesta pública.
 - PostgreSQL E2E determinista de transición, replay, aislamiento, rollback y
@@ -2899,6 +2914,7 @@ Pruebas requeridas:
 - Typecheck, lint, Prettier, build y `git diff --check`.
 
 Definition of Done:
+
 - Implementación transaction-bound sin nested transaction ni llamada HTTP
   interna.
 - AC y gates locales/PostgreSQL PASS con evidencia verificable.
@@ -2908,6 +2924,7 @@ Definition of Done:
   final de HC-LOCK-04 acreditado.
 
 Evidencia técnica e integración:
+
 - Jest focal: 346/346 PASS.
 - Typecheck, `lint:check`, Prettier focal, API build y `git diff --check`: PASS.
 - PostgreSQL/HTTP E2E focal sobre `zaping_spike_test`: 16/16 PASS, 26 skipped
@@ -2937,6 +2954,7 @@ Persistir la decisión de coordinación transaccional Company-scoped y alinear s
 fuentes documentales canónicas.
 
 Entregable:
+
 - [ADR-HC-LOCK-001 — Healthcare Company-Scoped Transaction Coordination](../architecture/adr/ADR-HC-LOCK-001-healthcare-company-scoped-transaction-coordination.md).
 - Alineación de
   [Equipment Assignment Technical Design](../modules/healthcare/EQUIPMENT_ASSIGNMENT_TECHNICAL_DESIGN.md).
@@ -2958,6 +2976,7 @@ adopción por participantes y política de timeouts que no debilite límites
 heredados.
 
 Dependencias:
+
 - HC-LOCK-01 define la arquitectura aceptada.
 - Debe completarse antes de considerar integración o rollout productivo.
 
@@ -2972,6 +2991,7 @@ y resolver las decisiones de dominio/API diferidas expresamente por
 ADR-HC-LOCK-001.
 
 Dependencias:
+
 - HC-LOCK-01 para el contrato arquitectónico.
 - HC-LOCK-02 para la implementación estable del protocolo.
 
@@ -3007,6 +3027,7 @@ La ejecución se separa en dos checkpoints dentro del mismo ticket:
    Retire dentro de la frontera transaccional final y sus regresiones.
 
 Dependencias:
+
 - HC-LOCK-02 para el protocolo consolidado.
 - HC-LOCK-03 para los escenarios finales de Manual Release.
 - HC-NEXT-03C4-C implementado para ejecutar el checkpoint integrado final; no
@@ -3033,6 +3054,7 @@ propagaron fallos de cleanup. Esta evidencia no afirma limpieza global de
 ### HC-NEXT-03C5 — Backend Hardening / Integrated E2E
 
 Decisiones aprobadas:
+
 - **DEC-C5-01:** `HealthcareEquipmentRequirementCoverageNote` y la cobertura
   agregada quedan fuera de C5. Se entregarán en el ticket backend independiente
   HC-NEXT-03C5-COVERAGE antes de cualquier slice C6 que dependa de cobertura; su
@@ -3058,6 +3080,7 @@ Decisiones aprobadas:
 Estado: COMPLETE / MERGED — PR #36 + #37 — `main@5ec9f67`
 
 Dependencias satisfechas:
+
 - baseline de inicio `main@5d33cb0`, integración mediante PR #36 y cierre
   documental mediante PR #37 en `main@5ec9f67`;
 - HC-NEXT-03C1–C4 COMPLETE / MERGED;
@@ -3068,6 +3091,7 @@ Dependencias satisfechas:
   `02d7a6e`.
 
 Alcance:
+
 - alinear la documentación CURRENT de Replace, Company Lock y estados de slices;
 - endurecer únicamente el harness PostgreSQL de integridad C1 para usar opt-in y
   URL explícitos (`RUN_HC_C5_POSTGRES_TESTS=1` y `HC_C5_DATABASE_URL`), sin
@@ -3083,6 +3107,7 @@ Alcance:
   referencial, con readback de conteos cero y propagación agregada de fallos.
 
 Infraestructura y ejecución acreditadas para C5-A:
+
 - usuario dedicado `zaping_hc_c5`;
 - base `zaping_spike_test`;
 - endpoint host `127.0.0.1:5434`.
@@ -3098,6 +3123,7 @@ durante toda la ejecución. Los laboratorios B4-B1 y 2H no se consideran
 equivalentes automáticamente.
 
 Definition of Ready:
+
 - contrato C5-A documentado y baseline limpia: satisfecho;
 - identidad/usuario/variable explícita y manifiesto mínimo de privilegios
   aprobados: satisfecho;
@@ -3105,6 +3131,7 @@ Definition of Ready:
   preflight autorizado: satisfecho para la ejecución C1 acreditada.
 
 Acceptance Criteria:
+
 - el harness falla cerrado antes de escribir ante cualquier mismatch de identidad,
   schema, permisos o sesiones;
 - no carga configuración implícita ni usa credenciales heredadas como fallback;
@@ -3113,6 +3140,7 @@ Acceptance Criteria:
 - el cambio no modifica producción, schema, migraciones ni semántica C1–C4.
 
 Definition of Done:
+
 - implementación y revisión focal del harness completadas;
 - preflight autorizado documenta identidad efectiva sin secretos;
 - validaciones estáticas y `git diff --check` verdes;
@@ -3120,6 +3148,7 @@ Definition of Done:
 - PR #36 y #37 integrados en `main@5ec9f67`; C5-A COMPLETE / MERGED.
 
 Sprint 1:
+
 - ventana: 24-sep–07-oct-2026;
 - capacidad bruta informada: 20 h/semana; no equivale a velocidad, Forecast ni
   Commitment;
@@ -3404,10 +3433,10 @@ UI merged mediante PR #71; CI PASS. Feature commit:
 `c66fc37fac4a36ebe7be91e84b484a59c3cb5907`; merge commit en main:
 `e56970d6f7587ef72e06a18ee1f45dbcb839ec83`.
 
-| Slice | Estado | Estimación |
-|---|---|---|
+| Slice                                                    | Estado                                               | Estimación  |
+| -------------------------------------------------------- | ---------------------------------------------------- | ----------- |
 | HC-CASE-AVL-R — Derived Case Availability Read — Backend | COMPLETE / MERGED — PR #69 — main@59d5aae — DoD PASS | TARGET 5 SP |
-| HC-CASE-AVL-UI — Case Availability Summary — Frontend | COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS | TARGET 3 SP |
+| HC-CASE-AVL-UI — Case Availability Summary — Frontend    | COMPLETE / MERGED — PR #71 — main@e56970d — DoD PASS | TARGET 3 SP |
 
 Contrato aprobado y autoridad DEC-CASE-AVL-01/02/03:
 [CASES §86](../modules/healthcare/CASES.md#861-contrato-aprobado-v1--case-level-projection).
@@ -3459,6 +3488,7 @@ Siguiente acción: revisión humana → staging selectivo → commit → docs PR
 Estado: COMPLETE / MERGED — PR #38 — `main@8a67d5a` — Actual 25-sep-2026
 
 Objetivo y alcance inicial:
+
 - entregar una pantalla centrada en Case, conectada a List/Detail existentes;
 - mostrar listado, detalle y disponibilidad expuesta por la API;
 - cubrir estados loading, empty, error y RBAC sin inventar reglas frontend;
@@ -3466,12 +3496,14 @@ Objetivo y alcance inicial:
   a los gates aplicables acreditados de autenticación, permisos y List/Detail.
 
 Acceptance Criteria:
+
 - desde un Case se consulta su listado y se abre el detalle de una Assignment;
 - la UI representa la disponibilidad recibida y estados loading/empty/error;
 - los cuatro roles respetan el contrato read-only y un 403 no destruye la sesión;
 - no se exponen ni habilitan acciones fuera del alcance.
 
 Definition of Done:
+
 - Vitest focal 29/29 PASS;
 - ESLint, TypeScript y Next.js build PASS; CI API/Web PASS;
 - validación manual PASS para empty state, Assignment DIRECT/RESERVED real,
@@ -3496,6 +3528,7 @@ request, manejo de resultados y refresh de List, sin ampliar reglas de dominio e
 frontend ni incorporar Requirement assignment, Replace, Release o CoverageNote.
 
 Evidencia de cierre:
+
 - Vitest focal 19/19 PASS;
 - TypeScript Web, ESLint Web y Next.js build PASS;
 - CI API/Web PASS;
@@ -3516,6 +3549,7 @@ Idempotency-Key por request, feedback y refresh de List. Los tests focales
 mantienen SALES read-only; no se registra validación manual de SALES.
 
 Evidencia de cierre:
+
 - Vitest focal 26/26 PASS;
 - TypeScript Web, ESLint Web y Next.js build PASS;
 - CI API/Web PASS;
@@ -3536,6 +3570,7 @@ y roles autorizados, excluye el Asset origen del selector, envía los campos e
 Idempotency-Key exigidos y refresca List inmediatamente tras éxito.
 
 Evidencia de cierre:
+
 - Vitest focal 33/33 PASS;
 - TypeScript Web, ESLint Web y Next.js build PASS;
 - CI API/Web PASS;
@@ -3558,6 +3593,7 @@ el backend integrado y refresca List mostrando `origin=REQUIREMENT`, la relació
 con el Requirement y su cobertura.
 
 Evidencia de cierre:
+
 - Vitest focal 42/42 PASS;
 - TypeScript Web, ESLint Web y Next.js build PASS;
 - CI API/Web PASS;
