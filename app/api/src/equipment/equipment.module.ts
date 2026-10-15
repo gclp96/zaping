@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { HealthcareCaseDispatchEquipmentEvidenceModule } from '../healthcare/case-dispatches/healthcare-case-dispatch-equipment-evidence.module';
+import { HealthcareCaseDispatchEquipmentContextAdapter } from '../healthcare/case-dispatches/healthcare-case-dispatch-equipment-context.adapter';
 
 import { CompanySequencesModule } from '../company-sequences/company-sequences.module';
 
@@ -17,7 +19,10 @@ import {
 } from './equipment-custody-context.registry';
 
 @Module({
-  imports: [CompanySequencesModule],
+  imports: [
+    CompanySequencesModule,
+    HealthcareCaseDispatchEquipmentEvidenceModule,
+  ],
   controllers: [EquipmentController],
   providers: [
     EquipmentService,
@@ -30,7 +35,9 @@ import {
     EquipmentCustodyContextRegistry,
     {
       provide: EQUIPMENT_CUSTODY_CONTEXT_ADAPTERS,
-      useValue: Object.freeze([]),
+      useFactory: (adapter: HealthcareCaseDispatchEquipmentContextAdapter) =>
+        Object.freeze([adapter]),
+      inject: [HealthcareCaseDispatchEquipmentContextAdapter],
     },
     PrismaService,
   ],

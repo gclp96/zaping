@@ -184,7 +184,7 @@ export class HealthcareCaseDispatchCommandService {
       replay,
       command: {
         auditId: a.id,
-        operation: a.operation as DraftOperation,
+        operation: a.operation,
         dispatchId: id,
         itemId: a.dispatchItemId,
         revisionBefore: a.revisionBefore,

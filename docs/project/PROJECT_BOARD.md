@@ -12,17 +12,20 @@ Responsable: Zaping Team
 01E-B COMPLETE / MERGED — PR #87 — TARGET 8 SP.
 Focal635/635 (32 suites); PostgreSQL35/35 en DB nueva efímera; full API1981/1981 (119 suites); Web43/43 (2 archivos) PASS.
 Elegibilidad física en Availability/Create/Replace; Inspection/Retirement con HC lock, revisión e historia atómicas.
-Coverage/PREPARED conservados; primitiva interna caller-owned y registry productivo vacío/fail-closed.
+Coverage/PREPARED conservados; primitiva interna caller-owned. 01E entregó registry vacío;
+01C registra el adapter CASE_DISPATCH_ITEM con validación durable fail-closed.
 UNVERIFIED no es destino nuevo: acreditar Assets necesarios mediante baseline01E-A antes del despliegue operativo.
 Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
-PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. CaseDispatch physical confirmation: NOT IMPLEMENTED. Return: NOT IMPLEMENTED. M-HC1 OPEN.
+PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH.
+CaseDispatch physical confirmation: IMPLEMENTED / TESTED — pending human review/merge — HC-DSP-01C TARGET 8 SP.
+Return: NOT IMPLEMENTED. M-HC1 OPEN. Backend completo sólo después del merge de 01C.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
 IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. 01E IMPLEMENTATION COMPLETE / MERGED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
 01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
 EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
-Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
+Custodia/eventos dedicados; UNVERIFIED conservador; adapter Dispatch productivo implementado en 01C.
 Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activación01D.
 REAL COMPANY CUTOVER: NOT EXECUTED. EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
 M-HC1 OPEN. Sin Forecast, Commitment, Actual ni fechas asignadas.
@@ -32,7 +35,10 @@ QUANTITY SOURCING BLOCKER: RESOLVED. Candidate C SALES-ONLY; Dispatch usa Positi
 explícita y revisión, batch nullable según tracking/fuente. Custodio híbrido,
 Equipment estricto y autoridad Inventory compartida conservados. Backend TARGET18SP:
 01A COMPLETE / MERGED — PR #89 — TARGET 5 SP.
-01B COMPLETE / MERGED — PR #90 — TARGET 5 SP; HC-DSP-LOCK-01 IMPLEMENTED / TESTED — pending human review/merge — TARGET 3 SP; 01C BLOCKED until HC-DSP-LOCK-01 merge — TARGET 8 SP.
+01B COMPLETE / MERGED — PR #90 — TARGET 5 SP; HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91 — TARGET 3 SP.
+01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+01C: PostgreSQL16 aislado75/75, focal905/905 (36 suites), full API2207/2207 (123 suites),
+typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff PASS; evidencia en TD §17.
 01B: focal242/242 (4 suites), API2147/2147 (122 suites), PostgreSQL16 comandos40/40 y
 cleanup PASS en DB nueva temporal; typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff PASS.
 CREATE vacío, custodian, add MATERIAL/EQUIPMENT, exclude y cancel; CAS/audit/idempotencia
@@ -101,7 +107,10 @@ SERIALIZED sin nueva integración física. Proyecciones compartidas y replay at�
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
 01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
-01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90;01C BLOCKED until HC-DSP-LOCK-01 merge; frontend fuera de scope; M-HC1 OPEN.
+01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87.
+HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90;
+HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91; 01C IMPLEMENTED / TESTED — pending human review/merge;
+frontend fuera de scope; M-HC1 OPEN.
 Evidencia del cierre histórico01B, anterior al wiring01D-C: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -178,18 +187,31 @@ loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APP
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
 Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Siguiente acción: revisión/merge del TD Dispatch → implementación01A autorizada. 01D/01E COMPLETE / MERGED; sin adopción real.
+Siguiente acción Dispatch: revisión humana/merge de 01C. 01D/01E COMPLETE / MERGED; sin adopción real.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice                                           | TARGET | Estado                                            |
 | ----------------------------------------------- | ------ | ------------------------------------------------- |
 | HC-DSP-01A — Persistence + read                 | 5 SP   | COMPLETE / MERGED — PR #89 |
 | HC-DSP-01B — DRAFT commands                     | 5 SP   | COMPLETE / MERGED — PR #90 |
-| HC-DSP-LOCK-01 — DRAFT lock compatibility | 3 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | BLOCKED until HC-DSP-LOCK-01 merge |
+| HC-DSP-LOCK-01 — DRAFT lock compatibility | 3 SP | COMPLETE / MERGED — PR #91 |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | IMPLEMENTED / TESTED — pending human review/merge |
 | HC-DSP-01D — Frontend                           | Candidate 5 SP   | OUT OF CURRENT BACKEND SCOPE |
 
-HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90 — TARGET 5 SP. HC-DSP-LOCK-01 IMPLEMENTED / TESTED — pending human review/merge — TARGET 3 SP. Backend Dispatch original total18SP;01C bloqueado hasta merge de HC-DSP-LOCK-01. P1 abiertos: recovery/reopen de PREPARED y selector
+HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90 — TARGET 5 SP.
+HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91 — TARGET 3 SP.
+HC-DSP-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+Backend Dispatch original total18SP: completo sólo después del merge de 01C.
+Confirm POST 200, tx único, QUANTITY AVAILABLE→CUSTODY y adapter Equipment productivo.
+Escenario29 validado con una fuente preparada y Positions/batches distintos, un Effect
+y destinos propios; el duplicado exacto sourceCaseKitItem/Position no puede ser DRAFT válido.
+PhysicalInventory conserva agregación defensiva inferior; no autoriza líneas Dispatch duplicadas.
+PostgreSQL16 nuevo aislado75/75, focal905/36 suites y API2207/123 suites PASS.
+Typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff check PASS; sin schema,
+migraciones nuevas ni generate. Custody habilitada por código Confirm; reconciliación real
+Equipment y real Company cutover NOT EXECUTED. RETURN NOT IMPLEMENTED.
+Evidencia y target aislado en [TD §17](../modules/healthcare/CASE_DISPATCH_TECHNICAL_DESIGN.md#17-hc-dsp-01c--atomic-confirm-implementado-y-probado).
+P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
 reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.

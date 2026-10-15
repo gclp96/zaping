@@ -3,6 +3,9 @@ import {
   HealthcareCaseDispatchCustodianType,
   ProductInventoryTracking,
   ProductLotTracking,
+  EquipmentCondition,
+  EquipmentLifecycle,
+  EquipmentPhysicalLocation,
 } from '@prisma/client';
 export interface DispatchActor {
   id: string;
@@ -52,6 +55,26 @@ export interface DispatchItemSnapshot {
     assetCode: string;
     serialNumber: string | null;
   } | null;
+  // Optional only for pre-productive v1 scaffold history. Confirm always authors
+  // both fields; historical reads never fill absent facts from live relations.
+  capturedAt?: string;
+  handoff?: DispatchItemHandoff | null;
+}
+export interface DispatchItemHandoff {
+  quantity: number | null;
+  sourcePositionId: string | null;
+  sourceRevision: number | null;
+  destinationPositionId: string | null;
+  physicalEffectId: string | null;
+  assignmentId: string | null;
+  assetId: string | null;
+  physicalRevisionBefore: number | null;
+  physicalRevisionAfter: number | null;
+  equipmentCustodyId: string | null;
+  equipmentPhysicalEventId: string | null;
+  conditionBefore: EquipmentCondition | null;
+  lifecycleBefore: EquipmentLifecycle | null;
+  locationBefore: EquipmentPhysicalLocation | null;
 }
 export type DispatchAuditChange = {
   version: 1;

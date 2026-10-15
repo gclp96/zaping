@@ -66,6 +66,26 @@ export function mapDispatchDetail(row: DispatchDetailRow) {
           (i.type === 'EQUIPMENT' && snap.equipment?.id !== i.assetId))
       )
         throw healthcarePersistenceException();
+      if (snap?.handoff !== undefined) {
+        const h = snap.handoff;
+        if (
+          snap.capturedAt !== s?.dispatchedAt ||
+          (i.lifecycle === 'EXCLUDED'
+            ? h !== null
+            : !h ||
+              h.quantity !== i.quantity ||
+              h.sourcePositionId !== i.sourcePositionId ||
+              h.sourceRevision !== i.expectedPositionRevision ||
+              h.destinationPositionId !== i.destinationPositionId ||
+              h.physicalEffectId !== i.physicalEffectId ||
+              h.assignmentId !== i.assignmentId ||
+              h.assetId !== i.assetId ||
+              h.physicalRevisionBefore !== i.expectedPhysicalRevision ||
+              h.equipmentCustodyId !== i.equipmentCustodyId ||
+              h.equipmentPhysicalEventId !== i.equipmentPhysicalEventId)
+        )
+          throw healthcarePersistenceException();
+      }
       return {
         id: i.id,
         type: i.type,
@@ -103,6 +123,9 @@ export function mapDispatchDetail(row: DispatchDetailRow) {
         excludedBy: i.excludedBy,
         excludedAt: i.excludedAt?.toISOString() ?? null,
         exclusionReason: i.exclusionReason,
+        ...(snap?.capturedAt
+          ? { capturedAt: snap.capturedAt, handoff: snap.handoff }
+          : {}),
       };
     }),
     audit: row.audit.map((a) => ({

@@ -3,6 +3,9 @@ import {
   HealthcareCaseDispatchCustodianType,
   ProductInventoryTracking,
   ProductLotTracking,
+  EquipmentCondition,
+  EquipmentLifecycle,
+  EquipmentPhysicalLocation,
 } from '@prisma/client';
 import { healthcarePersistenceException } from '../common/healthcare-errors';
 import {
@@ -10,6 +13,7 @@ import {
   DispatchAuditChange,
   DispatchItemSnapshot,
   DispatchRootSnapshot,
+  DispatchItemHandoff,
 } from './healthcare-case-dispatch.types';
 function fail(): never {
   throw healthcarePersistenceException();
@@ -32,6 +36,75 @@ function date(v: unknown): string {
 }
 function nullableDate(v: unknown) {
   return v === null ? null : date(v);
+}
+function nullableRevision(v: unknown) {
+  if (v === null) return null;
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 2147483647)
+    return fail();
+  return v;
+}
+function handoff(value: unknown): DispatchItemHandoff | null {
+  if (value === null) return null;
+  const h = object(value);
+  const result: DispatchItemHandoff = {
+    quantity: nullableRevision(h.quantity),
+    sourcePositionId: nullableText(h.sourcePositionId, 128),
+    sourceRevision: nullableRevision(h.sourceRevision),
+    destinationPositionId: nullableText(h.destinationPositionId, 128),
+    physicalEffectId: nullableText(h.physicalEffectId, 128),
+    assignmentId: nullableText(h.assignmentId, 128),
+    assetId: nullableText(h.assetId, 128),
+    physicalRevisionBefore: nullableRevision(h.physicalRevisionBefore),
+    physicalRevisionAfter: nullableRevision(h.physicalRevisionAfter),
+    equipmentCustodyId: nullableText(h.equipmentCustodyId, 128),
+    equipmentPhysicalEventId: nullableText(h.equipmentPhysicalEventId, 128),
+    conditionBefore:
+      h.conditionBefore === null
+        ? null
+        : enumValue(h.conditionBefore, EquipmentCondition),
+    lifecycleBefore:
+      h.lifecycleBefore === null
+        ? null
+        : enumValue(h.lifecycleBefore, EquipmentLifecycle),
+    locationBefore:
+      h.locationBefore === null
+        ? null
+        : enumValue(h.locationBefore, EquipmentPhysicalLocation),
+  };
+  if (result.physicalEffectId) {
+    if (
+      !result.quantity ||
+      !result.sourcePositionId ||
+      result.sourceRevision === null ||
+      !result.destinationPositionId ||
+      result.assignmentId !== null ||
+      result.assetId !== null ||
+      result.equipmentCustodyId !== null ||
+      result.equipmentPhysicalEventId !== null ||
+      result.physicalRevisionBefore !== null ||
+      result.physicalRevisionAfter !== null ||
+      result.conditionBefore !== null ||
+      result.lifecycleBefore !== null ||
+      result.locationBefore !== null
+    )
+      return fail();
+  } else if (
+    !result.equipmentCustodyId ||
+    !result.equipmentPhysicalEventId ||
+    !result.assignmentId ||
+    !result.assetId ||
+    result.physicalRevisionBefore === null ||
+    result.physicalRevisionAfter !== result.physicalRevisionBefore + 1 ||
+    result.locationBefore !== 'WAREHOUSE' ||
+    result.conditionBefore !== 'GOOD' ||
+    result.lifecycleBefore !== 'ACTIVE' ||
+    result.quantity !== null ||
+    result.sourcePositionId !== null ||
+    result.sourceRevision !== null ||
+    result.destinationPositionId !== null
+  )
+    return fail();
+  return result;
 }
 function enumValue<T extends string>(v: unknown, values: Record<string, T>): T {
   if (typeof v !== 'string' || !Object.values(values).includes(v as T))
@@ -124,6 +197,9 @@ export function parseDispatchItemSnapshot(
           serialNumber: nullableText(equipment.serialNumber, 256),
         }
       : null,
+    ...(o.capturedAt === undefined && o.handoff === undefined
+      ? {}
+      : { capturedAt: date(o.capturedAt), handoff: handoff(o.handoff) }),
   };
 }
 export function parseDispatchAuditChange(

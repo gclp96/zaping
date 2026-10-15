@@ -5,6 +5,23 @@ import {
   DispatchCommandIntent,
 } from './healthcare-case-dispatch-command.types';
 import { DispatchCustodianDto } from './dto/create-healthcare-case-dispatch.dto';
+export function createDispatchConfirmRequestHash(
+  c: DispatchCommandContext,
+  expectedRevision: number,
+) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 1,
+        operation: 'CONFIRM',
+        companyId: c.companyId,
+        caseId: c.caseId,
+        dispatchId: c.dispatchId,
+        expectedRevision,
+      }),
+    )
+    .digest('hex');
+}
 export function normalizeDispatchCustodian(c: DispatchCustodianDto) {
   return {
     type: c.type,

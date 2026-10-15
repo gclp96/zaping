@@ -1,4 +1,5 @@
 import { HealthcareCaseDispatchCommandService } from './healthcare-case-dispatch-command.service';
+import { HealthcareCaseDispatchConfirmService } from './healthcare-case-dispatch-confirm.service';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -17,6 +18,7 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
   const path = `/healthcare/cases/${caseId}/dispatches`;
   const secret = 'case-availability-test-only-secret';
   const commands = { execute: jest.fn() };
+  const confirmation = { execute: jest.fn() };
   const service = { list: jest.fn(), detail: jest.fn() };
   const prisma = { user: { findFirst: jest.fn() } };
   let app: INestApplication<App>;
@@ -37,6 +39,10 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
       imports: [PassportModule, JwtModule.register({ secret })],
       controllers: [HealthcareCaseDispatchesController],
       providers: [
+        {
+          provide: HealthcareCaseDispatchConfirmService,
+          useValue: confirmation,
+        },
         JwtStrategy,
         {
           provide: HealthcareCaseDispatchCommandService,
@@ -67,6 +73,11 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
     commands.execute.mockResolvedValue({
       replay: false,
       command: { operation: 'TEST' },
+      data: {},
+    });
+    confirmation.execute.mockResolvedValue({
+      replay: false,
+      command: { operation: 'CONFIRM' },
       data: {},
     });
     prisma.user.findFirst.mockImplementation(
@@ -334,11 +345,67 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
         });
     });
   });
-  it('has no CONFIRM route', async () => {
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'])(
+    'allows CONFIRM for %s and uses only authenticated identity',
+    async (role) => {
+      await supertest(app.getHttpServer())
+        .post(path + '/' + caseId + '/confirm')
+        .auth(token(role), { type: 'bearer' })
+        .set('Idempotency-Key', 'confirm-key')
+        .send({ expectedRevision: 0 })
+        .expect(200);
+      expect(confirmation.execute).toHaveBeenCalledWith(
+        {
+          companyId: 'jwt-tenant',
+          actorId: role,
+          caseId,
+          dispatchId: caseId,
+          key: 'confirm-key',
+        },
+        { expectedRevision: 0 },
+      );
+    },
+  );
+  it('denies CONFIRM to SALES and anonymous', async () => {
+    await supertest(app.getHttpServer())
+      .post(path + '/' + caseId + '/confirm')
+      .auth(token('SALES'), { type: 'bearer' })
+      .send({ expectedRevision: 0 })
+      .expect(403);
+    await supertest(app.getHttpServer())
+      .post(path + '/' + caseId + '/confirm')
+      .send({ expectedRevision: 0 })
+      .expect(401);
+    expect(confirmation.execute).not.toHaveBeenCalled();
+  });
+  it.each([
+    'assetId',
+    'assignmentId',
+    'sourcePositionId',
+    'batchId',
+    'expectedPhysicalRevision',
+    'companyId',
+    'actorId',
+    'physicalEffectId',
+  ])('rejects Confirm extra property %s', async (field) => {
+    await supertest(app.getHttpServer())
+      .post(path + '/' + caseId + '/confirm')
+      .auth(token(), { type: 'bearer' })
+      .send({ expectedRevision: 0, [field]: caseId })
+      .expect(400);
+    expect(confirmation.execute).not.toHaveBeenCalled();
+  });
+  it('returns Confirm replay with HTTP 200', async () => {
+    const result = {
+      replay: true,
+      command: { operation: 'CONFIRM' },
+      data: {},
+    };
+    confirmation.execute.mockResolvedValue(result);
     await supertest(app.getHttpServer())
       .post(path + '/' + caseId + '/confirm')
       .auth(token(), { type: 'bearer' })
       .send({ expectedRevision: 0 })
-      .expect(404);
+      .expect(200, result);
   });
 });
