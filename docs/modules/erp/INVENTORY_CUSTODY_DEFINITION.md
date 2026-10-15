@@ -3,7 +3,7 @@
 **COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.**
 
 01E-A COMPLETE / MERGED — PR #86 — TARGET 5 SP.
-01E-B IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+01E-B COMPLETE / MERGED — PR #87 — TARGET 8 SP.
 Focal635/635 (32 suites); PostgreSQL35/35 en DB nueva efímera; full API1981/1981 (119 suites); Web43/43 (2 archivos) PASS.
 Elegibilidad física en Availability/Create/Replace; Inspection/Retirement con HC lock, revisión e historia atómicas.
 Coverage/PREPARED conservados; primitiva interna caller-owned y registry productivo vacío/fail-closed.
@@ -12,9 +12,9 @@ Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATIO
 PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. CaseDispatch/Return: NOT IMPLEMENTED. M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
-IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge. 01E IMPLEMENTATION completa sólo después del merge01E-B. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
+IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. 01E IMPLEMENTATION COMPLETE / MERGED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
-01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
+01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
 EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
 Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
 Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activación01D.
@@ -53,12 +53,12 @@ DESIGN APPROVED no significa CUTOVER READY;01D ACTIVATION NOT STARTED.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:
 01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP COMPLETE / MERGED — PR #83;01D-C8SP COMPLETE / MERGED — PR #84; TOTAL21SP.
 Sin Forecast/Commitment/Actual ni fechas.
-01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B IMPLEMENTED / TESTED — pending human review/merge. Dispatch sigue bloqueado; 01A/01B/01C permanecen DORMANT.
+01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. Dispatch TECHNICAL DESIGN APPROVED;01A READY tras merge del TD; 01A/01B/01C permanecen DORMANT.
 
 Baseline: `456e5a6ddbffbbb9fdc3b2be524345c57a6bf90f`. DEC-INV-CUST-01..14 aprobadas
 por revisión humana de producto/arquitectura con refinamientos de §9. No
 implementación, schema aprobado, migración ni lectura de datos reales.
-HC-CASE-DISPATCH conserva CONTRACT APPROVED y sus slices BLOCKED. M-HC1 OPEN.
+HC-CASE-DISPATCH TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED;01A READY tras merge del TD;01B/01C bloqueados por secuencia. M-HC1 OPEN.
 
 ## 1. Autoridad documental y hallazgo arquitectónico
 
@@ -77,7 +77,8 @@ dirección exige revisión explícita de ADR, no elección silenciosa.
 
 Esto no aprueba el slice concreto, sus tablas, el backfill o una implementación
 InventoryPosition: DEC-DSP-08 sigue vigente. [CASE_LOGISTICS §258](../healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract)
-aprueba autoridad compartida y batch exacto para todo material Dispatch; custodian
+aprueba autoridad compartida; DEC-DSP-05 refinada exige fuente Position explícita
+y revisión, batch según tracking/fuente, no batch universal. Candidate C SALES-ONLY; custodian
 INTERNAL_USER/EXTERNAL_PERSON y snapshots siguen perteneciendo a Dispatch.
 [CASE_KITS §205](../healthcare/CASE_KITS.md#205-current) y
 [DOMAIN_MODEL](../healthcare/DOMAIN_MODEL.md) separan preparación lógica de custodia.
@@ -184,7 +185,9 @@ silencioso del campo público.
 
 Stock físico loteado usa posiciones respaldadas por InventoryBatch exacto.
 Material QUANTITY verdaderamente sin lote admite batchId null. Esto no relaja
-DEC-DSP-05: material Dispatch V1 requiere batch físico exacto soportado.
+DEC-DSP-05 refinada por el [TD Dispatch](../healthcare/CASE_DISPATCH_TECHNICAL_DESIGN.md):
+fuente AVAILABLE explícita y revisión; NONE sin lote, REQUIRED lote real, OPTIONAL
+unbatched o batched por elección explícita. Sin selección automática ni fallback.
 initialQuantity y otros campos históricos/acumulados recibidos no se reinterpretan
 como saldo físico actual. available/remaining legacy aplicable puede permanecer
 como proyección derivada; diseño técnico debe preservar y documentar semántica
@@ -327,9 +330,9 @@ no claims, SQL o locks. Snapshot de custodian híbrido permanece en Dispatch.
 | HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation                        | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
 | HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification                                   | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
 | HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation                         | 8 SP              | COMPLETE / MERGED — PR #84 — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
-| HC-INVENTORY-CUSTODY-01E | EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E | EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87 |
 | HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history | 5 SP | COMPLETE / MERGED — PR #86 |
-| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | COMPLETE / MERGED — PR #87 |
 
 La división histórica01A..01E sustituyó el slice integrado de 13 SP del discovery; el TARGET propio01E ahora se revisa a13 SP según su aprobación humana. Sin fechas,
 Forecast, Commitment ni Actual. 01D-A merged PR #82;01D-B merged PR #83; 01D-C merged PR #84; no hay activación. DEF fue merged
@@ -339,21 +342,24 @@ mediante PR #76 tras las sustituciones humanas 10/14/19. 01B COMPLETE / MERGED �
 01C COMPLETE / MERGED — PR #80 — main@c3d0824, DORMANT UNTIL 01D.
 01D diseño aprobado32/32;01D-A COMPLETE / MERGED — PR #82;
 01D-B COMPLETE / MERGED — PR #83;01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED. Activación depende de gates
-reales de cutover, no de decisiones TD pendientes. 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge. TD-INV-01B-01..30 APPROVED;
+reales de cutover, no de decisiones TD pendientes. 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. TD-INV-01B-01..30 APPROVED;
 TARGET 8 SP con alcance backend QUANTITY dormido, sin frontend/cutover.
 COUNT_CORRECTION cero conserva Effect/Line sin revision bump; Receipt mixto separa
 QUANTITY/ASSET/SERIALIZED. SERIALIZED físico queda deferred a decisión/slice futuro;
 ASSET pertenece Equipment/01E.
 
-HC-DSP-01A/B/C/D permanecen **DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION**.
-El refinamiento técnico de schema/API puede continuar posteriormente, pero la
-implementación productiva no precede al fundamento físico. Aprobación de DEF no
+HC-CASE-DISPATCH TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED.
+QUANTITY SOURCING BLOCKER RESOLVED. HC-DSP-01A READY — TARGET5SP tras merge TD;
+01B BLOCKED BY01A — TARGET5SP;01C BLOCKED BY01B — TARGET8SP. Backend total18SP;
+frontend01D fuera de scope backend, candidate5SP.
+Los detalles Prisma siguen en readiness01A; Foundation01D/01E ya está COMPLETE / MERGED,
+sin cutover/adopción reales. El diseño no habilita operación productiva. Aprobación de DEF no
 acredita disponibilidad, atomicidad ni cutover implementados. Preservar gates
 Dispatch de correction/reversal auditado y recovery PREPARED antes de uso amplio;
 selector Assignment >100 sigue P1. M-HC1 OPEN.
 
 **Resultado: COMPLETE / MERGED — PR #75 — main@51363f5 — HC-INVENTORY-CUSTODY-DEF.**
-Siguiente acción: revisión humana01E-B → staging selectivo → commit → PR; 01E IMPLEMENTATION completa sólo después del merge01E-B.
+Siguiente acción: revisión/merge del TD Dispatch → implementación01A autorizada. 01D/01E COMPLETE / MERGED; sin adopción real.
 Evidencia01D-A: full API1896/113 suites, PostgreSQL16/16 en DB nueva efímera
 (loopback/tmpfs, cleanup PASS), Prisma validate/typecheck/lint/build PASS; detalle
 y limitaciones (generate DLL ocupada y70 diagnósticos noEmit preexistentes) en §A.1 del diseño01D.
