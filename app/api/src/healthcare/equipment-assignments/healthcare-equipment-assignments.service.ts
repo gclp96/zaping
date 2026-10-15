@@ -1,9 +1,11 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
+import {
+  evaluateEquipmentPhysicalEligibility,
+  EquipmentPhysicalFacts,
+} from '../../equipment/equipment-physical-eligibility';
 
 import {
-  EquipmentCondition,
-  EquipmentLifecycle,
   HealthcareCaseStatus,
   HealthcareEquipmentAssignmentLifecycle,
   HealthcareEquipmentAssignmentOrigin,
@@ -204,7 +206,10 @@ export type HealthcareEquipmentAssignmentConflictReviewResponse = {
     caseId: string;
     requirementId: string | null;
     origin: HealthcareEquipmentAssignmentOrigin;
-    equipmentAsset: Omit<HealthcareEquipmentAssetRecord, 'updatedAt'>;
+    equipmentAsset: Omit<
+      HealthcareEquipmentAssetRecord,
+      'updatedAt' | 'physicalLocation' | 'physicalRevision' | 'activeCustodyId'
+    >;
     operationalWindow: OperationalWindow;
   };
   unresolvedReservations: Array<{
@@ -1591,12 +1596,15 @@ export class HealthcareEquipmentAssignmentsService {
     };
   }
 
-  private assertEquipmentAssetEligible(equipmentAsset: {
-    lifecycle: EquipmentLifecycle;
-    condition: EquipmentCondition;
-  }): void {
-    if (!equipmentAssignmentAssetIsEligible(equipmentAsset)) {
-      throw equipmentAssetNotEligibleException();
+  private assertEquipmentAssetEligible(
+    equipmentAsset: EquipmentPhysicalFacts,
+  ): void {
+    const physical = evaluateEquipmentPhysicalEligibility(equipmentAsset);
+    if (
+      !equipmentAssignmentAssetIsEligible(equipmentAsset) ||
+      !physical.available
+    ) {
+      throw equipmentAssetNotEligibleException(physical.reasons);
     }
   }
 

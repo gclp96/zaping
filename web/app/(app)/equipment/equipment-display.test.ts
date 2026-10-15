@@ -95,14 +95,12 @@ describe('equipment display helpers', () => {
     expect(getEquipmentRetirementReasonLabel(reason)).toBe(label);
   });
 
-  it.each([
-    '  eq-000001  ',
-    'sn-med-001',
-    'EQUIPO DE PRUEBA',
-    'eqp-001',
-  ])('busca sin distinguir mayúsculas ni espacios: %s', (search) => {
-    expect(equipmentMatchesSearch(equipment, search)).toBe(true);
-  });
+  it.each(['  eq-000001  ', 'sn-med-001', 'EQUIPO DE PRUEBA', 'eqp-001'])(
+    'busca sin distinguir mayúsculas ni espacios: %s',
+    (search) => {
+      expect(equipmentMatchesSearch(equipment, search)).toBe(true);
+    },
+  );
 
   it('rechaza búsquedas sin coincidencia', () => {
     expect(equipmentMatchesSearch(equipment, 'otro equipo')).toBe(false);
@@ -119,9 +117,7 @@ describe('equipment display helpers', () => {
     expect(formatEquipmentDate('2026-08-20T18:00:00.000Z')).not.toBe(
       'Fecha no disponible',
     );
-    expect(formatEquipmentDate('fecha-invalida')).toBe(
-      'Fecha no disponible',
-    );
+    expect(formatEquipmentDate('fecha-invalida')).toBe('Fecha no disponible');
   });
 
   it.each([
@@ -140,4 +136,16 @@ describe('equipment display helpers', () => {
       ).toBe(expected);
     },
   );
+});
+
+describe('01E-B physical reason compatibility', () => {
+  it.each([
+    'PHYSICAL_LOCATION_UNVERIFIED',
+    'EQUIPMENT_IN_CUSTODY',
+    'EQUIPMENT_PHYSICAL_STATE_INCOHERENT',
+  ])('renders %s through existing fallback', (reason) => {
+    expect(getEquipmentAvailabilityReasonLabel(reason)).toBe(
+      'Otro motivo (' + reason + ')',
+    );
+  });
 });

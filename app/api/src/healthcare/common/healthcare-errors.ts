@@ -290,11 +290,16 @@ export function assignmentProductMismatchException(): ConflictException {
   );
 }
 
-export function equipmentAssetNotEligibleException(): ConflictException {
-  return equipmentAssignmentConflictException(
-    HEALTHCARE_ERROR_CODES.equipmentAssetNotEligible,
-    'El equipo no está disponible para una nueva asignación',
-  );
+export function equipmentAssetNotEligibleException(
+  reasons?: readonly string[],
+): ConflictException {
+  return new ConflictException({
+    statusCode: HttpStatus.CONFLICT,
+    error: 'Conflict',
+    code: HEALTHCARE_ERROR_CODES.equipmentAssetNotEligible,
+    message: 'El equipo no está disponible para una nueva asignación',
+    ...(reasons ? { details: { reasons } } : {}),
+  });
 }
 
 export function requirementOverCoverageException(): ConflictException {

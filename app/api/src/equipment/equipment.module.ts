@@ -10,6 +10,11 @@ import { EquipmentAvailabilityService } from './equipment-availability.service';
 import { EquipmentProvisioningService } from './equipment-provisioning.service';
 import { EquipmentPhysicalRepository } from './equipment-physical.repository';
 import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
+import { EquipmentCustodyService } from './equipment-custody.service';
+import {
+  EQUIPMENT_CUSTODY_CONTEXT_ADAPTERS,
+  EquipmentCustodyContextRegistry,
+} from './equipment-custody-context.registry';
 
 @Module({
   imports: [CompanySequencesModule],
@@ -21,8 +26,14 @@ import { EquipmentPhysicalHistoryService } from './equipment-physical-history.se
     EquipmentProvisioningService,
     EquipmentPhysicalRepository,
     EquipmentPhysicalHistoryService,
+    EquipmentCustodyService,
+    EquipmentCustodyContextRegistry,
+    {
+      provide: EQUIPMENT_CUSTODY_CONTEXT_ADAPTERS,
+      useValue: Object.freeze([]),
+    },
     PrismaService,
   ],
-  exports: [EquipmentProvisioningService],
+  exports: [EquipmentProvisioningService, EquipmentCustodyService],
 })
 export class EquipmentModule {}

@@ -11,6 +11,87 @@ export class EquipmentPhysicalHistoryService {
   constructor(
     private readonly repository: EquipmentPhysicalRepository = new EquipmentPhysicalRepository(),
   ) {}
+  appendInspection(
+    tx: Prisma.TransactionClient,
+    before: EquipmentAsset,
+    inspectionId: string,
+    actorId: string,
+    conditionAfter: EquipmentAsset['condition'],
+  ) {
+    return this.appendTransition(
+      tx,
+      before,
+      'CONDITION_CHANGE',
+      'EQUIPMENT_INSPECTION',
+      inspectionId,
+      'RECORD_RESULT',
+      actorId,
+      conditionAfter,
+      before.lifecycle,
+    );
+  }
+  appendRetirement(
+    tx: Prisma.TransactionClient,
+    before: EquipmentAsset,
+    actorId: string,
+  ) {
+    return this.appendTransition(
+      tx,
+      before,
+      'LIFECYCLE_CHANGE',
+      'EQUIPMENT_RETIREMENT',
+      before.id,
+      'RETIRE',
+      actorId,
+      before.condition,
+      'RETIRED',
+    );
+  }
+  private appendTransition(
+    tx: Prisma.TransactionClient,
+    before: EquipmentAsset,
+    operation: 'CONDITION_CHANGE' | 'LIFECYCLE_CHANGE',
+    originType: string,
+    originId: string,
+    originOperation: string,
+    actorId: string,
+    conditionAfter: EquipmentAsset['condition'],
+    lifecycleAfter: EquipmentAsset['lifecycle'],
+  ) {
+    return this.repository.appendPhysicalEvent(tx, {
+      companyId: before.companyId,
+      equipmentAssetId: before.id,
+      custodyId: before.activeCustodyId,
+      operation,
+      originType,
+      originId,
+      originOperation,
+      hashVersion: 1,
+      requestHash: equipmentPhysicalHash({
+        version: 1,
+        companyId: before.companyId,
+        assetId: before.id,
+        operation,
+        originType,
+        originId,
+        originOperation,
+        actorId,
+        revisionBefore: before.physicalRevision,
+        conditionAfter,
+        lifecycleAfter,
+      }),
+      physicalLocationBefore: before.physicalLocation,
+      physicalLocationAfter: before.physicalLocation,
+      conditionBefore: before.condition,
+      conditionAfter,
+      lifecycleBefore: before.lifecycle,
+      lifecycleAfter,
+      revisionBefore: before.physicalRevision,
+      revisionAfter: before.physicalRevision + 1,
+      actorId,
+      reasonCode: originOperation,
+    });
+  }
   async requireReceiptActor(
     tx: Prisma.TransactionClient,
     companyId: string,

@@ -69,6 +69,9 @@ const requirement = {
   },
 };
 const equipmentAsset = {
+  physicalLocation: 'WAREHOUSE' as const,
+  physicalRevision: 1,
+  activeCustodyId: null,
   id: equipmentAssetId,
   productId,
   assetCode: 'EQ-000001',
@@ -3664,6 +3667,63 @@ describe('HealthcareEquipmentAssignmentsService', () => {
           status: 500,
           response: { code: 'HEALTHCARE_PERSISTENCE_ERROR' },
         });
+      },
+    );
+  });
+
+  describe('01E-B physical target enforcement', () => {
+    it.each([
+      {
+        physicalLocation: 'UNVERIFIED',
+        physicalRevision: 0,
+        activeCustodyId: null,
+      },
+      {
+        physicalLocation: 'CUSTODY',
+        physicalRevision: 2,
+        activeCustodyId: 'episode',
+      },
+      {
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: 'incoherent',
+      },
+      { condition: EquipmentCondition.INSPECTION_PENDING },
+      { condition: EquipmentCondition.DAMAGED },
+      { condition: EquipmentCondition.OUT_OF_SERVICE },
+      { lifecycle: EquipmentLifecycle.RETIRED },
+    ])(
+      'Create and Replace reject %j before writes, regardless of override',
+      async (change) => {
+        repository.findEquipmentAsset.mockResolvedValue({
+          ...equipmentAsset,
+          ...change,
+        });
+        const rejected = {
+          response: {
+            code: 'EQUIPMENT_ASSET_NOT_ELIGIBLE',
+            details: { reasons: expect.any(Array) as unknown },
+          },
+        };
+        await expect(
+          service.create(companyId, userId, 'physical-create', {
+            ...requirementDto,
+            confirmConflictOverride: true,
+            conflictOverrideReason: 'Must not bypass physical',
+            conflictReviewFingerprint: 'a'.repeat(64),
+          }),
+        ).rejects.toMatchObject(rejected);
+        await expect(
+          service.replace(companyId, userId, assignmentId, 'physical-replace', {
+            ...replaceDto,
+            confirmConflictOverride: true,
+            conflictOverrideReason: 'Must not bypass physical',
+            conflictReviewFingerprint: 'a'.repeat(64),
+          }),
+        ).rejects.toMatchObject(rejected);
+        expect(repository.createAssignment).not.toHaveBeenCalled();
+        expect(repository.replaceAssignment).not.toHaveBeenCalled();
+        expect(repository.createIdempotencyClaim).not.toHaveBeenCalled();
       },
     );
   });

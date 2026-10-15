@@ -485,6 +485,9 @@ export class HealthcareEquipmentAssignmentsRepository {
         serialNumber: true,
         lifecycle: true,
         condition: true,
+        physicalLocation: true,
+        physicalRevision: true,
+        activeCustodyId: true,
         updatedAt: true,
         product: {
           select: {
