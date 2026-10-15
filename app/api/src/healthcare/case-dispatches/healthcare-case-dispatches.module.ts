@@ -1,3 +1,5 @@
+import { HealthcareCaseDispatchCommandService } from './healthcare-case-dispatch-command.service';
+import { HealthcareCaseDispatchCommandRepository } from './healthcare-case-dispatch-command.repository';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { HealthcareCaseDispatchesController } from './healthcare-case-dispatches.controller';
@@ -7,6 +9,8 @@ import { HealthcareCaseDispatchesRepository } from './healthcare-case-dispatches
   imports: [PrismaModule],
   controllers: [HealthcareCaseDispatchesController],
   providers: [
+    HealthcareCaseDispatchCommandService,
+    HealthcareCaseDispatchCommandRepository,
     HealthcareCaseDispatchReadService,
     HealthcareCaseDispatchesRepository,
   ],

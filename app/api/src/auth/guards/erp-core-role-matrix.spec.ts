@@ -54,7 +54,15 @@ const allRoles = [
 const roleMatrix: RoleMatrix[] = [
   {
     controller: HealthcareCaseDispatchesController,
-    methods: { list: allRoles, detail: allRoles },
+    methods: {
+      list: allRoles,
+      detail: allRoles,
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      setCustodian: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      addItem: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      excludeItem: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      cancel: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+    },
   },
   {
     controller: CustomersController,

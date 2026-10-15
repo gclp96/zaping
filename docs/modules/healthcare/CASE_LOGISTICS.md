@@ -3768,14 +3768,15 @@ sin duplicar ni falsificar el hecho físico.
 
 # 258. HC-CASE-DISPATCH — V1 approved contract
 
-**TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED.**
+**TECHNICAL DESIGN APPROVED / MERGED — PR #88. 01A COMPLETE / MERGED — PR #89.
+01B IMPLEMENTED / TESTED — pending human review/merge; 01C BLOCKED until 01B merge.**
 
 Baseline inspeccionado: `15f062b1ff1a4f77724b489bd94abccfce7e998d`.
 Conclusión CaseKit vigente: **CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT**.
 M-HC1 permanece OPEN. DEC-DSP-01..17 fueron aprobadas por revisión humana de
-producto/arquitectura con los refinamientos de §258.7. El detalle técnico
-Prisma pertenece al readiness01A: la dirección de persistencia está aprobada,
-pero no hay endpoints ni migraciones Dispatch implementados. HC-INVENTORY-CUSTODY-DEF está COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP; véase
+producto/arquitectura con los refinamientos de §258.7.
+01A implementa persistencia/invariantes y GET list/detail; 01B añade sólo comandos
+DRAFT con idempotencia y recibo durable original. Confirmación física no implementada. HC-INVENTORY-CUSTODY-DEF está COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP; véase
 [definición Inventory](../erp/INVENTORY_CUSTODY_DEFINITION.md).
 Las secciones conceptuales anteriores conservan su valor histórico.
 
@@ -3950,13 +3951,13 @@ CaseKit. Ser custodio no concede permisos; Company/actor vienen de JWT.
 | Ruta candidata | Payload / semántica |
 | --- | --- |
 | GET /healthcare/cases/:caseId/dispatches | Lista paginada, orden estable createdAt/id, metadata de paginación. |
-| GET /healthcare/dispatches/:dispatchId | Detalle público + items/historia. |
+| GET /healthcare/cases/:caseId/dispatches/:dispatchId | Detalle público + items/historia. |
 | POST /healthcare/cases/:caseId/dispatches | `{custodian}` híbrido con type/displayName y userId opcional sólo INTERNAL_USER; Kit derivado; crea DRAFT. |
-| POST /healthcare/dispatches/:dispatchId/custodian | `{custodian, expectedRevision}`; sólo DRAFT. |
-| POST /healthcare/dispatches/:dispatchId/items | `{sourceCaseKitItemId, quantity?, sourcePositionId?, expectedSourceRevision?, batchId?, expectedRevision}`; MATERIAL exige quantity, Position/revisión y batchId explícito nullable según tracking/fuente; campos QUANTITY ausentes para EQUIPMENT; Product/Asset derivados. |
-| POST /healthcare/dispatches/:dispatchId/items/:itemId/exclude | `{reason, expectedRevision}`. |
-| POST /healthcare/dispatches/:dispatchId/confirm | `{expectedRevision}`: evita confirmar contenido modificado desde la revisión humana. |
-| POST /healthcare/dispatches/:dispatchId/cancel | `{reason, expectedRevision}`; sólo DRAFT. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/custodian | `{custodian, expectedRevision}`; sólo DRAFT. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/items | `{type, sourceCaseKitItemId, expectedRevision, quantity?, sourcePositionId?, batchId?}`; MATERIAL exige quantity, Position y batchId explícito nullable; EQUIPMENT no acepta campos MATERIAL. Product/Assignment/Asset y revisiones físicas se derivan/capturan bajo lock en servidor, nunca del cliente. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/items/:itemId/exclude | `{reason, expectedRevision}`. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/confirm (FUTURE 01C — NOT IMPLEMENTED) | `{expectedRevision}`: evita confirmar contenido modificado desde la revisión humana. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/cancel | `{reason, expectedRevision}`; sólo DRAFT. |
 
 Todas las mutaciones usan Idempotency-Key salvo futura revisión técnica que pruebe
 una mutación específica intrínsecamente sin efectos. Trim, 1..128, scopes candidatos
@@ -3970,8 +3971,11 @@ Nueva key sobre CONFIRMED sólo puede devolver state replay si corresponde a la
 misma revision de confirmación; nunca confirma otro contenido. Cliente retiene key
 por intención hasta resolver respuesta perdida. No devolver secretos en replay.
 
-Create/add 201 primera ejecución, 200 replay; otros comandos 200 con recurso
-público. Aggregate: id, caseId, status, revision, custodian público, dispatchedBy/At,
+01B: Create/add 201 primera ejecución, 200 replay; otros comandos 200. Respuesta
+`{replay, command, data}`: detalle actual + recibo original del audit (operación,
+Dispatch/item, revisiones, actorId/occurredAt). No reconstruye HTTP antiguo; witness
+ausente/incoherente falla saneado. Revisiones físicas observadas quedan fuera del hash.
+Audit change 01A conserva sólo version/operation/reason. Aggregate: id, caseId, status, revision, custodian público, dispatchedBy/At,
 createdAt, cancel audit y items. Item: id, sourceCaseKitItemId, type, Product público,
 quantity y fuente física exacta en material, batch público nullable explícito según tracking/fuente, EquipmentAsset cuando equipo,
 lifecycle y auditoría. DRAFT muestra referencias actuales y validaciones locales;
