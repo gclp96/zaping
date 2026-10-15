@@ -2,18 +2,28 @@
 
 **COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.**
 
-01D-C IMPLEMENTED / TESTED — TARGET 8 SP; pendiente revisión humana/merge.
+HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
+IMPLEMENTATION: NOT STARTED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
+01E-A: READY — TARGET 5 SP — inicio después del merge del Technical Design.
+01E-B: BLOCKED BY 01E-A — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
+EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
+Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
+Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activación01D.
+REAL COMPANY CUTOVER: NOT EXECUTED. EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
+M-HC1 OPEN. Sin Forecast, Commitment, Actual ni fechas asignadas.
+
+01D-C COMPLETE / MERGED — PR #84 — TARGET 8 SP. HC-INVENTORY-CUSTODY-01D IMPLEMENTATION COMPLETE / MERGED.
 Full API1935/1935 (116 suites), Web106/106 (8 archivos), PostgreSQL aislado27/27 PASS.
 Fence compartido/exclusivo y router único cableados; CLI interna exige adapter de evidencia.
 ACTUAL CUTOVER NOT EXECUTED; 01D ACTIVATION NOT PERFORMED AGAINST REAL COMPANY.
-EXTERNAL FENCE NOT CERTIFIED. [Runbook](INVENTORY_CUSTODY_01D_CUTOVER_RUNBOOK.md).
+EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED. [Runbook](INVENTORY_CUSTODY_01D_CUTOVER_RUNBOOK.md).
 
 Evidencia histórica 01D-B COMPLETE / MERGED — PR #83 — TARGET8SP.
 Focal77/77, full API1918/114 suites, PostgreSQL43/43 PASS; Prisma format/validate/generate,
 typecheck, lint tocado y build PASS. Aceptación sólo DB nueva efímera zaping_opening_test,
 loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APPLY/VERIFY;
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
-Detalle y límites en §A.2 del diseño01D.01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.
+Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN. Sin Forecast/Commitment/Actual.
 
 Merge DEF: `51363f566c8c6656f1653f03f11d9489ab4d082b`. 01A está COMPLETE / MERGED —
@@ -29,12 +39,12 @@ Candidate C OPTIONAL sólo unbatched; replay lógico sólo mismo actor; sin Idem
 01D TECHNICAL DESIGN: APPROVED; TD-INV-01D-01..32 = 32/32 human approved.
 [Diseño01D](INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md): control DB dedicado,
 initializer/adapter opening-only, router único Company y corte coordinado.
-01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED.
+01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;01D-C COMPLETE / MERGED — PR #84.
 DESIGN APPROVED no significa CUTOVER READY;01D ACTIVATION NOT STARTED.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:
-01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP COMPLETE / MERGED — PR #83;01D-C8SP IMPLEMENTED / TESTED; TOTAL21SP.
+01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP COMPLETE / MERGED — PR #83;01D-C8SP COMPLETE / MERGED — PR #84; TOTAL21SP.
 Sin Forecast/Commitment/Actual ni fechas.
-01E y Dispatch siguen bloqueados; 01A/01B/01C permanecen DORMANT.
+01E TECHNICAL DESIGN APPROVED; 01E-A READY tras merge del diseño, 01E-B BLOCKED BY 01E-A. Dispatch sigue bloqueado; 01A/01B/01C permanecen DORMANT.
 
 Baseline: `456e5a6ddbffbbb9fdc3b2be524345c57a6bf90f`. DEC-INV-CUST-01..14 aprobadas
 por revisión humana de producto/arquitectura con refinamientos de §9. No
@@ -304,21 +314,23 @@ no claims, SQL o locks. Snapshot de custodian híbrido permanece en Dispatch.
 | HC-INVENTORY-CUSTODY-01A   | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP              | COMPLETE / MERGED — PR #77 — main@47fd68a                                                                                            |
 | HC-INVENTORY-CUSTODY-01B   | Purchase Receipts + writers Inventory manual + proyecciones compatibles           | 8 SP              | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D                                                                                       |
 | HC-INVENTORY-CUSTODY-01C   | Sales shared availability + resolución outbound + concurrencia                    | 8 SP              | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D                                                                        |
-| HC-INVENTORY-CUSTODY-01D   | Reconciliation + opening baseline + coordinated cutover umbrella                  | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A MERGED PR #82; 01D-B COMPLETE / MERGED PR #83; 01D-C IMPLEMENTED / TESTED; original8SP SUPERSEDED |
+| HC-INVENTORY-CUSTODY-01D   | Reconciliation + opening baseline + coordinated cutover umbrella                  | 21 SP = 5 + 8 + 8 | IMPLEMENTATION COMPLETE / MERGED — 01D-A PR #82; 01D-B PR #83; 01D-C PR #84; original8SP SUPERSEDED |
 | HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation                        | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
 | HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification                                   | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
-| HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation                         | 8 SP              | IMPLEMENTED / TESTED — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
-| HC-INVENTORY-CUSTODY-01E   | Primitiva custodia Equipment + aceptación Foundation cruzada                      | 8 SP              | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D                                                  |
+| HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation                         | 8 SP              | COMPLETE / MERGED — PR #84 — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
+| HC-INVENTORY-CUSTODY-01E | EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: NOT STARTED |
+| HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history | 5 SP | READY — inicio después del merge del Technical Design |
+| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01E-A |
 
-Esta división sustituye el slice integrado de 13 SP del discovery. Sin fechas,
-Forecast, Commitment ni Actual. 01D-A merged PR #82;01D-B merged PR #83; 01D-C implementado y probado localmente; no hay activación. DEF fue merged
+La división histórica01A..01E sustituyó el slice integrado de 13 SP del discovery; el TARGET propio01E ahora se revisa a13 SP según su aprobación humana. Sin fechas,
+Forecast, Commitment ni Actual. 01D-A merged PR #82;01D-B merged PR #83; 01D-C merged PR #84; no hay activación. DEF fue merged
 mediante PR #75; 01A COMPLETE / MERGED mediante PR #77 sobre
 `47fd68a409906b3a5981bd7f7cd30a48e08714b0`, con TD-INV-01A-01..20 APPROVED / MERGED
 mediante PR #76 tras las sustituciones humanas 10/14/19. 01B COMPLETE / MERGED — PR #79;
 01C COMPLETE / MERGED — PR #80 — main@c3d0824, DORMANT UNTIL 01D.
 01D diseño aprobado32/32;01D-A COMPLETE / MERGED — PR #82;
-01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED. Activación depende de gates
-reales de cutover, no de decisiones TD pendientes. 01E sigue BLOCKED. TD-INV-01B-01..30 APPROVED;
+01D-B COMPLETE / MERGED — PR #83;01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED. Activación depende de gates
+reales de cutover, no de decisiones TD pendientes. 01E-A READY tras merge del diseño; 01E-B BLOCKED BY 01E-A. TD-INV-01B-01..30 APPROVED;
 TARGET 8 SP con alcance backend QUANTITY dormido, sin frontend/cutover.
 COUNT_CORRECTION cero conserva Effect/Line sin revision bump; Receipt mixto separa
 QUANTITY/ASSET/SERIALIZED. SERIALIZED físico queda deferred a decisión/slice futuro;
@@ -332,7 +344,7 @@ Dispatch de correction/reversal auditado y recovery PREPARED antes de uso amplio
 selector Assignment >100 sigue P1. M-HC1 OPEN.
 
 **Resultado: COMPLETE / MERGED — PR #75 — main@51363f5 — HC-INVENTORY-CUSTODY-DEF.**
-Siguiente acción: revisión humana01D-C → staging selectivo → commit → PR.
+Siguiente acción: revisión documental01E → staging selectivo → commit → PR de diseño; después del merge, implementación01E-A.
 Evidencia01D-A: full API1896/113 suites, PostgreSQL16/16 en DB nueva efímera
 (loopback/tmpfs, cleanup PASS), Prisma validate/typecheck/lint/build PASS; detalle
 y limitaciones (generate DLL ocupada y70 diagnósticos noEmit preexistentes) en §A.1 del diseño01D.
