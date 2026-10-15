@@ -26,7 +26,7 @@ export interface DispatchCommandContext {
 }
 export interface DispatchCommandReceipt {
   auditId: string;
-  operation: DraftOperation;
+  operation: HealthcareCaseDispatchAuditOperation;
   dispatchId: string;
   itemId: string | null;
   revisionBefore: number | null;

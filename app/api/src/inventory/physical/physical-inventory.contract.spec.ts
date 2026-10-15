@@ -126,6 +126,114 @@ describe('physical inventory business intent', () => {
 });
 
 describe('physical inventory composition and activation', () => {
+  it.each(['valid', 'insufficient-sum', 'contradictory-revisions'] as const)(
+    'generic repeated-source Transfer: %s (independent of Dispatch uniqueness)',
+    async (scenario) => {
+      const source = {
+        ...target,
+        id: randomUUID(),
+        quantity: scenario === 'insufficient-sum' ? 6 : 10,
+        revision: 0,
+      };
+      const destinations = [1, 2].map(() => ({
+        ...target,
+        id: randomUUID(),
+        state: 'CUSTODY' as const,
+        contextType: 'PRIMITIVE_TEST',
+        contextId: randomUUID(),
+        quantity: 0,
+        revision: 0,
+      }));
+      const repo = {
+        findEffect: jest.fn().mockResolvedValue(null),
+        findSources: jest.fn().mockResolvedValue([source]),
+        lockProducts: jest.fn().mockResolvedValue([
+          {
+            id: productId,
+            isActive: true,
+            inventoryTracking: 'QUANTITY',
+            lotTracking: 'NONE',
+          },
+        ]),
+        lockBatches: jest.fn().mockResolvedValue([]),
+        lockPositions: jest.fn().mockResolvedValue([source, ...destinations]),
+        claimEffect: jest
+          .fn()
+          .mockResolvedValue({ id: randomUUID(), kind: 'TRANSFER' }),
+        mutatePosition: jest
+          .fn<
+            Promise<{ count: number }>,
+            Parameters<PhysicalInventoryRepository['mutatePosition']>
+          >()
+          .mockResolvedValue({ count: 1 }),
+        appendLine: jest.fn((_tx: unknown, line: object) =>
+          Promise.resolve(line),
+        ),
+      };
+      const tx = {
+        user: {
+          findFirst: jest.fn().mockResolvedValue({ id: request.actorId }),
+        },
+        inventoryPosition: {
+          groupBy: jest
+            .fn()
+            .mockResolvedValue([{ productId, _sum: { quantity: 10 } }]),
+        },
+      };
+      const service = new PhysicalInventoryService(
+        repo as unknown as PhysicalInventoryRepository,
+      );
+      const result = service.transfer(
+        tx as unknown as Prisma.TransactionClient,
+        request,
+        destinations.map((destination, index) => ({
+          sourceId: source.id,
+          quantity: index === 0 ? 3 : 4,
+          expectedSourceRevision:
+            scenario === 'contradictory-revisions' && index === 1 ? 1 : 0,
+          target: destination,
+        })),
+      );
+      if (scenario === 'valid') {
+        const applied = await result;
+        expect(applied.effect.lines).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              positionId: source.id,
+              delta: -7,
+              quantityBefore: 10,
+              quantityAfter: 3,
+              revisionBefore: 0,
+              revisionAfter: 1,
+            }),
+          ]),
+        );
+        expect(
+          repo.mutatePosition.mock.calls.filter(
+            (call) => call[1].id === source.id,
+          ),
+        ).toHaveLength(1);
+        expect(
+          applied.effect.lines
+            .filter((line) => line.delta > 0)
+            .map((line) => line.delta)
+            .sort(),
+        ).toEqual([3, 4]);
+        expect(applied.projectionDeltas).toEqual([
+          { productId, ownedDelta: 0 },
+        ]);
+      } else {
+        await expect(result).rejects.toMatchObject({
+          code:
+            scenario === 'insufficient-sum'
+              ? 'INSUFFICIENT_PHYSICAL_AVAILABILITY'
+              : 'INVALID_PHYSICAL_REQUEST',
+        });
+        expect(repo.claimEffect).not.toHaveBeenCalled();
+        expect(repo.mutatePosition).not.toHaveBeenCalled();
+      }
+    },
+  );
   it('rejects a root PrismaClient before touching physical state', async () => {
     const repo = { findEffect: jest.fn() };
     const service = new PhysicalInventoryService(
@@ -203,6 +311,11 @@ describe('physical inventory composition and activation', () => {
   });
   it('restricts physical integration to the approved productive writer boundaries', () => {
     const src = join(__dirname, '../..');
+    const dispatchWriters = [
+      'healthcare-case-dispatch-confirm.repository.ts',
+      'healthcare-case-dispatch-confirm.service.ts',
+      'healthcare-case-dispatches.module.ts',
+    ].map((name) => join(src, 'healthcare', 'case-dispatches', name));
     function inspect(dir: string): void {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (entry.name === 'physical') continue;
@@ -211,6 +324,7 @@ describe('physical inventory composition and activation', () => {
         else if (
           entry.name.endsWith('.ts') &&
           !entry.name.endsWith('.spec.ts') &&
+          !dispatchWriters.includes(path) &&
           ![
             'create-physical-movement.dto.ts',
             'inventory.service.ts',
@@ -228,6 +342,12 @@ describe('physical inventory composition and activation', () => {
       }
     }
     inspect(src);
+    const confirm = readFileSync(dispatchWriters[1], 'utf8');
+    expect(confirm).toMatch(/this\.physical\.transfer\(/);
+    expect(confirm).toMatch(/this\.projections\.apply\(/);
+    expect(confirm).not.toMatch(
+      /authority\.run\(|InventoryCompatibilityHistory|inventoryMovement\.(?:create|update|delete)|\$transaction\s*\(/,
+    );
     const implementation = [
       'physical-inventory.service.ts',
       'physical-inventory.repository.ts',

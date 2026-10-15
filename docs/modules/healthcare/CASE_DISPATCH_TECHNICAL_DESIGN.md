@@ -2,22 +2,26 @@
 
 TECHNICAL DESIGN: APPROVED.
 IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
+HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91.
+HC-DSP-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
 QUANTITY SOURCING BLOCKER: RESOLVED.
 
-Baseline: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
-Rama: `feat/hc-case-dispatch-foundation`.
+Baseline del TD: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
+Rama del TD: `feat/hc-case-dispatch-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-CASE-DISPATCH.
 El Technical Design fue aprobado/merged por PR #88; 01A está merged por PR #89.
-01B implementa comandos DRAFT e idempotencia, pendiente de revisión humana/merge.
-Confirmación física y adapters productivos permanecen sin implementar.
+01B implementa comandos DRAFT e idempotencia y está merged por PR #90.
+01C implementa Confirm físico y el adapter productivo; evidencia local en §17.
+El backend Dispatch estará completo sólo después del merge de 01C.
 
 ## 1. Estado y dependencias
 
 HC-INVENTORY-CUSTODY-01D: COMPLETE / MERGED. REAL COMPANY CUTOVER: NOT EXECUTED.
 HC-INVENTORY-CUSTODY-01E: COMPLETE / MERGED; 01E-A PR #86 y 01E-B PR #87.
 REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
-PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED: el registry productivo sigue cerrado
-hasta implementar el contexto Dispatch real. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
+PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH; adapter CASE_DISPATCH_ITEM
+registrado con validación durable. No acredita Equipment real ni ejecuta reconciliación.
+RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
 
 La aprobación del diseño no activa 01D, no acredita Equipment y no habilita custodia productiva.
 Las descripciones de discovery anteriores de CASE_LOGISTICS son históricas; este delta
@@ -172,25 +176,24 @@ juntos. No nested physical transaction.
 Orden conceptual vinculante:
 
 ```text
-Inventory shared authority fence cuando existe QUANTITY
--> HC Company lock + timeouts
--> settings advisory shared si se requiere
+Inventory shared authority fence sólo con MATERIAL ACTIVE
+-> Confirm claim -> authority/runtime cuando existe MATERIAL ACTIVE
+-> HC Company exclusivo + timeouts
+-> settings advisory shared
 -> Cases afectados FOR SHARE en orden determinista, sin upgrade
--> CaseKit
--> Dispatch / items
--> Products ASC
--> EquipmentAssets ASC
--> Requirements / Assignments ASC
--> otras raíces físicas según dominio (Batches / Positions)
--> authoritative reread / CAS / physical mutations
+-> CaseKit UPDATE -> Dispatch UPDATE -> items -> sources
+-> Products UPDATE ASC -> Batches UPDATE ASC -> Positions UPDATE ASC
+-> EquipmentAssets UPDATE ASC para custody (incluye readiness)
+-> Requirements SHARE ASC -> Assignments SHARE ASC
+-> authoritative reread -> gates -> CONFIRM audit
+-> QUANTITY -> projection -> Equipment ASC -> item evidence/snapshots
+-> root terminal CAS -> claim completion
 ```
 
-La implementación debe validar el orden contra los caminos reales antes de cambiar
-código; no es una acreditación de concurrencia ejecutada. Nunca adquirir Inventory
-fence después de HC. Bloquear también Cases relacionados necesarios para agenda.
+La aceptación local de §17 valida este orden contra los writers reales. Nunca adquirir
+Inventory fence después de HC. Bloquear también Cases relacionados necesarios para agenda.
 HC-DSP-LOCK-01 acredita la dirección Case SHARE → Product → Asset → Assignment
-para DRAFT. El orden exacto entre las demás raíces físicas de 01C sigue pendiente
-de su aceptación específica; este delta no implementa ni acredita Confirm.
+para DRAFT. §17 acredita Confirm, con conexiones independientes y barreras observables.
 
 | Autoridad QUANTITY | Equipment-only | QUANTITY-only o mixto |
 | --- | --- | --- |
@@ -252,28 +255,28 @@ SERIALIZED material, sourcing automático y reconciliación/cutover reales.
 | --- | --- | --- | --- |
 | HC-DSP-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #89 |
 | HC-DSP-01B | DRAFT commands & idempotency | 5 SP | COMPLETE / MERGED — PR #90 |
-| HC-DSP-LOCK-01 | DRAFT lock compatibility (delta adicional) | 3 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED until HC-DSP-LOCK-01 merge |
-| BACKEND TOTAL | Backend aprobado | 18 SP | 01A/01B MERGED; HC-DSP-LOCK-01 pending review/merge; 01C BLOCKED |
+| HC-DSP-LOCK-01 | DRAFT lock compatibility (delta adicional) | 3 SP | COMPLETE / MERGED — PR #91 |
+| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| BACKEND TOTAL | Backend aprobado | 18 SP | Completo sólo después del merge de 01C |
 | HC-DSP-01D | Frontend | Candidate 5 SP | OUT OF CURRENT BACKEND SCOPE |
 
 Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. HC-DSP-LOCK-01
-está pendiente de revisión humana/merge; 01C permanece bloqueado hasta ese merge.
+está COMPLETE / MERGED — PR #91; 01C está implementado y probado, pendiente de revisión/merge.
 QUANTITY SOURCING BLOCKER: RESOLVED. No queda una decisión FEFO/FIFO por inferir.
 
-## 13. Validación futura y estado del cierre
+## 13. Validación exigida y estado del cierre
 
-Implementación futura: suites focales de contrato/RBAC/tenant/capacidad/replay y
+Validación local completada en §17: suites focales de contrato/RBAC/tenant/capacidad/replay y
 PostgreSQL nuevo aislado con conexiones independientes y barreras observables.
 Cubrir duplicados, sourcing NONE/REQUIRED/OPTIONAL sin fallback, revisiones stale,
 agenda estricta, Inspection/Retirement/Replace/release, competencia por Asset/Position,
 rollback cruzado, autoridad LEGACY/CUTOVER/PHYSICAL, provenance y owned sin doble descuento.
-La aceptación estructural de 01A está registrada en §14; la concurrencia de confirmación
-y la ejecución física de 01C permanecen pendientes.
+La aceptación estructural de 01A está registrada en §14; la concurrencia y ejecución
+física de Confirm se validaron en §17, exclusivamente en PostgreSQL16 nuevo aislado.
 
 TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
 REAL COMPANY CUTOVER: NOT EXECUTED. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
-PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
+PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
 
 ## 14. HC-DSP-01A — implementación local validada
 
@@ -327,9 +330,9 @@ Validación local:
   `263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
   Cliente actualizado conservando esa DLL. Sin cambios compartidos Web; no se requiere gate Web.
 
-HC-DSP-01B: **COMPLETE / MERGED — PR #90**. HC-DSP-01C: **BLOCKED until HC-DSP-LOCK-01 merge**.
-CASE DISPATCH PHYSICAL CONFIRMATION: **NOT IMPLEMENTED**.
-PRODUCTIVE EQUIPMENT CUSTODY: **NOT ENABLED**. RETURN: **NOT IMPLEMENTED**.
+HC-DSP-01B: **COMPLETE / MERGED — PR #90**. HC-DSP-LOCK-01: **COMPLETE / MERGED — PR #91**.
+HC-DSP-01C / CASE DISPATCH PHYSICAL CONFIRMATION: **IMPLEMENTED / TESTED — pending human review/merge** (§17).
+PRODUCTIVE EQUIPMENT CUSTODY: **ENABLED BY CONFIRM CODE PATH**. RETURN: **NOT IMPLEMENTED**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
 
 ## 15. HC-DSP-01B — comandos DRAFT e idempotencia local validados
@@ -377,16 +380,16 @@ Cleanup PASS; ninguna DB dev/QA/producción. Fixtures históricos estructurales 
 permiten comprobar capacidad confirmada; los comandos tienen delta cero en Effects,
 Custody, eventos, Positions, Assets y Assignments. Sin cambios Web compartidos.
 
-01C **BLOCKED until HC-DSP-LOCK-01 merge**. CONFIRM **NOT IMPLEMENTED**. PRODUCTIVE EQUIPMENT
-CUSTODY **NOT ENABLED**. RETURN **NOT IMPLEMENTED**. REAL COMPANY CUTOVER / REAL
+01C / CONFIRM **IMPLEMENTED / TESTED — pending human review/merge** (§17). PRODUCTIVE EQUIPMENT
+CUSTODY **ENABLED BY CONFIRM CODE PATH**. RETURN **NOT IMPLEMENTED**. REAL COMPANY CUTOVER / REAL
 EQUIPMENT RECONCILIATION **NOT EXECUTED**. M-HC1 **OPEN**.
 
 ## 16. HC-DSP-LOCK-01 — compatibilidad de locks DRAFT / Assignment
 
-**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **3 SP**.
+**COMPLETE / MERGED — PR #91**. TARGET **3 SP**.
 Baseline: 69d4a9358dd90d6d44449aeef2c9056d3203b569; rama
 fix/hc-dsp-lock-order-compatibility. 01A COMPLETE / MERGED — PR #89;
-01B COMPLETE / MERGED — PR #90. 01C **BLOCKED until HC-DSP-LOCK-01 merge**,
+01B COMPLETE / MERGED — PR #90. 01C **IMPLEMENTED / TESTED — pending human review/merge**,
 TARGET **8 SP**.
 
 Case se adquiere FOR SHARE al inicio de planificación, sin upgrade posterior.
@@ -437,6 +440,82 @@ build, Prisma validate, Prettier/check del código/arnés modificado y diff chec
 El noEmit global adicional de tsconfig.spec.json presenta errores en specs ajenos
 al delta; noEmit focal de los cuatro archivos TypeScript modificados PASS.
 
-Confirm **NOT IMPLEMENTED**; PRODUCTIVE EQUIPMENT CUSTODY **NOT ENABLED**;
-RETURN **NOT IMPLEMENTED**; M-HC1 **OPEN**. Revisión humana y merge de este delta
-son prerrequisitos para desbloquear HC-DSP-01C.
+HC-DSP-LOCK-01 quedó merged por PR #91. Confirm está **IMPLEMENTED / TESTED — pending human review/merge** (§17).
+PRODUCTIVE EQUIPMENT CUSTODY **ENABLED BY CONFIRM CODE PATH**; RETURN **NOT IMPLEMENTED**;
+M-HC1 **OPEN**. La aceptación local no ejecuta adopción real.
+
+## 17. HC-DSP-01C — Atomic Confirm implementado y probado
+
+**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **8 SP**.
+Baseline `14065c6e8139b1d7b7b1d1066e26e8ca2744713c`; rama
+`feat/hc-dsp-01c-atomic-confirm`. 01A/01B/LOCK-01 COMPLETE / MERGED — PR #89/#90/#91.
+CASE DISPATCH BACKEND: completo sólo después del merge de 01C.
+
+POST `/healthcare/cases/:caseId/dispatches/:dispatchId/confirm`: HTTP 200 original/replay,
+DTO estricto `{expectedRevision}`, Idempotency-Key obligatorio, JWT y roles
+ADMIN/MANAGER/WAREHOUSE. Actor/Company derivan del JWT. Replay durable precede
+todos los gates vivos y conserva el audit original y la lectura histórica.
+
+Sólo MATERIAL ACTIVE activa fence y autoridad PHYSICAL/runtime compatible.
+LEGACY rechaza material; CUTOVER/RECOVERY_REQUIRED y runtime ausente/incompatible
+fallan cerrados. Equipment-only no activa la autoridad QUANTITY. EXCLUDED no valida
+fuente física ni escribe evidence; un Dispatch sin ACTIVE sigue siendo inválido.
+Más de 1000 MATERIAL ACTIVE rechaza antes de escrituras físicas; 999/1000 permitidos
+estructuralmente. Sin defaults de runtime ni cambios en readiness global.
+
+Un tx caller-owned ReadCommitted con timeouts aplica el orden de §8. Audit CONFIRM
+N→N+1 único antes de custody, mientras root sigue DRAFT N; el adapter comprueba
+claim pendiente, audit/actor/revisión, fuente preparada, Assignment/Asset y contexto.
+Módulo de evidencia estrecho, consultas readonly en el tx recibido y factory de
+EquipmentModule registran el adapter sin forwardRef ni ciclo de servicios.
+
+QUANTITY usa TRANSFER AVAILABLE→CUSTODY, origin CASE_DISPATCH/dispatchId/CONFIRM_QUANTITY,
+destino CASE_DISPATCH_ITEM/itemId, un Effect y projection.apply una vez en el mismo tx.
+Product.stock permanece igual; Batch.availableQuantity refleja sólo el débito AVAILABLE.
+Sin InventoryCompatibilityHistory para Confirm. Después, Equipment en orden Asset ASC
+abre custody WAREHOUSE→CUSTODY y evento CONFIRM_EQUIPMENT por item, con revisión exacta.
+Agenda fullyVerifiable/conflictFree obligatoria: override previo no evita ese gate.
+Assignment queda RESERVED y los lifecycle Case/CaseKit no cambian.
+
+Snapshots JSON v1 amplían tipos/parser con capturedAt y handoff Material/Equipment;
+describen fuente, destino, Effect/custody/event y revisiones históricas, sin fallback vivo.
+La lectura conserva el scaffold histórico v1 sin inventar hechos físicos faltantes.
+Un transaction_timestamp de precisión persistida se asigna explícitamente al audit,
+root e historia capturada. Evidence/snapshots de todos los items preceden el único
+CAS terminal; completion del claim es el último write. Fallos posteriores a Effect,
+projection, custody, evidence, snapshots o root revierten todo.
+
+**Resolución vinculante del escenario 29:** un Dispatch no permite dos MATERIAL ACTIVE
+con el mismo par sourceCaseKitItemId/sourcePositionId. Se preservan todas las unicidades.
+El caso positivo usa una fuente preparada y dos Positions/batches reales distintos:
+cantidades 3+4 ≤ preparedQuantity 10, dos débitos exactos, un Effect compartido y dos
+destinos CUSTODY propios con provenance por item. Stock 27→27; Batch.available 20→17
+y 7→3. El comando DRAFT normal rechaza el duplicado exacto con 409 y cero writes.
+La agregación repetida de PhysicalInventory es una capacidad defensiva de nivel inferior;
+no permite líneas empresariales duplicadas de Dispatch. Regresiones de la primitiva
+prueban débito agregado único, saldo agregado insuficiente y revisiones contradictorias.
+Este último no se fabrica como estado empresarial CaseDispatch.
+
+Aceptación PostgreSQL16 **75/75 PASS**. Clientes independientes, observer, backend PIDs
+y pg_blocking_pids prueban esperas; pg_stat_database registra cero deadlocks.
+Incluye MATERIAL/Equipment/mixto, capacidad/saldo/revisión, competing keys, prepared
+Equipment, ambos órdenes de Inspection/Retirement/Replace/Release, Case schedule y
+preparación Kit, Sales/Receipt reales, fence/cutover en ambos órdenes, rollback por
+frontera, tenants, terminal/deferred constraints, runtime, adapter falsificado,
+1001 líneas válidas distintas, EXCLUDED mixto/solo y ausencia de Return.
+
+Último target nuevo: `127.0.0.1:55317/zaping_case_dispatch_confirm_test`, run
+`8aff13c5-7b17-42b7-94b6-e221342c741c`. Puerto loopback aleatorio, PostgreSQL16,
+tmpfs sin volumen existente, rol case_dispatch_confirm_test no superusuario.
+Las 42 migraciones existentes se aplicaron sólo a esa DB nueva. Cleanup PASS.
+Ninguna DB dev/QA/producción; ningún cutover/reconciliación de Company/Equipment real.
+
+Gates: focal Dispatch/PhysicalInventory/Equipment/Assignment **905/905 en 36 suites**;
+API completa **2207/2207 en 123 suites**; typecheck oficial, noEmit focal, lint:check,
+build, Prisma validate, Prettier/check de código/arnés y git diff --check PASS.
+Web no ejecutado: sin cambios Web ni contrato compartido consumido por Web.
+Schema/migraciones sin cambios, sin Prisma generate. Sin staging, commit ni push.
+
+PRODUCTIVE EQUIPMENT CUSTODY: **ENABLED BY CONFIRM CODE PATH**; REAL EQUIPMENT
+RECONCILIATION **NOT EXECUTED**. REAL COMPANY CUTOVER **NOT EXECUTED**.
+RETURN **NOT IMPLEMENTED**. M-HC1 **OPEN**. Revisión humana → staging selectivo → commit → PR.

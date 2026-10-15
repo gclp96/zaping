@@ -1,5 +1,7 @@
 import { Body, Headers, HttpStatus, Post, Res } from '@nestjs/common';
 import { Response } from 'express';
+import { HealthcareCaseDispatchConfirmService } from './healthcare-case-dispatch-confirm.service';
+import { ConfirmHealthcareCaseDispatchDto } from './dto/confirm-healthcare-case-dispatch.dto';
 import { HealthcareCaseDispatchCommandService } from './healthcare-case-dispatch-command.service';
 import { CreateHealthcareCaseDispatchDto } from './dto/create-healthcare-case-dispatch.dto';
 import { SetHealthcareCaseDispatchCustodianDto } from './dto/set-healthcare-case-dispatch-custodian.dto';
@@ -28,6 +30,7 @@ export class HealthcareCaseDispatchesController {
   constructor(
     private readonly service: HealthcareCaseDispatchReadService,
     private readonly commands: HealthcareCaseDispatchCommandService,
+    private readonly confirmation: HealthcareCaseDispatchConfirmService,
   ) {}
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SALES, UserRole.WAREHOUSE)
@@ -163,6 +166,29 @@ export class HealthcareCaseDispatchesController {
         key: key!,
       },
       { operation: 'CANCEL', dto },
+    );
+    response.status(HttpStatus.OK);
+    return result;
+  }
+  @Post(':dispatchId/confirm')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
+  async confirm(
+    @Req() req: AuthenticatedRequest,
+    @Param('caseId', ParseUUIDPipe) caseId: string,
+    @Param('dispatchId', ParseUUIDPipe) dispatchId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ConfirmHealthcareCaseDispatchDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const result = await this.confirmation.execute(
+      {
+        companyId: req.user.companyId,
+        actorId: req.user.id,
+        caseId,
+        dispatchId,
+        key: key!,
+      },
+      dto,
     );
     response.status(HttpStatus.OK);
     return result;
