@@ -1,3 +1,4 @@
+import { HealthcareCaseDispatchCommandService } from './healthcare-case-dispatch-command.service';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,6 +16,7 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
   const caseId = '11111111-1111-4111-8111-111111111111';
   const path = `/healthcare/cases/${caseId}/dispatches`;
   const secret = 'case-availability-test-only-secret';
+  const commands = { execute: jest.fn() };
   const service = { list: jest.fn(), detail: jest.fn() };
   const prisma = { user: { findFirst: jest.fn() } };
   let app: INestApplication<App>;
@@ -36,6 +38,10 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
       controllers: [HealthcareCaseDispatchesController],
       providers: [
         JwtStrategy,
+        {
+          provide: HealthcareCaseDispatchCommandService,
+          useValue: commands,
+        },
         { provide: PrismaService, useValue: prisma },
         { provide: HealthcareCaseDispatchReadService, useValue: service },
       ],
@@ -58,6 +64,11 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
   });
   beforeEach(() => {
     jest.resetAllMocks();
+    commands.execute.mockResolvedValue({
+      replay: false,
+      command: { operation: 'TEST' },
+      data: {},
+    });
     prisma.user.findFirst.mockImplementation(
       ({ where }: { where: { id: string; companyId: string } }) => ({
         ...where,
@@ -215,13 +226,119 @@ describe('Case Dispatch HTTP/JWT boundary (mock persistence)', () => {
       .expect(400);
     expect(service.detail).not.toHaveBeenCalled();
   });
-  it.each(['post', 'patch', 'delete'] as const)(
-    'has no %s route',
-    async (method) => {
-      await supertest(app.getHttpServer())
-        [method](path)
-        .auth(token(), { type: 'bearer' })
-        .expect(404);
+  it.each(['patch', 'delete'] as const)('has no %s route', async (method) => {
+    await supertest(app.getHttpServer())
+      [method](path)
+      .auth(token(), { type: 'bearer' })
+      .expect(404);
+  });
+  const mutations = [
+    {
+      route: '',
+      operation: 'CREATE',
+      status: 201,
+      dto: {
+        custodian: { type: 'EXTERNAL_PERSON', displayName: ' Receiver ' },
+      },
     },
-  );
+    {
+      route: '/' + caseId + '/custodian',
+      operation: 'CUSTODIAN_SET',
+      status: 200,
+      dto: {
+        expectedRevision: 0,
+        custodian: {
+          type: 'INTERNAL_USER',
+          displayName: 'Receiver',
+          userId: null,
+        },
+      },
+    },
+    {
+      route: '/' + caseId + '/items',
+      operation: 'ITEM_ADD',
+      status: 201,
+      dto: {
+        type: 'EQUIPMENT',
+        expectedRevision: 0,
+        sourceCaseKitItemId: caseId,
+      },
+    },
+    {
+      route: '/' + caseId + '/items/' + caseId + '/exclude',
+      operation: 'ITEM_EXCLUDE',
+      status: 200,
+      dto: { expectedRevision: 0, reason: 'Reason' },
+    },
+    {
+      route: '/' + caseId + '/cancel',
+      operation: 'CANCEL',
+      status: 200,
+      dto: { expectedRevision: 0, reason: 'Reason' },
+    },
+  ];
+  describe.each(mutations)('$operation HTTP boundary', (m) => {
+    it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'])('allows %s', async (role) => {
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token(role), { type: 'bearer' })
+        .set('Idempotency-Key', 'key')
+        .send(m.dto)
+        .expect(m.status);
+      expect(commands.execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          companyId: 'jwt-tenant',
+          actorId: role,
+          caseId,
+          key: 'key',
+        }),
+        expect.objectContaining({ operation: m.operation }),
+      );
+    });
+    it('denies SALES and anonymous', async () => {
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token('SALES'), { type: 'bearer' })
+        .set('Idempotency-Key', 'key')
+        .send(m.dto)
+        .expect(403);
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .send(m.dto)
+        .expect(401);
+      expect(commands.execute).not.toHaveBeenCalled();
+    });
+    it('rejects Company/actor spoofing', async () => {
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token(), { type: 'bearer' })
+        .send({ ...m.dto, companyId: 'foreign', actorId: caseId })
+        .expect(400);
+      expect(commands.execute).not.toHaveBeenCalled();
+    });
+    it('returns 200 for replay with same response envelope', async () => {
+      commands.execute.mockResolvedValue({
+        replay: true,
+        command: { operation: m.operation },
+        data: {},
+      });
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token(), { type: 'bearer' })
+        .set('Idempotency-Key', 'key')
+        .send(m.dto)
+        .expect(200, {
+          replay: true,
+          command: { operation: m.operation },
+          data: {},
+        });
+    });
+  });
+  it('has no CONFIRM route', async () => {
+    await supertest(app.getHttpServer())
+      .post(path + '/' + caseId + '/confirm')
+      .auth(token(), { type: 'bearer' })
+      .send({ expectedRevision: 0 })
+      .expect(404);
+  });
 });

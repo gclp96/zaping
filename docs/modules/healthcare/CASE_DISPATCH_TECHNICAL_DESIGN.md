@@ -1,13 +1,15 @@
 # HC-CASE-DISPATCH — Case Dispatch Foundation / Physical Handoff
 
 TECHNICAL DESIGN: APPROVED.
-IMPLEMENTATION: HC-DSP-01A IMPLEMENTED / TESTED — pending human review/merge.
+IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge.
 QUANTITY SOURCING BLOCKER: RESOLVED.
 
 Baseline: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
 Rama: `feat/hc-case-dispatch-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-CASE-DISPATCH.
-El Technical Design fue aprobado/merged por PR #88. HC-DSP-01A implementa persistencia, invariantes y lectura; no implementa comandos DRAFT, confirmación física ni adapters productivos.
+El Technical Design fue aprobado/merged por PR #88; 01A está merged por PR #89.
+01B implementa comandos DRAFT e idempotencia, pendiente de revisión humana/merge.
+Confirmación física y adapters productivos permanecen sin implementar.
 
 ## 1. Estado y dependencias
 
@@ -98,8 +100,10 @@ source Position ID, expected Position revision y quantity positiva entera.
 Backend deriva Product desde la fuente CaseKit y valida coherencia tenant/tracking.
 Confirm relee y valida LA MISMA fuente y revisión bajo lock; no la sustituye.
 Forma conceptual del comando add MATERIAL: sourceCaseKitItemId, quantity,
-sourcePositionId, expectedSourceRevision, batchId explícito nullable y expectedRevision
-del Dispatch. Los nombres/DTOs exactos se concretan en HC-DSP-01A/01B sin relajar identidad.
+type MATERIAL, sourcePositionId, batchId explícito nullable y expectedRevision del Dispatch.
+01B captura expectedPositionRevision del servidor bajo lock; el cliente no suministra
+revisiones físicas. EQUIPMENT recibe sólo type, sourceCaseKitItemId y expectedRevision;
+Assignment/Asset y expectedPhysicalRevision se derivan/capturan en backend.
 
 ## 5. Confirm QUANTITY
 
@@ -200,9 +204,9 @@ todo falla atómicamente. No activar 01D ni ejecutar adopción real en Dispatch.
 Idempotency-Key en CREATE, CUSTODIAN_SET, ITEM_ADD, ITEM_EXCLUDE, CONFIRM y CANCEL.
 Reutilizar patrón Company/scope/key, claim/completion en la misma transacción.
 Hash canónico versionado de intención: Company, target Dispatch cuando forma parte
-del comando, expectedRevision, custodio, identidades/revisiones de fuente, quantity,
-batch nullable y razón aplicables. Excluir tiempo servidor, IDs generados que no son
-intención y actor del retry. No construir el hash desde hechos vivos cambiantes.
+del comando, expectedRevision del Dispatch, custodio, identidades de fuente, quantity,
+batch nullable y razón aplicables. Excluir revisiones físicas observadas por servidor,
+tiempo servidor, IDs generados que no son intención y actor del retry. No construir el hash desde hechos vivos cambiantes.
 
 Misma key/request: replay lógico sin escrituras físicas duplicadas. Mismatch:
 IDEMPOTENCY_KEY_REUSED / 409. Respuesta perdida: readback durable fresco.
@@ -244,14 +248,14 @@ SERIALIZED material, sourcing automático y reconciliación/cutover reales.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-DSP-01A | Persistence, invariants & reads | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | BLOCKED until HC-DSP-01A merge |
-| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED BY HC-DSP-01B |
-| BACKEND TOTAL | Backend aprobado | 18 SP | 01A IMPLEMENTED / TESTED; 01B/01C BLOCKED |
+| HC-DSP-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #89 |
+| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED until HC-DSP-01B merge |
+| BACKEND TOTAL | Backend aprobado | 18 SP | 01A MERGED; 01B IMPLEMENTED / TESTED; 01C BLOCKED |
 | HC-DSP-01D | Frontend | Candidate 5 SP | OUT OF CURRENT BACKEND SCOPE |
 
-Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. 01A sigue pendiente
-de revisión humana/merge; 01B permanece bloqueado hasta ese merge.
+Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. 01B está pendiente
+de revisión humana/merge; 01C permanece bloqueado hasta ese merge.
 QUANTITY SOURCING BLOCKER: RESOLVED. No queda una decisión FEFO/FIFO por inferir.
 
 ## 13. Validación futura y estado del cierre
@@ -264,13 +268,13 @@ rollback cruzado, autoridad LEGACY/CUTOVER/PHYSICAL, provenance y owned sin dobl
 La aceptación estructural de 01A está registrada en §14; la concurrencia de confirmación
 y la ejecución física de 01C permanecen pendientes.
 
-TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A IMPLEMENTED / TESTED — pending human review/merge.
+TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge.
 REAL COMPANY CUTOVER: NOT EXECUTED. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
 
 ## 14. HC-DSP-01A — implementación local validada
 
-HC-DSP-01A: **IMPLEMENTED / TESTED — pending human review/merge**. TARGET: **5 SP**.
+HC-DSP-01A: **COMPLETE / MERGED — PR #89**. TARGET: **5 SP**.
 Baseline: `28de03737867d16116031f2688f048d61e168fd9` (PR #88).
 Rama: `feat/hc-dsp-01a-persistence-reads`.
 
@@ -320,7 +324,56 @@ Validación local:
   `263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
   Cliente actualizado conservando esa DLL. Sin cambios compartidos Web; no se requiere gate Web.
 
-HC-DSP-01B: **BLOCKED until 01A merge**. HC-DSP-01C: **BLOCKED**.
+HC-DSP-01B: **IMPLEMENTED / TESTED — pending human review/merge**. HC-DSP-01C: **BLOCKED until 01B merge**.
 CASE DISPATCH PHYSICAL CONFIRMATION: **NOT IMPLEMENTED**.
 PRODUCTIVE EQUIPMENT CUSTODY: **NOT ENABLED**. RETURN: **NOT IMPLEMENTED**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
+
+## 15. HC-DSP-01B — comandos DRAFT e idempotencia local validados
+
+**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **5 SP**.
+Baseline: ecb41325bb9779eaf95866f956670b6f383cb577; rama
+feat/hc-dsp-01b-draft-commands-idempotency. 01A COMPLETE / MERGED — PR #89.
+
+Cinco POST case-scoped: create, custodian, items, items/:itemId/exclude y cancel,
+bajo /healthcare/cases/:caseId/dispatches. CREATE produce DRAFT vacío con revisión 0,
+Case SCHEDULED/horario ordenado, Kit PREPARED y readiness local PASS. Custodian,
+exclude y cancel no dependen de readiness vivo; cancelar permite planificación degradada.
+Custodio idéntico con key nueva es comando real revisionado. EXCLUDE nunca borra.
+Nueva key sobre EXCLUDED/terminal produce conflicto; misma key/hash reproduce.
+
+MATERIAL usa Position explícita, batchId nullable explícito y Product derivado.
+NONE/REQUIRED/OPTIONAL sin fallback. Se valida saldo actual agregado por Position en
+este Dispatch, incluso entre sources distintos; capacidad preparada suma CONFIRMED
+ACTIVE + este DRAFT ACTIVE + candidato. Otros DRAFTs no reservan. EQUIPMENT deriva
+Assignment/Asset/Product, exige RESERVED y elegibilidad física actual mediante helper
+puro; captura revisión sin modificar Asset. Historia confirmada consume capacidad aun
+tras cerrar custodia. Agenda/confirmación fuerte siguen siendo 01C.
+
+Cada comando posee un tx ReadCommitted con timeouts: claim, locks ordenados, gates,
+CAS, un audit y completion. Sin HC Company advisory lock, authority fence ni tx anidado.
+Revisión stale: RESOURCE_STATE_CHANGED/409. DTOs estrictos rechazan identidades de
+Company/actor, evidence y revisiones físicas del cliente. JWT/RolesGuard: mutaciones
+ADMIN/MANAGER/WAREHOUSE; SALES read-only. Foreign tenant/wrong Case: 404.
+
+Replay antes de gates vivos: hash canónico versionado de intención, sin actor/tiempo,
+Kit resuelto ni revisiones físicas observadas. UNIQUE loser abandona el tx abortado
+y consulta ganador en snapshot RepeatableRead nuevo. Respuesta uniforme
+{ replay, command, data }: detalle ACTUAL + recibo del audit ORIGINAL (id, operación,
+Dispatch/item, revisiones, actorId y occurredAt). No promete HTTP histórico idéntico.
+Witness ausente/incoherente falla saneado. Audit JSON conserva exactamente versión,
+operación y razón; no before/after arbitrarios. CREATE/ADD originales 201, replay 200;
+otros 200. No nuevas tablas, migraciones, generate ni cambios de snapshot 01A.
+
+Validación: focal **242/242** en 4 suites; PostgreSQL16 **40/40**, conexiones independientes
+y barreras observables de lock; API **2147/2147** en 122 suites; typecheck, noEmit focal,
+lint, build, Prisma validate, Prettier/check de código/arnés modificado y diff check PASS.
+Último target nuevo: 127.0.0.1:60907/zaping_case_dispatch_commands_test, tmpfs,
+loopback y rol no superusuario. Las 42 migraciones existentes se aplicaron sólo allí.
+Cleanup PASS; ninguna DB dev/QA/producción. Fixtures históricos estructurales de test
+permiten comprobar capacidad confirmada; los comandos tienen delta cero en Effects,
+Custody, eventos, Positions, Assets y Assignments. Sin cambios Web compartidos.
+
+01C **BLOCKED until 01B merge**. CONFIRM **NOT IMPLEMENTED**. PRODUCTIVE EQUIPMENT
+CUSTODY **NOT ENABLED**. RETURN **NOT IMPLEMENTED**. REAL COMPANY CUTOVER / REAL
+EQUIPMENT RECONCILIATION **NOT EXECUTED**. M-HC1 **OPEN**.
