@@ -26,6 +26,8 @@ model Category {
 }
 
 model Product {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   inventoryCutoverProducts InventoryCutoverProduct[]
 
   id          String  @id @default(uuid())
@@ -90,6 +92,8 @@ model InventoryMovement {
 }
 
 model InventoryBatch {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   id        String @id @default(uuid())
   companyId String
   productId String
@@ -140,6 +144,9 @@ enum InventoryPhysicalEffectKind {
 }
 
 model InventoryPosition {
+  dispatchSources      HealthcareCaseDispatchItem[] @relation("DispatchSourcePosition")
+  dispatchDestinations HealthcareCaseDispatchItem[] @relation("DispatchDestinationPosition")
+
   id               String                        @id @default(uuid())
   companyId        String
   productId        String
@@ -164,6 +171,8 @@ model InventoryPosition {
 }
 
 model InventoryPhysicalEffect {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   openingCutoverProduct InventoryCutoverProduct? @relation("CutoverProductOpeningEffect")
 
   id              String                        @id @default(uuid())
@@ -225,6 +234,12 @@ enum ProductLotTracking {
 }
 
 enum IdempotencyScope {
+  HEALTHCARE_CASE_DISPATCH_CREATE
+  HEALTHCARE_CASE_DISPATCH_CUSTODIAN_SET
+  HEALTHCARE_CASE_DISPATCH_ITEM_ADD
+  HEALTHCARE_CASE_DISPATCH_ITEM_EXCLUDE
+  HEALTHCARE_CASE_DISPATCH_CONFIRM
+  HEALTHCARE_CASE_DISPATCH_CANCEL
   INVENTORY_MANUAL_PHYSICAL_MUTATION
   PURCHASE_RECEIPT_CREATE
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
@@ -451,6 +466,8 @@ model PurchaseReceiptItem {
 }
 
 model Company {
+  caseDispatches HealthcareCaseDispatch[]
+
   equipmentAssetCustodies      EquipmentAssetCustody[]
   equipmentAssetPhysicalEvents EquipmentAssetPhysicalEvent[]
 
@@ -578,6 +595,14 @@ enum HealthcareCaseKitItemLifecycle {
 }
 
 model User {
+  createdDispatches     HealthcareCaseDispatch[]      @relation("DispatchCreatedBy")
+  confirmedDispatches   HealthcareCaseDispatch[]      @relation("DispatchConfirmedBy")
+  cancelledDispatches   HealthcareCaseDispatch[]      @relation("DispatchCancelledBy")
+  custodianDispatches   HealthcareCaseDispatch[]      @relation("DispatchCustodian")
+  addedDispatchItems    HealthcareCaseDispatchItem[]  @relation("DispatchItemAddedBy")
+  excludedDispatchItems HealthcareCaseDispatchItem[]  @relation("DispatchItemExcludedBy")
+  dispatchAudits        HealthcareCaseDispatchAudit[]
+
   openedEquipmentCustodies     EquipmentAssetCustody[]       @relation("EquipmentCustodyOpenedBy")
   closedEquipmentCustodies     EquipmentAssetCustody[]       @relation("EquipmentCustodyClosedBy")
   equipmentAssetPhysicalEvents EquipmentAssetPhysicalEvent[] @relation("EquipmentPhysicalEventActor")
@@ -730,6 +755,8 @@ model HealthcareDoctorHospitalAffiliation {
 }
 
 model HealthcareCase {
+  dispatches HealthcareCaseDispatch[]
+
   equipmentAssetCustodies EquipmentAssetCustody[]
 
   id         String  @id @default(uuid())
@@ -825,6 +852,8 @@ model HealthcareCaseRequirement {
 }
 
 model EquipmentAsset {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   physicalLocation EquipmentPhysicalLocation     @default(UNVERIFIED)
   physicalRevision Int                           @default(0)
   activeCustodyId  String?
@@ -885,6 +914,8 @@ model EquipmentAsset {
 }
 
 model HealthcareEquipmentAssignment {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   equipmentAssetCustodies EquipmentAssetCustody[]
 
   id               String  @id @default(uuid())
@@ -964,6 +995,8 @@ model HealthcareEquipmentAssignmentConflictOverride {
 }
 
 model HealthcareCaseKit {
+  dispatches HealthcareCaseDispatch[]
+
   id           String                  @id @default(uuid())
   companyId    String
   caseId       String
@@ -988,6 +1021,8 @@ model HealthcareCaseKit {
 }
 
 model HealthcareCaseKitItem {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   id                    String                         @id @default(uuid())
   companyId             String
   caseId                String
@@ -1008,6 +1043,7 @@ model HealthcareCaseKitItem {
   addedBy             User                           @relation("HealthcareCaseKitItemAddedBy", fields: [addedById, companyId], references: [id, companyId], onDelete: Restrict)
   excludedBy          User?                          @relation("HealthcareCaseKitItemExcludedBy", fields: [excludedById, companyId], references: [id, companyId], onDelete: Restrict)
 
+  @@unique([id, companyId, caseId, caseKitId], map: "HealthcareCaseKitItem_dispatch_source_key")
   @@unique([id, companyId])
   @@index([companyId, caseKitId])
   @@index([companyId, caseKitId, lifecycle, createdAt])
@@ -1323,6 +1359,8 @@ model InventoryCutoverLegacySale {
 }
 
 model EquipmentAssetCustody {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   id               String                        @id @default(uuid())
   companyId        String
   equipmentAssetId String
@@ -1348,6 +1386,8 @@ model EquipmentAssetCustody {
 }
 
 model EquipmentAssetPhysicalEvent {
+  dispatchItems HealthcareCaseDispatchItem[]
+
   id                     String                     @id @default(uuid())
   companyId              String
   equipmentAssetId       String
@@ -1378,8 +1418,143 @@ model EquipmentAssetPhysicalEvent {
   custody                EquipmentAssetCustody?     @relation("EquipmentPhysicalEventCustody", fields: [custodyId, companyId, equipmentAssetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
   actor                  User?                      @relation("EquipmentPhysicalEventActor", fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
+  @@unique([id, companyId, equipmentAssetId], map: "EquipmentAssetPhysicalEvent_dispatch_identity_key")
   @@unique([companyId, equipmentAssetId, originType, originId, originOperation], map: "EquipmentAssetPhysicalEvent_origin_key")
   @@unique([companyId, equipmentAssetId, revisionAfter], map: "EquipmentAssetPhysicalEvent_revision_key")
   @@index([companyId, equipmentAssetId, createdAt, id])
   @@index([companyId, custodyId])
+}
+
+enum HealthcareCaseDispatchStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum HealthcareCaseDispatchItemType {
+  MATERIAL
+  EQUIPMENT
+}
+
+enum HealthcareCaseDispatchItemLifecycle {
+  ACTIVE
+  EXCLUDED
+}
+
+enum HealthcareCaseDispatchCustodianType {
+  INTERNAL_USER
+  EXTERNAL_PERSON
+}
+
+enum HealthcareCaseDispatchAuditOperation {
+  CREATE
+  CUSTODIAN_SET
+  ITEM_ADD
+  ITEM_EXCLUDE
+  CONFIRM
+  CANCEL
+}
+
+model HealthcareCaseDispatch {
+  id                    String                              @id @default(uuid())
+  companyId             String
+  caseId                String
+  caseKitId             String
+  status                HealthcareCaseDispatchStatus        @default(DRAFT)
+  revision              Int                                 @default(0)
+  custodianType         HealthcareCaseDispatchCustodianType
+  custodianUserId       String?
+  custodianDisplayName  String                              @db.VarChar(256)
+  createdById           String
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
+  confirmedFromRevision Int?
+  confirmedById         String?
+  confirmedAt           DateTime?
+  cancelledById         String?
+  cancelledAt           DateTime?
+  cancellationReason    String?                             @db.VarChar(1000)
+  snapshotVersion       Int?
+  snapshot              Json?                               @db.JsonB
+  company               Company                             @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  healthcareCase        HealthcareCase                      @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  caseKit               HealthcareCaseKit                   @relation(fields: [caseKitId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict, onUpdate: Restrict)
+  custodianUser         User?                               @relation("DispatchCustodian", fields: [custodianUserId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy             User                                @relation("DispatchCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  confirmedBy           User?                               @relation("DispatchConfirmedBy", fields: [confirmedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  cancelledBy           User?                               @relation("DispatchCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  items                 HealthcareCaseDispatchItem[]
+  audit                 HealthcareCaseDispatchAudit[]
+
+  @@unique([id, companyId])
+  @@unique([id, companyId, caseId, caseKitId], map: "HealthcareCaseDispatch_parent_key")
+  @@index([companyId, caseId, createdAt, id])
+  @@index([companyId, caseId, status, createdAt, id])
+}
+
+model HealthcareCaseDispatchItem {
+  id                       String                              @id @default(uuid())
+  companyId                String
+  dispatchId               String
+  caseId                   String
+  caseKitId                String
+  sourceCaseKitItemId      String
+  type                     HealthcareCaseDispatchItemType
+  lifecycle                HealthcareCaseDispatchItemLifecycle @default(ACTIVE)
+  productId                String
+  addedById                String
+  createdAt                DateTime                            @default(now())
+  excludedById             String?
+  excludedAt               DateTime?
+  exclusionReason          String?                             @db.VarChar(1000)
+  snapshot                 Json?                               @db.JsonB
+  quantity                 Int?
+  batchId                  String?
+  sourcePositionId         String?
+  expectedPositionRevision Int?
+  destinationPositionId    String?
+  physicalEffectId         String?
+  assignmentId             String?
+  assetId                  String?
+  expectedPhysicalRevision Int?
+  equipmentCustodyId       String?                             @unique
+  equipmentPhysicalEventId String?                             @unique
+  dispatch                 HealthcareCaseDispatch              @relation(fields: [dispatchId, companyId, caseId, caseKitId], references: [id, companyId, caseId, caseKitId], onDelete: Restrict, onUpdate: Restrict)
+  sourceCaseKitItem        HealthcareCaseKitItem               @relation(fields: [sourceCaseKitItemId, companyId, caseId, caseKitId], references: [id, companyId, caseId, caseKitId], onDelete: Restrict, onUpdate: Restrict)
+  product                  Product                             @relation(fields: [productId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  batch                    InventoryBatch?                     @relation(fields: [batchId, companyId, productId], references: [id, companyId, productId], onDelete: Restrict, onUpdate: Restrict)
+  sourcePosition           InventoryPosition?                  @relation("DispatchSourcePosition", fields: [sourcePositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  destinationPosition      InventoryPosition?                  @relation("DispatchDestinationPosition", fields: [destinationPositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  physicalEffect           InventoryPhysicalEffect?            @relation(fields: [physicalEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  assignment               HealthcareEquipmentAssignment?      @relation(fields: [assignmentId, companyId, caseId, assetId], references: [id, companyId, caseId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  asset                    EquipmentAsset?                     @relation(fields: [assetId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  equipmentCustody         EquipmentAssetCustody?              @relation(fields: [equipmentCustodyId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  equipmentPhysicalEvent   EquipmentAssetPhysicalEvent?        @relation(fields: [equipmentPhysicalEventId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  addedBy                  User                                @relation("DispatchItemAddedBy", fields: [addedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  excludedBy               User?                               @relation("DispatchItemExcludedBy", fields: [excludedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  audit                    HealthcareCaseDispatchAudit[]
+
+  @@unique([id, companyId])
+  @@unique([id, companyId, dispatchId], map: "HealthcareCaseDispatchItem_audit_parent_key")
+  @@index([companyId, dispatchId, createdAt, id])
+  @@index([companyId, sourceCaseKitItemId, lifecycle])
+}
+
+model HealthcareCaseDispatchAudit {
+  id             String                               @id @default(uuid())
+  companyId      String
+  dispatchId     String
+  dispatchItemId String?
+  operation      HealthcareCaseDispatchAuditOperation
+  actorId        String
+  createdAt      DateTime                             @default(now())
+  revisionBefore Int?
+  revisionAfter  Int
+  change         Json                                 @db.JsonB
+  dispatch       HealthcareCaseDispatch               @relation(fields: [dispatchId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  dispatchItem   HealthcareCaseDispatchItem?          @relation(fields: [dispatchItemId, companyId, dispatchId], references: [id, companyId, dispatchId], onDelete: Restrict, onUpdate: Restrict)
+  actor          User                                 @relation(fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, dispatchId, revisionAfter])
+  @@index([companyId, dispatchId, createdAt, id])
 }

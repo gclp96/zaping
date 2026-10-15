@@ -1,13 +1,13 @@
 # HC-CASE-DISPATCH — Case Dispatch Foundation / Physical Handoff
 
 TECHNICAL DESIGN: APPROVED.
-IMPLEMENTATION: NOT STARTED.
+IMPLEMENTATION: HC-DSP-01A IMPLEMENTED / TESTED — pending human review/merge.
 QUANTITY SOURCING BLOCKER: RESOLVED.
 
 Baseline: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
 Rama: `feat/hc-case-dispatch-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-CASE-DISPATCH.
-Este cierre es DOCUMENTATION ONLY; no implementa modelos, migraciones, APIs ni adapters.
+El Technical Design fue aprobado/merged por PR #88. HC-DSP-01A implementa persistencia, invariantes y lectura; no implementa comandos DRAFT, confirmación física ni adapters productivos.
 
 ## 1. Estado y dependencias
 
@@ -215,7 +215,7 @@ vuelve a validar disponibilidad viva. Nunca sobrescribir actor original.
 Dirección aprobada: HealthcareCaseDispatch, HealthcareCaseDispatchItem y
 HealthcareCaseDispatchAudit. Tenant-safe, revisionados, auditables, idempotentes y
 trazables para Return; sin generic event sourcing. Prisma, FKs/índices/CHECKs exactos
-y protección de inmutabilidad pertenecen al readiness de HC-DSP-01A, no se implementan aquí.
+y protección de inmutabilidad se concretan en HC-DSP-01A; el alcance local validado figura en §14.
 
 CONFIRMED conserva snapshot histórico mínimo/versionado: Case/Kit/source item,
 Requirement/Assignment, folio/horario, Product SKU/nombre/tracking, quantity, batch
@@ -244,14 +244,14 @@ SERIALIZED material, sourcing automático y reconciliación/cutover reales.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-DSP-01A | Persistence, invariants & reads | 5 SP | READY; entrada a implementación tras merge de este Technical Design |
-| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | BLOCKED BY HC-DSP-01A |
+| HC-DSP-01A | Persistence, invariants & reads | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | BLOCKED until HC-DSP-01A merge |
 | HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED BY HC-DSP-01B |
-| BACKEND TOTAL | Backend aprobado | 18 SP | IMPLEMENTATION NOT STARTED |
+| BACKEND TOTAL | Backend aprobado | 18 SP | 01A IMPLEMENTED / TESTED; 01B/01C BLOCKED |
 | HC-DSP-01D | Frontend | Candidate 5 SP | OUT OF CURRENT BACKEND SCOPE |
 
-Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. READY no declara
-este diseño merged ni autoriza implementar dentro del presente delta documental.
+Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. 01A sigue pendiente
+de revisión humana/merge; 01B permanece bloqueado hasta ese merge.
 QUANTITY SOURCING BLOCKER: RESOLVED. No queda una decisión FEFO/FIFO por inferir.
 
 ## 13. Validación futura y estado del cierre
@@ -261,8 +261,66 @@ PostgreSQL nuevo aislado con conexiones independientes y barreras observables.
 Cubrir duplicados, sourcing NONE/REQUIRED/OPTIONAL sin fallback, revisiones stale,
 agenda estricta, Inspection/Retirement/Replace/release, competencia por Asset/Position,
 rollback cruzado, autoridad LEGACY/CUTOVER/PHYSICAL, provenance y owned sin doble descuento.
-Ninguna ejecución DB o pruebas de aplicación pertenece a este cierre.
+La aceptación estructural de 01A está registrada en §14; la concurrencia de confirmación
+y la ejecución física de 01C permanecen pendientes.
 
-TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: NOT STARTED.
+TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A IMPLEMENTED / TESTED — pending human review/merge.
 REAL COMPANY CUTOVER: NOT EXECUTED. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
+
+## 14. HC-DSP-01A — implementación local validada
+
+HC-DSP-01A: **IMPLEMENTED / TESTED — pending human review/merge**. TARGET: **5 SP**.
+Baseline: `28de03737867d16116031f2688f048d61e168fd9` (PR #88).
+Rama: `feat/hc-dsp-01a-persistence-reads`.
+
+Una migración, `20261015000200_case_dispatch_persistence`, añade tres modelos
+Dispatch, cinco enums, seis scopes del IdempotencyRecord existente, FKs tenant-safe,
+CHECKs y uniques parciales. Sólo añade las dos claves parentales requeridas de
+CaseKitItem y EquipmentAssetPhysicalEvent. Sin backfill ni activación real.
+
+CONFIRMED y CANCELLED son terminales: root UPDATE/DELETE e item INSERT/UPDATE/DELETE
+rechazados; el guard de items bloquea el parent antes de comprobar su estado.
+Audit append-only y TRUNCATE rechazado en las tres tablas. Las comprobaciones
+DEFERRABLE INITIALLY DEFERRED evalúan el estado final, permitiendo preparar snapshots
+y enlaces mientras DRAFT, cambiar a CONFIRMED y añadir CONFIRM audit en el mismo tx.
+DRAFT/CANCELLED terminan sin snapshots ni evidencia física; EXCLUDED confirmado
+conserva snapshot descriptivo sin handoff. No se revalida balance/lifecycle/condición
+mutable para acreditar la historia. La unicidad Equipment con custodia permanece
+incluso después de cerrar el episodio; DRAFT no reserva Equipment.
+
+Snapshots v1 tipados/limitados: root Case/folio/agenda, custodio y actor/fecha del
+handoff; item Product/tracking, batch/Asset y referencias/hechos preparados.
+Identidades, cantidades, revisiones y enlaces físicos permanecen normalizados.
+JSON público se proyecta mediante whitelist. CONFIRMED inválido falla con
+HEALTHCARE_PERSISTENCE_ERROR saneado; no reconstruye historia desde entidades vivas.
+Audit change v1 tipado/limitado a operación/razón pública; sin producción de audit
+empresarial ni claim/replay/conflict de comandos en este slice.
+
+Sólo GET list y detail, ambos bajo `/healthcare/cases/:caseId/dispatches`.
+JWT + RolesGuard, ADMIN/MANAGER/SALES/WAREHOUSE, UUID y Company exclusivamente de
+sesión. Foreign Company/wrong Case: 404. List page=1/pageSize=25/max=100, status
+opcional y createdAt DESC/id DESC; count/page en RepeatableRead. Detail usa consultas
+acotadas sin N+1. HealthcareCaseDispatchModule importa sólo PrismaModule.
+
+Validación local:
+
+- Focal HTTP/JWT, parser/mapping, reads/repository y RBAC: **130/130**, 3 suites PASS.
+- Full API: **2035/2035**, 121 suites PASS.
+- PostgreSQL16 estructural: **59/59 PASS**; 42 migraciones aplicadas en DB nueva.
+  Último target: `127.0.0.1:58070/zaping_case_dispatch_persistence_test`;
+  loopback, contenedor nuevo, tmpfs sin volumen existente, rol no superusuario.
+  Cleanup del contenedor/tmpfs: PASS. Ninguna DB dev/QA/producción utilizada.
+- Typecheck del repositorio, noEmit focal de archivos 01A, lint, build, Prisma
+  format/validate, Prettier/check y git diff --check: PASS.
+- El noEmit adicional de todas las specs encuentra diagnósticos en suites ajenas
+  a los archivos modificados; no sustituye el typecheck oficial ni el noEmit focal.
+- Prisma generate estándar encontró EPERM de DLL Windows. Generación alternativa
+  completada; SHA-256 de motor existente/generado idéntico:
+  `263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
+  Cliente actualizado conservando esa DLL. Sin cambios compartidos Web; no se requiere gate Web.
+
+HC-DSP-01B: **BLOCKED until 01A merge**. HC-DSP-01C: **BLOCKED**.
+CASE DISPATCH PHYSICAL CONFIRMATION: **NOT IMPLEMENTED**.
+PRODUCTIVE EQUIPMENT CUSTODY: **NOT ENABLED**. RETURN: **NOT IMPLEMENTED**.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.

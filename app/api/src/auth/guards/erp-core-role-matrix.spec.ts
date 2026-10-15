@@ -1,3 +1,4 @@
+import { HealthcareCaseDispatchesController } from '../../healthcare/case-dispatches/healthcare-case-dispatches.controller';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import {
   GUARDS_METADATA,
@@ -51,6 +52,10 @@ const allRoles = [
 ];
 
 const roleMatrix: RoleMatrix[] = [
+  {
+    controller: HealthcareCaseDispatchesController,
+    methods: { list: allRoles, detail: allRoles },
+  },
   {
     controller: CustomersController,
     methods: {
