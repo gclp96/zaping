@@ -8,6 +8,7 @@ import {
 
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { EquipmentProvisioningService } from './equipment-provisioning.service';
+import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
 
 type PurchaseReceiptItemFindFirstArgs = {
   where: {
@@ -38,6 +39,11 @@ describe('EquipmentProvisioningService', () => {
   let service: EquipmentProvisioningService;
 
   const companyId = '699baaae-2718-4d96-8683-8a2cf12bfe55';
+  const actorId = 'f6c503b4-82db-4e21-b2ce-f7cc9e13f021';
+  const history = {
+    requireReceiptActor: jest.fn(),
+    initializeReceipt: jest.fn(),
+  };
   const otherCompanyId = '64af248f-8081-4407-91f5-8d545749d7f4';
   const productId = '953a950f-b33a-4ff5-85ac-4ff35b8f3017';
   const purchaseReceiptItemId = 'c2ed4313-b240-4f13-a83c-e5218710f56a';
@@ -98,9 +104,19 @@ describe('EquipmentProvisioningService', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    history.requireReceiptActor.mockResolvedValue(actorId);
+    history.initializeReceipt.mockImplementation(
+      (_tx: unknown, asset: Record<string, unknown>) =>
+        Promise.resolve({
+          ...asset,
+          physicalLocation: 'WAREHOUSE',
+          physicalRevision: 1,
+        }),
+    );
 
     service = new EquipmentProvisioningService(
       equipmentAssetCodeServiceMock as unknown as EquipmentAssetCodeService,
+      history as unknown as EquipmentPhysicalHistoryService,
     );
 
     txMock.purchaseReceiptItem.findFirst.mockResolvedValue(buildReceiptItem());
@@ -125,6 +141,7 @@ describe('EquipmentProvisioningService', () => {
         txMock as never,
         companyId,
         purchaseReceiptItemId,
+        actorId,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
 
@@ -142,6 +159,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(result).toHaveLength(1);
@@ -164,6 +182,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(result).toHaveLength(3);
@@ -181,6 +200,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(txMock.equipmentAsset.create).toHaveBeenCalledTimes(3);
@@ -202,6 +222,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(getCreateData(0).assetCode).toBe('EQ-000018');
@@ -214,6 +235,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(
@@ -226,6 +248,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(getCreateData()).toEqual(
@@ -242,6 +265,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(getCreateData()).toEqual(
@@ -263,6 +287,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     for (const call of txMock.equipmentAsset.create.mock.calls as [
@@ -277,6 +302,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(getCreateData().batchId).toBe(batchId);
@@ -293,6 +319,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(getCreateData().batchId).toBeNull();
@@ -309,6 +336,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(result).toEqual([]);
@@ -329,6 +357,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(result).toEqual([]);
@@ -346,6 +375,7 @@ describe('EquipmentProvisioningService', () => {
         txMock as never,
         otherCompanyId,
         purchaseReceiptItemId,
+        actorId,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
 
@@ -377,6 +407,7 @@ describe('EquipmentProvisioningService', () => {
         txMock as never,
         companyId,
         purchaseReceiptItemId,
+        actorId,
       ),
     ).rejects.toThrow('create failed');
 
@@ -391,6 +422,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(txMock.$transaction).not.toHaveBeenCalled();
@@ -407,6 +439,7 @@ describe('EquipmentProvisioningService', () => {
       txMock as never,
       companyId,
       purchaseReceiptItemId,
+      actorId,
     );
 
     expect(result).toHaveLength(1);

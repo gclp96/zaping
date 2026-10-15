@@ -238,6 +238,21 @@ enum IdempotencyScope {
   HEALTHCARE_CASE_KIT_CONFIRM_PREPARATION
 }
 
+enum EquipmentPhysicalLocation {
+  UNVERIFIED
+  WAREHOUSE
+  CUSTODY
+}
+
+enum EquipmentPhysicalOperation {
+  BASELINE_RECONCILIATION
+  RECEIPT_INITIALIZATION
+  CUSTODY_OPEN
+  CUSTODY_CLOSE
+  CONDITION_CHANGE
+  LIFECYCLE_CHANGE
+}
+
 enum EquipmentLifecycle {
   ACTIVE
   RETIRED
@@ -436,6 +451,9 @@ model PurchaseReceiptItem {
 }
 
 model Company {
+  equipmentAssetCustodies      EquipmentAssetCustody[]
+  equipmentAssetPhysicalEvents EquipmentAssetPhysicalEvent[]
+
   inventoryCutover InventoryCutover?
 
   id                                    String                                          @id @default(uuid())
@@ -560,6 +578,10 @@ enum HealthcareCaseKitItemLifecycle {
 }
 
 model User {
+  openedEquipmentCustodies     EquipmentAssetCustody[]       @relation("EquipmentCustodyOpenedBy")
+  closedEquipmentCustodies     EquipmentAssetCustody[]       @relation("EquipmentCustodyClosedBy")
+  equipmentAssetPhysicalEvents EquipmentAssetPhysicalEvent[] @relation("EquipmentPhysicalEventActor")
+
   initiatedInventoryCutovers InventoryCutover[] @relation("InventoryCutoverInitiator")
   approvedInventoryCutovers  InventoryCutover[] @relation("InventoryCutoverApprover")
   activatedInventoryCutovers InventoryCutover[] @relation("InventoryCutoverActivator")
@@ -708,6 +730,8 @@ model HealthcareDoctorHospitalAffiliation {
 }
 
 model HealthcareCase {
+  equipmentAssetCustodies EquipmentAssetCustody[]
+
   id         String  @id @default(uuid())
   companyId  String
   doctorId   String?
@@ -801,6 +825,13 @@ model HealthcareCaseRequirement {
 }
 
 model EquipmentAsset {
+  physicalLocation EquipmentPhysicalLocation     @default(UNVERIFIED)
+  physicalRevision Int                           @default(0)
+  activeCustodyId  String?
+  custodyEpisodes  EquipmentAssetCustody[]       @relation("EquipmentCustodyAsset")
+  activeCustody    EquipmentAssetCustody?        @relation("EquipmentActiveCustody", fields: [activeCustodyId, companyId, id], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  physicalEvents   EquipmentAssetPhysicalEvent[] @relation("EquipmentPhysicalEventAsset")
+
   id        String @id @default(uuid())
   companyId String
   productId String
@@ -842,6 +873,8 @@ model EquipmentAsset {
   @@unique([id, companyId])
   @@unique([companyId, assetCode])
   @@unique([companyId, productId, serialNumberKey])
+  @@index([companyId, physicalLocation])
+  @@index([activeCustodyId])
   @@index([companyId, productId])
   @@index([companyId, serialNumberKey])
   @@index([companyId, lifecycle])
@@ -852,6 +885,8 @@ model EquipmentAsset {
 }
 
 model HealthcareEquipmentAssignment {
+  equipmentAssetCustodies EquipmentAssetCustody[]
+
   id               String  @id @default(uuid())
   companyId        String
   caseId           String
@@ -894,6 +929,7 @@ model HealthcareEquipmentAssignment {
   conflictingAssignmentReviews HealthcareEquipmentAssignmentConflictOverride[] @relation("HealthcareEquipmentConflictingAssignmentOverride")
   caseKitItems                 HealthcareCaseKitItem[]
 
+  @@unique([id, companyId, caseId, equipmentAssetId], map: "HealthcareEquipmentAssignment_custody_identity_key")
   @@unique([id, companyId])
   @@unique([id, companyId, caseId])
   @@unique([companyId, replacesAssignmentId])
@@ -1284,4 +1320,66 @@ model InventoryCutoverLegacySale {
   @@id([cutoverId, saleId])
   @@index([companyId, saleId])
   @@index([quoteId, companyId])
+}
+
+model EquipmentAssetCustody {
+  id               String                        @id @default(uuid())
+  companyId        String
+  equipmentAssetId String
+  caseId           String
+  assignmentId     String
+  openedAt         DateTime                      @default(now())
+  openedById       String
+  closedAt         DateTime?
+  closedById       String?
+  company          Company                       @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  asset            EquipmentAsset                @relation("EquipmentCustodyAsset", fields: [equipmentAssetId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  healthcareCase   HealthcareCase                @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  assignment       HealthcareEquipmentAssignment @relation(fields: [assignmentId, companyId, caseId, equipmentAssetId], references: [id, companyId, caseId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  openedBy         User                          @relation("EquipmentCustodyOpenedBy", fields: [openedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  closedBy         User?                         @relation("EquipmentCustodyClosedBy", fields: [closedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  activeForAssets  EquipmentAsset[]              @relation("EquipmentActiveCustody")
+  physicalEvents   EquipmentAssetPhysicalEvent[] @relation("EquipmentPhysicalEventCustody")
+
+  @@unique([id, companyId, equipmentAssetId], map: "EquipmentAssetCustody_identity_key")
+  @@index([companyId, caseId, openedAt, id])
+  @@index([companyId, assignmentId])
+  @@index([companyId, equipmentAssetId, openedAt, id])
+}
+
+model EquipmentAssetPhysicalEvent {
+  id                     String                     @id @default(uuid())
+  companyId              String
+  equipmentAssetId       String
+  custodyId              String?
+  operation              EquipmentPhysicalOperation
+  originType             String                     @db.VarChar(64)
+  originId               String                     @db.VarChar(128)
+  originOperation        String                     @db.VarChar(64)
+  hashVersion            Int                        @default(1)
+  requestHash            String                     @db.Char(64)
+  physicalLocationBefore EquipmentPhysicalLocation
+  physicalLocationAfter  EquipmentPhysicalLocation
+  conditionBefore        EquipmentCondition
+  conditionAfter         EquipmentCondition
+  lifecycleBefore        EquipmentLifecycle
+  lifecycleAfter         EquipmentLifecycle
+  revisionBefore         Int
+  revisionAfter          Int
+  actorId                String?
+  reasonCode             String                     @db.VarChar(64)
+  reason                 String?                    @db.VarChar(1000)
+  operatorIdentity       String?                    @db.VarChar(128)
+  evidenceReference      String?                    @db.VarChar(1024)
+  evidenceHash           String?                    @db.Char(64)
+  createdAt              DateTime                   @default(now())
+  company                Company                    @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  asset                  EquipmentAsset             @relation("EquipmentPhysicalEventAsset", fields: [equipmentAssetId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  custody                EquipmentAssetCustody?     @relation("EquipmentPhysicalEventCustody", fields: [custodyId, companyId, equipmentAssetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  actor                  User?                      @relation("EquipmentPhysicalEventActor", fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, equipmentAssetId, originType, originId, originOperation], map: "EquipmentAssetPhysicalEvent_origin_key")
+  @@unique([companyId, equipmentAssetId, revisionAfter], map: "EquipmentAssetPhysicalEvent_revision_key")
+  @@index([companyId, equipmentAssetId, createdAt, id])
+  @@index([companyId, custodyId])
 }

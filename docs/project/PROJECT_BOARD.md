@@ -8,9 +8,16 @@ Responsable: Zaping Team
 
 0. Snapshot vigente
 
+01E-A IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
+Focal118/118; PostgreSQL23/23 en DB nueva efímera; full API1948/117 suites; Web87/5 archivos PASS.
+Persistencia/eventos/baseline interno y Receipt ASSET inicializado; manual UNVERIFIED/0.
+Sin cambio Assignment/Availability/Inspection/Retirement; 01E-B BLOCKED hasta aceptación/merge01E-A.
+Sin reconciliación real ni custodia productiva; M-HC1 OPEN. Detalle y limitación generate DLL en el diseño01E.
+
+
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
-IMPLEMENTATION: NOT STARTED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
-01E-A: READY — TARGET 5 SP — inicio después del merge del Technical Design.
+IMPLEMENTATION: PARTIAL — 01E-A IMPLEMENTED / TESTED; 01E-B NOT STARTED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
+01E-A: IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
 01E-B: BLOCKED BY 01E-A — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
 EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
 Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
@@ -39,8 +46,8 @@ fundamento dormido; los writers/readers productivos conservan su comportamiento.
 | HC-INVENTORY-CUSTODY-01D-A — Durable Cutover Control & Legacy Classification Foundation     | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
 | HC-INVENTORY-CUSTODY-01D-B — Reconciliation, Opening Baseline & Verification                | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
 | HC-INVENTORY-CUSTODY-01D-C — Authority Cutover, Writer Wiring & Operational Activation      | 8 SP              | COMPLETE / MERGED — PR #84 — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
-| HC-INVENTORY-CUSTODY-01E — EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: NOT STARTED |
-| HC-INVENTORY-CUSTODY-01E-A — Persistence, invariants, baseline & physical history | 5 SP | READY — inicio después del merge del Technical Design |
+| HC-INVENTORY-CUSTODY-01E — EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A IMPLEMENTED / TESTED; 01E-B BLOCKED |
+| HC-INVENTORY-CUSTODY-01E-A — Persistence, invariants, baseline & physical history | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
 | HC-INVENTORY-CUSTODY-01E-B — Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01E-A |
 
 DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
@@ -84,7 +91,7 @@ SERIALIZED sin nueva integración física. Proyecciones compartidas y replay at�
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
 01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
-01E TECHNICAL DESIGN APPROVED; 01E-A READY tras merge del diseño, 01E-B BLOCKED BY 01E-A. HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
+01E TECHNICAL DESIGN APPROVED; 01E-A IMPLEMENTED / TESTED, pending human review/merge, 01E-B BLOCKED BY 01E-A. HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
 Evidencia del cierre histórico01B, anterior al wiring01D-C: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -141,7 +148,7 @@ Manifest externo seguro, no Git real por defecto; operador técnico separado del
 Certificación KNOWN WRITERS=COMPLETE / UNKNOWN WRITERS=0 y freeze tenant demostrado
 o GLOBAL APPLICATION WRITE FREEZE son gates. OPTIONAL inaccesible/ambiguo, discrepancias,
 UNKNOWN legacy, parity/idempotency/tenant/barrier fallidos bloquean toda Company.
-01A/01B/01C DORMANT;01E no requiere activar01D; 01E-A READY tras merge TD; 01E-B BLOCKED BY 01E-A;M-HC1 OPEN.
+01A/01B/01C DORMANT;01E no requiere activar01D; 01E-A IMPLEMENTED / TESTED, pending human review/merge; 01E-B BLOCKED BY 01E-A;M-HC1 OPEN.
 01D-A: schema-only migration, CAS/checkpoints/membership/classifier/resolver internos implementados.
 Al cierre histórico01D-A no incluía reconciliation/APPLY/VERIFY.01D-B los añade internamente, sin activación/routing productivo.
 Validación histórica01D-A: full API1896 tests/113 suites PASS; PostgreSQL16/16 PASS en contenedor nuevo
@@ -161,7 +168,7 @@ loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APP
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
 Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Siguiente acción: revisión documental01E → staging selectivo → commit → PR de diseño; después del merge, implementación01E-A.
+Siguiente acción: revisión humana01E-A → staging selectivo → commit → PR; 01E-B BLOCKED hasta aceptación/merge01E-A.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice                                           | TARGET | Estado                                            |

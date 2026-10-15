@@ -1621,6 +1621,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       createdReceiptItemId,
+      userId,
       undefined,
     );
     expect(
@@ -1805,6 +1806,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       firstReceiptItemId,
+      userId,
       undefined,
     );
     expect(
@@ -1814,6 +1816,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       secondReceiptItemId,
+      userId,
       undefined,
     );
     expect(transactionClient.product.update).toHaveBeenCalledTimes(2);
@@ -1914,6 +1917,7 @@ describe('PurchaseReceiptsService', () => {
         transactionClient,
         companyId,
         createdReceiptItemId,
+        userId,
         undefined,
       );
       expect(transactionClient.product.update).toHaveBeenCalledTimes(1);
@@ -2014,6 +2018,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       createdReceiptItemId,
+      userId,
       undefined,
     );
     expect(transactionClient.product.update).not.toHaveBeenCalled();
@@ -2174,6 +2179,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       createdReceiptItemId,
+      userId,
       undefined,
     );
 

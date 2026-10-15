@@ -285,6 +285,7 @@ export class ReceiptPhysicalIntegrationService {
           tx,
           companyId,
           i.id,
+          actorId,
           prepared.get(i.purchaseItemId),
         );
       const update = await tx.product.updateMany({

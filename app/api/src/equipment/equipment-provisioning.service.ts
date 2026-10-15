@@ -9,11 +9,14 @@ import {
 } from '@prisma/client';
 
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
+import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
+import { equipmentPhysicalFailure } from './equipment-physical.contract';
 
 @Injectable()
 export class EquipmentProvisioningService {
   constructor(
     private readonly equipmentAssetCodeService: EquipmentAssetCodeService,
+    private readonly physicalHistory: EquipmentPhysicalHistoryService = new EquipmentPhysicalHistoryService(),
   ) {}
 
   // Dormant Receipt can reserve codes before acquiring Product roots.
@@ -38,6 +41,7 @@ export class EquipmentProvisioningService {
     tx: Prisma.TransactionClient,
     companyId: string,
     purchaseReceiptItemId: string,
+    actorId?: string,
     preparedCodes?: string[],
   ): Promise<EquipmentAsset[]> {
     const receiptItem = await tx.purchaseReceiptItem.findFirst({
@@ -68,6 +72,12 @@ export class EquipmentProvisioningService {
       return [];
     }
 
+    const authenticatedActor = await this.physicalHistory.requireReceiptActor(
+      tx,
+      companyId,
+      actorId,
+    );
+
     const equipmentAssets: EquipmentAsset[] = [];
 
     if (
@@ -97,10 +107,24 @@ export class EquipmentProvisioningService {
           origin: EquipmentOrigin.PURCHASE_RECEIPT,
           purchaseReceiptItemId: receiptItem.id,
           batchId: receiptItem.batchId,
+          physicalLocation: 'UNVERIFIED',
+          physicalRevision: 0,
+          activeCustodyId: null,
         },
       });
 
-      equipmentAssets.push(equipmentAsset);
+      try {
+        equipmentAssets.push(
+          await this.physicalHistory.initializeReceipt(
+            tx,
+            equipmentAsset,
+            receiptItem.id,
+            authenticatedActor,
+          ),
+        );
+      } catch (error) {
+        equipmentPhysicalFailure(error);
+      }
     }
 
     return equipmentAssets;

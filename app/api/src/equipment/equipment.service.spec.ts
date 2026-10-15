@@ -18,6 +18,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { EquipmentService } from './equipment.service';
+import { equipmentPhysicalPublicOmit } from './equipment-physical.contract';
 
 describe('EquipmentService', () => {
   let service: EquipmentService;
@@ -116,6 +117,7 @@ describe('EquipmentService', () => {
     expect(result).toEqual(equipment);
 
     expect(prismaMock.equipmentAsset.findMany).toHaveBeenCalledWith({
+      omit: equipmentPhysicalPublicOmit,
       where: {
         companyId,
       },
@@ -172,6 +174,7 @@ describe('EquipmentService', () => {
     expect(result).toEqual(createdEquipment);
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId,
         productId,
@@ -219,6 +222,7 @@ describe('EquipmentService', () => {
     });
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId,
         productId,
@@ -263,6 +267,7 @@ describe('EquipmentService', () => {
     });
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenNthCalledWith(1, {
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId,
         productId,
@@ -280,6 +285,7 @@ describe('EquipmentService', () => {
     });
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenNthCalledWith(2, {
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId: otherCompanyId,
         productId,
@@ -399,6 +405,7 @@ describe('EquipmentService', () => {
     });
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId,
         productId,
@@ -455,6 +462,7 @@ describe('EquipmentService', () => {
     });
 
     expect(prismaMock.equipmentAsset.create).toHaveBeenCalledWith({
+      omit: equipmentPhysicalPublicOmit,
       data: {
         companyId,
         productId,
