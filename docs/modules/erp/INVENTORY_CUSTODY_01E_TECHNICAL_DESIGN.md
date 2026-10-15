@@ -1,20 +1,21 @@
 # HC-INVENTORY-CUSTODY-01E — EquipmentAsset Custody Integration
 
-TECHNICAL DESIGN: APPROVED
-IMPLEMENTATION: NOT STARTED
+TECHNICAL DESIGN: APPROVED / MERGED — PR #85
+IMPLEMENTATION: 01E-A IMPLEMENTED / TESTED — pending human review/merge; 01E-B NOT STARTED.
 
 Baseline: `77a83539dc3a2069bf0b3085cbd6f32e55fffb79`.
 Rama: `feat/hc-inventory-custody-01e-equipment-custody`.
 Autoridad: aprobación humana del Technical Design Approval Delta 01E.
-Las decisiones de este documento están APPROVED; no autorizan implementación en este delta.
+Las decisiones están APPROVED / MERGED. El cierre local01E-A figura al final;
+la implementación01E-B y la adopción operativa siguen pendientes.
 
 | Slice                      | Alcance                                                                     | TARGET        | Estado                                                   |
 | -------------------------- | --------------------------------------------------------------------------- | ------------- | -------------------------------------------------------- |
-| HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history                        | 5 SP          | READY — después del merge de este Technical Design       |
+| HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history                        | 5 SP          | IMPLEMENTED / TESTED — pending human review/merge       |
 | HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP          | BLOCKED BY HC-INVENTORY-CUSTODY-01E-A                    |
-| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED — IMPLEMENTATION: NOT STARTED |
+| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A IMPLEMENTED / TESTED; 01E-B BLOCKED |
 
-01E-A: READY — TARGET 5 SP, con gate de inicio: Technical Design merged.
+01E-A: IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP. Technical Design MERGED — PR #85.
 01E-B: BLOCKED BY 01E-A — TARGET 8 SP. El TARGET anterior de 8 SP para 01E
 queda sustituido por el split humano aprobado de 13 SP. Sólo planificación TARGET;
 sin Forecast, Commitment, Actual ni fechas asignadas.
@@ -179,7 +180,8 @@ atomicidad, actor, origen, idempotencia y audit, con persistencia especializada.
 
 ## Migración, baseline y adopción
 
-La implementación requerirá migración; este delta no la crea ni ejecuta.
+Las dos migraciones01E-A están implementadas y validadas sólo en PostgreSQL efímero;
+su detalle y límites están en el cierre local al final del documento.
 EquipmentAssets existentes comienzan physicalLocation = UNVERIFIED, conservando
 condition, lifecycle, serial, origin, batch y provenance Receipt.
 
@@ -248,14 +250,14 @@ y barreras explícitas: reserve vs custody; Replace vs custody; dos claims mismo
 Asset; stale revision; retirement vs custody; inspection/damaged vs custody;
 duplicate replay; FKs tenant-safe; rollback atómico; PREPARED sin fake custody;
 provisioning Receipt sin inversión. Adapters de fixture sólo en tests; ninguno
-permisivo productivo. No actividad DB en este delta documental.
+permisivo productivo. La ejecución01E-A se limita a la DB efímera descrita abajo.
 
 ## Cierre de aprobación
 
-TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: NOT STARTED.
-01E-A: READY — TARGET 5 SP — inicio después de Technical Design merge.
+TECHNICAL DESIGN: APPROVED / MERGED — PR #85. 01E-A IMPLEMENTED / TESTED — pending human review/merge; 01E-B NOT STARTED.
+01E-A: IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
 01E-B: BLOCKED BY 01E-A — TARGET 8 SP. TOTAL TARGET: 13 SP.
-M-HC1 OPEN. Sin migraciones, cambios de código, staging, commit ni push.
+M-HC1 OPEN. Este cierre conserva sin staging/commit/push los cambios locales descritos abajo.
 
 Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
 [01D Technical Design](INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md),
@@ -263,3 +265,63 @@ Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
 [CaseKit](../healthcare/CASE_KITS.md),
 [Dispatch contract](../healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract),
 [Project Board](../../project/PROJECT_BOARD.md).
+
+
+## Implementación local 01E-A y evidencia de validación
+
+01E-A IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
+Baseline de implementación: `4e491fdbda5ca6d41d24ed5d4c41fe15058256a8`, rama
+`feat/hc-inventory-custody-01e-a-equipment-physical-foundation`.
+01E-B BLOCKED hasta aceptación/merge01E-A; TOTAL01E TARGET13SP conservado.
+
+- EquipmentAsset añade physicalLocation UNVERIFIED por defecto, physicalRevision0
+  y activeCustodyId nullable; AVAILABLE no se persiste. Custody con FKs compuestas
+  Company/Asset/Case/Assignment/actor y UNIQUE parcial de episodio abierto.
+- PhysicalEvent dedicado: origen/hash v1, revisión consecutiva, actor/evidencia,
+  snapshots independientes y protección DB append-only UPDATE/DELETE/TRUNCATE.
+  No ACL de roles hardcodeada en migraciones.
+- Dos migraciones: `20261015000000_equipment_physical_foundation` y
+  `20261015000100_equipment_custody_coherence`. La segunda sólo valida estructura
+  puntero/episodio al commit; no consulta estado empresarial, agenda ni permisos.
+  No endurecimiento de FKs históricas Product/Batch/ReceiptItem/retiredBy.
+- Baseline interno + CLI single-Asset, sin --all, HTTP ni startup automático.
+  Campos explícitos Company/Asset/reconciliationId/revisión/target WAREHOUSE,
+  operador y referencia/hash de evidencia; actor de negocio opcional sólo baseline.
+  READ COMMITTED → HC lock/timeouts → Asset lock → replay/evidencia → CAS0→1/evento.
+  El adapter cerrado rechaza por defecto. Sólo configuración privilegiada
+  `EQUIPMENT_BASELINE_EVIDENCE_ADAPTER_PATH` absoluta puede cargar una factory
+  `createEquipmentBaselineEvidenceAdapter`; nunca se toma código de CLI/evidencia.
+  La factory debe autenticar prueba externa real y su binding al comando.
+- Receipt propaga actor en ambos callers; inicializa identidades ASSET nuevas a
+  WAREHOUSE + INSPECTION_PENDING/rev1 con un evento por Asset dentro de su tx,
+  sin HC lock adicional, nested transaction ni InventoryPhysicalEffect. Replay
+  histórico no crea identidades/eventos retroactivos. Manual conserva UNVERIFIED/0.
+- Proyección omit explícita conserva respuestas Equipment públicas. Availability,
+  Assignment, Replace, Coverage y CaseKit no cambian. Inspection/Retirement siguen
+  sin integración de physicalRevision: 01E-B es dueño de ese wiring. No afirmar
+  cobertura global de revisión física ni custody productiva en01E-A.
+
+Validación: focal118/118 en5 suites; PostgreSQL23/23; full API1948/1948 en117 suites;
+Web Equipment/Receipts87/87 en5 archivos. Typecheck productivo, noEmit tocado, lint
+completo, build, Prisma format/validate, Prettier y git diff --check PASS.
+Generate estándar encontró EPERM al reemplazar DLL Windows ocupada, también fuera
+del sandbox. Generate en destino nuevo PASS; cliente actualizado conservando DLL
+existente tras comprobar SHA-256 idéntico
+`263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
+No se detuvieron procesos ajenos ni se afirma éxito del reemplazo estándar de DLL.
+
+Aceptación: PostgreSQL16 nuevo loopback/tmpfs, DB vacía verificada;39 migraciones
+base → ocho Assets históricos ACTIVE/RETIRED × cuatro conditions y hechos RESERVED/
+PREPARED → dos migraciones nuevas → snapshot histórico conservado y cero eventos
+ficticios. Target de aceptación funcional `127.0.0.1:52779/zaping_equipment_physical_test`, run
+`618714df-e00c-423a-ad43-da311fe4c3d2`; rol runtime no superuser. Barreras explícitas
+y conexiones independientes acreditan arbitraje de custodia/origen/revisión,
+baseline concurrente, rollback y Receipt completando mientras HC lock está retenido.
+Cleanup de fixtures/contenedor/tmpfs y archivos temporales task-owned PASS.
+Runner: `node test/helpers/equipment-physical-foundation-postgres-runner.cjs --run-isolated`.
+Primera corrida se detuvo en un fixture histórico CaseKit; corregido antes del
+resultado23/23; su cleanup también PASS. Sin DB dev/QA/prod/prior-task; .env intacto.
+
+REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED.
+01D IMPLEMENTATION COMPLETE / MERGED; REAL COMPANY CUTOVER NOT EXECUTED;
+EXTERNAL OPERATIONAL FENCE NOT CERTIFIED. M-HC1 OPEN.

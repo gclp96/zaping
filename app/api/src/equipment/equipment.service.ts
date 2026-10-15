@@ -21,6 +21,7 @@ import { CreateEquipmentInspectionDto } from './dto/create-equipment-inspection.
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { RetireEquipmentDto } from './dto/retire-equipment.dto';
+import { equipmentPhysicalPublicOmit } from './equipment-physical.contract';
 
 @Injectable()
 export class EquipmentService {
@@ -31,6 +32,7 @@ export class EquipmentService {
 
   async findAll(companyId: string) {
     return this.prisma.equipmentAsset.findMany({
+      omit: equipmentPhysicalPublicOmit,
       where: {
         companyId,
       },
@@ -46,6 +48,7 @@ export class EquipmentService {
 
   async findOne(companyId: string, equipmentId: string) {
     const equipment = await this.prisma.equipmentAsset.findFirst({
+      omit: equipmentPhysicalPublicOmit,
       where: {
         id: equipmentId,
         companyId,
@@ -134,6 +137,7 @@ export class EquipmentService {
 
       try {
         return await tx.equipmentAsset.create({
+          omit: equipmentPhysicalPublicOmit,
           data: {
             companyId,
             productId: dto.productId,
@@ -358,6 +362,7 @@ export class EquipmentService {
       }
 
       const retiredEquipment = await tx.equipmentAsset.findFirst({
+        omit: equipmentPhysicalPublicOmit,
         where: {
           id: equipment.id,
           companyId,

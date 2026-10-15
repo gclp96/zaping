@@ -301,6 +301,7 @@ export class PurchaseReceiptsService {
             tx,
             companyId,
             createdReceiptItem.id,
+            receivedBy,
             codes.get(item.purchaseItemId),
           );
 

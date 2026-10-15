@@ -8,6 +8,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { EquipmentAvailabilityService } from './equipment-availability.service';
 import { EquipmentProvisioningService } from './equipment-provisioning.service';
+import { EquipmentPhysicalRepository } from './equipment-physical.repository';
+import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
 
 @Module({
   imports: [CompanySequencesModule],
@@ -17,6 +19,8 @@ import { EquipmentProvisioningService } from './equipment-provisioning.service';
     EquipmentAssetCodeService,
     EquipmentAvailabilityService,
     EquipmentProvisioningService,
+    EquipmentPhysicalRepository,
+    EquipmentPhysicalHistoryService,
     PrismaService,
   ],
   exports: [EquipmentProvisioningService],
