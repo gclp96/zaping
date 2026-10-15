@@ -91,6 +91,23 @@ export class HealthcareCaseDispatchCommandRepository {
       Prisma.sql`SELECT id FROM ${Prisma.raw('"' + table + '"')} WHERE "companyId"=${companyId} AND id IN (${Prisma.join([...new Set(ids)].sort())}) ORDER BY id ${Prisma.raw(exclusive ? 'FOR UPDATE' : 'FOR SHARE')}`,
     );
   }
+  lockCaseForShare(companyId: string, caseId: string, tx: Tx) {
+    return this.lockSources('HealthcareCase', [caseId], companyId, tx);
+  }
+  async lockProductForKeyShare(companyId: string, productId: string, tx: Tx) {
+    await tx.$queryRaw`SELECT id FROM "Product" WHERE "companyId"=${companyId} AND id=${productId} FOR KEY SHARE`;
+  }
+  lockAssetsForShare(companyId: string, ids: string[], tx: Tx) {
+    return this.lockSources('EquipmentAsset', ids, companyId, tx);
+  }
+  lockAssignmentsForShare(companyId: string, ids: string[], tx: Tx) {
+    return this.lockSources(
+      'HealthcareEquipmentAssignment',
+      ids,
+      companyId,
+      tx,
+    );
+  }
   findIdentity(c: DispatchCommandContext, tx: Tx) {
     return tx.healthcareCaseDispatch.findFirst({
       where: { id: c.dispatchId, companyId: c.companyId, caseId: c.caseId },
@@ -148,20 +165,6 @@ export class HealthcareCaseDispatchCommandRepository {
       tx,
     );
     await this.lockSources(
-      'HealthcareCaseRequirement',
-      kit.healthcareCase.requirements.map((r) => r.id),
-      c.companyId,
-      tx,
-    );
-    await this.lockSources(
-      'HealthcareEquipmentAssignment',
-      active.flatMap((i) =>
-        i.equipmentAssignmentId ? [i.equipmentAssignmentId] : [],
-      ),
-      c.companyId,
-      tx,
-    );
-    await this.lockSources(
       'Product',
       active.flatMap((i) =>
         i.requirement
@@ -173,12 +176,24 @@ export class HealthcareCaseDispatchCommandRepository {
       c.companyId,
       tx,
     );
-    await this.lockSources(
-      'EquipmentAsset',
+    await this.lockAssetsForShare(
+      c.companyId,
       active.flatMap((i) =>
         i.equipmentAssignment ? [i.equipmentAssignment.equipmentAsset.id] : [],
       ),
+      tx,
+    );
+    await this.lockSources(
+      'HealthcareCaseRequirement',
+      kit.healthcareCase.requirements.map((r) => r.id),
       c.companyId,
+      tx,
+    );
+    await this.lockAssignmentsForShare(
+      c.companyId,
+      active.flatMap((i) =>
+        i.equipmentAssignmentId ? [i.equipmentAssignmentId] : [],
+      ),
       tx,
     );
   }

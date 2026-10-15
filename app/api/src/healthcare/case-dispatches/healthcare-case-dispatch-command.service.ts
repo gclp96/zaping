@@ -209,13 +209,7 @@ export class HealthcareCaseDispatchCommandService {
     return u;
   }
   private async planning(c: DispatchCommandContext, tx: Tx) {
-    await this.repo.lockSources(
-      'HealthcareCase',
-      [c.caseId],
-      c.companyId,
-      tx,
-      true,
-    );
+    await this.repo.lockCaseForShare(c.companyId, c.caseId, tx);
     const parent = await this.repo.findCase(c, tx);
     if (!parent) throw caseNotFoundException();
     let kit = await this.repo.findKit(c, tx);
@@ -250,8 +244,12 @@ export class HealthcareCaseDispatchCommandService {
     if (i.operation === 'CREATE') {
       let kit = await this.planning(c, tx);
       this.assertPlanning(kit);
+      const discovered = this.readinessBindings(kit);
       await this.repo.lockReadiness(kit, c, tx);
       kit = (await this.repo.findKit(c, tx))!;
+      if (!kit || this.readinessBindings(kit) !== discovered)
+        throw resourceStateChangedException();
+      this.assertPlanning(kit);
       const readiness = evaluateHealthcareCaseKitReadiness(kit);
       if (readiness.status !== 'PASS')
         throw caseKitPreparationBlockedException(readiness.blockers);
@@ -474,31 +472,36 @@ export class HealthcareCaseDispatchCommandService {
     }
     if (!source.equipmentAssignment || source.requirementId)
       invalidDispatchSource();
-    await this.repo.lockSources(
-      'HealthcareEquipmentAssignment',
-      [source.equipmentAssignment.id],
+    // Discovery is only a lock-set hint. Never authorize from this snapshot or
+    // acquire a different physical root after the canonical locks below.
+    const discoveredAssignment = source.equipmentAssignment;
+    const before = await this.repo.findAsset(
       c.companyId,
+      discoveredAssignment.equipmentAssetId,
+      tx,
+    );
+    if (!before) invalidDispatchSource();
+    await this.repo.lockProductForKeyShare(c.companyId, before.productId, tx);
+    await this.repo.lockAssetsForShare(c.companyId, [before.id], tx);
+    await this.repo.lockAssignmentsForShare(
+      c.companyId,
+      [discoveredAssignment.id],
       tx,
     );
     source = (await this.repo.findSource(c, kitId, d.sourceCaseKitItemId, tx))!;
-    const assignment = source.equipmentAssignment;
+    const assignment = source?.equipmentAssignment;
     if (
+      !source ||
+      source.lifecycle !== 'ACTIVE' ||
+      source.requirementId ||
       !assignment ||
+      assignment.id !== discoveredAssignment.id ||
+      assignment.equipmentAssetId !== before.id ||
       assignment.lifecycle !== 'RESERVED' ||
       assignment.companyId !== c.companyId ||
       assignment.caseId !== c.caseId
     )
       invalidDispatchSource();
-    // Asset identity is read first without a lock solely to discover Product; all
-    // authoritative facts are reread after Product -> Asset locks.
-    const before = await this.repo.findAsset(
-      c.companyId,
-      assignment.equipmentAssetId,
-      tx,
-    );
-    if (!before) invalidDispatchSource();
-    await this.repo.lockSources('Product', [before.productId], c.companyId, tx);
-    await this.repo.lockSources('EquipmentAsset', [before.id], c.companyId, tx);
     const asset = await this.repo.findAsset(c.companyId, before.id, tx),
       product = await this.repo.findProduct(c.companyId, before.productId, tx);
     if (
@@ -509,6 +512,21 @@ export class HealthcareCaseDispatchCommandService {
       product.inventoryTracking !== 'ASSET'
     )
       invalidDispatchSource();
+    const currentKit = await this.repo.findKit(c, tx);
+    if (!currentKit || currentKit.id !== kitId) invalidDispatchSource();
+    this.assertPlanning(currentKit);
+    // This root is already held FOR UPDATE by mutate(); rereading cannot add a
+    // new lock dependency and keeps every admission fact after physical locks.
+    const currentRoot = await this.repo.lockDraftById(c, tx);
+    if (!currentRoot) dispatchMissing();
+    if (currentRoot.revision !== d.expectedRevision)
+      throw resourceStateChangedException();
+    if (currentRoot.status !== 'DRAFT')
+      dispatchConflict(
+        'CASE_DISPATCH_NOT_MUTABLE',
+        'El despacho no admite cambios',
+      );
+    if (currentRoot.caseKitId !== kitId) invalidDispatchSource();
     const eligibility = evaluateEquipmentPhysicalEligibility(asset);
     if (!eligibility.available)
       throw equipmentAssetNotEligibleException(eligibility.reasons);
@@ -532,5 +550,22 @@ export class HealthcareCaseDispatchCommandService {
         tx,
       )
     ).id;
+  }
+  private readinessBindings(kit: HealthcareCaseKitRecord) {
+    return JSON.stringify({
+      kit: kit.id,
+      requirements: kit.healthcareCase.requirements.map((r) => r.id).sort(),
+      sources: kit.items
+        .filter((i) => i.lifecycle === 'ACTIVE')
+        .map((i) => [
+          i.id,
+          i.requirementId,
+          i.requirement?.productId,
+          i.equipmentAssignmentId,
+          i.equipmentAssignment?.equipmentAsset.id,
+          i.equipmentAssignment?.equipmentAsset.product.id,
+        ])
+        .sort(),
+    });
   }
 }

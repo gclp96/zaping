@@ -1,7 +1,7 @@
 # HC-CASE-DISPATCH — Case Dispatch Foundation / Physical Handoff
 
 TECHNICAL DESIGN: APPROVED.
-IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge.
+IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
 QUANTITY SOURCING BLOCKER: RESOLVED.
 
 Baseline: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
@@ -175,20 +175,22 @@ Orden conceptual vinculante:
 Inventory shared authority fence cuando existe QUANTITY
 -> HC Company lock + timeouts
 -> settings advisory shared si se requiere
--> Cases afectados en orden determinista
+-> Cases afectados FOR SHARE en orden determinista, sin upgrade
 -> CaseKit
 -> Dispatch / items
--> Requirements / Assignments
 -> Products ASC
--> Batches ASC
--> Positions ASC
 -> EquipmentAssets ASC
+-> Requirements / Assignments ASC
+-> otras raíces físicas según dominio (Batches / Positions)
 -> authoritative reread / CAS / physical mutations
 ```
 
 La implementación debe validar el orden contra los caminos reales antes de cambiar
 código; no es una acreditación de concurrencia ejecutada. Nunca adquirir Inventory
 fence después de HC. Bloquear también Cases relacionados necesarios para agenda.
+HC-DSP-LOCK-01 acredita la dirección Case SHARE → Product → Asset → Assignment
+para DRAFT. El orden exacto entre las demás raíces físicas de 01C sigue pendiente
+de su aceptación específica; este delta no implementa ni acredita Confirm.
 
 | Autoridad QUANTITY | Equipment-only | QUANTITY-only o mixto |
 | --- | --- | --- |
@@ -249,13 +251,14 @@ SERIALIZED material, sourcing automático y reconciliación/cutover reales.
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
 | HC-DSP-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #89 |
-| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED until HC-DSP-01B merge |
-| BACKEND TOTAL | Backend aprobado | 18 SP | 01A MERGED; 01B IMPLEMENTED / TESTED; 01C BLOCKED |
+| HC-DSP-01B | DRAFT commands & idempotency | 5 SP | COMPLETE / MERGED — PR #90 |
+| HC-DSP-LOCK-01 | DRAFT lock compatibility (delta adicional) | 3 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | BLOCKED until HC-DSP-LOCK-01 merge |
+| BACKEND TOTAL | Backend aprobado | 18 SP | 01A/01B MERGED; HC-DSP-LOCK-01 pending review/merge; 01C BLOCKED |
 | HC-DSP-01D | Frontend | Candidate 5 SP | OUT OF CURRENT BACKEND SCOPE |
 
-Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. 01B está pendiente
-de revisión humana/merge; 01C permanece bloqueado hasta ese merge.
+Sólo TARGET: sin Forecast, Commitment, Actual ni fechas asignadas. HC-DSP-LOCK-01
+está pendiente de revisión humana/merge; 01C permanece bloqueado hasta ese merge.
 QUANTITY SOURCING BLOCKER: RESOLVED. No queda una decisión FEFO/FIFO por inferir.
 
 ## 13. Validación futura y estado del cierre
@@ -268,7 +271,7 @@ rollback cruzado, autoridad LEGACY/CUTOVER/PHYSICAL, provenance y owned sin dobl
 La aceptación estructural de 01A está registrada en §14; la concurrencia de confirmación
 y la ejecución física de 01C permanecen pendientes.
 
-TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge.
+TECHNICAL DESIGN: APPROVED. IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
 REAL COMPANY CUTOVER: NOT EXECUTED. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. RETURN: NOT IMPLEMENTED. M-HC1: OPEN.
 
@@ -324,14 +327,14 @@ Validación local:
   `263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
   Cliente actualizado conservando esa DLL. Sin cambios compartidos Web; no se requiere gate Web.
 
-HC-DSP-01B: **IMPLEMENTED / TESTED — pending human review/merge**. HC-DSP-01C: **BLOCKED until 01B merge**.
+HC-DSP-01B: **COMPLETE / MERGED — PR #90**. HC-DSP-01C: **BLOCKED until HC-DSP-LOCK-01 merge**.
 CASE DISPATCH PHYSICAL CONFIRMATION: **NOT IMPLEMENTED**.
 PRODUCTIVE EQUIPMENT CUSTODY: **NOT ENABLED**. RETURN: **NOT IMPLEMENTED**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
 
 ## 15. HC-DSP-01B — comandos DRAFT e idempotencia local validados
 
-**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **5 SP**.
+**COMPLETE / MERGED — PR #90**. TARGET **5 SP**.
 Baseline: ecb41325bb9779eaf95866f956670b6f383cb577; rama
 feat/hc-dsp-01b-draft-commands-idempotency. 01A COMPLETE / MERGED — PR #89.
 
@@ -374,6 +377,66 @@ Cleanup PASS; ninguna DB dev/QA/producción. Fixtures históricos estructurales 
 permiten comprobar capacidad confirmada; los comandos tienen delta cero en Effects,
 Custody, eventos, Positions, Assets y Assignments. Sin cambios Web compartidos.
 
-01C **BLOCKED until 01B merge**. CONFIRM **NOT IMPLEMENTED**. PRODUCTIVE EQUIPMENT
+01C **BLOCKED until HC-DSP-LOCK-01 merge**. CONFIRM **NOT IMPLEMENTED**. PRODUCTIVE EQUIPMENT
 CUSTODY **NOT ENABLED**. RETURN **NOT IMPLEMENTED**. REAL COMPANY CUTOVER / REAL
 EQUIPMENT RECONCILIATION **NOT EXECUTED**. M-HC1 **OPEN**.
+
+## 16. HC-DSP-LOCK-01 — compatibilidad de locks DRAFT / Assignment
+
+**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **3 SP**.
+Baseline: 69d4a9358dd90d6d44449aeef2c9056d3203b569; rama
+fix/hc-dsp-lock-order-compatibility. 01A COMPLETE / MERGED — PR #89;
+01B COMPLETE / MERGED — PR #90. 01C **BLOCKED until HC-DSP-LOCK-01 merge**,
+TARGET **8 SP**.
+
+Case se adquiere FOR SHARE al inicio de planificación, sin upgrade posterior.
+CaseKit conserva FOR UPDATE; los comandos sobre Dispatch conservan su root
+FOR UPDATE, revisión optimista, claim/completion y audit. No se añade HC Company
+advisory lock ni autoridad física a DRAFT. Los writers de Assignment no cambian.
+
+CREATE: Case SHARE → CaseKit UPDATE → items estructurales SHARE → Products SHARE
+ordenados → Assets SHARE ordenados → Requirements SHARE ordenados → Assignments
+SHARE ordenados → relectura autoritativa → readiness → creación. Se comprueba que
+los bindings descubiertos corresponden al conjunto bloqueado; un cambio aborta
+sin adquirir nuevas raíces fuera de orden. Case SCHEDULED, agenda completa y
+ordenada, Kit PREPARED y readiness PASS siguen siendo obligatorios.
+
+Equipment ITEM_ADD: Case SHARE → CaseKit UPDATE → Dispatch UPDATE → source SHARE
+→ Product KEY SHARE → Asset SHARE → Assignment SHARE → relectura autoritativa
+de source, Kit/Case, Dispatch, Assignment, Asset y Product → validación/persistencia.
+Product KEY SHARE anticipa la protección de identidad/FK; actividad y tracking se
+leen nuevamente. Los IDs iniciales sólo descubren locks, nunca autorizan. Binding
+Assignment/Asset o Product/Asset distinto aborta sin bloquear otra raíz tardía.
+La elegibilidad y physicalRevision se capturan del Asset bloqueado. DRAFT no
+reserva, no modifica Assignment/Asset y no crea efectos, custodia ni eventos físicos.
+Se conservan capacidad, duplicados, idempotencia, replay y auditoría de 01B.
+
+Case SHARE es compatible con los Cases SHARE de Assignment CREATE/REPLACE.
+Case update/cancel y CaseKit preparation, que requieren Case UPDATE, esperan
+antes de tomar sus fuentes posteriores. RELEASE y REPLACE pueden esperar las
+fuentes SHARE de DRAFT sin la inversión Assignment → Asset. CUSTODIAN_SET,
+ITEM_EXCLUDE y CANCEL siguen serializando por Dispatch sin esperar Asset/Assignment.
+
+Aceptación PostgreSQL16: **60/60 PASS** (40 regresiones 01B y 20 pruebas nuevas
+que cubren los 19 escenarios solicitados). Servicios reales de Assignment,
+CaseKit y Case; clientes independientes, observador, backend PIDs y
+pg_blocking_pids() prueban las esperas, sin 40P01. Incluye ambos órdenes de
+RELEASE/REPLACE, CREATE/readiness, roots Dispatch, rollback, tenants, preparación,
+agenda/cancelación, múltiples Assets/Requirement y fuentes compartidas entre Cases.
+Se verifican revisiones, auditoría y ausencia de efectos físicos de DRAFT.
+
+Último entorno NUEVO: 127.0.0.1:52737/zaping_case_dispatch_commands_test,
+run 1f189f81-33d2-4b45-ade5-b12bf622f77c, PostgreSQL16/tmpfs, puerto loopback
+aleatorio y rol no superusuario. Las 42 migraciones existentes se aplicaron sólo
+al contenedor vacío de aceptación. Cleanup del contenedor/tmpfs PASS.
+Sin DB dev/QA/producción, cambios de .env, schema, nuevas migraciones ni generate.
+
+Regresión focal Dispatch/Assignment **562/562** en 17 suites; comandos **87/87**;
+API completa **2152/2152** en 122 suites. Typecheck oficial, noEmit focal, lint,
+build, Prisma validate, Prettier/check del código/arnés modificado y diff check PASS.
+El noEmit global adicional de tsconfig.spec.json presenta errores en specs ajenos
+al delta; noEmit focal de los cuatro archivos TypeScript modificados PASS.
+
+Confirm **NOT IMPLEMENTED**; PRODUCTIVE EQUIPMENT CUSTODY **NOT ENABLED**;
+RETURN **NOT IMPLEMENTED**; M-HC1 **OPEN**. Revisión humana y merge de este delta
+son prerrequisitos para desbloquear HC-DSP-01C.
