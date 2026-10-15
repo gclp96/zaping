@@ -146,6 +146,9 @@ jobs:
           export NODE_ENV=test
           export PORT=3201
           export TRUST_PROXY_HOPS=0
+          export INVENTORY_AUTHORITY_PROTOCOL=inventory-authority-v1
+          export INVENTORY_RUNTIME_BUILD="ci-${GITHUB_SHA}"
+          export INVENTORY_RUNTIME_ENVIRONMENT=ci
 
           startup_log="$RUNNER_TEMP/zaping-api-startup.log"
           setsid npm run start:prod > "$startup_log" 2>&1 &
