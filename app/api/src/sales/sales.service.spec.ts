@@ -1,3 +1,4 @@
+import { SalesPhysicalIntegrationService } from '../inventory/physical/sales-physical-integration.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductInventoryTracking, ProductLotTracking } from '@prisma/client';
@@ -66,6 +67,7 @@ const quote = {
   ],
 };
 const transactionMock = {
+  $queryRaw: jest.fn(),
   quote: {
     findFirst: jest.fn(),
     updateMany: jest.fn(),
@@ -74,6 +76,7 @@ const transactionMock = {
   sale: {
     create: jest.fn(),
     findFirst: jest.fn(),
+    findFirstOrThrow: jest.fn(),
     update: jest.fn(),
     updateMany: jest.fn(),
   },
@@ -210,11 +213,22 @@ describe('SalesService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    transactionMock.product.findFirst.mockReset();
+    transactionMock.sale.findFirst.mockReset();
+    transactionMock.sale.findFirstOrThrow.mockReset();
 
     prismaMock.$transaction.mockImplementation(
       async (callback: TransactionCallback) => callback(transactionMock),
     );
 
+    transactionMock.sale.findFirst.mockImplementation(
+      (...args: unknown[]) =>
+        prismaMock.sale.findFirst(...args) as Promise<unknown>,
+    );
+    transactionMock.sale.findFirstOrThrow.mockImplementation(
+      (...args: unknown[]) =>
+        transactionMock.sale.findFirst(...args) as Promise<unknown>,
+    );
     prismaMock.product.findMany.mockResolvedValue([createProductMock()]);
     transactionMock.product.findMany.mockResolvedValue([createProductMock()]);
     transactionMock.sale.create.mockResolvedValue({
@@ -227,6 +241,23 @@ describe('SalesService', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         SalesService,
+        {
+          provide: SalesPhysicalIntegrationService,
+          useValue: {
+            approve: (
+              _c: string,
+              _a: string,
+              _s: string,
+              legacy: TransactionCallback,
+            ) => prismaMock.$transaction(legacy) as Promise<unknown>,
+            createFromQuote: (
+              _c: string,
+              _a: string,
+              _q: string,
+              legacy: TransactionCallback,
+            ) => prismaMock.$transaction(legacy) as Promise<unknown>,
+          },
+        },
         {
           provide: PrismaService,
           useValue: prismaMock,
@@ -817,51 +848,51 @@ describe('SalesService', () => {
 
   describe('approve', () => {
     it('rechaza una venta inexistente o de otra empresa', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(null);
+      transactionMock.sale.findFirst.mockResolvedValue(null);
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
     });
 
     it('rechaza una venta ya confirmada', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue({
+      transactionMock.sale.findFirst.mockResolvedValue({
         ...draftSale,
         status: 'CONFIRMED',
       });
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        new BadRequestException('La venta ya fue aprobada'),
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(new BadRequestException('La venta ya fue aprobada'));
 
-      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
     });
 
     it('rechaza una venta cancelada', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue({
+      transactionMock.sale.findFirst.mockResolvedValue({
         ...draftSale,
         status: 'CANCELLED',
       });
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(BadRequestException);
 
       expect(transactionMock.inventoryMovement.create).not.toHaveBeenCalled();
     });
 
     it('bloquea una segunda aprobación concurrente', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.sale.updateMany.mockResolvedValue({
         count: 0,
       });
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(BadRequestException);
 
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
 
@@ -869,7 +900,7 @@ describe('SalesService', () => {
     });
 
     it('rechaza aprobar una venta con producto no QUANTITY', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.product.findMany.mockResolvedValue([
         createProductMock({
@@ -877,9 +908,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        new BadRequestException(incompatibleTrackingMessage),
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
       expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
@@ -887,7 +918,7 @@ describe('SalesService', () => {
     });
 
     it('rechaza aprobar una venta con producto que requiere lote', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.product.findMany.mockResolvedValue([
         createProductMock({
@@ -895,9 +926,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        new BadRequestException(requiredLotMessage),
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(new BadRequestException(requiredLotMessage));
 
       expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
@@ -905,7 +936,7 @@ describe('SalesService', () => {
     });
 
     it('rechaza aprobar una venta mixta si una partida es incompatible', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue({
+      transactionMock.sale.findFirst.mockResolvedValue({
         ...draftSale,
         items: [
           ...draftSale.items,
@@ -928,9 +959,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
-        new BadRequestException(incompatibleTrackingMessage),
-      );
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
       expect(transactionMock.sale.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.product.updateMany).not.toHaveBeenCalled();
@@ -938,7 +969,7 @@ describe('SalesService', () => {
     });
 
     it('rechaza la aprobación cuando no existe stock suficiente', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.sale.updateMany.mockResolvedValue({
         count: 1,
@@ -952,7 +983,9 @@ describe('SalesService', () => {
         count: 0,
       });
 
-      await expect(service.approve(companyId, saleId)).rejects.toThrow(
+      await expect(
+        service.approve(companyId, saleId, companyId),
+      ).rejects.toThrow(
         new BadRequestException(
           'Stock insuficiente para Producto médico. Disponible: 1',
         ),
@@ -962,7 +995,7 @@ describe('SalesService', () => {
     });
 
     it('aprueba una venta borrador, descuenta inventario y registra el movimiento', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.sale.updateMany.mockResolvedValue({
         count: 1,
@@ -985,9 +1018,9 @@ describe('SalesService', () => {
         status: 'CONFIRMED',
       };
 
-      transactionMock.sale.findFirst.mockResolvedValue(confirmedSale);
+      transactionMock.sale.findFirstOrThrow.mockResolvedValue(confirmedSale);
 
-      const result = await service.approve(companyId, saleId);
+      const result = await service.approve(companyId, saleId, companyId);
 
       expect(transactionMock.sale.updateMany).toHaveBeenCalledWith({
         where: {
@@ -1038,7 +1071,7 @@ describe('SalesService', () => {
     });
 
     it('usa el saldo real posterior al descuento', async () => {
-      prismaMock.sale.findFirst.mockResolvedValue(draftSale);
+      transactionMock.sale.findFirst.mockResolvedValue(draftSale);
 
       transactionMock.sale.updateMany.mockResolvedValue({
         count: 1,
@@ -1056,12 +1089,12 @@ describe('SalesService', () => {
         id: 'movement-1',
       });
 
-      transactionMock.sale.findFirst.mockResolvedValue({
+      transactionMock.sale.findFirstOrThrow.mockResolvedValue({
         ...draftSale,
         status: 'CONFIRMED',
       });
 
-      await service.approve(companyId, saleId);
+      await service.approve(companyId, saleId, companyId);
 
       expect(transactionMock.inventoryMovement.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1335,7 +1368,11 @@ describe('SalesService', () => {
 
       transactionMock.sale.findFirst.mockResolvedValue(convertedSale);
 
-      const result = await service.createFromQuote(companyId, quoteId);
+      const result = await service.createFromQuote(
+        companyId,
+        quoteId,
+        companyId,
+      );
 
       expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
       expect(
@@ -1445,9 +1482,9 @@ describe('SalesService', () => {
     it('rechaza una cotización inexistente o de otra empresa', async () => {
       transactionMock.quote.findFirst.mockResolvedValue(null);
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(NotFoundException);
 
       expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
 
@@ -1460,7 +1497,9 @@ describe('SalesService', () => {
         status: 'DRAFT',
       });
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(
         new BadRequestException(
           'La cotización debe estar aprobada antes de convertirse en venta',
         ),
@@ -1477,7 +1516,9 @@ describe('SalesService', () => {
         convertedToSale: true,
       });
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(
         new BadRequestException('La cotización ya fue convertida a venta'),
       );
 
@@ -1492,7 +1533,9 @@ describe('SalesService', () => {
         items: [],
       });
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(
         new BadRequestException('La cotización no contiene productos'),
       );
 
@@ -1506,7 +1549,9 @@ describe('SalesService', () => {
         count: 0,
       });
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(
         new BadRequestException(
           'La cotización ya fue convertida o ya no puede convertirse',
         ),
@@ -1524,9 +1569,9 @@ describe('SalesService', () => {
         new Error('sequence unavailable'),
       );
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        'sequence unavailable',
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow('sequence unavailable');
 
       expect(
         salesFolioServiceMock.allocateNextAvailableFolio,
@@ -1542,9 +1587,9 @@ describe('SalesService', () => {
 
       transactionMock.product.findMany.mockResolvedValue([]);
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(NotFoundException);
 
       expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.sale.create).not.toHaveBeenCalled();
@@ -1561,9 +1606,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        new BadRequestException(incompatibleTrackingMessage),
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
       expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.sale.create).not.toHaveBeenCalled();
@@ -1580,9 +1625,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        new BadRequestException(requiredLotMessage),
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(new BadRequestException(requiredLotMessage));
 
       expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.sale.create).not.toHaveBeenCalled();
@@ -1614,9 +1659,9 @@ describe('SalesService', () => {
         }),
       ]);
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
-        new BadRequestException(incompatibleTrackingMessage),
-      );
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(new BadRequestException(incompatibleTrackingMessage));
 
       expect(transactionMock.quote.updateMany).not.toHaveBeenCalled();
       expect(transactionMock.sale.create).not.toHaveBeenCalled();
@@ -1644,7 +1689,9 @@ describe('SalesService', () => {
         count: 0,
       });
 
-      await expect(service.createFromQuote(companyId, quoteId)).rejects.toThrow(
+      await expect(
+        service.createFromQuote(companyId, quoteId, companyId),
+      ).rejects.toThrow(
         new BadRequestException(
           'Stock insuficiente para Producto médico. Disponible: 1',
         ),
@@ -1689,7 +1736,7 @@ describe('SalesService', () => {
         id: saleId,
       });
 
-      await service.createFromQuote(companyId, quoteId);
+      await service.createFromQuote(companyId, quoteId, companyId);
 
       expect(transactionMock.inventoryMovement.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1729,7 +1776,7 @@ describe('SalesService', () => {
         id: saleId,
       });
 
-      await service.createFromQuote(companyId, quoteId);
+      await service.createFromQuote(companyId, quoteId, companyId);
 
       expect(transactionMock.inventoryMovement.create).toHaveBeenCalledWith(
         expect.objectContaining({

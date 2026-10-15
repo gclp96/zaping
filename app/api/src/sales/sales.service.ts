@@ -1,3 +1,6 @@
+import { inventoryWriterError } from '../inventory/physical/inventory-authority-error';
+import { Prisma } from '@prisma/client';
+import { SalesPhysicalIntegrationService } from '../inventory/physical/sales-physical-integration.service';
 import { Injectable, BadRequestException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,6 +24,7 @@ export class SalesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly salesFolioService: SalesFolioService,
+    private readonly physical: SalesPhysicalIntegrationService,
   ) {}
 
   private validateGenericSalesProductEligibility(product: GenericSalesProduct) {
@@ -226,8 +230,23 @@ export class SalesService {
     });
   }
 
-  async approve(companyId: string, saleId: string) {
-    const sale = await this.prisma.sale.findFirst({
+  approve(companyId: string, saleId: string, actorId: string) {
+    return this.physical
+      .approve(companyId, actorId, saleId, (tx) =>
+        this.approveLegacy(tx, companyId, saleId),
+      )
+      .catch(inventoryWriterError);
+  }
+
+  private async approveLegacy(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    saleId: string,
+  ) {
+    await tx.$queryRaw(
+      Prisma.sql`SELECT id FROM "Sale" WHERE id=${saleId} AND "companyId"=${companyId} FOR UPDATE`,
+    );
+    const sale = await tx.sale.findFirst({
       where: {
         id: saleId,
         companyId,
@@ -249,121 +268,104 @@ export class SalesService {
       throw new BadRequestException('No se puede aprobar una venta cancelada');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const saleProductIds = Array.from(
-        new Set(sale.items.map((item) => item.productId)),
+    const saleProductIds = Array.from(
+      new Set(sale.items.map((item) => item.productId)),
+    );
+
+    for (const id of [...saleProductIds].sort())
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Product" WHERE id=${id} AND "companyId"=${companyId} FOR UPDATE`,
       );
-
-      const products = await tx.product.findMany({
-        where: {
-          id: {
-            in: saleProductIds,
-          },
-          companyId,
-          isActive: true,
+    const products = await tx.product.findMany({
+      where: {
+        id: {
+          in: saleProductIds,
         },
-        select: {
-          id: true,
-          name: true,
-          cost: true,
-          inventoryTracking: true,
-          lotTracking: true,
-        },
-      });
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        cost: true,
+        inventoryTracking: true,
+        lotTracking: true,
+      },
+    });
 
-      const productsById = new Map(
-        products.map((product) => [product.id, product]),
-      );
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
 
-      for (const item of sale.items) {
-        const product = productsById.get(item.productId);
+    for (const item of sale.items) {
+      const product = productsById.get(item.productId);
 
-        if (!product) {
-          throw new NotFoundException(
-            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
-          );
-        }
-
-        this.validateGenericSalesProductEligibility(product);
-      }
-
-      /*
-       * Reservar la transición DRAFT -> CONFIRMED.
-       *
-       * Esto evita que dos solicitudes concurrentes
-       * aprueben la misma venta y descuenten inventario
-       * más de una vez.
-       */
-      const statusUpdate = await tx.sale.updateMany({
-        where: {
-          id: saleId,
-          companyId,
-          status: 'DRAFT',
-        },
-        data: {
-          status: 'CONFIRMED',
-        },
-      });
-
-      if (statusUpdate.count !== 1) {
-        throw new BadRequestException(
-          'La venta ya fue aprobada, cancelada o ya no puede aprobarse',
+      if (!product) {
+        throw new NotFoundException(
+          `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
         );
       }
 
-      for (const item of sale.items) {
-        const product = productsById.get(item.productId);
+      this.validateGenericSalesProductEligibility(product);
+    }
 
-        if (!product) {
-          throw new NotFoundException(
-            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
-          );
-        }
+    /*
+     * Reservar la transición DRAFT -> CONFIRMED.
+     *
+     * Esto evita que dos solicitudes concurrentes
+     * aprueben la misma venta y descuenten inventario
+     * más de una vez.
+     */
+    const statusUpdate = await tx.sale.updateMany({
+      where: {
+        id: saleId,
+        companyId,
+        status: 'DRAFT',
+      },
+      data: {
+        status: 'CONFIRMED',
+      },
+    });
 
-        /*
-         * Descuento condicional.
-         *
-         * La condición stock >= quantity evita sobreventa
-         * incluso cuando existen operaciones concurrentes.
-         */
-        const stockUpdate = await tx.product.updateMany({
-          where: {
-            id: product.id,
-            companyId,
-            isActive: true,
-            stock: {
-              gte: item.quantity,
-            },
+    if (statusUpdate.count !== 1) {
+      throw new BadRequestException(
+        'La venta ya fue aprobada, cancelada o ya no puede aprobarse',
+      );
+    }
+
+    for (const item of sale.items) {
+      const product = productsById.get(item.productId);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+        );
+      }
+
+      /*
+       * Descuento condicional.
+       *
+       * La condición stock >= quantity evita sobreventa
+       * incluso cuando existen operaciones concurrentes.
+       */
+      const stockUpdate = await tx.product.updateMany({
+        where: {
+          id: product.id,
+          companyId,
+          isActive: true,
+          stock: {
+            gte: item.quantity,
           },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
+        },
+        data: {
+          stock: {
+            decrement: item.quantity,
           },
-        });
+        },
+      });
 
-        if (stockUpdate.count !== 1) {
-          const currentProduct = await tx.product.findFirst({
-            where: {
-              id: product.id,
-              companyId,
-            },
-            select: {
-              stock: true,
-            },
-          });
-
-          throw new BadRequestException(
-            `Stock insuficiente para ${product.name}. Disponible: ${
-              currentProduct?.stock ?? 0
-            }`,
-          );
-        }
-
-        /*
-         * Leer el saldo real después del descuento.
-         */
-        const updatedProduct = await tx.product.findFirst({
+      if (stockUpdate.count !== 1) {
+        const currentProduct = await tx.product.findFirst({
           where: {
             id: product.id,
             companyId,
@@ -373,48 +375,68 @@ export class SalesService {
           },
         });
 
-        if (!updatedProduct) {
-          throw new NotFoundException(`Producto ${product.id} no encontrado`);
-        }
-
-        await tx.inventoryMovement.create({
-          data: {
-            companyId,
-            productId: product.id,
-
-            movementType: 'OUT',
-            quantity: item.quantity,
-
-            /*
-             * El movimiento almacena costo de inventario,
-             * no precio de venta.
-             */
-            unitCost: product.cost,
-
-            balance: updatedProduct.stock,
-
-            referenceType: 'SALE',
-            referenceId: sale.id,
-
-            notes: `Venta aprobada ${sale.folio}`,
-          },
-        });
+        throw new BadRequestException(
+          `Stock insuficiente para ${product.name}. Disponible: ${
+            currentProduct?.stock ?? 0
+          }`,
+        );
       }
 
-      return tx.sale.findFirst({
+      /*
+       * Leer el saldo real después del descuento.
+       */
+      const updatedProduct = await tx.product.findFirst({
         where: {
-          id: saleId,
+          id: product.id,
           companyId,
         },
-        include: {
-          customer: true,
-          items: {
-            include: {
-              product: true,
-            },
-          },
+        select: {
+          stock: true,
         },
       });
+
+      if (!updatedProduct) {
+        throw new NotFoundException(`Producto ${product.id} no encontrado`);
+      }
+
+      await tx.inventoryMovement.create({
+        data: {
+          companyId,
+          productId: product.id,
+
+          movementType: 'OUT',
+          quantity: item.quantity,
+
+          /*
+           * El movimiento almacena costo de inventario,
+           * no precio de venta.
+           */
+          unitCost: product.cost,
+
+          balance: updatedProduct.stock,
+
+          referenceType: 'SALE',
+          referenceId: sale.id,
+
+          notes: `Venta aprobada ${sale.folio}`,
+        },
+      });
+    }
+
+    return tx.sale.findFirstOrThrow({
+      where: {
+        id: saleId,
+        companyId,
+      },
+      include: {
+        customer: true,
+        quote: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
     });
   }
 
@@ -543,183 +565,180 @@ export class SalesService {
     doc.end();
   }
 
-  async createFromQuote(companyId: string, quoteId: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const quote = await tx.quote.findFirst({
-        where: {
-          id: quoteId,
-          companyId,
-        },
-        include: {
-          items: true,
-        },
-      });
-
-      if (!quote) {
-        throw new NotFoundException('Cotización no encontrada');
-      }
-
-      if (quote.status !== 'CONFIRMED') {
-        throw new BadRequestException(
-          'La cotización debe estar aprobada antes de convertirse en venta',
-        );
-      }
-
-      if (quote.convertedToSale) {
-        throw new BadRequestException(
-          'La cotización ya fue convertida a venta',
-        );
-      }
-
-      if (quote.items.length === 0) {
-        throw new BadRequestException('La cotización no contiene productos');
-      }
-
-      const quoteProductIds = Array.from(
-        new Set(quote.items.map((item) => item.productId)),
-      );
-
-      const products = await tx.product.findMany({
-        where: {
-          id: {
-            in: quoteProductIds,
-          },
-          companyId,
-          isActive: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          cost: true,
-          inventoryTracking: true,
-          lotTracking: true,
-        },
-      });
-
-      const productsById = new Map(
-        products.map((product) => [product.id, product]),
-      );
-
-      for (const item of quote.items) {
-        const product = productsById.get(item.productId);
-
-        if (!product) {
-          throw new NotFoundException(
-            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
-          );
-        }
-
-        this.validateGenericSalesProductEligibility(product);
-      }
-
-      const folio = await this.salesFolioService.allocateNextAvailableFolio(
-        tx,
+  createFromQuote(companyId: string, quoteId: string, actorId: string) {
+    return this.physical
+      .createFromQuote(companyId, actorId, quoteId, (tx) =>
+        this.createFromQuoteLegacy(tx, companyId, quoteId),
+      )
+      .catch(inventoryWriterError);
+  }
+  private async createFromQuoteLegacy(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    quoteId: string,
+  ) {
+    const folio = await this.salesFolioService.allocateNextAvailableFolio(
+      tx,
+      companyId,
+    );
+    await tx.$queryRaw(
+      Prisma.sql`SELECT id FROM "Quote" WHERE id=${quoteId} AND "companyId"=${companyId} FOR UPDATE`,
+    );
+    const quote = await tx.quote.findFirst({
+      where: {
+        id: quoteId,
         companyId,
+      },
+      include: {
+        items: true,
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException('Cotización no encontrada');
+    }
+
+    if (quote.status !== 'CONFIRMED') {
+      throw new BadRequestException(
+        'La cotización debe estar aprobada antes de convertirse en venta',
       );
+    }
+
+    if (quote.convertedToSale) {
+      throw new BadRequestException('La cotización ya fue convertida a venta');
+    }
+
+    if (quote.items.length === 0) {
+      throw new BadRequestException('La cotización no contiene productos');
+    }
+
+    const quoteProductIds = Array.from(
+      new Set(quote.items.map((item) => item.productId)),
+    );
+
+    for (const id of [...quoteProductIds].sort())
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "Product" WHERE id=${id} AND "companyId"=${companyId} FOR UPDATE`,
+      );
+    const products = await tx.product.findMany({
+      where: {
+        id: {
+          in: quoteProductIds,
+        },
+        companyId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        name: true,
+        cost: true,
+        inventoryTracking: true,
+        lotTracking: true,
+      },
+    });
+
+    const productsById = new Map(
+      products.map((product) => [product.id, product]),
+    );
+
+    for (const item of quote.items) {
+      const product = productsById.get(item.productId);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+        );
+      }
+
+      this.validateGenericSalesProductEligibility(product);
+    }
+
+    /*
+     * Reservar la conversión dentro de la misma
+     * transacción.
+     *
+     * El WHERE convertedToSale: false evita que dos
+     * solicitudes simultáneas conviertan la misma
+     * cotización.
+     */
+    const quoteConversion = await tx.quote.updateMany({
+      where: {
+        id: quoteId,
+        companyId,
+        status: 'CONFIRMED',
+        convertedToSale: false,
+      },
+      data: {
+        convertedToSale: true,
+      },
+    });
+
+    if (quoteConversion.count !== 1) {
+      throw new BadRequestException(
+        'La cotización ya fue convertida o ya no puede convertirse',
+      );
+    }
+
+    const sale = await tx.sale.create({
+      data: {
+        companyId,
+        customerId: quote.customerId,
+
+        quoteId,
+
+        folio,
+
+        subtotal: quote.subtotal,
+        iva: quote.iva,
+        total: quote.total,
+
+        status: 'CONFIRMED',
+
+        items: {
+          create: quote.items.map((item) => ({
+            productId: item.productId,
+            quantity: item.quantity,
+            price: item.price,
+            subtotal: item.subtotal,
+          })),
+        },
+      },
+    });
+
+    for (const item of quote.items) {
+      const product = productsById.get(item.productId);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
+        );
+      }
 
       /*
-       * Reservar la conversión dentro de la misma
-       * transacción.
+       * El descuento es condicional.
        *
-       * El WHERE convertedToSale: false evita que dos
-       * solicitudes simultáneas conviertan la misma
-       * cotización.
+       * Esto evita vender más unidades de las
+       * disponibles aunque existan operaciones
+       * concurrentes.
        */
-      const quoteConversion = await tx.quote.updateMany({
+      const stockUpdate = await tx.product.updateMany({
         where: {
-          id: quoteId,
+          id: product.id,
           companyId,
-          status: 'CONFIRMED',
-          convertedToSale: false,
+          isActive: true,
+          stock: {
+            gte: item.quantity,
+          },
         },
         data: {
-          convertedToSale: true,
-        },
-      });
-
-      if (quoteConversion.count !== 1) {
-        throw new BadRequestException(
-          'La cotización ya fue convertida o ya no puede convertirse',
-        );
-      }
-
-      const sale = await tx.sale.create({
-        data: {
-          companyId,
-          customerId: quote.customerId,
-
-          quoteId,
-
-          folio,
-
-          subtotal: quote.subtotal,
-          iva: quote.iva,
-          total: quote.total,
-
-          status: 'CONFIRMED',
-
-          items: {
-            create: quote.items.map((item) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              price: item.price,
-              subtotal: item.subtotal,
-            })),
+          stock: {
+            decrement: item.quantity,
           },
         },
       });
 
-      for (const item of quote.items) {
-        const product = productsById.get(item.productId);
-
-        if (!product) {
-          throw new NotFoundException(
-            `Producto ${item.productId} no encontrado, inactivo o fuera de la empresa`,
-          );
-        }
-
-        /*
-         * El descuento es condicional.
-         *
-         * Esto evita vender más unidades de las
-         * disponibles aunque existan operaciones
-         * concurrentes.
-         */
-        const stockUpdate = await tx.product.updateMany({
-          where: {
-            id: product.id,
-            companyId,
-            isActive: true,
-            stock: {
-              gte: item.quantity,
-            },
-          },
-          data: {
-            stock: {
-              decrement: item.quantity,
-            },
-          },
-        });
-
-        if (stockUpdate.count !== 1) {
-          const currentProduct = await tx.product.findFirst({
-            where: {
-              id: product.id,
-              companyId,
-            },
-            select: {
-              stock: true,
-            },
-          });
-
-          throw new BadRequestException(
-            `Stock insuficiente para ${product.name}. Disponible: ${
-              currentProduct?.stock ?? 0
-            }`,
-          );
-        }
-
-        const updatedProduct = await tx.product.findFirst({
+      if (stockUpdate.count !== 1) {
+        const currentProduct = await tx.product.findFirst({
           where: {
             id: product.id,
             companyId,
@@ -729,44 +748,60 @@ export class SalesService {
           },
         });
 
-        if (!updatedProduct) {
-          throw new NotFoundException(`Producto ${product.id} no encontrado`);
-        }
-
-        await tx.inventoryMovement.create({
-          data: {
-            companyId,
-            productId: product.id,
-
-            movementType: 'OUT',
-            quantity: item.quantity,
-
-            unitCost: product.cost,
-            balance: updatedProduct.stock,
-
-            referenceType: 'SALE',
-            referenceId: sale.id,
-
-            notes: `Venta ${sale.folio} generada desde cotización ${quote.folio}`,
-          },
-        });
+        throw new BadRequestException(
+          `Stock insuficiente para ${product.name}. Disponible: ${
+            currentProduct?.stock ?? 0
+          }`,
+        );
       }
 
-      return tx.sale.findFirst({
+      const updatedProduct = await tx.product.findFirst({
         where: {
-          id: sale.id,
+          id: product.id,
           companyId,
         },
-        include: {
-          customer: true,
-          quote: true,
-          items: {
-            include: {
-              product: true,
-            },
-          },
+        select: {
+          stock: true,
         },
       });
+
+      if (!updatedProduct) {
+        throw new NotFoundException(`Producto ${product.id} no encontrado`);
+      }
+
+      await tx.inventoryMovement.create({
+        data: {
+          companyId,
+          productId: product.id,
+
+          movementType: 'OUT',
+          quantity: item.quantity,
+
+          unitCost: product.cost,
+          balance: updatedProduct.stock,
+
+          referenceType: 'SALE',
+          referenceId: sale.id,
+
+          notes: `Venta ${sale.folio} generada desde cotización ${quote.folio}`,
+        },
+      });
+    }
+
+    return tx.sale.findFirstOrThrow({
+      where: {
+        id: sale.id,
+        companyId,
+      },
+      include: {
+        customer: true,
+        quote: true,
+        items: {
+          include: {
+            product: true,
+          },
+        },
+      },
     });
   }
 

@@ -83,6 +83,7 @@ function setup(initial = control()) {
     ),
   };
   const tx = {
+    $queryRaw: jest.fn().mockResolvedValue([{ isolation: 'read committed' }]),
     user: { findFirst: jest.fn().mockResolvedValue({ id: actorId }) },
     inventoryCutover: { create: jest.fn().mockResolvedValue(row) },
     inventoryCutoverProduct: { findMany: jest.fn().mockResolvedValue([]) },

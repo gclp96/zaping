@@ -9,7 +9,7 @@ import {
 
 export type InventoryAuthority = 'LEGACY' | 'CUTOVER' | 'PHYSICAL';
 @Injectable()
-// Foundation only: no productive module, controller or writer imports this class.
+// The productive transaction boundary acquires the shared authority fence first.
 export class InventoryAuthorityResolver {
   async resolve(
     tx: Prisma.TransactionClient,

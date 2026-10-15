@@ -1,3 +1,5 @@
+import { InventoryAuthorityTransactionService } from '../inventory/physical/inventory-authority-transaction.service';
+import { ReceiptPhysicalIntegrationService } from '../inventory/physical/receipt-physical-integration.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -25,7 +27,9 @@ type LotTrackingReceiptItemFixture = {
 };
 
 type TransactionClientMock = {
+  $queryRaw: jest.Mock;
   idempotencyRecord: {
+    findUnique: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
   };
@@ -39,6 +43,7 @@ type TransactionClientMock = {
     update: jest.Mock;
   };
   purchaseReceipt: {
+    findFirst: jest.Mock;
     create: jest.Mock;
     findUniqueOrThrow: jest.Mock;
   };
@@ -215,7 +220,12 @@ describe('PurchaseReceiptsService', () => {
 
   beforeEach(async () => {
     transactionClient = {
+      $queryRaw: jest.fn(),
       idempotencyRecord: {
+        findUnique: jest.fn(
+          (...args: unknown[]) =>
+            prisma.idempotencyRecord.findUnique(...args) as Promise<unknown>,
+        ),
         create: jest.fn().mockResolvedValue({
           id: 'idempotency-record-1',
         }),
@@ -231,6 +241,10 @@ describe('PurchaseReceiptsService', () => {
         update: jest.fn(),
       },
       purchaseReceipt: {
+        findFirst: jest.fn(
+          (...args: unknown[]) =>
+            prisma.purchaseReceipt.findFirst(...args) as Promise<unknown>,
+        ),
         create: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
@@ -274,6 +288,25 @@ describe('PurchaseReceiptsService', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         PurchaseReceiptsService,
+        {
+          provide: ReceiptPhysicalIntegrationService,
+          useValue: { execute: jest.fn() },
+        },
+        {
+          provide: InventoryAuthorityTransactionService,
+          useValue: {
+            run: (
+              _c: string,
+              fn: (
+                tx: TransactionClientMock,
+                authority: string,
+              ) => Promise<unknown>,
+            ) =>
+              prisma.$transaction((tx: TransactionClientMock) =>
+                fn(tx, 'LEGACY'),
+              ) as Promise<unknown>,
+          },
+        },
         {
           provide: EquipmentProvisioningService,
           useValue: equipmentProvisioningService,
@@ -409,7 +442,7 @@ describe('PurchaseReceiptsService', () => {
     expect(service).toBeDefined();
   });
 
-  it('reproduce una recepción completada sin abrir otra transacción ni repetir mutaciones', async () => {
+  it('reproduce una recepción completada dentro del fence sin repetir mutaciones', async () => {
     const companyId = '33333333-3333-4333-8333-333333333333';
     const idempotencyKey = 'completed-receipt-key';
     const receiptId = '66666666-6666-4666-8666-666666666666';
@@ -452,7 +485,7 @@ describe('PurchaseReceiptsService', () => {
         },
       },
     });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expectNoReceiptMutations();
     expect(transactionClient.idempotencyRecord.create).not.toHaveBeenCalled();
   });
@@ -496,7 +529,7 @@ describe('PurchaseReceiptsService', () => {
       ),
     ).resolves.toEqual(existingReceipt);
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expectNoReceiptMutations();
   });
 
@@ -541,7 +574,7 @@ describe('PurchaseReceiptsService', () => {
       status: 409,
     });
 
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expectNoReceiptMutations();
   });
 
@@ -610,7 +643,7 @@ describe('PurchaseReceiptsService', () => {
       ),
     ).rejects.toBe(unrelatedUniqueError);
 
-    expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledTimes(1);
+    expect(prisma.idempotencyRecord.findUnique).not.toHaveBeenCalled();
   });
 
   it('mantiene aislada la misma clave literal entre empresas', async () => {
@@ -720,14 +753,16 @@ describe('PurchaseReceiptsService', () => {
         requestHash,
         resourceId: receiptId,
       });
-    prisma.$transaction.mockRejectedValue(uniqueError);
+    transactionClient.idempotencyRecord.create.mockRejectedValueOnce(
+      uniqueError,
+    );
     prisma.purchaseReceipt.findFirst.mockResolvedValue(winningReceipt);
 
     await expect(
       createReceipt(companyId, lotTrackingUserId, dto, idempotencyKey),
     ).resolves.toEqual(winningReceipt);
 
-    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
     expect(prisma.idempotencyRecord.findUnique).toHaveBeenCalledTimes(2);
     expect(transactionClient.purchaseReceipt.create).not.toHaveBeenCalled();
     expectNoReceiptMutations();
@@ -1582,7 +1617,12 @@ describe('PurchaseReceiptsService', () => {
     ).toHaveBeenCalledTimes(1);
     expect(
       equipmentProvisioningService.provisionFromPurchaseReceiptItem,
-    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
+    ).toHaveBeenCalledWith(
+      transactionClient,
+      companyId,
+      createdReceiptItemId,
+      undefined,
+    );
     expect(
       equipmentProvisioningService.provisionFromPurchaseReceiptItem.mock
         .invocationCallOrder[0],
@@ -1765,6 +1805,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       firstReceiptItemId,
+      undefined,
     );
     expect(
       equipmentProvisioningService.provisionFromPurchaseReceiptItem,
@@ -1773,6 +1814,7 @@ describe('PurchaseReceiptsService', () => {
       transactionClient,
       companyId,
       secondReceiptItemId,
+      undefined,
     );
     expect(transactionClient.product.update).toHaveBeenCalledTimes(2);
     expect(transactionClient.inventoryMovement.create).toHaveBeenCalledTimes(2);
@@ -1872,6 +1914,7 @@ describe('PurchaseReceiptsService', () => {
         transactionClient,
         companyId,
         createdReceiptItemId,
+        undefined,
       );
       expect(transactionClient.product.update).toHaveBeenCalledTimes(1);
       expect(transactionClient.product.update).toHaveBeenCalledWith({
@@ -1967,7 +2010,12 @@ describe('PurchaseReceiptsService', () => {
     );
     expect(
       equipmentProvisioningService.provisionFromPurchaseReceiptItem,
-    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
+    ).toHaveBeenCalledWith(
+      transactionClient,
+      companyId,
+      createdReceiptItemId,
+      undefined,
+    );
     expect(transactionClient.product.update).not.toHaveBeenCalled();
     expect(transactionClient.inventoryMovement.create).not.toHaveBeenCalled();
     expect(transactionClient.purchase.update).not.toHaveBeenCalled();
@@ -2122,7 +2170,12 @@ describe('PurchaseReceiptsService', () => {
     ).toHaveBeenCalledTimes(1);
     expect(
       equipmentProvisioningService.provisionFromPurchaseReceiptItem,
-    ).toHaveBeenCalledWith(transactionClient, companyId, createdReceiptItemId);
+    ).toHaveBeenCalledWith(
+      transactionClient,
+      companyId,
+      createdReceiptItemId,
+      undefined,
+    );
 
     expect(transactionClient.product.update).toHaveBeenCalledWith({
       where: {

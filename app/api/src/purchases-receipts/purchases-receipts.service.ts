@@ -1,3 +1,7 @@
+import { inventoryWriterError } from '../inventory/physical/inventory-authority-error';
+import { InventoryAuthorityTransactionService } from '../inventory/physical/inventory-authority-transaction.service';
+import { ReceiptPhysicalIntegrationService } from '../inventory/physical/receipt-physical-integration.service';
+import { ForbiddenException } from '@nestjs/common';
 import {
   BadRequestException,
   ConflictException,
@@ -76,6 +80,8 @@ export class PurchaseReceiptsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly equipmentProvisioningService: EquipmentProvisioningService,
+    private readonly authority: InventoryAuthorityTransactionService,
+    private readonly physical: ReceiptPhysicalIntegrationService,
   ) {}
 
   async create(
@@ -88,268 +94,317 @@ export class PurchaseReceiptsService {
 
     const requestHash = createPurchaseReceiptRequestHash(dto);
 
-    const replay = await this.findCompletedIdempotentReceipt(
-      companyId,
-      idempotencyKey,
-      requestHash,
-    );
-
-    if (replay) {
-      return replay;
-    }
-
     try {
-      return await this.prisma.$transaction(
-        async (tx) => {
-          const idempotencyRecord = await tx.idempotencyRecord.create({
-            data: {
-              companyId,
-              scope: PURCHASE_RECEIPT_CREATE_SCOPE,
-              key: idempotencyKey,
-              requestHash,
-            },
+      return await this.authority.run(companyId, async (tx, authority) => {
+        const replay = await this.findCompletedIdempotentReceipt(
+          tx,
+          companyId,
+          idempotencyKey,
+          requestHash,
+        );
+        if (replay) return replay;
+        if (authority === 'PHYSICAL') {
+          if (!receivedBy) throw new ForbiddenException();
+          const receipt = await this.physical.execute(
+            tx,
+            companyId,
+            receivedBy,
+            idempotencyKey,
+            dto,
+          );
+          return tx.purchaseReceipt.findFirstOrThrow({
+            where: { id: receipt.id, companyId },
+            include: createReceiptResponseInclude,
           });
+        }
+        const idempotencyRecord = await tx.idempotencyRecord.create({
+          data: {
+            companyId,
+            scope: PURCHASE_RECEIPT_CREATE_SCOPE,
+            key: idempotencyKey,
+            requestHash,
+          },
+        });
 
-          const receivedAt = new Date();
+        await tx.$queryRaw(
+          Prisma.sql`SELECT id FROM "Purchase" WHERE id=${dto.purchaseId} AND "companyId"=${companyId} FOR UPDATE`,
+        );
+        const receivedAt = new Date();
 
-          const purchase = await tx.purchase.findFirst({
-            where: {
-              id: dto.purchaseId,
-              companyId,
-            },
-            include: {
-              items: {
-                include: {
-                  receiptItems: {
-                    select: {
-                      quantityReceived: true,
-                    },
+        const purchase = await tx.purchase.findFirst({
+          where: {
+            id: dto.purchaseId,
+            companyId,
+          },
+          include: {
+            items: {
+              include: {
+                receiptItems: {
+                  select: {
+                    quantityReceived: true,
                   },
                 },
               },
             },
-          });
+          },
+        });
 
-          if (!purchase) {
-            throw new NotFoundException('Compra no encontrada');
-          }
+        if (!purchase) {
+          throw new NotFoundException('Compra no encontrada');
+        }
 
-          this.validatePurchaseStatus(purchase.status);
+        this.validatePurchaseStatus(purchase.status);
 
-          const purchaseItemsById = new Map(
-            purchase.items.map((item) => [item.id, item]),
-          );
+        const purchaseItemsById = new Map(
+          purchase.items.map((item) => [item.id, item]),
+        );
 
-          const normalizedItems: NormalizedReceiptItem[] = dto.items.map(
-            (inputItem) => {
-              const purchaseItem = purchaseItemsById.get(
-                inputItem.purchaseItemId,
-              );
-
-              if (!purchaseItem) {
-                throw new BadRequestException(
-                  `La partida ${inputItem.purchaseItemId} no pertenece a la compra`,
-                );
-              }
-
-              const previouslyReceived = purchaseItem.receiptItems.reduce(
-                (total, receiptItem) => total + receiptItem.quantityReceived,
-                0,
-              );
-
-              const pendingQuantity =
-                purchaseItem.quantity - previouslyReceived;
-
-              if (pendingQuantity <= 0) {
-                throw new BadRequestException(
-                  `La partida ${purchaseItem.id} ya fue recibida completamente`,
-                );
-              }
-
-              if (inputItem.quantityReceived > pendingQuantity) {
-                throw new BadRequestException(
-                  `La cantidad recibida de la partida ${purchaseItem.id} supera la cantidad pendiente (${pendingQuantity})`,
-                );
-              }
-
-              const lotNumber = this.normalizeOptionalText(inputItem.lotNumber);
-
-              return {
-                purchaseItemId: purchaseItem.id,
-                productId: purchaseItem.productId,
-                quantityReceived: inputItem.quantityReceived,
-                unitCost: purchaseItem.price,
-                lotNumber,
-                expirationDate: inputItem.expirationDate,
-              };
-            },
-          );
-
-          const productsById = await this.validateProducts(
-            tx,
-            companyId,
-            normalizedItems.map((item) => item.productId),
-          );
-
-          this.validateLotTracking(normalizedItems, productsById);
-
-          const validatedItems: ValidatedReceiptItem[] = normalizedItems.map(
-            (item) => ({
-              ...item,
-              expirationDate: this.parseExpirationDate(
-                item.expirationDate,
-                receivedAt,
-              ),
-            }),
-          );
-
-          const receipt = await tx.purchaseReceipt.create({
-            data: {
-              companyId,
-              purchaseId: purchase.id,
-              folio: this.generateFolio(),
-              receivedAt,
-              receivedBy,
-              notes: this.normalizeOptionalText(dto.notes),
-            },
-          });
-
-          for (const item of validatedItems) {
-            const batch = item.lotNumber
-              ? await this.registerBatch(tx, {
-                  companyId,
-                  productId: item.productId,
-                  lotNumber: item.lotNumber,
-                  expirationDate: item.expirationDate,
-                  quantityReceived: item.quantityReceived,
-                  unitCost: item.unitCost,
-                  receivedAt,
-                })
-              : undefined;
-
-            const createdReceiptItem = await tx.purchaseReceiptItem.create({
-              data: {
-                companyId,
-                receiptId: receipt.id,
-                purchaseItemId: item.purchaseItemId,
-                productId: item.productId,
-                quantityReceived: item.quantityReceived,
-                lotNumber: item.lotNumber,
-                expirationDate: item.expirationDate,
-                unitCost: item.unitCost,
-                batchId: batch?.id,
-              },
-            });
-
-            await this.equipmentProvisioningService.provisionFromPurchaseReceiptItem(
-              tx,
-              companyId,
-              createdReceiptItem.id,
+        const normalizedItems: NormalizedReceiptItem[] = dto.items.map(
+          (inputItem) => {
+            const purchaseItem = purchaseItemsById.get(
+              inputItem.purchaseItemId,
             );
 
-            const updatedProduct = await tx.product.update({
-              where: {
-                id_companyId: {
-                  id: item.productId,
-                  companyId,
-                },
-              },
-              data: {
-                stock: {
-                  increment: item.quantityReceived,
-                },
-              },
-              select: {
-                stock: true,
-              },
-            });
+            if (!purchaseItem) {
+              throw new BadRequestException(
+                `La partida ${inputItem.purchaseItemId} no pertenece a la compra`,
+              );
+            }
 
-            await tx.inventoryMovement.create({
-              data: {
+            const previouslyReceived = purchaseItem.receiptItems.reduce(
+              (total, receiptItem) => total + receiptItem.quantityReceived,
+              0,
+            );
+
+            const pendingQuantity = purchaseItem.quantity - previouslyReceived;
+
+            if (pendingQuantity <= 0) {
+              throw new BadRequestException(
+                `La partida ${purchaseItem.id} ya fue recibida completamente`,
+              );
+            }
+
+            if (inputItem.quantityReceived > pendingQuantity) {
+              throw new BadRequestException(
+                `La cantidad recibida de la partida ${purchaseItem.id} supera la cantidad pendiente (${pendingQuantity})`,
+              );
+            }
+
+            const lotNumber = this.normalizeOptionalText(inputItem.lotNumber);
+
+            return {
+              purchaseItemId: purchaseItem.id,
+              productId: purchaseItem.productId,
+              quantityReceived: inputItem.quantityReceived,
+              unitCost: purchaseItem.price,
+              lotNumber,
+              expirationDate: inputItem.expirationDate,
+            };
+          },
+        );
+
+        const ids = [
+          ...new Set(normalizedItems.map((i) => i.productId)),
+        ].sort();
+        const tracking = await tx.product.findMany({
+          where: { companyId, id: { in: ids } },
+          select: { id: true, inventoryTracking: true },
+        });
+        const codes = new Map<string, string[]>();
+        for (const item of normalizedItems) {
+          if (
+            tracking.find((p) => p.id === item.productId)?.inventoryTracking ===
+            'ASSET'
+          )
+            codes.set(
+              item.purchaseItemId,
+              await this.equipmentProvisioningService.prepareReceiptCodes(
+                tx,
+                companyId,
+                item.quantityReceived,
+              ),
+            );
+        }
+        for (const id of ids)
+          await tx.$queryRaw(
+            Prisma.sql`SELECT id FROM "Product" WHERE id=${id} AND "companyId"=${companyId} FOR UPDATE`,
+          );
+        const lockedTracking = await tx.product.findMany({
+          where: { companyId, id: { in: ids } },
+          select: { id: true, inventoryTracking: true },
+        });
+        if (
+          lockedTracking.some(
+            (p) =>
+              tracking.find((x) => x.id === p.id)?.inventoryTracking !==
+              p.inventoryTracking,
+          )
+        )
+          throw new ConflictException('Product tracking changed');
+        const productsById = await this.validateProducts(
+          tx,
+          companyId,
+          normalizedItems.map((item) => item.productId),
+        );
+
+        this.validateLotTracking(normalizedItems, productsById);
+
+        const validatedItems: ValidatedReceiptItem[] = normalizedItems.map(
+          (item) => ({
+            ...item,
+            expirationDate: this.parseExpirationDate(
+              item.expirationDate,
+              receivedAt,
+            ),
+          }),
+        );
+
+        const receipt = await tx.purchaseReceipt.create({
+          data: {
+            companyId,
+            purchaseId: purchase.id,
+            folio: this.generateFolio(),
+            receivedAt,
+            receivedBy,
+            notes: this.normalizeOptionalText(dto.notes),
+          },
+        });
+
+        for (const item of validatedItems) {
+          const batch = item.lotNumber
+            ? await this.registerBatch(tx, {
                 companyId,
                 productId: item.productId,
-                batchId: batch?.id,
-                movementType: InventoryMovementType.IN,
-                quantity: item.quantityReceived,
-                balance: updatedProduct.stock,
-                referenceType: 'PURCHASE_RECEIPT',
-                referenceId: receipt.id,
-                notes: `Recepción ${receipt.folio} de compra ${purchase.folio}`,
-                createdBy: receivedBy,
+                lotNumber: item.lotNumber,
+                expirationDate: item.expirationDate,
+                quantityReceived: item.quantityReceived,
                 unitCost: item.unitCost,
-              },
-            });
-          }
+                receivedAt,
+              })
+            : undefined;
 
-          const receivedInCurrentRequest = new Map(
-            validatedItems.map((item) => [
-              item.purchaseItemId,
-              item.quantityReceived,
-            ]),
-          );
-
-          const purchaseWasFullyReceived = purchase.items.every(
-            (purchaseItem) => {
-              const previouslyReceived = purchaseItem.receiptItems.reduce(
-                (total, receiptItem) => total + receiptItem.quantityReceived,
-                0,
-              );
-
-              const currentlyReceived =
-                receivedInCurrentRequest.get(purchaseItem.id) ?? 0;
-
-              return (
-                previouslyReceived + currentlyReceived >= purchaseItem.quantity
-              );
-            },
-          );
-
-          const purchaseUpdateResult = await tx.purchase.updateMany({
-            where: {
-              id: purchase.id,
+          const createdReceiptItem = await tx.purchaseReceiptItem.create({
+            data: {
               companyId,
+              receiptId: receipt.id,
+              purchaseItemId: item.purchaseItemId,
+              productId: item.productId,
+              quantityReceived: item.quantityReceived,
+              lotNumber: item.lotNumber,
+              expirationDate: item.expirationDate,
+              unitCost: item.unitCost,
+              batchId: batch?.id,
+            },
+          });
+
+          await this.equipmentProvisioningService.provisionFromPurchaseReceiptItem(
+            tx,
+            companyId,
+            createdReceiptItem.id,
+            codes.get(item.purchaseItemId),
+          );
+
+          const updatedProduct = await tx.product.update({
+            where: {
+              id_companyId: {
+                id: item.productId,
+                companyId,
+              },
             },
             data: {
-              status: purchaseWasFullyReceived
-                ? PurchaseStatus.RECEIVED
-                : PurchaseStatus.PARTIALLY_RECEIVED,
+              stock: {
+                increment: item.quantityReceived,
+              },
+            },
+            select: {
+              stock: true,
             },
           });
 
-          if (purchaseUpdateResult.count === 0) {
-            throw new NotFoundException('Compra no encontrada');
-          }
-
-          await tx.idempotencyRecord.update({
-            where: {
-              id: idempotencyRecord.id,
-            },
+          await tx.inventoryMovement.create({
             data: {
-              resourceId: receipt.id,
+              companyId,
+              productId: item.productId,
+              batchId: batch?.id,
+              movementType: InventoryMovementType.IN,
+              quantity: item.quantityReceived,
+              balance: updatedProduct.stock,
+              referenceType: 'PURCHASE_RECEIPT',
+              referenceId: receipt.id,
+              notes: `Recepción ${receipt.folio} de compra ${purchase.folio}`,
+              createdBy: receivedBy,
+              unitCost: item.unitCost,
             },
           });
+        }
 
-          return tx.purchaseReceipt.findUniqueOrThrow({
-            where: {
-              id: receipt.id,
-            },
-            include: createReceiptResponseInclude,
-          });
-        },
-        {
-          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-          timeout: 10000,
-        },
-      );
+        const receivedInCurrentRequest = new Map(
+          validatedItems.map((item) => [
+            item.purchaseItemId,
+            item.quantityReceived,
+          ]),
+        );
+
+        const purchaseWasFullyReceived = purchase.items.every(
+          (purchaseItem) => {
+            const previouslyReceived = purchaseItem.receiptItems.reduce(
+              (total, receiptItem) => total + receiptItem.quantityReceived,
+              0,
+            );
+
+            const currentlyReceived =
+              receivedInCurrentRequest.get(purchaseItem.id) ?? 0;
+
+            return (
+              previouslyReceived + currentlyReceived >= purchaseItem.quantity
+            );
+          },
+        );
+
+        const purchaseUpdateResult = await tx.purchase.updateMany({
+          where: {
+            id: purchase.id,
+            companyId,
+          },
+          data: {
+            status: purchaseWasFullyReceived
+              ? PurchaseStatus.RECEIVED
+              : PurchaseStatus.PARTIALLY_RECEIVED,
+          },
+        });
+
+        if (purchaseUpdateResult.count === 0) {
+          throw new NotFoundException('Compra no encontrada');
+        }
+
+        await tx.idempotencyRecord.update({
+          where: {
+            id: idempotencyRecord.id,
+          },
+          data: {
+            resourceId: receipt.id,
+          },
+        });
+
+        return tx.purchaseReceipt.findUniqueOrThrow({
+          where: {
+            id: receipt.id,
+          },
+          include: createReceiptResponseInclude,
+        });
+      });
     } catch (error: unknown) {
       if (!this.isConcurrentIdempotencyError(error)) {
-        throw error;
+        inventoryWriterError(error);
       }
 
-      const concurrentReplay = await this.findCompletedIdempotentReceipt(
-        companyId,
-        idempotencyKey,
-        requestHash,
+      const concurrentReplay = await this.authority.run(companyId, (tx) =>
+        this.findCompletedIdempotentReceipt(
+          tx,
+          companyId,
+          idempotencyKey,
+          requestHash,
+        ),
       );
 
       if (concurrentReplay) {
@@ -552,11 +607,12 @@ export class PurchaseReceiptsService {
   }
 
   private async findCompletedIdempotentReceipt(
+    tx: Prisma.TransactionClient,
     companyId: string,
     idempotencyKey: string,
     requestHash: string,
   ) {
-    const record = await this.prisma.idempotencyRecord.findUnique({
+    const record = await tx.idempotencyRecord.findUnique({
       where: {
         companyId_scope_key: {
           companyId,
@@ -578,7 +634,7 @@ export class PurchaseReceiptsService {
       return null;
     }
 
-    const receipt = await this.prisma.purchaseReceipt.findFirst({
+    const receipt = await tx.purchaseReceipt.findFirst({
       where: {
         id: record.resourceId,
         companyId,

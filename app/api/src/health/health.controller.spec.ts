@@ -1,3 +1,4 @@
+import { InventoryRuntimeCompatibilityService } from '../inventory/physical/inventory-runtime-compatibility.service';
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
@@ -16,6 +17,14 @@ describe('HealthController', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [HealthModule],
     })
+      .overrideProvider(InventoryRuntimeCompatibilityService)
+      .useValue({
+        identity: () => ({
+          protocol: 'inventory-authority-v1',
+          build: 'test',
+          environment: 'isolated',
+        }),
+      })
       .overrideProvider(PrismaService)
       .useValue({ $queryRaw: queryRaw })
       .compile();
@@ -41,7 +50,14 @@ describe('HealthController', () => {
     await request(app.getHttpServer())
       .get('/health/ready')
       .expect(200)
-      .expect({ status: 'ok' });
+      .expect({
+        status: 'ok',
+        inventory: {
+          protocol: 'inventory-authority-v1',
+          build: 'test',
+          environment: 'isolated',
+        },
+      });
 
     expect(queryRaw).toHaveBeenCalledTimes(1);
     const queryCall = queryRaw.mock.calls[0] as unknown[];

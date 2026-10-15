@@ -1,3 +1,4 @@
+import { inventoryAuthorityFence } from './inventory-authority-fence';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { cutoverAssert } from './inventory-cutover.contract';
 import {
@@ -40,7 +41,8 @@ export class InventoryCutoverVerifyService {
     );
     return m;
   }
-  private async inspect(
+  // Internal transactional verification reused by the dedicated activation service.
+  async inspect(
     tx: Prisma.TransactionClient,
     m: OpeningManifest,
     asOf: string,
@@ -117,6 +119,7 @@ export class InventoryCutoverVerifyService {
     cutoverAssert(p, 'NOT_FOUND');
     return db.$transaction(
       async (tx) => {
+        await inventoryAuthorityFence(tx, m.companyId, 'exclusive');
         const c = this.opening.assertControl(
           await this.opening.controlRepo.lock(tx, m.companyId, m.cutoverId),
           m,
@@ -150,7 +153,7 @@ export class InventoryCutoverVerifyService {
         );
         return 'VERIFIED';
       },
-      { timeout: 60000 },
+      { isolationLevel: 'ReadCommitted', timeout: 60000 },
     );
   }
   async certifyCompany(db: PrismaClient, proof: Verification, actorId: string) {
@@ -161,6 +164,7 @@ export class InventoryCutoverVerifyService {
     );
     return db.$transaction(
       async (tx) => {
+        await inventoryAuthorityFence(tx, m.companyId, 'exclusive');
         const c = this.opening.assertControl(
           await this.opening.controlRepo.lock(tx, m.companyId, m.cutoverId),
           m,
@@ -194,7 +198,7 @@ export class InventoryCutoverVerifyService {
         );
         return 'VERIFIED';
       },
-      { timeout: 60000 },
+      { isolationLevel: 'ReadCommitted', timeout: 60000 },
     );
   }
 }

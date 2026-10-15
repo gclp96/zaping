@@ -59,7 +59,7 @@ export class SalesController {
     @Req() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.salesService.approve(req.user.companyId, id);
+    return this.salesService.approve(req.user.companyId, id, req.user.id);
   }
 
   @Get(':id/pdf')
@@ -77,7 +77,11 @@ export class SalesController {
     @Param('quoteId', ParseUUIDPipe)
     quoteId: string,
   ) {
-    return this.salesService.createFromQuote(req.user.companyId, quoteId);
+    return this.salesService.createFromQuote(
+      req.user.companyId,
+      quoteId,
+      req.user.id,
+    );
   }
 
   @Patch(':id/cancel')

@@ -1,3 +1,5 @@
+import { InventoryAuthorityTransactionService } from './physical/inventory-authority-transaction.service';
+import { ManualPhysicalInventoryService } from './physical/manual-physical-inventory.service';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { InventoryMovementType, Prisma } from '@prisma/client';
 
@@ -6,6 +8,7 @@ import { CreateMovementDto } from './dto/create-movement.dto';
 import { InventoryService } from './inventory.service';
 
 type TransactionClientMock = {
+  $queryRaw: jest.Mock;
   product: {
     findFirst: jest.Mock;
     update: jest.Mock;
@@ -36,6 +39,7 @@ describe('InventoryService', () => {
 
   beforeEach(() => {
     transactionClient = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
       product: {
         findFirst: jest.fn(),
         update: jest.fn().mockResolvedValue({ id: productId }),
@@ -59,7 +63,19 @@ describe('InventoryService', () => {
       },
     };
 
-    service = new InventoryService(prisma as unknown as PrismaService);
+    service = new InventoryService(
+      prisma as unknown as PrismaService,
+      new InventoryAuthorityTransactionService(
+        prisma as unknown as PrismaService,
+        {
+          resolve: jest.fn().mockResolvedValue('LEGACY'),
+        },
+        {
+          identity: jest.fn(),
+        },
+      ),
+      {} as ManualPhysicalInventoryService,
+    );
   });
 
   function movementData(
@@ -83,9 +99,11 @@ describe('InventoryService', () => {
     });
   }
 
-  function expectSerializableTransaction(): void {
+  function expectReadCommittedTransaction(): void {
     expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 5000,
+      timeout: 15000,
     });
   }
 
@@ -168,7 +186,7 @@ describe('InventoryService', () => {
     });
   });
 
-  it('registra un movimiento IN dentro de una transacción Serializable', async () => {
+  it('registra un movimiento IN dentro de una transacción ReadCommitted', async () => {
     arrangeProduct(10);
     const movement = {
       id: 'movement-in',
@@ -213,7 +231,7 @@ describe('InventoryService', () => {
         stock: 12,
       },
     });
-    expectSerializableTransaction();
+    expectReadCommittedTransaction();
   });
 
   it('registra un movimiento OUT cuando existe stock suficiente', async () => {
@@ -252,7 +270,7 @@ describe('InventoryService', () => {
       },
       data: { stock: 3 },
     });
-    expectSerializableTransaction();
+    expectReadCommittedTransaction();
   });
 
   it('rechaza OUT por stock insuficiente sin crear movimiento', async () => {
@@ -395,12 +413,20 @@ describe('InventoryService', () => {
     expect(prisma.$transaction).toHaveBeenNthCalledWith(
       1,
       expect.any(Function),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        maxWait: 5000,
+        timeout: 15000,
+      },
     );
     expect(prisma.$transaction).toHaveBeenNthCalledWith(
       2,
       expect.any(Function),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      {
+        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        maxWait: 5000,
+        timeout: 15000,
+      },
     );
   });
 

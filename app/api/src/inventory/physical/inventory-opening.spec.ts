@@ -255,6 +255,11 @@ describe('01D-B manifest, reconciliation and dormant boundaries', () => {
         else if (
           entry.name.endsWith('.ts') &&
           !entry.name.endsWith('.spec.ts') &&
+          ![
+            'inventory-cutover-activate.ts',
+            'inventory-cutover-activation.contract.ts',
+            'inventory-cutover-activation.service.ts',
+          ].includes(entry.name) &&
           !/^inventory-(opening|reconciliation|cutover-verify)/.test(
             entry.name,
           ) &&

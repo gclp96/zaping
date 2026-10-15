@@ -1,3 +1,10 @@
+import { InventoryAuthorityTransactionService } from '../src/inventory/physical/inventory-authority-transaction.service';
+import { InventoryAuthorityResolver } from '../src/inventory/physical/inventory-authority-resolver';
+import { ManualPhysicalInventoryService } from '../src/inventory/physical/manual-physical-inventory.service';
+import { PhysicalInventoryService } from '../src/inventory/physical/physical-inventory.service';
+import { PhysicalInventoryRepository } from '../src/inventory/physical/physical-inventory.repository';
+import { InventoryCompatibilityProjectionService } from '../src/inventory/physical/inventory-compatibility-projection.service';
+import { InventoryCompatibilityHistoryService } from '../src/inventory/physical/inventory-compatibility-history.service';
 import 'dotenv/config';
 
 import { randomUUID } from 'node:crypto';
@@ -20,7 +27,25 @@ const runDbConcurrencyTests = process.env.RUN_DB_CONCURRENCY_TESTS === '1';
   'InventoryService PostgreSQL concurrency',
   () => {
     const prisma = new PrismaService();
-    const service = new InventoryService(prisma);
+    const service = new InventoryService(
+      prisma,
+      new InventoryAuthorityTransactionService(
+        prisma,
+        new InventoryAuthorityResolver(),
+        {
+          identity: () => ({
+            protocol: 'inventory-authority-v1',
+            build: 'legacy-concurrency-fixture',
+            environment: 'isolated-test',
+          }),
+        },
+      ),
+      new ManualPhysicalInventoryService(
+        new PhysicalInventoryService(new PhysicalInventoryRepository()),
+        new InventoryCompatibilityProjectionService(),
+        new InventoryCompatibilityHistoryService(),
+      ),
+    );
 
     beforeAll(async () => {
       await prisma.$connect();

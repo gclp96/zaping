@@ -1,3 +1,4 @@
+import { InventoryRuntimeCompatibilityService } from '../inventory/physical/inventory-runtime-compatibility.service';
 import { Module } from '@nestjs/common';
 
 import { PrismaModule } from '../prisma/prisma.module';
@@ -7,6 +8,6 @@ import { HealthService } from './health.service';
 @Module({
   imports: [PrismaModule],
   controllers: [HealthController],
-  providers: [HealthService],
+  providers: [InventoryRuntimeCompatibilityService, HealthService],
 })
 export class HealthModule {}

@@ -2,12 +2,18 @@
 
 **COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP.**
 
-01D-B IMPLEMENTED / TESTED — pending human review/merge — TARGET8SP.
+01D-C IMPLEMENTED / TESTED — TARGET 8 SP; pendiente revisión humana/merge.
+Full API1935/1935 (116 suites), Web106/106 (8 archivos), PostgreSQL aislado27/27 PASS.
+Fence compartido/exclusivo y router único cableados; CLI interna exige adapter de evidencia.
+ACTUAL CUTOVER NOT EXECUTED; 01D ACTIVATION NOT PERFORMED AGAINST REAL COMPANY.
+EXTERNAL FENCE NOT CERTIFIED. [Runbook](INVENTORY_CUSTODY_01D_CUTOVER_RUNBOOK.md).
+
+Evidencia histórica 01D-B COMPLETE / MERGED — PR #83 — TARGET8SP.
 Focal77/77, full API1918/114 suites, PostgreSQL43/43 PASS; Prisma format/validate/generate,
 typecheck, lint tocado y build PASS. Aceptación sólo DB nueva efímera zaping_opening_test,
 loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APPLY/VERIFY;
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
-Detalle y límites en §A.2 del diseño01D.01D-C BLOCKED hasta aceptación/merge01D-B.
+Detalle y límites en §A.2 del diseño01D.01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN. Sin Forecast/Commitment/Actual.
 
 Merge DEF: `51363f566c8c6656f1653f03f11d9489ab4d082b`. 01A está COMPLETE / MERGED —
@@ -23,10 +29,10 @@ Candidate C OPTIONAL sólo unbatched; replay lógico sólo mismo actor; sin Idem
 01D TECHNICAL DESIGN: APPROVED; TD-INV-01D-01..32 = 32/32 human approved.
 [Diseño01D](INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md): control DB dedicado,
 initializer/adapter opening-only, router único Company y corte coordinado.
-01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C BLOCKED.
+01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED.
 DESIGN APPROVED no significa CUTOVER READY;01D ACTIVATION NOT STARTED.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:
-01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP IMPLEMENTED / TESTED — pending human review/merge;01D-C8SP BLOCKED hasta aceptación/merge01D-B; TOTAL21SP.
+01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP COMPLETE / MERGED — PR #83;01D-C8SP IMPLEMENTED / TESTED; TOTAL21SP.
 Sin Forecast/Commitment/Actual ni fechas.
 01E y Dispatch siguen bloqueados; 01A/01B/01C permanecen DORMANT.
 
@@ -58,23 +64,29 @@ INTERNAL_USER/EXTERNAL_PERSON y snapshots siguen perteneciendo a Dispatch.
 [DOMAIN_MODEL](../healthcare/DOMAIN_MODEL.md) separan preparación lógica de custodia.
 PROJECT_BOARD y ROADMAP mantienen el gate de arquitectura previo a logística física.
 
-## 2. Current inventory fact map
+## 2. Inventory fact map del baseline de discovery
 
-| Hecho | Persistencia y comportamiento real | Autoridad / concurrencia / tenant |
-| --- | --- | --- |
-| Product.stock | Int default 0; Product create no recibe stock. Inventory createMovement IN suma, OUT resta, ADJUSTMENT fija saldo absoluto. Receipts incrementa; Sales approve y convertFromQuote decrementan. | Saldo operativo leído para gastar y para dashboard/low stock; no se recalcula del ledger en cada request. Writes acompañados de movimientos en transacción en esos caminos. Lookup Company y update compuesto/filtrado por tenant. |
-| InventoryBatch | Company/Product, lotNumber, expirationDate?, initialQuantity, availableQuantity, isActive, unitCost. Receipt crea ambos contadores o los incrementa; initialQuantity es acumulado recibido, no saldo actual. | Único Company/Product/lotNumber; FKs Company y Product separadas, no garantizan por sí solas coincidencia tenant. Servicios validan relaciones. Sin decremento de batch en los caminos OUT examinados. |
-| Batch vs Product | Receipt con lote incrementa batch y Product; Receipt sin lote, movimiento manual y Sales pueden operar sólo agregado. | No igualdad garantizada entre suma availableQuantity y stock. Sales no conserva qué lote salió: distribución histórica no reconstruible por esos registros. No se afirma que datos reales sean inconsistentes; no se consultó DB. |
-| InventoryMovement | IN/OUT/ADJUSTMENT, quantity, balance?, Product, batch opcional, referenceType/Id, createdBy opcional, costo/notas. Sin source/target location ni transferencia. | Evidencia histórica por ADR; ejecución usa saldo persistido, no replay del historial. ADJUSTMENT quantity es saldo final, no delta. FK simples no aseguran todo el matching Company/Product/Batch. |
-| Manual Inventory | createMovement relee Product por intento; movimiento + stock en Serializable, hasta tres intentos ante conflicto. | Evita reutilizar saldo de transacción abortada. Sin IdempotencyRecord en ese comando: retry HTTP de IN/OUT tras respuesta perdida no es replay seguro. Actor no se llena en ese write actual. |
-| Sales | approve DRAFT→CONFIRMED y conversión Quote→Sale CONFIRMED consumen stock dentro de transacción; decremento condicional stock>=quantity. | Estado condicional evita doble aprobación; conversión protege origen Quote/relación única. No Idempotency-Key físico común; repetir no garantiza respuesta de replay. Product tenant/activo validado. |
-| Elegibilidad Sales | Generic Sales sólo QUANTITY; rechaza lotTracking REQUIRED y ASSET/SERIALIZED. NONE/OPTIONAL no seleccionan batch. | No afirmar que Sales ya vende REQUIRED por lote. OPTIONAL puede tener receipts con lote pero su OUT sigue agregado. No puede excluir custodia inexistente. |
-| Purchase | Confirmar orden cambia estado; no ingresa stock. | Transición condicional en transacción, evita confundir compra con recepción física. |
-| PurchaseReceipt | Recepción parcial valida pendientes y lotTracking; REQUIRED exige lote, NONE rechaza datos de lote, OPTIONAL permite ambos. Crea receipt/items, batch opcional, incrementa stock, crea IN PURCHASE_RECEIPT; puede provisionar EquipmentAsset. | Transacción Serializable; key/hash PURCHASE_RECEIPT_CREATE, claim/completion y efectos atómicos. Misma key/payload replay, mismatch rechazado. |
-| Helper legacy | Inventory.registerPurchaseEntry incrementa Product + IN en transacción recibida. | No se encontró caller productivo en búsqueda de src; no confundir existencia de helper con efecto actual de Purchase.approve. Debe migrarse o retirarse antes de cutover. |
-| Equipment | Asset individual, lifecycle/condition/serial; Assignment RESERVED lógico por Case. | No custodia física ni posición material. Receipt ASSET también incrementa saldo agregado hoy: no sumarlo de nuevo como material más Asset. |
-| CaseKit | DRAFT/PREPARED, preparedQuantity, auditoría y referencias actuales. | No modifica stock, batch ni movimiento. Assignment release no puede convertirse en liberación física futura. |
-| IdempotencyRecord | Company/scope/key único, hash, resourceId. | Receipt y Healthcare lo usan; no scopes de shared physical effect actuales. |
+Esta tabla conserva evidencia histórica previa al wiring01D-C. Estado actual: los cuatro
+writers usan fence Company compartido, runtime/resolver y una rama LEGACY o PHYSICAL en
+READ COMMITTED; CUTOVER/recovery rechazan. El helper registerPurchaseEntry fue retirado.
+Manual físico usa fuentes/revisiones explícitas; Receipt/Sales reutilizan01B/01C.
+Product.stock conserva owned; no se redefine lowStock ni valoración. Ver §A.3 del diseño01D.
+
+| Hecho              | Persistencia y comportamiento real                                                                                                                                                                                                            | Autoridad / concurrencia / tenant                                                                                                                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product.stock      | Int default 0; Product create no recibe stock. Inventory createMovement IN suma, OUT resta, ADJUSTMENT fija saldo absoluto. Receipts incrementa; Sales approve y convertFromQuote decrementan.                                                | Saldo operativo leído para gastar y para dashboard/low stock; no se recalcula del ledger en cada request. Writes acompañados de movimientos en transacción en esos caminos. Lookup Company y update compuesto/filtrado por tenant. |
+| InventoryBatch     | Company/Product, lotNumber, expirationDate?, initialQuantity, availableQuantity, isActive, unitCost. Receipt crea ambos contadores o los incrementa; initialQuantity es acumulado recibido, no saldo actual.                                  | Único Company/Product/lotNumber; FKs Company y Product separadas, no garantizan por sí solas coincidencia tenant. Servicios validan relaciones. Sin decremento de batch en los caminos OUT examinados.                             |
+| Batch vs Product   | Receipt con lote incrementa batch y Product; Receipt sin lote, movimiento manual y Sales pueden operar sólo agregado.                                                                                                                         | No igualdad garantizada entre suma availableQuantity y stock. Sales no conserva qué lote salió: distribución histórica no reconstruible por esos registros. No se afirma que datos reales sean inconsistentes; no se consultó DB.  |
+| InventoryMovement  | IN/OUT/ADJUSTMENT, quantity, balance?, Product, batch opcional, referenceType/Id, createdBy opcional, costo/notas. Sin source/target location ni transferencia.                                                                               | Evidencia histórica por ADR; ejecución usa saldo persistido, no replay del historial. ADJUSTMENT quantity es saldo final, no delta. FK simples no aseguran todo el matching Company/Product/Batch.                                 |
+| Manual Inventory   | createMovement relee Product por intento; movimiento + stock en Serializable, hasta tres intentos ante conflicto.                                                                                                                             | Evita reutilizar saldo de transacción abortada. Sin IdempotencyRecord en ese comando: retry HTTP de IN/OUT tras respuesta perdida no es replay seguro. Actor no se llena en ese write actual.                                      |
+| Sales              | approve DRAFT→CONFIRMED y conversión Quote→Sale CONFIRMED consumen stock dentro de transacción; decremento condicional stock>=quantity.                                                                                                       | Estado condicional evita doble aprobación; conversión protege origen Quote/relación única. No Idempotency-Key físico común; repetir no garantiza respuesta de replay. Product tenant/activo validado.                              |
+| Elegibilidad Sales | Generic Sales sólo QUANTITY; rechaza lotTracking REQUIRED y ASSET/SERIALIZED. NONE/OPTIONAL no seleccionan batch.                                                                                                                             | No afirmar que Sales ya vende REQUIRED por lote. OPTIONAL puede tener receipts con lote pero su OUT sigue agregado. No puede excluir custodia inexistente.                                                                         |
+| Purchase           | Confirmar orden cambia estado; no ingresa stock.                                                                                                                                                                                              | Transición condicional en transacción, evita confundir compra con recepción física.                                                                                                                                                |
+| PurchaseReceipt    | Recepción parcial valida pendientes y lotTracking; REQUIRED exige lote, NONE rechaza datos de lote, OPTIONAL permite ambos. Crea receipt/items, batch opcional, incrementa stock, crea IN PURCHASE_RECEIPT; puede provisionar EquipmentAsset. | Transacción Serializable; key/hash PURCHASE_RECEIPT_CREATE, claim/completion y efectos atómicos. Misma key/payload replay, mismatch rechazado.                                                                                     |
+| Helper legacy      | Inventory.registerPurchaseEntry incrementa Product + IN en transacción recibida.                                                                                                                                                              | No se encontró caller productivo en búsqueda de src; no confundir existencia de helper con efecto actual de Purchase.approve. Debe migrarse o retirarse antes de cutover.                                                          |
+| Equipment          | Asset individual, lifecycle/condition/serial; Assignment RESERVED lógico por Case.                                                                                                                                                            | No custodia física ni posición material. Receipt ASSET también incrementa saldo agregado hoy: no sumarlo de nuevo como material más Asset.                                                                                         |
+| CaseKit            | DRAFT/PREPARED, preparedQuantity, auditoría y referencias actuales.                                                                                                                                                                           | No modifica stock, batch ni movimiento. Assignment release no puede convertirse en liberación física futura.                                                                                                                       |
+| IdempotencyRecord  | Company/scope/key único, hash, resourceId.                                                                                                                                                                                                    | Receipt y Healthcare lo usan; no scopes de shared physical effect actuales.                                                                                                                                                        |
 
 Evidencia inspeccionada: [schema](../../../app/api/prisma/schema.prisma),
 [Inventory service](../../../app/api/src/inventory/inventory.service.ts),
@@ -97,12 +109,12 @@ Posiciones y evidencia se actualizan atómicamente. Leer disponibilidad normal n
 requiere reproducir el historial completo. Nombres concretos de entidades Prisma,
 campos y mecanismos de locks siguen siendo diseño técnico, no decisiones de schema.
 
-| Familia evaluada en discovery | Resultado |
-| --- | --- |
-| Posiciones | Base aprobada para autoridad física actual; disponibilidad compartida por Inventory/Sales/Healthcare. |
-| Owned + allocations/holds | No seleccionada como autoridad alternativa; no introducir ledger paralelo que pueda gastar las mismas unidades. |
-| Ledger puro con replay por request | No seleccionado; evidencia histórica con posiciones transaccionales evita replay completo en consultas normales. |
-| Posiciones + ledger transaccional | Arquitectura aprobada, con Product.stock y balances batch compatibles como proyecciones, no autoridades independientes. |
+| Familia evaluada en discovery      | Resultado                                                                                                               |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Posiciones                         | Base aprobada para autoridad física actual; disponibilidad compartida por Inventory/Sales/Healthcare.                   |
+| Owned + allocations/holds          | No seleccionada como autoridad alternativa; no introducir ledger paralelo que pueda gastar las mismas unidades.         |
+| Ledger puro con replay por request | No seleccionado; evidencia histórica con posiciones transaccionales evita replay completo en consultas normales.        |
+| Posiciones + ledger transaccional  | Arquitectura aprobada, con Product.stock y balances batch compatibles como proyecciones, no autoridades independientes. |
 
 ADR-014 describe entradas relacionadas OUT origen + IN destino. El refinamiento
 DEC-INV-CUST-04 distingue dirección contable de semántica empresarial: TRANSFER es
@@ -213,15 +225,15 @@ Misma identidad con payload incompatible se rechaza. Receipt conserva su patrón
 Sales y writers manuales deben integrarse, no confiar en una nueva key por retry.
 No llamadas externas dentro de la sección transaccional física.
 
-| Caso de aceptación requerido | Invariante |
-| --- | --- |
-| Sale vs Sale, Sale vs Dispatch, Dispatch vs Dispatch | Compiten por la misma disponibilidad batch/posición; no overdraw. |
-| Receipt vs consumo | Orden serial coherente, no incremento perdido ni gasto de ingreso no confirmado. |
-| Count correction vs consumo | Revisión/saldo actual; conteo viejo no sobrescribe gasto concurrente. |
-| Dos handoffs del mismo Asset | Una única cadena activa de custodia. |
-| Respuesta perdida/retry | Un efecto, una auditoría y un delta de proyección. |
-| Fallo tras débito antes de crédito | Rollback de todo el handoff, posiciones, evidencia y claim. |
-| Return futuro vs otra operación | Contexto/version residual común; no doble retorno ni disponibilidad automática antes de inspección. |
+| Caso de aceptación requerido                         | Invariante                                                                                          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Sale vs Sale, Sale vs Dispatch, Dispatch vs Dispatch | Compiten por la misma disponibilidad batch/posición; no overdraw.                                   |
+| Receipt vs consumo                                   | Orden serial coherente, no incremento perdido ni gasto de ingreso no confirmado.                    |
+| Count correction vs consumo                          | Revisión/saldo actual; conteo viejo no sobrescribe gasto concurrente.                               |
+| Dos handoffs del mismo Asset                         | Una única cadena activa de custodia.                                                                |
+| Respuesta perdida/retry                              | Un efecto, una auditoría y un delta de proyección.                                                  |
+| Fallo tras débito antes de crédito                   | Rollback de todo el handoff, posiciones, evidencia y claim.                                         |
+| Return futuro vs otra operación                      | Contexto/version residual común; no doble retorno ni disponibilidad automática antes de inspección. |
 
 No se escriben pruebas ni se ejecutan DB aquí.
 
@@ -268,44 +280,44 @@ no claims, SQL o locks. Snapshot de custodian híbrido permanece en Dispatch.
 
 ## 9. DEC-INV-CUST-01..14 — APPROVED con refinamientos
 
-| ID | Estado | Decisión vinculante |
-| --- | --- | --- |
-| DEC-INV-CUST-01 | APPROVED | Posiciones = autoridad física actual; ledger/efectos inmutables = evidencia histórica; Product.stock/batch legacy = proyecciones. Actualización atómica, sin replay completo normal; nombres Prisma no aprobados. |
-| DEC-INV-CUST-02 | APPROVED WITH WRITE DEPRECATION | Product.stock = Company-owned material quantity. Tras cutover sólo proyección transaccional; ningún writer independiente ni uso Sales como available. CURRENT intacto hasta corte. |
-| DEC-INV-CUST-03 | APPROVED | Posiciones loteadas InventoryBatch-backed; batchId null para QUANTITY realmente sin lote. Históricos recibidos no son saldos actuales; preservar semántica exacta de campos compatibles. |
-| DEC-INV-CUST-04 | APPROVED WITH SEMANTIC REFINEMENT | TRANSFER es un evento atómico debit+credit, preserva owned; origen no es OUT definitivo ni movimiento empresarial independiente. OUT sólo disposición definitiva. |
-| DEC-INV-CUST-05 | APPROVED | Material en custodia dentro de posiciones compartidas con linkage durable Dispatch/Item. No duplicar Dispatch; handoff empresarial vs balance físico separados. |
-| DEC-INV-CUST-06 | APPROVED | OUT consume posición propia real y reduce owned una vez. Transfers a Custody/Inspection no reducen owned; downstream nunca repite descuento. |
-| DEC-INV-CUST-07 | APPROVED | Sales consume shared AVAILABLE, nunca custody. Fuente concreta obligatoria; REQUIRED selección batch exacta; OPTIONAL puede resolución backend determinista (FEFO candidato); unbatched usa posición sin lote. |
-| DEC-INV-CUST-08 | APPROVED | Receipt atómico: AVAILABLE + evidencia + proyecciones owned/batch + idempotencia, sin incrementos de autoridades competidoras. |
-| DEC-INV-CUST-09 | APPROVED WITH ADJUSTMENT SPLIT | COUNT_CORRECTION por posición/batch, expected version, actor, razón y delta; owned refleja conteo. Reclassification es TRANSFER, no ajuste. No Product.stock=X después del corte. |
-| DEC-INV-CUST-10 | APPROVED V1 SERIALIZATION PROTOCOL | Transacción → Product roots ordenados → posiciones/batches ordenados → invariantes → balances → efecto → proyecciones → idempotencia → commit. Todos los writers; mecanismo técnico pendiente, sin advisory lock aprobado. |
-| DEC-INV-CUST-11 | APPROVED | Origen físico único durable: un evento idempotente, un efecto. Mutación empresarial, balances, ledger y completion atómicos; sin duplicados por retry. |
-| DEC-INV-CUST-12 | APPROVED | Opening baseline conciliado/auditado; sin inventar linaje. Unbatched stock conciliado puede sembrar AVAILABLE; loteado por batch real; discrepancia exige resolución, nunca distribución arbitraria. Timestamp/manifest y autoridad única al corte. |
-| DEC-INV-CUST-13 | APPROVED | owned=sum posiciones propias no terminales; available=sum elegibles; inCustody=sum propias en custodia. Futuro inspection/quarantine; no afirmar reserved/staged implementados. |
-| DEC-INV-CUST-14 | APPROVED | EquipmentAsset fuera de posiciones cuantitativas; una custodia activa por Asset. Handoff coordina material, Asset y Dispatch atómicamente; persistencia Equipment técnica posterior. |
+| ID              | Estado                             | Decisión vinculante                                                                                                                                                                                                                                 |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DEC-INV-CUST-01 | APPROVED                           | Posiciones = autoridad física actual; ledger/efectos inmutables = evidencia histórica; Product.stock/batch legacy = proyecciones. Actualización atómica, sin replay completo normal; nombres Prisma no aprobados.                                   |
+| DEC-INV-CUST-02 | APPROVED WITH WRITE DEPRECATION    | Product.stock = Company-owned material quantity. Tras cutover sólo proyección transaccional; ningún writer independiente ni uso Sales como available. CURRENT intacto hasta corte.                                                                  |
+| DEC-INV-CUST-03 | APPROVED                           | Posiciones loteadas InventoryBatch-backed; batchId null para QUANTITY realmente sin lote. Históricos recibidos no son saldos actuales; preservar semántica exacta de campos compatibles.                                                            |
+| DEC-INV-CUST-04 | APPROVED WITH SEMANTIC REFINEMENT  | TRANSFER es un evento atómico debit+credit, preserva owned; origen no es OUT definitivo ni movimiento empresarial independiente. OUT sólo disposición definitiva.                                                                                   |
+| DEC-INV-CUST-05 | APPROVED                           | Material en custodia dentro de posiciones compartidas con linkage durable Dispatch/Item. No duplicar Dispatch; handoff empresarial vs balance físico separados.                                                                                     |
+| DEC-INV-CUST-06 | APPROVED                           | OUT consume posición propia real y reduce owned una vez. Transfers a Custody/Inspection no reducen owned; downstream nunca repite descuento.                                                                                                        |
+| DEC-INV-CUST-07 | APPROVED                           | Sales consume shared AVAILABLE, nunca custody. Fuente concreta obligatoria; REQUIRED selección batch exacta; OPTIONAL puede resolución backend determinista (FEFO candidato); unbatched usa posición sin lote.                                      |
+| DEC-INV-CUST-08 | APPROVED                           | Receipt atómico: AVAILABLE + evidencia + proyecciones owned/batch + idempotencia, sin incrementos de autoridades competidoras.                                                                                                                      |
+| DEC-INV-CUST-09 | APPROVED WITH ADJUSTMENT SPLIT     | COUNT_CORRECTION por posición/batch, expected version, actor, razón y delta; owned refleja conteo. Reclassification es TRANSFER, no ajuste. No Product.stock=X después del corte.                                                                   |
+| DEC-INV-CUST-10 | APPROVED V1 SERIALIZATION PROTOCOL | Transacción → Product roots ordenados → posiciones/batches ordenados → invariantes → balances → efecto → proyecciones → idempotencia → commit. Todos los writers; mecanismo técnico pendiente, sin advisory lock aprobado.                          |
+| DEC-INV-CUST-11 | APPROVED                           | Origen físico único durable: un evento idempotente, un efecto. Mutación empresarial, balances, ledger y completion atómicos; sin duplicados por retry.                                                                                              |
+| DEC-INV-CUST-12 | APPROVED                           | Opening baseline conciliado/auditado; sin inventar linaje. Unbatched stock conciliado puede sembrar AVAILABLE; loteado por batch real; discrepancia exige resolución, nunca distribución arbitraria. Timestamp/manifest y autoridad única al corte. |
+| DEC-INV-CUST-13 | APPROVED                           | owned=sum posiciones propias no terminales; available=sum elegibles; inCustody=sum propias en custodia. Futuro inspection/quarantine; no afirmar reserved/staged implementados.                                                                     |
+| DEC-INV-CUST-14 | APPROVED                           | EquipmentAsset fuera de posiciones cuantitativas; una custodia activa por Asset. Handoff coordina material, Asset y Dispatch atómicamente; persistencia Equipment técnica posterior.                                                                |
 
 ## 10. Slices definidos y estado posterior al merge DEF
 
-| ID | Alcance | TARGET | Estado |
-| --- | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01A | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP | COMPLETE / MERGED — PR #77 — main@47fd68a |
-| HC-INVENTORY-CUSTODY-01B | Purchase Receipts + writers Inventory manual + proyecciones compatibles | 8 SP | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01C | Sales shared availability + resolución outbound + concurrencia | 8 SP | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D |
-| HC-INVENTORY-CUSTODY-01D | Reconciliation + opening baseline + coordinated cutover umbrella | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A MERGED PR #82; 01D-B IMPLEMENTED / TESTED, pending review/merge; 01D-C BLOCKED; original8SP SUPERSEDED |
-| HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation | 5 SP | COMPLETE / MERGED — PR #82 — NON-ACTIVATING |
-| HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification | 8 SP | IMPLEMENTED / TESTED — pending human review/merge — NO PRODUCTIVE ACTIVATION |
-| HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-B — IMPLEMENTATION: NOT STARTED |
-| HC-INVENTORY-CUSTODY-01E | Primitiva custodia Equipment + aceptación Foundation cruzada | 8 SP | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D |
+| ID                         | Alcance                                                                           | TARGET            | Estado                                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| HC-INVENTORY-CUSTODY-01A   | Core physical authority: posiciones + ledger/efectos transaccionales + read model | 8 SP              | COMPLETE / MERGED — PR #77 — main@47fd68a                                                                                            |
+| HC-INVENTORY-CUSTODY-01B   | Purchase Receipts + writers Inventory manual + proyecciones compatibles           | 8 SP              | COMPLETE / MERGED — PR #79 — DORMANT UNTIL 01D                                                                                       |
+| HC-INVENTORY-CUSTODY-01C   | Sales shared availability + resolución outbound + concurrencia                    | 8 SP              | COMPLETE / MERGED — PR #80 — main@c3d0824 — DORMANT UNTIL 01D                                                                        |
+| HC-INVENTORY-CUSTODY-01D   | Reconciliation + opening baseline + coordinated cutover umbrella                  | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A MERGED PR #82; 01D-B COMPLETE / MERGED PR #83; 01D-C IMPLEMENTED / TESTED; original8SP SUPERSEDED |
+| HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation                        | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
+| HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification                                   | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
+| HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation                         | 8 SP              | IMPLEMENTED / TESTED — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
+| HC-INVENTORY-CUSTODY-01E   | Primitiva custodia Equipment + aceptación Foundation cruzada                      | 8 SP              | DEFINED / BLOCKED BY completion/activation requirements of HC-INVENTORY-CUSTODY-01D                                                  |
 
 Esta división sustituye el slice integrado de 13 SP del discovery. Sin fechas,
-Forecast, Commitment ni Actual. 01D-A merged PR #82;01D-B implementado localmente; no hay activación. DEF fue merged
+Forecast, Commitment ni Actual. 01D-A merged PR #82;01D-B merged PR #83; 01D-C implementado y probado localmente; no hay activación. DEF fue merged
 mediante PR #75; 01A COMPLETE / MERGED mediante PR #77 sobre
 `47fd68a409906b3a5981bd7f7cd30a48e08714b0`, con TD-INV-01A-01..20 APPROVED / MERGED
 mediante PR #76 tras las sustituciones humanas 10/14/19. 01B COMPLETE / MERGED — PR #79;
 01C COMPLETE / MERGED — PR #80 — main@c3d0824, DORMANT UNTIL 01D.
 01D diseño aprobado32/32;01D-A COMPLETE / MERGED — PR #82;
-01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C bloqueado hasta aceptación/merge01D-B. Activación depende de gates
+01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED. Activación depende de gates
 reales de cutover, no de decisiones TD pendientes. 01E sigue BLOCKED. TD-INV-01B-01..30 APPROVED;
 TARGET 8 SP con alcance backend QUANTITY dormido, sin frontend/cutover.
 COUNT_CORRECTION cero conserva Effect/Line sin revision bump; Receipt mixto separa
@@ -320,7 +332,7 @@ Dispatch de correction/reversal auditado y recovery PREPARED antes de uso amplio
 selector Assignment >100 sigue P1. M-HC1 OPEN.
 
 **Resultado: COMPLETE / MERGED — PR #75 — main@51363f5 — HC-INVENTORY-CUSTODY-DEF.**
-Siguiente acción: revisión humana01D-B → staging selectivo → commit → PR.
+Siguiente acción: revisión humana01D-C → staging selectivo → commit → PR.
 Evidencia01D-A: full API1896/113 suites, PostgreSQL16/16 en DB nueva efímera
 (loopback/tmpfs, cleanup PASS), Prisma validate/typecheck/lint/build PASS; detalle
 y limitaciones (generate DLL ocupada y70 diagnósticos noEmit preexistentes) en §A.1 del diseño01D.

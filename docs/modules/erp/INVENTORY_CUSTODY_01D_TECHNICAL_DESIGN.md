@@ -3,7 +3,7 @@
 ## A. Executive summary
 
 TECHNICAL DESIGN: APPROVED — TD-INV-01D-01..32, 32/32 human approved.
-IMPLEMENTATION: 01D-A COMPLETE / MERGED — PR #82; 01D-B IMPLEMENTED / TESTED — pending human review/merge — NON-ACTIVATING; 01D-C BLOCKED.
+IMPLEMENTATION: 01D-A COMPLETE / MERGED — PR #82; 01D-B COMPLETE / MERGED — PR #83 — NON-ACTIVATING; 01D-C IMPLEMENTED / TESTED.
 DESIGN APPROVED no significa CUTOVER READY.
 Baseline: `c3d0824e64152ae26c0d891d203b5fa8ebb80899`, rama
 `docs/hc-inventory-custody-01d-technical-design`; DEF/01A/B/C merged PR#75/#77/#79/#80.
@@ -20,9 +20,9 @@ Router único Company LEGACY/FROZEN/PHYSICAL desde control durable; sin fallback
 Membership Sales DB exacto; UNKNOWN falla cerrado; sin replay OUT histórico.
 OPTIONAL accessibility y discrepancias reales bloquean toda Company.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:01D-A5 +01D-B8 +01D-C8 =21SP.
-01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C BLOCKED hasta aceptación/merge01D-B. Sin fechas/Forecast/Commitment/Actual.
+01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED. Sin fechas/Forecast/Commitment/Actual.
 Writer certification, manifest real, reconciliation y freeze son gates futuros, no TD pendientes.
-DATABASE ACTIVITY: sólo aceptación en DB efímera vacía; migración nueva schema-only.
+DATABASE ACTIVITY: sólo aceptación en DB efímera vacía; 01D-C no añade migraciones.
 01D ACTIVATION: NOT STARTED; no DB dev/qa/producción ni apertura real.
 
 ## A.1 Implementación local01D-A y evidencia de validación
@@ -66,13 +66,13 @@ ocupada (EPERM); tipos generados y motor existente ejecutaron la aceptación rea
 El SHA-256 del motor DLL existente coincide con el motor instalado de Prisma.
 No se detuvieron procesos ajenos; no afirmar generate PASS.
 
-01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C BLOCKED hasta aceptación/merge01D-B.01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
+01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
 
 ## A.2 Implementación local01D-B y evidencia de validación
 
-01D-A COMPLETE / MERGED — PR #82. 01D-B IMPLEMENTED / TESTED — pending human review/merge.
+01D-A COMPLETE / MERGED — PR #82. 01D-B COMPLETE / MERGED — PR #83.
 TARGET 8 SP — CONFIRMED. Baseline `351bbc9272740cdea9042ad5ceb7448648045c99`,
-rama `feat/hc-inventory-custody-01d-b-opening-baseline`. 01D-C BLOCKED hasta aceptación/merge01D-B.
+rama `feat/hc-inventory-custody-01d-b-opening-baseline`. 01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.
 
 - OPENING interno en InventoryPhysicalEffectKind; migraciones separadas
   `20261014000300_inventory_opening_enum` y `20261014000400_inventory_opening_constraints`.
@@ -114,6 +114,44 @@ Run `2b5b5d4b-89fb-421a-b802-668bc22f682b`. Cleanup contenedor/fixtures/tmpfs PA
 Sin DB dev/QA/producción/prior spike; .env sin cambios. No deployment.
 01A/01B/01C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN. No CUTOVER READY.
 
+## A.3 Implementación local 01D-C
+
+TARGET 8 SP. Baseline `f24577d312291dbb9ee4441a5091698abbdeda06`, rama
+`feat/hc-inventory-custody-01d-c-authority-cutover`.
+01D-C IMPLEMENTED / TESTED; pendiente revisión humana y merge.
+
+- Fence advisory transaccional compartido por Company para Manual, Receipt, Sales approve
+  y Quote conversion; exclusivo para creación/control/recovery/activación. READ COMMITTED;
+  runtime y resolver después del fence, una rama por intento, sin fallback.
+- Manual físico explícito con key, actor autenticado, Position/revisión y motivo; lector
+  tenant-safe de Positions. Legacy manual rechaza PHYSICAL. registerPurchaseEntry retirado.
+- Receipt reutiliza integración01B y respuesta pública; Sales reutiliza01C, actor/replay,
+  Candidate C y REQUIRED. Product.stock continúa proyección owned; lectores sin cambio semántico.
+- Activación interna CAS VERIFIED→PHYSICAL_ACTIVE y CLI explícita, adapter externo obligatorio;
+  no endpoint ni setter genérico. Readback conserva actor original. Rollback sólo evaluación
+  con baseline OPENING exacta; cualquier Effect de negocio, incluso COUNT cero, exige forward-fix.
+- Readiness valida protocolo/build/environment configurados. No acredita binarios antiguos,
+  credenciales ni sesiones externas: EXTERNAL FENCE NOT CERTIFIED.
+
+Validación: focal308/308 en16 suites; regresión final de fixtures145/145 en6 suites,
+incluidos tres contratos estáticos nuevos. Typecheck productivo, noEmit tocado, lint completo,
+build, Prisma format/validate, Prettier y git diff --check PASS. Sin cambio de schema/client,
+Prisma generate no requerido. Full API 1935/1935 en116 suites; Web relevante106/106 en8 archivos;
+PostgreSQL27/27 en contenedor nuevo PostgreSQL16, DB vacía antes de39 migraciones existentes,
+rol runtime no superuser. Último target `127.0.0.1:63478/zaping_authority_test`, run
+`852659ba-edca-40d5-b10e-b33ee9abd0fd`; cleanup PASS. Incluye barreras/conexiones
+independientes, cuatro writers, CAS/replay, zero-write CUTOVER, shared-fence concurrency y
+simulación aislada de revocación/terminación de rol/sesión antiguos. Sin DB real ni spike.
+No schema/migración nueva, frontend ni infraestructura de deployment.
+Chequeo suplementario global de specs:69 diagnósticos frente a71 del baseline,
+cero diagnósticos nuevos al comparar archivo/código/fuente con baseline en memoria.
+No declarar ese chequeo global PASS; typecheck productivo y noEmit de archivos tocados PASS.
+
+[Runbook operativo](INVENTORY_CUSTODY_01D_CUTOVER_RUNBOOK.md): gates externos, metadata,
+CLI, freeze/drain, evidencia, read-only acceptance, unfreeze y primeras operaciones legítimas.
+01A/01B/01C ACTIVATION DORMANT. ACTUAL CUTOVER NOT EXECUTED.
+01D ACTIVATION NOT PERFORMED AGAINST REAL COMPANY. M-HC1 OPEN.
+
 ## B. Current-state evidence map
 
 Referencias relativas al repo, inspeccionadas en el baseline anterior. Los símbolos
@@ -126,48 +164,48 @@ operaciones debe completar ese inventario antes del freeze.
 
 ### B.1 Evidencia canónica
 
-| Ref | Fuente / evidencia |
-| --- | --- |
-| E01 | [DEF](INVENTORY_CUSTODY_DEFINITION.md), DEC-INV-CUST-01..14, §§4–7: owned, elegibilidad, opening reconciliado y autoridad única. |
-| E02 | [01A](INVENTORY_CUSTODY_TECHNICAL_DESIGN.md), TD-10/14/19 y §§2–8: origen único, locks, append-only, pool lógico sin location master, elegibilidad de CREDIT. |
-| E03 | [01B](INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md), TD-03/12–16/19/22–30: replay Receipt, manual aditivo, batch AVAILABLE, subconjuntos de tracking. |
-| E04 | [01C](INVENTORY_CUSTODY_01C_TECHNICAL_DESIGN.md), TD-09/17/24–26/31/34: Candidate C, locks, mismo actor, legacy UNKNOWN. |
-| E05 | [schema](../../../app/api/prisma/schema.prisma), Product:28, Movement:64, Batch:90, Position:139, Effect:163, Line:185, Company:429, Sequence:473, IdempotencyRecord:488, Sale:1046. Campo físico real `inventoryBatchId`; Movement usa `batchId`. No modelo cutover/manifest/epoch. |
-| E06 | [InventoryService](../../../app/api/src/inventory/inventory.service.ts), createMovement:61, write:96/115, registerPurchaseEntry:151; [controller](../../../app/api/src/inventory/inventory.controller.ts):40 y módulo. |
-| E07 | [Receipt legacy](../../../app/api/src/purchases-receipts/purchases-receipts.service.ts), create stock:258, Movement:267, registerBatch:754/786; controller y PurchaseReceiptsModule lo conectan. |
-| E08 | [Sales legacy](../../../app/api/src/sales/sales.service.ts), approve stock:339 / Movement:380, createFromQuote stock:698 / Movement:736; SalesController:57/75 y SalesModule. |
-| E09 | [Core](../../../app/api/src/inventory/physical/physical-inventory.service.ts), mutate / validateKey; [repository](../../../app/api/src/inventory/physical/physical-inventory.repository.ts), locks / claimEffect / createPosition / mutatePosition / appendLine; [read](../../../app/api/src/inventory/physical/physical-inventory-read.service.ts), agregado single-statement. |
-| E10 | [Projection](../../../app/api/src/inventory/physical/inventory-compatibility-projection.service.ts):71/92 aplica incrementos desde líneas persistidas; [history](../../../app/api/src/inventory/physical/inventory-compatibility-history.service.ts):83/155 escribe Movement compatible. |
+| Ref | Fuente / evidencia                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| E01 | [DEF](INVENTORY_CUSTODY_DEFINITION.md), DEC-INV-CUST-01..14, §§4–7: owned, elegibilidad, opening reconciliado y autoridad única.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| E02 | [01A](INVENTORY_CUSTODY_TECHNICAL_DESIGN.md), TD-10/14/19 y §§2–8: origen único, locks, append-only, pool lógico sin location master, elegibilidad de CREDIT.                                                                                                                                                                                                                                                                                                                                                                               |
+| E03 | [01B](INVENTORY_CUSTODY_01B_TECHNICAL_DESIGN.md), TD-03/12–16/19/22–30: replay Receipt, manual aditivo, batch AVAILABLE, subconjuntos de tracking.                                                                                                                                                                                                                                                                                                                                                                                          |
+| E04 | [01C](INVENTORY_CUSTODY_01C_TECHNICAL_DESIGN.md), TD-09/17/24–26/31/34: Candidate C, locks, mismo actor, legacy UNKNOWN.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| E05 | [schema](../../../app/api/prisma/schema.prisma), Product:28, Movement:64, Batch:90, Position:139, Effect:163, Line:185, Company:429, Sequence:473, IdempotencyRecord:488, Sale:1046. Campo físico real `inventoryBatchId`; Movement usa `batchId`. No modelo cutover/manifest/epoch.                                                                                                                                                                                                                                                        |
+| E06 | [InventoryService](../../../app/api/src/inventory/inventory.service.ts), createMovement:61, write:96/115, registerPurchaseEntry:151; [controller](../../../app/api/src/inventory/inventory.controller.ts):40 y módulo.                                                                                                                                                                                                                                                                                                                      |
+| E07 | [Receipt legacy](../../../app/api/src/purchases-receipts/purchases-receipts.service.ts), create stock:258, Movement:267, registerBatch:754/786; controller y PurchaseReceiptsModule lo conectan.                                                                                                                                                                                                                                                                                                                                            |
+| E08 | [Sales legacy](../../../app/api/src/sales/sales.service.ts), approve stock:339 / Movement:380, createFromQuote stock:698 / Movement:736; SalesController:57/75 y SalesModule.                                                                                                                                                                                                                                                                                                                                                               |
+| E09 | [Core](../../../app/api/src/inventory/physical/physical-inventory.service.ts), mutate / validateKey; [repository](../../../app/api/src/inventory/physical/physical-inventory.repository.ts), locks / claimEffect / createPosition / mutatePosition / appendLine; [read](../../../app/api/src/inventory/physical/physical-inventory-read.service.ts), agregado single-statement.                                                                                                                                                             |
+| E10 | [Projection](../../../app/api/src/inventory/physical/inventory-compatibility-projection.service.ts):71/92 aplica incrementos desde líneas persistidas; [history](../../../app/api/src/inventory/physical/inventory-compatibility-history.service.ts):83/155 escribe Movement compatible.                                                                                                                                                                                                                                                    |
 | E11 | [Receipt physical](../../../app/api/src/inventory/physical/receipt-physical-integration.service.ts), execute; [manual](../../../app/api/src/inventory/physical/manual-physical-inventory.service.ts), execute; [Sales physical](../../../app/api/src/inventory/physical/sales-physical-integration.service.ts), run / classify / convert; [resolver](../../../app/api/src/inventory/physical/sales-physical-source-resolver.ts); [classifier](../../../app/api/src/inventory/physical/sales-legacy-classifier.ts) devuelve UNKNOWN siempre. |
-| E12 | [AppModule](../../../app/api/src/app.module.ts), InventoryModule, SalesModule, PurchaseReceiptsModule y [config](../../../app/api/src/config/env.validation.ts): sin wiring físico, guard de corte ni switch de autoridad. No mecanismo de freeze suficiente encontrado en estos caminos. |
-| E13 | [Products](../../../app/api/src/products/products.service.ts), create omite stock (default 0), update no escribe tracking/stock, remove desactiva; lowStock:153 es filtro. [Dashboard](../../../app/api/src/dashboard/dashboard.service.ts):60/72 lee stock para alertas/valoración. |
-| E14 | [Purchase](../../../app/api/src/purchases/purchases.service.ts), approve sólo estado, findInventoryMovements read; Quotes approve/cancel sin inventory. Sale create DRAFT / cancel no debitan. Equipment provisioning escribe Assets y secuencias, no Positions de material. |
-| E15 | Migraciones [01A](../../../app/api/prisma/migrations/20261013000000_add_inventory_physical_authority/migration.sql) y [01B constraints](../../../app/api/prisma/migrations/20261014000100_inventory_count_constraints/migration.sql): cuatro índices canónicos, FKs tenant, lineCount>0, CREDIT positivo AVAILABLE, count cero estrecho. Sólo lectura de SQL. |
-| E16 | [QA seed](../../../scripts/qa/seed.cjs):27/96/98; specs Inventory/physical/Sales y runners `app/api/test/helpers/*physical*postgres-runner.cjs`: fixtures y cleanup aislados, opt-in. Evidencia histórica de cleanup no prueba que un entorno futuro esté vacío. |
-| E17 | [ADR-002](../../architecture/adr/ADR-002-inventory-movements.md), [ADR-013](../../architecture/adr/ADR-013-inventory-custody-case-logistics.md), [ADR-014](<../../architecture/adr/ADR-014 — Inventory Locations and Internal Transfers>): ledger histórico, transfer ≠ OUT, ubicaciones target; refinamientos 01A no crean warehouse master. [Inventory](INVENTORY.md), [Advanced Inventory](ADVANCED_INVENTORY.md), [Sales](SALES.md), [PurchaseReceipt](PURCHASE_RECEIPTS.md). |
-| E18 | [Audit](AUDIT.md) REQUIREMENT APPROVED / NOT IMPLEMENTED. [Returns](RETURNS.md) y SaleReturn schema no equivalen a writer activo: no servicio/controller restock registrado encontrado en src/AppModule. |
-| E19 | [Sequence allocator](../../../app/api/src/company-sequences/company-sequence-allocator.service.ts), SalesFolioService, EquipmentProvisioningService.prepareReceiptCodes: locks de secuencias antes de roots en adapters; Receipt toma Purchase antes de ASSET codes. |
+| E12 | [AppModule](../../../app/api/src/app.module.ts), InventoryModule, SalesModule, PurchaseReceiptsModule y [config](../../../app/api/src/config/env.validation.ts): sin wiring físico, guard de corte ni switch de autoridad. No mecanismo de freeze suficiente encontrado en estos caminos.                                                                                                                                                                                                                                                   |
+| E13 | [Products](../../../app/api/src/products/products.service.ts), create omite stock (default 0), update no escribe tracking/stock, remove desactiva; lowStock:153 es filtro. [Dashboard](../../../app/api/src/dashboard/dashboard.service.ts):60/72 lee stock para alertas/valoración.                                                                                                                                                                                                                                                        |
+| E14 | [Purchase](../../../app/api/src/purchases/purchases.service.ts), approve sólo estado, findInventoryMovements read; Quotes approve/cancel sin inventory. Sale create DRAFT / cancel no debitan. Equipment provisioning escribe Assets y secuencias, no Positions de material.                                                                                                                                                                                                                                                                |
+| E15 | Migraciones [01A](../../../app/api/prisma/migrations/20261013000000_add_inventory_physical_authority/migration.sql) y [01B constraints](../../../app/api/prisma/migrations/20261014000100_inventory_count_constraints/migration.sql): cuatro índices canónicos, FKs tenant, lineCount>0, CREDIT positivo AVAILABLE, count cero estrecho. Sólo lectura de SQL.                                                                                                                                                                               |
+| E16 | [QA seed](../../../scripts/qa/seed.cjs):27/96/98; specs Inventory/physical/Sales y runners `app/api/test/helpers/*physical*postgres-runner.cjs`: fixtures y cleanup aislados, opt-in. Evidencia histórica de cleanup no prueba que un entorno futuro esté vacío.                                                                                                                                                                                                                                                                            |
+| E17 | [ADR-002](../../architecture/adr/ADR-002-inventory-movements.md), [ADR-013](../../architecture/adr/ADR-013-inventory-custody-case-logistics.md), [ADR-014](<../../architecture/adr/ADR-014 — Inventory Locations and Internal Transfers>): ledger histórico, transfer ≠ OUT, ubicaciones target; refinamientos 01A no crean warehouse master. [Inventory](INVENTORY.md), [Advanced Inventory](ADVANCED_INVENTORY.md), [Sales](SALES.md), [PurchaseReceipt](PURCHASE_RECEIPTS.md).                                                           |
+| E18 | [Audit](AUDIT.md) REQUIREMENT APPROVED / NOT IMPLEMENTED. [Returns](RETURNS.md) y SaleReturn schema no equivalen a writer activo: no servicio/controller restock registrado encontrado en src/AppModule.                                                                                                                                                                                                                                                                                                                                    |
+| E19 | [Sequence allocator](../../../app/api/src/company-sequences/company-sequence-allocator.service.ts), SalesFolioService, EquipmentProvisioningService.prepareReceiptCodes: locks de secuencias antes de roots en adapters; Receipt toma Purchase antes de ASSET codes.                                                                                                                                                                                                                                                                        |
 
 ### B.2 Writers, readers y disposición al corte
 
-| Superficie / caller probado | Clasificación | Mutación / disposición futura |
-| --- | --- | --- |
-| InventoryController → createMovement | CURRENT PRODUCTIVE LEGACY | Product.stock IN/OUT/ADJUSTMENT + Movement; rechazar QUANTITY en ruta legacy al activar, ofrecer contrato físico explícito. |
-| PurchaseReceiptsController → legacy create/registerBatch | CURRENT PRODUCTIVE LEGACY | stock+, batch initial+/available+, IN; sustituir orquestación QUANTITY por 01B, sin llamar ambos caminos. |
-| SalesController → approve | CURRENT PRODUCTIVE LEGACY | DRAFT→CONFIRMED, stock−, OUT; conectar 01C con actor JWT. |
-| SalesController → createFromQuote | CURRENT PRODUCTIVE LEGACY | Quote flag, nueva Sale, folio, stock−, OUT; conectar 01C conjuntamente con approve. |
-| registerPurchaseEntry | DEPRECATED / NO CALLER | Puede escribir stock+/IN si se invoca; búsqueda src encuentra sólo definición. Retirar/inhibir, jamás alias legacy físico. |
-| Product create / update / remove | CURRENT PRODUCTIVE LEGACY (catálogo) | Default stock=0 no es ingreso; cambios de elegibilidad afectan manifest, por eso entran al freeze. No writer oculto de stock positivo. |
-| Core/repository 01A | DORMANT PHYSICAL | Único mutador de Position y creador Effect/Line por adapters soportados; sin controller/import productivo. |
-| Receipt/manual/Sales adapters 01B/C | DORMANT PHYSICAL | Orquestación física atómica; Receipt mantiene rama ASSET/SERIALIZED legacy disjunta. |
-| Projection + history 01B/C | DORMANT PHYSICAL | stock y batch available por delta; Movement compatible, jamás autoridad paralela. |
-| Inventory GET, Product GET/lowStock, Dashboard, consulta Movement Purchase/Sale | READ ONLY | Hoy agregados legacy. Conservar stock=owned; availability de surtido requiere lectura física explícita, no renombrar semántica en silencio. |
-| PhysicalInventoryReadService y resolver | READ ONLY (dormant) | Sumas Positions; resolver toma locks para planificación pero no muta stock. |
-| Purchase approve, Quote approve/cancel, Sale create/cancel | CURRENT PRODUCTIVE LEGACY (negocio) | Sin write de inventario; congelar mutaciones de negocio que afectan snapshot/clasificación; cancel no revierte CONFIRMED. |
-| Equipment provisioning / Healthcare CaseKit / Assignment | CURRENT PRODUCTIVE LEGACY (otros dominios) | Assets o preparación/reserva lógica, no balances QUANTITY. No contarlos como Positions. |
-| Seeds QA, unit mocks, e2e fixtures y teardown | TEST/FIXTURE ONLY | Pueden escribir/borrar directamente; no son plan de apertura ni herramientas autorizadas en destino real. |
-| SQL de migraciones | EVIDENCIA DE SCHEMA; fuera de writers online | Revisado sin ejecución; no usar schema migration como backfill de datos. |
-| Dispatch/Return físico, locations/transfers de negocio, custodia Equipment | FUTURE / NOT IMPLEMENTED | No crear consumidores para este corte. Tablas/ADR no demuestran caller. |
+| Superficie / caller probado                                                     | Clasificación                                | Mutación / disposición futura                                                                                                               |
+| ------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| InventoryController → createMovement                                            | CURRENT PRODUCTIVE LEGACY                    | Product.stock IN/OUT/ADJUSTMENT + Movement; rechazar QUANTITY en ruta legacy al activar, ofrecer contrato físico explícito.                 |
+| PurchaseReceiptsController → legacy create/registerBatch                        | CURRENT PRODUCTIVE LEGACY                    | stock+, batch initial+/available+, IN; sustituir orquestación QUANTITY por 01B, sin llamar ambos caminos.                                   |
+| SalesController → approve                                                       | CURRENT PRODUCTIVE LEGACY                    | DRAFT→CONFIRMED, stock−, OUT; conectar 01C con actor JWT.                                                                                   |
+| SalesController → createFromQuote                                               | CURRENT PRODUCTIVE LEGACY                    | Quote flag, nueva Sale, folio, stock−, OUT; conectar 01C conjuntamente con approve.                                                         |
+| registerPurchaseEntry                                                           | DEPRECATED / NO CALLER                       | Puede escribir stock+/IN si se invoca; búsqueda src encuentra sólo definición. Retirar/inhibir, jamás alias legacy físico.                  |
+| Product create / update / remove                                                | CURRENT PRODUCTIVE LEGACY (catálogo)         | Default stock=0 no es ingreso; cambios de elegibilidad afectan manifest, por eso entran al freeze. No writer oculto de stock positivo.      |
+| Core/repository 01A                                                             | DORMANT PHYSICAL                             | Único mutador de Position y creador Effect/Line por adapters soportados; sin controller/import productivo.                                  |
+| Receipt/manual/Sales adapters 01B/C                                             | DORMANT PHYSICAL                             | Orquestación física atómica; Receipt mantiene rama ASSET/SERIALIZED legacy disjunta.                                                        |
+| Projection + history 01B/C                                                      | DORMANT PHYSICAL                             | stock y batch available por delta; Movement compatible, jamás autoridad paralela.                                                           |
+| Inventory GET, Product GET/lowStock, Dashboard, consulta Movement Purchase/Sale | READ ONLY                                    | Hoy agregados legacy. Conservar stock=owned; availability de surtido requiere lectura física explícita, no renombrar semántica en silencio. |
+| PhysicalInventoryReadService y resolver                                         | READ ONLY (dormant)                          | Sumas Positions; resolver toma locks para planificación pero no muta stock.                                                                 |
+| Purchase approve, Quote approve/cancel, Sale create/cancel                      | CURRENT PRODUCTIVE LEGACY (negocio)          | Sin write de inventario; congelar mutaciones de negocio que afectan snapshot/clasificación; cancel no revierte CONFIRMED.                   |
+| Equipment provisioning / Healthcare CaseKit / Assignment                        | CURRENT PRODUCTIVE LEGACY (otros dominios)   | Assets o preparación/reserva lógica, no balances QUANTITY. No contarlos como Positions.                                                     |
+| Seeds QA, unit mocks, e2e fixtures y teardown                                   | TEST/FIXTURE ONLY                            | Pueden escribir/borrar directamente; no son plan de apertura ni herramientas autorizadas en destino real.                                   |
+| SQL de migraciones                                                              | EVIDENCIA DE SCHEMA; fuera de writers online | Revisado sin ejecución; no usar schema migration como backfill de datos.                                                                    |
+| Dispatch/Return físico, locations/transfers de negocio, custodia Equipment      | FUTURE / NOT IMPLEMENTED                     | No crear consumidores para este corte. Tablas/ADR no demuestran caller.                                                                     |
 
 No se encontró otro writer QUANTITY en los árboles auditados. SQL privilegiado,
 jobs externos y réplicas/versiones desplegadas quedan como inventario operacional obligatorio,
@@ -209,40 +247,40 @@ no como ausencia demostrada. Ningún fixture autoriza limpiar filas desconocidas
 
 ## C. Full TD decision table — 32/32 human approved
 
-| TD-ID | Decision | Binding human decision | Repo evidence | Main risk | Status |
-| --- | --- | --- | --- | --- | --- |
-| TD-INV-01D-01 | Frontera de activación por Company | Cortar todo QUANTITY de una Company como unidad de activación, aunque apply avance por Product; ASSET/SERIALIZED fuera. | E01/E03/E11 | Un corte por Product deja Receipt/Sale multiproducto con autoridades diferentes. | APPROVED |
-| TD-INV-01D-02 | Inventario exhaustivo de writers | Inventario de código aprobado con certificación operacional obligatoria antes del cutover. | E06–E16 | Un bypass legacy rompe parity inmediatamente. | APPROVED WITH OPERATIONS CERTIFICATION |
-| TD-INV-01D-03 | Fuentes y límites de reconciliación | Triangular stock, batches, movimientos, Receipt y Sale con conteo/evidencia física revisada; registrar ausencias explícitas. | E01/E05/E06/E07/E08 | Ledger legacy no conserva lotes salientes ni custodia. | APPROVED |
-| TD-INV-01D-04 | Ecuaciones y semántica de parity | Adoptar ecuaciones de E: stock=owned; batch.availableQuantity=suma AVAILABLE del batch, sin filtro de caducidad; available elegible separado; Sale Candidate C sólo unbatched.. | E01/E03 TD-25/E09/E10 | Owned, AVAILABLE-state y eligible available son distintos. | APPROVED |
-| TD-INV-01D-05 | Apertura NONE y cero | NONE conciliado y realmente libre: un pool AVAILABLE con inventoryBatchId/contextos null. | E01 §7/E02/E05/E09 | Un stock agregado no prueba automáticamente un pool libre. | APPROVED |
-| TD-INV-01D-06 | Apertura REQUIRED por batch real | Una fila de manifest por batch existente y coherente del tenant con cantidad física conciliada. | E01/E03/E04 TD-08/E05 | REQUIRED no admite residual sin identidad. | APPROVED |
-| TD-INV-01D-07 | Gate OPTIONAL Candidate C | Preservar pools batched y unbatched reales. | E04 TD-09/31/E11 resolver | Apertura honesta puede hacer inaccesible stock antes vendible. | APPROVED WITH OPTIONAL ACCESSIBILITY HARD GATE |
-| TD-INV-01D-08 | Discrepancias y resolución explícita | Estados de reporte RECONCILED, DISCREPANCY, MANUAL_RESOLUTION_REQUIRED, BLOCKING_DISCREPANCY. | E01 §7/E06/E07 | Product.stock puede diferir de hechos físicos o contadores batch. | APPROVED WITH COMPANY-BLOCKING POLICY |
-| TD-INV-01D-09 | Initializer interno exclusivo de apertura | Initializer opening-only aprobado; validación operacional01A queda intacta. | E02 §7/E09 validateKey/E15 | El baseline debe conservar propiedad no elegible y custody representable sin convertirlas en disponibilidad operativa. | APPROVED WITH OPENING-ONLY INITIALIZER CONSTRAINT |
-| TD-INV-01D-10 | Identidad y evidencia opening con schema existente | Namespace opening y Effect por Product positivo aprobados; productos cero sólo checkpoint. | E02/E05/E09/E15 | Apertura debe distinguirse de ingreso operativo. | APPROVED |
-| TD-INV-01D-11 | Manifest determinista como artefacto | Artefacto externo controlado + digest/control/membership/progreso en DB dedicada. | E01/E02 physicalRequestHash/E05 | El plan debe revisarse y luego aplicarse exactamente. | APPROVED WITH SECURE RETENTION CONSTRAINT |
-| TD-INV-01D-12 | Persistencia dedicada de cutover | Usar las tres estructuras dedicadas conceptuales; decisión DB-vs-file cerrada. | E05 Company/Sequence/IdempotencyRecord/E11 classifier/E12 | Control durable, checkpoint y membership necesitan autoridad tenant-scoped explícita. | APPROVED WITH DEDICATED CUTOVER PERSISTENCE |
-| TD-INV-01D-13 | Dry-run obligatorio read-only | Permitir preview informativo online; sólo dry-run final bajo freeze sirve para APPLY. | E01/E06–E12 | Un plan generado con writers vivos puede quedar obsoleto. | APPROVED |
-| TD-INV-01D-14 | Granularidad de APPLY | Aplicar una tx por Product completo, secuencial, ReadCommitted con roots/batches/positions ordenados; progreso durable mismo commit. | E02 límites1000/E09/E11 | Una tx Company puede retener demasiados locks; chunks pueden ocultar parcialidad. | APPROVED |
-| TD-INV-01D-15 | Inicialización de proyecciones sin doble conteo | Adapter de baseline exclusivo aprobado; stock10 + opening10 permanece10. | E10 apply:71/92 | El adapter01B incrementa stock existente desde deltas opening. | APPROVED WITH OPENING-ONLY BASELINE ADAPTER |
-| TD-INV-01D-16 | Exactly-once, crash y respuesta perdida | APPLY exige epoch/digest fijados. | E02 TD-10/14/E05/E09 | No basta que operador no repita comando. | APPROVED |
-| TD-INV-01D-17 | Barrera de writers verificable | Freeze tenant demostrado o fallback global obligatorio; barrera no depende de cooperación legacy. | E06–E12/E19 | Locks físicos no detienen legacy ni sobreviven entre tx de apply. | APPROVED WITH GLOBAL-FREEZE FALLBACK |
-| TD-INV-01D-18 | Router único de autoridad por Company | Single Company authority router DB-backed aprobado;01D-A fundamento no activante,01D-C integración. | E03 TD-21/30/E04 TD-35/E12 | Flags separados permiten Sales físico y Receipt legacy simultáneos. | APPROVED WITH SINGLE AUTHORITY ROUTER |
-| TD-INV-01D-19 | Contrato manual y readers al activar | Contrato backend-only y preservación de semántica de readers aprobados. | E03 TD-12/28/29/E06/E13 | Endpoint legacy no tiene actor/key/sources; stock no equivale a available. | APPROVED WITH BACKEND-ONLY CONTRACT |
-| TD-INV-01D-20 | Clasificación durable de Sales confirmadas | Exact durable DB legacy membership aprobada. | E04 TD-24/34/E05/E11 classifier | Falta de Effect no prueba venta legacy. | APPROVED WITH DB LEGACY MEMBERSHIP |
-| TD-INV-01D-21 | DRAFT y Quote anteriores al corte | Excluir DRAFT y Quotes no convertidas del conjunto legacy. | E08/E11 classify/convert/E04 | createdAt antiguo no determina cuándo ocurrió OUT. | APPROVED |
-| TD-INV-01D-22 | Receipt legacy e idempotencia al cruzar epoch | Retener IdempotencyRecord PURCHASE_RECEIPT_CREATE y vínculo Receipt; mismo key/hash devuelve Receipt previo antes de credit/provisioning. | E03 TD-03/E07/E11 Receipt execute | Retry de Receipt anterior no debe acreditar inventario otra vez. | APPROVED |
-| TD-INV-01D-23 | Matriz PASS / WARN / BLOCK | Strict WARN policy aprobada; datos inciertos nunca best-effort. | E01/E05/E09/E15 | Una suma coincidente puede esconder doble crédito o linaje inventado. | APPROVED WITH STRICT WARN POLICY |
-| TD-INV-01D-24 | VERIFY independiente pre-activación | Nueva sesión read-only recarga manifest por digest y DB; compara todos Products/checkpoints/Effects/Lines, ausencia de otras posiciones/efectos y paridad. | E09/E10/E15/E16 | APPLY exitoso no demuestra persistencia completa tras respuesta perdida. | APPROVED |
-| TD-INV-01D-25 | Fallo antes de activación | Tx fallida se revierte; Products ya committed se conservan y reanudan bajo mismo epoch. | E02 TD-19/E05 restrict/E09 | Append-only impide prometer reset libre de aperturas committed. | APPROVED |
-| TD-INV-01D-26 | Fallo durante activación | Traffic gate permanece cerrado hasta que todas atestigüen mismo build/epoch/routing; fallo => RECOVERY_REQUIRED y stop de instancias incompatibles. | E12/E04 TD-35 | Algunas instancias pueden arrancar con wiring distinto. | APPROVED |
-| TD-INV-01D-27 | Frontera de rollback tras primer efecto | Primer Effect empresarial post-cutover committed marca límite: sólo freeze, diagnose y forward-fix compatible. | E01 §7/E03 TD-30/E04 TD-35 | Volver a legacy pierde sourcing/revision/idempotencia física. | APPROVED |
-| TD-INV-01D-28 | Auditoría mínima operacional | Artefactos restringidos JSON/JSONL con operador y actor de negocio cuando aplica, UTC, Company/build/epoch/digest/snapshot, discrepancias, aprobación y resultados apply/verify/activate/failures; storage seguro, sin Git por defecto. | E05 Effect.actorId/E18/E16 | Audit genérico no está implementado. | APPROVED WITH SECURE-STORAGE CONSTRAINT |
-| TD-INV-01D-29 | CLI estrecha y separación operador/actor | CLI estrecha con OPERATOR/ACTOR SEPARATION aprobada; auditar ambas identidades donde aplica. | E05 tenant FKs/E09/E16 | CLI privilegiada puede apuntar a Company equivocada. | APPROVED WITH OPERATOR/ACTOR SEPARATION |
-| TD-INV-01D-30 | Reaudit de orden global y competencia de operadores | Control del cutover sólo tooling y antes de roots. | E02/E03 TD-22/E04 TD-17/E11/E19 | Introducir control del corte puede invertir locks existentes. | APPROVED |
-| TD-INV-01D-31 | Aceptación antes y después del corte | Plan J: unit/integration + PostgreSQL aislado + ensayo de runbook y aceptación operativa. | E15/E16/E04 §F | Unit tests no prueban barrera ni conexiones antiguas. | APPROVED |
-| TD-INV-01D-32 | Reestimación humana y split01D-A/B/C | APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP. | E05/E11/E12 y TD-09/12/15/17/19 | TARGET original8SP no cubre el control durable, apertura, verificación y corte operacional. | APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP |
+| TD-ID         | Decision                                            | Binding human decision                                                                                                                                                                                                                  | Repo evidence                                             | Main risk                                                                                                              | Status                                            |
+| ------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| TD-INV-01D-01 | Frontera de activación por Company                  | Cortar todo QUANTITY de una Company como unidad de activación, aunque apply avance por Product; ASSET/SERIALIZED fuera.                                                                                                                 | E01/E03/E11                                               | Un corte por Product deja Receipt/Sale multiproducto con autoridades diferentes.                                       | APPROVED                                          |
+| TD-INV-01D-02 | Inventario exhaustivo de writers                    | Inventario de código aprobado con certificación operacional obligatoria antes del cutover.                                                                                                                                              | E06–E16                                                   | Un bypass legacy rompe parity inmediatamente.                                                                          | APPROVED WITH OPERATIONS CERTIFICATION            |
+| TD-INV-01D-03 | Fuentes y límites de reconciliación                 | Triangular stock, batches, movimientos, Receipt y Sale con conteo/evidencia física revisada; registrar ausencias explícitas.                                                                                                            | E01/E05/E06/E07/E08                                       | Ledger legacy no conserva lotes salientes ni custodia.                                                                 | APPROVED                                          |
+| TD-INV-01D-04 | Ecuaciones y semántica de parity                    | Adoptar ecuaciones de E: stock=owned; batch.availableQuantity=suma AVAILABLE del batch, sin filtro de caducidad; available elegible separado; Sale Candidate C sólo unbatched..                                                         | E01/E03 TD-25/E09/E10                                     | Owned, AVAILABLE-state y eligible available son distintos.                                                             | APPROVED                                          |
+| TD-INV-01D-05 | Apertura NONE y cero                                | NONE conciliado y realmente libre: un pool AVAILABLE con inventoryBatchId/contextos null.                                                                                                                                               | E01 §7/E02/E05/E09                                        | Un stock agregado no prueba automáticamente un pool libre.                                                             | APPROVED                                          |
+| TD-INV-01D-06 | Apertura REQUIRED por batch real                    | Una fila de manifest por batch existente y coherente del tenant con cantidad física conciliada.                                                                                                                                         | E01/E03/E04 TD-08/E05                                     | REQUIRED no admite residual sin identidad.                                                                             | APPROVED                                          |
+| TD-INV-01D-07 | Gate OPTIONAL Candidate C                           | Preservar pools batched y unbatched reales.                                                                                                                                                                                             | E04 TD-09/31/E11 resolver                                 | Apertura honesta puede hacer inaccesible stock antes vendible.                                                         | APPROVED WITH OPTIONAL ACCESSIBILITY HARD GATE    |
+| TD-INV-01D-08 | Discrepancias y resolución explícita                | Estados de reporte RECONCILED, DISCREPANCY, MANUAL_RESOLUTION_REQUIRED, BLOCKING_DISCREPANCY.                                                                                                                                           | E01 §7/E06/E07                                            | Product.stock puede diferir de hechos físicos o contadores batch.                                                      | APPROVED WITH COMPANY-BLOCKING POLICY             |
+| TD-INV-01D-09 | Initializer interno exclusivo de apertura           | Initializer opening-only aprobado; validación operacional01A queda intacta.                                                                                                                                                             | E02 §7/E09 validateKey/E15                                | El baseline debe conservar propiedad no elegible y custody representable sin convertirlas en disponibilidad operativa. | APPROVED WITH OPENING-ONLY INITIALIZER CONSTRAINT |
+| TD-INV-01D-10 | Identidad y evidencia opening con schema existente  | Namespace opening y Effect por Product positivo aprobados; productos cero sólo checkpoint.                                                                                                                                              | E02/E05/E09/E15                                           | Apertura debe distinguirse de ingreso operativo.                                                                       | APPROVED                                          |
+| TD-INV-01D-11 | Manifest determinista como artefacto                | Artefacto externo controlado + digest/control/membership/progreso en DB dedicada.                                                                                                                                                       | E01/E02 physicalRequestHash/E05                           | El plan debe revisarse y luego aplicarse exactamente.                                                                  | APPROVED WITH SECURE RETENTION CONSTRAINT         |
+| TD-INV-01D-12 | Persistencia dedicada de cutover                    | Usar las tres estructuras dedicadas conceptuales; decisión DB-vs-file cerrada.                                                                                                                                                          | E05 Company/Sequence/IdempotencyRecord/E11 classifier/E12 | Control durable, checkpoint y membership necesitan autoridad tenant-scoped explícita.                                  | APPROVED WITH DEDICATED CUTOVER PERSISTENCE       |
+| TD-INV-01D-13 | Dry-run obligatorio read-only                       | Permitir preview informativo online; sólo dry-run final bajo freeze sirve para APPLY.                                                                                                                                                   | E01/E06–E12                                               | Un plan generado con writers vivos puede quedar obsoleto.                                                              | APPROVED                                          |
+| TD-INV-01D-14 | Granularidad de APPLY                               | Aplicar una tx por Product completo, secuencial, ReadCommitted con roots/batches/positions ordenados; progreso durable mismo commit.                                                                                                    | E02 límites1000/E09/E11                                   | Una tx Company puede retener demasiados locks; chunks pueden ocultar parcialidad.                                      | APPROVED                                          |
+| TD-INV-01D-15 | Inicialización de proyecciones sin doble conteo     | Adapter de baseline exclusivo aprobado; stock10 + opening10 permanece10.                                                                                                                                                                | E10 apply:71/92                                           | El adapter01B incrementa stock existente desde deltas opening.                                                         | APPROVED WITH OPENING-ONLY BASELINE ADAPTER       |
+| TD-INV-01D-16 | Exactly-once, crash y respuesta perdida             | APPLY exige epoch/digest fijados.                                                                                                                                                                                                       | E02 TD-10/14/E05/E09                                      | No basta que operador no repita comando.                                                                               | APPROVED                                          |
+| TD-INV-01D-17 | Barrera de writers verificable                      | Freeze tenant demostrado o fallback global obligatorio; barrera no depende de cooperación legacy.                                                                                                                                       | E06–E12/E19                                               | Locks físicos no detienen legacy ni sobreviven entre tx de apply.                                                      | APPROVED WITH GLOBAL-FREEZE FALLBACK              |
+| TD-INV-01D-18 | Router único de autoridad por Company               | Single Company authority router DB-backed aprobado;01D-A fundamento no activante,01D-C integración.                                                                                                                                     | E03 TD-21/30/E04 TD-35/E12                                | Flags separados permiten Sales físico y Receipt legacy simultáneos.                                                    | APPROVED WITH SINGLE AUTHORITY ROUTER             |
+| TD-INV-01D-19 | Contrato manual y readers al activar                | Contrato backend-only y preservación de semántica de readers aprobados.                                                                                                                                                                 | E03 TD-12/28/29/E06/E13                                   | Endpoint legacy no tiene actor/key/sources; stock no equivale a available.                                             | APPROVED WITH BACKEND-ONLY CONTRACT               |
+| TD-INV-01D-20 | Clasificación durable de Sales confirmadas          | Exact durable DB legacy membership aprobada.                                                                                                                                                                                            | E04 TD-24/34/E05/E11 classifier                           | Falta de Effect no prueba venta legacy.                                                                                | APPROVED WITH DB LEGACY MEMBERSHIP                |
+| TD-INV-01D-21 | DRAFT y Quote anteriores al corte                   | Excluir DRAFT y Quotes no convertidas del conjunto legacy.                                                                                                                                                                              | E08/E11 classify/convert/E04                              | createdAt antiguo no determina cuándo ocurrió OUT.                                                                     | APPROVED                                          |
+| TD-INV-01D-22 | Receipt legacy e idempotencia al cruzar epoch       | Retener IdempotencyRecord PURCHASE_RECEIPT_CREATE y vínculo Receipt; mismo key/hash devuelve Receipt previo antes de credit/provisioning.                                                                                               | E03 TD-03/E07/E11 Receipt execute                         | Retry de Receipt anterior no debe acreditar inventario otra vez.                                                       | APPROVED                                          |
+| TD-INV-01D-23 | Matriz PASS / WARN / BLOCK                          | Strict WARN policy aprobada; datos inciertos nunca best-effort.                                                                                                                                                                         | E01/E05/E09/E15                                           | Una suma coincidente puede esconder doble crédito o linaje inventado.                                                  | APPROVED WITH STRICT WARN POLICY                  |
+| TD-INV-01D-24 | VERIFY independiente pre-activación                 | Nueva sesión read-only recarga manifest por digest y DB; compara todos Products/checkpoints/Effects/Lines, ausencia de otras posiciones/efectos y paridad.                                                                              | E09/E10/E15/E16                                           | APPLY exitoso no demuestra persistencia completa tras respuesta perdida.                                               | APPROVED                                          |
+| TD-INV-01D-25 | Fallo antes de activación                           | Tx fallida se revierte; Products ya committed se conservan y reanudan bajo mismo epoch.                                                                                                                                                 | E02 TD-19/E05 restrict/E09                                | Append-only impide prometer reset libre de aperturas committed.                                                        | APPROVED                                          |
+| TD-INV-01D-26 | Fallo durante activación                            | Traffic gate permanece cerrado hasta que todas atestigüen mismo build/epoch/routing; fallo => RECOVERY_REQUIRED y stop de instancias incompatibles.                                                                                     | E12/E04 TD-35                                             | Algunas instancias pueden arrancar con wiring distinto.                                                                | APPROVED                                          |
+| TD-INV-01D-27 | Frontera de rollback tras primer efecto             | Primer Effect empresarial post-cutover committed marca límite: sólo freeze, diagnose y forward-fix compatible.                                                                                                                          | E01 §7/E03 TD-30/E04 TD-35                                | Volver a legacy pierde sourcing/revision/idempotencia física.                                                          | APPROVED                                          |
+| TD-INV-01D-28 | Auditoría mínima operacional                        | Artefactos restringidos JSON/JSONL con operador y actor de negocio cuando aplica, UTC, Company/build/epoch/digest/snapshot, discrepancias, aprobación y resultados apply/verify/activate/failures; storage seguro, sin Git por defecto. | E05 Effect.actorId/E18/E16                                | Audit genérico no está implementado.                                                                                   | APPROVED WITH SECURE-STORAGE CONSTRAINT           |
+| TD-INV-01D-29 | CLI estrecha y separación operador/actor            | CLI estrecha con OPERATOR/ACTOR SEPARATION aprobada; auditar ambas identidades donde aplica.                                                                                                                                            | E05 tenant FKs/E09/E16                                    | CLI privilegiada puede apuntar a Company equivocada.                                                                   | APPROVED WITH OPERATOR/ACTOR SEPARATION           |
+| TD-INV-01D-30 | Reaudit de orden global y competencia de operadores | Control del cutover sólo tooling y antes de roots.                                                                                                                                                                                      | E02/E03 TD-22/E04 TD-17/E11/E19                           | Introducir control del corte puede invertir locks existentes.                                                          | APPROVED                                          |
+| TD-INV-01D-31 | Aceptación antes y después del corte                | Plan J: unit/integration + PostgreSQL aislado + ensayo de runbook y aceptación operativa.                                                                                                                                               | E15/E16/E04 §F                                            | Unit tests no prueban barrera ni conexiones antiguas.                                                                  | APPROVED                                          |
+| TD-INV-01D-32 | Reestimación humana y split01D-A/B/C                | APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP.                                                                                                                                                                                      | E05/E11/E12 y TD-09/12/15/17/19                           | TARGET original8SP no cubre el control durable, apertura, verificación y corte operacional.                            | APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP |
 
 ## D. Full TD records — binding human review closeout
 
@@ -980,11 +1018,11 @@ Implementación01D-A local completada; B/C NOT STARTED. Las referencias E01..E19
 - **01A compatibility:** Core aprobado permanece DORMANT hasta corte coordinado.
 - **01B compatibility:** Receipt/manual/proyecciones permanecen DORMANT hasta01D-C autorizado.
 - **01C compatibility:** Candidate C/replay/legacy gates aprobados preservados, DORMANT hasta corte.
-- **Cutover dependency:** 01D-A COMPLETE / MERGED PR #82→01D-B IMPLEMENTED / TESTED (pending review/merge)→01D-C BLOCKED hasta aceptación/merge01D-B;01E sigue bloqueado por completion/activation01D.
+- **Cutover dependency:** 01D-A COMPLETE / MERGED PR #82→01D-B COMPLETE / MERGED PR #83→01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED;01E sigue bloqueado por completion/activation01D.
 - **Rollback/recovery impact:** Matriz I obligatoria, opening-only resume y forward-fix después de business Effect.
 - **Scope impact:** A5+B8+C8=21SP TARGET; scopes detallados K; sin frontend/FEFO/Delivery/SalesOrder/Dispatch/Return.
 - **Test implications:** Focused control/classifier tests A; isolated PostgreSQL opening/verify B; ensayo operacional completo C.
-- **Open question:** Resuelta por reestimación y split humanos. 01D-A COMPLETE / MERGED — PR #82; 01D-B IMPLEMENTED / TESTED — pending human review/merge; 01D-C BLOCKED.
+- **Open question:** Resuelta por reestimación y split humanos. 01D-A COMPLETE / MERGED — PR #82; 01D-B COMPLETE / MERGED — PR #83; 01D-C IMPLEMENTED / TESTED.
 - **Status:** APPROVED — RE-ESTIMATED / SPLIT 5 + 8 + 8 = 21 SP
 
 ## E. Reconciliation model
@@ -1029,20 +1067,20 @@ por distribución proporcional ni asumir que initialQuantity es saldo.
 
 ### E.2 Ejemplos ilustrativos, no datos consultados
 
-| Caso | Evidencia física revisada | Opening / ecuaciones | Resultado |
-| --- | --- | --- | --- |
-| NONE | stock9, 9 libres sin lote | unbatched9, owned9, available9, custody0; stock permanece9 | PASS si elegible y restantes gates pasan |
-| NONE cero | stock0, conteo0, ninguna Position | manifest certificado0, sin CREDIT vacío; owned0 | PASS con control durable TD-12 |
-| REQUIRED | stock8, batch A3 + B5 reales/elegibles | owned8, batch projections3/5, available8 | Física reconciliada; Sales REQUIRED sigue rechazado |
-| OPTIONAL unbatched | stock8, 8 realmente sin lote | owned8, Sales pool8 | PASS |
-| OPTIONAL batched | stock8, A8 reales, históricamente vendibles | owned8 y físico available8; Sales pool0 | BLOCK OPTIONAL_ACCESSIBILITY |
-| OPTIONAL mixed | stock10, unbatched4 contadas + A6 contadas | owned10, available10, Sales pool4 | BLOCK si esas6 eran vendibles; si uso/evidencia desconocido, también BLOCK |
-| OPTIONAL con residual no probado | stock10, batch A6 documentado, resto desconocido | no deducir unbatched4 de 10−6 | BLOCK MANUAL_RESOLUTION_REQUIRED |
-| REQUIRED discrepancia | stock10, lotes conciliados6 | faltan4 de identidad/propiedad | BLOCK; no UNKNOWN batch |
-| Batch counter legacy stale | stock6, lote A6 físico, availableQuantity10, initialQuantity12 | old10→baseline6 aprobado; initial12 intacto | Resolved discrepancy documentada; PASS sólo después de revisión, no silencio |
-| Custodia real | stock10, libres6 + custody4 | owned10, available6, custody4 | Initializer opening-only reproduce contexto durable válido y representable; si falta/ambiguo, BLOCK; nunca ubicar10 en AVAILABLE |
-| Vencido/inactivo propio | stock7, lote vencido7 propio en estado físico AVAILABLE | owned7; eligible available0; A_state7 | Apertura opening-only aprobada: metadata intacta; operaciones normales continúan rechazando consumo |
-| Pool inesperado | stock5, Position previa5 sin opening certificado | sumar otro crédito produciría10 | BLOCK UNKNOWN_PHYSICAL_BASELINE |
+| Caso                             | Evidencia física revisada                                      | Opening / ecuaciones                                       | Resultado                                                                                                                        |
+| -------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| NONE                             | stock9, 9 libres sin lote                                      | unbatched9, owned9, available9, custody0; stock permanece9 | PASS si elegible y restantes gates pasan                                                                                         |
+| NONE cero                        | stock0, conteo0, ninguna Position                              | manifest certificado0, sin CREDIT vacío; owned0            | PASS con control durable TD-12                                                                                                   |
+| REQUIRED                         | stock8, batch A3 + B5 reales/elegibles                         | owned8, batch projections3/5, available8                   | Física reconciliada; Sales REQUIRED sigue rechazado                                                                              |
+| OPTIONAL unbatched               | stock8, 8 realmente sin lote                                   | owned8, Sales pool8                                        | PASS                                                                                                                             |
+| OPTIONAL batched                 | stock8, A8 reales, históricamente vendibles                    | owned8 y físico available8; Sales pool0                    | BLOCK OPTIONAL_ACCESSIBILITY                                                                                                     |
+| OPTIONAL mixed                   | stock10, unbatched4 contadas + A6 contadas                     | owned10, available10, Sales pool4                          | BLOCK si esas6 eran vendibles; si uso/evidencia desconocido, también BLOCK                                                       |
+| OPTIONAL con residual no probado | stock10, batch A6 documentado, resto desconocido               | no deducir unbatched4 de 10−6                              | BLOCK MANUAL_RESOLUTION_REQUIRED                                                                                                 |
+| REQUIRED discrepancia            | stock10, lotes conciliados6                                    | faltan4 de identidad/propiedad                             | BLOCK; no UNKNOWN batch                                                                                                          |
+| Batch counter legacy stale       | stock6, lote A6 físico, availableQuantity10, initialQuantity12 | old10→baseline6 aprobado; initial12 intacto                | Resolved discrepancy documentada; PASS sólo después de revisión, no silencio                                                     |
+| Custodia real                    | stock10, libres6 + custody4                                    | owned10, available6, custody4                              | Initializer opening-only reproduce contexto durable válido y representable; si falta/ambiguo, BLOCK; nunca ubicar10 en AVAILABLE |
+| Vencido/inactivo propio          | stock7, lote vencido7 propio en estado físico AVAILABLE        | owned7; eligible available0; A_state7                      | Apertura opening-only aprobada: metadata intacta; operaciones normales continúan rechazando consumo                              |
+| Pool inesperado                  | stock5, Position previa5 sin opening certificado               | sumar otro crédito produciría10                            | BLOCK UNKNOWN_PHYSICAL_BASELINE                                                                                                  |
 
 Los códigos de reporte y nombres conceptuales aprobados aún no son schema/API implementados.
 RECONCILED significa igualdad física demostrada; DISCREPANCY es hallazgo,
@@ -1053,20 +1091,20 @@ linaje actual, con evidencia de conteo y revisión suficiente.
 
 ### E.3 Gates de parity
 
-| Check | PASS | WARN permitido | BLOCK |
-| --- | --- | --- | --- |
-| Stock / owned | Igualdad exacta por Product y Company | Ninguno | Diferencia, negativo, overflow |
-| Batches | AVAILABLE-state por batch igual proyección; initial intacto; diferencia legacy resuelta con evidencia old→new revisada | Sólo documentación histórica no esencial ausente | Cantidad física/identidad sin probar, residual distribuido o normalización no revisada |
-| Canonical pools | Identidad exacta, cero o una por clave, FKs tenant | Ninguno | Duplicado, batch ajeno, estado/contexto inválido |
-| Opening evidence | Un Effect por Product positivo, líneas desde0/revision0→1, origen/hash exactos; ceros certificados | Ninguno | Effect/Line/progreso ausente o incoherente |
-| Elegibilidad | Initializer abre propiedad real sin alterar elegibilidad; uso normal respeta policy01A a asOf | Ninguno | Estado/contexto no representable o custody sin contexto durable; no elegibilidad no se oculta ni se cambia |
-| OPTIONAL | Sin pérdida de acceso demostrada y revisión comercial completa | Ninguno | Stock batched históricamente vendible inaccesible o desconocido |
-| Legacy Sales/Receipts | Membership DB exacto; relaciones/completions coherentes | Movimiento antiguo sin actor/nota sólo si es documentación no esencial y no afecta cantidad/identidad/autoridad/seguridad | UNKNOWN, Sale fuera del conjunto sin Effect cuando debería tenerlo, flag inconsistente |
-| Writer inventory | Cada ruta/job cubierto, cero bypass | Ninguno | Writer desconocido, helper vivo, deployment no acreditado |
-| Barrier | Procesos drained/fenced y build homogéneo | Ninguno | Nueva escritura o conexión antigua habilitada |
-| Observability | Manifest externo y DB control/aprobación/results recuperables por digest | Nota histórica no esencial ausente | Archivo/control perdido, hash alterado |
-| Dormancy pre-activate | Sólo opening aprobado; cero Effect empresarial nuevo | Ninguno | Effect desde ruta productiva antes de activación |
-| Scope | Sólo QUANTITY y requisitos acordados | Ninguno | FEFO, fulfillment o UI imprescindibles para completar el corte |
+| Check                 | PASS                                                                                                                   | WARN permitido                                                                                                            | BLOCK                                                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Stock / owned         | Igualdad exacta por Product y Company                                                                                  | Ninguno                                                                                                                   | Diferencia, negativo, overflow                                                                             |
+| Batches               | AVAILABLE-state por batch igual proyección; initial intacto; diferencia legacy resuelta con evidencia old→new revisada | Sólo documentación histórica no esencial ausente                                                                          | Cantidad física/identidad sin probar, residual distribuido o normalización no revisada                     |
+| Canonical pools       | Identidad exacta, cero o una por clave, FKs tenant                                                                     | Ninguno                                                                                                                   | Duplicado, batch ajeno, estado/contexto inválido                                                           |
+| Opening evidence      | Un Effect por Product positivo, líneas desde0/revision0→1, origen/hash exactos; ceros certificados                     | Ninguno                                                                                                                   | Effect/Line/progreso ausente o incoherente                                                                 |
+| Elegibilidad          | Initializer abre propiedad real sin alterar elegibilidad; uso normal respeta policy01A a asOf                          | Ninguno                                                                                                                   | Estado/contexto no representable o custody sin contexto durable; no elegibilidad no se oculta ni se cambia |
+| OPTIONAL              | Sin pérdida de acceso demostrada y revisión comercial completa                                                         | Ninguno                                                                                                                   | Stock batched históricamente vendible inaccesible o desconocido                                            |
+| Legacy Sales/Receipts | Membership DB exacto; relaciones/completions coherentes                                                                | Movimiento antiguo sin actor/nota sólo si es documentación no esencial y no afecta cantidad/identidad/autoridad/seguridad | UNKNOWN, Sale fuera del conjunto sin Effect cuando debería tenerlo, flag inconsistente                     |
+| Writer inventory      | Cada ruta/job cubierto, cero bypass                                                                                    | Ninguno                                                                                                                   | Writer desconocido, helper vivo, deployment no acreditado                                                  |
+| Barrier               | Procesos drained/fenced y build homogéneo                                                                              | Ninguno                                                                                                                   | Nueva escritura o conexión antigua habilitada                                                              |
+| Observability         | Manifest externo y DB control/aprobación/results recuperables por digest                                               | Nota histórica no esencial ausente                                                                                        | Archivo/control perdido, hash alterado                                                                     |
+| Dormancy pre-activate | Sólo opening aprobado; cero Effect empresarial nuevo                                                                   | Ninguno                                                                                                                   | Effect desde ruta productiva antes de activación                                                           |
+| Scope                 | Sólo QUANTITY y requisitos acordados                                                                                   | Ninguno                                                                                                                   | FEFO, fulfillment o UI imprescindibles para completar el corte                                             |
 
 WARN sólo documentación histórica no esencial, con razón/responsable; no degrada
 un BLOCK ni habilita best-effort. Cantidad/identidad/autoridad/seguridad inciertas,
@@ -1101,36 +1139,42 @@ Identificadores inventados de muestra; digest se calcula, no se proporciona uno 
   "baselineBuild": "c3d0824",
   "freezeEvidenceRef": "example/freeze-evidence",
   "snapshotFingerprint": "<sha256-calculado-de-fuentes-congeladas>",
-  "products": [{
-    "productId": "33333333-3333-4333-8333-333333333333",
-    "inventoryTracking": "QUANTITY",
-    "lotTracking": "NONE",
-    "stockBefore": 9,
-    "sourceClassification": "RECONCILED_UNBATCHED",
-    "evidenceRefs": ["example/reviewed-count"],
-    "discrepancyStatus": "RECONCILED",
-    "pools": [{
-      "inventoryBatchId": null,
-      "state": "AVAILABLE",
-      "contextType": null,
-      "contextId": null,
-      "quantity": 9,
-      "revisionBefore": 0,
-      "revisionAfter": 1
-    }],
-    "expected": {"owned": 9, "available": 9, "inCustody": 0},
-    "openingOrigin": {
-      "type": "INVENTORY_OPENING",
-      "id": "11111111-1111-4111-8111-111111111111",
-      "operation": "OPEN_33333333-3333-4333-8333-333333333333"
+  "products": [
+    {
+      "productId": "33333333-3333-4333-8333-333333333333",
+      "inventoryTracking": "QUANTITY",
+      "lotTracking": "NONE",
+      "stockBefore": 9,
+      "sourceClassification": "RECONCILED_UNBATCHED",
+      "evidenceRefs": ["example/reviewed-count"],
+      "discrepancyStatus": "RECONCILED",
+      "pools": [
+        {
+          "inventoryBatchId": null,
+          "state": "AVAILABLE",
+          "contextType": null,
+          "contextId": null,
+          "quantity": 9,
+          "revisionBefore": 0,
+          "revisionAfter": 1
+        }
+      ],
+      "expected": { "owned": 9, "available": 9, "inCustody": 0 },
+      "openingOrigin": {
+        "type": "INVENTORY_OPENING",
+        "id": "11111111-1111-4111-8111-111111111111",
+        "operation": "OPEN_33333333-3333-4333-8333-333333333333"
+      }
     }
-  }],
-  "legacyConfirmedSales": [{
-    "saleId": "44444444-4444-4444-8444-444444444444",
-    "statusAtFreeze": "CONFIRMED",
-    "quoteId": null,
-    "evidenceRef": "example/confirmed-sale-fingerprint"
-  }]
+  ],
+  "legacyConfirmedSales": [
+    {
+      "saleId": "44444444-4444-4444-8444-444444444444",
+      "statusAtFreeze": "CONFIRMED",
+      "quoteId": null,
+      "evidenceRef": "example/confirmed-sale-fingerprint"
+    }
+  ]
 }
 ```
 
@@ -1165,11 +1209,11 @@ son la solución aprobada. No sobrecargar Sequence/IdempotencyRecord/Effects vac
 
 Nombres conceptuales recomendados; no pseudocode Prisma ni migración en este delta.
 
-| Estructura | Propósito / mínimo conceptual |
-| --- | --- |
-| InventoryCutover | id/cutoverId, companyId, manifestDigest, snapshotFingerprint, baselineBuild, status, revision, initiatedBy, approvedBy nullable según lifecycle, activatedBy nullable, createdAt, updatedAt, activatedAt nullable |
-| InventoryCutoverProduct | cutoverId, companyId, productId, manifestProductFingerprint, status, expectedOwned, expectedAvailable, expectedCustody, openingEffectId nullable, appliedAt nullable, verifiedAt nullable y before/expected projection evidence necesaria para recovery |
-| InventoryCutoverLegacySale | cutoverId, companyId, saleId, saleFingerprint, quoteId nullable, statusAtFreeze, capturedAt y evidence/fingerprint metadata necesaria |
+| Estructura                 | Propósito / mínimo conceptual                                                                                                                                                                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| InventoryCutover           | id/cutoverId, companyId, manifestDigest, snapshotFingerprint, baselineBuild, status, revision, initiatedBy, approvedBy nullable según lifecycle, activatedBy nullable, createdAt, updatedAt, activatedAt nullable                                       |
+| InventoryCutoverProduct    | cutoverId, companyId, productId, manifestProductFingerprint, status, expectedOwned, expectedAvailable, expectedCustody, openingEffectId nullable, appliedAt nullable, verifiedAt nullable y before/expected projection evidence necesaria para recovery |
+| InventoryCutoverLegacySale | cutoverId, companyId, saleId, saleFingerprint, quoteId nullable, statusAtFreeze, capturedAt y evidence/fingerprint metadata necesaria                                                                                                                   |
 
 **InventoryCutover:** autoridad Company-scoped de epoch legacy→physical; como máximo
 un epoch activo por Company. Identidad estable, jamás regenerada por retry.
@@ -1221,12 +1265,12 @@ Cualquier gate fallido → FAILED / RECOVERY_REQUIRED (tráfico cerrado)
 
 ### G.1 Alternativas de barrier y recomendación
 
-| Opción | Ventaja | Límite / decisión |
-| --- | --- | --- |
-| A. Maintenance/write freeze | Simple, permite snapshot final y revisión | HTTP guard solo no detiene jobs/direct SQL; necesita stop/drain y fence de identidades escritoras |
-| B. Deployment/runtime switch | Una versión puede cablear todas rutas | Rolling deploy/flags independientes producen ventanas híbridas; usar bajo A y control durable |
-| C. Lock de DB | Locks de tablas pueden frenar writes mientras tx viva | No sobreviven entre tx por Product; pueden bloquear lecturas/FKs; advisory no obliga a legacy; no barrera única recomendada |
-| D. Mecanismo repo existente | Reutilización si existiera | Config/módulos inspeccionados no ofrecen maintenance/epoch aplicable; autorización JWT no equivale a freeze |
+| Opción                       | Ventaja                                               | Límite / decisión                                                                                                           |
+| ---------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| A. Maintenance/write freeze  | Simple, permite snapshot final y revisión             | HTTP guard solo no detiene jobs/direct SQL; necesita stop/drain y fence de identidades escritoras                           |
+| B. Deployment/runtime switch | Una versión puede cablear todas rutas                 | Rolling deploy/flags independientes producen ventanas híbridas; usar bajo A y control durable                               |
+| C. Lock de DB                | Locks de tablas pueden frenar writes mientras tx viva | No sobreviven entre tx por Product; pueden bloquear lecturas/FKs; advisory no obliga a legacy; no barrera única recomendada |
+| D. Mecanismo repo existente  | Reutilización si existiera                            | Config/módulos inspeccionados no ofrecen maintenance/epoch aplicable; autorización JWT no equivale a freeze                 |
 
 Decisión aprobada A+B con global-freeze fallback: downtime explícito, bloquear tráfico mutador de Company
 (o deployment completo si infraestructura no permite aislamiento tenant), detener
@@ -1243,19 +1287,19 @@ de permisos futura exige plan revisado; no se ejecuta aquí.
 
 ### G.2 Secuencia y STOP en cada gate
 
-| Fase | Acción futura / evidencia obligatoria | STOP / recuperación |
-| --- | --- | --- |
-| PRECHECK | Diseño aprobado; acreditar control implementado, permisos/destino, KNOWN WRITERS=COMPLETE / UNKNOWN WRITERS=0, backup, build y recovery; preview read-only | Control requerido no implementado/verificado, writer desconocido, exclusión no garantizada o alcance fuera del aprobado |
-| FREEZE | Cerrar tráfico, stop/drain, verificar cero tx mutadoras anteriores y fence que impida reconexión; congelar metadata y Sale/Quote/Receipt | No establecer snapshot hasta exclusión demostrada |
-| DRY RUN | Snapshot final read-only, conteo/evidencia vigente, manifest completo, gates y digest | Discrepancia, OPTIONAL accessibility, opening no representable, residuos físicos desconocidos |
-| HUMAN REVIEW | Revisar plan exacto/destino/digest, normalización batch old→new y legacy membership; guardar aprobación | Sin aprobación concreta no apply; si cambia cualquier fuente, repetir dry-run/revisión |
-| APPLY OPENING | Epoch/digest fijos desde OPENING_APPLYING; Product a Product con control/initializer/Effect/adapter/InventoryCutoverProduct en misma tx | Failure parcial mantiene freeze; abort local y resume mismo plan; sin cambio de cantidades |
-| VERIFY | Nueva sesión read-only, manifest↔DB exacto, paridad, no duplicados, cero Effect empresarial; comprobar fence | No reparar in-place desde VERIFY; abrir recovery |
-| PREPARE ACTIVATION | Desplegar mismo binario compatible a todas instancias sin tráfico; wiring completo y classifier cargado | Una ruta legacy QUANTITY o instancia stale bloquea todas |
-| ACTIVATE | CAS durable VERIFIED→PHYSICAL_ACTIVE; router único Company cambia todos los writers juntos; sin tráfico externo aún | Respuesta perdida => readback; estado ambiguo mantiene fence; ningún fallback a legacy |
-| SMOKE / ACCEPTANCE | Checks read-only primero; ensayo de negocio ya aprobado en DB aislada; operación real controlada sólo si autorizada | Primer Effect empresarial committed cambia frontera rollback; fallo => forward-fix |
-| UNFREEZE | Todas las instancias/paths atestiguados, parity/gates revalidados, fence antiguo sigue impidiendo legacy; abrir tráfico nuevo | Ningún request antiguo en cola ejecuta decisión legacy; debe reevaluar epoch |
-| POST-CUTOVER VERIFY | Comprobar primeras operaciones, proyecciones y ausencia double writes; conservar evidencia y vigilancia operacional acordada | Mismatch => congelar de nuevo, diagnosticar con autoridad física intacta |
+| Fase                | Acción futura / evidencia obligatoria                                                                                                                      | STOP / recuperación                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| PRECHECK            | Diseño aprobado; acreditar control implementado, permisos/destino, KNOWN WRITERS=COMPLETE / UNKNOWN WRITERS=0, backup, build y recovery; preview read-only | Control requerido no implementado/verificado, writer desconocido, exclusión no garantizada o alcance fuera del aprobado |
+| FREEZE              | Cerrar tráfico, stop/drain, verificar cero tx mutadoras anteriores y fence que impida reconexión; congelar metadata y Sale/Quote/Receipt                   | No establecer snapshot hasta exclusión demostrada                                                                       |
+| DRY RUN             | Snapshot final read-only, conteo/evidencia vigente, manifest completo, gates y digest                                                                      | Discrepancia, OPTIONAL accessibility, opening no representable, residuos físicos desconocidos                           |
+| HUMAN REVIEW        | Revisar plan exacto/destino/digest, normalización batch old→new y legacy membership; guardar aprobación                                                    | Sin aprobación concreta no apply; si cambia cualquier fuente, repetir dry-run/revisión                                  |
+| APPLY OPENING       | Epoch/digest fijos desde OPENING_APPLYING; Product a Product con control/initializer/Effect/adapter/InventoryCutoverProduct en misma tx                    | Failure parcial mantiene freeze; abort local y resume mismo plan; sin cambio de cantidades                              |
+| VERIFY              | Nueva sesión read-only, manifest↔DB exacto, paridad, no duplicados, cero Effect empresarial; comprobar fence                                               | No reparar in-place desde VERIFY; abrir recovery                                                                        |
+| PREPARE ACTIVATION  | Desplegar mismo binario compatible a todas instancias sin tráfico; wiring completo y classifier cargado                                                    | Una ruta legacy QUANTITY o instancia stale bloquea todas                                                                |
+| ACTIVATE            | CAS durable VERIFIED→PHYSICAL_ACTIVE; router único Company cambia todos los writers juntos; sin tráfico externo aún                                        | Respuesta perdida => readback; estado ambiguo mantiene fence; ningún fallback a legacy                                  |
+| SMOKE / ACCEPTANCE  | Checks read-only primero; ensayo de negocio ya aprobado en DB aislada; operación real controlada sólo si autorizada                                        | Primer Effect empresarial committed cambia frontera rollback; fallo => forward-fix                                      |
+| UNFREEZE            | Todas las instancias/paths atestiguados, parity/gates revalidados, fence antiguo sigue impidiendo legacy; abrir tráfico nuevo                              | Ningún request antiguo en cola ejecuta decisión legacy; debe reevaluar epoch                                            |
+| POST-CUTOVER VERIFY | Comprobar primeras operaciones, proyecciones y ausencia double writes; conservar evidencia y vigilancia operacional acordada                               | Mismatch => congelar de nuevo, diagnosticar con autoridad física intacta                                                |
 
 No esperar una revisión humana manteniendo una transacción SQL abierta: freeze
 es operacional y durable; dry-run y apply usan transacciones acotadas.
@@ -1304,17 +1348,17 @@ de requests stale deben mantener esta autoridad durable en implementación.
 
 ## H. Legacy classification matrix
 
-| Estado observado con epoch certificado | Clasificación / operación | Efecto y respuesta |
-| --- | --- | --- |
-| CONFIRMED al freeze, membership exacto, sin Effect | LEGACY | Error histórico ya aprobada/convertida; cero OUT nuevo, cero writes |
-| DRAFT al freeze, confirmado después | Primera confirmación física | Effect SALE/id/CONFIRM atómico; createdAt antiguo irrelevante |
-| Quote anterior no convertida, convertida después | Conversión física | Sale canónica nueva + un Effect; folio una vez |
-| Quote ya convertida antes | Clasificar Sale relacionada | Membership legacy válido conserva error histórico; flag/relación incoherente falla |
-| Post-cutover con Effect coherente | PHYSICAL | Mismo actor actualmente autorizado: éxito ZERO WRITES; otro actor: error histórico ZERO WRITES |
-| CONFIRMED fuera del membership, sin Effect | Integrity failure / UNKNOWN | Falla cerrado, sin recrear OUT ni agregarla al manifest retroactivamente |
-| Membership legacy pero Effect inesperado | Contradicción | BLOCK; investigar sin borrar evidencia |
-| Manifest no disponible/hash erróneo/Company incorrecta | UNKNOWN | Falla cerrado; no fallback temporal ni “ausencia implica legacy” |
-| DRAFT/CANCELLED con evidencia de confirmación física incompatible | Integrity failure | No reparar estado para que replay parezca válido |
+| Estado observado con epoch certificado                            | Clasificación / operación   | Efecto y respuesta                                                                             |
+| ----------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------- |
+| CONFIRMED al freeze, membership exacto, sin Effect                | LEGACY                      | Error histórico ya aprobada/convertida; cero OUT nuevo, cero writes                            |
+| DRAFT al freeze, confirmado después                               | Primera confirmación física | Effect SALE/id/CONFIRM atómico; createdAt antiguo irrelevante                                  |
+| Quote anterior no convertida, convertida después                  | Conversión física           | Sale canónica nueva + un Effect; folio una vez                                                 |
+| Quote ya convertida antes                                         | Clasificar Sale relacionada | Membership legacy válido conserva error histórico; flag/relación incoherente falla             |
+| Post-cutover con Effect coherente                                 | PHYSICAL                    | Mismo actor actualmente autorizado: éxito ZERO WRITES; otro actor: error histórico ZERO WRITES |
+| CONFIRMED fuera del membership, sin Effect                        | Integrity failure / UNKNOWN | Falla cerrado, sin recrear OUT ni agregarla al manifest retroactivamente                       |
+| Membership legacy pero Effect inesperado                          | Contradicción               | BLOCK; investigar sin borrar evidencia                                                         |
+| Manifest no disponible/hash erróneo/Company incorrecta            | UNKNOWN                     | Falla cerrado; no fallback temporal ni “ausencia implica legacy”                               |
+| DRAFT/CANCELLED con evidencia de confirmación física incompatible | Integrity failure           | No reparar estado para que replay parezca válido                                               |
 
 Clasificador debe comprobar membership exacto y coherencia; timestamps son audit,
 jamás criterio exclusivo. Sale confirmada antes de crear el cutover pero ajena al
@@ -1323,13 +1367,13 @@ previo conserva replay de Receipt; no inventar PhysicalEffect de ingreso histór
 
 ## I. Rollback matrix
 
-| Punto | Comportamiento permitido propuesto | Prohibido / frontera |
-| --- | --- | --- |
-| Antes de opening committed | Abort tx; mantener o cerrar intento; volver LEGACY_ACTIVE sólo tras acreditar cero apertura y retirar fence de forma controlada | Reutilizar plan anterior tras nuevas escrituras legacy |
-| Tras opening parcial/completo, antes de activar | Preferir resume del mismo plan con freeze; filas/Effects quedan append-only. Si se abandona, plan de recovery humano con before-images y verificación antes de habilitar legacy | DELETE/TRUNCATE de apertura, reset revision, segundo opening bajo nuevo ID; no asumir reversión total gratuita |
-| Durante activación | Mantener tráfico cerrado, parar instancias incompatibles, leer control y completar/fijar forward. Rollback sólo con pruebas de ausencia de efectos empresariales | Mezcla de runtimes atendiendo clientes, fallback automático |
-| PHYSICAL_ACTIVE antes del primer Effect empresarial | Bajo freeze/drain probar cero no-opening Effects desde boundary, misma realidad/compatibilidad y before-images revisados; posible rollback de routing sólo mediante plan explícito, no automático | Un simple redeploy legacy no acredita seguridad; cambios catálogo/negocio también se evalúan |
-| Después del primer Effect empresarial committed | Freeze, diagnóstico, forward-fix compatible con autoridad física e idempotencia; eventual migración inversa exige nuevo diseño/reconciliación | Volver writers stock legacy; borrar Effects; simular replay histórico; auto-rollback de aplicación |
+| Punto                                               | Comportamiento permitido propuesto                                                                                                                                                                | Prohibido / frontera                                                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Antes de opening committed                          | Abort tx; mantener o cerrar intento; volver LEGACY_ACTIVE sólo tras acreditar cero apertura y retirar fence de forma controlada                                                                   | Reutilizar plan anterior tras nuevas escrituras legacy                                                         |
+| Tras opening parcial/completo, antes de activar     | Preferir resume del mismo plan con freeze; filas/Effects quedan append-only. Si se abandona, plan de recovery humano con before-images y verificación antes de habilitar legacy                   | DELETE/TRUNCATE de apertura, reset revision, segundo opening bajo nuevo ID; no asumir reversión total gratuita |
+| Durante activación                                  | Mantener tráfico cerrado, parar instancias incompatibles, leer control y completar/fijar forward. Rollback sólo con pruebas de ausencia de efectos empresariales                                  | Mezcla de runtimes atendiendo clientes, fallback automático                                                    |
+| PHYSICAL_ACTIVE antes del primer Effect empresarial | Bajo freeze/drain probar cero no-opening Effects desde boundary, misma realidad/compatibilidad y before-images revisados; posible rollback de routing sólo mediante plan explícito, no automático | Un simple redeploy legacy no acredita seguridad; cambios catálogo/negocio también se evalúan                   |
+| Después del primer Effect empresarial committed     | Freeze, diagnóstico, forward-fix compatible con autoridad física e idempotencia; eventual migración inversa exige nuevo diseño/reconciliación                                                     | Volver writers stock legacy; borrar Effects; simular replay histórico; auto-rollback de aplicación             |
 
 El límite incluye Receipt, Sale, manual IN/OUT y COUNT_CORRECTION delta0.
 Un smoke real committed cuenta; una prueba aislada no. Resultado de commit
@@ -1343,22 +1387,22 @@ FREEZE→DIAGNOSE→FORWARD-FIX; la aprobación del diseño no autoriza ejecutar
 
 ### J.1 Unit / integration futura
 
-| Grupo | Casos / aserciones |
-| --- | --- |
-| Reconciliación | NONE, REQUIRED batch, OPTIONAL unbatched/batch/mixed, owned vencido/inactivo conservado y custody válida exacta; missing/ambiguous context bloqueado; ADJUSTMENT absoluto; residual sin linaje; initialQuantity intacto |
-| Manifest | Orden canónico, null/UUID/UTC, digest estable, referencias/evidencia, snapshot distinto invalida; todos Products incluso0 |
-| Dry-run | Cero writes incluyendo claims/control; repetición mismo snapshot; preview online no autoriza apply |
-| Apply | Initializer opening-only con state/eligibility separados, before0→q/revision1, stock no duplicado, batch baseline old→new aprobado; cero sin Effect vacío; límite1000 |
-| Idempotencia | Duplicate apply, distinto digest, distinto cutoverId sobre baseline existente, respuesta perdida, lectura fresca tras claim conflict |
-| Fallos | Antes/después de cabecera, Position, líneas, proyección batch, checkpoint y commit; tx revierte todo Product; resume parcial |
-| Legacy | CONFIRMED certificado; UNKNOWN; DRAFT viejo; Quote vieja; flag incoherente; mismo/otro actor; actor histórico inactivo |
-| Receipt boundary | Replay key legacy devuelve Receipt sin stock/batch/Equipment nuevos; mismatch y completion roto bloquean |
-| Parity | Igualdad stock/owned; batch estado vs elegibilidad; cross-tenant, duplicados, negativos/overflow, líneas incorrectas aun suma igual |
-| Routing | Inventario completo, legacy QUANTITY rechazado, helper inhibido, Receipt mixto, ambos Sales activos juntos, readers sin apertura parcial |
-| Máquina de estados | Ninguna transición salta aprobación/VERIFY; dos operadores; stale build/epoch; freeze perdido impide activate |
-| Recovery | Inmutabilidad de apertura; rollback antes/después primer efecto y count0; sin auto-unfreeze por timeout |
-| Seguridad | Company requerida, sin all-company, destino errado, actor sin rol, error sanitizado, archivo alterado/faltante |
-| Regresión | Suites01A/B/C, Sales legacy para Companies aún LEGACY según router Company aprobado; no cambios tracking/lot/FEFO |
+| Grupo              | Casos / aserciones                                                                                                                                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reconciliación     | NONE, REQUIRED batch, OPTIONAL unbatched/batch/mixed, owned vencido/inactivo conservado y custody válida exacta; missing/ambiguous context bloqueado; ADJUSTMENT absoluto; residual sin linaje; initialQuantity intacto |
+| Manifest           | Orden canónico, null/UUID/UTC, digest estable, referencias/evidencia, snapshot distinto invalida; todos Products incluso0                                                                                               |
+| Dry-run            | Cero writes incluyendo claims/control; repetición mismo snapshot; preview online no autoriza apply                                                                                                                      |
+| Apply              | Initializer opening-only con state/eligibility separados, before0→q/revision1, stock no duplicado, batch baseline old→new aprobado; cero sin Effect vacío; límite1000                                                   |
+| Idempotencia       | Duplicate apply, distinto digest, distinto cutoverId sobre baseline existente, respuesta perdida, lectura fresca tras claim conflict                                                                                    |
+| Fallos             | Antes/después de cabecera, Position, líneas, proyección batch, checkpoint y commit; tx revierte todo Product; resume parcial                                                                                            |
+| Legacy             | CONFIRMED certificado; UNKNOWN; DRAFT viejo; Quote vieja; flag incoherente; mismo/otro actor; actor histórico inactivo                                                                                                  |
+| Receipt boundary   | Replay key legacy devuelve Receipt sin stock/batch/Equipment nuevos; mismatch y completion roto bloquean                                                                                                                |
+| Parity             | Igualdad stock/owned; batch estado vs elegibilidad; cross-tenant, duplicados, negativos/overflow, líneas incorrectas aun suma igual                                                                                     |
+| Routing            | Inventario completo, legacy QUANTITY rechazado, helper inhibido, Receipt mixto, ambos Sales activos juntos, readers sin apertura parcial                                                                                |
+| Máquina de estados | Ninguna transición salta aprobación/VERIFY; dos operadores; stale build/epoch; freeze perdido impide activate                                                                                                           |
+| Recovery           | Inmutabilidad de apertura; rollback antes/después primer efecto y count0; sin auto-unfreeze por timeout                                                                                                                 |
+| Seguridad          | Company requerida, sin all-company, destino errado, actor sin rol, error sanitizado, archivo alterado/faltante                                                                                                          |
+| Regresión          | Suites01A/B/C, Sales legacy para Companies aún LEGACY según router Company aprobado; no cambios tracking/lot/FEFO                                                                                                       |
 
 ### J.2 PostgreSQL futuro, exclusivamente aislado
 
@@ -1407,7 +1451,7 @@ los checks requeridos. Fallo relevante mantiene/repone freeze.
 CTO/Architecture/Product review complete. DOC DELTA aplicado: TECHNICAL DESIGN
 APPROVED, TD-INV-01D-01..32 =32/32 human approved con restricciones vinculantes.
 No queda decisión abierta de producto/arquitectura/persistencia para este diseño.
-01D-A implementa Prisma/migración y control/resolver internos. CLI, routing productivo y opening siguen sin implementar.
+01D-A implementa Prisma/migración y control/resolver internos. Opening fue implementado en01D-B; CLI interna y routing en01D-C. Activación real no ejecutada.
 DESIGN APPROVED y CUTOVER READY son estados diferentes.
 
 Los siguientes son requisitos de implementación/gates futuros, no TD pendientes:
@@ -1422,12 +1466,12 @@ posterior explícita sin fingir que este diseño lo aprobó.
 Original HC-INVENTORY-CUSTODY-01D TARGET: **8 SP — SUPERSEDED BY HUMAN RE-ESTIMATION**.
 Revised TOTAL01D TARGET: **21 SP**; sólo TARGET, sin Forecast/Commitment/Actual ni fechas.
 
-| Slice | Título | TARGET | Estado |
-| --- | --- | --- | --- |
-| HC-INVENTORY-CUSTODY-01D-A | Durable Cutover Control & Legacy Classification Foundation | 5 SP | COMPLETE / MERGED — PR #82 — NON-ACTIVATING |
-| HC-INVENTORY-CUSTODY-01D-B | Reconciliation, Opening Baseline & Verification | 8 SP | IMPLEMENTED / TESTED — pending human review/merge — NO PRODUCTIVE ACTIVATION |
-| HC-INVENTORY-CUSTODY-01D-C | Authority Cutover, Writer Wiring & Operational Activation | 8 SP | BLOCKED BY HC-INVENTORY-CUSTODY-01D-B — IMPLEMENTATION: NOT STARTED |
-| HC-INVENTORY-CUSTODY-01D umbrella | Re-estimated implementation split | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A IMPLEMENTED / TESTED; B/C BLOCKED |
+| Slice                             | Título                                                     | TARGET            | Estado                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| HC-INVENTORY-CUSTODY-01D-A        | Durable Cutover Control & Legacy Classification Foundation | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                |
+| HC-INVENTORY-CUSTODY-01D-B        | Reconciliation, Opening Baseline & Verification            | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                      |
+| HC-INVENTORY-CUSTODY-01D-C        | Authority Cutover, Writer Wiring & Operational Activation  | 8 SP              | IMPLEMENTED / TESTED — ACTUAL CUTOVER NOT EXECUTED                                                         |
+| HC-INVENTORY-CUSTODY-01D umbrella | Re-estimated implementation split                          | 21 SP = 5 + 8 + 8 | TECHNICAL DESIGN: APPROVED — 01D-A/B MERGED PR #82/#83; 01D-C IMPLEMENTED / TESTED; ACTIVATION NOT STARTED |
 
 **01D-A — TARGET5SP:** dedicated cutover persistence design/implementation,
 InventoryCutover/Product/LegacySale y Prisma/schema/migration implementados tras
@@ -1450,32 +1494,32 @@ acceptance y gates de rollback/forward-recovery con ensayo operacional completo.
 Sin frontend, FEFO/FIFO comercial, lot picker, Delivery, SalesOrder, Dispatch o Return.
 
 **HC-INVENTORY-CUSTODY-01D-A COMPLETE / MERGED — PR #82.**
-01D-B IMPLEMENTED / TESTED — pending human review/merge;01D-C continúa BLOCKED hasta aceptación/merge01D-B.
+01D-B COMPLETE / MERGED — PR #83;01D-C IMPLEMENTED / TESTED; actual cutover NOT EXECUTED.
 01E sigue BLOCKED por completion/activation01D según sus dependencias; Dispatch
 también permanece bloqueado por el fundamento correspondiente. No marcar ningún
 slice de implementación IN PROGRESS/COMPLETE por aprobación del diseño.
 
 ### K.3 Operational cutover gates
 
-| Gate | Evidencia requerida / STOP |
-| --- | --- |
-| Writer certification | KNOWN WRITERS = COMPLETE; UNKNOWN WRITERS = 0; instancias, scheduled jobs, workers externos/internos, SQL directo, versiones antiguas y caminos fuera del repo |
-| Company reconciliation | Cantidad/identidad actuales demostradas; correcciones necesarias previamente autorizadas y nuevo snapshot/dry-run/revisión |
-| Opening representation | Initializer específico conserva propiedad no elegible; CUSTODY exacta con contexto durable; no inventar hechos/estados/contextos |
-| OPTIONAL | Pool real preservado; vendible batched inaccesible o evidencia ambigua => BLOCK Company |
-| Freeze | Tenant sólo con prueba de aislamiento total; si no GLOBAL APPLICATION WRITE FREEZE; no exclusión demostrable => STOP |
-| Durable control & routing | DB control/membership/checkpoints implementados y verificados; Company authority única; nunca routing por Product ni fallback físico→legacy |
-| Manifest / audit storage | Artefactos externos con acceso/backup/recovery/integridad, digest y aprobación; sin Git real por defecto, secretos ni clinical data |
-| Rerun / parity / tenant | Coherencia exacta, ZERO WRITES en replay, stock=owned y batch=AVAILABLE-state; UNKNOWN/incoherencia no son WARN |
-| VERIFY / activation | Fresh independent VERIFY sin reparación; sólo VERIFIED hacia PHYSICAL_ACTIVE, todos writers y réplicas homogéneos |
-| Recovery / acceptance | Ensayo aislado completo; después primer business Effect FREEZE→DIAGNOSE→FORWARD-FIX; no cleanup productivo sintético |
-| Operator / actor | Operador técnico distinto de Company User autorizado requerido por Effect; auditar ambos, no crear User ficticio |
+| Gate                      | Evidencia requerida / STOP                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Writer certification      | KNOWN WRITERS = COMPLETE; UNKNOWN WRITERS = 0; instancias, scheduled jobs, workers externos/internos, SQL directo, versiones antiguas y caminos fuera del repo |
+| Company reconciliation    | Cantidad/identidad actuales demostradas; correcciones necesarias previamente autorizadas y nuevo snapshot/dry-run/revisión                                     |
+| Opening representation    | Initializer específico conserva propiedad no elegible; CUSTODY exacta con contexto durable; no inventar hechos/estados/contextos                               |
+| OPTIONAL                  | Pool real preservado; vendible batched inaccesible o evidencia ambigua => BLOCK Company                                                                        |
+| Freeze                    | Tenant sólo con prueba de aislamiento total; si no GLOBAL APPLICATION WRITE FREEZE; no exclusión demostrable => STOP                                           |
+| Durable control & routing | DB control/membership/checkpoints implementados y verificados; Company authority única; nunca routing por Product ni fallback físico→legacy                    |
+| Manifest / audit storage  | Artefactos externos con acceso/backup/recovery/integridad, digest y aprobación; sin Git real por defecto, secretos ni clinical data                            |
+| Rerun / parity / tenant   | Coherencia exacta, ZERO WRITES en replay, stock=owned y batch=AVAILABLE-state; UNKNOWN/incoherencia no son WARN                                                |
+| VERIFY / activation       | Fresh independent VERIFY sin reparación; sólo VERIFIED hacia PHYSICAL_ACTIVE, todos writers y réplicas homogéneos                                              |
+| Recovery / acceptance     | Ensayo aislado completo; después primer business Effect FREEZE→DIAGNOSE→FORWARD-FIX; no cleanup productivo sintético                                           |
+| Operator / actor          | Operador técnico distinto de Company User autorizado requerido por Effect; auditar ambos, no crear User ficticio                                               |
 
 WARN sólo documentación histórica no esencial que no afecte quantity, identity,
 authority o seguridad del corte. No override de BLOCK.
 
-Estado final: TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B IMPLEMENTED / TESTED — pending human review/merge;
+Estado final: TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83;
 01A/01B/01C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
 Migraciones y pruebas01D-A/B completadas sólo en entornos efímeros aislados.
-Reconciliation/APPLY/VERIFY internos implementados; sin activation, staging, commit ni push.
-Próximo paso: revisión humana → staging selectivo → commit → PR01D-B.
+Reconciliation/APPLY/VERIFY y activación interna implementados; sin activación real, staging, commit ni push.
+Próximo paso: revisión humana → staging selectivo → commit → PR01D-C.

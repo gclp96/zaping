@@ -1,3 +1,4 @@
+import { inventoryAuthorityFence } from './inventory-authority-fence';
 import { Injectable } from '@nestjs/common';
 import { InventoryCutover, Prisma } from '@prisma/client';
 import { isDeepStrictEqual } from 'node:util';
@@ -19,7 +20,7 @@ import {
 } from './sales-physical-evidence';
 
 @Injectable()
-// DORMANT control bookkeeping only. No APPLY/VERIFY/activation or operational fence.
+// Internal control bookkeeping; exclusive authority fence precedes all roots.
 // Caller must supply an already-owned transaction and roll it back on any error.
 export class InventoryCutoverService {
   constructor(private readonly repository: InventoryCutoverRepository) {}
@@ -44,6 +45,7 @@ export class InventoryCutoverService {
     assertCutoverTransaction(tx);
     cutoverId(input.id);
     cutoverId(input.companyId);
+    await inventoryAuthorityFence(tx, input.companyId, 'exclusive');
     await this.authorize(tx, input.companyId, input.actorId);
     // Ordinary INSERT: uniqueness errors abort the caller's transaction. Never retry here.
     return tx.inventoryCutover.create({
@@ -64,6 +66,7 @@ export class InventoryCutoverService {
     control: InventoryCutover;
   }> {
     assertCutoverTransaction(tx);
+    await inventoryAuthorityFence(tx, e.companyId, 'exclusive');
     const target = transitionTarget(e, op);
     await this.authorize(tx, e.companyId, actorId);
     const row = await this.repository.lock(tx, e.companyId, e.cutoverId);
