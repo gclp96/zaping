@@ -27,12 +27,12 @@ Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activac
 REAL COMPANY CUTOVER: NOT EXECUTED. EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
 M-HC1 OPEN. Sin Forecast, Commitment, Actual ni fechas asignadas.
 
-HC-CASE-DISPATCH — TECHNICAL DESIGN APPROVED / MERGED — PR #88. HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge.
+HC-CASE-DISPATCH — TECHNICAL DESIGN APPROVED / MERGED — PR #88. HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
 QUANTITY SOURCING BLOCKER: RESOLVED. Candidate C SALES-ONLY; Dispatch usa Position
 explícita y revisión, batch nullable según tracking/fuente. Custodio híbrido,
 Equipment estricto y autoridad Inventory compartida conservados. Backend TARGET18SP:
 01A COMPLETE / MERGED — PR #89 — TARGET 5 SP.
-01B IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP; 01C BLOCKED until 01B merge — TARGET 8 SP.
+01B COMPLETE / MERGED — PR #90 — TARGET 5 SP; HC-DSP-LOCK-01 IMPLEMENTED / TESTED — pending human review/merge — TARGET 3 SP; 01C BLOCKED until HC-DSP-LOCK-01 merge — TARGET 8 SP.
 01B: focal242/242 (4 suites), API2147/2147 (122 suites), PostgreSQL16 comandos40/40 y
 cleanup PASS en DB nueva temporal; typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff PASS.
 CREATE vacío, custodian, add MATERIAL/EQUIPMENT, exclude y cancel; CAS/audit/idempotencia
@@ -101,7 +101,7 @@ SERIALIZED sin nueva integración física. Proyecciones compartidas y replay at�
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
 01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
-01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge;01C BLOCKED until 01B merge; frontend fuera de scope; M-HC1 OPEN.
+01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90;01C BLOCKED until HC-DSP-LOCK-01 merge; frontend fuera de scope; M-HC1 OPEN.
 Evidencia del cierre histórico01B, anterior al wiring01D-C: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -184,11 +184,12 @@ Sin Forecast/Commitment/Actual ni fechas asignados.
 | Slice                                           | TARGET | Estado                                            |
 | ----------------------------------------------- | ------ | ------------------------------------------------- |
 | HC-DSP-01A — Persistence + read                 | 5 SP   | COMPLETE / MERGED — PR #89 |
-| HC-DSP-01B — DRAFT commands                     | 5 SP   | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | BLOCKED until HC-DSP-01B merge |
+| HC-DSP-01B — DRAFT commands                     | 5 SP   | COMPLETE / MERGED — PR #90 |
+| HC-DSP-LOCK-01 — DRAFT lock compatibility | 3 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | BLOCKED until HC-DSP-LOCK-01 merge |
 | HC-DSP-01D — Frontend                           | Candidate 5 SP   | OUT OF CURRENT BACKEND SCOPE |
 
-HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP. Backend total18SP;01C bloqueado hasta merge de01B. P1 abiertos: recovery/reopen de PREPARED y selector
+HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90 — TARGET 5 SP. HC-DSP-LOCK-01 IMPLEMENTED / TESTED — pending human review/merge — TARGET 3 SP. Backend Dispatch original total18SP;01C bloqueado hasta merge de HC-DSP-LOCK-01. P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
 reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.

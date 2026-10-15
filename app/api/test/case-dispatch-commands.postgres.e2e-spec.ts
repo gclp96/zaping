@@ -4,6 +4,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { HealthcareCaseDispatchCommandRepository } from '../src/healthcare/case-dispatches/healthcare-case-dispatch-command.repository';
 import { HealthcareCaseDispatchCommandService } from '../src/healthcare/case-dispatches/healthcare-case-dispatch-command.service';
 import { HealthcareCaseDispatchesRepository } from '../src/healthcare/case-dispatches/healthcare-case-dispatches.repository';
+import { HealthcareEquipmentAssignmentsRepository } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.repository';
+import { HealthcareEquipmentAssignmentsService } from '../src/healthcare/equipment-assignments/healthcare-equipment-assignments.service';
+import { HealthcareCaseKitsRepository } from '../src/healthcare/case-kits/healthcare-case-kits.repository';
+import { HealthcareCaseKitsService } from '../src/healthcare/case-kits/healthcare-case-kits.service';
+import { HealthcareCaseService } from '../src/healthcare/cases/healthcare-case.service';
 import { healthcareCompanyTransactionTimeoutConfiguration } from '../src/healthcare/common/healthcare-company-transaction-timeout.config';
 import {
   DispatchCommandContext,
@@ -14,7 +19,7 @@ const suite =
   process.env.RUN_CASE_DISPATCH_COMMANDS_POSTGRES === '1'
     ? describe
     : describe.skip;
-suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
+suite('HC-DSP-LOCK-01 PostgreSQL16 + 01B regression', () => {
   let db: PrismaClient, one: PrismaClient, two: PrismaClient;
   beforeAll(async () => {
     const url = new URL(process.env.CASE_DISPATCH_COMMANDS_TEST_DATABASE_URL!);
@@ -1053,7 +1058,10 @@ suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
     await expect(
       run(
         f,
-        { operation: 'CANCEL', dto: { expectedRevision: 1, reason: 'Again' } },
+        {
+          operation: 'CANCEL',
+          dto: { expectedRevision: 1, reason: 'Again' },
+        },
         d.data.id,
       ),
     ).rejects.toMatchObject({
@@ -1085,7 +1093,10 @@ suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
     await expect(
       service().execute(
         { ...context(f, d.data.id), caseId: other.id },
-        { operation: 'CUSTODIAN_SET', dto: { expectedRevision: 0, custodian } },
+        {
+          operation: 'CUSTODIAN_SET',
+          dto: { expectedRevision: 0, custodian },
+        },
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
@@ -1270,7 +1281,10 @@ suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
   ])('24 Equipment current eligibility rejects %j', async (patch) => {
     const f = await admitted(),
       d = await create(f);
-    await db.equipmentAsset.update({ where: { id: f.asset.id }, data: patch });
+    await db.equipmentAsset.update({
+      where: { id: f.asset.id },
+      data: patch,
+    });
     await expect(addEquipment(f, d.data.id)).rejects.toMatchObject({
       response: { code: 'EQUIPMENT_ASSET_NOT_ELIGIBLE' },
     });
@@ -1323,12 +1337,18 @@ suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
       d = await create(f);
     const a = await run(
         f,
-        { operation: 'CUSTODIAN_SET', dto: { expectedRevision: 0, custodian } },
+        {
+          operation: 'CUSTODIAN_SET',
+          dto: { expectedRevision: 0, custodian },
+        },
         d.data.id,
       ),
       b = await run(
         f,
-        { operation: 'CUSTODIAN_SET', dto: { expectedRevision: 1, custodian } },
+        {
+          operation: 'CUSTODIAN_SET',
+          dto: { expectedRevision: 1, custodian },
+        },
         d.data.id,
       );
     expect(a.command.revisionAfter).toBe(1);
@@ -1490,8 +1510,782 @@ suite('HC-DSP-01B new isolated PostgreSQL16 command acceptance', () => {
         }),
       ).toBe(1);
       expect(
-        await db.idempotencyRecord.count({ where: { companyId: f.companyId } }),
+        await db.idempotencyRecord.count({
+          where: { companyId: f.companyId },
+        }),
       ).toBe(1);
     },
   );
+  // HC-DSP-LOCK-01: real services, independent clients and exact blocker PID.
+  const assignmentRepo = (client: PrismaClient) =>
+    new HealthcareEquipmentAssignmentsRepository(client as PrismaService);
+  const assignmentService = (repo: HealthcareEquipmentAssignmentsRepository) =>
+    new HealthcareEquipmentAssignmentsService(repo, policy);
+  const kitService = (client: PrismaClient) =>
+    new HealthcareCaseKitsService(
+      new HealthcareCaseKitsRepository(client as PrismaService),
+      policy,
+    );
+  const caseService = (client: PrismaClient) =>
+    new HealthcareCaseService(
+      client as PrismaService,
+      {} as never,
+      assignmentService(assignmentRepo(client)),
+      policy,
+    );
+  const equipmentIntent = (f: F): DispatchCommandIntent => ({
+    operation: 'ITEM_ADD',
+    dto: {
+      type: 'EQUIPMENT',
+      sourceCaseKitItemId: f.es.id,
+      expectedRevision: 0,
+    },
+  });
+  const createIntent = (): DispatchCommandIntent => ({
+    operation: 'CREATE',
+    dto: { custodian },
+  });
+  function lockGate() {
+    const g = gate();
+    let pid = 0;
+    return {
+      ...g,
+      pid: () => pid,
+      async pause(tx: Prisma.TransactionClient) {
+        const [row] = await tx.$queryRaw<
+          { pid: number }[]
+        >`SELECT pg_backend_pid() AS pid`;
+        pid = row.pid;
+        g.entered();
+        await g.blocked;
+      },
+    };
+  }
+  async function exactBlocking(pid: number) {
+    for (let n = 0; n < 150; n++) {
+      const rows = await db.$queryRaw<{ pid: number; blockers: number[] }[]>`
+        SELECT pid, pg_blocking_pids(pid) AS blockers FROM pg_stat_activity
+        WHERE application_name='dispatch-command-b' AND wait_event_type='Lock'`;
+      const row = rows.find((r) => r.blockers.includes(pid));
+      if (row) {
+        console.log(`LOCK BARRIER: backend ${row.pid} waits for ${pid}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    throw Error('Expected exact blocking backend not observed');
+  }
+  async function lockedRace(
+    g: ReturnType<typeof lockGate>,
+    first: () => Promise<unknown>,
+    second: () => Promise<unknown>,
+  ) {
+    const a = first();
+    const aResult = Promise.allSettled([a]);
+    let bResult: Promise<PromiseSettledResult<unknown>[]> | undefined;
+    try {
+      await Promise.race([
+        g.held,
+        a.then(() => {
+          throw Error('Holder completed before barrier');
+        }),
+      ]);
+      bResult = Promise.allSettled([second()]);
+      await exactBlocking(g.pid());
+    } finally {
+      g.release();
+    }
+    const [ar, br] = await Promise.all([aResult, bResult]);
+    const results = [...ar, ...br];
+    for (const result of results)
+      if (result.status === 'rejected')
+        expect(String(result.reason)).not.toMatch(/40P01|deadlock/i);
+    return results;
+  }
+  function holdDraft(
+    repo: HealthcareCaseDispatchCommandRepository,
+    g: ReturnType<typeof lockGate>,
+    point: 'assignments' | 'case' | 'root' = 'assignments',
+    fail = false,
+  ) {
+    if (point === 'assignments') {
+      const original = (
+        ...args: Parameters<
+          HealthcareCaseDispatchCommandRepository['lockAssignmentsForShare']
+        >
+      ) => repository(one).lockAssignmentsForShare(...args);
+      jest
+        .spyOn(repo, 'lockAssignmentsForShare')
+        .mockImplementation(async (...args) => {
+          await original(...args);
+          await g.pause(args[2]);
+          if (fail) throw Error('Injected rollback after physical locks');
+        });
+    } else if (point === 'case') {
+      const original = (
+        ...args: Parameters<
+          HealthcareCaseDispatchCommandRepository['lockCaseForShare']
+        >
+      ) => repository(one).lockCaseForShare(...args);
+      jest
+        .spyOn(repo, 'lockCaseForShare')
+        .mockImplementation(async (...args) => {
+          await original(...args);
+          await g.pause(args[2]);
+        });
+    } else {
+      const original = (
+        ...args: Parameters<
+          HealthcareCaseDispatchCommandRepository['lockDraftById']
+        >
+      ) => repository(one).lockDraftById(...args);
+      jest.spyOn(repo, 'lockDraftById').mockImplementation(async (...args) => {
+        const r = await original(...args);
+        await g.pause(args[1]);
+        return r;
+      });
+    }
+  }
+  function holdWriter(
+    repo: HealthcareEquipmentAssignmentsRepository,
+    g: ReturnType<typeof lockGate>,
+    point: 'asset' | 'assignment',
+  ) {
+    if (point === 'asset') {
+      const original = (
+        ...args: Parameters<
+          HealthcareEquipmentAssignmentsRepository['lockEquipmentAsset']
+        >
+      ) => assignmentRepo(one).lockEquipmentAsset(...args);
+      jest
+        .spyOn(repo, 'lockEquipmentAsset')
+        .mockImplementation(async (...args) => {
+          const r = await original(...args);
+          await g.pause(args[0]);
+          return r;
+        });
+    } else {
+      const original = (
+        ...args: Parameters<
+          HealthcareEquipmentAssignmentsRepository['lockAssignment']
+        >
+      ) => assignmentRepo(one).lockAssignment(...args);
+      jest.spyOn(repo, 'lockAssignment').mockImplementation(async (...args) => {
+        const r = await original(...args);
+        await g.pause(args[0]);
+        return r;
+      });
+    }
+  }
+  async function destination(f: F) {
+    return db.equipmentAsset.create({
+      data: {
+        companyId: f.companyId,
+        productId: f.ep.id,
+        assetCode: randomUUID(),
+        condition: 'GOOD',
+        physicalLocation: 'WAREHOUSE',
+      },
+    });
+  }
+  async function noDraftPhysicalEffects(f: F) {
+    const p = await physical(f);
+    expect([p.effects, p.custodies, p.events]).toEqual([0, 0, 0]);
+    expect(
+      p.assets.every(
+        (a) => a.physicalRevision === 0 && a.activeCustodyId === null,
+      ),
+    ).toBe(true);
+  }
+  async function assertAdd(f: F, dispatchId: string, present: boolean) {
+    const root = await db.healthcareCaseDispatch.findUniqueOrThrow({
+      where: { id: dispatchId },
+    });
+    expect(root.revision).toBe(present ? 1 : 0);
+    const items = await db.healthcareCaseDispatchItem.findMany({
+      where: { dispatchId },
+    });
+    expect(items).toHaveLength(present ? 1 : 0);
+    if (present)
+      expect(items[0]).toMatchObject({
+        assignmentId: f.assignment.id,
+        assetId: f.asset.id,
+        expectedPhysicalRevision: 0,
+      });
+    expect(
+      await db.healthcareCaseDispatchAudit.count({
+        where: { dispatchId, operation: 'ITEM_ADD' },
+      }),
+    ).toBe(present ? 1 : 0);
+    await noDraftPhysicalEffects(f);
+  }
+  it.each(['draft-first', 'release-first'])(
+    'LOCK01 1/2 ADD vs real RELEASE %s',
+    async (order) => {
+      const f = await admitted(),
+        d = await create(f),
+        g = lockGate(),
+        dr = repository(one),
+        wr = assignmentRepo(order === 'draft-first' ? two : one);
+      const release = () =>
+        assignmentService(wr).release(
+          f.companyId,
+          f.user.id,
+          f.assignment.id,
+          { reason: 'Compatibility release' },
+          randomUUID(),
+        );
+      let results: PromiseSettledResult<unknown>[];
+      if (order === 'draft-first') {
+        holdDraft(dr, g);
+        results = await lockedRace(
+          g,
+          () =>
+            new HealthcareCaseDispatchCommandService(dr, policy).execute(
+              context(f, d.data.id),
+              equipmentIntent(f),
+            ),
+          release,
+        );
+        expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      } else {
+        holdWriter(wr, g, 'asset');
+        results = await lockedRace(g, release, () =>
+          service(two).execute(context(f, d.data.id), equipmentIntent(f)),
+        );
+        expect(results[0].status).toBe('fulfilled');
+        expect(results[1]).toMatchObject({
+          status: 'rejected',
+          reason: { status: 409 },
+        });
+      }
+      expect(
+        await db.healthcareEquipmentAssignment.findUnique({
+          where: { id: f.assignment.id },
+        }),
+      ).toMatchObject({
+        lifecycle: 'RELEASED',
+        releaseReason: 'Compatibility release',
+        releaseCause: 'MANUAL',
+      });
+      await assertAdd(f, d.data.id, order === 'draft-first');
+    },
+  );
+  it.each(['draft-first', 'replace-first'])(
+    'LOCK01 3/4 ADD vs real REPLACE %s different destination',
+    async (order) => {
+      const f = await admitted(),
+        d = await create(f),
+        next = await destination(f),
+        g = lockGate(),
+        dr = repository(one),
+        wr = assignmentRepo(order === 'draft-first' ? two : one);
+      const replace = () =>
+        assignmentService(wr).replace(
+          f.companyId,
+          f.user.id,
+          f.assignment.id,
+          randomUUID(),
+          {
+            equipmentAssetId: next.id,
+            replacementReason: 'Compatibility replacement',
+          },
+        );
+      let results: PromiseSettledResult<unknown>[];
+      if (order === 'draft-first') {
+        holdDraft(dr, g);
+        results = await lockedRace(
+          g,
+          () =>
+            new HealthcareCaseDispatchCommandService(dr, policy).execute(
+              context(f, d.data.id),
+              equipmentIntent(f),
+            ),
+          replace,
+        );
+      } else {
+        holdWriter(wr, g, 'assignment');
+        results = await lockedRace(g, replace, () =>
+          service(two).execute(context(f, d.data.id), equipmentIntent(f)),
+        );
+      }
+      expect(results[0].status).toBe('fulfilled');
+      expect(results[1].status).toBe(
+        order === 'draft-first' ? 'fulfilled' : 'rejected',
+      );
+      expect(
+        await db.healthcareEquipmentAssignment.findUnique({
+          where: { id: f.assignment.id },
+        }),
+      ).toMatchObject({ lifecycle: 'REPLACED' });
+      expect(
+        await db.healthcareEquipmentAssignment.count({
+          where: {
+            companyId: f.companyId,
+            equipmentAssetId: next.id,
+            lifecycle: 'RESERVED',
+            replacesAssignmentId: f.assignment.id,
+          },
+        }),
+      ).toBe(1);
+      await assertAdd(f, d.data.id, order === 'draft-first');
+    },
+  );
+  async function relatedCase(f: F) {
+    return db.healthcareCase.create({
+      data: {
+        companyId: f.companyId,
+        createdById: f.user.id,
+        folio: randomUUID(),
+        title: 'Related scheduling',
+        status: 'SCHEDULED',
+        scheduledStart: new Date('2026-11-03T10:00:00Z'),
+        scheduledEnd: new Date('2026-11-03T12:00:00Z'),
+      },
+    });
+  }
+  it.each(['ADD', 'CREATE'])(
+    'LOCK01 5/6 %s vs real Assignment CREATE on related Case',
+    async (kind) => {
+      const f = await admitted(),
+        d = kind === 'ADD' ? await create(f) : null,
+        other = await relatedCase(f),
+        g = lockGate(),
+        dr = repository(one);
+      holdDraft(dr, g);
+      const results = await lockedRace(
+        g,
+        () =>
+          new HealthcareCaseDispatchCommandService(dr, policy).execute(
+            context(f, d?.data.id),
+            kind === 'ADD' ? equipmentIntent(f) : createIntent(),
+          ),
+        () =>
+          assignmentService(assignmentRepo(two)).create(
+            f.companyId,
+            f.user.id,
+            randomUUID(),
+            {
+              caseId: other.id,
+              equipmentAssetId: f.asset.id,
+              directAssignmentReason: 'Related scheduling',
+            },
+          ),
+      );
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      expect(
+        await db.healthcareEquipmentAssignment.count({
+          where: {
+            companyId: f.companyId,
+            equipmentAssetId: f.asset.id,
+            lifecycle: 'RESERVED',
+          },
+        }),
+      ).toBe(2);
+      await noDraftPhysicalEffects(f);
+    },
+  );
+  it('LOCK01 7 CREATE readiness vs real REPLACE', async () => {
+    const f = await admitted(),
+      next = await destination(f),
+      g = lockGate(),
+      dr = repository(one);
+    holdDraft(dr, g);
+    const results = await lockedRace(
+      g,
+      () =>
+        new HealthcareCaseDispatchCommandService(dr, policy).execute(
+          context(f),
+          createIntent(),
+        ),
+      () =>
+        assignmentService(assignmentRepo(two)).replace(
+          f.companyId,
+          f.user.id,
+          f.assignment.id,
+          randomUUID(),
+          { equipmentAssetId: next.id, replacementReason: 'Readiness race' },
+        ),
+    );
+    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    expect(
+      await db.healthcareCaseDispatch.count({
+        where: { companyId: f.companyId, revision: 0 },
+      }),
+    ).toBe(1);
+    await noDraftPhysicalEffects(f);
+  });
+  it.each(['CANCEL', 'CUSTODIAN_SET'])(
+    'LOCK01 8/9 ADD serializes with %s',
+    async (operation) => {
+      const f = await admitted(),
+        d = await create(f),
+        g = lockGate(),
+        dr = repository(one);
+      holdDraft(dr, g);
+      const intent: DispatchCommandIntent =
+        operation === 'CANCEL'
+          ? { operation, dto: { expectedRevision: 0, reason: 'Cancel race' } }
+          : {
+              operation: 'CUSTODIAN_SET',
+              dto: {
+                expectedRevision: 0,
+                custodian: { ...custodian, displayName: 'Changed' },
+              },
+            };
+      const results = await lockedRace(
+        g,
+        () =>
+          new HealthcareCaseDispatchCommandService(dr, policy).execute(
+            context(f, d.data.id),
+            equipmentIntent(f),
+          ),
+        () => service(two).execute(context(f, d.data.id), intent),
+      );
+      expect(results[0].status).toBe('fulfilled');
+      expect(results[1]).toMatchObject({
+        status: 'rejected',
+        reason: { status: 409 },
+      });
+      await assertAdd(f, d.data.id, true);
+    },
+  );
+  it('LOCK01 10 two Equipment ADDs, one revision winner and one audit', async () => {
+    const f = await admitted(),
+      d = await create(f),
+      g = lockGate(),
+      dr = repository(one);
+    holdDraft(dr, g);
+    const results = await lockedRace(
+      g,
+      () =>
+        new HealthcareCaseDispatchCommandService(dr, policy).execute(
+          context(f, d.data.id),
+          equipmentIntent(f),
+        ),
+      () => service(two).execute(context(f, d.data.id), equipmentIntent(f)),
+    );
+    expect(results[0].status).toBe('fulfilled');
+    expect(results[1]).toMatchObject({
+      status: 'rejected',
+      reason: { status: 409 },
+    });
+    await assertAdd(f, d.data.id, true);
+  });
+  it.each(['release', 'replace'])(
+    'LOCK01 11/12 real %s semantics and idempotency regression',
+    async (kind) => {
+      const f = await admitted(),
+        next = await destination(f),
+        key = randomUUID(),
+        svc = assignmentService(assignmentRepo(one));
+      const command = () =>
+        kind === 'release'
+          ? svc.release(
+              f.companyId,
+              f.user.id,
+              f.assignment.id,
+              { reason: 'Regression reason' },
+              key,
+            )
+          : svc.replace(f.companyId, f.user.id, f.assignment.id, key, {
+              equipmentAssetId: next.id,
+              replacementReason: 'Regression reason',
+            });
+      const first = await command(),
+        before = await physical(f),
+        replay = await command();
+      expect(replay).toEqual(first);
+      expect(await physical(f)).toEqual(before);
+      const row = await db.healthcareEquipmentAssignment.findUniqueOrThrow({
+        where: { id: f.assignment.id },
+      });
+      expect(row.lifecycle).toBe(kind === 'release' ? 'RELEASED' : 'REPLACED');
+      if (kind === 'release')
+        expect(row).toMatchObject({
+          releasedById: f.user.id,
+          releaseReason: 'Regression reason',
+          releaseCause: 'MANUAL',
+        });
+      else
+        expect(
+          await db.healthcareEquipmentAssignment.count({
+            where: { replacesAssignmentId: f.assignment.id },
+          }),
+        ).toBe(1);
+      expect(
+        await db.idempotencyRecord.count({
+          where: { companyId: f.companyId, key },
+        }),
+      ).toBe(1);
+      await noDraftPhysicalEffects(f);
+    },
+  );
+  it('LOCK01 13 rollback releases physical/root locks and claim/item/audit', async () => {
+    const f = await admitted(),
+      d = await create(f),
+      g = lockGate(),
+      dr = repository(one),
+      key = randomUUID();
+    holdDraft(dr, g, 'assignments', true);
+    const results = await lockedRace(
+      g,
+      () =>
+        new HealthcareCaseDispatchCommandService(dr, policy).execute(
+          context(f, d.data.id, undefined, key),
+          equipmentIntent(f),
+        ),
+      () => service(two).execute(context(f, d.data.id), equipmentIntent(f)),
+    );
+    expect(results[0]).toMatchObject({ status: 'rejected' });
+    expect(results[1].status).toBe('fulfilled');
+    expect(
+      await db.idempotencyRecord.count({
+        where: { companyId: f.companyId, key },
+      }),
+    ).toBe(0);
+    await assertAdd(f, d.data.id, true);
+  });
+  it('LOCK01 14 foreign tenant discovery cannot authorize Equipment ADD', async () => {
+    const f = await admitted(),
+      foreign = await admitted(),
+      d = await create(f);
+    await expect(
+      service(one).execute(context(f, d.data.id), {
+        operation: 'ITEM_ADD',
+        dto: {
+          type: 'EQUIPMENT',
+          expectedRevision: 0,
+          sourceCaseKitItemId: foreign.es.id,
+        },
+      }),
+    ).rejects.toMatchObject({ status: 409 });
+    await assertAdd(f, d.data.id, false);
+    await noDraftPhysicalEffects(foreign);
+  });
+  it.each(['ADD', 'CREATE'])(
+    'LOCK01 15 %s blocks real preparation before its physical locks',
+    async (kind) => {
+      const f = await admitted(),
+        d = kind === 'ADD' ? await create(f) : null,
+        g = lockGate(),
+        dr = repository(one);
+      holdDraft(dr, g);
+      const results = await lockedRace(
+        g,
+        () =>
+          new HealthcareCaseDispatchCommandService(dr, policy).execute(
+            context(f, d?.data.id),
+            kind === 'ADD' ? equipmentIntent(f) : createIntent(),
+          ),
+        () =>
+          kitService(two).confirmPreparation(
+            f.companyId,
+            f.user.id,
+            f.kit.id,
+            randomUUID(),
+          ),
+      );
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      expect(
+        await db.healthcareCaseKit.findUnique({ where: { id: f.kit.id } }),
+      ).toMatchObject({ status: 'PREPARED' });
+      await noDraftPhysicalEffects(f);
+    },
+  );
+  it.each(['cancel', 'update'])(
+    'LOCK01 16/19 real Case %s waits on SHARE before downstream roots',
+    async (kind) => {
+      const f = await admitted(),
+        d = await create(f),
+        g = lockGate(),
+        dr = repository(one);
+      holdDraft(dr, g);
+      const results = await lockedRace(
+        g,
+        () =>
+          new HealthcareCaseDispatchCommandService(dr, policy).execute(
+            context(f, d.data.id),
+            equipmentIntent(f),
+          ),
+        () =>
+          kind === 'cancel'
+            ? caseService(two).cancel(
+                f.companyId,
+                f.c.id,
+                f.user.id,
+                'Case cancellation race',
+              )
+            : caseService(two).update(f.companyId, f.c.id, {
+                scheduledStart: new Date('2026-11-04T10:00:00Z'),
+                scheduledEnd: new Date('2026-11-04T12:00:00Z'),
+              }),
+      );
+      expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+      expect(
+        await db.healthcareCase.findUnique({ where: { id: f.c.id } }),
+      ).toMatchObject({
+        status: kind === 'cancel' ? 'CANCELLED' : 'SCHEDULED',
+      });
+      await assertAdd(f, d.data.id, true);
+    },
+  );
+  it('LOCK01 17 multi-Asset CREATE vs REPLACE sharing an ASSET Requirement', async () => {
+    const f = await fixture(),
+      next = await destination(f);
+    const req = await db.healthcareCaseRequirement.create({
+      data: {
+        companyId: f.companyId,
+        caseId: f.c.id,
+        productId: f.ep.id,
+        requestedQty: 2,
+        type: 'BACKUP',
+        sortOrder: 1,
+        createdById: f.user.id,
+      },
+    });
+    await db.healthcareEquipmentAssignment.update({
+      where: { id: f.assignment.id },
+      data: {
+        requirementId: req.id,
+        origin: 'REQUIREMENT',
+        directAssignmentReason: null,
+      },
+    });
+    const extra = await db.healthcareEquipmentAssignment.create({
+      data: {
+        companyId: f.companyId,
+        caseId: f.c.id,
+        equipmentAssetId: next.id,
+        origin: 'REQUIREMENT',
+        requirementId: req.id,
+        createdById: f.user.id,
+      },
+    });
+    await db.healthcareCaseKitItem.create({
+      data: {
+        companyId: f.companyId,
+        caseId: f.c.id,
+        caseKitId: f.kit.id,
+        equipmentAssignmentId: extra.id,
+        addedById: f.user.id,
+      },
+    });
+    await db.healthcareCase.update({
+      where: { id: f.c.id },
+      data: {
+        status: 'SCHEDULED',
+        scheduledStart: new Date('2026-11-01T10:00:00Z'),
+        scheduledEnd: new Date('2026-11-01T12:00:00Z'),
+      },
+    });
+    await db.healthcareCaseKit.update({
+      where: { id: f.kit.id },
+      data: {
+        status: 'PREPARED',
+        preparedById: f.user.id,
+        preparedAt: new Date(),
+      },
+    });
+    await db.equipmentAsset.update({
+      where: { id: f.asset.id },
+      data: { physicalLocation: 'WAREHOUSE' },
+    });
+    const replacement = await destination(f),
+      g = lockGate(),
+      dr = repository(one);
+    holdDraft(dr, g);
+    const results = await lockedRace(
+      g,
+      () =>
+        new HealthcareCaseDispatchCommandService(dr, policy).execute(
+          context(f),
+          createIntent(),
+        ),
+      () =>
+        assignmentService(assignmentRepo(two)).replace(
+          f.companyId,
+          f.user.id,
+          f.assignment.id,
+          randomUUID(),
+          {
+            equipmentAssetId: replacement.id,
+            replacementReason: 'Shared Requirement race',
+          },
+        ),
+    );
+    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    await noDraftPhysicalEffects(f);
+  });
+  it('LOCK01 18 distinct Cases share material Product and Asset; Product precedes Asset', async () => {
+    const f = await admitted(),
+      other = await relatedCase(f);
+    const kit = await db.healthcareCaseKit.create({
+      data: {
+        companyId: f.companyId,
+        caseId: other.id,
+        createdById: f.user.id,
+      },
+    });
+    const req = await db.healthcareCaseRequirement.create({
+      data: {
+        companyId: f.companyId,
+        caseId: other.id,
+        productId: f.product.id,
+        requestedQty: 1,
+        type: 'REQUIRED',
+        sortOrder: 0,
+        createdById: f.user.id,
+      },
+    });
+    await db.healthcareCaseKitItem.create({
+      data: {
+        companyId: f.companyId,
+        caseId: other.id,
+        caseKitId: kit.id,
+        requirementId: req.id,
+        preparedQuantity: 1,
+        addedById: f.user.id,
+      },
+    });
+    const a = await db.healthcareEquipmentAssignment.create({
+      data: {
+        companyId: f.companyId,
+        caseId: other.id,
+        equipmentAssetId: f.asset.id,
+        origin: 'DIRECT',
+        directAssignmentReason: 'Shared Asset',
+        createdById: f.user.id,
+      },
+    });
+    await db.healthcareCaseKitItem.create({
+      data: {
+        companyId: f.companyId,
+        caseId: other.id,
+        caseKitId: kit.id,
+        equipmentAssignmentId: a.id,
+        addedById: f.user.id,
+      },
+    });
+    const g = lockGate(),
+      dr = repository(one);
+    holdDraft(dr, g);
+    const results = await lockedRace(
+      g,
+      () =>
+        new HealthcareCaseDispatchCommandService(dr, policy).execute(
+          context(f),
+          createIntent(),
+        ),
+      () =>
+        kitService(two).confirmPreparation(
+          f.companyId,
+          f.user.id,
+          kit.id,
+          randomUUID(),
+        ),
+    );
+    expect(results.every((r) => r.status === 'fulfilled')).toBe(true);
+    await noDraftPhysicalEffects(f);
+  });
 });

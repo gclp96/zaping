@@ -308,6 +308,10 @@ describe('Dispatch service receipt/transaction boundary', () => {
     findWitness: jest.fn(),
     findReplayItem: jest.fn(),
     lockSources: jest.fn(),
+    lockCaseForShare: jest.fn(),
+    lockProductForKeyShare: jest.fn(),
+    lockAssetsForShare: jest.fn(),
+    lockAssignmentsForShare: jest.fn(),
     findCase: jest.fn(),
     findKit: jest.fn(),
     lockReadiness: jest.fn(),
@@ -371,7 +375,7 @@ describe('Dispatch service receipt/transaction boundary', () => {
     });
     expect(r.replay).toBe(false);
     expect(repo.createClaim.mock.invocationCallOrder[0]).toBeLessThan(
-      repo.lockSources.mock.invocationCallOrder[0],
+      repo.lockCaseForShare.mock.invocationCallOrder[0],
     );
     expect(repo.appendAudit).toHaveBeenCalledTimes(1);
     expect(repo.completeClaim).toHaveBeenCalledWith('claim', 'dispatch', tx);
@@ -609,6 +613,10 @@ describe('Dispatch source validation before physical mutation', () => {
     createClaim: jest.fn(),
     findIdentity: jest.fn(),
     lockSources: jest.fn(),
+    lockCaseForShare: jest.fn(),
+    lockProductForKeyShare: jest.fn(),
+    lockAssetsForShare: jest.fn(),
+    lockAssignmentsForShare: jest.fn(),
     findCase: jest.fn(),
     findKit: jest.fn(),
     lockDraftById: jest.fn(),
@@ -830,6 +838,7 @@ describe('Dispatch source validation before physical mutation', () => {
     });
   });
   it('Equipment requires coherent RESERVED Assignment', async () => {
+    repo.findAsset.mockResolvedValue({ id: 'asset', productId: 'product' });
     repo.findSource.mockResolvedValue({
       id: 'source',
       lifecycle: 'ACTIVE',
@@ -850,6 +859,134 @@ describe('Dispatch source validation before physical mutation', () => {
     ).rejects.toMatchObject({
       response: { code: 'CASE_DISPATCH_SOURCE_NOT_VALID' },
     });
-    expect(repo.findAsset).not.toHaveBeenCalled();
+    expect(repo.insertEquipmentItem).not.toHaveBeenCalled();
+  });
+  it.each(['valid', 'changed binding', 'changed product'])(
+    'locks Equipment canonically and rereads %s',
+    async (scenario) => {
+      const source = {
+        id: 'source',
+        lifecycle: 'ACTIVE',
+        requirementId: null,
+        equipmentAssignment: {
+          id: 'assignment',
+          equipmentAssetId: 'asset',
+          companyId: c.companyId,
+          caseId: c.caseId,
+          lifecycle: 'RESERVED',
+        },
+      };
+      repo.findSource.mockResolvedValueOnce(source).mockResolvedValue({
+        ...source,
+        equipmentAssignment: {
+          ...source.equipmentAssignment,
+          equipmentAssetId: scenario === 'changed binding' ? 'other' : 'asset',
+        },
+      });
+      repo.findAsset
+        .mockResolvedValueOnce({ id: 'asset', productId: 'product' })
+        .mockResolvedValue({
+          id: 'asset',
+          productId: scenario === 'changed product' ? 'other' : 'product',
+          lifecycle: 'ACTIVE',
+          condition: 'GOOD',
+          physicalLocation: 'WAREHOUSE',
+          physicalRevision: 9,
+          activeCustodyId: null,
+        });
+      repo.findProduct.mockResolvedValue({
+        id: 'product',
+        isActive: true,
+        inventoryTracking: 'ASSET',
+      });
+      repo.equipmentConsumed.mockResolvedValue(false);
+      repo.insertEquipmentItem.mockResolvedValue({ id: 'item' });
+      const pending = service.execute(c, {
+        operation: 'ITEM_ADD',
+        dto: equipment as AddHealthcareCaseDispatchItemDto,
+      });
+      if (scenario === 'valid') {
+        await pending;
+        expect(repo.insertEquipmentItem).toHaveBeenCalledWith(
+          expect.objectContaining({ expectedPhysicalRevision: 9 }),
+          tx,
+        );
+      } else {
+        await expect(pending).rejects.toMatchObject({ status: 409 });
+        expect(repo.insertEquipmentItem).not.toHaveBeenCalled();
+      }
+      expect(repo.lockCaseForShare.mock.invocationCallOrder[0]).toBeLessThan(
+        repo.lockProductForKeyShare.mock.invocationCallOrder[0],
+      );
+      expect(
+        repo.lockProductForKeyShare.mock.invocationCallOrder[0],
+      ).toBeLessThan(repo.lockAssetsForShare.mock.invocationCallOrder[0]);
+      expect(repo.lockAssetsForShare.mock.invocationCallOrder[0]).toBeLessThan(
+        repo.lockAssignmentsForShare.mock.invocationCallOrder[0],
+      );
+      expect(repo.lockAssetsForShare).toHaveBeenCalledTimes(1);
+      expect(repo.lockAssignmentsForShare).toHaveBeenCalledTimes(1);
+      expect(
+        repo.lockSources.mock.calls.some(
+          ([table]) => table === 'HealthcareCase',
+        ),
+      ).toBe(false);
+    },
+  );
+});
+
+describe('Dispatch readiness repository lock protocol', () => {
+  it('locks Products then Assets then Requirements then Assignments', async () => {
+    const repository = new HealthcareCaseDispatchCommandRepository(
+      {} as never,
+      {} as never,
+    );
+    const locks = jest.spyOn(repository, 'lockSources').mockResolvedValue();
+    const kit = {
+      items: [
+        {
+          id: 'item',
+          lifecycle: 'ACTIVE',
+          equipmentAssignmentId: 'assignment',
+          equipmentAssignment: {
+            equipmentAsset: { id: 'asset', product: { id: 'product' } },
+          },
+        },
+      ],
+      healthcareCase: { requirements: [{ id: 'requirement' }] },
+    };
+    await repository.lockReadiness(
+      kit as never,
+      c,
+      {} as Prisma.TransactionClient,
+    );
+    expect(locks.mock.calls.map(([table]) => table)).toEqual([
+      'HealthcareCaseKitItem',
+      'Product',
+      'EquipmentAsset',
+      'HealthcareCaseRequirement',
+      'HealthcareEquipmentAssignment',
+    ]);
+  });
+  it('sorts and deduplicates lock IDs and uses actual SHARE/KEY SHARE modes', async () => {
+    const query = jest
+      .fn<
+        Promise<unknown[]>,
+        [Prisma.Sql | TemplateStringsArray, ...unknown[]]
+      >()
+      .mockResolvedValue([]);
+    const tx = { $queryRaw: query } as unknown as Prisma.TransactionClient;
+    const repository = new HealthcareCaseDispatchCommandRepository(
+      {} as never,
+      {} as never,
+    );
+    await repository.lockAssetsForShare('tenant', ['z', 'a', 'z'], tx);
+    const sql = query.mock.calls[0][0] as Prisma.Sql;
+    expect(sql.values).toEqual(['tenant', 'a', 'z']);
+    expect(sql.text).toMatch(/ORDER BY id FOR SHARE$/);
+    await repository.lockProductForKeyShare('tenant', 'product', tx);
+    expect((query.mock.calls[1][0] as TemplateStringsArray).join('')).toContain(
+      'FOR KEY SHARE',
+    );
   });
 });
