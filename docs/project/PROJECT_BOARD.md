@@ -9,7 +9,7 @@ Responsable: Zaping Team
 0. Snapshot vigente
 
 01E-A COMPLETE / MERGED — PR #86 — TARGET 5 SP.
-01E-B IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+01E-B COMPLETE / MERGED — PR #87 — TARGET 8 SP.
 Focal635/635 (32 suites); PostgreSQL35/35 en DB nueva efímera; full API1981/1981 (119 suites); Web43/43 (2 archivos) PASS.
 Elegibilidad física en Availability/Create/Replace; Inspection/Retirement con HC lock, revisión e historia atómicas.
 Coverage/PREPARED conservados; primitiva interna caller-owned y registry productivo vacío/fail-closed.
@@ -18,18 +18,21 @@ Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATIO
 PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. CaseDispatch/Return: NOT IMPLEMENTED. M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
-IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge. 01E IMPLEMENTATION completa sólo después del merge01E-B. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
+IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. 01E IMPLEMENTATION COMPLETE / MERGED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
-01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
+01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
 EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
 Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
 Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activación01D.
 REAL COMPANY CUTOVER: NOT EXECUTED. EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
 M-HC1 OPEN. Sin Forecast, Commitment, Actual ni fechas asignadas.
 
-HC-CASE-DISPATCH — CONTRACT APPROVED / IMPLEMENTATION BLOCKED BY INVENTORY CUSTODY FOUNDATION.
-DEC-DSP-01..17 APPROVED con refinamientos de batch obligatorio, custodio híbrido,
-Equipment estricto y autoridad Inventory compartida en
+HC-CASE-DISPATCH — TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED.
+QUANTITY SOURCING BLOCKER: RESOLVED. Candidate C SALES-ONLY; Dispatch usa Position
+explícita y revisión, batch nullable según tracking/fuente. Custodio híbrido,
+Equipment estricto y autoridad Inventory compartida conservados. Backend TARGET18SP:
+01A READY5SP (entrada tras merge TD),01B BLOCKED por01A5SP,01C BLOCKED por01B8SP.
+[Technical Design](../modules/healthcare/CASE_DISPATCH_TECHNICAL_DESIGN.md) y
 [CASE_LOGISTICS §258](../modules/healthcare/CASE_LOGISTICS.md#258-hc-case-dispatch--v1-approved-contract).
 
 HC-INVENTORY-CUSTODY-DEF — Inventory Custody & Physical Availability Definition —
@@ -48,9 +51,9 @@ fundamento dormido; los writers/readers productivos conservan su comportamiento.
 | HC-INVENTORY-CUSTODY-01D-A — Durable Cutover Control & Legacy Classification Foundation     | 5 SP              | COMPLETE / MERGED — PR #82 — NON-ACTIVATING                                                                                          |
 | HC-INVENTORY-CUSTODY-01D-B — Reconciliation, Opening Baseline & Verification                | 8 SP              | COMPLETE / MERGED — PR #83 — NO PRODUCTIVE ACTIVATION                                                                                |
 | HC-INVENTORY-CUSTODY-01D-C — Authority Cutover, Writer Wiring & Operational Activation      | 8 SP              | COMPLETE / MERGED — PR #84 — ACTUAL CUTOVER NOT EXECUTED                                                                                   |
-| HC-INVENTORY-CUSTODY-01E — EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E — EquipmentAsset custody foundation | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87 |
 | HC-INVENTORY-CUSTODY-01E-A — Persistence, invariants, baseline & physical history | 5 SP | COMPLETE / MERGED — PR #86 |
-| HC-INVENTORY-CUSTODY-01E-B — Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E-B — Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP | COMPLETE / MERGED — PR #87 |
 
 DEF merged en `51363f566c8c6656f1653f03f11d9489ab4d082b`;
 [TD-INV-01A-01..20](../modules/erp/INVENTORY_CUSTODY_TECHNICAL_DESIGN.md)
@@ -93,7 +96,7 @@ SERIALIZED sin nueva integración física. Proyecciones compartidas y replay at�
 TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfill.
 01C COMPLETE / MERGED — PR #80 — main@c3d0824 — TARGET 8 SP; DORMANT UNTIL 01D.
 01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
-01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B IMPLEMENTED / TESTED — pending human review/merge. HC-DSP-01A/B/C/D siguen BLOCKED; M-HC1 OPEN.
+01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. HC-DSP-01A READY tras merge del TD;01B por01A;01C por01B; frontend fuera de scope; M-HC1 OPEN.
 Evidencia del cierre histórico01B, anterior al wiring01D-C: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
 desde hechos persistidos; historial compatible ADJUSTMENT absoluto; manual con key,
@@ -150,7 +153,7 @@ Manifest externo seguro, no Git real por defecto; operador técnico separado del
 Certificación KNOWN WRITERS=COMPLETE / UNKNOWN WRITERS=0 y freeze tenant demostrado
 o GLOBAL APPLICATION WRITE FREEZE son gates. OPTIONAL inaccesible/ambiguo, discrepancias,
 UNKNOWN legacy, parity/idempotency/tenant/barrier fallidos bloquean toda Company.
-01A/01B/01C DORMANT;01E no requiere activar01D; 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge;M-HC1 OPEN.
+01A/01B/01C DORMANT;01E no requiere activar01D; 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87;M-HC1 OPEN.
 01D-A: schema-only migration, CAS/checkpoints/membership/classifier/resolver internos implementados.
 Al cierre histórico01D-A no incluía reconciliation/APPLY/VERIFY.01D-B los añade internamente, sin activación/routing productivo.
 Validación histórica01D-A: full API1896 tests/113 suites PASS; PostgreSQL16/16 PASS en contenedor nuevo
@@ -170,17 +173,17 @@ loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APP
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
 Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Siguiente acción: revisión humana01E-B → staging selectivo → commit → PR; 01E IMPLEMENTATION completa sólo después del merge01E-B.
+Siguiente acción: revisión/merge del TD Dispatch → implementación01A autorizada. 01D/01E COMPLETE / MERGED; sin adopción real.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice                                           | TARGET | Estado                                            |
 | ----------------------------------------------- | ------ | ------------------------------------------------- |
-| HC-DSP-01A — Persistence + read                 | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01B — DRAFT commands                     | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
-| HC-DSP-01D — Frontend                           | 5 SP   | DEFINED / BLOCKED BY INVENTORY CUSTODY FOUNDATION |
+| HC-DSP-01A — Persistence + read                 | 5 SP   | READY; implementación tras merge del TD |
+| HC-DSP-01B — DRAFT commands                     | 5 SP   | BLOCKED BY HC-DSP-01A |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | BLOCKED BY HC-DSP-01B |
+| HC-DSP-01D — Frontend                           | Candidate 5 SP   | OUT OF CURRENT BACKEND SCOPE |
 
-Ningún slice Dispatch READY. P1 abiertos: recovery/reopen de PREPARED y selector
+HC-DSP-01A READY — TARGET5SP; implementación tras merge TD. Backend total18SP;01B/01C por secuencia. P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
 reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
