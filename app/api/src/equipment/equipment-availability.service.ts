@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { PrismaService } from '../prisma/prisma.service';
 
-import * as equipmentAvailabilityEvaluator from './equipment-availability.evaluator';
+import { evaluateEquipmentPhysicalEligibility } from './equipment-physical-eligibility';
 import { EquipmentCurrentAvailabilityResult } from './equipment-availability.types';
 
 @Injectable()
@@ -21,6 +21,9 @@ export class EquipmentAvailabilityService {
       select: {
         lifecycle: true,
         condition: true,
+        physicalLocation: true,
+        physicalRevision: true,
+        activeCustodyId: true,
       },
     });
 
@@ -28,11 +31,7 @@ export class EquipmentAvailabilityService {
       throw new NotFoundException('Equipo no encontrado');
     }
 
-    const evaluation =
-      equipmentAvailabilityEvaluator.evaluateEquipmentCurrentAvailability({
-        lifecycle: equipment.lifecycle,
-        condition: equipment.condition,
-      });
+    const evaluation = evaluateEquipmentPhysicalEligibility(equipment);
 
     return {
       ...evaluation,

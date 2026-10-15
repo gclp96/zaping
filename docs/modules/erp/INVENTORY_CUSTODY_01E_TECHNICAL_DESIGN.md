@@ -1,22 +1,23 @@
 # HC-INVENTORY-CUSTODY-01E — EquipmentAsset Custody Integration
 
 TECHNICAL DESIGN: APPROVED / MERGED — PR #85
-IMPLEMENTATION: 01E-A IMPLEMENTED / TESTED — pending human review/merge; 01E-B NOT STARTED.
+IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge.
+01E IMPLEMENTATION completa sólo después del merge01E-B.
 
 Baseline: `77a83539dc3a2069bf0b3085cbd6f32e55fffb79`.
 Rama: `feat/hc-inventory-custody-01e-equipment-custody`.
 Autoridad: aprobación humana del Technical Design Approval Delta 01E.
 Las decisiones están APPROVED / MERGED. El cierre local01E-A figura al final;
-la implementación01E-B y la adopción operativa siguen pendientes.
+01E-B está IMPLEMENTED / TESTED, pendiente de revisión humana/merge; la adopción operativa sigue pendiente.
 
 | Slice                      | Alcance                                                                     | TARGET        | Estado                                                   |
 | -------------------------- | --------------------------------------------------------------------------- | ------------- | -------------------------------------------------------- |
-| HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history                        | 5 SP          | IMPLEMENTED / TESTED — pending human review/merge       |
-| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP          | BLOCKED BY HC-INVENTORY-CUSTODY-01E-A                    |
-| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A IMPLEMENTED / TESTED; 01E-B BLOCKED |
+| HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history                        | 5 SP          | COMPLETE / MERGED — PR #86 |
+| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP          | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge |
 
-01E-A: IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP. Technical Design MERGED — PR #85.
-01E-B: BLOCKED BY 01E-A — TARGET 8 SP. El TARGET anterior de 8 SP para 01E
+01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP. Technical Design MERGED — PR #85.
+01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. El TARGET anterior de 8 SP para 01E
 queda sustituido por el split humano aprobado de 13 SP. Sólo planificación TARGET;
 sin Forecast, Commitment, Actual ni fechas asignadas.
 
@@ -254,9 +255,9 @@ permisivo productivo. La ejecución01E-A se limita a la DB efímera descrita aba
 
 ## Cierre de aprobación
 
-TECHNICAL DESIGN: APPROVED / MERGED — PR #85. 01E-A IMPLEMENTED / TESTED — pending human review/merge; 01E-B NOT STARTED.
-01E-A: IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
-01E-B: BLOCKED BY 01E-A — TARGET 8 SP. TOTAL TARGET: 13 SP.
+TECHNICAL DESIGN: APPROVED / MERGED — PR #85. 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge.
+01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
+01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. TOTAL TARGET: 13 SP.
 M-HC1 OPEN. Este cierre conserva sin staging/commit/push los cambios locales descritos abajo.
 
 Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
@@ -269,10 +270,10 @@ Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
 
 ## Implementación local 01E-A y evidencia de validación
 
-01E-A IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
+01E-A COMPLETE / MERGED — PR #86 — TARGET 5 SP.
 Baseline de implementación: `4e491fdbda5ca6d41d24ed5d4c41fe15058256a8`, rama
 `feat/hc-inventory-custody-01e-a-equipment-physical-foundation`.
-01E-B BLOCKED hasta aceptación/merge01E-A; TOTAL01E TARGET13SP conservado.
+01E-B IMPLEMENTED / TESTED — pending human review/merge; TOTAL01E TARGET13SP conservado.
 
 - EquipmentAsset añade physicalLocation UNVERIFIED por defecto, physicalRevision0
   y activeCustodyId nullable; AVAILABLE no se persiste. Custody con FKs compuestas
@@ -325,3 +326,57 @@ resultado23/23; su cleanup también PASS. Sin DB dev/QA/prod/prior-task; .env in
 REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED.
 01D IMPLEMENTATION COMPLETE / MERGED; REAL COMPANY CUTOVER NOT EXECUTED;
 EXTERNAL OPERATIONAL FENCE NOT CERTIFIED. M-HC1 OPEN.
+
+## Cierre local 01E-B — Equipment physical primitives y wiring
+
+01E-A COMPLETE / MERGED — PR #86. 01E-B IMPLEMENTED / TESTED — pending human review/merge.
+TARGET 8 SP; total01E TARGET13SP = 5 + 8. Baseline `242f8cf15293648360546cf69e8da027fbaf7cf5`;
+rama `feat/hc-inventory-custody-01e-b-equipment-custody-wiring`.
+01E IMPLEMENTATION completa sólo después del merge01E-B; sin Forecast/Commitment/Actual ni fechas nuevas.
+
+- Un predicado físico puro compone salud/lifecycle con WAREHOUSE, pointer nulo y revisión válida/coherencia.
+  Availability conserva available/primaryReason/reasons/evaluatedAt y prioridad de salud;
+  incorpora PHYSICAL_LOCATION_UNVERIFIED, EQUIPMENT_IN_CUSTODY y EQUIPMENT_PHYSICAL_STATE_INCOHERENT.
+  No expone physicalLocation/physicalRevision/activeCustodyId.
+- Create/Replace validan destino tras lock/relectura dentro del orden HC existente, antes de writes.
+  Override no omite elegibilidad física. RESERVED sigue lógico; Replace no cierra ni modifica custodia de A.
+  Coverage conserva helper de salud/población; PREPARED no cambia episodio, revisión ni eventos.
+- Inspection/Retirement usan READ COMMITTED → HC Company lock/timeouts → Asset FOR UPDATE → CAS/evento.
+  Inspection conserva documento único; cambio real añade CONDITION_CHANGE, origen
+  EQUIPMENT_INSPECTION / inspection.id / RECORD_RESULT; mismo condition no cambia revisión ni evento.
+  Retirement añade LIFECYCLE_CHANGE, origen EQUIPMENT_RETIREMENT / asset.id / RETIRE.
+  Decisión humana: se permite ACTIVE+CUSTODY → RETIRED+CUSTODY; no Return implícito.
+  Ambos conservan ubicación/pointer/episodio y enlazan event.custodyId cuando aplica.
+- EquipmentCustodyService exportado, sin controller ni nested transaction. Caller autoriza y adquiere
+  HC Company lock antes de business locks; la primitiva comprueba lock retenido, bloquea/relee Asset,
+  valida actor/contexto, Assignment RESERVED Company/Case/Asset, revisión, elegibilidad y episodio ausente.
+  Episodio + CAS ubicación/pointer/revisión + CUSTODY_OPEN son atómicos en la tx del caller.
+  Caller mixto: Inventory fence si aplica → HC Company → business locks; Equipment no adquiere fence posterior.
+- Registry inyectado vacío/fail-closed en EquipmentModule, sin flags ni adapters productivos.
+  Sólo adapters explícitos de prueba con evidencia retenida determinista. Referencias de contexto no son prueba;
+  adapter valida binding/origen y autorización en tx, sin adquirir locks posteriores.
+  Future Dispatch deberá aportar adapter/documento real; no se implementa ese dominio.
+- Origen/hash canónico v1: mismo origen/payload replays sin writes ni reatribución; payload distinto
+  IDEMPOTENCY_KEY_REUSED; otro origen en CUSTODY conflicto. Replay prueba episodio/evento/cadena de revisiones
+  y estado/pointer actual, incluso tras Inspection/Replace o cierre futuro coherente demostrado.
+  No se añade idempotency HTTP a Inspection/Retirement ni primitiva Return/close.
+- Adopción humana aprobada: sin control Company adicional, fallback, migración ni acreditación automática.
+  Histórico/manual UNVERIFIED bloquea nuevos destinos hasta baseline01E-A explícito; replays históricos preservados.
+  Receipt WAREHOUSE+INSPECTION_PENDING requiere GOOD. Antes de desplegar a entornos con Equipment real,
+  acreditar explícitamente los Assets necesarios. Esta implementación no ejecuta esa reconciliación.
+
+Validación01E-B: focal635/635 en32 suites; full API1981/1981 en119 suites; Web43/43 en2 archivos.
+PostgreSQL35/35 PASS: conexiones independientes y pg_blocking_pids como barrera real,
+Reserve/Replace/Inspection/Retirement vs claim, claims concurrentes, stale revision, replay/origen,
+rollback, tenant, Coverage, PREPARED, Receipt mixto/QUANTITY y adopción UNVERIFIED.
+Target final nuevo `127.0.0.1:55986/zaping_equipment_custody_test`, PostgreSQL16/tmpfs sin volumen;
+run `0595f972-568d-47de-9ab1-e5035de95d6c`; DB vacía verificada antes de41 migraciones merged.
+Rol runtime no superuser; cleanup contenedor/tmpfs PASS. Ninguna DB dev/QA/prod/prior-task ni .env modificados.
+Runner: `node test/helpers/equipment-custody-wiring-postgres-runner.cjs --run-isolated`.
+Typecheck productivo, noEmit18 fuentes/specs/aceptación tocados, lint completo, build y Prisma validate PASS.
+Prisma schema/migrations sin cambios; generate/format Prisma no necesarios. Prettier fuentes/harness/Web y git diff --check PASS. Web productivo sin cambios;
+regresión explícita del fallback de los tres motivos nuevos.
+
+REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED
+porque el registry productivo permanece cerrado. CASE DISPATCH: NOT IMPLEMENTED. RETURN: NOT IMPLEMENTED.
+01D IMPLEMENTATION COMPLETE / MERGED; REAL COMPANY CUTOVER NOT EXECUTED. M-HC1 OPEN.

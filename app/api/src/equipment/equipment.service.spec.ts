@@ -1,3 +1,5 @@
+import { acquireHealthcareCompanyLock } from '../healthcare/common/healthcare-company-lock';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../healthcare/common/healthcare-subsequent-transaction-timeouts';
 import {
   BadRequestException,
   ConflictException,
@@ -19,6 +21,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { EquipmentService } from './equipment.service';
 import { equipmentPhysicalPublicOmit } from './equipment-physical.contract';
+
+jest.mock('../healthcare/common/healthcare-company-lock', () => ({
+  acquireHealthcareCompanyLock: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock(
+  '../healthcare/common/healthcare-subsequent-transaction-timeouts',
+  () => ({
+    applyHealthcareSubsequentTransactionTimeouts: jest
+      .fn()
+      .mockResolvedValue(undefined),
+  }),
+);
 
 describe('EquipmentService', () => {
   let service: EquipmentService;
@@ -52,6 +66,8 @@ describe('EquipmentService', () => {
       create: jest.fn(),
       findMany: jest.fn(),
     },
+    $queryRaw: jest.fn(),
+    equipmentAssetPhysicalEvent: { create: jest.fn() },
     $transaction: jest.fn(),
   };
 
@@ -61,6 +77,12 @@ describe('EquipmentService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    jest.mocked(acquireHealthcareCompanyLock).mockResolvedValue(undefined);
+    jest
+      .mocked(applyHealthcareSubsequentTransactionTimeouts)
+      .mockResolvedValue(undefined);
+    prismaMock.$queryRaw.mockResolvedValue([{ id: equipmentId }]);
+    prismaMock.equipmentAssetPhysicalEvent.create.mockResolvedValue({});
 
     prismaMock.$transaction.mockImplementation(
       async (callback: (tx: typeof prismaMock) => Promise<unknown>) =>
@@ -544,6 +566,10 @@ describe('EquipmentService', () => {
       id: equipmentId,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.INSPECTION_PENDING,
+      companyId,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     const createdInspection = {
@@ -603,8 +629,12 @@ describe('EquipmentService', () => {
         companyId,
         lifecycle: EquipmentLifecycle.ACTIVE,
         condition: EquipmentCondition.INSPECTION_PENDING,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       },
       data: {
+        physicalRevision: { increment: 1 },
         condition: EquipmentCondition.GOOD,
       },
     });
@@ -644,7 +674,7 @@ describe('EquipmentService', () => {
       service.createInspection(companyId, inspectorId, equipmentId, {
         conditionAfter: EquipmentCondition.GOOD,
       }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({ status: 404 });
 
     expect(prismaMock.equipmentInspection.create).not.toHaveBeenCalled();
   });
@@ -658,6 +688,10 @@ describe('EquipmentService', () => {
       id: equipmentId,
       lifecycle: EquipmentLifecycle.RETIRED,
       condition: EquipmentCondition.GOOD,
+      companyId,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     await expect(
@@ -678,6 +712,10 @@ describe('EquipmentService', () => {
       id: equipmentId,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.DAMAGED,
+      companyId,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     prismaMock.equipmentInspection.create.mockResolvedValue({
@@ -713,6 +751,10 @@ describe('EquipmentService', () => {
       id: equipmentId,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.GOOD,
+      companyId,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     prismaMock.equipmentInspection.create.mockResolvedValue({
@@ -749,6 +791,10 @@ describe('EquipmentService', () => {
       id: equipmentId,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.INSPECTION_PENDING,
+      companyId,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     prismaMock.equipmentInspection.create.mockResolvedValue({
@@ -763,7 +809,7 @@ describe('EquipmentService', () => {
       service.createInspection(companyId, inspectorId, equipmentId, {
         conditionAfter: EquipmentCondition.GOOD,
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
   });
 
   it('should return inspection history ordered by inspectedAt descending', async () => {
@@ -849,6 +895,12 @@ describe('EquipmentService', () => {
       .mockResolvedValueOnce({
         id: equipmentId,
         lifecycle: EquipmentLifecycle.ACTIVE,
+
+        companyId,
+        condition: EquipmentCondition.GOOD,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       })
       .mockResolvedValueOnce({
         id: equipmentId,
@@ -862,6 +914,10 @@ describe('EquipmentService', () => {
         retiredById: inspectorId,
         retiredReason: EquipmentRetirementReason.END_OF_LIFE,
         retirementNotes: 'Fin de vida útil',
+
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       });
 
     prismaMock.equipmentAsset.updateMany.mockResolvedValue({
@@ -898,8 +954,13 @@ describe('EquipmentService', () => {
         id: equipmentId,
         companyId,
         lifecycle: EquipmentLifecycle.ACTIVE,
+        condition: EquipmentCondition.GOOD,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       },
       data: {
+        physicalRevision: { increment: 1 },
         lifecycle: EquipmentLifecycle.RETIRED,
         retiredAt,
         retiredById: inspectorId,
@@ -934,10 +995,22 @@ describe('EquipmentService', () => {
       .mockResolvedValueOnce({
         id: equipmentId,
         lifecycle: EquipmentLifecycle.ACTIVE,
+
+        companyId,
+        condition: EquipmentCondition.GOOD,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       })
       .mockResolvedValueOnce({
         id: equipmentId,
         lifecycle: EquipmentLifecycle.RETIRED,
+
+        companyId,
+        condition: EquipmentCondition.GOOD,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       });
 
     prismaMock.equipmentAsset.updateMany.mockResolvedValue({
@@ -954,8 +1027,13 @@ describe('EquipmentService', () => {
         id: equipmentId,
         companyId,
         lifecycle: EquipmentLifecycle.ACTIVE,
+        condition: EquipmentCondition.GOOD,
+        physicalLocation: 'WAREHOUSE',
+        physicalRevision: 1,
+        activeCustodyId: null,
       },
       data: {
+        physicalRevision: { increment: 1 },
         lifecycle: EquipmentLifecycle.RETIRED,
         retiredAt,
         retiredById: inspectorId,
@@ -989,7 +1067,7 @@ describe('EquipmentService', () => {
       service.retire(companyId, inspectorId, equipmentId, {
         retiredReason: EquipmentRetirementReason.END_OF_LIFE,
       }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    ).rejects.toMatchObject({ status: 404 });
 
     expect(prismaMock.equipmentAsset.updateMany).not.toHaveBeenCalled();
   });
@@ -1002,6 +1080,12 @@ describe('EquipmentService', () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValue({
       id: equipmentId,
       lifecycle: EquipmentLifecycle.RETIRED,
+
+      companyId,
+      condition: EquipmentCondition.GOOD,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     await expect(
@@ -1021,6 +1105,12 @@ describe('EquipmentService', () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
       id: equipmentId,
       lifecycle: EquipmentLifecycle.ACTIVE,
+
+      companyId,
+      condition: EquipmentCondition.GOOD,
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
     });
 
     prismaMock.equipmentAsset.updateMany.mockResolvedValue({
@@ -1031,6 +1121,6 @@ describe('EquipmentService', () => {
       service.retire(companyId, inspectorId, equipmentId, {
         retiredReason: EquipmentRetirementReason.END_OF_LIFE,
       }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    ).rejects.toMatchObject({ status: 409 });
   });
 });

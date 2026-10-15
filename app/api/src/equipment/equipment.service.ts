@@ -3,6 +3,8 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Inject,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 
@@ -21,13 +23,31 @@ import { CreateEquipmentInspectionDto } from './dto/create-equipment-inspection.
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { EquipmentAssetCodeService } from './equipment-asset-code.service';
 import { RetireEquipmentDto } from './dto/retire-equipment.dto';
-import { equipmentPhysicalPublicOmit } from './equipment-physical.contract';
+import {
+  equipmentPhysicalPublicOmit,
+  equipmentPhysicalFailure,
+  EquipmentPhysicalError,
+} from './equipment-physical.contract';
+import { EquipmentPhysicalRepository } from './equipment-physical.repository';
+import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
+import { acquireHealthcareCompanyLock } from '../healthcare/common/healthcare-company-lock';
+import { HealthcareCompanyLockTimeoutError } from '../healthcare/common/healthcare-company-lock-timeout.error';
+import { applyHealthcareSubsequentTransactionTimeouts } from '../healthcare/common/healthcare-subsequent-transaction-timeouts';
+import { healthcareCompanyTransactionTimeoutConfiguration } from '../healthcare/common/healthcare-company-transaction-timeout.config';
+import { HealthcareCompanyTransactionTimeoutPolicy } from '../healthcare/common/healthcare-company-transaction-timeout-policy';
 
 @Injectable()
 export class EquipmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly equipmentAssetCodeService: EquipmentAssetCodeService,
+    @Optional()
+    private readonly physical: EquipmentPhysicalRepository = new EquipmentPhysicalRepository(),
+    @Optional()
+    private readonly history: EquipmentPhysicalHistoryService = new EquipmentPhysicalHistoryService(),
+    @Optional()
+    @Inject(healthcareCompanyTransactionTimeoutConfiguration.KEY)
+    private readonly physicalPolicy: HealthcareCompanyTransactionTimeoutPolicy = healthcareCompanyTransactionTimeoutConfiguration(),
   ) {}
 
   async findAll(companyId: string) {
@@ -175,7 +195,7 @@ export class EquipmentService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.physicalTransaction(companyId, async (tx) => {
       const inspector = await tx.user.findFirst({
         where: {
           id: inspectedById,
@@ -192,30 +212,17 @@ export class EquipmentService {
         );
       }
 
-      const equipment = await tx.equipmentAsset.findFirst({
-        where: {
-          id: equipmentId,
-          companyId,
-        },
-        select: {
-          id: true,
-          lifecycle: true,
-          condition: true,
-        },
-      });
-
-      if (!equipment) {
-        throw new NotFoundException('Equipo no encontrado');
-      }
-
+      const equipment = await this.physical.lockAssetForPhysicalMutation(
+        tx,
+        companyId,
+        equipmentId,
+      );
       if (equipment.lifecycle !== EquipmentLifecycle.ACTIVE) {
         throw new BadRequestException(
           'No se puede inspeccionar un equipo retirado',
         );
       }
-
       const conditionBefore = equipment.condition;
-
       const inspection = await tx.equipmentInspection.create({
         data: {
           companyId,
@@ -226,25 +233,20 @@ export class EquipmentService {
           notes: dto.notes?.trim() || null,
         },
       });
-
-      const updateResult = await tx.equipmentAsset.updateMany({
-        where: {
-          id: equipment.id,
-          companyId,
-          lifecycle: EquipmentLifecycle.ACTIVE,
-          condition: conditionBefore,
-        },
-        data: {
-          condition: dto.conditionAfter,
-        },
-      });
-
-      if (updateResult.count !== 1) {
-        throw new ConflictException(
-          'El estado del equipo cambió durante la inspección. Intenta nuevamente',
+      if (conditionBefore !== dto.conditionAfter) {
+        await this.physical.changeInspectionCondition(
+          tx,
+          equipment,
+          dto.conditionAfter,
+        );
+        await this.history.appendInspection(
+          tx,
+          equipment,
+          inspection.id,
+          inspectedById,
+          dto.conditionAfter,
         );
       }
-
       return inspection;
     });
   }
@@ -302,7 +304,7 @@ export class EquipmentService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.physicalTransaction(companyId, async (tx) => {
       const retiringUser = await tx.user.findFirst({
         where: {
           id: retiredById,
@@ -319,66 +321,61 @@ export class EquipmentService {
         );
       }
 
-      const equipment = await tx.equipmentAsset.findFirst({
-        where: {
-          id: equipmentId,
-          companyId,
-        },
-        select: {
-          id: true,
-          lifecycle: true,
-        },
-      });
-
-      if (!equipment) {
-        throw new NotFoundException('Equipo no encontrado');
-      }
-
+      const equipment = await this.physical.lockAssetForPhysicalMutation(
+        tx,
+        companyId,
+        equipmentId,
+      );
       if (equipment.lifecycle === EquipmentLifecycle.RETIRED) {
         throw new ConflictException('El equipo ya se encuentra retirado');
       }
-
       const retiredAt = new Date();
-
-      const updateResult = await tx.equipmentAsset.updateMany({
-        where: {
-          id: equipment.id,
-          companyId,
-          lifecycle: EquipmentLifecycle.ACTIVE,
-        },
-        data: {
-          lifecycle: EquipmentLifecycle.RETIRED,
-          retiredAt,
-          retiredById,
-          retiredReason: dto.retiredReason,
-          retirementNotes,
-        },
+      await this.physical.retireAsset(tx, equipment, {
+        retiredAt,
+        retiredById,
+        retiredReason: dto.retiredReason,
+        retirementNotes,
       });
-
-      if (updateResult.count !== 1) {
-        throw new ConflictException(
-          'El estado del equipo cambió durante el retiro. Intenta nuevamente',
-        );
-      }
-
+      await this.history.appendRetirement(tx, equipment, retiredById);
       const retiredEquipment = await tx.equipmentAsset.findFirst({
         omit: equipmentPhysicalPublicOmit,
-        where: {
-          id: equipment.id,
-          companyId,
-        },
-        include: {
-          product: true,
-          batch: true,
-        },
+        where: { id: equipment.id, companyId },
+        include: { product: true, batch: true },
       });
-
-      if (!retiredEquipment) {
+      if (!retiredEquipment)
         throw new NotFoundException('Equipo no encontrado después del retiro');
-      }
-
       return retiredEquipment;
     });
+  }
+
+  private async physicalTransaction<T>(
+    companyId: string,
+    operation: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await acquireHealthcareCompanyLock(tx, companyId, {
+            acquisitionTimeoutMs:
+              this.physicalPolicy.companyLockAcquisitionTimeoutMs,
+          });
+          await applyHealthcareSubsequentTransactionTimeouts(
+            tx,
+            this.physicalPolicy,
+          );
+          return operation(tx);
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+          maxWait: this.physicalPolicy.prismaMaxWaitMs,
+          timeout: this.physicalPolicy.prismaTransactionTimeoutMs,
+        },
+      );
+    } catch (error) {
+      if (error instanceof HealthcareCompanyLockTimeoutError)
+        throw new EquipmentPhysicalError('HEALTHCARE_CONCURRENCY_TIMEOUT');
+      equipmentPhysicalFailure(error);
+    }
   }
 
   private normalizeSerialNumber(serialNumber?: string | null): {

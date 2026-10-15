@@ -16,6 +16,9 @@ type EquipmentAssetFindFirstArgs = {
   select: {
     lifecycle: true;
     condition: true;
+    physicalLocation: true;
+    physicalRevision: true;
+    activeCustodyId: true;
   };
 };
 
@@ -50,6 +53,9 @@ describe('EquipmentAvailabilityService', () => {
     jest.setSystemTime(evaluatedAt);
 
     prismaMock.equipmentAsset.findFirst.mockResolvedValue({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.GOOD,
     });
@@ -87,6 +93,9 @@ describe('EquipmentAvailabilityService', () => {
 
   it('should block ACTIVE INSPECTION_PENDING equipment', async () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.INSPECTION_PENDING,
     });
@@ -103,6 +112,9 @@ describe('EquipmentAvailabilityService', () => {
 
   it('should block ACTIVE DAMAGED equipment', async () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.DAMAGED,
     });
@@ -119,6 +131,9 @@ describe('EquipmentAvailabilityService', () => {
 
   it('should block ACTIVE OUT_OF_SERVICE equipment', async () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.ACTIVE,
       condition: EquipmentCondition.OUT_OF_SERVICE,
     });
@@ -135,6 +150,9 @@ describe('EquipmentAvailabilityService', () => {
 
   it('should block RETIRED GOOD equipment', async () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.RETIRED,
       condition: EquipmentCondition.GOOD,
     });
@@ -151,6 +169,9 @@ describe('EquipmentAvailabilityService', () => {
 
   it('should return RETIRED before DAMAGED', async () => {
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.RETIRED,
       condition: EquipmentCondition.DAMAGED,
     });
@@ -199,6 +220,9 @@ describe('EquipmentAvailabilityService', () => {
     expect(getFindFirstArgs().select).toEqual({
       lifecycle: true,
       condition: true,
+      physicalLocation: true,
+      physicalRevision: true,
+      activeCustodyId: true,
     });
   });
 
@@ -209,6 +233,9 @@ describe('EquipmentAvailabilityService', () => {
     );
 
     prismaMock.equipmentAsset.findFirst.mockResolvedValueOnce({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.RETIRED,
       condition: EquipmentCondition.OUT_OF_SERVICE,
     });
@@ -216,6 +243,9 @@ describe('EquipmentAvailabilityService', () => {
     await service.evaluateCurrent(companyId, equipmentId);
 
     expect(evaluateSpy).toHaveBeenCalledWith({
+      physicalLocation: 'WAREHOUSE',
+      physicalRevision: 1,
+      activeCustodyId: null,
       lifecycle: EquipmentLifecycle.RETIRED,
       condition: EquipmentCondition.OUT_OF_SERVICE,
     });
