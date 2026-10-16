@@ -144,6 +144,9 @@ enum InventoryPhysicalEffectKind {
 }
 
 model InventoryPosition {
+  reconciliationSources      HealthcareCaseReconciliationItem[] @relation("ReconciliationSourcePosition")
+  reconciliationDestinations HealthcareCaseReconciliationItem[] @relation("ReconciliationDestinationPosition")
+
   dispatchSources      HealthcareCaseDispatchItem[] @relation("DispatchSourcePosition")
   dispatchDestinations HealthcareCaseDispatchItem[] @relation("DispatchDestinationPosition")
 
@@ -171,6 +174,9 @@ model InventoryPosition {
 }
 
 model InventoryPhysicalEffect {
+  reconciliationReturns HealthcareCaseReconciliationItem[] @relation("ReconciliationReturnedEffect")
+  reconciliationUses    HealthcareCaseReconciliationItem[] @relation("ReconciliationUsedEffect")
+
   dispatchItems HealthcareCaseDispatchItem[]
 
   openingCutoverProduct InventoryCutoverProduct? @relation("CutoverProductOpeningEffect")
@@ -234,6 +240,12 @@ enum ProductLotTracking {
 }
 
 enum IdempotencyScope {
+  HEALTHCARE_CASE_RECONCILIATION_CREATE
+  HEALTHCARE_CASE_RECONCILIATION_ITEM_ADD
+  HEALTHCARE_CASE_RECONCILIATION_OUTCOME_SET
+  HEALTHCARE_CASE_RECONCILIATION_ITEM_EXCLUDE
+  HEALTHCARE_CASE_RECONCILIATION_CONFIRM
+  HEALTHCARE_CASE_RECONCILIATION_CANCEL
   HEALTHCARE_CASE_DISPATCH_CREATE
   HEALTHCARE_CASE_DISPATCH_CUSTODIAN_SET
   HEALTHCARE_CASE_DISPATCH_ITEM_ADD
@@ -466,6 +478,8 @@ model PurchaseReceiptItem {
 }
 
 model Company {
+  caseReconciliations HealthcareCaseReconciliation[]
+
   caseDispatches HealthcareCaseDispatch[]
 
   equipmentAssetCustodies      EquipmentAssetCustody[]
@@ -595,6 +609,13 @@ enum HealthcareCaseKitItemLifecycle {
 }
 
 model User {
+  createdReconciliations      HealthcareCaseReconciliation[]      @relation("ReconciliationCreatedBy")
+  confirmedReconciliations    HealthcareCaseReconciliation[]      @relation("ReconciliationConfirmedBy")
+  cancelledReconciliations    HealthcareCaseReconciliation[]      @relation("ReconciliationCancelledBy")
+  createdReconciliationItems  HealthcareCaseReconciliationItem[]  @relation("ReconciliationItemCreatedBy")
+  excludedReconciliationItems HealthcareCaseReconciliationItem[]  @relation("ReconciliationItemExcludedBy")
+  reconciliationAudits        HealthcareCaseReconciliationAudit[]
+
   createdDispatches     HealthcareCaseDispatch[]      @relation("DispatchCreatedBy")
   confirmedDispatches   HealthcareCaseDispatch[]      @relation("DispatchConfirmedBy")
   cancelledDispatches   HealthcareCaseDispatch[]      @relation("DispatchCancelledBy")
@@ -755,6 +776,8 @@ model HealthcareDoctorHospitalAffiliation {
 }
 
 model HealthcareCase {
+  reconciliations HealthcareCaseReconciliation[]
+
   dispatches HealthcareCaseDispatch[]
 
   equipmentAssetCustodies EquipmentAssetCustody[]
@@ -852,6 +875,8 @@ model HealthcareCaseRequirement {
 }
 
 model EquipmentAsset {
+  reconciliationItems HealthcareCaseReconciliationItem[]
+
   dispatchItems HealthcareCaseDispatchItem[]
 
   physicalLocation EquipmentPhysicalLocation     @default(UNVERIFIED)
@@ -914,6 +939,8 @@ model EquipmentAsset {
 }
 
 model HealthcareEquipmentAssignment {
+  reconciliationItems HealthcareCaseReconciliationItem[]
+
   dispatchItems HealthcareCaseDispatchItem[]
 
   equipmentAssetCustodies EquipmentAssetCustody[]
@@ -995,6 +1022,8 @@ model HealthcareEquipmentAssignmentConflictOverride {
 }
 
 model HealthcareCaseKit {
+  reconciliations HealthcareCaseReconciliation[]
+
   dispatches HealthcareCaseDispatch[]
 
   id           String                  @id @default(uuid())
@@ -1359,6 +1388,8 @@ model InventoryCutoverLegacySale {
 }
 
 model EquipmentAssetCustody {
+  reconciliationItems HealthcareCaseReconciliationItem[]
+
   dispatchItems HealthcareCaseDispatchItem[]
 
   id               String                        @id @default(uuid())
@@ -1386,6 +1417,8 @@ model EquipmentAssetCustody {
 }
 
 model EquipmentAssetPhysicalEvent {
+  reconciliationItems HealthcareCaseReconciliationItem[]
+
   dispatchItems HealthcareCaseDispatchItem[]
 
   id                     String                     @id @default(uuid())
@@ -1456,6 +1489,8 @@ enum HealthcareCaseDispatchAuditOperation {
 }
 
 model HealthcareCaseDispatch {
+  reconciliations HealthcareCaseReconciliation[]
+
   id                    String                              @id @default(uuid())
   companyId             String
   caseId                String
@@ -1493,6 +1528,8 @@ model HealthcareCaseDispatch {
 }
 
 model HealthcareCaseDispatchItem {
+  reconciliationItems HealthcareCaseReconciliationItem[]
+
   id                       String                              @id @default(uuid())
   companyId                String
   dispatchId               String
@@ -1557,4 +1594,137 @@ model HealthcareCaseDispatchAudit {
 
   @@unique([companyId, dispatchId, revisionAfter])
   @@index([companyId, dispatchId, createdAt, id])
+}
+
+enum HealthcareCaseReconciliationStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum HealthcareCaseReconciliationItemType {
+  MATERIAL
+  EQUIPMENT
+}
+
+enum HealthcareCaseReconciliationItemLifecycle {
+  ACTIVE
+  EXCLUDED
+}
+
+enum HealthcareCaseReconciliationEquipmentOutcome {
+  RETURNED
+  UNRESOLVED
+}
+
+enum HealthcareCaseReconciliationAuditOperation {
+  CREATE
+  ITEM_ADD
+  OUTCOME_SET
+  ITEM_EXCLUDE
+  CONFIRM
+  CANCEL
+}
+
+model HealthcareCaseReconciliation {
+  id                    String                              @id @default(uuid())
+  companyId             String
+  caseId                String
+  dispatchId            String
+  caseKitId             String
+  status                HealthcareCaseReconciliationStatus  @default(DRAFT)
+  revision              Int                                 @default(0)
+  createdById           String
+  createdAt             DateTime                            @default(now())
+  updatedAt             DateTime                            @updatedAt
+  confirmedFromRevision Int?
+  confirmedById         String?
+  confirmedAt           DateTime?
+  cancelledById         String?
+  cancelledAt           DateTime?
+  cancellationReason    String?                             @db.VarChar(1000)
+  observation           String?                             @db.VarChar(1000)
+  snapshotVersion       Int?
+  snapshot              Json?                               @db.JsonB
+  company               Company                             @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  healthcareCase        HealthcareCase                      @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  dispatch              HealthcareCaseDispatch              @relation(fields: [dispatchId, companyId, caseId, caseKitId], references: [id, companyId, caseId, caseKitId], onDelete: Restrict, onUpdate: Restrict)
+  caseKit               HealthcareCaseKit                   @relation(fields: [caseKitId, companyId, caseId], references: [id, companyId, caseId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy             User                                @relation("ReconciliationCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  confirmedBy           User?                               @relation("ReconciliationConfirmedBy", fields: [confirmedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  cancelledBy           User?                               @relation("ReconciliationCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  items                 HealthcareCaseReconciliationItem[]
+  audit                 HealthcareCaseReconciliationAudit[]
+
+  @@unique([id, companyId], map: "Reconciliation_identity_key")
+  @@unique([id, companyId, caseId, dispatchId], map: "Reconciliation_parent_key")
+  @@index([companyId, caseId, createdAt, id], map: "Reconciliation_case_list_idx")
+  @@index([companyId, caseId, status, createdAt, id], map: "Reconciliation_status_list_idx")
+  @@index([companyId, caseId, dispatchId, createdAt, id], map: "Reconciliation_dispatch_list_idx")
+}
+
+model HealthcareCaseReconciliationItem {
+  id                            String                                        @id @default(uuid())
+  companyId                     String
+  reconciliationId              String
+  caseId                        String
+  dispatchId                    String
+  sourceDispatchItemId          String
+  type                          HealthcareCaseReconciliationItemType
+  lifecycle                     HealthcareCaseReconciliationItemLifecycle     @default(ACTIVE)
+  createdById                   String
+  createdAt                     DateTime                                      @default(now())
+  excludedById                  String?
+  excludedAt                    DateTime?
+  exclusionReason               String?                                       @db.VarChar(1000)
+  snapshot                      Json?                                         @db.JsonB
+  sourceCustodyPositionId       String?
+  expectedSourceRevision        Int?
+  returnedQty                   Int?
+  usedQty                       Int?
+  returnedDestinationPositionId String?
+  returnedPhysicalEffectId      String?
+  usedPhysicalEffectId          String?
+  equipmentCustodyId            String?
+  assetId                       String?
+  assignmentId                  String?
+  expectedPhysicalRevision      Int?
+  outcome                       HealthcareCaseReconciliationEquipmentOutcome?
+  reportedCondition             EquipmentCondition?
+  closePhysicalEventId          String?
+  reconciliation                HealthcareCaseReconciliation                  @relation(fields: [reconciliationId, companyId, caseId, dispatchId], references: [id, companyId, caseId, dispatchId], onDelete: Restrict, onUpdate: Restrict)
+  sourceDispatchItem            HealthcareCaseDispatchItem                    @relation(fields: [sourceDispatchItemId, companyId, dispatchId], references: [id, companyId, dispatchId], onDelete: Restrict, onUpdate: Restrict)
+  sourceCustodyPosition         InventoryPosition?                            @relation("ReconciliationSourcePosition", fields: [sourceCustodyPositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  returnedDestinationPosition   InventoryPosition?                            @relation("ReconciliationDestinationPosition", fields: [returnedDestinationPositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  returnedPhysicalEffect        InventoryPhysicalEffect?                      @relation("ReconciliationReturnedEffect", fields: [returnedPhysicalEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  usedPhysicalEffect            InventoryPhysicalEffect?                      @relation("ReconciliationUsedEffect", fields: [usedPhysicalEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  equipmentCustody              EquipmentAssetCustody?                        @relation(fields: [equipmentCustodyId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  asset                         EquipmentAsset?                               @relation(fields: [assetId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  assignment                    HealthcareEquipmentAssignment?                @relation(fields: [assignmentId, companyId, caseId, assetId], references: [id, companyId, caseId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  closePhysicalEvent            EquipmentAssetPhysicalEvent?                  @relation(fields: [closePhysicalEventId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy                     User                                          @relation("ReconciliationItemCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  excludedBy                    User?                                         @relation("ReconciliationItemExcludedBy", fields: [excludedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  audit                         HealthcareCaseReconciliationAudit[]
+
+  @@unique([id, companyId, reconciliationId], map: "Reconciliation_item_audit_key")
+  @@index([companyId, reconciliationId, createdAt, id], map: "Reconciliation_item_list_idx")
+}
+
+model HealthcareCaseReconciliationAudit {
+  id                   String                                     @id @default(uuid())
+  companyId            String
+  reconciliationId     String
+  reconciliationItemId String?
+  operation            HealthcareCaseReconciliationAuditOperation
+  actorId              String
+  createdAt            DateTime                                   @default(now())
+  revisionBefore       Int?
+  revisionAfter        Int
+  change               Json                                       @db.JsonB
+  reconciliation       HealthcareCaseReconciliation               @relation(fields: [reconciliationId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  reconciliationItem   HealthcareCaseReconciliationItem?          @relation(fields: [reconciliationItemId, companyId, reconciliationId], references: [id, companyId, reconciliationId], onDelete: Restrict, onUpdate: Restrict)
+  actor                User                                       @relation(fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, reconciliationId, revisionAfter], map: "Reconciliation_audit_revision_key")
+  @@index([companyId, reconciliationId, createdAt, id], map: "Reconciliation_audit_list_idx")
 }
