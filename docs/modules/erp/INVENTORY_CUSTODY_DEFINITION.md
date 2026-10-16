@@ -6,17 +6,20 @@
 01E-B COMPLETE / MERGED — PR #87 — TARGET 8 SP.
 Focal635/635 (32 suites); PostgreSQL35/35 en DB nueva efímera; full API1981/1981 (119 suites); Web43/43 (2 archivos) PASS.
 Elegibilidad física en Availability/Create/Replace; Inspection/Retirement con HC lock, revisión e historia atómicas.
-Coverage/PREPARED conservados; primitiva interna caller-owned y registry productivo vacío/fail-closed.
+Coverage/PREPARED conservados; primitiva interna caller-owned. El registry vacío entregado
+por 01E tiene ahora adapter CASE_DISPATCH_ITEM productivo mediante HC-DSP-01C.
 UNVERIFIED no es destino nuevo: acreditar Assets necesarios mediante baseline01E-A antes del despliegue operativo.
 Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
-PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED. CaseDispatch/Return: NOT IMPLEMENTED. M-HC1 OPEN.
+PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH. HC-CASE-DISPATCH BACKEND:
+COMPLETE / MERGED — through PR #92. Return/Reconciliation: TECHNICAL DESIGN APPROVED /
+IMPLEMENTATION NOT STARTED. M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
 IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. 01E IMPLEMENTATION COMPLETE / MERGED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
 01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. TOTAL 01E TARGET: 13 SP = 5 + 8; sustituye el TARGET8SP anterior.
 EquipmentAsset root físico; lifecycle/condition/location independientes; AVAILABLE derivado.
-Custodia/eventos dedicados; UNVERIFIED conservador; ningún adapter Dispatch productivo.
+Custodia/eventos dedicados; UNVERIFIED conservador; adapter Dispatch productivo en HC-DSP-01C.
 Autoridad Equipment independiente de InventoryCutover QUANTITY: no exige activación01D.
 REAL COMPANY CUTOVER: NOT EXECUTED. EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
 M-HC1 OPEN. Sin Forecast, Commitment, Actual ni fechas asignadas.
@@ -53,12 +56,29 @@ DESIGN APPROVED no significa CUTOVER READY;01D ACTIVATION NOT STARTED.
 Original TARGET8SP SUPERSEDED BY HUMAN RE-ESTIMATION:
 01D-A5SP COMPLETE / MERGED — PR #82;01D-B8SP COMPLETE / MERGED — PR #83;01D-C8SP COMPLETE / MERGED — PR #84; TOTAL21SP.
 Sin Forecast/Commitment/Actual ni fechas.
-01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87. Dispatch TECHNICAL DESIGN APPROVED;01A READY tras merge del TD; 01A/01B/01C permanecen DORMANT.
+01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87.
+HC-CASE-DISPATCH BACKEND COMPLETE / MERGED — PR #89/#90/#91/#92.
+Inventory 01A/01B/01C: sin activación de Company real; no confundir con los slices Dispatch.
 
 Baseline: `456e5a6ddbffbbb9fdc3b2be524345c57a6bf90f`. DEC-INV-CUST-01..14 aprobadas
 por revisión humana de producto/arquitectura con refinamientos de §9. No
 implementación, schema aprobado, migración ni lectura de datos reales.
-HC-CASE-DISPATCH TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED;01A READY tras merge del TD;01B/01C bloqueados por secuencia. M-HC1 OPEN.
+HC-RETURN-RECONCILIATION: TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED.
+[TD canónico Healthcare](../healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+Un agregado HealthcareCaseReconciliation, Dispatch CONFIRMED 1:N episodios; no ledger
+paralelo ni modificación de Dispatch. returnedQty exige retorno físico RESTOCKABLE:
+CUSTODY->AVAILABLE canónica, mismo Product/batch/null, TRANSFER y owned sin cambio.
+usedQty usa DEFINITIVE_OUT desde CUSTODY, owned disminuye una vez y Batch.available
+no disminuye. Effects distintos y proyecciones en el tx empresarial. Unresolved es
+saldo derivado y sigue CUSTODY, sin movimiento ni contador mutable.
+
+Limitación V1 aprobada: recibido pero con disposición pendiente sigue unresolved/CUSTODY,
+con observación explícita; no returnedQty/usedQty ficticio ni QUARANTINE/unavailable-return
+nuevo. Clasificación confirmada inmutable; corrección futura fuera de scope. Revisar
+ambos límites antes de producción. Observación cero no activa Inventory authority;
+sólo MATERIAL positivo exige shared fence antes de HC, PHYSICAL y runtime compatible.
+LEGACY/CUTOVER/recovery rechazan esa mutación; Equipment-only permanece independiente.
+No se ejecuta real Company cutover ni real Equipment reconciliation. M-HC1 OPEN.
 
 ## 1. Autoridad documental y hallazgo arquitectónico
 

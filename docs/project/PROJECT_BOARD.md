@@ -17,8 +17,10 @@ Coverage/PREPARED conservados; primitiva interna caller-owned. 01E entregó regi
 UNVERIFIED no es destino nuevo: acreditar Assets necesarios mediante baseline01E-A antes del despliegue operativo.
 Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH.
-CaseDispatch physical confirmation: IMPLEMENTED / TESTED — pending human review/merge — HC-DSP-01C TARGET 8 SP.
-Return: NOT IMPLEMENTED. M-HC1 OPEN. Backend completo sólo después del merge de 01C.
+CaseDispatch physical confirmation: COMPLETE / MERGED — PR #92 — HC-DSP-01C TARGET 8 SP.
+HC-CASE-DISPATCH BACKEND: COMPLETE / MERGED. Return/Reconciliation: TECHNICAL DESIGN
+APPROVED / IMPLEMENTATION NOT STARTED; [TD aprobado](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
 IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87. 01E IMPLEMENTATION COMPLETE / MERGED. ASSET/EquipmentAsset únicamente; SERIALIZED material excluido.
@@ -36,7 +38,7 @@ explícita y revisión, batch nullable según tracking/fuente. Custodio híbrido
 Equipment estricto y autoridad Inventory compartida conservados. Backend TARGET18SP:
 01A COMPLETE / MERGED — PR #89 — TARGET 5 SP.
 01B COMPLETE / MERGED — PR #90 — TARGET 5 SP; HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91 — TARGET 3 SP.
-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+01C COMPLETE / MERGED — PR #92 — TARGET 8 SP.
 01C: PostgreSQL16 aislado75/75, focal905/905 (36 suites), full API2207/2207 (123 suites),
 typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff PASS; evidencia en TD §17.
 01B: focal242/242 (4 suites), API2147/2147 (122 suites), PostgreSQL16 comandos40/40 y
@@ -109,7 +111,7 @@ TARGET 8 SP con alcance backend dormido; sin frontend, cutover, Sales ni backfil
 01D TECHNICAL DESIGN APPROVED32/32;01D-A COMPLETE / MERGED — PR #82;01D-B COMPLETE / MERGED — PR #83.
 01E TECHNICAL DESIGN APPROVED; 01E-A COMPLETE / MERGED — PR #86, 01E-B COMPLETE / MERGED — PR #87.
 HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90;
-HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91; 01C IMPLEMENTED / TESTED — pending human review/merge;
+HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91; 01C COMPLETE / MERGED — PR #92;
 frontend fuera de scope; M-HC1 OPEN.
 Evidencia del cierre histórico01B, anterior al wiring01D-C: COUNT_CORRECTION con delta cero auditado y sin UPDATE Position;
 dos migraciones (enums separados de constraints); adapter compartido de proyección
@@ -187,7 +189,8 @@ loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APP
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
 Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Siguiente acción Dispatch: revisión humana/merge de 01C. 01D/01E COMPLETE / MERGED; sin adopción real.
+Dispatch backend COMPLETE / MERGED — PR #92. Siguiente acción: merge del TD Reconciliation,
+luego readiness HC-RR-01A. 01D/01E COMPLETE / MERGED; sin adopción real.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice                                           | TARGET | Estado                                            |
@@ -195,13 +198,13 @@ Sin Forecast/Commitment/Actual ni fechas asignados.
 | HC-DSP-01A — Persistence + read                 | 5 SP   | COMPLETE / MERGED — PR #89 |
 | HC-DSP-01B — DRAFT commands                     | 5 SP   | COMPLETE / MERGED — PR #90 |
 | HC-DSP-LOCK-01 — DRAFT lock compatibility | 3 SP | COMPLETE / MERGED — PR #91 |
-| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-DSP-01C — Atomic Confirm + custody/inventory | 8 SP   | COMPLETE / MERGED — PR #92 |
 | HC-DSP-01D — Frontend                           | Candidate 5 SP   | OUT OF CURRENT BACKEND SCOPE |
 
 HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90 — TARGET 5 SP.
 HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91 — TARGET 3 SP.
-HC-DSP-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
-Backend Dispatch original total18SP: completo sólo después del merge de 01C.
+HC-DSP-01C COMPLETE / MERGED — PR #92 — TARGET 8 SP.
+Backend Dispatch original total18SP: COMPLETE / MERGED — through PR #92.
 Confirm POST 200, tx único, QUANTITY AVAILABLE→CUSTODY y adapter Equipment productivo.
 Escenario29 validado con una fuente preparada y Positions/batches distintos, un Effect
 y destinos propios; el duplicado exacto sourceCaseKitItem/Position no puede ser DRAFT válido.
@@ -215,6 +218,30 @@ P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
 reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
+
+HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED**.
+[TD canónico](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md) y
+[Case Logistics §259](../modules/healthcare/CASE_LOGISTICS.md#259-hc-return-reconciliation--v1-approved-contract).
+Un HealthcareCaseReconciliation por episodio de un Dispatch CONFIRMED; Dispatch 1:N.
+MATERIAL returnedQty=retornado y aprobado RESTOCKABLE; usedQty=consumo definitivo;
+unresolved derivado, sin movimiento. Recibido con disposición pendiente sigue
+unresolved/CUSTODY con observación; sin QUARANTINE/unavailable-return V1. Confirmados
+inmutables: corrección futura fuera de scope. Revisar ambos riesgos antes de producción.
+Equipment RETURNED/UNRESOLVED, condición separada; cierre exacto con un CUSTODY_CLOSE,
+sin Inspection fabricado, reactivar RETIRED ni liberar Assignment. Sin mutar Case/Kit.
+Mixto atómico; sólo MATERIAL positivo activa fence/PHYSICAL/runtime. Observacional
+sin efectos exige recurso pendiente y razón explícita. No implementación ni DB.
+
+| Slice | Alcance | TARGET | Estado |
+| --- | --- | --- | --- |
+| HC-RR-01A | Persistence, invariants & reads | 5 SP | READY AFTER TECHNICAL DESIGN MERGE |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED BY 01A |
+| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | IMPLEMENTATION NOT STARTED |
+
+Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
+y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Merge TD antes de readiness01A.
 
 Este documento representa el estado operativo actual del proyecto.
 
