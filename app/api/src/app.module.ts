@@ -1,3 +1,4 @@
+import { HealthcareCaseReconciliationModule } from './healthcare/case-reconciliations/healthcare-case-reconciliations.module';
 import { HealthcareCaseDispatchModule } from './healthcare/case-dispatches/healthcare-case-dispatches.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
@@ -61,6 +62,7 @@ import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/c
     HealthcareCaseKitsModule,
     HealthcareCaseAvailabilityModule,
     HealthcareCaseDispatchModule,
+    HealthcareCaseReconciliationModule,
   ],
 })
 export class AppModule {}

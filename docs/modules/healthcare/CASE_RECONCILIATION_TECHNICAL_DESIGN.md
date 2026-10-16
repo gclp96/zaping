@@ -1,13 +1,16 @@
 # HC-RETURN-RECONCILIATION — Healthcare Return / Reconciliation V1
 
 TECHNICAL DESIGN: **APPROVED**.
-IMPLEMENTATION: **NOT STARTED**. Esta aprobación no autoriza implementación.
+HC-RR-01A: **IMPLEMENTED / TESTED — pending human review/merge**.
+HC-RR-01B/01C/01D: **BLOCKED**. Implementación 01A autorizada por CODEX-IMPLEMENT humano.
 
-Baseline: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
-Rama: `feat/hc-return-reconciliation-foundation`.
+Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
+Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
+Rama de implementación: `feat/hc-rr-01a-persistence-reads`.
+Rama del TD: `feat/hc-return-reconciliation-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-RETURN-RECONCILIATION.
-Este documento registra las decisiones aprobadas; Prisma/DTOs exactos corresponden
-a readiness HC-RR-01A y de los slices siguientes, sin implementar aquí.
+Este documento registra las decisiones aprobadas y, en §16, la implementación y
+validación local de HC-RR-01A. Los comandos y la ejecución física siguen pendientes.
 
 ## 1. Estado, dependencias y alcance
 
@@ -196,7 +199,7 @@ FKs tenant-safe y RESTRICT; una línea ACTIVE por reconciliation/sourceDispatchI
 No UNIQUE global sobre custody para simples observaciones UNRESOLVED. Con evidencia
 física de cierre, cada custody exacta sólo puede cerrarse una vez. Capacidad MATERIAL
 bajo locks; historia terminal inmutable; audit append-only; final-evidence constraints
-diferidos donde hagan falta. Prisma/índices/SQL exactos corresponden a HC-RR-01A readiness.
+diferidos donde hagan falta. La persistencia/SQL implementados en 01A se registran en §16.
 
 Snapshots y audit deben preservar hechos históricos, intentos de mutación y evidence
 sin reconstruirlos con estado vivo. No reescribir la historia Dispatch ni episodios anteriores.
@@ -263,7 +266,8 @@ Base: `/healthcare/cases/:caseId/reconciliations`.
 | POST | `:id/cancel` |
 | GET | `/healthcare/cases/:caseId/dispatches/:dispatchId/reconciliation-summary` |
 
-DTOs exactos pertenecen a readiness, sin aprobar schema/API implementado aquí.
+En 01A sólo se implementan los tres GET de esta tabla. Los POST son contrato futuro
+de 01B/01D y no están registrados por el módulo Reconciliation.
 Reads ADMIN/MANAGER/WAREHOUSE/SALES; mutaciones ADMIN/MANAGER/WAREHOUSE.
 SALES read-only. Custodio/receiver no concede autorización.
 
@@ -271,16 +275,16 @@ SALES read-only. Custodio/receiver no concede autorización.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-RR-01A | Persistence, invariants & reads | 5 SP | READY AFTER TECHNICAL DESIGN MERGE |
-| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED BY 01A |
+| HC-RR-01A | Persistence, invariants & reads | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED UNTIL 01A MERGE |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
 | HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
-| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | IMPLEMENTATION NOT STARTED |
+| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A IMPLEMENTED / TESTED; 01B/01C/01D BLOCKED |
 
 Sólo planning TARGET; sin Forecast/Commitment/Actual ni fechas. Siguiente paso:
-revisar/mergear este TD, luego readiness HC-RR-01A y autorización de implementación.
-Las pruebas de negocio y aceptación PostgreSQL con conexiones/barreras observables
-son trabajo futuro de los slices; no se ejecutaron ni se accedió a DB en este delta.
+revisión humana y merge de HC-RR-01A; después readiness de 01B. El TD ya está
+APPROVED / MERGED — PR #93. La aceptación estructural 01A se registra en §16;
+la ejecución física y concurrencia de negocio permanecen en slices posteriores.
 
 ## 15. Limitaciones, riesgos y cierre
 
@@ -292,7 +296,90 @@ son trabajo futuro de los slices; no se ejecutaron ni se accedió a DB en este d
 3. Reconsiderar ambas limitaciones antes de production readiness si la operación
    exige cuarentena o corrección. No resolverlas ampliando este milestone sin aprobación.
 
-TECHNICAL DESIGN: **APPROVED**. IMPLEMENTATION: **NOT STARTED**.
+TECHNICAL DESIGN: **APPROVED / MERGED — PR #93**.
+HC-RR-01A: **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
 HC-CASE-DISPATCH: **COMPLETE / MERGED — through PR #92**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**.
-M-HC1: **OPEN**. Aprobación documental, sin código, schema, migración ni activación.
+M-HC1: **OPEN**. Sin cutover real ni activación de Return/Reconciliation productivo.
+
+## 16. HC-RR-01A — persistence, invariants & reads: validación local
+
+**IMPLEMENTED / TESTED — pending human review/merge**. TARGET **5 SP**.
+Una migración: `20261015000300_case_reconciliation_persistence`.
+Tres modelos, cinco enums y seis scopes, con relaciones RESTRICT tenant-safe.
+Tablas padre: sólo relaciones inversas Prisma; **sin nuevos UNIQUEs padre**.
+
+- Root: observation nullable, normalizada y acotada a 1000; status/revision y
+  metadatos terminales coherentes, aritmética de revisión con bigint en CHECKs.
+  Persistir observation no define comando de edición: sin OBSERVATION_SET,
+  sin campos observationBefore/After en audit, sin endpoint de mutación.
+- Items: discriminator MATERIAL/Equipment, revisiones no negativas, MATERIAL
+  returnedQty/usedQty >=0, intención 0/0 válida, provenance de CUSTODY creada por
+  Dispatch. Product/batch se derivan del source DispatchItem, sin duplicarlos.
+  RETURNED Equipment exige condición; UNRESOLVED no guarda condición ni close.
+- Una fuente ACTIVE por episodio; EXCLUDED permite reemplazo posterior y preserva
+  historia. Unicidad de cierre sólo con closePhysicalEventId; UNRESOLVED no consume
+  capacidad de cierre. Índice parcial de capacidad MATERIAL, sin contadores mutables.
+- Guards de raíz/item terminal, identidad/creador inmutables, audit append-only y
+  TRUNCATE bloqueado. Los checks diferidos permiten evidence/snapshots/audit durante
+  DRAFT y terminal CAS al final del mismo tx. DRAFT/CANCELLED no conservan resultados.
+- Validación final: source Dispatch CONFIRMED/Item ACTIVE, tipos y provenance exactos,
+  snapshots y witness CONFIRM; Effects RETURNED TRANSFER / USED DEFINITIVE_OUT
+  separados con origins CASE_RECONCILIATION y cantidades estructurales de sus líneas.
+  Equipment close ligado al mismo Asset/Custody/Assignment y evento CUSTODY_CLOSE.
+  Sin gates de estado vivo Case/Kit/Assignment/Asset. Observacional CONFIRMED exige
+  ACTIVE + observation + snapshots válidos y cero evidencia física; probar saldo
+  pendiente real bajo locks sigue siendo responsabilidad de 01D.
+- IdempotencyRecord: seis scopes nuevos, recursos root/item según operación,
+  validación diferida de existencia/tipo/Company y completion al commit. Claims
+  incompletos transitorios permitidos; scopes existentes sin modificación.
+- Snapshots V1 tipados, máximo 32 KiB por objeto. Root conserva source Dispatch
+  identity/history, actor/fecha/observation y episodeFacts descriptivos. Item conserva
+  history Dispatch, sourceDispatchItemId, dispatchedQty, capturedAt y result tipado
+  (MATERIAL con balances observados, fuente y evidence; Equipment con custody/open
+  origin, Assignment, before/after y close). EXCLUDED usa result null. CONFIRMED
+  nunca reconstruye descripciones desde Product/Asset actual; fallo sanitizado ante
+  snapshot ausente/inválido. Audit V1 estricto de máximo 8 KiB, sin request bodies.
+- Sólo GET list/detail y Dispatch reconciliation-summary. List defaults 1/25,
+  pageSize<=100, status y dispatchId UUID opcionales; createdAt DESC/id DESC.
+  Detail items createdAt ASC/id ASC y audit revisionAfter ASC. Company viene del
+  JWT, reads ADMIN/MANAGER/WAREHOUSE/SALES, foreign Company/wrong Case -> 404.
+  Summary sólo acepta Dispatch CONFIRMED del mismo tenant/Case. Reads RepeatableRead
+  con carga de relaciones por conjuntos; helpers puros, módulo importa sólo PrismaModule.
+- Summary deriva UNRECONCILED/PARTIALLY_RECONCILED/FULLY_RECONCILED de items ACTIVE
+  de raíces CONFIRMED y evidencia física durable. Observaciones no suman progreso;
+  INSPECTION_PENDING no impide cierre completo. Desacuerdo con CUSTODY ->
+  HEALTHCARE_PERSISTENCE_ERROR, sin reparación. Custody antigua cerrada no exige
+  que el Asset siga actualmente WAREHOUSE: redispatch posterior es válido.
+
+Validación final:
+
+| Gate | Resultado |
+| --- | --- |
+| Focal Reconciliation | 89/89 — 4 suites PASS |
+| PostgreSQL16 estructural | 44/44 — PASS; cubre los 36 casos mínimos aprobados |
+| Full API | 2296/2296 — 127 suites PASS |
+| Typecheck oficial y noEmit focal (14 archivos) | PASS |
+| Lint / build | PASS |
+| Prisma format / validate | PASS |
+| Prisma generate | PASS mediante patrón alternativo seguro por DLL EPERM Windows |
+| Prettier/check TS/CJS y sintaxis del runner | PASS |
+| git diff --check | PASS |
+| Web | N/A: sin cambios frontend/contrato compartido |
+
+Generate alternativo conservó la DLL existente tras verificar SHA-256 idéntico con
+el motor generado: `263946105f428384d2318dc3241b85b1c3dd98fbb1bfac62d3e81f513ab35897`.
+El noEmit opcional global de todas las specs presenta diagnósticos en suites ajenas;
+el gate oficial y el noEmit focal pasan, sin ampliar scope para corregirlos.
+
+Último target: `127.0.0.1:65095/zaping_case_reconciliation_persistence_test`.
+PostgreSQL16 nuevo, loopback, tmpfs sin volumen existente; runtime role
+`case_reconciliation_persistence_test` no superusuario. **43 migraciones aplicadas**.
+Runner opt-in: `node test/helpers/case-reconciliation-persistence-postgres-runner.cjs --run-isolated`
+desde `app/api`, sin .env ni DB preexistente. Fixtures estructurales insertan evidencia
+sintética directamente: no invocan Return, primitiva close ni adapter productivo.
+Cleanup contenedor/tmpfs: **PASS**. Ninguna DB dev/QA/producción usada.
+
+01B: **BLOCKED UNTIL 01A MERGE**. 01C/01D: **BLOCKED**. BACKEND TOTAL: **23 SP**.
+Sin comandos Reconciliation, mutaciones físicas productivas, concurrencia física ni frontend.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.

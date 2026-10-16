@@ -219,7 +219,8 @@ Assignment >100. Recovery es gate antes de uso amplio en producción; correcció
 reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-ready.
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
 
-HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED**.
+HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / MERGED — PR #93**;
+HC-RR-01A **IMPLEMENTED / TESTED — pending human review/merge**.
 [TD canónico](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md) y
 [Case Logistics §259](../modules/healthcare/CASE_LOGISTICS.md#259-hc-return-reconciliation--v1-approved-contract).
 Un HealthcareCaseReconciliation por episodio de un Dispatch CONFIRMED; Dispatch 1:N.
@@ -230,18 +231,24 @@ inmutables: corrección futura fuera de scope. Revisar ambos riesgos antes de pr
 Equipment RETURNED/UNRESOLVED, condición separada; cierre exacto con un CUSTODY_CLOSE,
 sin Inspection fabricado, reactivar RETIRED ni liberar Assignment. Sin mutar Case/Kit.
 Mixto atómico; sólo MATERIAL positivo activa fence/PHYSICAL/runtime. Observacional
-sin efectos exige recurso pendiente y razón explícita. No implementación ni DB.
+sin efectos exige recurso pendiente y razón explícita (prueba operacional futura en 01D).
+01A implementa persistencia, invariantes y sólo GET list/detail/summary; sin comandos
+ni ejecución física productiva. Validado: focal 89/89, PostgreSQL16 estructural 44/44
+en DB nueva aislada/tmpfs con 43 migraciones y cleanup PASS; Full API 2296/2296
+(127 suites), typecheck/noEmit focal, lint, build, Prisma format/validate y generate
+alternativo seguro por DLL EPERM, Prettier/check y diff check PASS. Sin DB real.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-RR-01A | Persistence, invariants & reads | 5 SP | READY AFTER TECHNICAL DESIGN MERGE |
-| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED BY 01A |
+| HC-RR-01A | Persistence, invariants & reads | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED UNTIL 01A MERGE |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
 | HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | IMPLEMENTATION NOT STARTED |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A IMPLEMENTED / TESTED; 01B/01C/01D BLOCKED |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
-y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Merge TD antes de readiness01A.
+y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión humana
+y merge 01A; luego readiness de 01B. Sin Forecast, Commitment, Actual ni fechas nuevos.
 
 Este documento representa el estado operativo actual del proyecto.
 
