@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EquipmentAsset, Prisma } from '@prisma/client';
+import { EquipmentAsset, EquipmentAssetCustody, Prisma } from '@prisma/client';
 import {
   equipmentPhysicalAssert,
   physicalRevision,
@@ -7,6 +7,63 @@ import {
 
 @Injectable()
 export class EquipmentPhysicalRepository {
+  async lockCustodyForClose(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    custodyId: string,
+  ) {
+    const rows = await tx.$queryRaw<{ id: string }[]>(
+      Prisma.sql`SELECT "id" FROM "EquipmentAssetCustody" WHERE "companyId"=${companyId} AND "id"=${custodyId} FOR UPDATE`,
+    );
+    equipmentPhysicalAssert(rows.length === 1, 'EQUIPMENT_CUSTODY_NOT_FOUND');
+    const custody = await tx.equipmentAssetCustody.findFirst({
+      where: { companyId, id: custodyId },
+    });
+    equipmentPhysicalAssert(custody, 'EQUIPMENT_CUSTODY_NOT_FOUND');
+    return custody;
+  }
+  async closeCustodyCas(
+    tx: Prisma.TransactionClient,
+    custody: EquipmentAssetCustody,
+    closedAt: Date,
+    actorId: string,
+  ) {
+    const result = await tx.equipmentAssetCustody.updateMany({
+      where: {
+        id: custody.id,
+        companyId: custody.companyId,
+        equipmentAssetId: custody.equipmentAssetId,
+        caseId: custody.caseId,
+        assignmentId: custody.assignmentId,
+        closedAt: null,
+        closedById: null,
+      },
+      data: { closedAt, closedById: actorId },
+    });
+    equipmentPhysicalAssert(result.count === 1, 'RESOURCE_STATE_CHANGED');
+  }
+  async closeAssetFromCustodyCas(
+    tx: Prisma.TransactionClient,
+    before: EquipmentAsset,
+    custodyId: string,
+    condition: EquipmentAsset['condition'],
+  ) {
+    equipmentPhysicalAssert(
+      before.physicalLocation === 'CUSTODY' &&
+        before.activeCustodyId === custodyId,
+      'RESOURCE_STATE_CHANGED',
+    );
+    const result = await tx.equipmentAsset.updateMany({
+      where: this.mutationWhere(before),
+      data: {
+        physicalLocation: 'WAREHOUSE',
+        activeCustodyId: null,
+        condition,
+        physicalRevision: { increment: 1 },
+      },
+    });
+    equipmentPhysicalAssert(result.count === 1, 'RESOURCE_STATE_CHANGED');
+  }
   private mutationWhere(before: EquipmentAsset) {
     physicalRevision(before.physicalRevision);
     return {

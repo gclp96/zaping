@@ -13,6 +13,11 @@ import { EquipmentProvisioningService } from './equipment-provisioning.service';
 import { EquipmentPhysicalRepository } from './equipment-physical.repository';
 import { EquipmentPhysicalHistoryService } from './equipment-physical-history.service';
 import { EquipmentCustodyService } from './equipment-custody.service';
+import { EquipmentCustodyCloseService } from './equipment-custody-close.service';
+import {
+  EquipmentCustodyCloseContextRegistry,
+  EQUIPMENT_CUSTODY_CLOSE_CONTEXT_ADAPTERS,
+} from './equipment-custody-close-context.registry';
 import {
   EQUIPMENT_CUSTODY_CONTEXT_ADAPTERS,
   EquipmentCustodyContextRegistry,
@@ -32,6 +37,12 @@ import {
     EquipmentPhysicalRepository,
     EquipmentPhysicalHistoryService,
     EquipmentCustodyService,
+    EquipmentCustodyCloseService,
+    EquipmentCustodyCloseContextRegistry,
+    {
+      provide: EQUIPMENT_CUSTODY_CLOSE_CONTEXT_ADAPTERS,
+      useValue: Object.freeze([]),
+    },
     EquipmentCustodyContextRegistry,
     {
       provide: EQUIPMENT_CUSTODY_CONTEXT_ADAPTERS,
@@ -41,6 +52,10 @@ import {
     },
     PrismaService,
   ],
-  exports: [EquipmentProvisioningService, EquipmentCustodyService],
+  exports: [
+    EquipmentProvisioningService,
+    EquipmentCustodyService,
+    EquipmentCustodyCloseService,
+  ],
 })
 export class EquipmentModule {}

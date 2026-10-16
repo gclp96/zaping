@@ -2,17 +2,19 @@
 
 TECHNICAL DESIGN: **APPROVED**.
 HC-RR-01A: **COMPLETE / MERGED — PR #94**.
-HC-RR-01B: **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
-HC-RR-01C/01D: **BLOCKED**.
+HC-RR-01B: **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
+HC-RR-01C: **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
+HC-RR-01D: **BLOCKED UNTIL 01C MERGE** — TARGET **8 SP**.
 
 Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
 Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
 Rama de implementación: `feat/hc-rr-01a-persistence-reads`.
 Rama del TD: `feat/hc-return-reconciliation-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-RETURN-RECONCILIATION.
-Este documento registra las decisiones aprobadas y, en §16, la implementación y
-validación local de HC-RR-01A/01B. Los comandos DRAFT están implementados (§17);
-CONFIRM y la ejecución física siguen pendientes.
+Este documento registra las decisiones aprobadas y la implementación y
+validación local de HC-RR-01A/01B/01C (§16–18). Los comandos DRAFT y la primitiva
+interna de cierre Equipment están implementados; CONFIRM y su adapter productivo
+siguen pendientes. El registry productivo de cierre permanece vacío/fail-closed.
 
 ## 1. Estado, dependencias y alcance
 
@@ -278,15 +280,16 @@ SALES read-only. Custodio/receiver no concede autorización.
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
-| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
-| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A MERGED; 01B IMPLEMENTED / TESTED; 01C/01D BLOCKED |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
+| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED UNTIL 01C MERGE |
+| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A/01B MERGED; 01C IMPLEMENTED / TESTED; 01D BLOCKED UNTIL 01C MERGE |
 
 Sólo planning TARGET; sin Forecast/Commitment/Actual ni fechas. Siguiente paso:
-revisión humana y merge de HC-RR-01B. TD APPROVED / MERGED — PR #93;
-01A COMPLETE / MERGED — PR #94. Evidencia local 01A en §16 y 01B en §17.
-La ejecución física y concurrencia física permanecen en slices posteriores.
+revisión humana y merge de HC-RR-01C. TD APPROVED / MERGED — PR #93;
+01A COMPLETE / MERGED — PR #94; 01B COMPLETE / MERGED — PR #95.
+Evidencia local 01A en §16, 01B en §17 y primitiva interna 01C en §18.
+CONFIRM, adapter productivo y aceptación física de Reconciliation pertenecen a 01D.
 
 ## 15. Limitaciones, riesgos y cierre
 
@@ -382,7 +385,7 @@ desde `app/api`, sin .env ni DB preexistente. Fixtures estructurales insertan ev
 sintética directamente: no invocan Return, primitiva close ni adapter productivo.
 Cleanup contenedor/tmpfs: **PASS**. Ninguna DB dev/QA/producción usada.
 
-Estado vigente 01B en §17. 01C/01D: **BLOCKED**. BACKEND TOTAL: **23 SP**.
+Evidencia histórica 01B en §17; estado vigente 01C en §18. BACKEND TOTAL: **23 SP**.
 Sin comandos Reconciliation, mutaciones físicas productivas, concurrencia física ni frontend.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
 
@@ -478,6 +481,78 @@ Barreras observadas mediante pg_blocking_pids/pg_stat_activity para unique claim
 raíz concurrente; no prueba basada sólo en sleeps. Sin concurrencia física 01D.
 Fixtures de historia física son sintéticas, no ejecutan Return ni close productivo.
 
-HC-RR-01A **COMPLETE / MERGED — PR #94**. HC-RR-01B **IMPLEMENTED / TESTED — pending human review/merge**.
-01C/01D **BLOCKED**; BACKEND TOTAL TARGET **23 SP**. Sin Forecast/Commitment/Actual nuevos.
+HC-RR-01A **COMPLETE / MERGED — PR #94**. HC-RR-01B **COMPLETE / MERGED — PR #95**.
+Estado posterior de 01C en §18; 01D **BLOCKED UNTIL 01C MERGE**.
+BACKEND TOTAL TARGET **23 SP**. Sin Forecast/Commitment/Actual nuevos.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION **NOT EXECUTED**. M-HC1 **OPEN**.
+
+## 18. HC-RR-01C — Equipment custody close: implementación y aceptación interna
+
+**IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
+Baseline: `3144dcd197b99af5ff11e38f731d406fd0e7529e` (merge PR #95).
+Rama: `feat/hc-rr-01c-equipment-custody-close`.
+
+`EquipmentCustodyCloseService.returnFromCustody(tx, command)` es una primitiva interna,
+sin controller ni transacción propia. Exige el HC Company exclusive advisory lock
+retenido, comprobado mediante la clave existente y pg_locks; nunca lo adquiere.
+Orden interno: Asset FOR UPDATE → Custody FOR UPDATE → CAS Custody → CAS Asset → evento.
+El caller multi-Asset prebloquea todos los Assets UPDATE en ID ordenado; la primitiva
+puede readquirir el lock propio. No añade locks tardíos de Case, Assignment o Inventory.
+
+APPLY prueba tenant/Asset/Custody/Case/Assignment históricos exactos, episodio abierto,
+puntero, CUSTODY, revisión esperada y continuidad estructural de historia. Un timestamp
+del servidor, obtenido bajo locks y normalizado a milisegundos, se conserva idéntico en
+Custody.closedAt, event.createdAt y resultado. CAS cierra la custody exacta, limpia
+activeCustodyId, mueve CUSTODY → WAREHOUSE, aplica reportedCondition y avanza revisión +1.
+Whitelist runtime: GOOD / INSPECTION_PENDING / DAMAGED / OUT_OF_SERVICE.
+Exactamente un CUSTODY_CLOSE, con before/after; sin Inspection ni CONDITION_CHANGE o
+LIFECYCLE_CHANGE adicional. RETIRED sigue RETIRED y conserva todos los metadatos de retiro.
+Assignment RESERVED/RELEASED/REPLACED es provenance: cero mutaciones de Assignment,
+Case/Kit o Inventory. Sin gates de agenda, readiness o elegibilidad física de apertura.
+
+Hash SHA-256 v1 de campos canónicos aprobados, sin actor, timestamp, ID generado ni
+estado mutable. Reutiliza unicidad de origen del evento; sin nuevo IdempotencyRecord.
+REPLAY compara hash, valida contexto REPLAY y testigo histórico original antes de
+cualquier gate de APPLY. Devuelve la transición original y actor original; no consulta
+continuidad posterior ni exige location/puntero/condition/revision actuales. Lost response
+seguido de redispatch y cambio de condición reproduce el cierre anterior sin escrituras.
+Origen igual/hash distinto: IDEMPOTENCY_KEY_REUSED; otro origen con cierre coherente:
+EQUIPMENT_CUSTODY_ALREADY_CLOSED (409); custody ausente: EQUIPMENT_CUSTODY_NOT_FOUND (404).
+Testigo corrupto: EQUIPMENT_PHYSICAL_PERSISTENCE_ERROR; errores sin exposición SQL.
+
+EquipmentModule posee servicio y registry de cierre separados, con provider vacío,
+congelado y fail-closed en APPLY/REPLAY. Sólo exporta el nuevo servicio; no repository,
+CaseReconciliationModule ni forwardRef. Adapters de evidencia sólo en tests.
+Productive CASE_RECONCILIATION_ITEM close adapter: **NOT IMPLEMENTED**.
+Reconciliation CONFIRM: **NOT IMPLEMENTED**. Ambos pertenecen a HC-RR-01D.
+
+| Gate | Resultado |
+| --- | --- |
+| Nuevas pruebas unitarias contrato / registry / servicio | 72/72 — 3 suites PASS |
+| Focal Equipment / Assignment / CaseDispatch, incluida apertura, historia, Inspection/Retirement | 825/825 — 31 suites PASS |
+| PostgreSQL16 aceptación interna de cierre | 46/46 PASS; incluye los 40 escenarios mínimos |
+| Full API | 2460/2460 — 133 suites PASS |
+| Typecheck oficial / noEmit focal | PASS; cero diagnósticos focales |
+| Lint / build / Prisma validate | PASS |
+| Prettier/check TS/CJS / sintaxis runner / git diff --check | PASS |
+
+Target de aceptación PASS: `127.0.0.1:58222/zaping_equipment_custody_close_test`, rol
+`equipment_custody_close_test`, run `fea605b0-35f8-4052-b32f-f2ce49411339`.
+PostgreSQL16 nuevo, loopback/tmpfs, sin volumen/base previa; rol NOSUPERUSER /
+NOCREATEDB / NOCREATEROLE. Aplicadas las 43 migraciones existentes sólo allí.
+Primer intento: 44/46; dos fixtures RELEASED/REPLACED carecían de audit requerido.
+Corregidos los fixtures, repetición en otro contenedor nuevo: 46/46.
+Cleanup de ambos contenedores/tmpfs: **PASS**. Sin DB dev/QA/producción, .env ni credenciales.
+
+Concurrencia probada con conexiones independientes, backend PIDs distintos,
+pg_blocking_pids y pg_stat_activity wait_event_type=Lock y barreras antes del commit:
+origen igual produce CLOSED + REPLAY; orígenes distintos producen CLOSED + conflicto.
+Inspection con cambio real y Retirement primero invalidan revisión vieja; Close primero
+permite la operación posterior sobre estado vigente, sin lost update ni reactivación.
+Inspection no-op no inventa revisión. Prelocks deterministas de dos Assets compatibles.
+Rollback del caller después de Custody, Asset o evento revierte todos los efectos.
+
+**Sin schema, migración, enum DB ni Prisma generate.** Sin implementación Material,
+Inventory fence/authority, snapshots/finalización, endpoint o frontend. HC-RR-01D:
+**BLOCKED UNTIL 01C MERGE**, TARGET **8 SP**. BACKEND TOTAL TARGET **23 SP**.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
