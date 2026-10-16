@@ -1,23 +1,23 @@
 # HC-INVENTORY-CUSTODY-01E — EquipmentAsset Custody Integration
 
 TECHNICAL DESIGN: APPROVED / MERGED — PR #85
-IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge.
-01E IMPLEMENTATION completa sólo después del merge01E-B.
+IMPLEMENTATION: 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87.
+01E IMPLEMENTATION: COMPLETE / MERGED. Adopción operativa real: NOT EXECUTED.
 
 Baseline: `77a83539dc3a2069bf0b3085cbd6f32e55fffb79`.
 Rama: `feat/hc-inventory-custody-01e-equipment-custody`.
 Autoridad: aprobación humana del Technical Design Approval Delta 01E.
 Las decisiones están APPROVED / MERGED. El cierre local01E-A figura al final;
-01E-B está IMPLEMENTED / TESTED, pendiente de revisión humana/merge; la adopción operativa sigue pendiente.
+01E-B está COMPLETE / MERGED — PR #87; la adopción operativa sigue pendiente.
 
 | Slice                      | Alcance                                                                     | TARGET        | Estado                                                   |
 | -------------------------- | --------------------------------------------------------------------------- | ------------- | -------------------------------------------------------- |
 | HC-INVENTORY-CUSTODY-01E-A | Persistence, invariants, baseline & physical history                        | 5 SP          | COMPLETE / MERGED — PR #86 |
-| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP          | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | TECHNICAL DESIGN: APPROVED / MERGED — PR #85 — 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge |
+| HC-INVENTORY-CUSTODY-01E-B | Physical primitives, Equipment/Assignment/readers & cross-domain acceptance | 8 SP          | COMPLETE / MERGED — PR #87 |
+| HC-INVENTORY-CUSTODY-01E   | EquipmentAsset custody foundation                                           | 13 SP = 5 + 8 | COMPLETE / MERGED — 01E-A PR #86; 01E-B PR #87 |
 
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP. Technical Design MERGED — PR #85.
-01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. El TARGET anterior de 8 SP para 01E
+01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. El TARGET anterior de 8 SP para 01E
 queda sustituido por el split humano aprobado de 13 SP. Sólo planificación TARGET;
 sin Forecast, Commitment, Actual ni fechas asignadas.
 
@@ -26,6 +26,11 @@ HC-INVENTORY-CUSTODY-01D IMPLEMENTATION: COMPLETE / MERGED.
 REAL COMPANY CUTOVER: NOT EXECUTED.
 EXTERNAL OPERATIONAL FENCE: NOT CERTIFIED.
 01A/01B/01C ACTIVATION: DORMANT. M-HC1: OPEN.
+
+Estado posterior vigente: HC-CASE-DISPATCH BACKEND COMPLETE / MERGED — PR #92;
+PRODUCTIVE EQUIPMENT CUSTODY ENABLED BY CONFIRM CODE PATH. Return/Reconciliation
+TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED; ver [seam Return](#seam-futuro-de-return).
+Los cierres locales siguientes conservan evidencia histórica, sin adopción real ejecutada.
 
 ## Alcance aprobado y límites
 
@@ -223,6 +228,30 @@ OUT_OF_SERVICE. Return futuro cierra el episodio activo exacto y registra el
 resultado físico atómicamente. Cambiar condition mientras permanece CUSTODY no
 significa devolución. No se implementa workflow Return/Reconciliation en01E.
 
+Contrato posterior aprobado: [HC-RETURN-RECONCILIATION TD](../healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED. HC-CASE-DISPATCH BACKEND
+COMPLETE / MERGED hasta PR #92; CASE_DISPATCH_ITEM ya es contexto productivo de apertura.
+Las referencias a Dispatch futuro/registry vacío en el diseño y cierres históricos
+01E describen el alcance entregado por 01E, no el estado posterior a PR #92.
+
+Se aprueba futura primitiva interna caller-owned `returnFromCustody(tx, ...)`, sin
+endpoint Equipment ni tx anidado. Contexto CASE_RECONCILIATION_ITEM y registry de cierre
+dedicado, sin alterar apertura. Prueba mismo tx/Company/Case, Reconciliation/item ACTIVE,
+Dispatch CONFIRMED, source DispatchItem, custody abierta exacta, Asset, revisión,
+actor y origen durable. CUSTODY_CLOSE ya existe; no nuevo enum físico.
+
+Outcome RETURNED/UNRESOLVED, condición separada. RETURNED exige reportedCondition
+GOOD/INSPECTION_PENDING/DAMAGED/OUT_OF_SERVICE; cierra custody, limpia pointer,
+CUSTODY->WAREHOUSE, aplica condición y revision+1 con exactamente un CUSTODY_CLOSE
+que captura todos los hechos antes/después. No segundo CONDITION_CHANGE ni Inspection
+fabricado. INSPECTION_PENDING delega resolución posterior a Inspection vigente.
+UNRESOLVED no cambia custody/location/pointer/condition/revision. RETIRED+CUSTODY
+puede retornar a RETIRED+WAREHOUSE sin reactivar. Assignment histórico puede estar
+RESERVED/RELEASED/REPLACED: no liberarlo/reemplazarlo ni restaurar capacidad preparada.
+Sin cambios Case/Kit ni gates actuales de agenda/readiness. Equipment-only independiente
+de QUANTITY; mixto atómico. HC-RR-01C BLOCKED — TARGET 5 SP; 01D BLOCKED — TARGET 8 SP.
+REAL EQUIPMENT RECONCILIATION / REAL COMPANY CUTOVER NOT EXECUTED; M-HC1 OPEN.
+
 ## Relación con01D y compatibilidad
 
 Autoridad Equipment independiente de QUANTITY InventoryCutover. No extender ese
@@ -255,10 +284,10 @@ permisivo productivo. La ejecución01E-A se limita a la DB efímera descrita aba
 
 ## Cierre de aprobación
 
-TECHNICAL DESIGN: APPROVED / MERGED — PR #85. 01E-A COMPLETE / MERGED — PR #86; 01E-B IMPLEMENTED / TESTED — pending human review/merge.
+TECHNICAL DESIGN: APPROVED / MERGED — PR #85. 01E-A COMPLETE / MERGED — PR #86; 01E-B COMPLETE / MERGED — PR #87.
 01E-A: COMPLETE / MERGED — PR #86 — TARGET 5 SP.
-01E-B: IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP. TOTAL TARGET: 13 SP.
-M-HC1 OPEN. Este cierre conserva sin staging/commit/push los cambios locales descritos abajo.
+01E-B: COMPLETE / MERGED — PR #87 — TARGET 8 SP. TOTAL TARGET: 13 SP.
+M-HC1 OPEN. Los cierres locales siguientes conservan su evidencia de validación anterior al merge.
 
 Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
 [01D Technical Design](INVENTORY_CUSTODY_01D_TECHNICAL_DESIGN.md),
@@ -273,7 +302,7 @@ Referencias: [Inventory Custody Definition](INVENTORY_CUSTODY_DEFINITION.md),
 01E-A COMPLETE / MERGED — PR #86 — TARGET 5 SP.
 Baseline de implementación: `4e491fdbda5ca6d41d24ed5d4c41fe15058256a8`, rama
 `feat/hc-inventory-custody-01e-a-equipment-physical-foundation`.
-01E-B IMPLEMENTED / TESTED — pending human review/merge; TOTAL01E TARGET13SP conservado.
+01E-B COMPLETE / MERGED — PR #87; TOTAL01E TARGET13SP conservado.
 
 - EquipmentAsset añade physicalLocation UNVERIFIED por defecto, physicalRevision0
   y activeCustodyId nullable; AVAILABLE no se persiste. Custody con FKs compuestas
@@ -323,16 +352,17 @@ Runner: `node test/helpers/equipment-physical-foundation-postgres-runner.cjs --r
 Primera corrida se detuvo en un fixture histórico CaseKit; corregido antes del
 resultado23/23; su cleanup también PASS. Sin DB dev/QA/prod/prior-task; .env intacto.
 
-REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED.
+REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. Al cierre histórico 01E-A, PRODUCTIVE
+EQUIPMENT CUSTODY estaba NOT ENABLED; estado actual posterior a PR #92 en cabecera.
 01D IMPLEMENTATION COMPLETE / MERGED; REAL COMPANY CUTOVER NOT EXECUTED;
 EXTERNAL OPERATIONAL FENCE NOT CERTIFIED. M-HC1 OPEN.
 
 ## Cierre local 01E-B — Equipment physical primitives y wiring
 
-01E-A COMPLETE / MERGED — PR #86. 01E-B IMPLEMENTED / TESTED — pending human review/merge.
+01E-A COMPLETE / MERGED — PR #86. 01E-B COMPLETE / MERGED — PR #87.
 TARGET 8 SP; total01E TARGET13SP = 5 + 8. Baseline `242f8cf15293648360546cf69e8da027fbaf7cf5`;
 rama `feat/hc-inventory-custody-01e-b-equipment-custody-wiring`.
-01E IMPLEMENTATION completa sólo después del merge01E-B; sin Forecast/Commitment/Actual ni fechas nuevas.
+01E IMPLEMENTATION COMPLETE / MERGED; sin Forecast/Commitment/Actual ni fechas nuevas.
 
 - Un predicado físico puro compone salud/lifecycle con WAREHOUSE, pointer nulo y revisión válida/coherencia.
   Availability conserva available/primaryReason/reasons/evaluatedAt y prioridad de salud;
@@ -377,6 +407,8 @@ Typecheck productivo, noEmit18 fuentes/specs/aceptación tocados, lint completo,
 Prisma schema/migrations sin cambios; generate/format Prisma no necesarios. Prettier fuentes/harness/Web y git diff --check PASS. Web productivo sin cambios;
 regresión explícita del fallback de los tres motivos nuevos.
 
-REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. PRODUCTIVE EQUIPMENT CUSTODY: NOT ENABLED
-porque el registry productivo permanece cerrado. CASE DISPATCH: NOT IMPLEMENTED. RETURN: NOT IMPLEMENTED.
+REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. Al cierre histórico 01E-B, custody productiva
+no estaba habilitada y Dispatch no estaba implementado. Estado actual: Dispatch COMPLETE /
+MERGED — PR #92, apertura productiva mediante Confirm; Return/Reconciliation TECHNICAL
+DESIGN APPROVED / IMPLEMENTATION NOT STARTED. Cierre productivo todavía no implementado.
 01D IMPLEMENTATION COMPLETE / MERGED; REAL COMPANY CUTOVER NOT EXECUTED. M-HC1 OPEN.

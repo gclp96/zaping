@@ -4,7 +4,9 @@
 **Producto:** Zaping Healthcare
 **Versión:** 2.0.0
 **Estado:** Aprobado
-**Estado de implementación:** DOMAIN DESIGN / APPROVED TARGET / NOT IMPLEMENTED
+**Estado de implementación:** secciones conceptuales históricas; HC-CASE-DISPATCH
+BACKEND COMPLETE / MERGED — PR #92 (§258). Return/Reconciliation TECHNICAL DESIGN
+APPROVED / IMPLEMENTATION NOT STARTED (§259); sus refinamientos V1 prevalecen para ese alcance.
 **Última actualización:** 2026-08-20
 **Responsable:** Zaping Healthcare Team
 
@@ -3770,7 +3772,7 @@ sin duplicar ni falsificar el hecho físico.
 
 **TECHNICAL DESIGN APPROVED / MERGED — PR #88. 01A COMPLETE / MERGED — PR #89.
 01B COMPLETE / MERGED — PR #90; HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91.
-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.**
+01C COMPLETE / MERGED — PR #92 — TARGET 8 SP. HC-CASE-DISPATCH BACKEND COMPLETE / MERGED.**
 
 Baseline inspeccionado: `15f062b1ff1a4f77724b489bd94abccfce7e998d`.
 Conclusión CaseKit vigente: **CASEKIT IS SUFFICIENT; PROCEED TO CASEDISPATCH CONTRACT**.
@@ -3778,7 +3780,7 @@ M-HC1 permanece OPEN. DEC-DSP-01..17 fueron aprobadas por revisión humana de
 producto/arquitectura con los refinamientos de §258.7.
 01A implementa persistencia/invariantes y GET list/detail; 01B añade sólo comandos
 DRAFT con idempotencia y recibo durable original. 01C implementa Confirm físico y adapter
-Equipment; el backend estará completo sólo después de su merge. Evidencia en TD §17.
+Equipment; backend COMPLETE / MERGED hasta PR #92. Evidencia local en Dispatch TD §17.
 HC-INVENTORY-CUSTODY-DEF está COMPLETE / MERGED — PR #75 — main@51363f5 — TARGET 5 SP; véase
 [definición Inventory](../erp/INVENTORY_CUSTODY_DEFINITION.md).
 Las secciones conceptuales anteriores conservan su valor histórico.
@@ -3959,7 +3961,7 @@ CaseKit. Ser custodio no concede permisos; Company/actor vienen de JWT.
 | POST /healthcare/cases/:caseId/dispatches/:dispatchId/custodian | `{custodian, expectedRevision}`; sólo DRAFT. |
 | POST /healthcare/cases/:caseId/dispatches/:dispatchId/items | `{type, sourceCaseKitItemId, expectedRevision, quantity?, sourcePositionId?, batchId?}`; MATERIAL exige quantity, Position y batchId explícito nullable; EQUIPMENT no acepta campos MATERIAL. Product/Assignment/Asset y revisiones físicas se derivan/capturan bajo lock en servidor, nunca del cliente. |
 | POST /healthcare/cases/:caseId/dispatches/:dispatchId/items/:itemId/exclude | `{reason, expectedRevision}`. |
-| POST /healthcare/cases/:caseId/dispatches/:dispatchId/confirm (01C IMPLEMENTED / TESTED — pending review/merge) | `{expectedRevision}` y Idempotency-Key: HTTP 200 original/replay; evita confirmar contenido modificado desde la revisión humana. |
+| POST /healthcare/cases/:caseId/dispatches/:dispatchId/confirm (01C COMPLETE / MERGED — PR #92) | `{expectedRevision}` y Idempotency-Key: HTTP 200 original/replay; evita confirmar contenido modificado desde la revisión humana. |
 | POST /healthcare/cases/:caseId/dispatches/:dispatchId/cancel | `{reason, expectedRevision}`; sólo DRAFT. |
 
 Todas las mutaciones usan Idempotency-Key salvo futura revisión técnica que pruebe
@@ -4059,7 +4061,7 @@ candidato dentro de estas decisiones vinculantes.
 
 [CASE_DISPATCH_TECHNICAL_DESIGN](CASE_DISPATCH_TECHNICAL_DESIGN.md) registra el delta
 humano vinculante. TECHNICAL DESIGN: APPROVED. 01A/01B/LOCK-01 COMPLETE / MERGED;
-01C IMPLEMENTED / TESTED — pending human review/merge. Evidencia local en TD §17.
+01C COMPLETE / MERGED — PR #92. Evidencia local en Dispatch TD §17.
 QUANTITY SOURCING BLOCKER: RESOLVED. La regla refinada DEC-DSP-05 sustituye la
 exigencia histórica de batch para todo material; no modifica Candidate C Sales.
 
@@ -4073,8 +4075,8 @@ La implementación local no ejecuta adopción real ni habilita Return.
 | HC-DSP-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #89 |
 | HC-DSP-01B | DRAFT commands & idempotency | 5 SP | COMPLETE / MERGED — PR #90 |
 | HC-DSP-LOCK-01 | DRAFT lock compatibility (delta adicional) | 3 SP | COMPLETE / MERGED — PR #91 |
-| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| BACKEND TOTAL | Backend aprobado | 18 SP | Completo sólo después del merge de 01C |
+| HC-DSP-01C | Atomic confirm, physical adapters & concurrency | 8 SP | COMPLETE / MERGED — PR #92 |
+| BACKEND TOTAL | Backend aprobado | 18 SP | COMPLETE / MERGED — through PR #92 |
 | HC-DSP-01D | Frontend | Candidate 5 SP | OUT OF CURRENT BACKEND SCOPE |
 
 Son planning TARGET, sin Forecast/Commitment/Actual ni fechas. Los detalles Prisma
@@ -4085,6 +4087,68 @@ Un Dispatch no permite dos MATERIAL ACTIVE con el mismo sourceCaseKitItem/source
 La aceptación29 usa una fuente preparada y Positions/batches reales distintos: Effect compartido
 y destino CUSTODY propio por item. La agregación defensiva de PhysicalInventory no implica
 líneas empresariales duplicadas; el comando normal rechaza el duplicado exacto.
-RETURN NOT IMPLEMENTED. M-HC1 OPEN. Siguiente acción: revisión humana/merge de 01C.
+RETURN / RECONCILIATION: TECHNICAL DESIGN APPROVED; IMPLEMENTATION NOT STARTED (§259).
+M-HC1 OPEN. Siguiente acción: merge del TD Reconciliation, luego readiness HC-RR-01A.
 
 <!-- END HC-CASE-DISPATCH V1 APPROVED CONTRACT -->
+
+# 259. HC-RETURN-RECONCILIATION — V1 approved contract
+
+**TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED**.
+Contrato canónico: [Case Reconciliation TD](CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+HC-CASE-DISPATCH BACKEND COMPLETE / MERGED — PR #92; Inventory 01D/01E COMPLETE / MERGED.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN.
+
+Un único HealthcareCaseReconciliation, sin separar Return/Reconciliation. Cada Dispatch
+CONFIRMED admite N episodios; cada episodio corresponde exactamente a un Dispatch.
+Una visita multi-Dispatch produce varios episodios. DRAFT->CONFIRMED o CANCELLED;
+ambos terminales inmutables. DRAFT sin efectos; parciales/múltiples episodios admitidos.
+
+Fuente: DispatchItem y sus enlaces CUSTODY/Effect o Equipment custody/open event,
+Asset/Assignment histórico y snapshots. No inferir desde Kit/preparedQuantity,
+Product.stock, Assignment solo o la Position AVAILABLE anterior. No mutar Dispatch.
+
+Una línea ACTIVE por episodio/sourceDispatchItem. MATERIAL returnedQty/usedQty enteros
+no negativos; dispatched=confirmedReturned+confirmedUsed+unresolved. Sólo ACTIVE de
+episodios CONFIRMED consume capacidad. Unresolved derivado, sin contador mutable.
+
+**Refinamiento vinculante V1 de §§74/102:** returnedQty significa físicamente retornado
+Y explícitamente aprobado RESTOCKABLE. TRANSFER de CUSTODY exacta a AVAILABLE canónica,
+mismo Company/Product/batch o null, sin contexto; owned sin cambio, Batch.available aumenta.
+USED es DEFINITIVE_OUT desde CUSTODY: owned disminuye una vez, Batch.available no disminuye.
+Effects separados; sin devolver USED primero a AVAILABLE, Sales history, FEFO/FIFO o cambio de lote.
+
+Material recibido/revisado pero con disposición pendiente permanece unresolved/CUSTODY;
+no se clasifica returnedQty ni usedQty. Registrar observación/razón acotada. No implica
+que nunca haya llegado físicamente. No QUARANTINE/unavailable-return en este milestone.
+Confirm observacional sin efectos sólo con recurso pendiente referenciado y razón explícita;
+un episodio vacío no confirma. Corrección de RETURNED/USED confirmado requiere workflow
+futuro explícito fuera de alcance. Ambas limitaciones requieren revisión antes de
+production readiness si la operación necesita cuarentena/corrección.
+
+Equipment outcome RETURNED/UNRESOLVED; reportedCondition sólo RETURNED, con GOOD,
+INSPECTION_PENDING, DAMAGED u OUT_OF_SERVICE. RETURNED cierra custody exacta, lleva
+CUSTODY->WAREHOUSE, limpia pointer, aplica condición, revision+1 y un solo CUSTODY_CLOSE.
+No segundo CONDITION_CHANGE ni EquipmentInspection fabricado. RETIRED sigue RETIRED;
+UNRESOLVED no cambia hechos físicos. Primitiva interna caller-owned y registry/contexto
+de cierre CASE_RECONCILIATION_ITEM dedicados, sin endpoint Equipment ni nested tx.
+
+Sin liberar/reemplazar Assignment o restaurar capacidad; referencias RESERVED/RELEASED/
+REPLACED son históricas. Sin mutar Case/Kit ni exigir SCHEDULED/PREPARED/readiness/agenda.
+Mixto atómico. Sólo MATERIAL returnedQty>0 o usedQty>0 activa fence/PHYSICAL/runtime;
+observaciones cero y Equipment-only no activan autoridad QUANTITY.
+
+Estado por Dispatch derivado: UNRECONCILED/PARTIALLY_RECONCILED/FULLY_RECONCILED,
+sin flag mutable. Full exige cantidades resueltas y Equipment cerrado con evidencia;
+Inspection pendiente no bloquea cierre físico. Desacuerdo de saldos/evidence falla cerrado.
+Reads sin N+1: saldos, custody/evidence y episodios.
+
+API `/healthcare/cases/:caseId/reconciliations`: GET list/detail; POST create, items,
+item outcome/exclude, confirm/cancel; resumen GET Dispatch `reconciliation-summary`.
+Idempotency-Key para los seis intents, witness original y readback actual antes de
+gates vivos. Reads ADMIN/MANAGER/WAREHOUSE/SALES; writes ADMIN/MANAGER/WAREHOUSE.
+Custodio/receiver no concede permisos. Detalles de DTO/Prisma pertenecen a readiness.
+
+HC-RR-01A READY AFTER TECHNICAL DESIGN MERGE — 5 SP; 01B BLOCKED BY 01A — 5 SP;
+01C BLOCKED / DEPENDS ON APPROVED FOUNDATION — 5 SP; 01D BLOCKED — 8 SP.
+BACKEND TOTAL TARGET 23 SP. Sin Forecast/Commitment/Actual ni fechas.
