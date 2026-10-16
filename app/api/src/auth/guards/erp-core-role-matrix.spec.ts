@@ -1,3 +1,4 @@
+import { HealthcareCaseReconciliationsController } from '../../healthcare/case-reconciliations/healthcare-case-reconciliations.controller';
 import { HealthcareCaseDispatchesController } from '../../healthcare/case-dispatches/healthcare-case-dispatches.controller';
 import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import {
@@ -52,6 +53,19 @@ const allRoles = [
 ];
 
 const roleMatrix: RoleMatrix[] = [
+  {
+    controller: HealthcareCaseReconciliationsController,
+    methods: {
+      list: allRoles,
+      detail: allRoles,
+      summary: allRoles,
+      create: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      addItem: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      setOutcome: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      excludeItem: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      cancel: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+    },
+  },
   {
     controller: HealthcareCaseDispatchesController,
     methods: {

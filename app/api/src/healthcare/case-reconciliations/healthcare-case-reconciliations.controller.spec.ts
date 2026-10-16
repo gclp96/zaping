@@ -1,3 +1,4 @@
+import { HealthcareCaseReconciliationCommandService } from './healthcare-case-reconciliation-command.service';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -15,6 +16,7 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
   const caseId = '11111111-1111-4111-8111-111111111111';
   const path = `/healthcare/cases/${caseId}/reconciliations`;
   const secret = 'case-availability-test-only-secret';
+  const commands = { execute: jest.fn() };
   const service = { list: jest.fn(), detail: jest.fn(), summary: jest.fn() };
   const prisma = { user: { findFirst: jest.fn() } };
   let app: INestApplication<App>;
@@ -36,6 +38,10 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
       controllers: [HealthcareCaseReconciliationsController],
       providers: [
         JwtStrategy,
+        {
+          provide: HealthcareCaseReconciliationCommandService,
+          useValue: commands,
+        },
         { provide: PrismaService, useValue: prisma },
         { provide: HealthcareCaseReconciliationReadService, useValue: service },
       ],
@@ -215,15 +221,12 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
       .expect(400);
     expect(service.detail).not.toHaveBeenCalled();
   });
-  it.each(['post', 'patch', 'delete'] as const)(
-    'has no %s route',
-    async (method) => {
-      await supertest(app.getHttpServer())
-        [method](path)
-        .auth(token(), { type: 'bearer' })
-        .expect(404);
-    },
-  );
+  it.each(['patch', 'delete'] as const)('has no %s route', async (method) => {
+    await supertest(app.getHttpServer())
+      [method](path)
+      .auth(token(), { type: 'bearer' })
+      .expect(404);
+  });
 
   it.each(['ADMIN', 'MANAGER', 'SALES', 'WAREHOUSE'])(
     'allows summary for %s',
@@ -260,5 +263,108 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
       .get(path + '?dispatchId=bad')
       .auth(token(), { type: 'bearer' })
       .expect(400);
+  });
+
+  const mutations = [
+    {
+      method: 'create',
+      route: '',
+      dto: { dispatchId: caseId, observation: ' Note ' },
+      code: 201,
+    },
+    {
+      method: 'addItem',
+      route: '/' + caseId + '/items',
+      dto: { expectedRevision: 0, sourceDispatchItemId: caseId },
+      code: 201,
+    },
+    {
+      method: 'setOutcome',
+      route: '/' + caseId + '/items/' + caseId + '/outcome',
+      dto: {
+        expectedRevision: 0,
+        type: 'MATERIAL',
+        returnedQty: 1,
+        usedQty: 0,
+      },
+      code: 200,
+    },
+    {
+      method: 'excludeItem',
+      route: '/' + caseId + '/items/' + caseId + '/exclude',
+      dto: { expectedRevision: 0, reason: ' Reason ' },
+      code: 200,
+    },
+    {
+      method: 'cancel',
+      route: '/' + caseId + '/cancel',
+      dto: { expectedRevision: 0, reason: ' Reason ' },
+      code: 200,
+    },
+  ];
+  describe.each(mutations)('$method commands', (m) => {
+    beforeEach(() => {
+      commands.execute.mockResolvedValue({
+        replay: false,
+        command: {},
+        data: {},
+      });
+    });
+    it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'])(
+      'allows %s and passes authenticated identity',
+      async (role) => {
+        await supertest(app.getHttpServer())
+          .post(path + m.route)
+          .auth(token(role), { type: 'bearer' })
+          .set('Idempotency-Key', 'key')
+          .send(m.dto)
+          .expect(m.code);
+        expect(commands.execute).toHaveBeenCalledWith(
+          expect.objectContaining({
+            companyId: 'jwt-tenant',
+            actorId: role,
+            caseId,
+            key: 'key',
+          }),
+          expect.any(Object),
+        );
+      },
+    );
+    it('denies SALES and anonymous', async () => {
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token('SALES'), { type: 'bearer' })
+        .send(m.dto)
+        .expect(403);
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .send(m.dto)
+        .expect(401);
+      expect(commands.execute).not.toHaveBeenCalled();
+    });
+    it('rejects unknown fields', async () => {
+      await supertest(app.getHttpServer())
+        .post(path + m.route)
+        .auth(token(), { type: 'bearer' })
+        .send({ ...m.dto, companyId: 'foreign' })
+        .expect(400);
+      expect(commands.execute).not.toHaveBeenCalled();
+    });
+  });
+  it('has no confirm route', async () => {
+    await supertest(app.getHttpServer())
+      .post(path + '/' + caseId + '/confirm')
+      .auth(token(), { type: 'bearer' })
+      .send({ expectedRevision: 0 })
+      .expect(404);
+  });
+  it('create replay returns 200', async () => {
+    commands.execute.mockResolvedValue({ replay: true, command: {}, data: {} });
+    await supertest(app.getHttpServer())
+      .post(path)
+      .auth(token(), { type: 'bearer' })
+      .set('Idempotency-Key', 'key')
+      .send({ dispatchId: caseId })
+      .expect(200);
   });
 });
