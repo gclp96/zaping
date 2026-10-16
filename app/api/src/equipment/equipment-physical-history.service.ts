@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { EquipmentAsset, Prisma } from '@prisma/client';
+import { EquipmentCustodyCloseCommand } from './equipment-custody-close.contract';
 import { EquipmentPhysicalRepository } from './equipment-physical.repository';
 import {
   equipmentPhysicalAssert,
@@ -8,6 +9,36 @@ import {
 
 @Injectable()
 export class EquipmentPhysicalHistoryService {
+  appendCustodyClose(
+    tx: Prisma.TransactionClient,
+    before: EquipmentAsset,
+    c: EquipmentCustodyCloseCommand,
+    requestHash: string,
+    closedAt: Date,
+  ) {
+    return this.repository.appendPhysicalEvent(tx, {
+      companyId: c.companyId,
+      equipmentAssetId: c.assetId,
+      custodyId: c.custodyId,
+      operation: 'CUSTODY_CLOSE',
+      originType: c.durableOrigin.type,
+      originId: c.durableOrigin.id,
+      originOperation: c.durableOrigin.operation,
+      hashVersion: 1,
+      requestHash,
+      physicalLocationBefore: 'CUSTODY',
+      physicalLocationAfter: 'WAREHOUSE',
+      conditionBefore: before.condition,
+      conditionAfter: c.reportedCondition,
+      lifecycleBefore: before.lifecycle,
+      lifecycleAfter: before.lifecycle,
+      revisionBefore: before.physicalRevision,
+      revisionAfter: before.physicalRevision + 1,
+      actorId: c.actorId,
+      reasonCode: 'CUSTODY_CLOSE',
+      createdAt: closedAt,
+    });
+  }
   constructor(
     private readonly repository: EquipmentPhysicalRepository = new EquipmentPhysicalRepository(),
   ) {}

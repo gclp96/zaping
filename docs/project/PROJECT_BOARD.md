@@ -221,7 +221,8 @@ M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
 
 HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / MERGED — PR #93**;
 HC-RR-01A **COMPLETE / MERGED — PR #94**.
-HC-RR-01B **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
+HC-RR-01B **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
+HC-RR-01C **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
 [TD canónico](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md) y
 [Case Logistics §259](../modules/healthcare/CASE_LOGISTICS.md#259-hc-return-reconciliation--v1-approved-contract).
 Un HealthcareCaseReconciliation por episodio de un Dispatch CONFIRMED; Dispatch 1:N.
@@ -241,19 +242,35 @@ Inventory, fence o HC Company lock; sin cambios Prisma/migraciones. Validado: fo
 Reconciliation/RBAC 259/259, PostgreSQL16 comandos 39/39 y regresión 01A 44/44,
 cada uno en entorno nuevo aislado/tmpfs, 43 migraciones existentes y cleanup PASS.
 Full API 2388/2388 (130 suites); typecheck/noEmit focal, lint, build, Prisma validate,
-Prettier/check y diff check PASS. Sin DB real ni implementación física de 01C/01D.
+Prettier/check y diff check PASS. Esta evidencia corresponde al cierre histórico 01B.
+
+01C entrega `returnFromCustody(tx, command)` caller-owned y registry de cierre separado,
+vacío/congelado/fail-closed en producción. Exige HC Company lock retenido; Asset UPDATE
+antes de Custody UPDATE; CAS y un único CUSTODY_CLOSE con timestamp compartido.
+Retorno CUSTODY → WAREHOUSE, pointer null, reportedCondition whitelist, revision +1;
+lifecycle y metadata RETIRED preservados. Cero cambios Assignment/Case/Kit/Inventory.
+Replay por origen/hash/testigo histórico, incluso tras lost response y redispatch,
+sin gates actuales ni escrituras. Sin schema/migración ni endpoint público.
+Validado 01C: unitarios nuevos 72/72; focal Equipment/Assignment/Dispatch 825/825
+(31 suites); PostgreSQL16 nuevo aislado loopback/tmpfs 46/46, rol no superusuario,
+43 migraciones existentes, cleanup PASS; full API 2460/2460 (133 suites).
+Typecheck/noEmit focal, lint, build, Prisma validate, Prettier/check y diff check PASS.
+Carreras observadas por PIDs, pg_blocking_pids y pg_stat_activity: cierres concurrentes,
+Inspection y Retirement; rollback tras Custody/Asset/evento y prelocks multi-Asset PASS.
+Productive reconciliation close adapter **NOT IMPLEMENTED**; Reconciliation Confirm
+**NOT IMPLEMENTED**. Evidencia y target exacto en TD §18. Sin DB real.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
-| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A MERGED; 01B IMPLEMENTED / TESTED; 01C/01D BLOCKED |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
+| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED UNTIL 01C MERGE |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B MERGED; 01C IMPLEMENTED / TESTED; 01D BLOCKED UNTIL 01C MERGE |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
 y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión humana
-y merge 01B. 01C/01D permanecen BLOCKED. Sin Forecast, Commitment, Actual ni fechas nuevos.
+y merge 01C. 01D permanece BLOCKED UNTIL 01C MERGE. Sin Forecast, Commitment, Actual ni fechas nuevos.
 
 Este documento representa el estado operativo actual del proyecto.
 

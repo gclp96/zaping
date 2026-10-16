@@ -7,6 +7,8 @@ export const MAX_EQUIPMENT_PHYSICAL_REVISION = 2147483647;
 export type EquipmentPhysicalCode =
   | 'INVALID_REQUEST_BODY'
   | 'EQUIPMENT_ASSET_NOT_FOUND'
+  | 'EQUIPMENT_CUSTODY_NOT_FOUND'
+  | 'EQUIPMENT_CUSTODY_ALREADY_CLOSED'
   | 'RESOURCE_STATE_CHANGED'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'EQUIPMENT_PHYSICAL_EVIDENCE_REQUIRED'
@@ -20,7 +22,8 @@ export class EquipmentPhysicalError extends HttpException {
     const status =
       code === 'INVALID_REQUEST_BODY'
         ? HttpStatus.BAD_REQUEST
-        : code === 'EQUIPMENT_ASSET_NOT_FOUND'
+        : code === 'EQUIPMENT_ASSET_NOT_FOUND' ||
+            code === 'EQUIPMENT_CUSTODY_NOT_FOUND'
           ? HttpStatus.NOT_FOUND
           : code === 'EQUIPMENT_PHYSICAL_ACTOR_INVALID'
             ? HttpStatus.FORBIDDEN

@@ -229,12 +229,12 @@ resultado físico atómicamente. Cambiar condition mientras permanece CUSTODY no
 significa devolución. No se implementa workflow Return/Reconciliation en01E.
 
 Contrato posterior aprobado: [HC-RETURN-RECONCILIATION TD](../healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
-TECHNICAL DESIGN APPROVED / IMPLEMENTATION NOT STARTED. HC-CASE-DISPATCH BACKEND
+TECHNICAL DESIGN APPROVED; HC-RR-01A/01B COMPLETE / MERGED — PR #94/#95. HC-CASE-DISPATCH BACKEND
 COMPLETE / MERGED hasta PR #92; CASE_DISPATCH_ITEM ya es contexto productivo de apertura.
 Las referencias a Dispatch futuro/registry vacío en el diseño y cierres históricos
 01E describen el alcance entregado por 01E, no el estado posterior a PR #92.
 
-Se aprueba futura primitiva interna caller-owned `returnFromCustody(tx, ...)`, sin
+HC-RR-01C implementa primitiva interna caller-owned `returnFromCustody(tx, ...)`, sin
 endpoint Equipment ni tx anidado. Contexto CASE_RECONCILIATION_ITEM y registry de cierre
 dedicado, sin alterar apertura. Prueba mismo tx/Company/Case, Reconciliation/item ACTIVE,
 Dispatch CONFIRMED, source DispatchItem, custody abierta exacta, Asset, revisión,
@@ -249,7 +249,18 @@ UNRESOLVED no cambia custody/location/pointer/condition/revision. RETIRED+CUSTOD
 puede retornar a RETIRED+WAREHOUSE sin reactivar. Assignment histórico puede estar
 RESERVED/RELEASED/REPLACED: no liberarlo/reemplazarlo ni restaurar capacidad preparada.
 Sin cambios Case/Kit ni gates actuales de agenda/readiness. Equipment-only independiente
-de QUANTITY; mixto atómico. HC-RR-01C BLOCKED — TARGET 5 SP; 01D BLOCKED — TARGET 8 SP.
+de QUANTITY; mixto atómico pertenece al futuro Confirm 01D.
+HC-RR-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 5 SP.
+Registry productivo de cierre vacío/congelado/fail-closed; adapters sólo en tests.
+Sin adapter productivo CASE_RECONCILIATION_ITEM ni Reconciliation CONFIRM.
+Primitiva: HC Company lock preexistente, Asset UPDATE → Custody UPDATE, CAS y un único
+timestamp servidor compartido con CUSTODY_CLOSE. Replay histórico autorizado por
+origen/hash/contexto/testigo durable, independiente del estado actual incluso tras
+redispatch; sin escrituras ni nuevas revisiones. Sin mutación Assignment/Case/Kit/Inventory.
+Aceptación local: 72 unitarios nuevos, PostgreSQL16 aislado 46/46 con cleanup PASS,
+focal 825/825 y full API 2460/2460; gates estáticos PASS, sin schema/migración.
+Evidencia detallada en HC-RETURN-RECONCILIATION TD §18.
+HC-RR-01D BLOCKED UNTIL 01C MERGE — TARGET 8 SP; backend total TARGET 23 SP.
 REAL EQUIPMENT RECONCILIATION / REAL COMPANY CUTOVER NOT EXECUTED; M-HC1 OPEN.
 
 ## Relación con01D y compatibilidad
