@@ -220,7 +220,8 @@ reversal auditado de Dispatch confirmado es RELEASE GATE antes de production-rea
 M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
 
 HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / MERGED — PR #93**;
-HC-RR-01A **IMPLEMENTED / TESTED — pending human review/merge**.
+HC-RR-01A **COMPLETE / MERGED — PR #94**.
+HC-RR-01B **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
 [TD canónico](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md) y
 [Case Logistics §259](../modules/healthcare/CASE_LOGISTICS.md#259-hc-return-reconciliation--v1-approved-contract).
 Un HealthcareCaseReconciliation por episodio de un Dispatch CONFIRMED; Dispatch 1:N.
@@ -232,23 +233,27 @@ Equipment RETURNED/UNRESOLVED, condición separada; cierre exacto con un CUSTODY
 sin Inspection fabricado, reactivar RETIRED ni liberar Assignment. Sin mutar Case/Kit.
 Mixto atómico; sólo MATERIAL positivo activa fence/PHYSICAL/runtime. Observacional
 sin efectos exige recurso pendiente y razón explícita (prueba operacional futura en 01D).
-01A implementa persistencia, invariantes y sólo GET list/detail/summary; sin comandos
-ni ejecución física productiva. Validado: focal 89/89, PostgreSQL16 estructural 44/44
-en DB nueva aislada/tmpfs con 43 migraciones y cleanup PASS; Full API 2296/2296
-(127 suites), typecheck/noEmit focal, lint, build, Prisma format/validate y generate
-alternativo seguro por DLL EPERM, Prettier/check y diff check PASS. Sin DB real.
+01A entrega persistencia/invariantes/GET; 01B añade CREATE vacío, ITEM_ADD neutral,
+OUTCOME_SET, EXCLUDE y CANCEL con revisión, audit, hash/idempotencia y replay durable.
+Observation CREATE-only; corregir con CANCEL + CREATE. DRAFTs no reservan capacidad;
+OUTCOME recaptura revisiones observadas. Sin CONFIRM ni escrituras físicas, autoridad
+Inventory, fence o HC Company lock; sin cambios Prisma/migraciones. Validado: focal
+Reconciliation/RBAC 259/259, PostgreSQL16 comandos 39/39 y regresión 01A 44/44,
+cada uno en entorno nuevo aislado/tmpfs, 43 migraciones existentes y cleanup PASS.
+Full API 2388/2388 (130 suites); typecheck/noEmit focal, lint, build, Prisma validate,
+Prettier/check y diff check PASS. Sin DB real ni implementación física de 01C/01D.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
-| HC-RR-01A | Persistence, invariants & reads | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | BLOCKED UNTIL 01A MERGE |
+| HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
+| HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | BLOCKED / DEPENDS ON APPROVED FOUNDATION |
 | HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A IMPLEMENTED / TESTED; 01B/01C/01D BLOCKED |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A MERGED; 01B IMPLEMENTED / TESTED; 01C/01D BLOCKED |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
 y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión humana
-y merge 01A; luego readiness de 01B. Sin Forecast, Commitment, Actual ni fechas nuevos.
+y merge 01B. 01C/01D permanecen BLOCKED. Sin Forecast, Commitment, Actual ni fechas nuevos.
 
 Este documento representa el estado operativo actual del proyecto.
 
