@@ -700,7 +700,7 @@ suite('HC-DSP-01A isolated PostgreSQL16 structural acceptance', () => {
   it('28 all historical Dispatch tables TRUNCATE rejected', async () => {
     await rejected(
       db.$executeRawUnsafe(
-        'TRUNCATE "HealthcareCaseDispatch", "HealthcareCaseDispatchItem", "HealthcareCaseDispatchAudit"',
+        'TRUNCATE "HealthcareCaseDispatch", "HealthcareCaseDispatchItem", "HealthcareCaseDispatchAudit" CASCADE',
       ),
       /append-only/,
     );

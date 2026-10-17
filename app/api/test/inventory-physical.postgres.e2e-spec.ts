@@ -127,7 +127,9 @@ describeDb('Inventory physical authority isolated PostgreSQL', () => {
     const url = new URL(raw);
     if (
       url.hostname !== '127.0.0.1' ||
-      url.port !== '5434' ||
+      (process.env.INVENTORY_PHYSICAL_TEST_RUN
+        ? !/^[0-9]+$/.test(url.port)
+        : url.port !== '5434') ||
       url.pathname !== '/zaping_spike_test' ||
       !/^zaping_inv01a_[0-9a-f]{12}$/.test(url.username)
     )
@@ -147,7 +149,7 @@ describeDb('Inventory physical authority isolated PostgreSQL', () => {
       superuser: false,
     });
     console.log(
-      `Verified test DB: 127.0.0.1:5434/${identity.database}; user=${identity.role}; superuser=false`,
+      `Verified test DB: 127.0.0.1:${url.port}/${identity.database}; user=${identity.role}; superuser=false`,
     );
     await db.company.createMany({
       data: [companyId, foreignId].map((id) => ({

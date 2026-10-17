@@ -274,6 +274,17 @@ export class HealthcareCaseDispatchConfirmService {
             ),
           );
           await this.repo.commands.completeClaim(claim.id, root.id, tx);
+          // Flush only constraints touched by Confirm after every staging write.
+          // Keep deferred CPU work under the existing statement_timeout.
+          await tx.$executeRawUnsafe(
+            'SET CONSTRAINTS "InventoryPhysicalEffectLine_complete" IMMEDIATE',
+          );
+          await tx.$executeRawUnsafe(
+            'SET CONSTRAINTS "InventoryPhysicalEffect_complete" IMMEDIATE',
+          );
+          await tx.$executeRawUnsafe(
+            'SET CONSTRAINTS "Dispatch_local_state", "Dispatch_item_final_state", "Dispatch_final_state", "Dispatch_insert_final_state", "Dispatch_idempotency_resource", "EquipmentAsset_custody_coherence", "EquipmentAssetCustody_coherence" IMMEDIATE',
+          );
           return this.result(tx, c, audit, false);
         }, this.policy);
       } catch (error) {

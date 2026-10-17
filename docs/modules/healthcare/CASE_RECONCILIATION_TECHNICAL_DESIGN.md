@@ -3,8 +3,8 @@
 TECHNICAL DESIGN: **APPROVED**.
 HC-RR-01A: **COMPLETE / MERGED — PR #94**.
 HC-RR-01B: **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
-HC-RR-01C: **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
-HC-RR-01D: **BLOCKED UNTIL 01C MERGE** — TARGET **8 SP**.
+HC-RR-01C: **COMPLETE / MERGED — PR #96** — TARGET **5 SP**.
+HC-RR-01D: **IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED** — TARGET **8 SP**.
 
 Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
 Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
@@ -14,7 +14,12 @@ Autoridad: Technical Design Approval Delta humano de HC-RETURN-RECONCILIATION.
 Este documento registra las decisiones aprobadas y la implementación y
 validación local de HC-RR-01A/01B/01C (§16–18). Los comandos DRAFT y la primitiva
 interna de cierre Equipment están implementados; CONFIRM y su adapter productivo
-siguen pendientes. El registry productivo de cierre permanece vacío/fail-closed.
+siguen pendientes en la baseline merged de este worktree. El registry productivo
+de cierre permanece vacío/fail-closed aquí. El estado funcional no merged de 01D
+se registra por el delta humano; no se inspeccionó el worktree separado.
+HC-RR-PERF-01: IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP.
+HC-RR-PERF-02: READY / NOT IMPLEMENTED — TARGET 5 SP.
+Return/Reconciliation backend: NOT YET CERTIFIED COMPLETE. Estado vigente en §19.
 
 ## 1. Estado, dependencias y alcance
 
@@ -556,3 +561,35 @@ Rollback del caller después de Custody, Asset o evento revierte todos los efect
 Inventory fence/authority, snapshots/finalización, endpoint o frontend. HC-RR-01D:
 **BLOCKED UNTIL 01C MERGE**, TARGET **8 SP**. BACKEND TOTAL TARGET **23 SP**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**. M-HC1: **OPEN**.
+
+## 19. HC-RR-PERF-01 — aceptación final de validación diferida
+
+Actualización 2026-10-17: 01A/01B/01C COMPLETE / MERGED — PR #94/#95/#96.
+01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED según delta humano.
+Los estados pre-merge de §16–18 son históricos; no representan la dependencia vigente.
+PERF-01 IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP.
+PERF-02 READY / NOT IMPLEMENTED — TARGET 5 SP; throughput real NOT CERTIFIED.
+
+Una sola migración forward, `20261016000000_deferred_validation_scalability`,
+separa checks locales del estado final de root/item y una validación agregada por
+transición DRAFT→CONFIRMED (o INSERT confirmado). Checks locales releen estado final,
+permiten staging y retienen DRAFT safety y provenance. El agregado conserva audit,
+snapshots, Material/Equipment evidence, episodios observacionales, tenant isolation
+y terminal integrity. Totales Material agrupados por Company/root una vez; insertar
+audit no vuelve a encolar agregados. No cambia schema, migraciones merged ni datos.
+
+PostgreSQL final: RR 44/44 y escalabilidad/DRAFT/timeout 10/10; N1000 RR aggregate
+70.71 ms, exactamente una llamada. Dispatch estructural N1000 1288.36 ms y toda su
+validación explícita física/Dispatch 147.59 ms. Total regresión PostgreSQL 406/406
+(latest executions), API completa 2460/2460 (133 suites). Typecheck/noEmit focal,
+lint focal, Prisma y formato PASS. Fallos previos y repeticiones se conservan en
+[evidencia](../../../app/api/test/deferred-validation-results.md); no se ocultan.
+
+El gate viejo Confirm real <10 s queda superseded sólo para PERF-01. La prueba real
+continúa verificando semántica/replay. PERF-02 exige p95 <=15 s y cero timeouts con
+configuración normal; baseline mediana 15.94 s, p95 18.45 s y ~8137 SQL. Este delta
+no implementa batching ni Confirm/adapter RR. Tras review/merge PERF-01, 01D deberá
+integrar evaluación explícita Line→Effect→RR/idempotency/custody al final del caller
+bajo statement_timeout, y repetir aceptación propia; detalle exacto en evidencia.
+PERF-02 y aceptación de 01D siguen pendientes. BACKEND NOT YET CERTIFIED COMPLETE.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN.

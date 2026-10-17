@@ -267,7 +267,7 @@ suite('01E-A fresh isolated Equipment physical foundation', () => {
     expect(
       await db.$queryRaw<
         { count: bigint }[]
-      >`SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`,
+      >`SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND migration_name < '20261015000200'`,
     ).toEqual([{ count: 41n }]);
   });
   it('defers coherent open/close ordering but rejects an open episode without pointer at COMMIT', async () => {

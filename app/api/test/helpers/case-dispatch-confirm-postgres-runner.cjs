@@ -145,6 +145,12 @@ function run(args, env) {
         '--runInBand',
         '--runTestsByPath',
         'test/case-dispatch-confirm.postgres.e2e-spec.ts',
+        ...(process.env.CASE_DISPATCH_CONFIRM_TEST_PATTERN
+          ? [
+              '--testNamePattern',
+              process.env.CASE_DISPATCH_CONFIRM_TEST_PATTERN,
+            ]
+          : []),
       ],
       {
         ...process.env,
