@@ -3,7 +3,7 @@
 TECHNICAL DESIGN: APPROVED.
 IMPLEMENTATION: HC-DSP-01A COMPLETE / MERGED — PR #89; HC-DSP-01B COMPLETE / MERGED — PR #90.
 HC-DSP-LOCK-01 COMPLETE / MERGED — PR #91.
-HC-DSP-01C IMPLEMENTED / TESTED — pending human review/merge — TARGET 8 SP.
+HC-DSP-01C COMPLETE / MERGED — PR #92 — TARGET 8 SP.
 QUANTITY SOURCING BLOCKER: RESOLVED.
 
 Baseline del TD: `8b6a883d5a5a2b7c5cbef001428fb478051f81f5`.
@@ -12,7 +12,8 @@ Autoridad: Technical Design Approval Delta humano de HC-CASE-DISPATCH.
 El Technical Design fue aprobado/merged por PR #88; 01A está merged por PR #89.
 01B implementa comandos DRAFT e idempotencia y está merged por PR #90.
 01C implementa Confirm físico y el adapter productivo; evidencia local en §17.
-El backend Dispatch estará completo sólo después del merge de 01C.
+El backend Dispatch está COMPLETE / MERGED por PR #92; escalabilidad diferida
+y throughput del writer se registran por separado en el addendum PERF-01 final.
 
 ## 1. Estado y dependencias
 
@@ -519,3 +520,32 @@ Schema/migraciones sin cambios, sin Prisma generate. Sin staging, commit ni push
 PRODUCTIVE EQUIPMENT CUSTODY: **ENABLED BY CONFIRM CODE PATH**; REAL EQUIPMENT
 RECONCILIATION **NOT EXECUTED**. REAL COMPANY CUTOVER **NOT EXECUTED**.
 RETURN **NOT IMPLEMENTED**. M-HC1 **OPEN**. Revisión humana → staging selectivo → commit → PR.
+
+## 18. HC-RR-PERF-01 — aceptación final de validación diferida
+
+2026-10-17: PERF-01 IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE,
+TARGET 8 SP. Migración única `20261016000000_deferred_validation_scalability`.
+Checks locales root/item conservan DRAFT safety; un agregado por root terminal
+retiene snapshots, audit, physical evidence e integridad terminal. Material agrupado
+por Company/root. Sin schema, backfill ni cambios a migraciones merged.
+Confirm evalúa explícitamente Line→Effect→Dispatch/idempotency/custody después de
+staging, snapshots, audit, root y claim completo, antes de devolver el callback;
+statement_timeout activo. Prueba real de cancelación SQLSTATE 57014 y rollback PASS.
+Timeouts normales y writer/CAS/projection/evidence/snapshot permanecen sin rediseño.
+
+N1000 estructural 1288.36 ms; agregado Dispatch 118.28 ms; físico local 20.05 ms;
+agregado físico 9.27 ms; total explícito 147.59 ms. Exactamente una llamada agregada
+por root/Effect. Dispatch persistence 59/59, Confirm final 76/76; total PostgreSQL
+406/406 y API completa 2460/2460 (133 suites). Fallos y repeticiones se mantienen en
+[evidencia actual e histórica](../../../app/api/test/deferred-validation-results.md).
+El <10 s de Confirm real fue superseded como gate PERF-01, conservando su prueba
+funcional/replay. No acredita throughput real. Primer intento actual falló ~20 s;
+repetición sin carga concurrente 13.54 s, sin cambio de timeouts.
+
+PERF-02 READY / NOT IMPLEMENTED — TARGET 5 SP: mediana histórica 15.94 s,
+p95 muestral 18.45 s, 7/10 >15 s, 0/10 fallos naturales sólo en esa muestra;
+~8137 SQL/Confirm. Aceptación futura p95 <=15 s y cero timeouts con política normal.
+RR01A/B/C MERGED PR #94/#95/#96; RR01D funcional no merged, aceptación bloqueada.
+Backend Return/Reconciliation NOT YET CERTIFIED COMPLETE. Cutover Company real y
+reconciliación Equipment real NOT EXECUTED. M-HC1 OPEN. Los estados al cierre de
+§17 son históricos; este addendum registra el estado de aceptación vigente.

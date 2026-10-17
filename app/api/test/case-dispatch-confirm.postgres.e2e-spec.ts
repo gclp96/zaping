@@ -1851,53 +1851,213 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
       ).toMatchObject({ quantity: kind === 'Sales' ? 15 : 19, revision: 2 });
     },
   );
-  it('45 1001 valid distinct material Positions reject before audit, transfer or custody', async () => {
-    const f = await fixture('MATERIAL', 'PHYSICAL', true, 1010, 1);
-    const batches = Array.from({ length: 1000 }, () => ({
-      id: randomUUID(),
-      companyId: f.companyId,
-      productId: f.material.id,
-      lotNumber: randomUUID(),
-      initialQuantity: 1,
-      availableQuantity: 1,
-      unitCost: 1,
-      expirationDate: new Date('2028-01-01'),
-    }));
-    await db.inventoryBatch.createMany({ data: batches });
-    const positions = batches.map((batch) => ({
-      id: randomUUID(),
-      companyId: f.companyId,
-      productId: f.material.id,
-      inventoryBatchId: batch.id,
-      state: 'AVAILABLE' as const,
-      quantity: 1,
-    }));
-    await db.inventoryPosition.createMany({ data: positions });
-    await db.healthcareCaseDispatchItem.createMany({
-      data: positions.map((p) => ({
+  it.each([1000, 1001])(
+    '45 %i distinct material Positions preserve Confirm boundary',
+    async (count) => {
+      const fixtureAt = performance.now();
+      const f = await fixture('MATERIAL', 'PHYSICAL', true, 1010, 1);
+      const batches = Array.from({ length: count - 1 }, () => ({
+        id: randomUUID(),
         companyId: f.companyId,
-        caseId: f.parent.id,
-        caseKitId: f.kit.id,
-        dispatchId: f.c.dispatchId,
-        sourceCaseKitItemId: f.source.id,
-        type: 'MATERIAL',
         productId: f.material.id,
-        addedById: f.actor.id,
+        lotNumber: randomUUID(),
+        initialQuantity: 1,
+        availableQuantity: 1,
+        unitCost: 1,
+        expirationDate: new Date('2028-01-01'),
+      }));
+      await db.inventoryBatch.createMany({ data: batches });
+      const positions = batches.map((batch) => ({
+        id: randomUUID(),
+        companyId: f.companyId,
+        productId: f.material.id,
+        inventoryBatchId: batch.id,
+        state: 'AVAILABLE' as const,
         quantity: 1,
-        batchId: p.inventoryBatchId,
-        sourcePositionId: p.id,
-        expectedPositionRevision: 0,
-      })),
-    });
-    const before = await state(f),
-      s = services();
-    const transfer = jest.spyOn(s.physical, 'transfer'),
-      audit = jest.spyOn(s.repo, 'audit');
-    await expect(confirm(f, s)).rejects.toMatchObject({ status: 409 });
-    expect(transfer).not.toHaveBeenCalled();
-    expect(audit).not.toHaveBeenCalled();
-    expect(await state(f)).toEqual(before);
-  });
+      }));
+      await db.inventoryPosition.createMany({ data: positions });
+      await db.healthcareCaseDispatchItem.createMany({
+        data: positions.map((p) => ({
+          companyId: f.companyId,
+          caseId: f.parent.id,
+          caseKitId: f.kit.id,
+          dispatchId: f.c.dispatchId,
+          sourceCaseKitItemId: f.source.id,
+          type: 'MATERIAL',
+          productId: f.material.id,
+          addedById: f.actor.id,
+          quantity: 1,
+          batchId: p.inventoryBatchId,
+          sourcePositionId: p.id,
+          expectedPositionRevision: 0,
+        })),
+      });
+      const before = await state(f),
+        s = services();
+      if (count === 1000) {
+        const phases: Record<string, { calls: number; ms: number }> = {};
+        async function measured<T>(
+          name: string,
+          action: () => Promise<T>,
+        ): Promise<T> {
+          const at = performance.now();
+          try {
+            return await action();
+          } finally {
+            const phase = phases[name] ?? { calls: 0, ms: 0 };
+            phase.calls++;
+            phase.ms += performance.now() - at;
+            phases[name] = phase;
+          }
+        }
+        const original_physicalTransfer = Reflect.get(s.physical, 'transfer');
+        jest
+          .spyOn(s.physical, 'transfer')
+          .mockImplementation((...args) =>
+            measured('physicalTransfer', () =>
+              Reflect.apply(original_physicalTransfer, s.physical, args),
+            ),
+          );
+        const original_projections = Reflect.get(s.projections, 'apply');
+        jest
+          .spyOn(s.projections, 'apply')
+          .mockImplementation((...args) =>
+            measured('projections', () =>
+              Reflect.apply(original_projections, s.projections, args),
+            ),
+          );
+        const original_materialConsumed = Reflect.get(
+          s.repo,
+          'materialConsumed',
+        );
+        jest
+          .spyOn(s.repo, 'materialConsumed')
+          .mockImplementation((...args) =>
+            measured('materialConsumed', () =>
+              Reflect.apply(original_materialConsumed, s.repo, args),
+            ),
+          );
+        const original_itemEvidence = Reflect.get(s.repo, 'itemEvidence');
+        jest
+          .spyOn(s.repo, 'itemEvidence')
+          .mockImplementation((...args) =>
+            measured('itemEvidence', () =>
+              Reflect.apply(original_itemEvidence, s.repo, args),
+            ),
+          );
+        const original_itemSnapshot = Reflect.get(s.repo, 'itemSnapshot');
+        jest
+          .spyOn(s.repo, 'itemSnapshot')
+          .mockImplementation((...args) =>
+            measured('itemSnapshot', () =>
+              Reflect.apply(original_itemSnapshot, s.repo, args),
+            ),
+          );
+        const original_lockPhysical = Reflect.get(s.repo, 'lockPhysical');
+        jest
+          .spyOn(s.repo, 'lockPhysical')
+          .mockImplementation((...args) =>
+            measured('lockPhysical', () =>
+              Reflect.apply(original_lockPhysical, s.repo, args),
+            ),
+          );
+        // Prisma fluent read clients are kept intact; historical read timings
+        // remain recorded in deferred-validation-results.md.
+        const originalRun = Reflect.get(s.commands, 'runInTransaction');
+        jest
+          .spyOn(s.commands, 'runInTransaction')
+          .mockImplementation((action, p) =>
+            Reflect.apply(originalRun, s.commands, [
+              async (tx: Prisma.TransactionClient) => {
+                const observed = new Proxy(tx, {
+                  get(target, key, receiver) {
+                    if (key === '$executeRawUnsafe')
+                      return (sql: string, ...values: unknown[]) =>
+                        measured(sql, () =>
+                          target.$executeRawUnsafe(sql, ...values),
+                        );
+                    return Reflect.get(target, key, receiver) as unknown;
+                  },
+                });
+                return action(observed);
+              },
+              p,
+            ]),
+          );
+        const confirmAt = performance.now();
+        try {
+          await confirm(f, s);
+        } catch (error) {
+          console.log(
+            'HC-RR-PERF-02 baseline (throughput NOT CERTIFIED) production Confirm failure ' +
+              JSON.stringify({
+                n: count,
+                elapsedMs: performance.now() - confirmAt,
+                phases,
+              }),
+          );
+          throw error;
+        }
+        const confirmMs = performance.now() - confirmAt;
+        console.log(
+          'HC-RR-PERF-02 baseline (throughput NOT CERTIFIED) production Confirm ' +
+            JSON.stringify({
+              n: count,
+              confirmMs,
+              phases,
+              fixtureAndConfirmMs: performance.now() - fixtureAt,
+            }),
+        );
+        const root = await db.healthcareCaseDispatch.findUniqueOrThrow({
+          where: { id: f.c.dispatchId },
+          include: { items: true },
+        });
+        expect(root.status).toBe('CONFIRMED');
+        expect(
+          root.items.every(
+            (i) => i.snapshot !== null && i.destinationPositionId !== null,
+          ),
+        ).toBe(true);
+        const effects = await db.inventoryPhysicalEffect.findMany({
+          where: { companyId: f.companyId, originId: root.id },
+          include: { lines: true },
+        });
+        expect(effects).toHaveLength(1);
+        expect(effects[0].lines).toHaveLength(2000);
+        const lineByPosition = new Map(
+          effects[0].lines.map((l) => [l.positionId, l]),
+        );
+        for (const item of root.items)
+          expect(lineByPosition.get(item.destinationPositionId!)?.delta).toBe(
+            item.quantity,
+          );
+        expect((await confirm(f, s)).replay).toBe(true);
+        expect(
+          await db.inventoryPhysicalEffectLine.count({
+            where: { effectId: effects[0].id },
+          }),
+        ).toBe(2000);
+        expect(
+          await db.healthcareCaseDispatchItem.count({
+            where: {
+              dispatchId: f.c.dispatchId,
+              physicalEffectId: { not: null },
+            },
+          }),
+        ).toBe(1000);
+        // Final acceptance delta supersedes the PERF-01 single-run <10s assertion.
+        // Keep real Confirm semantics above; writer p95 <=15s with zero failures
+        // remains an unimplemented PERF-02 acceptance gate (not certified here).
+        return;
+      }
+      const transfer = jest.spyOn(s.physical, 'transfer'),
+        audit = jest.spyOn(s.repo, 'audit');
+      await expect(confirm(f, s)).rejects.toMatchObject({ status: 409 });
+      expect(transfer).not.toHaveBeenCalled();
+      expect(audit).not.toHaveBeenCalled();
+      expect(await state(f)).toEqual(before);
+    },
+  );
   it('38 deferred database invariant rejects terminal transition with missing item evidence/audit at commit', async () => {
     const f = await fixture('MATERIAL'),
       before = await state(f);

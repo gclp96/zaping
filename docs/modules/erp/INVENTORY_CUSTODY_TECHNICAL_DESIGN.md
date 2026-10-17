@@ -1,5 +1,8 @@
 # HC-INVENTORY-CUSTODY-01A — Core Physical Authority Technical Design
 
+Estado de implementación en las secciones originales: histórico. Para el cambio
+actual de validación diferida, ver addendum HC-RR-PERF-01 al final.
+
 **TECHNICAL DESIGN APPROVED / PR PENDING — TARGET 8 SP.**
 **TD-INV-01A-01..20 APPROVED. IMPLEMENTATION NOT STARTED.**
 
@@ -537,3 +540,30 @@ staging selectivo → commit de diseño → PR técnico. Tras merge, iniciar imp
 01A desde main actualizado, manteniendo la autoridad dormida hasta el cutover posterior.
 01A permanece dormido, 01B..01E BLOCKED, HC-DSP-01A/B/C/D BLOCKED BY INVENTORY
 CUSTODY FOUNDATION y M-HC1 OPEN.
+
+## Addendum HC-RR-PERF-01 — aceptación final 2026-10-17
+
+PERF-01 IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP.
+La migración forward única `20261016000000_deferred_validation_scalability`
+reemplaza validación agregada por Line con checks locales de la Line final y parent
+Company/Effect: 1 <= sequence <= lineCount. CHECK/FK/UNIQUE mantienen aritmética,
+tenant safety y duplicados. Effect INSERT encola un solo agregado con relación
+MATERIALIZED Lines/Position y balance TRANSFER agrupado; conserva count/min/max,
+CREDIT, DEFINITIVE_OUT, COUNT_CORRECTION y todas las reglas OPENING (incluye CUSTODY).
+Una Line tardía de un Effect confirmado sin cambios rechaza por ordinal ocupado o
+fuera de rango. Append-only se garantiza por caminos de aplicación soportados;
+no se incorporan guards generales UPDATE/DELETE/TRUNCATE para historia SQL.
+Este addendum sustituye sólo la multiplicidad agregada por Line del diseño histórico.
+
+N1000/2000 Lines: local 20.05 ms + agregado 9.27 ms = 29.32 ms, una llamada agregada
+por Effect y cero al evaluar sólo constraints locales. Matriz nueva 37/37, físico
+26/26, Receipt/Manual/Count 30/30, Sales 12/12, OPENING 43/43; Equipment foundation
+23/23 y custody close final 46/46. Primer intento custody 32/46 por guard de timestamp;
+repetición sin cambios 46/46, causa original no capturada, conservada como limitación.
+Negativos y rollback atómico PASS. [Evidencia y targets](../../../app/api/test/deferred-validation-results.md).
+Sin schema/backfill ni cambios a transfer, CAS, proyecciones, stock, autoridad o custody.
+
+PERF-02 READY / NOT IMPLEMENTED — TARGET 5 SP; real writer throughput NOT CERTIFIED.
+Su gate futuro es p95 <=15 s, cero timeouts, política normal. RR01D funcional no
+merged y aceptación bloqueada. Backend RR NOT YET CERTIFIED COMPLETE; cutover real
+Company y reconciliación real Equipment NOT EXECUTED. M-HC1 OPEN.

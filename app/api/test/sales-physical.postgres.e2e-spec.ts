@@ -86,7 +86,9 @@ suite('Sales01C isolated PostgreSQL acceptance', () => {
     const url = new URL(raw);
     if (
       url.hostname !== '127.0.0.1' ||
-      url.port !== '5434' ||
+      (process.env.INVENTORY_PHYSICAL_TEST_RUN
+        ? !/^[0-9]+$/.test(url.port)
+        : url.port !== '5434') ||
       url.pathname !== '/zaping_spike_test' ||
       !/^zaping_inv01c_[0-9a-f]{12}$/.test(url.username)
     )

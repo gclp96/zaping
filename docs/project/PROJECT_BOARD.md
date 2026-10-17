@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
-Última actualización: 2026-10-09
+Última actualización: 2026-10-17
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -18,8 +18,9 @@ UNVERIFIED no es destino nuevo: acreditar Assets necesarios mediante baseline01E
 Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH.
 CaseDispatch physical confirmation: COMPLETE / MERGED — PR #92 — HC-DSP-01C TARGET 8 SP.
-HC-CASE-DISPATCH BACKEND: COMPLETE / MERGED. Return/Reconciliation: TECHNICAL DESIGN
-APPROVED / IMPLEMENTATION NOT STARTED; [TD aprobado](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+HC-CASE-DISPATCH BACKEND: COMPLETE / MERGED. Return/Reconciliation: 01A/01B/01C MERGED
+(PR #94/#95/#96); 01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED;
+BACKEND NOT YET CERTIFIED COMPLETE; [TD aprobado](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
 M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
@@ -212,7 +213,8 @@ PhysicalInventory conserva agregación defensiva inferior; no autoriza líneas D
 PostgreSQL16 nuevo aislado75/75, focal905/36 suites y API2207/123 suites PASS.
 Typecheck/noEmit focal/lint/build/Prisma validate/Prettier/diff check PASS; sin schema,
 migraciones nuevas ni generate. Custody habilitada por código Confirm; reconciliación real
-Equipment y real Company cutover NOT EXECUTED. RETURN NOT IMPLEMENTED.
+Equipment y real Company cutover NOT EXECUTED. RETURN: 01D funcional no merged;
+aceptación bloqueada, detalle vigente abajo.
 Evidencia y target aislado en [TD §17](../modules/healthcare/CASE_DISPATCH_TECHNICAL_DESIGN.md#17-hc-dsp-01c--atomic-confirm-implementado-y-probado).
 P1 abiertos: recovery/reopen de PREPARED y selector
 Assignment >100. Recovery es gate antes de uso amplio en producción; corrección/
@@ -222,7 +224,7 @@ M-HC1 permanece OPEN. Sin Forecast, Commitment, Actual ni fechas nuevas.
 HC-RETURN-RECONCILIATION — **TECHNICAL DESIGN APPROVED / MERGED — PR #93**;
 HC-RR-01A **COMPLETE / MERGED — PR #94**.
 HC-RR-01B **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
-HC-RR-01C **IMPLEMENTED / TESTED — pending human review/merge** — TARGET **5 SP**.
+HC-RR-01C **COMPLETE / MERGED — PR #96** — TARGET **5 SP**.
 [TD canónico](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md) y
 [Case Logistics §259](../modules/healthcare/CASE_LOGISTICS.md#259-hc-return-reconciliation--v1-approved-contract).
 Un HealthcareCaseReconciliation por episodio de un Dispatch CONFIRMED; Dispatch 1:N.
@@ -257,20 +259,39 @@ Validado 01C: unitarios nuevos 72/72; focal Equipment/Assignment/Dispatch 825/82
 Typecheck/noEmit focal, lint, build, Prisma validate, Prettier/check y diff check PASS.
 Carreras observadas por PIDs, pg_blocking_pids y pg_stat_activity: cierres concurrentes,
 Inspection y Retirement; rollback tras Custody/Asset/evento y prelocks multi-Asset PASS.
-Productive reconciliation close adapter **NOT IMPLEMENTED**; Reconciliation Confirm
-**NOT IMPLEMENTED**. Evidencia y target exacto en TD §18. Sin DB real.
+En la baseline merged 01C, productive reconciliation close adapter y Confirm RR
+**NOT IMPLEMENTED**; 01D funcional existe por separado, sin aceptación/merge.
+Evidencia histórica 01C y target exacto en TD §18; estado vigente en §19. Sin DB real.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
 | HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
-| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED UNTIL 01C MERGE |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B MERGED; 01C IMPLEMENTED / TESTED; 01D BLOCKED UNTIL 01C MERGE |
+| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | COMPLETE / MERGED — PR #96 |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B/01C MERGED; 01D ACCEPTANCE BLOCKED / NOT MERGED |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
-y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión humana
-y merge 01C. 01D permanece BLOCKED UNTIL 01C MERGE. Sin Forecast, Commitment, Actual ni fechas nuevos.
+y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión/merge
+PERF-01 y aceptación del writer PERF-02 antes de certificar 01D. Sin Forecast, Commitment, Actual ni fechas nuevos.
+
+HC-RR-PERF-01: **IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP**.
+HC-RR-PERF-02: **READY / NOT IMPLEMENTED — TARGET 5 SP**.
+PERF-01 resuelve escalabilidad de validación diferida, sin implementar batching del writer.
+N1000 estructural 1288.36 ms; validación explícita Dispatch + física 147.59 ms;
+una validación agregada por root/Effect. PostgreSQL final 406/406; API completa
+2460/2460 en 133 suites; typecheck/noEmit focal/lint/Prisma/formato PASS.
+La evidencia conserva un intento Confirm fallido ~20 s y un primer fallo temporal
+Equipment 32/46; repeticiones completas 76/76 y 46/46, sin debilitar código/invariantes.
+PERF-02 NOT CERTIFIED: baseline 10 runs, mediana 15.94 s, p95 muestral 18.45 s,
+7/10 >15 s, 0/10 fallos naturales sólo en esa muestra histórica; ~8137 SQL/Confirm.
+Requiere p95 <=15 s y cero timeouts bajo configuración normal, pendiente de implementación.
+01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED según delta humano;
+no se inspeccionó su otro worktree. Backend Return/Reconciliation NOT YET CERTIFIED COMPLETE.
+TARGET feature backend 23 SP permanece separado de los prerrequisitos PERF-01 (8 SP)
+y PERF-02 (5 SP); no se altera su estimación ni se declara producción completa.
+[Resultados actuales, targets, cleanup y fallos históricos](../../app/api/test/deferred-validation-results.md).
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. M-HC1 OPEN.
 
 Este documento representa el estado operativo actual del proyecto.
 

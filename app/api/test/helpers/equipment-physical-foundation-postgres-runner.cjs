@@ -230,7 +230,7 @@ async function historicalFixtures(url) {
     fs.mkdirSync(migrations);
     const names = fs
       .readdirSync(resolve(cwd, 'prisma/migrations'))
-      .filter((n) => /^\d/.test(n) && !n.startsWith('2026101500'));
+      .filter((n) => /^\d/.test(n) && n < '20261015000000');
     if (names.length !== 39)
       throw new Error('Unexpected baseline migration set');
     for (const n of names)
