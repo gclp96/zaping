@@ -312,7 +312,7 @@ export class PhysicalInventoryService {
       physicalRequestHash(request),
       lines.length,
     );
-    const evidence = [] as PhysicalResult['effect']['lines'];
+    const staged: Prisma.InventoryPhysicalEffectLineCreateManyInput[] = [];
     for (const [index, line] of lines.entries()) {
       const position =
         line.position ??
@@ -322,20 +322,19 @@ export class PhysicalInventoryService {
           ? { count: 1 }
           : await this.repository.mutatePosition(tx, position, line.delta);
       requirePhysical(result.count === 1, 'PHYSICAL_POSITION_CONFLICT');
-      evidence.push(
-        await this.repository.appendLine(tx, {
-          companyId: request.companyId,
-          effectId: header.id,
-          positionId: position.id,
-          sequence: index + 1,
-          delta: line.delta,
-          quantityBefore: position.quantity,
-          quantityAfter: position.quantity + line.delta,
-          revisionBefore: position.revision,
-          revisionAfter: position.revision + (line.delta === 0 ? 0 : 1),
-        }),
-      );
+      staged.push({
+        companyId: request.companyId,
+        effectId: header.id,
+        positionId: position.id,
+        sequence: index + 1,
+        delta: line.delta,
+        quantityBefore: position.quantity,
+        quantityAfter: position.quantity + line.delta,
+        revisionBefore: position.revision,
+        revisionAfter: position.revision + (line.delta === 0 ? 0 : 1),
+      });
     }
+    const evidence = await this.repository.appendLines(tx, staged);
     return {
       replay: false,
       effect: { ...header, lines: evidence },

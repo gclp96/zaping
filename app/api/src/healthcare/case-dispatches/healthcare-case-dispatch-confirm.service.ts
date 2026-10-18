@@ -44,6 +44,7 @@ import {
 import { ConfirmHealthcareCaseDispatchDto } from './dto/confirm-healthcare-case-dispatch.dto';
 import {
   ConfirmContext,
+  DispatchItemEvidence,
   ConfirmItem,
   ConfirmKit,
   ConfirmRoot,
@@ -215,7 +216,7 @@ export class HealthcareCaseDispatchConfirmService {
           };
           parseDispatchRootSnapshot(rootSnapshot);
           const audit = await this.repo.audit(tx, c, root.revision, at);
-          await this.transferQuantity(tx, c, root, snapshots);
+          const evidence = await this.transferQuantity(tx, c, root, snapshots);
           for (const item of root.items
             .filter((i) => i.lifecycle === 'ACTIVE' && i.type === 'EQUIPMENT')
             .sort((a, b) => a.assetId!.localeCompare(b.assetId!))) {
@@ -238,12 +239,12 @@ export class HealthcareCaseDispatchConfirmService {
             });
             if (result.outcome !== 'OPENED')
               throw healthcarePersistenceException();
-            this.requireOne(
-              await this.repo.itemEvidence(tx, c, item.id, {
-                equipmentCustodyId: result.custody.id,
-                equipmentPhysicalEventId: result.event.id,
-              }),
-            );
+            evidence.push({
+              id: item.id,
+              type: 'EQUIPMENT',
+              equipmentCustodyId: result.custody.id,
+              equipmentPhysicalEventId: result.event.id,
+            });
             snapshots.get(item.id)!.handoff = {
               ...this.emptyHandoff(),
               assignmentId: item.assignmentId,
@@ -257,13 +258,20 @@ export class HealthcareCaseDispatchConfirmService {
               locationBefore: item.asset!.physicalLocation,
             };
           }
+          await this.repo.itemEvidenceBulk(tx, c, evidence);
           for (const item of root.items) {
             const snapshot = snapshots.get(item.id)!;
             parseDispatchItemSnapshot(snapshot);
-            this.requireOne(
-              await this.repo.itemSnapshot(tx, c, item.id, json(snapshot)),
-            );
           }
+          await this.repo.itemSnapshotsBulk(
+            tx,
+            c,
+            root.items.map((item) => ({
+              id: item.id,
+              lifecycle: item.lifecycle,
+              snapshot: snapshots.get(item.id)!,
+            })),
+          );
           this.requireOne(
             await this.repo.finalize(
               tx,
@@ -477,7 +485,8 @@ export class HealthcareCaseDispatchConfirmService {
     const material = root.items.filter(
       (i) => i.lifecycle === 'ACTIVE' && i.type === 'MATERIAL',
     );
-    if (!material.length) return;
+    const evidence: DispatchItemEvidence[] = [];
+    if (!material.length) return evidence;
     const result = await this.physical.transfer(
       tx,
       {
@@ -526,12 +535,12 @@ export class HealthcareCaseDispatchConfirmService {
         )
       )
         throw healthcarePersistenceException();
-      this.requireOne(
-        await this.repo.itemEvidence(tx, c, item.id, {
-          destinationPositionId: target.id,
-          physicalEffectId: result.effect.id,
-        }),
-      );
+      evidence.push({
+        id: item.id,
+        type: 'MATERIAL',
+        destinationPositionId: target.id,
+        physicalEffectId: result.effect.id,
+      });
       snapshots.get(item.id)!.handoff = {
         ...this.emptyHandoff(),
         quantity: item.quantity,
@@ -541,6 +550,7 @@ export class HealthcareCaseDispatchConfirmService {
         physicalEffectId: result.effect.id,
       };
     }
+    return evidence;
   }
   private emptyHandoff(): DispatchItemHandoff {
     return {

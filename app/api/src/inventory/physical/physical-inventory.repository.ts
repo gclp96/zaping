@@ -10,6 +10,7 @@ import {
   PhysicalRequest,
   PositionKey,
   isPhysicalUniqueViolation,
+  requirePhysical,
 } from './physical-inventory.contract';
 
 @Injectable()
@@ -149,6 +150,52 @@ export class PhysicalInventoryRepository {
       },
       data: { quantity: { increment: delta }, revision: { increment: 1 } },
     });
+  }
+
+  // Keep Position CAS separate. Prisma generates real IDs and RETURNING supplies
+  // persisted evidence; never infer identities from INSERT return order.
+  async appendLines(
+    tx: Prisma.TransactionClient,
+    data: Prisma.InventoryPhysicalEffectLineCreateManyInput[],
+  ) {
+    requirePhysical(data.length > 0);
+    const first = data[0];
+    requirePhysical(
+      new Set(data.map((l) => l.positionId)).size === data.length,
+    );
+    requirePhysical(
+      data.every(
+        (l, i) =>
+          l.companyId === first.companyId &&
+          l.effectId === first.effectId &&
+          l.sequence === i + 1 &&
+          l.id === undefined,
+      ),
+    );
+    const persisted: Awaited<
+      ReturnType<typeof tx.inventoryPhysicalEffectLine.createManyAndReturn>
+    > = [];
+    for (let offset = 0; offset < data.length; offset += 250) {
+      const chunk = data.slice(offset, offset + 250);
+      const rows = await tx.inventoryPhysicalEffectLine.createManyAndReturn({
+        data: chunk,
+      });
+      requirePhysical(rows.length === chunk.length);
+      const bySequence = new Map(rows.map((l) => [l.sequence, l]));
+      requirePhysical(bySequence.size === chunk.length);
+      for (const expected of chunk) {
+        const row = bySequence.get(expected.sequence);
+        requirePhysical(
+          row &&
+            Object.entries(expected).every(
+              ([key, value]) => Reflect.get(row, key) === value,
+            ),
+        );
+        persisted.push(row);
+      }
+    }
+    requirePhysical(new Set(persisted.map((l) => l.id)).size === data.length);
+    return persisted;
   }
 
   appendLine(

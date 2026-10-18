@@ -268,29 +268,31 @@ Evidencia histórica 01C y target exacto en TD §18; estado vigente en §19. Sin
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
 | HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | COMPLETE / MERGED — PR #96 |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B/01C MERGED; 01D ACCEPTANCE BLOCKED / NOT MERGED |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE / NOT MERGED |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B/01C MERGED; 01D ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE / NOT MERGED |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
 y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión/merge
-PERF-01 y aceptación del writer PERF-02 antes de certificar 01D. Sin Forecast, Commitment, Actual ni fechas nuevos.
+PERF-02 y aceptación propia de 01D antes de certificar el backend RR. Sin Forecast, Commitment, Actual ni fechas nuevos.
 
-HC-RR-PERF-01: **IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP**.
-HC-RR-PERF-02: **READY / NOT IMPLEMENTED — TARGET 5 SP**.
-PERF-01 resuelve escalabilidad de validación diferida, sin implementar batching del writer.
-N1000 estructural 1288.36 ms; validación explícita Dispatch + física 147.59 ms;
-una validación agregada por root/Effect. PostgreSQL final 406/406; API completa
-2460/2460 en 133 suites; typecheck/noEmit focal/lint/Prisma/formato PASS.
-La evidencia conserva un intento Confirm fallido ~20 s y un primer fallo temporal
-Equipment 32/46; repeticiones completas 76/76 y 46/46, sin debilitar código/invariantes.
-PERF-02 NOT CERTIFIED: baseline 10 runs, mediana 15.94 s, p95 muestral 18.45 s,
-7/10 >15 s, 0/10 fallos naturales sólo en esa muestra histórica; ~8137 SQL/Confirm.
-Requiere p95 <=15 s y cero timeouts bajo configuración normal, pendiente de implementación.
-01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED según delta humano;
-no se inspeccionó su otro worktree. Backend Return/Reconciliation NOT YET CERTIFIED COMPLETE.
-TARGET feature backend 23 SP permanece separado de los prerrequisitos PERF-01 (8 SP)
-y PERF-02 (5 SP); no se altera su estimación ni se declara producción completa.
-[Resultados actuales, targets, cleanup y fallos históricos](../../app/api/test/deferred-validation-results.md).
+HC-RR-PERF-01: **COMPLETE / MERGED — PR #97 — TARGET 8 SP**.
+HC-RR-PERF-02: **IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 5 SP**.
+N1000 real Confirm: 30 ejecuciones normales, mediana 6.324 s, p90 7.486 s,
+p95 nearest-rank 7.922 s, máximo 8.519 s; cero fallos/timeouts. Gate PASS.
+SQL por Confirm: ~8137 → 3157 (-61.2%); Transfer 3019, proyección 6,
+evidencia 4, snapshots 4, resto 124. Baseline histórica: mediana 15.94 s,
+p95 18.45 s, 7/10 >15 s, cero fallos naturales sólo en esa muestra READ.
+Lotes <=250; Position CAS, locks, hashes, timeouts, schema y migraciones intactos.
+Prelocks canónicos existentes antes de UPDATE Batch; cardinalidad/identidades
+exactas y rollback completo, incluidos fallos en chunks posteriores.
+PostgreSQL funcional 360/360; benchmark aparte 30/30, exclusiones no cuentan PASS.
+API completa 2473/2473 (134 suites); typecheck/noEmit focal/lint/build/Prisma/formato PASS.
+HC-RR-01D: **IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE /
+NOT MERGED — TARGET 8 SP**. Requiere sync de baseline y aceptación/merge propios.
+01A/01B/01C COMPLETE / MERGED — PR #94/#95/#96. Backend RR NOT YET CERTIFIED COMPLETE.
+Backend feature TARGET 23 SP separado de PERF-01 (8 SP) y PERF-02 (5 SP).
+Sin Forecast, Commitment, Actual ni fechas nuevos.
+[Evidencia actual, límites, targets y cleanup](../../app/api/test/physical-writer-throughput-results.md).
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. M-HC1 OPEN.
 
 Este documento representa el estado operativo actual del proyecto.

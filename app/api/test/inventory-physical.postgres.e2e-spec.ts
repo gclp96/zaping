@@ -504,6 +504,61 @@ describeDb('Inventory physical authority isolated PostgreSQL', () => {
     ).toBe('INV01A fixture');
   });
 
+  it('PERF-02 later EffectLine chunk failure rolls back earlier chunks and every Position CAS', async () => {
+    const seedData = await seed(251);
+    const failing = new PhysicalInventoryRepository();
+    jest.spyOn(failing, 'appendLines').mockImplementation((client, rows) => {
+      expect(rows.length).toBe(252);
+      return repo.appendLines(
+        client,
+        rows.map((row, index) =>
+          index === 250
+            ? { ...row, quantityAfter: row.quantityAfter + 1 }
+            : row,
+        ),
+      );
+    });
+    const origin = {
+      type: 'PERF02_CHUNK',
+      id: randomUUID(),
+      operation: 'TRANSFER',
+    };
+    await expect(
+      tx((client) =>
+        new PhysicalInventoryService(failing).transfer(
+          client,
+          { companyId, actorId, origin },
+          Array.from({ length: 251 }, () => ({
+            sourceId: seedData.positionId,
+            quantity: 1,
+            target: {
+              ...available(seedData.productId),
+              state: 'CUSTODY' as const,
+              contextType: 'PERF02',
+              contextId: randomUUID(),
+            },
+          })),
+        ),
+      ),
+    ).rejects.toThrow();
+    expect(
+      await db.inventoryPhysicalEffect.findFirst({
+        where: { companyId, originId: origin.id },
+      }),
+    ).toBeNull();
+    expect(
+      await db.inventoryPosition.findMany({
+        where: { companyId, productId: seedData.productId },
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: seedData.positionId,
+        quantity: 251,
+        revision: 1,
+      }),
+    ]);
+  });
+
   async function rootRace(first: PhysicalRequest, second: PhysicalRequest) {
     const entered = gate();
     const release = gate();

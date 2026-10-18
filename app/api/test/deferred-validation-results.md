@@ -1,3 +1,7 @@
+> Historical PERF-01 evidence, COMPLETE / MERGED — PR #97. The pending-review
+> status below records its pre-merge acceptance. Current writer optimization and
+> project status: [PERF-02 acceptance](physical-writer-throughput-results.md).
+
 # HC-RR-PERF-01 — final acceptance delta (2026-10-17)
 
 HC-RR-PERF-01: **IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP**.
