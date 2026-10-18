@@ -309,6 +309,155 @@ describeDb('Inventory physical authority isolated PostgreSQL', () => {
       }),
     ).rejects.toMatchObject({ code: 'PHYSICAL_EFFECT_MISMATCH' });
   });
+  it.each([
+    'missing',
+    'company',
+    'product',
+    'duplicate',
+    'underflow',
+    'overflow',
+  ] as const)(
+    'PERF-02 Batch bulk %s rejects and rolls back all affected rows',
+    async (kind) => {
+      const id = await product(),
+        a = await batch(id),
+        b = await batch(id);
+      const first = { id: a.id, productId: id, delta: 1 };
+      const second = {
+        id: kind === 'missing' ? randomUUID() : b.id,
+        productId: kind === 'product' ? randomUUID() : id,
+        delta: kind === 'underflow' ? -1 : kind === 'overflow' ? 2147483647 : 1,
+      };
+      if (kind === 'overflow')
+        await db.inventoryBatch.update({
+          where: { id: b.id },
+          data: { availableQuantity: 1 },
+        });
+      const before = await db.inventoryBatch.findMany({
+        where: { id: { in: [a.id, b.id] } },
+        orderBy: { id: 'asc' },
+      });
+      await expect(
+        tx(async (c) => {
+          await repo.lockProducts(c, companyId, [id]);
+          await repo.lockBatches(c, companyId, [a.id, b.id].sort());
+          await projection.applyBatchDeltas(
+            c,
+            kind === 'company' ? foreignId : companyId,
+            [first, kind === 'duplicate' ? first : second],
+          );
+        }),
+      ).rejects.toThrow();
+      expect(
+        await db.inventoryBatch.findMany({
+          where: { id: { in: [a.id, b.id] } },
+          orderBy: { id: 'asc' },
+        }),
+      ).toEqual(before);
+    },
+  );
+  it('PERF-02 CUSTODY to AVAILABLE restores Batch availability without owned stock credit', async () => {
+    const f = await opening(5, true);
+    const forward = await tx(async (c) => {
+      const r = await service.transfer(
+        c,
+        {
+          companyId,
+          actorId,
+          origin: { type: 'PERF02', id: randomUUID(), operation: 'FORWARD' },
+        },
+        [
+          {
+            sourceId: f.positionId,
+            quantity: 2,
+            target: {
+              productId: f.id,
+              inventoryBatchId: f.b!.id,
+              state: 'CUSTODY',
+              contextType: 'PERF02',
+              contextId: randomUUID(),
+            },
+          },
+        ],
+      );
+      await projection.apply(c, companyId, r);
+      return r;
+    });
+    const source = forward.effect.lines.find((l) => l.delta > 0)!;
+    const origin = { type: 'PERF02', id: randomUUID(), operation: 'RETURN' };
+    for (let i = 0; i < 2; i++)
+      await tx(async (c) => {
+        const r = await service.transfer(c, { companyId, actorId, origin }, [
+          {
+            sourceId: source.positionId,
+            expectedSourceRevision: 1,
+            quantity: 2,
+            target: {
+              productId: f.id,
+              inventoryBatchId: f.b!.id,
+              state: 'AVAILABLE',
+              contextType: null,
+              contextId: null,
+            },
+          },
+        ]);
+        expect(r.replay).toBe(i === 1);
+        await projection.apply(c, companyId, r);
+      });
+    expect(await db.product.findUnique({ where: { id: f.id } })).toMatchObject({
+      stock: 5,
+    });
+    expect(
+      await db.inventoryBatch.findUnique({ where: { id: f.b!.id } }),
+    ).toMatchObject({ availableQuantity: 5 });
+  });
+  it('PERF-02 competing Batch writers block on canonical prelocks then recheck quantity bounds', async () => {
+    const f = await opening(5, true);
+    const held = gate(),
+      release = gate(),
+      started = gate();
+    let firstPid = 0,
+      secondPid = 0;
+    const write = async (c: Prisma.TransactionClient) => {
+      await repo.lockProducts(c, companyId, [f.id]);
+      await repo.lockBatches(c, companyId, [f.b!.id]);
+      await projection.applyBatchDeltas(c, companyId, [
+        { id: f.b!.id, productId: f.id, delta: -3 },
+      ]);
+    };
+    const a = tx(async (c) => {
+      firstPid = (
+        await c.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`
+      )[0].pid;
+      await write(c);
+      held.release();
+      await release.wait;
+    });
+    await held.wait;
+    const b = tx(async (c) => {
+      secondPid = (
+        await c.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`
+      )[0].pid;
+      started.release();
+      await write(c);
+    });
+    const settled = Promise.allSettled([a, b]);
+    try {
+      await started.wait;
+      expect(firstPid).not.toBe(secondPid);
+      await waitForBlock(secondPid);
+    } finally {
+      release.release();
+    }
+    const outcomes = await settled;
+    expect(outcomes.map((r) => r.status)).toEqual(['fulfilled', 'rejected']);
+    expect(
+      await db.inventoryBatch.findUnique({ where: { id: f.b!.id } }),
+    ).toMatchObject({ availableQuantity: 2 });
+    expect(await db.product.findUnique({ where: { id: f.id } })).toMatchObject({
+      stock: 5,
+    });
+  });
   it('transfer preserves owned and custody OUT does not reduce batch AVAILABLE', async () => {
     const s = await opening(5, true);
     const moved = await tx(async (c) => {

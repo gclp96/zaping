@@ -4,7 +4,7 @@ TECHNICAL DESIGN: **APPROVED**.
 HC-RR-01A: **COMPLETE / MERGED — PR #94**.
 HC-RR-01B: **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
 HC-RR-01C: **COMPLETE / MERGED — PR #96** — TARGET **5 SP**.
-HC-RR-01D: **IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED** — TARGET **8 SP**.
+HC-RR-01D: **IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE / NOT MERGED** — TARGET **8 SP**.
 
 Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
 Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
@@ -17,9 +17,9 @@ interna de cierre Equipment están implementados; CONFIRM y su adapter productiv
 siguen pendientes en la baseline merged de este worktree. El registry productivo
 de cierre permanece vacío/fail-closed aquí. El estado funcional no merged de 01D
 se registra por el delta humano; no se inspeccionó el worktree separado.
-HC-RR-PERF-01: IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 8 SP.
-HC-RR-PERF-02: READY / NOT IMPLEMENTED — TARGET 5 SP.
-Return/Reconciliation backend: NOT YET CERTIFIED COMPLETE. Estado vigente en §19.
+HC-RR-PERF-01: COMPLETE / MERGED — PR #97 — TARGET 8 SP.
+HC-RR-PERF-02: IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 5 SP.
+Return/Reconciliation backend: NOT YET CERTIFIED COMPLETE. Estado vigente en el addendum PERF-02 al final.
 
 ## 1. Estado, dependencias y alcance
 
@@ -593,3 +593,48 @@ integrar evaluación explícita Line→Effect→RR/idempotency/custody al final 
 bajo statement_timeout, y repetir aceptación propia; detalle exacto en evidencia.
 PERF-02 y aceptación de 01D siguen pendientes. BACKEND NOT YET CERTIFIED COMPLETE.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN.
+
+## HC-RR-PERF-02 — aceptación de throughput 2026-10-17
+
+HC-RR-PERF-01 COMPLETE / MERGED — PR #97. HC-RR-PERF-02 IMPLEMENTED / TESTED —
+PENDING HUMAN REVIEW / MERGE — TARGET 5 SP. Este addendum actualiza los estados
+pre-implementación de PERF-02 conservados en la evidencia histórica de PERF-01.
+
+Se optimizan exactamente tres áreas: INSERT de EffectLines con createManyAndReturn,
+evidencia/snapshots Dispatch con VALUES/UPDATE/RETURNING tipados y proyección Batch
+con UPDATE FROM guardado. Lotes <=250, valores parametrizados, unicidad de inputs,
+cardinalidad e identidades exactas; nunca skipDuplicates. IDs de Lines persistidos
+reconstruidos por sequence, sin depender del orden SQL. Snapshots completos ACTIVE
+y EXCLUDED, version dentro del JSON; sin nueva columna ni fallback. Root DRAFT,
+tenant/type/lifecycle y referencias guardados; sin sobrescritura ni writes terminales.
+
+Los Products/Batches de sources y targets están prelocked en orden canónico antes
+de Positions. El bulk Batch sólo vuelve a tocar filas ya retenidas; el planner no
+elige un nuevo orden de locks. Mantiene Product.stock ownership y Batch.available,
+bounds atómicos, null-batch y updatedAt. Transfer AVAILABLE↔CUSTODY no cambia owned;
+OUT desde CUSTODY reduce owned sin debitar AVAILABLE. Position CAS permanece idéntico.
+Los fallos de cardinalidad/chunk posterior revierten toda la transacción del caller.
+Constraints explícitas PERF-01 permanecen al final, después de todo el staging.
+
+N1000 real: 30/30, primera ejecución incluida, sin warm-up descartado ni suites
+concurrentes. Mediana 6.324 s; p90 7.486 s; p95 nearest-rank 7.922 s; max 8.519 s;
+cero fallos y cero timeouts. Gate p95 <=15 s PASS; mediana deseada <12 s PASS.
+Baseline READ: mediana 15.94 s, p95 18.45 s, ~8137 SQL. Optimizado: 3157 SQL
+(Transfer 3019, proyección 6, evidencia 4, snapshots 4, resto 124), -61.2%.
+Time limits intactos: Company 2500 / lock 1500 / statement 4000 / maxWait 3000 /
+transacción Prisma 20000 ms. Sin schema/migraciones ni cambios a triggers PERF-01.
+
+PostgreSQL funcional 360/360; benchmark aparte 30/30. Confirm final 90/90, físico
+27/27 + matriz 37/37, Receipt/Manual/Count/Batch 38/38, Sales 12/12, Dispatch
+persistence 59/59, RR structural 44/44, OPENING 43/43, PERF-01 10/10.
+Concurrencia por PIDs/bloqueo observable, replay y rollback PASS; API completa
+2473/2473 (134 suites), typecheck/noEmit focal/lint/build/Prisma/formato PASS.
+Equipment standalone PostgreSQL no repetido: código intacto; Confirm Equipment/MIXED
+y unidades Equipment del full API cubiertos. Web no ejecutado: sin contrato consumido.
+[Evidencia completa, fases, límites, targets y cleanup](../../../app/api/test/physical-writer-throughput-results.md).
+
+HC-RR-01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE /
+NOT MERGED — TARGET 8 SP. Worktree separado sin inspección/modificación aquí.
+Tras merge requiere integrar baseline y completar aceptación propia; no se declara
+01D COMPLETE. Backend Return/Reconciliation NOT YET CERTIFIED COMPLETE.
+Real Company cutover y real Equipment reconciliation NOT EXECUTED. M-HC1 OPEN.

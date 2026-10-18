@@ -166,8 +166,8 @@ describe('physical inventory composition and activation', () => {
             Parameters<PhysicalInventoryRepository['mutatePosition']>
           >()
           .mockResolvedValue({ count: 1 }),
-        appendLine: jest.fn((_tx: unknown, line: object) =>
-          Promise.resolve(line),
+        appendLines: jest.fn((_tx: unknown, lines: object[]) =>
+          Promise.resolve(lines),
         ),
       };
       const tx = {

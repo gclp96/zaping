@@ -51,6 +51,24 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
   ] as const;
   const runtimeEnv = runtimeKeys.map((k) => process.env[k]);
   const policy = healthcareCompanyTransactionTimeoutConfiguration();
+  const benchmarkRuns =
+    process.env.RUN_WRITER_THROUGHPUT === '1'
+      ? Number(process.env.WRITER_THROUGHPUT_RUNS ?? 30)
+      : 0;
+  if (
+    process.env.RUN_WRITER_THROUGHPUT === '1' &&
+    (!Number.isInteger(benchmarkRuns) ||
+      benchmarkRuns < 10 ||
+      benchmarkRuns > 30)
+  )
+    throw Error('Writer benchmark requires 10..30 normal executions');
+  let sqlCounts: Record<string, number> | null = null;
+  let sqlPhase = 'other';
+  const measuredRuns: {
+    ms: number;
+    failed: boolean;
+    counts: Record<string, number>;
+  }[] = [];
   beforeAll(async () => {
     const url = new URL(process.env.CASE_DISPATCH_CONFIRM_TEST_DATABASE_URL!);
     if (
@@ -63,7 +81,14 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
     const client = (name: string) => {
       const u = new URL(url);
       u.searchParams.set('application_name', name);
-      return new PrismaClient({ datasources: { db: { url: u.toString() } } });
+      const instance = new PrismaClient({
+        datasources: { db: { url: u.toString() } },
+        log: [{ emit: 'event', level: 'query' }],
+      });
+      instance.$on('query', () => {
+        if (sqlCounts) sqlCounts[sqlPhase] = (sqlCounts[sqlPhase] ?? 0) + 1;
+      });
+      return instance;
     };
     db = client('confirm-observer');
     one = client('confirm-a');
@@ -94,6 +119,32 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
       one?.$disconnect(),
       two?.$disconnect(),
     ]);
+    if (benchmarkRuns) {
+      const times = measuredRuns.map((r) => r.ms).sort((a, b) => a - b);
+      const rank = (p: number) => times[Math.ceil(times.length * p) - 1];
+      const failures = measuredRuns.filter((r) => r.failed).length;
+      console.log(
+        'HC-RR-PERF-02 distribution ' +
+          JSON.stringify({
+            runs: measuredRuns.length,
+            medianMs:
+              (times[Math.floor((times.length - 1) / 2)] +
+                times[Math.floor(times.length / 2)]) /
+              2,
+            p90Ms: rank(0.9),
+            p95Ms: rank(0.95),
+            maxMs: times[times.length - 1],
+            failures,
+            timeoutCount: measuredRuns.filter(
+              (r) => r.failed && r.ms >= policy.prismaTransactionTimeoutMs,
+            ).length,
+            sqlCounts: measuredRuns.map((r) => r.counts),
+          }),
+      );
+      expect(measuredRuns).toHaveLength(benchmarkRuns);
+      expect(failures).toBe(0);
+      expect(rank(0.95)).toBeLessThanOrEqual(15000);
+    }
   });
   function services(client = db) {
     const reads = new HealthcareCaseDispatchesRepository(
@@ -1511,11 +1562,11 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
       } else if (point === 'evidence') {
         const original = (
           ...args: Parameters<
-            HealthcareCaseDispatchConfirmRepository['itemEvidence']
+            HealthcareCaseDispatchConfirmRepository['itemEvidenceBulk']
           >
-        ) => services().repo.itemEvidence(...args);
+        ) => services().repo.itemEvidenceBulk(...args);
         jest
-          .spyOn(s.repo, 'itemEvidence')
+          .spyOn(s.repo, 'itemEvidenceBulk')
           .mockImplementation(async (...args) => {
             const r = await original(...args);
             fail();
@@ -1524,11 +1575,11 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
       } else if (point === 'snapshot') {
         const original = (
           ...args: Parameters<
-            HealthcareCaseDispatchConfirmRepository['itemSnapshot']
+            HealthcareCaseDispatchConfirmRepository['itemSnapshotsBulk']
           >
-        ) => services().repo.itemSnapshot(...args);
+        ) => services().repo.itemSnapshotsBulk(...args);
         jest
-          .spyOn(s.repo, 'itemSnapshot')
+          .spyOn(s.repo, 'itemSnapshotsBulk')
           .mockImplementation(async (...args) => {
             const r = await original(...args);
             fail();
@@ -1851,8 +1902,202 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
       ).toMatchObject({ quantity: kind === 'Sales' ? 15 : 19, revision: 2 });
     },
   );
-  it.each([1000, 1001])(
-    '45 %i distinct material Positions preserve Confirm boundary',
+  it.each([
+    'duplicate',
+    'missing',
+    'company',
+    'root',
+    'reference',
+    'overwrite',
+  ] as const)(
+    'PERF-02 bulk evidence %s rejects with atomic rollback',
+    async (scenario) => {
+      const f = await fixture('MIXED', 'PHYSICAL', true);
+      const before = await state(f),
+        s = services();
+      const original = (
+        ...args: Parameters<
+          HealthcareCaseDispatchConfirmRepository['itemEvidenceBulk']
+        >
+      ) => services().repo.itemEvidenceBulk(...args);
+      jest
+        .spyOn(s.repo, 'itemEvidenceBulk')
+        .mockImplementation(async (tx, c, rows) => {
+          if (scenario === 'overwrite') {
+            await original(tx, c, rows);
+            return original(tx, c, rows);
+          }
+          const changed =
+            scenario === 'duplicate'
+              ? [...rows, rows[0]]
+              : scenario === 'missing'
+                ? rows.map((r, index) =>
+                    index === rows.length - 1 ? { ...r, id: randomUUID() } : r,
+                  )
+                : scenario === 'reference'
+                  ? rows.map((r) =>
+                      r.type === 'MATERIAL'
+                        ? { ...r, destinationPositionId: randomUUID() }
+                        : r,
+                    )
+                  : rows;
+          return original(
+            tx,
+            {
+              ...c,
+              companyId: scenario === 'company' ? randomUUID() : c.companyId,
+              dispatchId: scenario === 'root' ? randomUUID() : c.dispatchId,
+            },
+            changed,
+          );
+        });
+      await expect(confirm(f, s)).rejects.toThrow();
+      expect(await state(f)).toEqual(before);
+    },
+  );
+  it.each([
+    'duplicate',
+    'missing',
+    'company',
+    'lifecycle',
+    'overwrite',
+  ] as const)(
+    'PERF-02 bulk snapshot %s rejects with atomic rollback',
+    async (scenario) => {
+      const f = await fixture('MIXED', 'PHYSICAL', true);
+      const before = await state(f),
+        s = services();
+      const original = (
+        ...args: Parameters<
+          HealthcareCaseDispatchConfirmRepository['itemSnapshotsBulk']
+        >
+      ) => services().repo.itemSnapshotsBulk(...args);
+      jest
+        .spyOn(s.repo, 'itemSnapshotsBulk')
+        .mockImplementation(async (tx, c, rows) => {
+          if (scenario === 'overwrite') {
+            await original(tx, c, rows);
+            return original(tx, c, rows);
+          }
+          const changed =
+            scenario === 'duplicate'
+              ? [...rows, rows[0]]
+              : rows.map((r) => ({
+                  ...r,
+                  id:
+                    scenario === 'missing' && r.id === rows[rows.length - 1].id
+                      ? randomUUID()
+                      : r.id,
+                  lifecycle:
+                    scenario === 'lifecycle'
+                      ? ('EXCLUDED' as const)
+                      : r.lifecycle,
+                }));
+          return original(
+            tx,
+            {
+              ...c,
+              companyId: scenario === 'company' ? randomUUID() : c.companyId,
+            },
+            changed,
+          );
+        });
+      await expect(confirm(f, s)).rejects.toThrow();
+      expect(await state(f)).toEqual(before);
+    },
+  );
+  it('PERF-02 terminal bulk snapshot and evidence writes reject without mutation', async () => {
+    const f = await fixture('MIXED', 'PHYSICAL', true);
+    const s = services();
+    await confirm(f, s);
+    const before = await state(f);
+    const root = await s.repo.root(db, f.c);
+    const item = root!.items[0];
+    await expect(
+      db.$transaction((tx) =>
+        s.repo.itemEvidenceBulk(tx, f.c, [
+          {
+            id: item.id,
+            type: 'MATERIAL',
+            destinationPositionId: item.destinationPositionId!,
+            physicalEffectId: item.physicalEffectId!,
+          },
+        ]),
+      ),
+    ).rejects.toThrow();
+    await expect(
+      db.$transaction((tx) =>
+        s.repo.itemSnapshotsBulk(tx, f.c, [
+          {
+            id: item.id,
+            lifecycle: item.lifecycle,
+            snapshot:
+              item.snapshot as unknown as import('../src/healthcare/case-dispatches/healthcare-case-dispatch.types').DispatchItemSnapshot,
+          },
+        ]),
+      ),
+    ).rejects.toThrow();
+    expect(await state(f)).toEqual(before);
+  });
+  it.each(['ACTIVE', 'EXCLUDED'] as const)(
+    'PERF-02 exact snapshot JSON survives bulk write for %s items',
+    async (lifecycle) => {
+      const f = await fixture('MIXED', 'PHYSICAL', true),
+        s = services();
+      const material = await db.healthcareCaseDispatchItem.findFirstOrThrow({
+        where: { dispatchId: f.c.dispatchId, type: 'MATERIAL' },
+      });
+      if (lifecycle === 'EXCLUDED') {
+        await s.draft.execute(
+          { ...f.c, itemId: material.id, key: randomUUID() },
+          {
+            operation: 'ITEM_EXCLUDE',
+            dto: { expectedRevision: f.revision, reason: 'Not handed off' },
+          },
+        );
+        f.revision++;
+        const before = await state(f);
+        await expect(
+          db.$transaction((tx) =>
+            s.repo.itemEvidenceBulk(tx, f.c, [
+              {
+                id: material.id,
+                type: 'MATERIAL',
+                destinationPositionId: randomUUID(),
+                physicalEffectId: randomUUID(),
+              },
+            ]),
+          ),
+        ).rejects.toThrow();
+        expect(await state(f)).toEqual(before);
+      }
+      const writes: import('../src/healthcare/case-dispatches/healthcare-case-dispatch-confirm.repository').DispatchItemSnapshotWrite[] =
+        [];
+      jest.spyOn(s.repo, 'itemSnapshotsBulk').mockImplementation((...args) => {
+        writes.push(...args[2]);
+        return services().repo.itemSnapshotsBulk(...args);
+      });
+      await confirm(f, s);
+      await assertConfirmed(f);
+      const items = await db.healthcareCaseDispatchItem.findMany({
+        where: { dispatchId: f.c.dispatchId },
+      });
+      expect(writes).toHaveLength(items.length);
+      for (const row of writes)
+        expect(items.find((i) => i.id === row.id)!.snapshot).toEqual(
+          row.snapshot,
+        );
+      expect(items.find((i) => i.id === material.id)!.lifecycle).toBe(
+        lifecycle,
+      );
+    },
+  );
+  it.each(
+    benchmarkRuns
+      ? Array.from({ length: benchmarkRuns }, () => 1000)
+      : [1000, 1001],
+  )(
+    '45 %i distinct material Positions preserve Confirm boundary [sample %#]',
     async (count) => {
       const fixtureAt = performance.now();
       const f = await fixture('MATERIAL', 'PHYSICAL', true, 1010, 1);
@@ -1901,6 +2146,8 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
           action: () => Promise<T>,
         ): Promise<T> {
           const at = performance.now();
+          const previousPhase = sqlPhase;
+          sqlPhase = name;
           try {
             return await action();
           } finally {
@@ -1908,6 +2155,7 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
             phase.calls++;
             phase.ms += performance.now() - at;
             phases[name] = phase;
+            sqlPhase = previousPhase;
           }
         }
         const original_physicalTransfer = Reflect.get(s.physical, 'transfer');
@@ -1937,20 +2185,26 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
               Reflect.apply(original_materialConsumed, s.repo, args),
             ),
           );
-        const original_itemEvidence = Reflect.get(s.repo, 'itemEvidence');
+        const original_itemEvidenceBulk = Reflect.get(
+          s.repo,
+          'itemEvidenceBulk',
+        );
         jest
-          .spyOn(s.repo, 'itemEvidence')
+          .spyOn(s.repo, 'itemEvidenceBulk')
           .mockImplementation((...args) =>
-            measured('itemEvidence', () =>
-              Reflect.apply(original_itemEvidence, s.repo, args),
+            measured('itemEvidenceBulk', () =>
+              Reflect.apply(original_itemEvidenceBulk, s.repo, args),
             ),
           );
-        const original_itemSnapshot = Reflect.get(s.repo, 'itemSnapshot');
+        const original_itemSnapshotsBulk = Reflect.get(
+          s.repo,
+          'itemSnapshotsBulk',
+        );
         jest
-          .spyOn(s.repo, 'itemSnapshot')
+          .spyOn(s.repo, 'itemSnapshotsBulk')
           .mockImplementation((...args) =>
-            measured('itemSnapshot', () =>
-              Reflect.apply(original_itemSnapshot, s.repo, args),
+            measured('itemSnapshotsBulk', () =>
+              Reflect.apply(original_itemSnapshotsBulk, s.repo, args),
             ),
           );
         const original_lockPhysical = Reflect.get(s.repo, 'lockPhysical');
@@ -1984,12 +2238,19 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
               p,
             ]),
           );
+        sqlCounts = {};
         const confirmAt = performance.now();
         try {
           await confirm(f, s);
         } catch (error) {
+          measuredRuns.push({
+            ms: performance.now() - confirmAt,
+            failed: true,
+            counts: { ...sqlCounts },
+          });
+          sqlCounts = null;
           console.log(
-            'HC-RR-PERF-02 baseline (throughput NOT CERTIFIED) production Confirm failure ' +
+            'HC-RR-PERF-02 measured production Confirm failure ' +
               JSON.stringify({
                 n: count,
                 elapsedMs: performance.now() - confirmAt,
@@ -1999,12 +2260,17 @@ suite('HC-DSP-01C isolated PostgreSQL16 acceptance', () => {
           throw error;
         }
         const confirmMs = performance.now() - confirmAt;
+        const counts = { ...sqlCounts };
+        sqlCounts = null;
+        measuredRuns.push({ ms: confirmMs, failed: false, counts });
         console.log(
-          'HC-RR-PERF-02 baseline (throughput NOT CERTIFIED) production Confirm ' +
+          'HC-RR-PERF-02 measured production Confirm ' +
             JSON.stringify({
               n: count,
               confirmMs,
               phases,
+              counts,
+              sqlCommands: Object.values(counts).reduce((a, b) => a + b, 0),
               fixtureAndConfirmMs: performance.now() - fixtureAt,
             }),
         );

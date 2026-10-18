@@ -1,3 +1,5 @@
+import { healthcarePersistenceException } from '../common/healthcare-errors';
+import { DispatchItemSnapshot } from './healthcare-case-dispatch.types';
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -9,6 +11,23 @@ import { PhysicalInventoryRepository } from '../../inventory/physical/physical-i
 import { PositionKey } from '../../inventory/physical/physical-inventory.contract';
 
 export type ConfirmContext = DispatchCommandContext & { dispatchId: string };
+export type DispatchItemEvidence = { id: string } & (
+  | {
+      type: 'MATERIAL';
+      destinationPositionId: string;
+      physicalEffectId: string;
+    }
+  | {
+      type: 'EQUIPMENT';
+      equipmentCustodyId: string;
+      equipmentPhysicalEventId: string;
+    }
+);
+export type DispatchItemSnapshotWrite = {
+  id: string;
+  lifecycle: 'ACTIVE' | 'EXCLUDED';
+  snapshot: DispatchItemSnapshot;
+};
 type Tx = Prisma.TransactionClient;
 const include = {
   healthcareCase: true,
@@ -271,38 +290,94 @@ export class HealthcareCaseDispatchConfirmRepository {
     >`SELECT transaction_timestamp()::timestamp(3) AS at`;
     return row.at;
   }
-  async itemEvidence(
-    tx: Tx,
-    c: ConfirmContext,
-    id: string,
-    data: Pick<
-      Prisma.HealthcareCaseDispatchItemUncheckedUpdateManyInput,
-      | 'destinationPositionId'
-      | 'physicalEffectId'
-      | 'equipmentCustodyId'
-      | 'equipmentPhysicalEventId'
-    >,
-  ) {
-    return tx.healthcareCaseDispatchItem.updateMany({
-      where: {
-        id,
-        companyId: c.companyId,
-        dispatchId: c.dispatchId,
-        lifecycle: 'ACTIVE',
-      },
-      data,
-    });
+  private uniqueItems(rows: { id: string }[]) {
+    if (new Set(rows.map((r) => r.id)).size !== rows.length)
+      throw healthcarePersistenceException();
   }
-  async itemSnapshot(
+  private exactItems(expected: { id: string }[], actual: { id: string }[]) {
+    const ids = new Set(actual.map((r) => r.id));
+    if (
+      actual.length !== expected.length ||
+      ids.size !== expected.length ||
+      !expected.every((r) => ids.has(r.id))
+    )
+      throw healthcarePersistenceException();
+  }
+  // Caller already holds the root and every item lock in canonical order.
+  async itemEvidenceBulk(
     tx: Tx,
     c: ConfirmContext,
-    id: string,
-    snapshot: Prisma.InputJsonValue,
+    rows: DispatchItemEvidence[],
   ) {
-    return tx.healthcareCaseDispatchItem.updateMany({
-      where: { id, companyId: c.companyId, dispatchId: c.dispatchId },
-      data: { snapshot },
-    });
+    this.uniqueItems(rows);
+    for (let offset = 0; offset < rows.length; offset += 250) {
+      const chunk = rows.slice(offset, offset + 250);
+      const values = chunk.map(
+        (r) => Prisma.sql`(${r.id}::text, ${r.type}::text,
+        ${r.type === 'MATERIAL' ? r.destinationPositionId : null}::text,
+        ${r.type === 'MATERIAL' ? r.physicalEffectId : null}::text,
+        ${r.type === 'EQUIPMENT' ? r.equipmentCustodyId : null}::text,
+        ${r.type === 'EQUIPMENT' ? r.equipmentPhysicalEventId : null}::text)`,
+      );
+      const updated = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        UPDATE "HealthcareCaseDispatchItem" i SET
+          "destinationPositionId"=v.destination, "physicalEffectId"=v.effect,
+          "equipmentCustodyId"=v.custody, "equipmentPhysicalEventId"=v.event
+        FROM (VALUES ${Prisma.join(values)}) v(id, type, destination, effect, custody, event),
+          "HealthcareCaseDispatch" d
+        WHERE i.id=v.id AND i."companyId"=${c.companyId} AND i."dispatchId"=${c.dispatchId}
+          AND i.lifecycle='ACTIVE' AND i.type::text=v.type AND i.snapshot IS NULL
+          AND i."physicalEffectId" IS NULL AND i."destinationPositionId" IS NULL
+          AND i."equipmentCustodyId" IS NULL AND i."equipmentPhysicalEventId" IS NULL
+          AND d.id=i."dispatchId" AND d."companyId"=i."companyId"
+          AND d."caseId"=${c.caseId} AND d.status='DRAFT'
+          AND ((v.type='MATERIAL' AND EXISTS (
+            SELECT 1 FROM "InventoryPosition" p JOIN "InventoryPhysicalEffect" e
+              ON e.id=v.effect AND e."companyId"=i."companyId"
+            JOIN "InventoryPhysicalEffectLine" l ON l."effectId"=e.id
+              AND l."companyId"=e."companyId" AND l."positionId"=p.id
+            WHERE p.id=v.destination AND p."companyId"=i."companyId"
+              AND p."productId"=i."productId" AND p."inventoryBatchId" IS NOT DISTINCT FROM i."batchId"
+              AND p.state='CUSTODY' AND p."contextType"='CASE_DISPATCH_ITEM' AND p."contextId"=i.id
+              AND e.kind='TRANSFER' AND e."originType"='CASE_DISPATCH' AND e."originId"=d.id
+              AND e."originOperation"='CONFIRM_QUANTITY' AND l.delta=i.quantity
+          )) OR (v.type='EQUIPMENT' AND EXISTS (
+            SELECT 1 FROM "EquipmentAssetCustody" u JOIN "EquipmentAssetPhysicalEvent" e
+              ON e.id=v.event AND e."companyId"=u."companyId" AND e."custodyId"=u.id
+            WHERE u.id=v.custody AND u."companyId"=i."companyId" AND u."equipmentAssetId"=i."assetId"
+              AND u."caseId"=i."caseId" AND u."assignmentId"=i."assignmentId"
+              AND e."equipmentAssetId"=i."assetId" AND e.operation='CUSTODY_OPEN'
+              AND e."originType"='CASE_DISPATCH_ITEM' AND e."originId"=i.id
+              AND e."originOperation"='CONFIRM_EQUIPMENT'
+          ))) RETURNING i.id`);
+      this.exactItems(chunk, updated);
+    }
+    return { count: rows.length };
+  }
+  async itemSnapshotsBulk(
+    tx: Tx,
+    c: ConfirmContext,
+    rows: DispatchItemSnapshotWrite[],
+  ) {
+    this.uniqueItems(rows);
+    for (let offset = 0; offset < rows.length; offset += 250) {
+      const chunk = rows.slice(offset, offset + 250);
+      const values = chunk.map(
+        (r) =>
+          Prisma.sql`(${r.id}::text, ${r.lifecycle}::text, ${JSON.stringify(r.snapshot)}::jsonb)`,
+      );
+      const updated = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        UPDATE "HealthcareCaseDispatchItem" i SET snapshot=v.snapshot
+        FROM (VALUES ${Prisma.join(values)}) v(id, lifecycle, snapshot), "HealthcareCaseDispatch" d
+        WHERE i.id=v.id AND i."companyId"=${c.companyId} AND i."dispatchId"=${c.dispatchId}
+          AND i.lifecycle::text=v.lifecycle AND i.snapshot IS NULL
+          AND d.id=i."dispatchId" AND d."companyId"=i."companyId"
+          AND d."caseId"=${c.caseId} AND d.status='DRAFT'
+          AND v.snapshot->>'version'='1'
+        RETURNING i.id`);
+      this.exactItems(chunk, updated);
+    }
+    return { count: rows.length };
   }
   async finalize(
     tx: Tx,
