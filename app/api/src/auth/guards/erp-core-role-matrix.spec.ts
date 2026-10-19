@@ -64,6 +64,7 @@ const roleMatrix: RoleMatrix[] = [
       setOutcome: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       excludeItem: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       cancel: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
+      confirm: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
     },
   },
   {

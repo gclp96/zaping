@@ -24,7 +24,7 @@ export interface ReconciliationCommandContext {
 }
 export interface ReconciliationCommandReceipt {
   auditId: string;
-  operation: ReconciliationDraftOperation;
+  operation: HealthcareCaseReconciliationAuditOperation;
   reconciliationId: string;
   itemId: string | null;
   revisionBefore: number | null;

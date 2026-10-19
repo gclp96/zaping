@@ -316,6 +316,11 @@ describe('physical inventory composition and activation', () => {
       'healthcare-case-dispatch-confirm.service.ts',
       'healthcare-case-dispatches.module.ts',
     ].map((name) => join(src, 'healthcare', 'case-dispatches', name));
+    const reconciliationWriters = [
+      'healthcare-case-reconciliation-confirm.repository.ts',
+      'healthcare-case-reconciliation-confirm.service.ts',
+      'healthcare-case-reconciliations.module.ts',
+    ].map((name) => join(src, 'healthcare', 'case-reconciliations', name));
     function inspect(dir: string): void {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (entry.name === 'physical') continue;
@@ -325,6 +330,7 @@ describe('physical inventory composition and activation', () => {
           entry.name.endsWith('.ts') &&
           !entry.name.endsWith('.spec.ts') &&
           !dispatchWriters.includes(path) &&
+          !reconciliationWriters.includes(path) &&
           ![
             'create-physical-movement.dto.ts',
             'inventory.service.ts',
@@ -342,6 +348,13 @@ describe('physical inventory composition and activation', () => {
       }
     }
     inspect(src);
+    const reconciliation = readFileSync(reconciliationWriters[1], 'utf8');
+    expect(reconciliation).toMatch(/this\.physical\.transfer\(/);
+    expect(reconciliation).toMatch(/this\.physical\.definitiveOut\(/);
+    expect(reconciliation).toMatch(/this\.projections\.apply\(/);
+    expect(reconciliation).not.toMatch(
+      /authority\.run\(|InventoryCompatibilityHistory|inventoryMovement\.(?:create|update|delete)|\$transaction\s*\(/,
+    );
     const confirm = readFileSync(dispatchWriters[1], 'utf8');
     expect(confirm).toMatch(/this\.physical\.transfer\(/);
     expect(confirm).toMatch(/this\.projections\.apply\(/);

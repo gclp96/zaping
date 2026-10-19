@@ -1,4 +1,21 @@
 import { createHash } from 'node:crypto';
+export function createReconciliationConfirmRequestHash(
+  c: { companyId: string; caseId: string; reconciliationId: string },
+  expectedRevision: number,
+): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: 1,
+        operation: 'CONFIRM',
+        companyId: c.companyId,
+        caseId: c.caseId,
+        reconciliationId: c.reconciliationId,
+        expectedRevision,
+      }),
+    )
+    .digest('hex');
+}
 import {
   ReconciliationCommandContext,
   ReconciliationCommandIntent,

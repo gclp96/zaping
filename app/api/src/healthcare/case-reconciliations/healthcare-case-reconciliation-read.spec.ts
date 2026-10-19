@@ -3,6 +3,8 @@ import { HealthcareCaseReconciliationsRepository as Repository } from './healthc
 import { HealthcareCaseReconciliationReadService as Service } from './healthcare-case-reconciliation-read.service';
 import { HealthcareCaseReconciliationModule } from './healthcare-case-reconciliations.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { EquipmentModule } from '../../equipment/equipment.module';
+import { InventoryPhysicalAuthorityModule } from '../../inventory/physical/inventory-physical-authority.module';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import { PrismaService } from '../../prisma/prisma.service';
 describe('Reconciliation read service and persistence boundary', () => {
@@ -66,13 +68,17 @@ describe('Reconciliation read service and persistence boundary', () => {
       pagination: { page: 2, pageSize: 25, totalItems: 27, totalPages: 2 },
     });
   });
-  it('imports only PrismaModule', () => {
+  it('imports Prisma and the physical dependencies required by Confirm', () => {
     expect(
       Reflect.getMetadata(
         MODULE_METADATA.IMPORTS,
         HealthcareCaseReconciliationModule,
       ),
-    ).toEqual([PrismaModule]);
+    ).toEqual([
+      PrismaModule,
+      EquipmentModule,
+      InventoryPhysicalAuthorityModule,
+    ]);
   });
   it('repository queries are scoped, ordered and bound to read transaction', async () => {
     const count = jest.fn().mockResolvedValue(4),

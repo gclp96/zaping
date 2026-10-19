@@ -1,4 +1,5 @@
 import { HealthcareCaseReconciliationCommandService } from './healthcare-case-reconciliation-command.service';
+import { HealthcareCaseReconciliationConfirmService } from './healthcare-case-reconciliation-confirm.service';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -17,6 +18,7 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
   const path = `/healthcare/cases/${caseId}/reconciliations`;
   const secret = 'case-availability-test-only-secret';
   const commands = { execute: jest.fn() };
+  const confirmation = { execute: jest.fn() };
   const service = { list: jest.fn(), detail: jest.fn(), summary: jest.fn() };
   const prisma = { user: { findFirst: jest.fn() } };
   let app: INestApplication<App>;
@@ -38,6 +40,10 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
       controllers: [HealthcareCaseReconciliationsController],
       providers: [
         JwtStrategy,
+        {
+          provide: HealthcareCaseReconciliationConfirmService,
+          useValue: confirmation,
+        },
         {
           provide: HealthcareCaseReconciliationCommandService,
           useValue: commands,
@@ -351,12 +357,54 @@ describe('Case Reconciliation HTTP/JWT boundary (mock persistence)', () => {
       expect(commands.execute).not.toHaveBeenCalled();
     });
   });
-  it('has no confirm route', async () => {
+  it.each([false, true])(
+    'confirm returns 200 with replay=%s and authenticated tenant',
+    async (replay) => {
+      confirmation.execute.mockResolvedValue({
+        replay,
+        command: { operation: 'CONFIRM' },
+        data: {},
+      });
+      await supertest(app.getHttpServer())
+        .post(path + '/' + caseId + '/confirm')
+        .auth(token(), { type: 'bearer' })
+        .send({ expectedRevision: 0 })
+        .set('Idempotency-Key', 'confirm-key')
+        .expect(200, { replay, command: { operation: 'CONFIRM' }, data: {} });
+      expect(confirmation.execute).toHaveBeenCalledWith(
+        {
+          companyId: 'jwt-tenant',
+          actorId: 'ADMIN',
+          caseId,
+          reconciliationId: caseId,
+          key: 'confirm-key',
+        },
+        { expectedRevision: 0 },
+      );
+    },
+  );
+  it.each(['SALES', 'ANONYMOUS'])('confirm denies %s', async (role) => {
+    const req = supertest(app.getHttpServer()).post(
+      path + '/' + caseId + '/confirm',
+    );
+    if (role !== 'ANONYMOUS') req.auth(token(role), { type: 'bearer' });
+    await req
+      .send({ expectedRevision: 0 })
+      .expect(role === 'SALES' ? 403 : 401);
+    expect(confirmation.execute).not.toHaveBeenCalled();
+  });
+  it.each([
+    { expectedRevision: -1 },
+    { expectedRevision: 2147483647 },
+    { expectedRevision: 0, extra: true },
+    {},
+  ])('confirm validates body %j', async (body) => {
     await supertest(app.getHttpServer())
       .post(path + '/' + caseId + '/confirm')
       .auth(token(), { type: 'bearer' })
-      .send({ expectedRevision: 0 })
-      .expect(404);
+      .send(body)
+      .expect(400);
+    expect(confirmation.execute).not.toHaveBeenCalled();
   });
   it('create replay returns 200', async () => {
     commands.execute.mockResolvedValue({ replay: true, command: {}, data: {} });
