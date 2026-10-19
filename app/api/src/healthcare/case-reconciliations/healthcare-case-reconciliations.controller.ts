@@ -1,4 +1,6 @@
 import { HttpCode } from '@nestjs/common';
+import { HealthcareCaseReconciliationConfirmService } from './healthcare-case-reconciliation-confirm.service';
+import { ConfirmHealthcareCaseReconciliationDto } from './dto/confirm-healthcare-case-reconciliation.dto';
 import { Body, Headers, HttpStatus, Post, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { HealthcareCaseReconciliationCommandService } from './healthcare-case-reconciliation-command.service';
@@ -30,6 +32,7 @@ export class HealthcareCaseReconciliationsController {
   constructor(
     private readonly service: HealthcareCaseReconciliationReadService,
     private readonly commands: HealthcareCaseReconciliationCommandService,
+    private readonly confirmation: HealthcareCaseReconciliationConfirmService,
   ) {}
   @Get('reconciliations')
   list(
@@ -152,6 +155,27 @@ export class HealthcareCaseReconciliationsController {
     return result;
   }
 
+  @Post('reconciliations/:reconciliationId/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)
+  confirm(
+    @Req() req: AuthenticatedRequest,
+    @Param('caseId', ParseUUIDPipe) caseId: string,
+    @Param('reconciliationId', ParseUUIDPipe) reconciliationId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ConfirmHealthcareCaseReconciliationDto,
+  ) {
+    return this.confirmation.execute(
+      {
+        companyId: req.user.companyId,
+        actorId: req.user.id,
+        caseId,
+        reconciliationId,
+        key: key!,
+      },
+      dto,
+    );
+  }
   @Post('reconciliations/:reconciliationId/cancel')
   @HttpCode(HttpStatus.OK)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE)

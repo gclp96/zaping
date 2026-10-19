@@ -4,22 +4,21 @@ TECHNICAL DESIGN: **APPROVED**.
 HC-RR-01A: **COMPLETE / MERGED — PR #94**.
 HC-RR-01B: **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
 HC-RR-01C: **COMPLETE / MERGED — PR #96** — TARGET **5 SP**.
-HC-RR-01D: **IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED UNTIL PERF-02 MERGE / NOT MERGED** — TARGET **8 SP**.
+HC-RR-01D: **IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED** — TARGET **8 SP**.
 
 Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
 Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
 Rama de implementación: `feat/hc-rr-01a-persistence-reads`.
 Rama del TD: `feat/hc-return-reconciliation-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-RETURN-RECONCILIATION.
-Este documento registra las decisiones aprobadas y la implementación y
-validación local de HC-RR-01A/01B/01C (§16–18). Los comandos DRAFT y la primitiva
-interna de cierre Equipment están implementados; CONFIRM y su adapter productivo
-siguen pendientes en la baseline merged de este worktree. El registry productivo
-de cierre permanece vacío/fail-closed aquí. El estado funcional no merged de 01D
-se registra por el delta humano; no se inspeccionó el worktree separado.
+Este documento registra las decisiones aprobadas y la evidencia histórica de
+HC-RR-01A/01B/01C (§16–18), PERF-01 (§19) y PERF-02. El cierre local actual de
+HC-RR-01D se registra en §20: CONFIRM y el adapter productivo están implementados
+y probados en el worktree de integración, pendientes de revisión humana y merge.
+Las afirmaciones pre-01D de las secciones históricas describen aquellas baselines.
 HC-RR-PERF-01: COMPLETE / MERGED — PR #97 — TARGET 8 SP.
-HC-RR-PERF-02: IMPLEMENTED / TESTED — PENDING HUMAN REVIEW / MERGE — TARGET 5 SP.
-Return/Reconciliation backend: NOT YET CERTIFIED COMPLETE. Estado vigente en el addendum PERF-02 al final.
+HC-RR-PERF-02: COMPLETE / MERGED — PR #98 — TARGET 5 SP.
+Return/Reconciliation backend: NOT MERGED COMPLETE UNTIL 01D MERGE. Estado vigente en §20.
 
 ## 1. Estado, dependencias y alcance
 
@@ -276,7 +275,8 @@ Base: `/healthcare/cases/:caseId/reconciliations`.
 | GET | `/healthcare/cases/:caseId/dispatches/:dispatchId/reconciliation-summary` |
 
 01A entregó los tres GET. 01B implementa POST create/items/outcome/exclude/cancel.
-POST confirm sigue reservado a 01D y no está registrado. No hay PATCH ni DELETE.
+01D implementa y registra POST confirm en esta integración; pendiente de merge.
+No hay PATCH ni DELETE.
 Reads ADMIN/MANAGER/WAREHOUSE/SALES; mutaciones ADMIN/MANAGER/WAREHOUSE.
 SALES read-only. Custodio/receiver no concede autorización.
 
@@ -286,12 +286,12 @@ SALES read-only. Custodio/receiver no concede autorización.
 | --- | --- | --- | --- |
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
 | HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
-| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | IMPLEMENTED / TESTED — pending human review/merge |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | BLOCKED UNTIL 01C MERGE |
-| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A/01B MERGED; 01C IMPLEMENTED / TESTED; 01D BLOCKED UNTIL 01C MERGE |
+| HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | COMPLETE / MERGED — PR #96 |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED |
+| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A/01B/01C MERGED; NOT MERGED COMPLETE UNTIL 01D MERGE |
 
 Sólo planning TARGET; sin Forecast/Commitment/Actual ni fechas. Siguiente paso:
-revisión humana y merge de HC-RR-01C. TD APPROVED / MERGED — PR #93;
+revisión humana de staging y posterior merge de HC-RR-01D. TD APPROVED / MERGED — PR #93;
 01A COMPLETE / MERGED — PR #94; 01B COMPLETE / MERGED — PR #95.
 Evidencia local 01A en §16, 01B en §17 y primitiva interna 01C en §18.
 CONFIRM, adapter productivo y aceptación física de Reconciliation pertenecen a 01D.
@@ -594,7 +594,10 @@ bajo statement_timeout, y repetir aceptación propia; detalle exacto en evidenci
 PERF-02 y aceptación de 01D siguen pendientes. BACKEND NOT YET CERTIFIED COMPLETE.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN.
 
-## HC-RR-PERF-02 — aceptación de throughput 2026-10-17
+## HC-RR-PERF-02 — aceptación histórica de throughput 2026-10-17
+
+Este addendum conserva la evidencia previa al merge de PR #98. Los estados
+vigentes de integración y aceptación de 01D se registran en §20.
 
 HC-RR-PERF-01 COMPLETE / MERGED — PR #97. HC-RR-PERF-02 IMPLEMENTED / TESTED —
 PENDING HUMAN REVIEW / MERGE — TARGET 5 SP. Este addendum actualiza los estados
@@ -638,3 +641,129 @@ NOT MERGED — TARGET 8 SP. Worktree separado sin inspección/modificación aqu�
 Tras merge requiere integrar baseline y completar aceptación propia; no se declara
 01D COMPLETE. Backend Return/Reconciliation NOT YET CERTIFIED COMPLETE.
 Real Company cutover y real Equipment reconciliation NOT EXECUTED. M-HC1 OPEN.
+
+## 20. HC-RR-01D — cierre QA y preparación de staging (2026-10-18)
+
+HC-RR-01D: **IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED**.
+TARGET **8 SP**. Baseline `f5fefa66cdd53dffbf421cb52c65d504e3163254` (PR #98),
+rama `integrate/hc-rr-01d-post-perf`, worktree `C:/dev/zaping-rr01d-integration`.
+HC-RR-PERF-01 COMPLETE / MERGED — PR #97; HC-RR-PERF-02 COMPLETE / MERGED — PR #98.
+Este cierre sustituye los estados de dependencia bloqueada conservados en la
+evidencia histórica; no declara merge, release, deployment ni adopción real.
+
+### Implementación e integridad
+
+Confirm usa el servicio normal, adapter productivo CASE_RECONCILIATION_ITEM,
+claim/hash/replay durable, fence Inventory cuando hay Material positivo y HC Company lock.
+En la misma transacción persiste efectos, proyecciones, evidencia, snapshots, root CAS
+y claim completo; antes de retornar evalúa explícitamente, en orden:
+
+1. `InventoryPhysicalEffectLine_complete`.
+2. `InventoryPhysicalEffect_complete`.
+3. Invariantes finales RR, idempotency y Equipment Asset/Custody.
+
+El delta QA sólo corrigió mocks Promise y tipos del observador en los dos tests
+Confirm, y normalizó a LF los nueve archivos afectados. No cambió assertions,
+fixtures, hooks compartidos, código productivo, contratos, límites ni timeouts.
+Equipment custody-close coincide con la baseline; guard, clock_timestamp, CAS,
+evento único y replay intactos. No quedan diagnósticos temporales de timestamps.
+Sin cambios schema/migraciones, enums, backfill, Position CAS ni writer Inventory.
+
+### Gates actuales y evidencia conservada
+
+| Gate | Resultado |
+| --- | --- |
+| ESLint focal y oficial | 24 errores / 1 warning antes; 0 errores / 0 warnings después |
+| Prettier | 9 archivos corregidos sólo por finales de línea; 19/19 tracked/untracked PASS |
+| Unit Confirm/adapter | 46/46 PASS, 2 suites, 2.786 s |
+| PostgreSQL core | 81 PASS / 0 FAIL / 4 SKIPPED, 22.311 s |
+| API completa actual | 2526/2526 PASS, 136 suites, 31.153 s |
+| Typecheck oficial | PASS |
+| noEmit focal | PASS, 18 raíces, 0 diagnósticos |
+| Build / Prisma validate / git diff --check | PASS |
+| PostgreSQL final normal, una sola ejecución | 85 PASS / 0 FAIL / 0 SKIPPED, 51.023 s |
+
+El core excluye sólo los cuatro límites Material: no se cuentan como PASS.
+El final ejecutó todos: RETURNED 1000 PASS (tx 11421.669 ms), USED 1000 PASS
+(tx 7537.644 ms), RETURNED 1001 y USED 1001 rechazados antes de efectos/audit
+con rollback. Ambos positivos completaron las tres evaluaciones explícitas.
+Equipment historical replay y replay tras redispatch PASS. Los negativos 23514
+y 57014 conservaron error, rollback real, callback no retornado y estado persistido
+igual al inicial; concurrencia/capacidad/idempotency/terminal immutability PASS.
+Política intacta en ms: Company 2500, lock 1500, statement 4000, maxWait 3000, tx 20000.
+
+Se conserva, sin presentarla como reejecutada, la regresión previa: 1363/1363
+en 55 suites focales y 553/553 PostgreSQL en 13 suites. Distribución PostgreSQL:
+RR persistence 44; RR commands 39; Dispatch persistence 59, commands 60 y Confirm 90;
+Equipment foundation 23, custody wiring 35 y close 46; Inventory físico/constraints 64;
+Receipt/Manual/Count 38; Sales 12; OPENING 43. No hubo cambios de producción ni
+fixtures/hooks compartidos que invaliden esa evidencia.
+
+### Targets desechables y cleanup
+
+Los dos runs actuales usaron PostgreSQL16 NUEVO, loopback, tmpfs sin volumen,
+44 migraciones y rol runtime `case_reconciliation_confirm_test` sin superusuario.
+Base `zaping_case_reconciliation_confirm_test`:
+
+| Run | Target | ID | Cleanup |
+| --- | --- | --- | --- |
+| Core | 127.0.0.1:50933 | 2ceb5fa8-fe1a-4604-873f-bbd2c2c38802 | PASS |
+| Final | 127.0.0.1:50168 | 302201c0-ae36-42c8-a7bb-2c953f8e9748 | PASS |
+
+No se usaron bases dev/QA/productivas ni anteriores. No se cargó .env.
+
+### Riesgo histórico Equipment — OPEN / NOT REPRODUCED
+
+El resultado histórico 84 PASS / 1 FAIL / 0 SKIPPED permanece válido: rechazo
+EQUIPMENT_PHYSICAL_PERSISTENCE_ERROR en el guard temporal del cierre inicial,
+antes del replay. No se retuvieron sus operandos. Root cause UNKNOWN / NOT VERIFIED.
+No se atribuye a timezone, precisión, mocks o fixtures; corrección funcional NONE.
+
+Posteriormente: 5 aislados PASS; 2 core de 81 seleccionados PASS cada uno;
+2 completos de 85 PASS cada uno; cierre sin instrumentación previo 85/0/0
+(45.974 s); core QA actual 81/0/4 y final QA actual 85/0/0. No se observó inversión
+de timestamps en las capturas aisladas/ordenadas. Los resultados posteriores no
+borran el fallo histórico ni prueban que esté corregido.
+
+Decisión humana: proceder con revisión de staging conservando el riesgo abierto,
+bajo seguimiento QA; reabrir la investigación si aparece evidencia reproducible.
+Sin nuevo endpoint diagnóstico ni automatización de monitorización. Registro:
+[Project Board RISK-006](../../project/PROJECT_BOARD.md#risk-006--equipment-custody-close-timestamp-guard).
+
+### Inventario para revisión humana de staging
+
+Rutas relativas al worktree indicado. Tracked modificados (incluye documentación):
+
+- `app/api/src/auth/guards/erp-core-role-matrix.spec.ts`
+- `app/api/src/equipment/equipment.module.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-command.types.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-read.spec.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-request-hash.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliations.controller.spec.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliations.controller.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliations.module.ts`
+- `app/api/src/inventory/physical/physical-inventory.contract.spec.ts`
+- `docs/modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md`
+- `docs/project/PROJECT_BOARD.md`
+
+Untracked HC-RR-01D, todos incluidos en revisión; ninguno staged:
+
+- `app/api/src/healthcare/case-reconciliations/dto/confirm-healthcare-case-reconciliation.dto.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-confirm.repository.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-confirm.service.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-confirm.spec.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-context.adapter.spec.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-context.adapter.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-evidence.module.ts`
+- `app/api/src/healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-evidence.repository.ts`
+- `app/api/test/case-reconciliation-confirm.postgres.e2e-spec.ts`
+- `app/api/test/helpers/case-reconciliation-confirm-postgres-runner.cjs`
+
+Cambios lógicos de este delta: los dos tests Confirm. Formato solamente: los nueve
+archivos API tracked listados. Documentación: este diseño y Project Board.
+Los otros ocho archivos untracked se conservan de la implementación 01D.
+
+Return/Reconciliation backend: **NOT MERGED COMPLETE UNTIL 01D MERGE**.
+REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**.
+M-HC1: **OPEN**. Staged / committed / pushed: **NONE**.
+Worktree original 01D y worktree PERF: **UNTOUCHED**.

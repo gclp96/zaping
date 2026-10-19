@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { HealthcareCaseReconciliationEquipmentEvidenceModule } from '../healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-evidence.module';
+import { HealthcareCaseReconciliationEquipmentContextAdapter } from '../healthcare/case-reconciliations/healthcare-case-reconciliation-equipment-context.adapter';
 import { HealthcareCaseDispatchEquipmentEvidenceModule } from '../healthcare/case-dispatches/healthcare-case-dispatch-equipment-evidence.module';
 import { HealthcareCaseDispatchEquipmentContextAdapter } from '../healthcare/case-dispatches/healthcare-case-dispatch-equipment-context.adapter';
 
@@ -25,6 +27,7 @@ import {
 
 @Module({
   imports: [
+    HealthcareCaseReconciliationEquipmentEvidenceModule,
     CompanySequencesModule,
     HealthcareCaseDispatchEquipmentEvidenceModule,
   ],
@@ -41,7 +44,10 @@ import {
     EquipmentCustodyCloseContextRegistry,
     {
       provide: EQUIPMENT_CUSTODY_CLOSE_CONTEXT_ADAPTERS,
-      useValue: Object.freeze([]),
+      useFactory: (
+        adapter: HealthcareCaseReconciliationEquipmentContextAdapter,
+      ) => Object.freeze([adapter]),
+      inject: [HealthcareCaseReconciliationEquipmentContextAdapter],
     },
     EquipmentCustodyContextRegistry,
     {
