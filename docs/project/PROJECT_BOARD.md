@@ -344,6 +344,25 @@ M-HC1 **OPEN**; REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION **NOT EXECU
 No implica despliegue, readiness operativa ni cierre de Healthcare Operations Foundation.
 [Cierre post-merge y evidencia conservada en TD §21](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md#21-hc-rr-01d--cierre-documental-post-merge-de-pr-99).
 
+### HC-DSP-COR-01 — Corrección auditada de Dispatch confirmado sin entrega física
+
+**M-HC1: OPEN. P0 RELEASE GATE. CONTRACT V0.7: HUMAN APPROVED / PENDING DOC MERGE. IMPLEMENTATION: NOT STARTED.**
+
+Contexto operativo INSAP: ajustes manuales con observación corrigen diferencias `AVAILABLE`; **no** corrigen por sí solos `CUSTODY` ni episodios Equipment. V1 permitirá una única compensación **completa** de un Dispatch `CONFIRMED` registrado por error **sin entrega física**, conservando el hecho original. ADMIN/MANAGER declara expresamente que no hubo entrega y consigna motivo; corrección inmutable con actor/fecha y efectos nuevos. Material: `TRANSFER CUSTODY → AVAILABLE`, mismo Product/batch, sin aumento de `Product.stock` owned. Equipment: `CUSTODY_CLOSE` de origen corrección, `WAREHOUSE`, preservando condición/lifecycle, sin eventos físicos posteriores a su `CUSTODY_OPEN`. R/R `DRAFT` bloquea hasta cancelación explícita, `CONFIRMED` bloquea; `CANCELLED` coherente sin efectos no bloquea. Lecturas: «Corregido — sin entrega física» separado de Return/Reconciliation y del status histórico `CONFIRMED`; sin pendiente físico ficticio.
+
+| Slice | Alcance | Estado |
+| --- | --- | --- |
+| HC-DSP-COR-01A | Technical Design Approval Delta | **HUMAN APPROVED / DOC PR PENDING** |
+| HC-DSP-COR-01B | Persistence & Witness | **REFINEMENT / NOT IMPLEMENTED** |
+| HC-DSP-COR-01C | Compensación MATERIAL QUANTITY | **BACKLOG** |
+| HC-DSP-COR-01D | Compensación Equipment | **BACKLOG** |
+| HC-DSP-COR-01E | RR admission, read model y bloqueos | **BACKLOG** |
+| HC-DSP-COR-01F | QA PostgreSQL y release gate backend | **BACKLOG** |
+
+Story Points / Forecast / Commitment / Actual / fechas: TBD; no inventar. API de compensación **no habilitada** hasta que 01B–01F estén integrados y aceptados con PostgreSQL real, clientes compatibles, regresiones y revisión humana. Sin cutover de Company real, sin writers externos certificados. **RISK-006: OPEN / NOT REPRODUCED**, causa desconocida; no se acreditó fix.
+
+[Technical Design aprobado](../modules/healthcare/CASE_DISPATCH_CORRECTION_TECHNICAL_DESIGN.md) · [Aprobación 01A](../modules/healthcare/CASE_DISPATCH_CORRECTION_APPROVAL_01A.md) · [Ticket 01B](HC_DSP_COR_01B_TICKET.md).
+
 Este documento representa el estado operativo actual del proyecto.
 
 Debe responder principalmente:
