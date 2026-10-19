@@ -18,9 +18,9 @@ UNVERIFIED no es destino nuevo: acreditar Assets necesarios mediante baseline01E
 Sin control Company nuevo, fallback ni migraciones. REAL EQUIPMENT RECONCILIATION: NOT EXECUTED.
 PRODUCTIVE EQUIPMENT CUSTODY: ENABLED BY CONFIRM CODE PATH.
 CaseDispatch physical confirmation: COMPLETE / MERGED — PR #92 — HC-DSP-01C TARGET 8 SP.
-HC-CASE-DISPATCH BACKEND: COMPLETE / MERGED. Return/Reconciliation: 01A/01B/01C MERGED
-(PR #94/#95/#96); 01D IMPLEMENTED FUNCTIONALLY / ACCEPTANCE BLOCKED / NOT MERGED;
-BACKEND NOT YET CERTIFIED COMPLETE; [TD aprobado](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md).
+HC-CASE-DISPATCH BACKEND: COMPLETE / MERGED. Return/Reconciliation: 01A/01B/01C/01D
+COMPLETE / MERGED — PR #94/#95/#96/#99. FUNCTIONAL BACKEND COMPLETE / MERGED —
+23/23 functional TARGET SP; [estado post-merge en TD §21](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md#21-hc-rr-01d--cierre-documental-post-merge-de-pr-99).
 M-HC1 OPEN.
 
 HC-INVENTORY-CUSTODY-01E — [Technical Design APPROVED](../modules/erp/INVENTORY_CUSTODY_01E_TECHNICAL_DESIGN.md).
@@ -190,8 +190,9 @@ loopback/tmpfs; cleanup PASS; .env intacto. OPENING interno, manifest/review/APP
 registry CUSTODY fail-closed sin namespaces predeterminados; sin routing ni PHYSICAL_ACTIVE.
 Detalle y límites en §A.2 del diseño01D.01D-C COMPLETE / MERGED — PR #84; actual cutover NOT EXECUTED.
 01A/B/C DORMANT;01D ACTIVATION NOT STARTED;M-HC1 OPEN.
-Dispatch backend COMPLETE / MERGED — PR #92. Siguiente acción: merge del TD Reconciliation,
-luego readiness HC-RR-01A. 01D/01E COMPLETE / MERGED; sin adopción real.
+Dispatch backend COMPLETE / MERGED — PR #92. Return/Reconciliation backend
+funcional COMPLETE / MERGED — PR #94/#95/#96/#99; seguimiento de RISK-006.
+Inventory 01D/01E COMPLETE / MERGED; sin adopción real.
 Sin Forecast/Commitment/Actual ni fechas asignados.
 
 | Slice                                           | TARGET | Estado                                            |
@@ -260,21 +261,20 @@ Typecheck/noEmit focal, lint, build, Prisma validate, Prettier/check y diff chec
 Carreras observadas por PIDs, pg_blocking_pids y pg_stat_activity: cierres concurrentes,
 Inspection y Retirement; rollback tras Custody/Asset/evento y prelocks multi-Asset PASS.
 En la baseline merged 01C, productive reconciliation close adapter y Confirm RR
-**NOT IMPLEMENTED** en aquella baseline; 01D está implementado/probado en integración,
-READY FOR HUMAN STAGING REVIEW / NOT MERGED.
-Evidencia histórica 01C y target exacto en TD §18; estado vigente en TD §20. Sin DB real.
+**NOT IMPLEMENTED** en aquella baseline. Estado actual 01D: COMPLETE / MERGED — PR #99.
+Evidencia histórica 01C y target exacto en TD §18; estado vigente en TD §21. Sin DB real.
 
 | Slice | Alcance | TARGET | Estado |
 | --- | --- | --- | --- |
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
 | HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | COMPLETE / MERGED — PR #96 |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED |
-| BACKEND TOTAL | Return / Reconciliation | 23 SP | 01A/01B/01C MERGED; NOT MERGED COMPLETE UNTIL 01D MERGE |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | COMPLETE / MERGED — PR #99 |
+| BACKEND TOTAL | Return / Reconciliation | 23 SP | FUNCTIONAL BACKEND COMPLETE / MERGED — 23/23 TARGET SP |
 
 Sólo planning TARGET, sin Forecast/Commitment/Actual ni fechas. REAL COMPANY CUTOVER
-y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. Siguiente: revisión humana
-de staging y merge de 01D. Sin Forecast, Commitment, Actual ni fechas nuevos.
+y REAL EQUIPMENT RECONCILIATION NOT EXECUTED; M-HC1 OPEN. 01D COMPLETE / MERGED —
+PR #99; el riesgo residual RISK-006 permanece abierto. Sin Actual SP ni métricas nuevas.
 
 HC-RR-PERF-01: **COMPLETE / MERGED — PR #97 — TARGET 8 SP**.
 HC-RR-PERF-02: **COMPLETE / MERGED — PR #98 — TARGET 5 SP**.
@@ -288,15 +288,20 @@ Prelocks canónicos existentes antes de UPDATE Batch; cardinalidad/identidades
 exactas y rollback completo, incluidos fallos en chunks posteriores.
 PostgreSQL funcional 360/360; benchmark aparte 30/30, exclusiones no cuentan PASS.
 API completa 2473/2473 (134 suites); typecheck/noEmit focal/lint/build/Prisma/formato PASS.
-HC-RR-01D: **IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED —
-TARGET 8 SP**. Baseline integrada f5fefa6 (PR #98), pendiente de revisión/merge humano.
-01A/01B/01C COMPLETE / MERGED — PR #94/#95/#96. Backend RR NOT MERGED COMPLETE UNTIL 01D MERGE.
+HC-RR-01D: **COMPLETE / MERGED — PR #99 — TARGET 8 SP**. Implementación `8a575b1`,
+merge en main `4d7395214f8501013f923341ea8186cd4b0d6ecb` (`4d73952`).
+01A/01B/01C COMPLETE / MERGED — PR #94/#95/#96. Backend RR: FUNCTIONAL BACKEND
+COMPLETE / MERGED — **23/23 functional TARGET SP**, sin atribuir Actual SP.
 Backend feature TARGET 23 SP separado de PERF-01 (8 SP) y PERF-02 (5 SP).
 Sin Forecast, Commitment, Actual ni fechas nuevos.
 [Evidencia histórica PERF-02, límites, targets y cleanup](../../app/api/test/physical-writer-throughput-results.md).
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: NOT EXECUTED. M-HC1 OPEN.
 
 ### HC-RR-01D — cierre QA 2026-10-18
+
+> Checkpoint histórico previo al merge de PR #99. Se conservan evidencia y fecha;
+> READY FOR HUMAN STAGING REVIEW / NOT MERGED describe ese momento.
+> Estado actual en el cierre post-merge siguiente y TD §21.
 
 IMPLEMENTED / TESTED — **READY FOR HUMAN STAGING REVIEW**, TARGET **8 SP**, NOT MERGED.
 API actual 2526/2526 (136 suites); focal Confirm/adapter 46/46 (2 suites); core
@@ -318,6 +323,26 @@ reabrir si aparece evidencia reproducible; ver RISK-006.
 [Evidencia, targets e inventario exacto tracked/untracked en TD §20](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md#20-hc-rr-01d--cierre-qa-y-preparación-de-staging-2026-10-18).
 Backend RR NOT MERGED COMPLETE UNTIL 01D MERGE. REAL COMPANY CUTOVER / REAL
 EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN. Staged/committed/pushed NONE.
+
+### HC-RR-01D — cierre post-merge de PR #99
+
+**COMPLETE / MERGED — PR #99 — TARGET 8 SP**. Implementación `8a575b1`, merge main
+`4d7395214f8501013f923341ea8186cd4b0d6ecb` (`4d73952`). Backend Return/Reconciliation V1:
+**FUNCTIONAL BACKEND COMPLETE / MERGED — 23/23 functional TARGET SP**.
+PERF-01 y PERF-02 COMPLETE / MERGED — PR #97/#98; sus SP correctivos se mantienen
+separados del TARGET funcional. No se reportan Actual SP ni métricas de entrega.
+
+Se conserva el cierre QA anterior: PostgreSQL 85/85, API 2526/2526 (136 suites),
+regresión PostgreSQL 553/553 (13 suites), ESLint/Prettier/typecheck/build/Prisma PASS.
+Constraints diferidas explícitas Line → Effect → RR/idempotency/Equipment dentro
+de la transacción; RETURNED/USED 1000 y rechazos 1001, Equipment replay histórico
+y rollback PASS. No se reejecutan tests en este delta exclusivamente documental.
+
+RISK-006 **OPEN**, causa UNKNOWN / NOT VERIFIED, corrección funcional NONE.
+El merge aceptó el riesgo residual documentado; no se declara resuelto.
+M-HC1 **OPEN**; REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION **NOT EXECUTED**.
+No implica despliegue, readiness operativa ni cierre de Healthcare Operations Foundation.
+[Cierre post-merge y evidencia conservada en TD §21](../modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md#21-hc-rr-01d--cierre-documental-post-merge-de-pr-99).
 
 Este documento representa el estado operativo actual del proyecto.
 
@@ -2501,14 +2526,15 @@ Los operandos de ese fallo no se retuvieron. Corrección funcional: **NONE**.
 
 Evidencia posterior: 5 aislados PASS; 2 core PASS (81 seleccionados cada uno);
 2 completos PASS (85 cada uno); cierre sin instrumentación previo 85/0/0;
-core QA actual 81/0/4 y final QA actual **85/0/0**, sin instrumentación. Todos los
+core QA 81/0/4 y final QA **85/0/0** del checkpoint 2026-10-18, sin instrumentación. Todos los
 límites Material se ejecutaron en los completos. No se observó inversión en las
 capturas diagnósticas; no se demuestra causa timezone/precisión/mocks/fixtures.
 
-Decisión humana: avanzar a revisión de staging bajo seguimiento QA, conservando
-este riesgo abierto y reabrir ante nueva evidencia reproducible. Los PASS posteriores
-no sustituyen el fallo histórico ni significan que fue corregido. No se introduce
-diagnóstico productivo ni automatización. Detalle en el diseño técnico §20.
+La decisión de merge de PR #99 aceptó el riesgo residual documentado, bajo seguimiento
+QA. RISK-006 permanece OPEN; reabrir la investigación ante evidencia reproducible.
+Los PASS posteriores no sustituyen el fallo histórico ni significan que fue corregido.
+No se introduce diagnóstico productivo ni automatización. Evidencia histórica en TD §20
+y estado post-merge en TD §21.
 
 23. Definition of Done
 

@@ -4,7 +4,7 @@ TECHNICAL DESIGN: **APPROVED**.
 HC-RR-01A: **COMPLETE / MERGED — PR #94**.
 HC-RR-01B: **COMPLETE / MERGED — PR #95** — TARGET **5 SP**.
 HC-RR-01C: **COMPLETE / MERGED — PR #96** — TARGET **5 SP**.
-HC-RR-01D: **IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED** — TARGET **8 SP**.
+HC-RR-01D: **COMPLETE / MERGED — PR #99** — TARGET **8 SP**.
 
 Baseline del TD: `446e9528127afb59803c25441b1d7069fae3ce1d` — merge PR #92.
 Baseline de implementación 01A: `d69dba411b5e29a714376d2fcd18c3af7f9a6ca5` — merge TD PR #93.
@@ -12,13 +12,13 @@ Rama de implementación: `feat/hc-rr-01a-persistence-reads`.
 Rama del TD: `feat/hc-return-reconciliation-foundation`.
 Autoridad: Technical Design Approval Delta humano de HC-RETURN-RECONCILIATION.
 Este documento registra las decisiones aprobadas y la evidencia histórica de
-HC-RR-01A/01B/01C (§16–18), PERF-01 (§19) y PERF-02. El cierre local actual de
-HC-RR-01D se registra en §20: CONFIRM y el adapter productivo están implementados
-y probados en el worktree de integración, pendientes de revisión humana y merge.
+HC-RR-01A/01B/01C (§16–18), PERF-01 (§19), PERF-02 y el checkpoint QA de 01D (§20).
+El estado post-merge vigente de HC-RR-01D se registra en §21: CONFIRM y el adapter
+productivo están implementados y merged en main mediante PR #99.
 Las afirmaciones pre-01D de las secciones históricas describen aquellas baselines.
 HC-RR-PERF-01: COMPLETE / MERGED — PR #97 — TARGET 8 SP.
 HC-RR-PERF-02: COMPLETE / MERGED — PR #98 — TARGET 5 SP.
-Return/Reconciliation backend: NOT MERGED COMPLETE UNTIL 01D MERGE. Estado vigente en §20.
+Return/Reconciliation backend: **FUNCTIONAL BACKEND COMPLETE / MERGED — 23/23 functional TARGET SP**. Estado vigente en §21.
 
 ## 1. Estado, dependencias y alcance
 
@@ -275,7 +275,7 @@ Base: `/healthcare/cases/:caseId/reconciliations`.
 | GET | `/healthcare/cases/:caseId/dispatches/:dispatchId/reconciliation-summary` |
 
 01A entregó los tres GET. 01B implementa POST create/items/outcome/exclude/cancel.
-01D implementa y registra POST confirm en esta integración; pendiente de merge.
+01D implementa y registra POST confirm, COMPLETE / MERGED — PR #99.
 No hay PATCH ni DELETE.
 Reads ADMIN/MANAGER/WAREHOUSE/SALES; mutaciones ADMIN/MANAGER/WAREHOUSE.
 SALES read-only. Custodio/receiver no concede autorización.
@@ -287,12 +287,12 @@ SALES read-only. Custodio/receiver no concede autorización.
 | HC-RR-01A | Persistence, invariants & reads | 5 SP | COMPLETE / MERGED — PR #94 |
 | HC-RR-01B | DRAFT commands, outcomes & idempotency | 5 SP | COMPLETE / MERGED — PR #95 |
 | HC-RR-01C | Equipment custody close primitive, close registry & internal tests | 5 SP | COMPLETE / MERGED — PR #96 |
-| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED |
-| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | 01A/01B/01C MERGED; NOT MERGED COMPLETE UNTIL 01D MERGE |
+| HC-RR-01D | Atomic Confirm, productive adapter & cross-domain PostgreSQL acceptance | 8 SP | COMPLETE / MERGED — PR #99 |
+| BACKEND TOTAL | Return / Reconciliation backend | 23 SP | FUNCTIONAL BACKEND COMPLETE / MERGED — 23/23 TARGET SP |
 
-Sólo planning TARGET; sin Forecast/Commitment/Actual ni fechas. Siguiente paso:
-revisión humana de staging y posterior merge de HC-RR-01D. TD APPROVED / MERGED — PR #93;
-01A COMPLETE / MERGED — PR #94; 01B COMPLETE / MERGED — PR #95.
+Sólo TARGET funcional; no se reportan Actual SP ni métricas de entrega. El backend
+funcional está merged: 01A/01B/01C/01D — PR #94/#95/#96/#99. TD APPROVED / MERGED —
+PR #93. Continúa el seguimiento de RISK-006 tras el merge de 01D.
 Evidencia local 01A en §16, 01B en §17 y primitiva interna 01C en §18.
 CONFIRM, adapter productivo y aceptación física de Reconciliation pertenecen a 01D.
 
@@ -597,7 +597,7 @@ REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION NOT EXECUTED. M-HC1 OPEN.
 ## HC-RR-PERF-02 — aceptación histórica de throughput 2026-10-17
 
 Este addendum conserva la evidencia previa al merge de PR #98. Los estados
-vigentes de integración y aceptación de 01D se registran en §20.
+vigentes post-merge de 01D se registran en §21.
 
 HC-RR-PERF-01 COMPLETE / MERGED — PR #97. HC-RR-PERF-02 IMPLEMENTED / TESTED —
 PENDING HUMAN REVIEW / MERGE — TARGET 5 SP. Este addendum actualiza los estados
@@ -643,6 +643,10 @@ Tras merge requiere integrar baseline y completar aceptación propia; no se decl
 Real Company cutover y real Equipment reconciliation NOT EXECUTED. M-HC1 OPEN.
 
 ## 20. HC-RR-01D — cierre QA y preparación de staging (2026-10-18)
+
+> Checkpoint histórico previo al merge de PR #99. Se conserva su evidencia y fecha;
+> sus estados de staging, archivos untracked y NOT MERGED no son el estado actual.
+> Estado post-merge vigente en §21.
 
 HC-RR-01D: **IMPLEMENTED / TESTED — READY FOR HUMAN STAGING REVIEW / NOT MERGED**.
 TARGET **8 SP**. Baseline `f5fefa66cdd53dffbf421cb52c65d504e3163254` (PR #98),
@@ -767,3 +771,49 @@ Return/Reconciliation backend: **NOT MERGED COMPLETE UNTIL 01D MERGE**.
 REAL COMPANY CUTOVER / REAL EQUIPMENT RECONCILIATION: **NOT EXECUTED**.
 M-HC1: **OPEN**. Staged / committed / pushed: **NONE**.
 Worktree original 01D y worktree PERF: **UNTOUCHED**.
+
+## 21. HC-RR-01D — cierre documental post-merge de PR #99
+
+HC-RR-01D: **COMPLETE / MERGED — PR #99 — TARGET 8 SP**.
+Commit de implementación: `8a575b1aa903fd3aad9a6e8d9ea5afc373a90f3a` (`8a575b1`).
+Commit de merge en main: `4d7395214f8501013f923341ea8186cd4b0d6ecb` (`4d73952`).
+El merge incorpora la implementación y evidencia QA de §20. Este delta es sólo
+documental; no reejecuta tests ni modifica código, tests, schema, migraciones o configuración.
+
+| Slice funcional | TARGET | Estado vigente |
+| --- | --- | --- |
+| HC-RR-01A | 5 SP | COMPLETE / MERGED — PR #94 |
+| HC-RR-01B | 5 SP | COMPLETE / MERGED — PR #95 |
+| HC-RR-01C | 5 SP | COMPLETE / MERGED — PR #96 |
+| HC-RR-01D | 8 SP | COMPLETE / MERGED — PR #99 |
+| Return/Reconciliation V1 backend | 23/23 functional TARGET SP | FUNCTIONAL BACKEND COMPLETE / MERGED |
+
+HC-RR-PERF-01 COMPLETE / MERGED — PR #97 y HC-RR-PERF-02 COMPLETE / MERGED — PR #98.
+Los TARGET correctivos PERF-01 (8 SP) y PERF-02 (5 SP) son separados de los 23 SP
+funcionales. Estos son TARGET SP merged, no Actual SP ni métricas de entrega.
+
+Evidencia de aceptación conservada de §20, sin presentarla como ejecutada de nuevo:
+
+- PostgreSQL final sin instrumentación: **85 PASS / 0 FAIL / 0 SKIPPED**, 51.023 s.
+- API completa: **2526/2526 PASS**, 136 suites; focal Confirm/adapter 46/46, 2 suites.
+- Regresión PostgreSQL relevante: **553/553 PASS**, 13 suites; core QA 81 PASS /
+  0 FAIL / 4 SKIPPED, con exclusiones nunca contadas como PASS.
+- ESLint 0 errores/0 warnings, Prettier 19/19, typecheck, noEmit focal (18 raíces,
+  0 diagnósticos), build, Prisma validate y git diff --check: PASS en el cierre QA.
+- Evaluación diferida explícita dentro de la transacción: Line → Effect →
+  RR/idempotency/Equipment Asset-Custody, después del staging y antes de retornar.
+- RETURNED 1000 y USED 1000 PASS; RETURNED 1001 y USED 1001 rechazados correctamente
+  con rollback. Equipment historical replay y replay tras redispatch PASS.
+- Negativos 23514/57014, rollback persistido, concurrencia, capacidad e idempotencia PASS.
+
+RISK-006 permanece **OPEN / NOT REPRODUCED**, root cause **UNKNOWN / NOT VERIFIED**.
+El fallo histórico 84 PASS / 1 FAIL permanece registrado. No hubo corrección
+funcional ni causa demostrada por timezone, fixtures, precisión o concurrencia.
+Las 5 ejecuciones aisladas, 2 core, 2 completas y posteriores cierres sin
+instrumentación no reprodujeron el fallo. La decisión de merge aceptó este riesgo
+residual documentado; se mantiene abierto y se reabre la investigación si aparece
+evidencia reproducible. Detalle en §20 y en Project Board RISK-006.
+
+**M-HC1 OPEN. REAL COMPANY CUTOVER: NOT EXECUTED. REAL EQUIPMENT RECONCILIATION:
+NOT EXECUTED.** Backend funcional merged no equivale a readiness operativa,
+despliegue productivo ni finalización de Healthcare Operations Foundation.
