@@ -22,6 +22,17 @@ import {
   physicalPersistenceError,
 } from './physical-inventory.contract';
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
+import {
+  DispatchCorrectionMaterialInput,
+  CorrectionContext,
+  loadCorrectionContext,
+  correctionTransaction,
+  correctionOrigin,
+  assertCorrectionWriterBoundary,
+  correctionTransferRequest,
+  assertCorrectionSources,
+  classifyCorrectionEvidence,
+} from './dispatch-correction-physical.adapter';
 
 type PlannedLine = {
   key: PositionKey;
@@ -43,6 +54,44 @@ function positionKey(position: InventoryPosition): PositionKey {
 @Injectable()
 export class PhysicalInventoryService {
   constructor(private readonly repository: PhysicalInventoryRepository) {}
+
+  async classifyCommittedDispatchCorrectionMaterial(
+    tx: Prisma.TransactionClient,
+    input: DispatchCorrectionMaterialInput,
+  ): Promise<PhysicalResult | null> {
+    correctionTransaction(tx);
+    let c = await loadCorrectionContext(tx, input);
+    const lookup: PhysicalRequest = {
+      companyId: input.companyId,
+      actorId: input.requesterId,
+      origin: correctionOrigin(input.correctionId),
+      operation: { kind: 'TRANSFER', transfers: [] },
+    };
+    const effect = await this.repository.findEffect(tx, lookup);
+    if (!c && effect) c = await loadCorrectionContext(tx, input);
+    if (!c) {
+      requirePhysical(!effect, 'PHYSICAL_EFFECT_MISMATCH');
+      return null;
+    }
+    return classifyCorrectionEvidence(tx, c, effect);
+  }
+
+  async transferDispatchCorrectionMaterial(
+    tx: Prisma.TransactionClient,
+    input: DispatchCorrectionMaterialInput,
+  ): Promise<PhysicalResult> {
+    correctionTransaction(tx);
+    const replay = await this.classifyCommittedDispatchCorrectionMaterial(
+      tx,
+      input,
+    );
+    if (replay) return replay;
+    const c = await loadCorrectionContext(tx, input);
+    requirePhysical(c, 'PHYSICAL_EFFECT_MISMATCH');
+    await assertCorrectionWriterBoundary(tx, c);
+    const request = await correctionTransferRequest(tx, c);
+    return this.mutate(tx, request, c);
+  }
 
   countCorrection(
     tx: Prisma.TransactionClient,
@@ -124,8 +173,17 @@ export class PhysicalInventoryService {
   private async mutate(
     tx: Prisma.TransactionClient,
     request: PhysicalRequest,
+    correction?: CorrectionContext,
   ): Promise<PhysicalResult> {
-    const early = await this.classifyCommittedEffect(tx, request);
+    const classify = () =>
+      correction
+        ? this.repository
+            .findEffect(tx, request)
+            .then((effect) =>
+              classifyCorrectionEvidence(tx, correction, effect),
+            )
+        : this.classifyCommittedEffect(tx, request);
+    const early = await classify();
     if (early) return early;
     const op = request.operation;
     const debits =
@@ -153,6 +211,8 @@ export class PhysicalInventoryService {
       discovered.length === sourceIds.length,
       'PHYSICAL_POSITION_NOT_FOUND',
     );
+    if (correction)
+      await assertCorrectionSources(tx, correction, request, discovered);
     const productIds = sortedUnique([
       ...discovered.map((p) => p.productId),
       ...targets.map((p) => p.productId),
@@ -163,7 +223,7 @@ export class PhysicalInventoryService {
       productIds,
     );
     requirePhysical(products.length === productIds.length, 'PRODUCT_NOT_FOUND');
-    const lockedReplay = await this.classifyCommittedEffect(tx, request);
+    const lockedReplay = await classify();
     if (lockedReplay) return lockedReplay;
     const batchIds = sortedUnique(
       [
@@ -186,6 +246,8 @@ export class PhysicalInventoryService {
       sourceIds,
       targets,
     );
+    if (correction)
+      await assertCorrectionSources(tx, correction, request, positions);
     const byId = new Map(positions.map((p) => [p.id, p]));
     requirePhysical(
       sourceIds.every((id) => byId.has(id)),
@@ -304,14 +366,20 @@ export class PhysicalInventoryService {
       select: { id: true },
     });
     requirePhysical(actor, 'INVENTORY_TENANT_MISMATCH');
-    const replay = await this.classifyCommittedEffect(tx, request);
+    const replay = await classify();
     if (replay) return replay;
-    const header = await this.repository.claimEffect(
-      tx,
-      request,
-      physicalRequestHash(request),
-      lines.length,
-    );
+    const header = correction
+      ? await this.repository.claimDispatchCorrectionEffect(
+          tx,
+          correction.root,
+          lines.length,
+        )
+      : await this.repository.claimEffect(
+          tx,
+          request,
+          physicalRequestHash(request),
+          lines.length,
+        );
     const staged: Prisma.InventoryPhysicalEffectLineCreateManyInput[] = [];
     for (const [index, line] of lines.entries()) {
       const position =
