@@ -1,0 +1,873 @@
+{
+  "baselineCommit": "619c9b6",
+  "prismaVersion": "6.19.3",
+  "typescriptVersion": "5.9.3",
+  "sameInstalledDependencies": true,
+  "noFileEmission": true,
+  "globalSpecsGate": "FAIL",
+  "baselineCount": 70,
+  "currentCount": 70,
+  "installedMatchesMemory": true,
+  "addedLocations": [],
+  "removedLocations": [],
+  "changedMessages": [
+    {
+      "baseline": {
+        "file": "test/inventory-opening.postgres.e2e-spec.ts",
+        "line": 476,
+        "code": 2345,
+        "message": "Argument of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Promise<never>' is not assignable to parameter of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Prisma__InventoryPhysicalEffectClient<{ id: string; ... 10 more ...; occurredAt: Date; }, never, DefaultArgs, PrismaClientOptions>'.\n  Type 'Promise<never>' is missing the following properties from type 'Prisma__InventoryPhysicalEffectClient<{ id: string; companyId: string; createdAt: Date; actorId: string; reason: string | null; requestHash: string; originType: string; originId: string; originOperation: string; kind: InventoryPhysicalEffectKind; lineCount: number; occurredAt: Date; }, never, DefaultArgs, PrismaClie...': reconciliationReturns, reconciliationUses, dispatchItems, openingCutoverProduct, and 3 more."
+      },
+      "current": {
+        "file": "test/inventory-opening.postgres.e2e-spec.ts",
+        "line": 476,
+        "code": 2345,
+        "message": "Argument of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Promise<never>' is not assignable to parameter of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Prisma__InventoryPhysicalEffectClient<{ id: string; ... 10 more ...; occurredAt: Date; }, never, DefaultArgs, PrismaClientOptions>'.\n  Type 'Promise<never>' is missing the following properties from type 'Prisma__InventoryPhysicalEffectClient<{ id: string; companyId: string; createdAt: Date; actorId: string; reason: string | null; requestHash: string; originType: string; originId: string; originOperation: string; kind: InventoryPhysicalEffectKind; lineCount: number; occurredAt: Date; }, never, DefaultArgs, PrismaClie...': correctionOriginalItems, correctionCompensatingItems, reconciliationReturns, reconciliationUses, and 5 more."
+      }
+    }
+  ],
+  "baselineDiagnostics": [
+    {
+      "file": "src/config/cors-options.spec.ts",
+      "line": 19,
+      "code": 2558,
+      "message": "Expected 0 type arguments, but got 1."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 27,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 71,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 91,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 100,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 175,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 177,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 114,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 128,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 142,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 176,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 193,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 211,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 223,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 232,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 241,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 249,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 260,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 269,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 275,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 289,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 317,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 333,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 352,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 369,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 381,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 393,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 405,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 425,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 437,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 446,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignment-availability.spec.ts",
+      "line": 124,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignment-availability.spec.ts",
+      "line": 219,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 384,
+      "code": 2322,
+      "message": "Type '\"WAREHOUSE\" | \"ADMIN\" | \"MANAGER\"' is not assignable to type '\"ADMIN\"'.\n  Type '\"WAREHOUSE\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 403,
+      "code": 2322,
+      "message": "Type '\"SALES\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 568,
+      "code": 2322,
+      "message": "Type '\"WAREHOUSE\" | \"ADMIN\" | \"MANAGER\"' is not assignable to type '\"ADMIN\"'.\n  Type '\"WAREHOUSE\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 591,
+      "code": 2322,
+      "message": "Type '\"SALES\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.controller.spec.ts",
+      "line": 54,
+      "code": 2345,
+      "message": "Argument of type '{ page: number; pageSize: number; status: \"ACTIVE\"; city: string; state: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Types of property 'status' are incompatible.\n    Type '\"ACTIVE\"' is not assignable to type 'HealthcareMasterStatus'. Did you mean 'HealthcareMasterStatus.INACTIVE'?"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.controller.spec.ts",
+      "line": 118,
+      "code": 2345,
+      "message": "Argument of type '{ page: number; pageSize: number; status: \"ALL\"; search: string; }' is not assignable to parameter of type 'HealthcareMasterListQueryDto'.\n  Types of property 'status' are incompatible.\n    Type '\"ALL\"' is not assignable to type 'HealthcareMasterStatus'."
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 205,
+      "code": 2345,
+      "message": "Argument of type '{ search: string; city: string; state: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ search: string; city: string; state: string; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize, status"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 229,
+      "code": 2345,
+      "message": "Argument of type '{ search: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ search: string; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize, status"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 241,
+      "code": 2345,
+      "message": "Argument of type '{ status: HealthcareMasterStatus; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ status: HealthcareMasterStatus; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize"
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 363,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 618,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 624,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 681,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 745,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 822,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 897,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 898,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 899,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 900,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 902,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 908,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 932,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 939,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 965,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 972,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 985,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 986,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1016,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1026,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1032,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1033,
+      "code": 2322,
+      "message": "Type '\"ACTIVE\" | \"RETIRED\"' is not assignable to type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1176,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/inventory/physical/sales-physical.spec.ts",
+      "line": 273,
+      "code": 2345,
+      "message": "Argument of type '{ apply: jest.Mock<any, any, any>; }' is not assignable to parameter of type 'InventoryCompatibilityProjectionService'.\n  Property 'applyBatchDeltas' is missing in type '{ apply: jest.Mock<any, any, any>; }' but required in type 'InventoryCompatibilityProjectionService'."
+    },
+    {
+      "file": "test/healthcare-case-kits.http.e2e-spec.ts",
+      "line": 296,
+      "code": 2345,
+      "message": "Argument of type '\"not-a-uuid\"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'."
+    },
+    {
+      "file": "test/healthcare-doctors-hospitals.persistence.e2e-spec.ts",
+      "line": 312,
+      "code": 2554,
+      "message": "Expected 4 arguments, but got 2."
+    },
+    {
+      "file": "test/healthcare-doctors-hospitals.persistence.e2e-spec.ts",
+      "line": 312,
+      "code": 2352,
+      "message": "Conversion of type '{ allocateNextAvailableFolio: () => Promise<string>; }' to type 'HealthcareCaseFolioService' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ allocateNextAvailableFolio: () => Promise<string>; }' is missing the following properties from type 'HealthcareCaseFolioService': companySequenceAllocator, formatHealthcareCaseFolio"
+    },
+    {
+      "file": "test/inventory-opening.postgres.e2e-spec.ts",
+      "line": 476,
+      "code": 2345,
+      "message": "Argument of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Promise<never>' is not assignable to parameter of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Prisma__InventoryPhysicalEffectClient<{ id: string; ... 10 more ...; occurredAt: Date; }, never, DefaultArgs, PrismaClientOptions>'.\n  Type 'Promise<never>' is missing the following properties from type 'Prisma__InventoryPhysicalEffectClient<{ id: string; companyId: string; createdAt: Date; actorId: string; reason: string | null; requestHash: string; originType: string; originId: string; originOperation: string; kind: InventoryPhysicalEffectKind; lineCount: number; occurredAt: Date; }, never, DefaultArgs, PrismaClie...': reconciliationReturns, reconciliationUses, dispatchItems, openingCutoverProduct, and 3 more."
+    }
+  ],
+  "currentDiagnostics": [
+    {
+      "file": "src/config/cors-options.spec.ts",
+      "line": 19,
+      "code": 2558,
+      "message": "Expected 0 type arguments, but got 1."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 27,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 71,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 91,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 100,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 175,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/config/env.validation.spec.ts",
+      "line": 177,
+      "code": 2790,
+      "message": "The operand of a 'delete' operator must be optional."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 114,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 128,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 142,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 176,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 193,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 211,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 223,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 232,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 241,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 249,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 260,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 269,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 275,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 289,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 317,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 333,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 352,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 369,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 381,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 393,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 405,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 425,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 437,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/cases/healthcare-cases.controller.spec.ts",
+      "line": 446,
+      "code": 2345,
+      "message": "Argument of type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is not assignable to parameter of type 'AuthenticatedRequest'.\n  Type '{ user: { id: string; companyId: string; email: string; firstName: string; lastName: string; role: \"ADMIN\"; }; }' is missing the following properties from type 'AuthenticatedRequest': cache, credentials, destination, headers, and 18 more."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignment-availability.spec.ts",
+      "line": 124,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignment-availability.spec.ts",
+      "line": 219,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 384,
+      "code": 2322,
+      "message": "Type '\"WAREHOUSE\" | \"ADMIN\" | \"MANAGER\"' is not assignable to type '\"ADMIN\"'.\n  Type '\"WAREHOUSE\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 403,
+      "code": 2322,
+      "message": "Type '\"SALES\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 568,
+      "code": 2322,
+      "message": "Type '\"WAREHOUSE\" | \"ADMIN\" | \"MANAGER\"' is not assignable to type '\"ADMIN\"'.\n  Type '\"WAREHOUSE\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/equipment-assignments/healthcare-equipment-assignments.controller.spec.ts",
+      "line": 591,
+      "code": 2322,
+      "message": "Type '\"SALES\"' is not assignable to type '\"ADMIN\"'."
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.controller.spec.ts",
+      "line": 54,
+      "code": 2345,
+      "message": "Argument of type '{ page: number; pageSize: number; status: \"ACTIVE\"; city: string; state: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Types of property 'status' are incompatible.\n    Type '\"ACTIVE\"' is not assignable to type 'HealthcareMasterStatus'. Did you mean 'HealthcareMasterStatus.INACTIVE'?"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.controller.spec.ts",
+      "line": 118,
+      "code": 2345,
+      "message": "Argument of type '{ page: number; pageSize: number; status: \"ALL\"; search: string; }' is not assignable to parameter of type 'HealthcareMasterListQueryDto'.\n  Types of property 'status' are incompatible.\n    Type '\"ALL\"' is not assignable to type 'HealthcareMasterStatus'."
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 205,
+      "code": 2345,
+      "message": "Argument of type '{ search: string; city: string; state: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ search: string; city: string; state: string; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize, status"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 229,
+      "code": 2345,
+      "message": "Argument of type '{ search: string; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ search: string; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize, status"
+    },
+    {
+      "file": "src/healthcare/hospitals/healthcare-hospitals.service.spec.ts",
+      "line": 241,
+      "code": 2345,
+      "message": "Argument of type '{ status: HealthcareMasterStatus; }' is not assignable to parameter of type 'HealthcareHospitalListQueryDto'.\n  Type '{ status: HealthcareMasterStatus; }' is missing the following properties from type 'HealthcareHospitalListQueryDto': page, pageSize"
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 363,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 618,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 624,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 681,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 745,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 822,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 897,
+      "code": 2322,
+      "message": "Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 898,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 899,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 900,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 902,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 908,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 932,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 939,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 965,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 972,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 985,
+      "code": 2322,
+      "message": "Type 'Date' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 986,
+      "code": 2322,
+      "message": "Type 'string' is not assignable to type 'null | undefined'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1016,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1026,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1032,
+      "code": 2345,
+      "message": "Argument of type '\"ACTIVE\" | \"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1033,
+      "code": 2322,
+      "message": "Type '\"ACTIVE\" | \"RETIRED\"' is not assignable to type '\"ACTIVE\" | undefined'.\n  Type '\"RETIRED\"' is not assignable to type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/healthcare/requirements/healthcare-requirements.service.spec.ts",
+      "line": 1176,
+      "code": 2345,
+      "message": "Argument of type '\"RETIRED\"' is not assignable to parameter of type '\"ACTIVE\"'."
+    },
+    {
+      "file": "src/inventory/physical/sales-physical.spec.ts",
+      "line": 273,
+      "code": 2345,
+      "message": "Argument of type '{ apply: jest.Mock<any, any, any>; }' is not assignable to parameter of type 'InventoryCompatibilityProjectionService'.\n  Property 'applyBatchDeltas' is missing in type '{ apply: jest.Mock<any, any, any>; }' but required in type 'InventoryCompatibilityProjectionService'."
+    },
+    {
+      "file": "test/healthcare-case-kits.http.e2e-spec.ts",
+      "line": 296,
+      "code": 2345,
+      "message": "Argument of type '\"not-a-uuid\"' is not assignable to parameter of type '`${string}-${string}-${string}-${string}-${string}`'."
+    },
+    {
+      "file": "test/healthcare-doctors-hospitals.persistence.e2e-spec.ts",
+      "line": 312,
+      "code": 2554,
+      "message": "Expected 4 arguments, but got 2."
+    },
+    {
+      "file": "test/healthcare-doctors-hospitals.persistence.e2e-spec.ts",
+      "line": 312,
+      "code": 2352,
+      "message": "Conversion of type '{ allocateNextAvailableFolio: () => Promise<string>; }' to type 'HealthcareCaseFolioService' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.\n  Type '{ allocateNextAvailableFolio: () => Promise<string>; }' is missing the following properties from type 'HealthcareCaseFolioService': companySequenceAllocator, formatHealthcareCaseFolio"
+    },
+    {
+      "file": "test/inventory-opening.postgres.e2e-spec.ts",
+      "line": 476,
+      "code": 2345,
+      "message": "Argument of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Promise<never>' is not assignable to parameter of type '(tx: TransactionClient, input: { companyId: string; cutoverId: string; productId: string; actorId: string; requestHash: string; lineCount: number; }) => Prisma__InventoryPhysicalEffectClient<{ id: string; ... 10 more ...; occurredAt: Date; }, never, DefaultArgs, PrismaClientOptions>'.\n  Type 'Promise<never>' is missing the following properties from type 'Prisma__InventoryPhysicalEffectClient<{ id: string; companyId: string; createdAt: Date; actorId: string; reason: string | null; requestHash: string; originType: string; originId: string; originOperation: string; kind: InventoryPhysicalEffectKind; lineCount: number; occurredAt: Date; }, never, DefaultArgs, PrismaClie...': correctionOriginalItems, correctionCompensatingItems, reconciliationReturns, reconciliationUses, and 5 more."
+    }
+  ]
+}

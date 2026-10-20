@@ -3,7 +3,7 @@
 **Milestone:** M-HC1 · **Prioridad:** P0
 **Workflow propuesto:** REFINEMENT → READY cuando 01A esté documentado e integrado
 **Story Points:** TBD tras inspección de constraints/migraciones
-**Dependencia:** HC-DSP-COR-01A — contrato V0.7 aprobado, pendiente merge documental de la aprobación y TD. Al merge, 01B puede pasar a READY tras refinamiento de SP/DoR.
+**Dependencia:** HC-DSP-COR-01A — aprobación y TD integrados en main mediante PR #101, base `619c9b6` de esta rama. La revisión humana de 01B sigue pendiente; este checkpoint no actualiza el Project Board.
 
 ## Objetivo
 
@@ -44,3 +44,17 @@ No compensar balances, transferir CUSTODY, cerrar custodia Equipment, modificar 
 ## Definition of Done
 
 PR focal de schema/migración/tests/docs revisado y merged en main; sin rutas expuestas ni cambios reales de inventario; evidencia de QA reproducible. Hasta ese merge, estado no puede ser `DONE`.
+
+## Checkpoint Pre-PR — 2026-10-20
+
+Persistencia, migración forward-only, guards diferidos, hash/idempotencia y lectura interna implementados en feat/hc-dsp-cor-01b-persistence, base 619c9b6 (PR #101). Sin endpoints ni compensaciones productivas. Evidencia y comandos en [Persistence & Witness 01B](../modules/healthcare/CASE_DISPATCH_CORRECTION_PERSISTENCE_01B.md).
+
+QA externo comunicado desde PostgreSQL 16.15 aislado (zaping-hc-cor-01b-pg, 127.0.0.1:5435, zaping_hc_dsp_cor_01b_test): migraciones PASS, **Persistence 29/29 PASS** y **Hardening 37/37 PASS sin instrumentación en dos ejecuciones completas consecutivas**. La versión final completó **66/66 PASS**. Codex no ejecutó PostgreSQL.
+
+Remediación: rechazos específicos por diagnóstico/constraint (incluido el CHECK decodificado desde el envelope Prisma), DispatchItem de otro Dispatch de la misma Company/Case/CaseKit y autorización fija a 5435. NOWAIT de dos conexiones y rechazo específico 55P03 validados externamente en Persistence. Se conservan **29 Persistence + 37 Hardening = 66/66 PASS** sobre la versión final.
+
+Unitarios 01B: 153 tests / 5 suites PASS. Regresión ampliada Dispatch/RR: 330 tests / 11 suites PASS. Typecheck focal y lint focal/global PASS. El typecheck global de specs permanece **FAIL: 70 errores preexistentes**, sin nuevas localizaciones; artefacto baseline/current conservado. Build API PASS previamente reportado; comparación global documentada y artefacto conservado. **La excepción del typecheck global FAIL está pendiente de aceptación humana expresa; los gates focales no la dispensan.** Comprobaciones finales en el documento de evidencia.
+
+Incidente EQUIPMENT: una ejecución previa 36/37 falló durante la creación inicial del witness; causa raíz no confirmada e intermitencia no declarada resuelta. Con diagnóstico: Hardening 37/37, subconjunto 10/10 y caso aislado 1/1 PASS. Últimos predicados: una fila, ninguno falso/NULL, cero eventos adicionales, deltas temporales +33 ms / +26 ms y diferencias respecto de confirmación 0 ms / 0 ms. El hook temporal fue retirado sin modificar fixtures ni fechas; después, dos ejecuciones completas consecutivas sin instrumentación obtuvieron 37/37 PASS. Estos resultados no demuestran resuelta la intermitencia.
+
+Revisión humana, PR y ensayos sobre bases pobladas pendientes. No se autoriza migración real, despliegue, cutover, activación de writers o actualización del Project Board. No declarar DONE. RISK-006 permanece **OPEN / NOT REPRODUCED**.

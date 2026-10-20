@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.spec.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": [
+    "../src/healthcare/case-dispatch-corrections/**/*.ts",
+    "case-dispatch-correction-*.postgres.e2e-spec.ts",
+    "helpers/dispatch-correction-*.ts"
+  ]
+}
