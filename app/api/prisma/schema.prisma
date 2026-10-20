@@ -144,6 +144,9 @@ enum InventoryPhysicalEffectKind {
 }
 
 model InventoryPosition {
+  correctionSources      HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionSourcePosition")
+  correctionDestinations HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionDestinationPosition")
+
   reconciliationSources      HealthcareCaseReconciliationItem[] @relation("ReconciliationSourcePosition")
   reconciliationDestinations HealthcareCaseReconciliationItem[] @relation("ReconciliationDestinationPosition")
 
@@ -174,6 +177,9 @@ model InventoryPosition {
 }
 
 model InventoryPhysicalEffect {
+  correctionOriginalItems     HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionOriginalEffect")
+  correctionCompensatingItems HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionCompensatingEffect")
+
   reconciliationReturns HealthcareCaseReconciliationItem[] @relation("ReconciliationReturnedEffect")
   reconciliationUses    HealthcareCaseReconciliationItem[] @relation("ReconciliationUsedEffect")
 
@@ -240,6 +246,7 @@ enum ProductLotTracking {
 }
 
 enum IdempotencyScope {
+  HEALTHCARE_CASE_DISPATCH_CORRECTION_NO_HANDOFF
   HEALTHCARE_CASE_RECONCILIATION_CREATE
   HEALTHCARE_CASE_RECONCILIATION_ITEM_ADD
   HEALTHCARE_CASE_RECONCILIATION_OUTCOME_SET
@@ -478,6 +485,8 @@ model PurchaseReceiptItem {
 }
 
 model Company {
+  dispatchCorrections HealthcareCaseDispatchCorrection[]
+
   caseReconciliations HealthcareCaseReconciliation[]
 
   caseDispatches HealthcareCaseDispatch[]
@@ -546,18 +555,20 @@ model CompanySequence {
 }
 
 model IdempotencyRecord {
-  id          String           @id @default(uuid())
-  companyId   String
-  scope       IdempotencyScope
-  key         String
-  requestHash String
-  resourceId  String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  dispatchCorrection HealthcareCaseDispatchCorrection?
+  id                 String                            @id @default(uuid())
+  companyId          String
+  scope              IdempotencyScope
+  key                String
+  requestHash        String
+  resourceId         String?
+  createdAt          DateTime                          @default(now())
+  updatedAt          DateTime                          @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   @@unique([companyId, scope, key])
+  @@unique([id, companyId], map: "IdempotencyRecord_correction_identity_key")
 }
 
 enum HealthcareCaseStatus {
@@ -609,6 +620,8 @@ enum HealthcareCaseKitItemLifecycle {
 }
 
 model User {
+  dispatchCorrectionsConfirmed HealthcareCaseDispatchCorrection[] @relation("DispatchCorrectionActor")
+
   createdReconciliations      HealthcareCaseReconciliation[]      @relation("ReconciliationCreatedBy")
   confirmedReconciliations    HealthcareCaseReconciliation[]      @relation("ReconciliationConfirmedBy")
   cancelledReconciliations    HealthcareCaseReconciliation[]      @relation("ReconciliationCancelledBy")
@@ -776,6 +789,8 @@ model HealthcareDoctorHospitalAffiliation {
 }
 
 model HealthcareCase {
+  dispatchCorrections HealthcareCaseDispatchCorrection[]
+
   reconciliations HealthcareCaseReconciliation[]
 
   dispatches HealthcareCaseDispatch[]
@@ -875,6 +890,8 @@ model HealthcareCaseRequirement {
 }
 
 model EquipmentAsset {
+  dispatchCorrectionItems HealthcareCaseDispatchCorrectionItem[]
+
   reconciliationItems HealthcareCaseReconciliationItem[]
 
   dispatchItems HealthcareCaseDispatchItem[]
@@ -1388,6 +1405,8 @@ model InventoryCutoverLegacySale {
 }
 
 model EquipmentAssetCustody {
+  dispatchCorrectionItems HealthcareCaseDispatchCorrectionItem[]
+
   reconciliationItems HealthcareCaseReconciliationItem[]
 
   dispatchItems HealthcareCaseDispatchItem[]
@@ -1417,6 +1436,9 @@ model EquipmentAssetCustody {
 }
 
 model EquipmentAssetPhysicalEvent {
+  correctionOpenItems  HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionOpenEvent")
+  correctionCloseItems HealthcareCaseDispatchCorrectionItem[] @relation("CorrectionCloseEvent")
+
   reconciliationItems HealthcareCaseReconciliationItem[]
 
   dispatchItems HealthcareCaseDispatchItem[]
@@ -1489,6 +1511,8 @@ enum HealthcareCaseDispatchAuditOperation {
 }
 
 model HealthcareCaseDispatch {
+  correction HealthcareCaseDispatchCorrection?
+
   reconciliations HealthcareCaseReconciliation[]
 
   id                    String                              @id @default(uuid())
@@ -1528,6 +1552,8 @@ model HealthcareCaseDispatch {
 }
 
 model HealthcareCaseDispatchItem {
+  correctionItems HealthcareCaseDispatchCorrectionItem[]
+
   reconciliationItems HealthcareCaseReconciliationItem[]
 
   id                       String                              @id @default(uuid())
@@ -1727,4 +1753,80 @@ model HealthcareCaseReconciliationAudit {
 
   @@unique([companyId, reconciliationId, revisionAfter], map: "Reconciliation_audit_revision_key")
   @@index([companyId, reconciliationId, createdAt, id], map: "Reconciliation_audit_list_idx")
+}
+
+enum HealthcareCaseDispatchCorrectionKind {
+  NO_PHYSICAL_HANDOFF
+}
+
+enum HealthcareCaseDispatchCorrectionStatus {
+  CONFIRMED
+}
+
+// SQL requires a complete sealed witness at commit. Null snapshots/evidence are
+// transaction-local staging only; seal the root last. No application writer yet.
+model HealthcareCaseDispatchCorrection {
+  // Internal top-level transaction identity, checked by SQL; not a public state.
+  creationTransactionId Unsupported("xid8")                    @default(dbgenerated("pg_current_xact_id()"))
+  id                    String                                 @id @default(uuid())
+  companyId             String
+  caseId                String
+  caseKitId             String
+  dispatchId            String
+  kind                  HealthcareCaseDispatchCorrectionKind   @default(NO_PHYSICAL_HANDOFF)
+  status                HealthcareCaseDispatchCorrectionStatus @default(CONFIRMED)
+  reason                String                                 @db.VarChar(1000)
+  attestedNoHandoff     Boolean
+  confirmedById         String
+  confirmedAt           DateTime                               @default(now())
+  hashVersion           Int                                    @default(1)
+  requestHash           String                                 @db.Char(64)
+  idempotencyRecordId   String                                 @unique(map: "DispatchCorrection_idempotency_key")
+  snapshotVersion       Int                                    @default(1)
+  snapshot              Json?                                  @db.JsonB
+  company               Company                                @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  healthcareCase        HealthcareCase                         @relation(fields: [caseId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  dispatch              HealthcareCaseDispatch                 @relation(fields: [dispatchId, companyId, caseId, caseKitId], references: [id, companyId, caseId, caseKitId], onDelete: Restrict, onUpdate: Restrict)
+  confirmedBy           User                                   @relation("DispatchCorrectionActor", fields: [confirmedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  idempotencyRecord     IdempotencyRecord                      @relation(fields: [idempotencyRecordId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  items                 HealthcareCaseDispatchCorrectionItem[]
+
+  @@unique([companyId, dispatchId], map: "DispatchCorrection_dispatch_key")
+  @@unique([dispatchId, companyId, caseId, caseKitId], map: "DispatchCorrection_dispatch_relation_key")
+  @@unique([idempotencyRecordId, companyId], map: "DispatchCorrection_idempotency_relation_key")
+  @@unique([id, companyId, dispatchId], map: "DispatchCorrection_parent_key")
+  @@index([companyId, caseId, confirmedAt, id], map: "DispatchCorrection_case_idx")
+  @@index([creationTransactionId], map: "DispatchCorrection_creation_transaction_idx")
+}
+
+model HealthcareCaseDispatchCorrectionItem {
+  id                       String                           @id @default(uuid())
+  companyId                String
+  correctionId             String
+  dispatchId               String
+  sourceDispatchItemId     String
+  type                     HealthcareCaseDispatchItemType
+  quantity                 Int?
+  originalPhysicalEffectId String?
+  sourceCustodyPositionId  String?
+  compensatingEffectId     String?
+  destinationPositionId    String?
+  assetId                  String?
+  equipmentCustodyId       String?
+  openPhysicalEventId      String?
+  closePhysicalEventId     String?                          @unique(map: "DispatchCorrectionItem_close_key")
+  snapshot                 Json?                            @db.JsonB
+  correction               HealthcareCaseDispatchCorrection @relation(fields: [correctionId, companyId, dispatchId], references: [id, companyId, dispatchId], onDelete: Restrict, onUpdate: Restrict)
+  sourceDispatchItem       HealthcareCaseDispatchItem       @relation(fields: [sourceDispatchItemId, companyId, dispatchId], references: [id, companyId, dispatchId], onDelete: Restrict, onUpdate: Restrict)
+  originalPhysicalEffect   InventoryPhysicalEffect?         @relation("CorrectionOriginalEffect", fields: [originalPhysicalEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  sourceCustodyPosition    InventoryPosition?               @relation("CorrectionSourcePosition", fields: [sourceCustodyPositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  compensatingEffect       InventoryPhysicalEffect?         @relation("CorrectionCompensatingEffect", fields: [compensatingEffectId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  destinationPosition      InventoryPosition?               @relation("CorrectionDestinationPosition", fields: [destinationPositionId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  asset                    EquipmentAsset?                  @relation(fields: [assetId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  equipmentCustody         EquipmentAssetCustody?           @relation(fields: [equipmentCustodyId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  openPhysicalEvent        EquipmentAssetPhysicalEvent?     @relation("CorrectionOpenEvent", fields: [openPhysicalEventId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+  closePhysicalEvent       EquipmentAssetPhysicalEvent?     @relation("CorrectionCloseEvent", fields: [closePhysicalEventId, companyId, assetId], references: [id, companyId, equipmentAssetId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, correctionId, sourceDispatchItemId], map: "DispatchCorrectionItem_source_key")
+  @@index([companyId, sourceDispatchItemId], map: "DispatchCorrectionItem_source_idx")
 }
