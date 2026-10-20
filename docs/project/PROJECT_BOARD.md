@@ -346,7 +346,7 @@ No implica despliegue, readiness operativa ni cierre de Healthcare Operations Fo
 
 ### HC-DSP-COR-01 — Corrección auditada de Dispatch confirmado sin entrega física
 
-**M-HC1: OPEN. P0 RELEASE GATE. TD V0.8 / 01A: APPROVED / MERGED — PR #101. 01B: IMPLEMENTATION COMPLETE / MERGED — PR #102. 01C–01F: BACKLOG.**
+**M-HC1: OPEN. P0 RELEASE GATE. TD V0.8 / 01A: APPROVED / MERGED — PR #101. 01B: IMPLEMENTATION COMPLETE / MERGED — PR #102. 01C: REFINEMENT ACTIVO / NO IMPLEMENTACIÓN. 01D–01F: BACKLOG.**
 
 Contexto operativo INSAP: ajustes manuales con observación corrigen diferencias `AVAILABLE`; **no** corrigen por sí solos `CUSTODY` ni episodios Equipment. V1 permitirá una única compensación **completa** de un Dispatch `CONFIRMED` registrado por error **sin entrega física**, conservando el hecho original. ADMIN/MANAGER declara expresamente que no hubo entrega y consigna motivo; corrección inmutable con actor/fecha y efectos nuevos. Material: `TRANSFER CUSTODY → AVAILABLE`, mismo Product/batch, sin aumento de `Product.stock` owned. Equipment: `CUSTODY_CLOSE` de origen corrección, `WAREHOUSE`, preservando condición/lifecycle, sin eventos físicos posteriores a su `CUSTODY_OPEN`. R/R `DRAFT` bloquea hasta cancelación explícita, `CONFIRMED` bloquea; `CANCELLED` coherente sin efectos no bloquea. Lecturas: «Corregido — sin entrega física» separado de Return/Reconciliation y del status histórico `CONFIRMED`; sin pendiente físico ficticio.
 
@@ -354,7 +354,7 @@ Contexto operativo INSAP: ajustes manuales con observación corrigen diferencias
 | --- | --- | --- |
 | HC-DSP-COR-01A | Technical Design Approval Delta | **APPROVED / MERGED — PR #101 — main@619c9b6** |
 | HC-DSP-COR-01B | Persistence & Witness | **IMPLEMENTATION COMPLETE / MERGED — PR #102 — main@af4fe0d** |
-| HC-DSP-COR-01C | Compensación MATERIAL QUANTITY | **BACKLOG** |
+| HC-DSP-COR-01C | Compensación MATERIAL QUANTITY | **ÚNICO TICKET PRINCIPAL ACTIVO — REFINEMENT / NOT READY FOR IMPLEMENTATION** |
 | HC-DSP-COR-01D | Compensación Equipment | **BACKLOG** |
 | HC-DSP-COR-01E | RR admission, read model y bloqueos | **BACKLOG** |
 | HC-DSP-COR-01F | QA PostgreSQL y release gate backend | **BACKLOG** |
@@ -365,11 +365,15 @@ Evidencia histórica comunicada por el responsable: PostgreSQL aislado Persisten
 
 Typecheck global de specs: **FAIL, 70 errores preexistentes, sin nuevas localizaciones reportadas**; excepción pendiente de aceptación humana expresa. Intermitencia EQUIPMENT: sin causa raíz confirmada ni resolución demostrada. **RISK-006: OPEN / NOT REPRODUCED. M-HC1: OPEN.** El merge no demuestra resolución ni aceptación formal de estas excepciones y riesgos.
 
-**La corrección operativa de Dispatch no está habilitada.** 01B integra Persistence & Witness, sin endpoints públicos ni writers productivos. No autoriza despliegue, migración real, cutover o activación. **01C–01F: BACKLOG**; no se cierra el release operativo.
+**La corrección operativa de Dispatch no está habilitada.** 01B integra Persistence & Witness, sin endpoints públicos ni writers productivos. No autoriza despliegue, migración real, cutover o activación. **01C: REFINEMENT ACTIVO; 01D–01F: BACKLOG**; no se cierra el release operativo.
 
 Para comenzar **HC-DSP-COR-01C**, 01A y la dependencia de persistencia 01B están integradas. Falta concretar y revisar el contrato de locks/replay/claim y fence Inventory sin invertir el protocolo vigente; verificar checksum de la migración y coordinar cliente Prisma/nuevo enum para el futuro writer. 01C debe cubrir MATERIAL QUANTITY `CUSTODY → AVAILABLE`, autoridad/fence, batch/proyecciones, idempotencia y rollback sin ruta pública. 01D (Equipment), 01E (serialización RR y lecturas discriminadas) y 01F (QA PostgreSQL/release gate) siguen siendo dependencias de habilitación conjunta. Conservar el seguimiento de typecheck y EQUIPMENT; iniciar 01C no acredita aceptación de excepciones ni autoriza el release.
 
-Story Points / Forecast / Commitment / Actual / fechas: TBD; no inventar. API de compensación **no habilitada** hasta que 01B–01F estén integrados y aceptados con PostgreSQL real, clientes compatibles, regresiones y revisión humana. Sin cutover de Company real, sin writers externos certificados. **RISK-006: OPEN / NOT REPRODUCED**, causa desconocida; no se acreditó fix.
+[Ticket 01C](HC_DSP_COR_01C_TICKET.md): único principal activo; ningún slice en implementación. Secuencia 01C-A → 01C-B → 01C-C, 5/5/3 SP preliminares (13 total), sin Target aprobado, Forecast, Commitment ni Actual. 01C-A pendiente de DoR específica; no READY FOR IMPLEMENTATION. Started/Merged de implementación, tiempos, bloqueos y retrabajo: no registrados; evidencia QA nueva: ninguna. El ticket conserva el detalle de métricas, AC y QA conforme al [workflow](../engineering/DEVELOPMENT_WORKFLOW.md#241-delivery-incremental-y-preparación-verificable).
+
+El orden final de locks requiere validación PostgreSQL real; la inspección no lo aprueba. Adapter hash/fecha interno específico, incluyendo creación/búsqueda/replay de Effects. Product/Batch no elegibles se rechazan; riesgo de vencimiento/desactivación posterior. Replay con autorización actual, misma Company/intención y actor histórico conservado; distinta key tras corrección: conflicto estable. Rechazo íntegro de Equipment ACTIVE, sin parciales ni caller público. No activar hasta integrar 01D/01E/01F.
+
+Forecast / Commitment / Actual / fechas: pendientes sin evidencia; no inventar. API de compensación **no habilitada** hasta que 01B–01F estén integrados y aceptados con PostgreSQL real, clientes compatibles, regresiones y revisión humana. Sin cutover de Company real, sin writers externos certificados. **RISK-006: OPEN / NOT REPRODUCED**, causa desconocida; no se acreditó fix.
 
 [Technical Design aprobado](../modules/healthcare/CASE_DISPATCH_CORRECTION_TECHNICAL_DESIGN.md) · [Aprobación 01A](../modules/healthcare/CASE_DISPATCH_CORRECTION_APPROVAL_01A.md) · [Ticket 01B](HC_DSP_COR_01B_TICKET.md).
 
