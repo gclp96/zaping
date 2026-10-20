@@ -4,6 +4,7 @@ import {
   InventoryPosition,
   Prisma,
   Product,
+  HealthcareCaseDispatchCorrection,
 } from '@prisma/client';
 import {
   PhysicalInventoryError,
@@ -15,6 +16,33 @@ import {
 
 @Injectable()
 export class PhysicalInventoryRepository {
+  // Only the specific adapter derives this root; no general writer overrides.
+  async claimDispatchCorrectionEffect(
+    tx: Prisma.TransactionClient,
+    root: HealthcareCaseDispatchCorrection,
+    lineCount: number,
+  ) {
+    try {
+      return await tx.inventoryPhysicalEffect.create({
+        data: {
+          companyId: root.companyId,
+          actorId: root.confirmedById,
+          kind: 'TRANSFER',
+          originType: 'CASE_DISPATCH_CORRECTION',
+          originId: root.id,
+          originOperation: 'COMPENSATE_NO_HANDOFF_QUANTITY',
+          requestHash: root.requestHash,
+          occurredAt: root.confirmedAt,
+          reason: root.reason,
+          lineCount,
+        },
+      });
+    } catch (error) {
+      if (isPhysicalUniqueViolation(error))
+        throw new PhysicalInventoryError('PHYSICAL_EFFECT_CLAIM_CONFLICT');
+      throw error;
+    }
+  }
   // Internal cutover primitive, deliberately absent from PhysicalRequest.
   claimOpeningEffect(
     tx: Prisma.TransactionClient,

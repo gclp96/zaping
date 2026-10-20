@@ -27,6 +27,58 @@ const request: PhysicalRequest = {
 };
 
 describe('physical inventory business intent', () => {
+  it('keeps generic Effect creation on its hash/default date contract', async () => {
+    const create = jest.fn().mockResolvedValue({ id: 'effect' });
+    const tx = {
+      inventoryPhysicalEffect: { create },
+    } as unknown as Prisma.TransactionClient;
+    await new PhysicalInventoryRepository().claimEffect(
+      tx,
+      request,
+      physicalRequestHash(request),
+      1,
+    );
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        companyId: request.companyId,
+        actorId: request.actorId,
+        originType: request.origin.type,
+        originId: request.origin.id,
+        originOperation: request.origin.operation,
+        kind: 'CREDIT',
+        requestHash: physicalRequestHash(request),
+        lineCount: 1,
+        reason: undefined,
+      },
+    });
+  });
+
+  it('finds correction Effects by the existing tenant/origin unique key', async () => {
+    const findUnique = jest.fn().mockResolvedValue(null);
+    const tx = {
+      inventoryPhysicalEffect: { findUnique },
+    } as unknown as Prisma.TransactionClient;
+    const origin = {
+      type: 'CASE_DISPATCH_CORRECTION',
+      id: randomUUID(),
+      operation: 'COMPENSATE_NO_HANDOFF_QUANTITY',
+    };
+    await new PhysicalInventoryRepository().findEffect(tx, {
+      ...request,
+      origin,
+    });
+    expect(findUnique).toHaveBeenCalledWith({
+      where: {
+        companyId_originType_originId_originOperation: {
+          companyId: request.companyId,
+          originType: origin.type,
+          originId: origin.id,
+          originOperation: origin.operation,
+        },
+      },
+      include: { lines: { orderBy: { sequence: 'asc' } } },
+    });
+  });
   it('aggregates repeated positions and canonicalizes order before hashing', () => {
     const second = { ...target, productId: randomUUID() };
     const a: PhysicalRequest = {
