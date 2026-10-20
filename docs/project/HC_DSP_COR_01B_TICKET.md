@@ -1,9 +1,23 @@
 # HC-DSP-COR-01B — Persistence & Witness
 
 **Milestone:** M-HC1 · **Prioridad:** P0
-**Workflow propuesto:** REFINEMENT → READY cuando 01A esté documentado e integrado
+**Estado actual:** IMPLEMENTATION COMPLETE / MERGED — PR #102; corrección operativa no habilitada
 **Story Points:** TBD tras inspección de constraints/migraciones
-**Dependencia:** HC-DSP-COR-01A — aprobación y TD integrados en main mediante PR #101, base `619c9b6` de esta rama. La revisión humana de 01B sigue pendiente; este checkpoint no actualiza el Project Board.
+**Dependencia:** HC-DSP-COR-01A — aprobación y TD integrados en main mediante PR #101, base `619c9b6` de esta rama. 01B integrado por PR #102; cierre documental post-merge reflejado en el Project Board.
+
+## Cierre de implementación e integración post-merge
+
+[PR #102](https://github.com/gclp96/zaping/pull/102) MERGED. Integración: `af4fe0d24cff828bad9b85b9ba52e69e95811c1d`. Commit funcional: `28b05820ab077a0b23fc3154d7c5ca6cc1000e5b`. Verificados en Git local: `main` y HEAD de `docs/hc-dsp-cor-01b-post-merge` coinciden con la integración y su segundo padre es el commit funcional. 01A integrado por PR #101 (`619c9b6`).
+
+Evidencia histórica comunicada por el responsable: PostgreSQL aislado Persistence **29/29 PASS** y Hardening **37/37 PASS**, con **dos ejecuciones completas consecutivas PASS sin instrumentación** de Hardening; total final **66/66 PASS**. Unitarias 01B **153/153 PASS**. PostgreSQL no se reejecutó en este cierre documental.
+
+Typecheck global de specs: **FAIL, 70 errores preexistentes, sin nuevas localizaciones reportadas**; excepción pendiente de aceptación humana expresa. Intermitencia EQUIPMENT: sin causa raíz confirmada ni resolución demostrada. **RISK-006: OPEN / NOT REPRODUCED. M-HC1: OPEN.** El merge no demuestra resolución ni aceptación formal de estas excepciones y riesgos.
+
+**La corrección operativa de Dispatch no está habilitada.** 01B integra Persistence & Witness, sin endpoints públicos ni writers productivos. No autoriza despliegue, migración real, cutover o activación. **01C–01F: BACKLOG**; no se cierra el release operativo.
+
+Para comenzar **HC-DSP-COR-01C**, 01A y la dependencia de persistencia 01B están integradas. Falta concretar y revisar el contrato de locks/replay/claim y fence Inventory sin invertir el protocolo vigente; verificar checksum de la migración y coordinar cliente Prisma/nuevo enum para el futuro writer. 01C debe cubrir MATERIAL QUANTITY `CUSTODY → AVAILABLE`, autoridad/fence, batch/proyecciones, idempotencia y rollback sin ruta pública. 01D (Equipment), 01E (serialización RR y lecturas discriminadas) y 01F (QA PostgreSQL/release gate) siguen siendo dependencias de habilitación conjunta. Conservar el seguimiento de typecheck y EQUIPMENT; iniciar 01C no acredita aceptación de excepciones ni autoriza el release.
+
+Los checkpoints Pre-PR y apartados de planificación siguientes se conservan como registro histórico. Las referencias a PR/revisión previa pendientes, ausencia de commit, inventario y comandos de staging corresponden a esa preparación anterior al merge; no describen el estado actual ni son instrucciones para este cierre documental. La aceptación formal de excepciones no se presume por el merge.
 
 ## Objetivo
 

@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
-Última actualización: 2026-10-17
+Última actualización: 2026-10-20
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -346,18 +346,28 @@ No implica despliegue, readiness operativa ni cierre de Healthcare Operations Fo
 
 ### HC-DSP-COR-01 — Corrección auditada de Dispatch confirmado sin entrega física
 
-**M-HC1: OPEN. P0 RELEASE GATE. CONTRACT V0.7: HUMAN APPROVED / PENDING DOC MERGE. IMPLEMENTATION: NOT STARTED.**
+**M-HC1: OPEN. P0 RELEASE GATE. TD V0.8 / 01A: APPROVED / MERGED — PR #101. 01B: IMPLEMENTATION COMPLETE / MERGED — PR #102. 01C–01F: BACKLOG.**
 
 Contexto operativo INSAP: ajustes manuales con observación corrigen diferencias `AVAILABLE`; **no** corrigen por sí solos `CUSTODY` ni episodios Equipment. V1 permitirá una única compensación **completa** de un Dispatch `CONFIRMED` registrado por error **sin entrega física**, conservando el hecho original. ADMIN/MANAGER declara expresamente que no hubo entrega y consigna motivo; corrección inmutable con actor/fecha y efectos nuevos. Material: `TRANSFER CUSTODY → AVAILABLE`, mismo Product/batch, sin aumento de `Product.stock` owned. Equipment: `CUSTODY_CLOSE` de origen corrección, `WAREHOUSE`, preservando condición/lifecycle, sin eventos físicos posteriores a su `CUSTODY_OPEN`. R/R `DRAFT` bloquea hasta cancelación explícita, `CONFIRMED` bloquea; `CANCELLED` coherente sin efectos no bloquea. Lecturas: «Corregido — sin entrega física» separado de Return/Reconciliation y del status histórico `CONFIRMED`; sin pendiente físico ficticio.
 
 | Slice | Alcance | Estado |
 | --- | --- | --- |
-| HC-DSP-COR-01A | Technical Design Approval Delta | **HUMAN APPROVED / DOC PR PENDING** |
-| HC-DSP-COR-01B | Persistence & Witness | **REFINEMENT / NOT IMPLEMENTED** |
+| HC-DSP-COR-01A | Technical Design Approval Delta | **APPROVED / MERGED — PR #101 — main@619c9b6** |
+| HC-DSP-COR-01B | Persistence & Witness | **IMPLEMENTATION COMPLETE / MERGED — PR #102 — main@af4fe0d** |
 | HC-DSP-COR-01C | Compensación MATERIAL QUANTITY | **BACKLOG** |
 | HC-DSP-COR-01D | Compensación Equipment | **BACKLOG** |
 | HC-DSP-COR-01E | RR admission, read model y bloqueos | **BACKLOG** |
 | HC-DSP-COR-01F | QA PostgreSQL y release gate backend | **BACKLOG** |
+
+[PR #102](https://github.com/gclp96/zaping/pull/102) MERGED. Integración: `af4fe0d24cff828bad9b85b9ba52e69e95811c1d`. Commit funcional: `28b05820ab077a0b23fc3154d7c5ca6cc1000e5b`. Verificados en Git local: `main` y HEAD de `docs/hc-dsp-cor-01b-post-merge` coinciden con la integración y su segundo padre es el commit funcional. 01A integrado por PR #101 (`619c9b6`).
+
+Evidencia histórica comunicada por el responsable: PostgreSQL aislado Persistence **29/29 PASS** y Hardening **37/37 PASS**, con **dos ejecuciones completas consecutivas PASS sin instrumentación** de Hardening; total final **66/66 PASS**. Unitarias 01B **153/153 PASS**. PostgreSQL no se reejecutó en este cierre documental.
+
+Typecheck global de specs: **FAIL, 70 errores preexistentes, sin nuevas localizaciones reportadas**; excepción pendiente de aceptación humana expresa. Intermitencia EQUIPMENT: sin causa raíz confirmada ni resolución demostrada. **RISK-006: OPEN / NOT REPRODUCED. M-HC1: OPEN.** El merge no demuestra resolución ni aceptación formal de estas excepciones y riesgos.
+
+**La corrección operativa de Dispatch no está habilitada.** 01B integra Persistence & Witness, sin endpoints públicos ni writers productivos. No autoriza despliegue, migración real, cutover o activación. **01C–01F: BACKLOG**; no se cierra el release operativo.
+
+Para comenzar **HC-DSP-COR-01C**, 01A y la dependencia de persistencia 01B están integradas. Falta concretar y revisar el contrato de locks/replay/claim y fence Inventory sin invertir el protocolo vigente; verificar checksum de la migración y coordinar cliente Prisma/nuevo enum para el futuro writer. 01C debe cubrir MATERIAL QUANTITY `CUSTODY → AVAILABLE`, autoridad/fence, batch/proyecciones, idempotencia y rollback sin ruta pública. 01D (Equipment), 01E (serialización RR y lecturas discriminadas) y 01F (QA PostgreSQL/release gate) siguen siendo dependencias de habilitación conjunta. Conservar el seguimiento de typecheck y EQUIPMENT; iniciar 01C no acredita aceptación de excepciones ni autoriza el release.
 
 Story Points / Forecast / Commitment / Actual / fechas: TBD; no inventar. API de compensación **no habilitada** hasta que 01B–01F estén integrados y aceptados con PostgreSQL real, clientes compatibles, regresiones y revisión humana. Sin cutover de Company real, sin writers externos certificados. **RISK-006: OPEN / NOT REPRODUCED**, causa desconocida; no se acreditó fix.
 
