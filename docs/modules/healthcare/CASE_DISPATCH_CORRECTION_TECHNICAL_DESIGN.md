@@ -439,3 +439,33 @@ Siguiente trabajo: `HC-DSP-COR-01B` — Persistence & Witness; sin endpoints hab
 Story Points, Commitment, fechas y Actual: **TBD** en refinamiento.
 
 **Referencias**: TD V0.7 y `docs/modules/healthcare/CASE_DISPATCH_TECHNICAL_DESIGN.md`, `docs/modules/healthcare/CASE_RECONCILIATION_TECHNICAL_DESIGN.md`, `docs/project/PROJECT_BOARD.md` de `main`.
+
+## 19. Refinement 01C — decisiones y límites vigentes
+
+Base de este refinamiento: main@0953883, posterior al PR #103. 01A está integrado por PR #101; 01B por PR #102 y su cierre documental por PR #103. Los checkpoints anteriores se conservan como historia; no representan el estado operativo actual. [Board](../../project/PROJECT_BOARD.md) y [ticket 01C](../../project/HC_DSP_COR_01C_TICKET.md) mantienen el seguimiento.
+
+01C es el único ticket principal activo, en refinamiento documental, sin implementación iniciada. Secuencia: 01C-A contrato Inventory y evidencia (5 SP preliminares), 01C-B orquestación MATERIAL-only (5 SP preliminares), 01C-C concurrencia y cierre (3 SP preliminares). No son Commitment, Forecast, Actual ni Target aprobado.
+
+### Contrato conservado y adapter específico
+
+Compensar CUSTODY → AVAILABLE desde la Position original de cada DispatchItem ACTIVE MATERIAL, mismo tenant/Product/Batch y cantidad exacta. Verificar cantidad y revisión actuales contra la evidencia original bajo locks, además de ausencia de movimientos posteriores incompatibles; saldo repuesto no demuestra historia intacta. Destino AVAILABLE canónico con contextType/contextId null. Conservar owned total, Product.stock sin incremento, Effects/Lines auditables e historia original de Dispatch; no restaurar capacidad CaseKit.
+
+Un Effect puede agrupar materiales; mantener mapping por fuente y totales agregados sin imponer un Effect por item. Product/Batch no elegibles siguen rechazándose por el contrato actual: vencimiento o desactivación posterior al Dispatch puede impedir la corrección. No introducir bypass ni relajar Inventory globalmente.
+
+El core actual calcula physicalRequestHash y crea occurredAt por default; 01B exige que el Effect compensatorio tenga requestHash y fecha iguales a la corrección. El adapter deberá ser interno y específico, derivando metadatos de la corrección staged y validando identidad, intención y transacción. No admitir overrides generales ni cambios de comportamiento en writers existentes. Revisar conjuntamente creación, búsqueda y replay de Effects: no basta adaptar el INSERT si findEffect/classifyCommittedEffect conserva una comparación incompatible. Origen: CASE_DISPATCH_CORRECTION / correction.id / COMPENSATE_NO_HANDOFF_QUANTITY. No se identifica una migración obligatoria por ese origen string; cualquier necesidad nueva exige diseño forward-only separado, sin editar migraciones existentes.
+
+### Protocolo candidato, todavía no validado
+
+Replay autorizado → READ COMMITTED → Inventory shared fence → claim con correctionId definitivo → control persistido/autoridad PHYSICAL/runtime → HC Company advisory lock/timeouts existentes → Case FOR SHARE → Dispatch FOR UPDATE → DispatchItems ordenados → Product → Batch → Positions fuente/destino ordenadas → validación/aplicación/proyecciones → snapshots y sello → commit.
+
+El orden es candidato por inspección, **no aprobado ni demostrado libre de inversiones**. Su orden final requiere PostgreSQL 16 real, aislado y autorizado con escritores competidores y ambas direcciones de adquisición. Conservar NOWAIT del sello 01B; timeout/deadlock/transporte no son rechazos de integridad ni duplicados. LEGACY/sin control rechaza PHYSICAL_AUTHORITY_REQUIRED; CUTOVER y RECOVERY_REQUIRED conservan sus bloqueos específicos. No adquirir el fence después de locks de negocio.
+
+Claim, root/items, transferencia, proyecciones y evidencia se completan en una sola transacción. Root sin snapshot, items y evidencias completos, snapshots de items y sello root al final; constraints diferidas verifican completitud. Cualquier error aborta todo. Colisiones se clasifican sólo tras rollback, mediante lectura fresca del ganador; Effect huérfano no se adopta como éxito.
+
+Replay entre actores exige autorización actual válida, misma Company e intención idéntica; conserva actor histórico y no depende del saldo físico vivo. Misma key con otro hash rechaza; distinta key para Dispatch ya corregido devuelve conflicto estable y ninguna compensación nueva. Mantener hash v1 de 01B, sin introducir precondiciones nuevas silenciosamente.
+
+### Dependencias de integración
+
+01C rechaza íntegramente Dispatch con Equipment ACTIVE antes de aplicar efectos. Sin compensación parcial, caller público ni exposición productiva. RR DRAFT/CONFIRMED bloquea; CANCELLED sólo si coherente y sin efectos. RR CREATE no toma el lock HC Company: su lock Dispatch y la comprobación posterior de corrección deben integrarse en 01E, junto con guards de otros comandos y lecturas discriminadas. 01D añade Equipment; 01F conserva QA integral. **Sin activar el flujo hasta integrar 01D, 01E y 01F y satisfacer los gates correspondientes.**
+
+M-HC1: **OPEN**. RISK-006: **OPEN / NOT REPRODUCED**. Incidente intermitente EQUIPMENT: sin causa raíz confirmada ni resolución demostrada. Typecheck global de specs: **FAIL, 70 errores históricos reportados**, sin nuevas localizaciones reportadas en la evidencia 01B; no se reejecutó ni se dispensa su excepción pendiente de aceptación humana. Sin cutover ni autorización de producción.

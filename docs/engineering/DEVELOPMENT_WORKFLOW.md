@@ -862,6 +862,31 @@ Cambios críticos además deben tener:
 
 ---
 
+## 24.1 Delivery incremental y preparación verificable
+
+Se conservan los sprints de dos semanas y el workflow existente. Mantener un solo ticket principal en ejecución y un solo slice en implementación; los slices se integran secuencialmente con alcance verificable. El refinamiento activo no equivale a implementación iniciada. El Board y el ticket conservan el trabajo accionable; no crear otro backlog o sistema de gestión.
+
+Antes de escribir código, la DoR debe registrar alcance y exclusiones, dependencias, riesgos, criterios de aceptación, estimación preliminar y estrategia QA. Para cambios de persistencia/concurrencia, definir primero fixtures válidas, pruebas negativas y diagnósticos esperados; revisar qué invariantes demuestra cada caso y qué requiere PostgreSQL real. No convertir mocks o pruebas omitidas en evidencia PostgreSQL.
+
+QA progresiva: unitarias → integración focal → PostgreSQL aislado y autorizado → concurrencia real → regresiones afectadas → CI. La integración focal sin DB no acredita integridad transaccional. Aplicar checks proporcionales al cambio y repetir/ampliar sólo ante cambios, fallos o dudas pendientes. Conservar los gates de ingeniería existentes.
+
+Registrar cada bloqueo y retrabajo con causa, evidencia y siguiente acción. Tras dos intentos diagnósticos sin nueva evidencia, detener ese ciclo y revisar hipótesis, instrumentación y estrategia; escalar la decisión cuando corresponda. No repetir indefinidamente ni relajar aserciones o timeouts para obtener PASS. Esta pausa diagnóstica no dispensa criterios de aceptación.
+
+En el registro del sprint existente, cerrar con una retrospectiva breve: resultado observado, bloqueo/retrabajo principal y una mejora concreta con responsable y revisión posterior. No inventar resultados retrospectivos.
+
+## 24.2 Métricas y niveles de entrega
+
+En el ticket responsable registrar Started, Merged, Target SP, Actual SP, tiempo estimado/real, bloqueo, retrabajo y evidencia QA. Started corresponde al inicio acreditado de implementación; Merged se verifica por PR/SHA. Mantener separadas estimación preliminar, Target aprobado, Forecast, Commitment y Actual. Actual SP requiere valoración explícita de cierre; no copiar Target ni convertir SP en horas. Tiempo real requiere registro; distinguir esfuerzo, tiempo transcurrido y tiempo bloqueado. Ausencia de evidencia se registra como pendiente/no registrado, nunca cero.
+
+Para bloqueos: inicio/fin cuando consten, causa, dependencia y resolución. Para retrabajo: motivo, cambio afectado y esfuerzo si se registró. Para QA: commit, comando, entorno, resultado y duración cuando existan. Las fechas de commits no reconstruyen esfuerzo ni Started por sí solas.
+
+- Backend integrado: implementación revisada e integrada con evidencia de su alcance.
+- Flujo demostrable: recorrido reproducible con las dependencias necesarias integradas.
+- Release-ready: gates integrales y aceptación correspondientes satisfechos.
+- Producción habilitada: autorización y despliegue/activación acreditados.
+
+Un nivel no acredita automáticamente el siguiente. El estado se mantiene en el Board/ticket; las reglas de dominio en su diseño, conforme a §26.
+
 # 25. Definition of Done
 
 Una funcionalidad está terminada cuando, según su alcance:
