@@ -1,9 +1,9 @@
 # HC-DSP-COR-01C — MATERIAL QUANTITY Compensation
 
-**Estado:** único ticket principal activo. 01C-A: POSTGRESQL QA 13/13 PASS / CODE REVIEW SIN BLOQUEOS FUNCIONALES / INTEGRACIÓN PENDIENTE. 01C-B y 01C-C pendientes; sin flujo operativo habilitado.
+**Estado actual:** HC-DSP-COR-01C es el único ticket principal activo, enfocado en 01C-B. **01C-A: DONE / MERGED — PR #105; 5 SP completados del Target aprobado. 01C-B: REFINEMENT / NOT READY FOR IMPLEMENTATION. 01C-C: PENDIENTE.** Corrección operativa de Dispatch deshabilitada.
 **Base del refinamiento:** main@0953883, integrado por PR #104. **Implementación A:** rama feat/hc-dsp-cor-01c-a-inventory-contract desde main@519f0dc.
 **Milestone:** M-HC1 OPEN. **Prioridad:** P0 release gate del conjunto.
-**Dependencias integradas:** 01A PR #101; 01B PR #102; cierre documental PR #103.
+**Dependencias integradas:** 01A PR #101; 01B PR #102; cierre documental PR #103; refinement PR #104; 01C-A PR #105 (main@2db5d64).
 **Fuentes:** [TD §19](../modules/healthcare/CASE_DISPATCH_CORRECTION_TECHNICAL_DESIGN.md#19-refinement-01c--decisiones-y-límites-vigentes), [Board](PROJECT_BOARD.md), [workflow](../engineering/DEVELOPMENT_WORKFLOW.md#241-delivery-incremental-y-preparación-verificable).
 
 ## Objetivo y alcance
@@ -22,11 +22,11 @@ Fuera de alcance: Equipment, ejecución parcial mixta, callers públicos, endpoi
 
 ## Slices secuenciales y estimación
 
-| Slice | Alcance / Acceptance Criteria | DoR específica | DoD específica | Riesgo / SP preliminares |
+| Slice | Alcance / Acceptance Criteria | DoR específica | DoD específica | Riesgo / SP y estado actual |
 | --- | --- | --- | --- | --- |
-| 01C-A | Contrato Inventory/evidencia: adapter específico; hash/fecha compatibles con 01B en creación, búsqueda y replay; agrupación y conservación; writers existentes sin cambio. Fixtures y negativas definidas antes de implementar. | Cumplir la lista de preparación siguiente. | Contrato implementado y revisado; unitarias e integración focal/PG autorizada acreditan compatibilidad con 01B; regresiones de writers existentes; sin caller productivo. | Core compartido y dos contratos de hash; Target aprobado 5 SP. |
-| 01C-B | Orquestación MATERIAL-only: autoridad, locks, claim, transferencia agrupada, proyecciones y witness atómicos; tenant/source/cantidad/revisión exactos; replay; rechazo mixto y RR incompatible; rollback total. | A integrado; contrato de errores y plan de locks/concurrencia revisados; fixtures/negativas de B definidas. | AC probados por unitarias e integración PG autorizada; dormancia verificada; documentación/evidencia revisadas. | Composición transaccional y carreras; 5 SP. |
-| 01C-C | Concurrencia y cierre: dos conexiones, duplicados, movimientos competidores, rollback, regresiones y evidencia; validar orden final de locks. | B integrado; barreras/diagnósticos y matriz concurrente revisados; entorno PG autorizado. | Matriz focal/concurrente y CI requeridas PASS, o no cerrar el slice; evidencia por commit y límites documentados. Sin atribuir gates 01D/01E/01F. | Sincronización y diagnóstico; 3 SP. |
+| 01C-A | Contrato Inventory/evidencia: adapter específico; hash/fecha compatibles con 01B en creación, búsqueda y replay; agrupación y conservación; writers existentes sin cambio. Fixtures y negativas definidas antes de implementar. | Cumplir la lista de preparación siguiente. | Contrato implementado y revisado; unitarias e integración focal/PG autorizada acreditan compatibilidad con 01B; regresiones de writers existentes; sin caller productivo. | Core compartido y dos contratos de hash; **DONE / MERGED — PR #105; 5 SP completados (Target 5)**. |
+| 01C-B | Orquestación MATERIAL-only: autoridad, locks, claim, transferencia agrupada, proyecciones y witness atómicos; tenant/source/cantidad/revisión exactos; replay; rechazo mixto y RR incompatible; rollback total. | A integrado; contrato de errores y plan de locks/concurrencia revisados; fixtures/negativas de B definidas. | AC probados por unitarias e integración PG autorizada; dormancia verificada; documentación/evidencia revisadas. | Composición transaccional y carreras; **REFINEMENT / NOT READY FOR IMPLEMENTATION**; 5 SP preliminares. |
+| 01C-C | Concurrencia y cierre: dos conexiones, duplicados, movimientos competidores, rollback, regresiones y evidencia; validar orden final de locks. | B integrado; barreras/diagnósticos y matriz concurrente revisados; entorno PG autorizado. | Matriz focal/concurrente y CI requeridas PASS, o no cerrar el slice; evidencia por commit y límites documentados. Sin atribuir gates 01D/01E/01F. | Sincronización y diagnóstico; **PENDIENTE**; 3 SP preliminares. |
 
 Referencia de refinamiento: 13 SP preliminares totales (5/5/3). Autorización posterior: únicamente 01C-A tiene Target aprobado de 5 SP; B/C conservan 5/3 preliminares. Sin Commitment, Forecast ni Actual. No equivalen a horas ni compromiso de completar los tres slices en un sprint. La estimación responde a adaptación del core compartido (A), transacción de dominio (B) y evidencia concurrente (C). Revisar si cambia el alcance; preservar historial de la estimación. Cada slice lleva QA propia; C no difiere la validación esencial de A/B.
 
@@ -79,14 +79,14 @@ Backend integrado no equivale a flujo demostrable, release-ready o producción h
 | Campo | Estado inicial / regla |
 | --- | --- |
 | Started | 2026-10-20, inicio real de implementación de A en esta sesión autorizada; no reconstruido de commits. |
-| Merged | Ningún merge de implementación 01C acreditado. Registrar PR/SHA cuando ocurra. |
+| Merged | 01C-A: PR #105, main@2db5d64, 2026-10-20 16:25:23 America/Hermosillo (2026-10-20T23:25:23Z), verificado en Git y GitHub. B/C sin merge. |
 | Target SP | A = 5 aprobado. B/C = 5/3 preliminares, sin Target aprobado. |
-| Actual SP | No registrado; no copiar Target. |
+| Actual SP | Sin reestimación Actual. Se registran **5 SP completados del Target de A**, únicamente por DoD acreditada; no se convierten en horas. |
 | Forecast / Commitment | No establecidos. |
 | Tiempo estimado / real | No registrados; no convertir SP a horas. Separar esfuerzo y tiempo transcurrido. |
 | Bloqueo | Sin medición registrada; capturar inicio/fin, causa, dependencia y resolución cuando existan. Pendientes DoR no implican duración inventada. |
 | Retrabajo | Sin medición registrada; capturar motivo, cambio y esfuerzo cuando consten. |
-| Evidencia QA | Codex: 253/253 PASS locales, build/lint/typecheck focal y productivo PASS reportados. Usuario: PostgreSQL QA 13/13 PASS, exit 0; evidencia externa posterior registrada abajo. Integración pendiente. |
+| Evidencia QA | Codex: 253/253 PASS locales, build/lint/typecheck focal y productivo PASS reportados. Usuario: PostgreSQL QA 13/13 PASS, exit 0. CI API/Web SUCCESS sobre adbbdb6; PR #105 merged. Cierre DoD post-merge registrado abajo. |
 
 Mantener sprints de dos semanas y un principal/un slice en implementación. Retrospectiva breve en el registro del sprint existente, con evidencia y acción concreta; no crear otro sistema de gestión.
 
@@ -152,7 +152,7 @@ No se amplió el inventario autorizado ni se modificó schema, SQL, módulos, ru
 
 Veredicto histórico local: **READY FOR POSTGRESQL QA**, ejecución real **BLOCKED / NOT EXECUTED** hasta preparación y autorización manual del entorno A. No DONE. git diff --check e inventario exacto de diez archivos verificados al entregar; cinco nuevos sin staging no aparecen en git diff --stat normal.
 
-## Estado actual de 01C-A — QA externa y cierre del P2
+## Estado histórico previo al merge — QA externa y cierre del P2
 
 **PostgreSQL QA: 13/13 PASS, exit code 0. Code Review final: sin bloqueos funcionales. Integración pendiente. P2 documental resuelto mediante esta actualización.** No se ha realizado staging, commit, push o PR; no declarar MERGED ni habilitación operativa.
 
@@ -170,3 +170,29 @@ Target aprobado de A: **5 SP**; sin Commitment, Forecast ni Actual establecidos.
 M-HC1 **OPEN**; RISK-006 **OPEN / NOT REPRODUCED**; incidente intermitente EQUIPMENT sin causa confirmada; typecheck global conserva el historial **FAIL con 70 errores reportados**, sin nueva ejecución ni aceptación automática. Sin cutover ni producción habilitada.
 
 **Veredicto documental: READY.** P2 resuelto; integración pendiente.
+
+## Cierre post-merge de 01C-A — DONE / MERGED
+
+**DoD del slice A acreditada. 01C-A: DONE / MERGED, 5 SP completados correspondientes al Target aprobado de 5 SP.** No se establece Commitment, Forecast, reestimación Actual ni horas trabajadas. Started conserva la fecha ya registrada de 2026-10-20; no se reconstruye ni se añaden tiempos sin evidencia.
+
+[PR #105](https://github.com/gclp96/zaping/pull/105) verificado merged hacia main mediante GitHub y Git local. Commit de integración: **2db5d64596552cb8802cce9c64fac93876dfc251**; commit funcional: **adbbdb63849b4cfd40e7b137f8c7aeacc207ead7**, segundo padre del merge. HEAD de docs/hc-dsp-cor-01c-a-post-merge y main coinciden con la integración al verificar este cierre. Merge confirmado el 2026-10-20T23:25:23Z (16:25:23 America/Hermosillo).
+
+### Comprobación de la DoD de A
+
+| Criterio de DoD del slice | Evidencia y conclusión |
+| --- | --- |
+| Contrato Inventory/evidencia implementado y revisado | Diez archivos integrados en PR #105; adapter interno específico, compatibilidad 01B, sin cambio de contrato de writers existentes ni caller productivo. Revisión técnica final aprobada en la sesión, sin bloqueos funcionales; también registrada en la descripción del PR. |
+| Unitarias, integración focal y regresiones | **253/253 PASS, 11 suites**, ejecutadas localmente por Codex y registradas antes del merge; incluyen 37 pruebas del adapter. No reejecutadas en este cierre. |
+| Compatibilidad PostgreSQL real con 01B | **13/13 PASS, exit code 0**, ejecución manual externa del usuario: PostgreSQL 16.15, 127.0.0.1:5436, zaping_hc_dsp_cor_01c_a_test. Codex no ejecutó PostgreSQL. Se conserva arriba el primer intento con 13 FAIL por INCOMPATIBLE_BUILD y la posterior configuración de runtime Inventory. |
+| Checks aplicables y CI | Build, lint, formato y typecheck focal/productivo locales PASS reportados. [CI #327](https://github.com/gclp96/zaping/actions/runs/39514031375), sobre adbbdb63849b4cfd40e7b137f8c7aeacc207ead7: completed/success verificado en GitHub; jobs [API](https://github.com/gclp96/zaping/actions/runs/39514031375/job/118941751820) y [Web](https://github.com/gclp96/zaping/actions/runs/39514031375/job/118941752053) completed/success. No atribuir esa ejecución a Codex ni inferir certificación de concurrencia global de corrección. |
+| Seguridad, tenant, errores y dormancia | Revisión final y pruebas del alcance A acreditadas; sin endpoints públicos, nueva activación o corrección parcial mixta. No se requiere migración nueva para este slice. |
+| Documentación y P2 | P2 documental corregido e integrado en PR #105; QA externa y checkpoint histórico diferenciados. Este cierre sincroniza únicamente ticket y Board. |
+| Integración | PR #105 merged, SHAs verificados; por ello se satisface la dependencia de integración de A para refinar B. |
+
+El cierre es del contrato interno A y representa **backend integrado de ese alcance**. No acredita flujo completo demostrable, release-ready o producción habilitada. El typecheck global de specs conserva su historial **FAIL con 70 errores reportados**; los PASS focales y CI no dispensan ni aceptan automáticamente esa deuda. M-HC1 permanece **OPEN**; RISK-006 **OPEN / NOT REPRODUCED**; intermitencia EQUIPMENT sin causa confirmada.
+
+### Transición administrativa hacia 01C-B
+
+HC-DSP-COR-01C conserva la condición de único ticket principal activo. **01C-B: REFINEMENT, NO READY FOR IMPLEMENTATION**; ningún nuevo slice se inicia por este cierre. A integrado satisface una dependencia, no toda la DoR de B. Antes de código, concretar orquestación caller-owned y prefijo de autoridad/fence/locks, contrato de errores e idempotencia, persistencia/sello/proyecciones atómicos y fixtures/negativas propias. Revisar el plan de concurrencia y estrategia PostgreSQL autorizada y aprobar el alcance/Target de B. Sus 5 SP siguen preliminares; sin Started ni Commitment/Forecast/Actual nuevos. **01C-C permanece pendiente**, con 3 SP preliminares.
+
+El orden global de locks, carreras reales con escritores Inventory/Dispatch/RR y gates de 01D/01E/01F siguen pendientes. **Corrección operativa de Dispatch deshabilitada**, sin cutover ni autorización de producción. Este cierre documental no modifica código, pruebas o schema; no ejecuta PostgreSQL ni realiza staging, commit, push o PR. Los estados de integración pendiente y bloqueo anteriores se conservan exclusivamente como historia.
