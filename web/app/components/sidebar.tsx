@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import Link from "next/link";
 
 import {
@@ -21,7 +21,6 @@ type SidebarProps = {
   onClose?: () => void;
   transitionEnabled?: boolean;
   currentUserRole?: UserRole | null;
-  onLogout?: () => void;
 };
 
 export default function Sidebar({
@@ -36,7 +35,6 @@ export default function Sidebar({
   onClose,
   transitionEnabled = true,
   currentUserRole,
-  onLogout,
 }: SidebarProps) {
   const navigationGroups = getVisibleNavigationGroups(currentUserRole);
 
@@ -155,18 +153,6 @@ export default function Sidebar({
           </div>
         ))}
       </nav>
-      {onLogout ? (
-        <button
-          type="button"
-          onClick={onLogout}
-          aria-label="Cerrar sesión"
-          title={collapsed ? "Cerrar sesión" : undefined}
-          className={`mt-auto flex min-h-10 items-center rounded-ui-md px-3 py-2 text-sm text-slate-300 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring ${collapsed ? "justify-center" : "gap-3"}`}
-        >
-          <LogOut aria-hidden="true" size={19} />
-          <span className={collapsed ? "sr-only" : ""}>Cerrar sesión</span>
-        </button>
-      ) : null}
     </aside>
   );
 }

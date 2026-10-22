@@ -2,19 +2,14 @@ import { useEffect } from "react";
 
 import {
   cleanup,
+  act,
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearAuthenticatedSessionCache,
@@ -102,7 +97,9 @@ function mockAuthSuccess(session: AuthenticatedSession = adminSession) {
   });
 }
 
-function renderShell(child = <div data-testid="protected-child">Protected child</div>) {
+function renderShell(
+  child = <div data-testid="protected-child">Protected child</div>,
+) {
   return render(<AppShell>{child}</AppShell>);
 }
 
@@ -117,11 +114,52 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+// Deterministic matchMedia events test state transitions, not CSS geometry.
+function mockViewport(initialWidth = 1279) {
+  const listeners = new Set<EventListenerOrEventListenerObject>();
+  const media = {
+    matches: initialWidth >= 1280,
+    media: "(min-width: 80rem)",
+    addEventListener: vi.fn(
+      (_type: string, listener: EventListenerOrEventListenerObject) =>
+        listeners.add(listener),
+    ),
+    removeEventListener: vi.fn(
+      (_type: string, listener: EventListenerOrEventListenerObject) =>
+        listeners.delete(listener),
+    ),
+  };
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn((query: string) => {
+      if (query !== media.media)
+        throw new Error("Unexpected media query: " + query);
+      return media as unknown as MediaQueryList;
+    }),
+  );
+  return {
+    media,
+    listeners,
+    resize(width: number) {
+      const matches = width >= 1280;
+      if (media.matches === matches) return;
+      media.matches = matches;
+      const event = new Event("change");
+      for (const listener of [...listeners]) {
+        if (typeof listener === "function") listener(event);
+        else listener.handleEvent(event);
+      }
+    },
+  };
+}
+
 describe("AppShell session gate", () => {
+  let viewport: ReturnType<typeof mockViewport>;
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    viewport = mockViewport();
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
     navigationMock.pathname = "/products";
@@ -135,6 +173,8 @@ describe("AppShell session gate", () => {
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.style.overflow = "";
   });
 
   it.each(["ADMIN", "MANAGER", "SALES", "WAREHOUSE"] as const)(
@@ -143,6 +183,9 @@ describe("AppShell session gate", () => {
       window.localStorage.setItem("token", "valid-token");
       mockAuthSuccess({ ...adminSession, role });
       renderShell();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Cuenta de Admin Test" }),
+      );
       await userEvent.click(
         await screen.findByRole("button", { name: "Cerrar sesión" }),
       );
@@ -163,20 +206,183 @@ describe("AppShell session gate", () => {
     },
   );
 
-  it("offers logout inside the mobile drawer and closes it", async () => {
+  it("keeps account actions outside the drawer and logs out through the header", async () => {
+    const user = userEvent.setup();
     window.localStorage.setItem("token", "valid-token");
     mockAuthSuccess();
     renderShell();
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Abrir navegación" }),
+    await user.click(
+      await screen.findByRole("button", { name: "Cuenta de Admin Test" }),
     );
-    const buttons = screen.getAllByRole("button", { name: "Cerrar sesión" });
-    await userEvent.click(buttons[buttons.length - 1]);
+    expect(
+      screen.getByRole("region", { name: "Opciones de cuenta" }),
+    ).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Abrir navegación" }));
+    const drawer = screen.getByRole("dialog");
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Cuenta de Admin Test" }),
+    ).toBeNull();
+    expect(
+      within(drawer).queryByRole("link", { name: "Cambiar contraseña" }),
+    ).toBeNull();
+    expect(
+      within(drawer).queryByRole("button", { name: "Cerrar sesión" }),
+    ).toBeNull();
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Abrir navegación" }),
+    );
+    const account = screen.getByRole("button", {
+      name: "Cuenta de Admin Test",
+    });
+    expect(account.getAttribute("aria-expanded")).toBe("false");
+    await user.click(account);
+    await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
     expect(window.localStorage.getItem("token")).toBeNull();
+    expect(screen.queryByTestId("protected-child")).toBeNull();
     await waitFor(() =>
       expect(navigationMock.replace).toHaveBeenCalledWith("/login"),
     );
+  });
+
+  it("navigates to the existing password route and resets the disclosure on route changes without refetching session", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    const view = renderShell();
+    await user.click(
+      await screen.findByRole("button", { name: "Cuenta de Admin Test" }),
+    );
+    const link = screen.getByRole("link", { name: "Cambiar contraseña" });
+    expect(link.getAttribute("href")).toBe("/change-password");
+    link.addEventListener("click", (event) => event.preventDefault());
+    await user.click(link);
+    expect(screen.queryByRole("region")).toBeNull();
+    await user.click(
+      screen.getByRole("button", { name: "Cuenta de Admin Test" }),
+    );
+    navigationMock.pathname = "/change-password";
+    view.rerender(
+      <AppShell>
+        <div data-testid="protected-child">Protected child</div>
+      </AppShell>,
+    );
+    expect(
+      within(screen.getByRole("banner")).getByText("Cambiar contraseña"),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getByRole("button", { name: "Cuenta de Admin Test" })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes the mobile drawer at 1280 after opening at 1279, restores scroll and moves focus to visible content", async () => {
+    const user = userEvent.setup();
+    document.body.style.overflow = "scroll";
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    renderShell();
+    await screen.findByRole("button", { name: /^Cuenta/ });
+    const mobileTrigger = screen.getByRole("button", {
+      name: "Abrir navegación",
+    });
+    await user.click(mobileTrigger);
+    expect(document.activeElement).toBe(screen.getByRole("dialog"));
+    expect(document.body.style.overflow).toBe("hidden");
+    const hiddenTriggerFocus = vi.spyOn(mobileTrigger, "focus");
+
+    act(() => viewport.resize(1280));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.body.style.overflow).toBe("scroll");
+    expect(screen.getAllByRole("button", { name: /^Cuenta/ })).toHaveLength(1);
+    expect(document.activeElement).toBe(screen.getByRole("main"));
+    expect(hiddenTriggerFocus).not.toHaveBeenCalled();
+    expect(viewport.listeners.size).toBe(0);
+    expect(viewport.media.removeEventListener).toHaveBeenCalledWith(
+      "change",
+      expect.any(Function),
+    );
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(window.localStorage.getItem("token")).toBe("valid-token");
+
+    act(() => viewport.resize(1279));
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Cuenta/ })).toHaveLength(1);
+    expect(document.activeElement).toBe(screen.getByRole("main"));
+    await user.click(screen.getByRole("button", { name: /^Cuenta/ }));
+    expect(
+      screen.getByRole("link", { name: "Cambiar contraseña" }),
+    ).toBeTruthy();
+    await user.click(mobileTrigger);
+    expect(
+      screen.queryByRole("region", { name: "Opciones de cuenta" }),
+    ).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(document.activeElement).toBe(mobileTrigger);
+    expect(document.body.style.overflow).toBe("scroll");
+    document.body.style.overflow = "";
+  });
+
+  it("preserves focus already outside the drawer when entering desktop", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    renderShell(<input aria-label="Page input" />);
+    await user.click(
+      await screen.findByRole("button", { name: "Abrir navegación" }),
+    );
+    const input = screen.getByRole("textbox", { name: "Page input" });
+    input.focus(); // Historical drawer focus-trap debt is not changed by this fix.
+    act(() => viewport.resize(1280));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(input);
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("removes the breakpoint listener and restores scroll when unmounted with the drawer open", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    const view = renderShell();
+    await user.click(
+      await screen.findByRole("button", { name: "Abrir navegación" }),
+    );
+    expect(viewport.listeners.size).toBe(1);
+    view.unmount();
+    expect(viewport.listeners.size).toBe(0);
+    expect(document.body.style.overflow).toBe("");
+    act(() => viewport.resize(1280));
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("handles a breakpoint change between the opening click and the drawer effect without focusing hidden controls", async () => {
+    window.localStorage.setItem("token", "valid-token");
+    mockAuthSuccess();
+    renderShell();
+    const mobileTrigger = await screen.findByRole("button", {
+      name: "Abrir navegación",
+    });
+    mobileTrigger.focus();
+    const hiddenTriggerFocus = vi.spyOn(mobileTrigger, "focus");
+    act(() => {
+      mobileTrigger.click();
+      viewport.resize(1280);
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "Cuenta de Admin Test" }),
+    ).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("main"));
+    expect(hiddenTriggerFocus).not.toHaveBeenCalled();
+    expect(document.body.style.overflow).toBe("");
+    expect(viewport.listeners.size).toBe(0);
   });
 
   it("does not restore a cleared session cache from an older request", async () => {
@@ -328,9 +534,7 @@ describe("AppShell session gate", () => {
     );
     expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_NEW_PASSWORD");
     expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_RESET_TOKEN");
-    expect(serializedConsoleArgs).not.toContain(
-      "SUPER_SECRET_RESPONSE_SECRET",
-    );
+    expect(serializedConsoleArgs).not.toContain("SUPER_SECRET_RESPONSE_SECRET");
   });
 
   it("does not fetch protected child data before auth bootstrap completes", async () => {
