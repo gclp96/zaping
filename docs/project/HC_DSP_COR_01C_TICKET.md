@@ -1,6 +1,6 @@
 # HC-DSP-COR-01C — MATERIAL QUANTITY Compensation
 
-**Estado actual:** HC-DSP-COR-01C permanece como ticket principal activo, con el siguiente foco en el refinamiento de 01C-C. **01C-A: DONE / MERGED — PR #105, Target 5 SP completados. 01C-B: DONE / MERGED — PR #109, Target 5 SP completados. 01C-C: PENDIENTE / NOT READY FOR IMPLEMENTATION — 3 SP preliminares.** Corrección operativa de Dispatch deshabilitada.
+**Estado actual:** HC-DSP-COR-01C permanece como ticket principal activo, con el siguiente foco en el refinamiento de 01C-C. **01C-A: DONE / MERGED — PR #105, Target 5 SP completados. 01C-B: DONE / MERGED — PR #109, Target 5 SP completados. 01C-C: REFINEMENT / NOT READY FOR IMPLEMENTATION — 3 SP preliminares, sin Target aprobado.** Corrección operativa de Dispatch deshabilitada.
 **Base del refinamiento:** main@0953883, integrado por PR #104. **Implementación A:** rama feat/hc-dsp-cor-01c-a-inventory-contract desde main@519f0dc.
 **Milestone:** M-HC1 OPEN. **Prioridad:** P0 release gate del conjunto.
 **Dependencias integradas:** 01A PR #101; 01B PR #102; cierre documental PR #103; refinement PR #104; 01C-A PR #105 (main@2db5d64); cierre A PR #106 (main@10a5327).
@@ -26,7 +26,7 @@ Fuera de alcance: Equipment, ejecución parcial mixta, callers públicos, endpoi
 | --- | --- | --- | --- | --- |
 | 01C-A | Contrato Inventory/evidencia: adapter específico; hash/fecha compatibles con 01B en creación, búsqueda y replay; agrupación y conservación; writers existentes sin cambio. Fixtures y negativas definidas antes de implementar. | Cumplir la lista de preparación siguiente. | Contrato implementado y revisado; unitarias e integración focal/PG autorizada acreditan compatibilidad con 01B; regresiones de writers existentes; sin caller productivo. | Core compartido y dos contratos de hash; **DONE / MERGED — PR #105; 5 SP completados (Target 5)**. |
 | 01C-B | Orquestación MATERIAL-only: autoridad, locks, claim, transferencia agrupada, proyecciones y witness atómicos; tenant/source/cantidad/revisión exactos; replay; rechazo mixto y RR incompatible; rollback total. | A integrado; contrato de errores y plan de locks/concurrencia revisados; fixtures/negativas de B definidas. | AC probados por unitarias e integración PG autorizada; dormancia verificada; documentación/evidencia revisadas. | Composición transaccional y carreras; **DONE / MERGED — PR #109**; Target **5 SP aprobado y completado**; sin Actual SP recalculados. |
-| 01C-C | Concurrencia y cierre: dos conexiones, duplicados, movimientos competidores, rollback, regresiones y evidencia; validar orden final de locks. | B integrado; barreras/diagnósticos y matriz concurrente revisados; entorno PG autorizado. | Matriz focal/concurrente y CI requeridas PASS, o no cerrar el slice; evidencia por commit y límites documentados. Sin atribuir gates 01D/01E/01F. | Sincronización y diagnóstico; **PENDIENTE**; 3 SP preliminares. |
+| 01C-C | Concurrencia y cierre: dos conexiones, duplicados, movimientos competidores, rollback, regresiones y evidencia; validar orden final de locks. | B integrado; barreras/diagnósticos y matriz concurrente revisados; entorno PG autorizado. | Matriz focal/concurrente y CI requeridas PASS, o no cerrar el slice; evidencia por commit y límites documentados. Sin atribuir gates 01D/01E/01F. | Sincronización y diagnóstico; **REFINEMENT / NOT READY FOR IMPLEMENTATION**; 3 SP preliminares, sin Target aprobado. |
 
 Estimación de referencia original: 13 SP (5/5/3); al cierre, A y B cuentan con Target aprobado de 5 SP cada uno, completados tras DoD y merge; C conserva 3 SP preliminares. Autorizaciones posteriores: A y B tienen Target aprobado de 5 SP cada uno; C conserva 3 SP preliminares. Sin Commitment, Forecast ni Actual. No equivalen a horas ni compromiso de completar los tres slices en un sprint. La estimación responde a adaptación del core compartido (A), transacción de dominio (B) y evidencia concurrente (C). Revisar si cambia el alcance; preservar historial de la estimación. Cada slice lleva QA propia; C no difiere la validación esencial de A/B.
 
@@ -318,3 +318,46 @@ Validación documental final: `git diff --check` sin diagnósticos de whitespace
 **Evidencia conservada, sin reejecución en este cierre documental:** revisión humana del inventario exacto de once archivos y `git diff --cached --check` PASS; QA focal final **260/260 PASS** (ocho suites, incluyendo 45 del comando); PostgreSQL 16 aislado **31/31 PASS**, 0 skipped, exit code 0, ejecución manual declarada por el responsable en `127.0.0.1:5437 / zaping_hc_dsp_cor_01c_b_test`; TypeScript focal/productivo, ESLint, Prettier y build API PASS según el checkpoint previo. [CI #341](https://github.com/gclp96/zaping/actions/runs/39818610916) completó **API SUCCESS / Web SUCCESS** sobre el commit del PR. GitHub confirmó PR mergeable y ausencia de review threads abiertos antes del merge. No se atribuyen las pruebas PostgreSQL a CI ni a Codex.
 
 **Límite de entrega:** B integra exclusivamente el comando interno MATERIAL-only; no registra caller/controlador/endpoints productivos, no ejecuta cutover y no activa Dispatch Correction. El hallazgo **P3 no bloqueante** de precisión de fault injection permanece documentado. Las carreras globales, orden final de locks y QA concurrente pertenecen a **01C-C**, que permanece pendiente de DoR, alcance/Target y autorización para PostgreSQL. Equipment (01D), RR/read models (01E) y release gate integral (01F) siguen en backlog. **M-HC1 OPEN; RISK-006 OPEN / NOT REPRODUCED; intermitencia EQUIPMENT sin causa raíz confirmada; typecheck global histórico con 70 errores sin dispensa formal.** Los checkpoints previos de «NOT MERGED» se conservan arriba como historial anterior a esta integración.
+
+## HC-DSP-COR-01C-C — Refinement / DoR propuesta (2026-10-22)
+
+**Estado:** REFINEMENT / NOT READY FOR IMPLEMENTATION. Base inspeccionada: `main@c17ef9cd0729b4b05602537113c4a8b38d922bb2`, que incluye PR #109 y cierre documental PR #110. **3 SP preliminares**, no Target aprobado ni Commitment/Forecast/Actual. Esta sección es una propuesta documental para revisión: no constituye autorización de desarrollar, ejecutar PostgreSQL, cambiar writers existentes o hacer cutover.
+
+### Frontera técnica comprobada por inspección (no por carrera real)
+
+- `healthcare-case-dispatch-correction-command.service.ts`: write READ COMMITTED, Inventory shared authority fence → control PHYSICAL/runtime → claim → HC Company advisory lock → Case FOR SHARE → Dispatch FOR UPDATE → Items ACTIVE ordenados → adapter MATERIAL → proyecciones y witness/sello.
+- `healthcare-case-dispatch-confirm.service.ts` y `healthcare-case-reconciliation-confirm.service.ts`: adquieren Inventory shared fence antes de HC Company lock en rutas materiales; después existen diferencias específicas en roots/locks. Esto **no certifica** ausencia de inversión entre escritores.
+- `healthcare-case-reconciliation-command.service.ts`: `CREATE` toma Case/Dispatch `FOR KEY SHARE` y comprueba Dispatch CONFIRMED; falta el admission guard post-corrección que corresponde a **01E**. C debe registrar esta ventana de carrera como dependencia, no darla por resuelta con sólo `FOR UPDATE` de B.
+- `inventory-cutover-activation.service.ts`: usa el Inventory **exclusive** fence; para C sólo se propone comprobar compartido/exclusivo con dos transacciones controladas, **sin ejecutar activación/cutover real**.
+- El E2E de B ya cubre con dos conexiones/PIDs y barrera una misma key: una ejecución nueva, un replay y un Effect. **Reusar como regresión**, no presentarlo como matriz C nueva.
+
+### Matriz de Acceptance Criteria candidata
+
+| ID | Carrera / negativo | Evidencia mínima de aprobación | Frontera |
+| --- | --- | --- | --- |
+| C-AC-01 | Dos comandos de corrección sobre el **mismo Dispatch con keys distintas**, en ambos órdenes viables | Dos sesiones/PIDs, resultado ganador persistido único, segundo rechazo tipado (sin replay ni segundo Effect), mismos hechos históricos y sin parcial | C |
+| C-AC-02 | Corrección vs writer de movimiento físico sobre Product/Batch/Position compartidos, ambos órdenes | Barreras deterministas antes de locks/persistencia; serialización segura **o** rechazo estable al releer historia/revisión, owned y proyecciones coherentes, nunca overwrite | C |
+| C-AC-03 | Corrección vs Reconciliation `CREATE` / `CANCEL` / `CONFIRM` con etapas ejecutables y ambos sentidos | Registrar qué locks se esperan, cuál operación se bloquea, resultado y estado final; `DRAFT/CONFIRMED` previo rechaza compensación. **El guard después del commit y la política completa de admission de RR no se aceptan como PASS de C: son 01E** | C diagnostica; 01E implementa guards |
+| C-AC-04 | Corrección con shared fence vs transacción de prueba que obtiene exclusive fence, ambos órdenes | El protocolo serializa y no permite escrituras bajo la fase exclusiva; preflight/lecturas de control coherentes. **No correr cutover real** | C |
+| C-AC-05 | Clasificación de colisiones, timeout/deadlock/transporte y abortos | Diferenciar colisión de negocio y error transitorio; jamás clasificar timeout/deadlock/transporte como replay; fallos salen de la transacción y no dejan claim/root/items/effect/proyecciones parciales | C |
+| C-AC-06 | Secuencia global del lock order | Tabla por writer/etapa real, PIDs distintos, `pg_locks`/diagnóstico acotado cuando proceda y ambas direcciones; ninguna inversión o deadlock tolerado sin investigación; **no declarar orden global aprobado si faltan writers** | C |
+| C-AC-07 | Fault injection de rollback (P3 documentado en B) | Cada negativa prueba explícitamente que alcanzó su punto de inyección, además de error y estado igual al anterior; no repetir toda la batería si el delta focal basta | C, ajuste test-only si corresponde |
+| C-AC-08 | Regressions/DoD y aislamiento | Suites focales, PostgreSQL autorizado, typecheck focal, lint, build, CI API/Web y revisión de PR PASS; ninguna ruta pública nueva, migración, cambio de schema o cutover | C |
+
+### Definition of Ready — lista de desbloqueo
+
+- [x] A y B integrados y documentados; baseline identificada.
+- [x] Identificados por inspección los principales writers y su prefijo de locks; **no** homologados globalmente.
+- [ ] Completar cuadro de fases reales por writer (corrección, movimiento físico, Dispatch Confirm, RR Create/Cancel/Confirm, exclusive fence), elegir puntos exactos de barrera **sin hooks productivos**, y confirmar cuáles carreras son ejecutables conforme al estado de los recursos.
+- [ ] Definir harness aislado con dos `PrismaClient` independientes, una conexión por cliente, PIDs verificados y barreras sin sleeps frágiles; fijar timeouts existentes sin ampliación especulativa. Incluir medición de etapa y estado persistido con lectura externa.
+- [ ] **Autorizar expresamente** destino PostgreSQL 16 *exclusivo de 01C-C*: host/puerto/base/rol/marker, privilegios restringidos, `DATABASE_URL` ajena prohibida y preflight read-only de identidad, versión, ownership, company fixtures y no-superuser **antes de cualquier fixture/writer**. No reutilizar automáticamente `zaping_hc_dsp_cor_01c_b_test`, `zaping_qa` ni `zaping_dev`; no crear/limpiar bases ni editar .env sin autorización.
+- [ ] Acordar exclusiones explícitas de 01D/01E/01F; en particular RR admission post-corrección queda como dependencia 01E, no permiso para modificarlo aquí.
+- [ ] Aprobar alcance definitivo y **Target SP**, plan QA, revisión humana y condiciones STOP antes de implementar.
+
+### Estrategia y STOP
+
+Primero inspección/grafo de locks y fixtures; después pruebas de orden/carreras focales con barreras y fixtures aislados; añadir cambios **sólo donde exista fallo reproducible y previa aprobación del alcance**. Comparar evidencia persistida antes/después: correction/root/items/claim, Effects/Lines, audit/witness, Position/Batch/Stock, Dispatch y RR. Preservar inmutabilidad del Dispatch original y conservación owned; nada de callbacks públicos.
+
+**STOP** ante deadlock real, lock inversion, timeout/transport no explicado, inconsistencias de estado, necesidad de alterar writers productivos, requerimiento de migración, destino PG no verificado o un resultado que dependa del guard RR futuro. Documentar hallazgo, hipótesis y opciones y pedir decisión; no añadir retries genéricos, subir timeouts ni debilitar aserciones para obtener PASS. Mantener **M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, intermitencia EQUIPMENT abierta, deuda histórica de 70 errores del typecheck global** y Dispatch Correction deshabilitada.
+
+**Decisión pendiente del responsable:** aprobar esta DoR/Target/env PG para pasar de REFINEMENT a READY; este cambio documental, aun integrado, no concede esa autorización.
