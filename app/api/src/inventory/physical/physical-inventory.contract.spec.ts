@@ -373,6 +373,16 @@ describe('physical inventory composition and activation', () => {
       'healthcare-case-reconciliation-confirm.service.ts',
       'healthcare-case-reconciliations.module.ts',
     ].map((name) => join(src, 'healthcare', 'case-reconciliations', name));
+    // 01C-B remains an internal consumer without Nest registration or public caller.
+    const correctionConsumers = ['contract', 'repository', 'service'].map(
+      (kind) =>
+        join(
+          src,
+          'healthcare',
+          'case-dispatch-corrections',
+          'healthcare-case-dispatch-correction-command.' + kind + '.ts',
+        ),
+    );
     function inspect(dir: string): void {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         if (entry.name === 'physical') continue;
@@ -383,6 +393,7 @@ describe('physical inventory composition and activation', () => {
           !entry.name.endsWith('.spec.ts') &&
           !dispatchWriters.includes(path) &&
           !reconciliationWriters.includes(path) &&
+          !correctionConsumers.includes(path) &&
           ![
             'create-physical-movement.dto.ts',
             'inventory.service.ts',
@@ -400,6 +411,22 @@ describe('physical inventory composition and activation', () => {
       }
     }
     inspect(src);
+    const correction = correctionConsumers
+      .map((p) => readFileSync(p, 'utf8'))
+      .join('\n');
+    expect(correction).toMatch(/transferDispatchCorrectionMaterial\(/);
+    expect(correction).not.toMatch(
+      /@Injectable|@Controller|RawUnsafe|inventoryMovement\.(?:create|update|delete)/,
+    );
+    for (const module of [
+      join(src, 'app.module.ts'),
+      ...dispatchWriters.filter((p) => p.endsWith('module.ts')),
+      ...reconciliationWriters.filter((p) => p.endsWith('module.ts')),
+    ]) {
+      expect(readFileSync(module, 'utf8')).not.toMatch(
+        /DispatchCorrectionCommand|dispatch-correction-command/,
+      );
+    }
     const reconciliation = readFileSync(reconciliationWriters[1], 'utf8');
     expect(reconciliation).toMatch(/this\.physical\.transfer\(/);
     expect(reconciliation).toMatch(/this\.physical\.definitiveOut\(/);
