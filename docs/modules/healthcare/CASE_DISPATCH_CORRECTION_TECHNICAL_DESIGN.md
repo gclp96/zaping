@@ -3,7 +3,7 @@
 **Producto:** Zaping Healthcare
 **Milestone:** M-HC1 — Healthcare Operations Foundation
 **Versión:** 0.8 — Consolidación documental del contrato técnico V0.7 aprobado, con aprobación 01A anexa
-**Estado actual:** TECHNICAL DESIGN APPROVED; 01A/01B integrados, 01C-A DONE / MERGED (PR #105), cierre A PR #106; 01C-B CODE REVIEW / QA PASSED / NOT MERGED (§21). Corrección operativa deshabilitada.
+**Estado actual:** TECHNICAL DESIGN APPROVED; 01A/01B integrados, 01C-A DONE / MERGED (PR #105), cierre A PR #106; **01C-B DONE / MERGED (PR #109, main@7ee270b)**. 01C-C pendiente de DoR y concurrencia global. Corrección operativa deshabilitada. Corrección operativa deshabilitada.
 **Base documental revisada:** `main`, después de los PR #99 y #100; contraste de rutas existentes de Dispatch, Reconciliation, PhysicalInventory y EquipmentCustodyClose.
 **Prioridad propuesta:** P0 — release gate de corrección/reversión auditada de Dispatch.
 **Alcance:** Backend y aceptación PostgreSQL; frontend en ticket posterior.
@@ -494,7 +494,7 @@ M-HC1 **OPEN**; RISK-006 **OPEN / NOT REPRODUCED**; incidente intermitente EQUIP
 
 ## 21. 01C-B — orquestación interna MATERIAL-only
 
-**Estado actual:** A DONE / MERGED (PR #105), cierre A integrado por PR #106 en `main@10a5327`. B en CODE REVIEW / QA PASSED / NOT MERGED sobre esa base en `feat/hc-dsp-cor-01c-b-material-orchestration`, **Target 5 SP aprobado**, Started 2026-10-20 (America/Hermosillo), sin Commitment/Forecast/Actual ni merge. §20 y el protocolo de §19 conservan checkpoints históricos; el prefijo vigente de B comprueba autoridad **antes del claim**. Seguimiento, comandos y evidencia en el [ticket 01C](../../project/HC_DSP_COR_01C_TICKET.md#01c-b--implementación-local-y-gate-postgresql).
+**Estado actual:** A DONE / MERGED (PR #105), cierre A integrado por PR #106 en `main@10a5327`. B **DONE / MERGED por PR #109** desde `feat/hc-dsp-cor-01c-b-material-orchestration`, commit funcional `1fd9b00`, merge `7ee270b`, **Target 5 SP aprobado y completado**, Started 2026-10-20 / Merged 2026-10-22 (America/Hermosillo), sin Commitment/Forecast/Actual recalculado. §20 y el protocolo de §19 conservan checkpoints históricos; el prefijo vigente de B comprueba autoridad **antes del claim**. Seguimiento, comandos y evidencia en el [ticket 01C](../../project/HC_DSP_COR_01C_TICKET.md#01c-b--implementación-local-y-gate-postgresql).
 
 ### Entrada y límite de transacción
 
@@ -541,4 +541,10 @@ Fixtures comparan estado completo antes/después de replay o rollback, conservan
 
 Revisión sin bloqueos funcionales P0/P1/P2. Observación **P3 no bloqueante** en E2E:432/496: las negativas de rollback comparan estado y error genérico, pero no afirman explícitamente llegada al throw inyectado; una falla anterior con el mismo código podría satisfacerlas. Mejora diagnóstica propuesta, no aplicada. No confundir esta limitación con un defecto funcional demostrado ni con aprobación global de concurrencia.
 
-Los 31 E2E cubren positivos/evidencia/sello, límites y negativos, rollback por las fases previstas y duplicado básico de misma key con dos conexiones/PIDs/barrera. El orden global y carreras con escritores Inventory/Dispatch/RR, cutover y otros conflictos permanecen en **01C-C pendiente**; guards/read models en 01E. No repetir auditorías generales 01B/A ni afirmar que el PASS de B habilita el flujo. **Aprobación humana y CI/integración pendientes; sin DONE/Actual SP.** M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, EQUIPMENT sin causa confirmada, typecheck global histórico FAIL con 70 errores y operación deshabilitada se conservan.
+Los 31 E2E cubren positivos/evidencia/sello, límites y negativos, rollback por las fases previstas y duplicado básico de misma key con dos conexiones/PIDs/barrera. El orden global y carreras con escritores Inventory/Dispatch/RR, cutover y otros conflictos permanecen en **01C-C pendiente**; guards/read models en 01E. No repetir auditorías generales 01B/A ni afirmar que el PASS de B habilita el flujo. **Aprobación de merge otorgada por el responsable; CI #341 API/Web SUCCESS, PR #109 MERGED, B DONE; sin Actual SP recalculados.** M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, EQUIPMENT sin causa confirmada, typecheck global histórico FAIL con 70 errores y operación deshabilitada se conservan.
+
+## 22. HC-DSP-COR-01C-B — cierre documental post-merge
+
+[PR #109](https://github.com/gclp96/zaping/pull/109): **MERGED** en `main@7ee270b6a11cadea284801ab76d634226b7add36` el 2026-10-22. Commit funcional `1fd9b004817b5c1c0caf3927258e5f77d541d86b`. [CI #341](https://github.com/gclp96/zaping/actions/runs/39818610916): **API SUCCESS, Web SUCCESS**. Se conserva la aceptación manual previa: 260/260 focales y 31/31 PostgreSQL aislado reportados, sin nuevas ejecuciones en este cierre. **B DONE / MERGED, Target 5 SP aprobado y completado**; no inferir Commitment, Forecast, Actual u horas.
+
+La implementación permanece **interna y dormida**, sin endpoint/caller productivo ni autorización de cutover. El orden global de locks y las carreras reales Inventory/Dispatch/RR/cutover no están certificados: son el alcance del siguiente refinamiento **01C-C pendiente** (3 SP preliminares, sin DoR de implementación aprobada). P3 de fault injection no bloqueante, M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, intermitencia EQUIPMENT sin causa confirmada y deuda histórica del typecheck global preservados. Los checkpoints de §21 anteriores al PR #109 permanecen como historia.
