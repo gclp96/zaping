@@ -3,7 +3,7 @@ Project Board — Zaping
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS
-Última actualización: 2026-10-20
+Última actualización: 2026-10-22
 Responsable: Zaping Team
 
 0. Snapshot vigente
@@ -381,6 +381,22 @@ El orden final de locks requiere validación PostgreSQL real; la inspección no 
 Forecast / Commitment y tiempos no establecidos; sin reestimación Actual. A registra 5 SP completados por DoD y merge verificados; B/C sin fechas nuevas. API de compensación **no habilitada** hasta que 01B–01F estén integrados y aceptados con PostgreSQL real, clientes compatibles, regresiones y revisión humana. Sin cutover de Company real, sin writers externos certificados. **RISK-006: OPEN / NOT REPRODUCED**, causa desconocida; no se acreditó fix.
 
 [Technical Design aprobado](../modules/healthcare/CASE_DISPATCH_CORRECTION_TECHNICAL_DESIGN.md) · [Aprobación 01A](../modules/healthcare/CASE_DISPATCH_CORRECTION_APPROVAL_01A.md) · [Ticket 01B](HC_DSP_COR_01B_TICKET.md).
+
+### M-OX1 — Great Operational Experience (UX)
+
+**Workstream: OPEN.** UX & Workflow V1; OX-SHELL-01A integrado no completa M-OX1 ni inicia otro incremento UX. Los estados Healthcare existentes se conservan.
+
+| Incremento | Estado | Evidencia |
+| --- | --- | --- |
+| [OX-SHELL-01A — Account Menu & Operational Navigation](OX_SHELL_01A_TICKET.md) | **COMPLETE / MERGED — PR #107** | [PR #107](https://github.com/gclp96/zaping/pull/107); funcional `27a5c6c0c4ab7ecc78cb534aba3cef1e5b802792`; merge `a5b46f1c683a8aa581ef9b295fad2a7ee67e1149`; Merged 2026-10-22. |
+
+UserMenu accesible en AppHeader mínimo persistente desktop/móvil; Cambiar contraseña y Cerrar sesión fuera de Sidebar, que conserva sólo navegación operativa. Ruta /change-password, título, sesión y logout existentes preservados. DEC-OX-049/055/056 aplicadas en este incremento; DEC-OX-050 **parcialmente implementada**. La autorización Stage 3 fue específica de este slice; sin Company selector, notificaciones, calendario, perfil editable ni capacidades adicionales de Top Bar.
+
+QA local posterior a los fixes: **111/111 PASS**, ocho suites; typecheck, ESLint, build, formato focal y whitespace PASS. **QA manual PASS reportado por el usuario**. Code Review realizado; **P2-01 CLOSED / P2-02 CLOSED**. [CI #333](https://github.com/gclp96/zaping/actions/runs/39746006362): **API SUCCESS / Web SUCCESS**; integración verificada en origin/main.
+
+**Deuda independiente: focus trap completo del drawer OPEN**, conservada en [UX Improvement Backlog](../ux/UX_IMPROVEMENT_BACKLOG.md#4-accesibilidad--drawer). No se cierra por el merge de OX-SHELL-01A. [CURRENT del shell](../ux/UX_DECISIONS.md#4-appshell-v2) actualizado documentalmente.
+
+Started 2026-10-21; Merged 2026-10-22. **5 SP preliminares**, sin Target/Forecast/Commitment/Actual, velocidad ni Sprint 01 asignados. Sin horas inventadas ni imputación al Sprint 1 histórico de Healthcare; no se modifican sus métricas o estados.
 
 Este documento representa el estado operativo actual del proyecto.
 
