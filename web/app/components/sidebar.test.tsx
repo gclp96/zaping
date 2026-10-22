@@ -7,7 +7,6 @@ import Sidebar from "./sidebar";
 const expectedNavigation = [
   ["Inicio", "/home"],
   ["Dashboard", "/dashboard"],
-  ["Cambiar contraseña", "/change-password"],
   ["Clientes", "/customers"],
   ["Cotizaciones", "/quotes"],
   ["Ventas", "/sales"],
@@ -29,6 +28,25 @@ afterEach(() => {
 });
 
 describe("Sidebar", () => {
+  it.each([false, true])(
+    "keeps account controls out of Sidebar, collapsed=%s",
+    (collapsed) => {
+      render(
+        <Sidebar
+          pathname="/change-password"
+          currentUserRole="ADMIN"
+          collapsed={collapsed}
+        />,
+      );
+      expect(
+        screen.queryByRole("link", { name: "Cambiar contraseña" }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Cerrar sesión" }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Cuenta\b/ })).toBeNull();
+    },
+  );
   it("preserves every navigation group and href", () => {
     render(<Sidebar pathname="/dashboard" currentUserRole="ADMIN" />);
 
@@ -50,76 +68,72 @@ describe("Sidebar", () => {
     ).toEqual(expectedNavigation);
   });
 
-  it('filters the ERP Core navigation for every role', () => {
+  it("filters the ERP Core navigation for every role", () => {
     const scenarios = [
       {
-        role: 'ADMIN' as const,
+        role: "ADMIN" as const,
         visible: expectedNavigation.map(([label]) => label),
         hidden: [],
       },
       {
-        role: 'MANAGER' as const,
+        role: "MANAGER" as const,
         visible: expectedNavigation
           .map(([label]) => label)
-          .filter((label) => label !== 'Usuarios'),
-        hidden: ['Usuarios'],
+          .filter((label) => label !== "Usuarios"),
+        hidden: ["Usuarios"],
       },
       {
-        role: 'SALES' as const,
+        role: "SALES" as const,
         visible: [
-          'Inicio',
-          'Dashboard',
-          'Cambiar contraseña',
-          'Clientes',
-          'Cotizaciones',
-          'Ventas',
-          'Productos',
-          'Inventario',
-          'Casos de salud',
-          'Médicos',
-          'Hospitales',
-          'Categorías',
+          "Inicio",
+          "Dashboard",
+          "Clientes",
+          "Cotizaciones",
+          "Ventas",
+          "Productos",
+          "Inventario",
+          "Casos de salud",
+          "Médicos",
+          "Hospitales",
+          "Categorías",
         ],
         hidden: [
-          'Proveedores',
-          'Compras',
-          'Recepciones',
-          'Equipos',
-          'Usuarios',
+          "Proveedores",
+          "Compras",
+          "Recepciones",
+          "Equipos",
+          "Usuarios",
         ],
       },
       {
-        role: 'WAREHOUSE' as const,
+        role: "WAREHOUSE" as const,
         visible: [
-          'Inicio',
-          'Dashboard',
-          'Cambiar contraseña',
-          'Proveedores',
-          'Compras',
-          'Recepciones',
-          'Productos',
-          'Inventario',
-          'Equipos',
-          'Casos de salud',
-          'Médicos',
-          'Hospitales',
-          'Categorías',
+          "Inicio",
+          "Dashboard",
+          "Proveedores",
+          "Compras",
+          "Recepciones",
+          "Productos",
+          "Inventario",
+          "Equipos",
+          "Casos de salud",
+          "Médicos",
+          "Hospitales",
+          "Categorías",
         ],
-        hidden: ['Clientes', 'Cotizaciones', 'Ventas', 'Usuarios'],
+        hidden: ["Clientes", "Cotizaciones", "Ventas", "Usuarios"],
       },
     ];
 
     for (const scenario of scenarios) {
       cleanup();
-      render(
-        <Sidebar pathname="/dashboard" currentUserRole={scenario.role} />,
-      );
+      render(<Sidebar pathname="/dashboard" currentUserRole={scenario.role} />);
 
       for (const label of scenario.visible) {
-        expect(screen.getByRole('link', { name: label })).toBeTruthy();
+        expect(screen.getByRole("link", { name: label })).toBeTruthy();
       }
       for (const label of scenario.hidden) {
-        expect(screen.queryByRole('link', { name: label })).toBeNull();
+        expect(screen.queryByRole("link", { name: label })).toBeNull();
       }
     }
   });

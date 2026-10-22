@@ -8,14 +8,7 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/services/api';
 import {
@@ -105,15 +98,19 @@ function configureApiMocks() {
 }
 
 function renderInShell(children: ReactNode) {
-  return render(
-    <AuthenticatedAppLayout>
-      {children}
-    </AuthenticatedAppLayout>,
-  );
+  return render(<AuthenticatedAppLayout>{children}</AuthenticatedAppLayout>);
 }
 
 describe('AuthenticatedAppLayout', () => {
   beforeEach(async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
     clearAuthenticatedSessionCache();
     window.localStorage.clear();
     window.localStorage.setItem('token', 'test-token');
@@ -127,6 +124,7 @@ describe('AuthenticatedAppLayout', () => {
     cleanup();
     window.localStorage.clear();
     document.body.style.overflow = '';
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
@@ -136,14 +134,14 @@ describe('AuthenticatedAppLayout', () => {
     expect(screen.getByText('Zaping ERP')).toBeTruthy();
     expect(screen.getByText('Clientes')).toBeTruthy();
     expect(
-      container.querySelector('#desktop-navigation')?.classList.contains(
-        'xl:flex',
-      ),
+      container
+        .querySelector('#desktop-navigation')
+        ?.classList.contains('xl:flex'),
     ).toBe(true);
     expect(
-      container.querySelector('#desktop-navigation')?.classList.contains(
-        'lg:flex',
-      ),
+      container
+        .querySelector('#desktop-navigation')
+        ?.classList.contains('lg:flex'),
     ).toBe(false);
   });
 
@@ -160,7 +158,9 @@ describe('AuthenticatedAppLayout', () => {
       }),
     ).toBeNull();
     expect(screen.queryByText('Leonardo')).toBeNull();
-    expect(screen.queryByLabelText('Cuenta')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Cuenta de Admin Test' }),
+    ).toBeTruthy();
 
     const menuButton = screen.getByLabelText('Abrir navegación');
     expect(menuButton.getAttribute('aria-expanded')).toBe('false');
@@ -179,16 +179,12 @@ describe('AuthenticatedAppLayout', () => {
     const { container } = renderInShell(<DashboardPage />);
 
     expect(
-      await screen.findByText(
-        'Estado actual de tu operación.',
-      ),
+      await screen.findByText('Estado actual de tu operación.'),
     ).toBeTruthy();
     expect(container.querySelectorAll('aside')).toHaveLength(1);
     expect(screen.getAllByText('Zaping ERP')).toHaveLength(1);
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(
-      screen.getAllByRole('heading', { level: 1 }),
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole('heading', {
         level: 1,
@@ -198,16 +194,12 @@ describe('AuthenticatedAppLayout', () => {
   });
 
   it('keeps a single page heading while Dashboard is loading', () => {
-    vi.mocked(api.get).mockImplementation(
-      () => new Promise(() => undefined),
-    );
+    vi.mocked(api.get).mockImplementation(() => new Promise(() => undefined));
 
     const { container } = renderInShell(<DashboardPage />);
 
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(
-      screen.getAllByRole('heading', { level: 1 }),
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole('heading', {
         level: 1,
@@ -224,9 +216,7 @@ describe('AuthenticatedAppLayout', () => {
     );
 
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(
-      screen.getAllByRole('heading', { level: 1 }),
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole('heading', {
         level: 1,
@@ -245,9 +235,7 @@ describe('AuthenticatedAppLayout', () => {
     });
 
     expect(container.querySelectorAll('main')).toHaveLength(1);
-    expect(
-      screen.getAllByRole('heading', { level: 1 }),
-    ).toHaveLength(1);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(
       screen.getByRole('heading', {
         level: 1,
@@ -270,76 +258,48 @@ describe('AuthenticatedAppLayout', () => {
     renderInShell(<div>Shell child</div>);
 
     expect(
-      screen
-        .getByRole('link', { name: 'Inicio' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Inicio' }).getAttribute('href'),
     ).toBe('/home');
     expect(
-      screen
-        .getByRole('link', { name: 'Dashboard' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Dashboard' }).getAttribute('href'),
     ).toBe('/dashboard');
     expect(
-      screen
-        .getByRole('link', { name: 'Clientes' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Clientes' }).getAttribute('href'),
     ).toBe('/customers');
     expect(
-      screen
-        .getByRole('link', { name: 'Cotizaciones' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Cotizaciones' }).getAttribute('href'),
     ).toBe('/quotes');
     expect(
-      screen
-        .getByRole('link', { name: 'Ventas' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Ventas' }).getAttribute('href'),
     ).toBe('/sales');
     expect(
-      screen
-        .getByRole('link', { name: 'Proveedores' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Proveedores' }).getAttribute('href'),
     ).toBe('/suppliers');
     expect(
-      screen
-        .getByRole('link', { name: 'Compras' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Compras' }).getAttribute('href'),
     ).toBe('/purchases');
     expect(
-      screen
-        .getByRole('link', { name: 'Recepciones' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Recepciones' }).getAttribute('href'),
     ).toBe('/purchase-receipts');
     expect(
-      screen
-        .getByRole('link', { name: 'Productos' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Productos' }).getAttribute('href'),
     ).toBe('/products');
     expect(
-      screen
-        .getByRole('link', { name: 'Inventario' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Inventario' }).getAttribute('href'),
     ).toBe('/inventory');
     expect(
-      screen
-        .getByRole('link', { name: 'Equipos' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Equipos' }).getAttribute('href'),
     ).toBe('/equipment');
     expect(
-      screen
-        .getByRole('link', { name: 'Categorías' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Categorías' }).getAttribute('href'),
     ).toBe('/categories');
   });
 
   it('does not render navigation links for missing routes', () => {
     renderInShell(<div>Shell child</div>);
 
-    expect(
-      screen.queryByRole('link', { name: 'Sales' }),
-    ).toBeNull();
-    expect(
-      screen.queryByRole('link', { name: 'Equipment' }),
-    ).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Sales' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Equipment' })).toBeNull();
   });
 
   it('renders Equipos after Inventario in the INVENTARIO group', () => {
@@ -363,7 +323,7 @@ describe('AuthenticatedAppLayout', () => {
       within(startGroup as HTMLElement)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Inicio', 'Dashboard', 'Cambiar contraseña']);
+    ).toEqual(['Inicio', 'Dashboard']);
   });
 
   it('renders Recepciones after Compras in the COMPRAS group', () => {
@@ -396,9 +356,7 @@ describe('AuthenticatedAppLayout', () => {
     renderInShell(<div>Shell child</div>);
 
     expect(
-      screen
-        .getByRole('link', { name: 'Inicio' })
-        .getAttribute('aria-current'),
+      screen.getByRole('link', { name: 'Inicio' }).getAttribute('aria-current'),
     ).toBe('page');
   });
 
@@ -456,9 +414,7 @@ describe('AuthenticatedAppLayout', () => {
     renderInShell(<div>Shell child</div>);
 
     expect(
-      screen
-        .getByRole('link', { name: 'Ventas' })
-        .getAttribute('aria-current'),
+      screen.getByRole('link', { name: 'Ventas' }).getAttribute('aria-current'),
     ).toBe('page');
   });
 
@@ -468,9 +424,7 @@ describe('AuthenticatedAppLayout', () => {
     renderInShell(<div>Shell child</div>);
 
     expect(
-      screen
-        .getByRole('link', { name: 'Ventas' })
-        .getAttribute('aria-current'),
+      screen.getByRole('link', { name: 'Ventas' }).getAttribute('aria-current'),
     ).toBe('page');
   });
 
@@ -493,9 +447,7 @@ describe('AuthenticatedAppLayout', () => {
 
     const activeLinks = screen
       .getAllByRole('link')
-      .filter((link) =>
-        link.getAttribute('aria-current') === 'page',
-      );
+      .filter((link) => link.getAttribute('aria-current') === 'page');
 
     expect(activeLinks).toHaveLength(0);
   });
@@ -509,24 +461,19 @@ describe('AuthenticatedAppLayout', () => {
     ['/quotes', 'Cotizaciones'],
     ['/sales', 'Ventas'],
     ['/equipment', 'Equipos'],
-  ])(
-    'renders %s with the correct Header title',
-    (pathname, title) => {
-      navigationMock.pathname = pathname;
+  ])('renders %s with the correct Header title', (pathname, title) => {
+    navigationMock.pathname = pathname;
 
-      renderInShell(<div>Shell child</div>);
+    renderInShell(<div>Shell child</div>);
 
-      expect(
-        within(screen.getByRole('banner')).getByText(title),
-      ).toBeTruthy();
-      expect(
-        screen.queryByRole('heading', {
-          level: 1,
-          name: title,
-        }),
-      ).toBeNull();
-    },
-  );
+    expect(within(screen.getByRole('banner')).getByText(title)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', {
+        level: 1,
+        name: title,
+      }),
+    ).toBeNull();
+  });
 
   it('renders Products under the authenticated shell', async () => {
     navigationMock.pathname = '/products';
@@ -571,9 +518,7 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(screen.getByText('Zaping ERP')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Administra las órdenes de compra registradas.',
-      ),
+      screen.getByText('Administra las órdenes de compra registradas.'),
     ).toBeTruthy();
   });
 
@@ -588,9 +533,7 @@ describe('AuthenticatedAppLayout', () => {
 
     expect(screen.getByText('Zaping ERP')).toBeTruthy();
     expect(
-      screen.getByText(
-        'Consulta y da seguimiento a las ventas registradas.',
-      ),
+      screen.getByText('Consulta y da seguimiento a las ventas registradas.'),
     ).toBeTruthy();
   });
 
@@ -633,9 +576,9 @@ describe('AuthenticatedAppLayout', () => {
       screen.getByRole('button', { name: 'Colapsar navegación' }),
     );
 
-    expect(
-      window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY),
-    ).toBe('true');
+    expect(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe(
+      'true',
+    );
     expect(
       screen.getByRole('button', { name: 'Expandir navegación' }),
     ).toBeTruthy();
@@ -644,9 +587,9 @@ describe('AuthenticatedAppLayout', () => {
       screen.getByRole('button', { name: 'Expandir navegación' }),
     );
 
-    expect(
-      window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY),
-    ).toBe('false');
+    expect(window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe(
+      'false',
+    );
   });
 
   it('restores a persisted collapsed Sidebar after hydration', async () => {
@@ -676,9 +619,7 @@ describe('AuthenticatedAppLayout', () => {
     expect(dialog.classList.contains('xl:hidden')).toBe(true);
     expect(dialog.classList.contains('lg:hidden')).toBe(false);
     expect(
-      screen.getByLabelText('Abrir navegación').getAttribute(
-        'aria-expanded',
-      ),
+      screen.getByLabelText('Abrir navegación').getAttribute('aria-expanded'),
     ).toBe('true');
 
     const closeButtons = screen.getAllByLabelText('Cerrar navegación');

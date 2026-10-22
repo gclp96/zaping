@@ -4,7 +4,6 @@ import {
   FileText,
   Hospital,
   House,
-  KeyRound,
   LayoutDashboard,
   Package,
   PackageCheck,
@@ -48,11 +47,6 @@ export const navigationGroups: NavigationGroup[] = [
         label: "Dashboard",
         href: "/dashboard",
         icon: LayoutDashboard,
-      },
-      {
-        label: "Cambiar contraseña",
-        href: "/change-password",
-        icon: KeyRound,
       },
     ],
   },
@@ -191,7 +185,12 @@ export function getVisibleNavigationGroups(
     .filter((group) => group.items.length > 0);
 }
 
+// Account context remains available without becoming operational navigation.
+const accountRouteTitles = [{ href: '/change-password', title: 'Cambiar contraseña' }];
+
 export function getRouteTitle(pathname: string): string {
+  const accountRoute = accountRouteTitles.find(route => isNavigationItemActive(pathname, route.href));
+  if (accountRoute) return accountRoute.title;
   for (const group of navigationGroups) {
     const activeItem = group.items.find((item) =>
       isNavigationItemActive(pathname, item.href),

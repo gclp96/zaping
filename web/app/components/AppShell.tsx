@@ -16,6 +16,8 @@ import Loading from "@/app/components/ui/Loading";
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "zaping.sidebar.collapsed";
 
 const MOBILE_NAVIGATION_ID = "mobile-navigation-drawer";
+// Keep aligned with Tailwind xl (80rem); only the open drawer subscribes.
+const DESKTOP_MEDIA_QUERY = "(min-width: 80rem)";
 
 type AppShellProps = {
   children: ReactNode;
@@ -30,6 +32,7 @@ export default function AppShell({ children }: AppShellProps) {
   const [sidebarPreferenceReady, setSidebarPreferenceReady] = useState(false);
   const sessionState = useAuthenticatedSession({ requireToken: true });
   const drawerRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
   const drawerWasOpenRef = useRef(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -60,7 +63,10 @@ export default function AppShell({ children }: AppShellProps) {
 
   useEffect(() => {
     if (!mobileNavigationOpen) {
-      if (drawerWasOpenRef.current) {
+      if (
+        drawerWasOpenRef.current &&
+        !window.matchMedia(DESKTOP_MEDIA_QUERY).matches
+      ) {
         menuButtonRef.current?.focus();
       }
 
@@ -68,6 +74,27 @@ export default function AppShell({ children }: AppShellProps) {
       return;
     }
 
+    const desktop = window.matchMedia(DESKTOP_MEDIA_QUERY);
+    function closeAtDesktop() {
+      if (!desktop.matches) return;
+      const activeElement = document.activeElement;
+      if (
+        drawerRef.current?.contains(activeElement) ||
+        activeElement === menuButtonRef.current ||
+        activeElement === document.body
+      ) {
+        mainRef.current?.focus();
+      }
+      setMobileNavigationOpen(false);
+    }
+
+    // The viewport may change between the opening click and this effect.
+    if (desktop.matches) {
+      closeAtDesktop();
+      return;
+    }
+
+    desktop.addEventListener("change", closeAtDesktop);
     drawerWasOpenRef.current = true;
     const previousBodyOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -84,6 +111,7 @@ export default function AppShell({ children }: AppShellProps) {
     return () => {
       document.body.style.overflow = previousBodyOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      desktop.removeEventListener("change", closeAtDesktop);
     };
   }, [mobileNavigationOpen]);
 
@@ -169,7 +197,6 @@ export default function AppShell({ children }: AppShellProps) {
         onToggleCollapsed={toggleSidebarCollapsed}
         transitionEnabled={sidebarPreferenceReady}
         currentUserRole={currentUserRole}
-        onLogout={logout}
       />
 
       {mobileNavigationOpen ? (
@@ -199,20 +226,24 @@ export default function AppShell({ children }: AppShellProps) {
             showCloseButton
             onClose={() => setMobileNavigationOpen(false)}
             currentUserRole={currentUserRole}
-            onLogout={logout}
           />
         </div>
       ) : null}
 
       <div className="flex min-h-screen min-w-0 flex-1 flex-col">
         <AppHeader
+          pathname={pathname}
+          user={sessionState.user}
+          onLogout={logout}
           title={title}
           mobileNavigationId={MOBILE_NAVIGATION_ID}
           mobileNavigationOpen={mobileNavigationOpen}
           menuButtonRef={menuButtonRef}
           onMenuClick={() => setMobileNavigationOpen(true)}
         />
-        <main className="min-w-0 flex-1">{children}</main>
+        <main ref={mainRef} tabIndex={-1} className="min-w-0 flex-1">
+          {children}
+        </main>
       </div>
     </div>
   );
