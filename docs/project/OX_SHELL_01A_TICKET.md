@@ -1,6 +1,6 @@
 # OX-SHELL-01A — Menú de usuario y reubicación de acciones de cuenta
 
-**Estado vigente:** DONE / MERGED — OX-SHELL-01A. **Cierre administrativo documental:** preparado para revisión, sin commit documental todavía.
+**Estado vigente:** DONE / MERGED — OX-SHELL-01A. **Cierre administrativo documental:** posterior a la integración del PR funcional #107.
 **Workstream:** M-OX1 — Great Operational Experience — OPEN; no se inicia otro incremento UX.
 **Started:** 2026-10-21. **Merged:** 2026-10-22. **Actualización de cierre:** 2026-10-22.
 **PR integrado:** [#107](https://github.com/gclp96/zaping/pull/107).
@@ -24,7 +24,7 @@ La deuda histórica del **focus trap completo del drawer permanece OPEN e indepe
 
 **Métricas vigentes:** 5 SP exclusivamente **preliminares**. Sin Target, Forecast, Commitment, Actual SP, velocidad ni asignación Sprint 01 aprobados. No imputar OX-SHELL-01A al Sprint 1 histórico de Healthcare. Se conserva Started acreditado y se registra Merged verificado; no se deducen horas/esfuerzo de fechas Git. Tiempo estimado/real y duración de bloqueo/retrabajo siguen sin registro cuantificado.
 
-**Límites y autorización actuales:** este cierre sólo modifica los tres documentos aprobados, en rama documental independiente desde origin/main. Sin staging, commit, push o PR documental todavía. El merge funcional ya ocurrió; las restricciones previas de no commit/push/merge que aparecen más abajo son historia de cada etapa, no restricciones actuales de la implementación integrada. La autorización Stage 3 sigue limitada únicamente a OX-SHELL-01A. DONE / MERGED no equivale a despliegue o habilitación general de producción.
+**Límites y autorización actuales:** este cierre sólo modifica los tres documentos aprobados, en rama documental independiente desde origin/main. El merge funcional ya ocurrió; las restricciones previas de no commit/push/merge que aparecen más abajo son historia de cada etapa, no restricciones actuales de la implementación integrada. La autorización Stage 3 sigue limitada únicamente a OX-SHELL-01A. DONE / MERGED no equivale a despliegue o habilitación general de producción.
 
 ## Historial conservado de preparación, correcciones y aceptación
 
