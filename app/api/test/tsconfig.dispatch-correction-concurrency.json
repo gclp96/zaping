@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.spec.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": [
+    "case-dispatch-correction-material-concurrency.postgres.e2e-spec.ts",
+    "helpers/dispatch-correction-material-concurrency*.ts"
+  ]
+}
