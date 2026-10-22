@@ -1,10 +1,13 @@
 # UX Decisions — Zaping
 
 **Estado:** Aprobado
-**Última actualización:** 2026-08-28
-**Decisión vigente:** UX-01 — App Shell v2 y consolidación de fundamentos
+**Última actualización:** 2026-10-22
+**CURRENT:** OX-SHELL-01A integrado — shell mínimo y navegación operativa.
+**Baseline histórica:** UX-01 — App Shell v2 y consolidación de fundamentos (2026-08-28).
 
 ---
+
+Este documento conserva el objetivo, historia y evidencia de UX-01 como baseline. Las secciones 4–7 distinguen esa baseline del CURRENT posterior a [OX-SHELL-01A](../project/OX_SHELL_01A_TICKET.md), integrado por [PR #107](https://github.com/gclp96/zaping/pull/107), funcional `27a5c6c0c4ab7ecc78cb534aba3cef1e5b802792`, merge `a5b46f1c683a8aa581ef9b295fad2a7ee67e1149` (2026-10-22). No reinterpreta la evidencia histórica como pruebas de la versión actual.
 
 ## 1. Objetivo de UX-01
 
@@ -50,43 +53,34 @@ Fuente técnica: `docs/ux/DESIGN_SYSTEM.md`.
 
 ## 4. AppShell v2
 
-`AppShell` es propietario de:
+**Baseline UX-01:** consolidó un único main autenticado, Sidebar desktop, AppHeader responsive, drawer mobile/tablet, preferencia de colapso persistida y título derivado de navegación centralizada. Las páginas de módulo no montan Sidebar, Header o main propios.
 
-- el único `main` autenticado;
-- Sidebar desktop;
-- AppHeader responsive;
-- drawer mobile/tablet;
-- estado colapsado persistente;
-- título de ruta derivado de navegación centralizada.
-
-Las páginas de módulo no montan Sidebar, Header o `main` propios.
+**CURRENT posterior a OX-SHELL-01A:** AppShell conserva esas responsabilidades y el bootstrap de sesión; aloja un **AppHeader mínimo persistente en escritorio y móvil**. Una sola instancia de **UserMenu accesible, fuera de Sidebar**, recibe identidad y el callback de logout existente. Cambiar contraseña conserva /change-password y su título mediante metadata de cuenta independiente de los grupos operativos. No se crean otra sesión, autenticación ni permisos backend.
 
 ## 5. Sidebar
 
-Decisiones vigentes:
+La baseline UX-01 aportó expansión por defecto, colapso desktop, preferencia en localStorage, labels accesibles al colapsar, aria-current, agrupación en navigation.ts y hrefs históricos.
 
-- expandido por defecto;
-- colapsable en desktop;
-- preferencia persistida en `localStorage`;
-- labels accesibles cuando está colapsado;
-- `aria-current="page"` para active state;
-- navegación agrupada desde `navigation.ts`;
-- hrefs históricos conservados.
+**CURRENT:** esas capacidades se conservan, con Sidebar **exclusivamente operativa**. Cambiar contraseña y Cerrar sesión están en UserMenu, no en Sidebar desktop expandida/colapsada ni en el drawer. Los demás grupos, rutas y filtros por rol se conservan.
 
-El focus trap completo del drawer queda diferido como deuda de accesibilidad.
+El **focus trap completo del drawer permanece OPEN como deuda histórica independiente**; véase [UX Improvement Backlog](UX_IMPROVEMENT_BACKLOG.md#4-accesibilidad--drawer). OX-SHELL-01A mejora el cierre al cruzar xl y el foco asociado, pero no implementa ni cierra esa deuda.
 
 ## 6. AppHeader
 
-AppHeader:
+**Baseline UX-01 (histórica):** aparecía por debajo de xl, mostraba contexto compacto, abría el drawer con aria-controls/aria-expanded, no introducía un segundo h1 y no reservaba espacio en desktop xl o superior.
 
-- aparece por debajo de `xl`;
-- muestra contexto compacto de la ruta;
-- controla la apertura del drawer;
-- expone `aria-controls` y `aria-expanded`;
-- no introduce un segundo `h1`;
-- no reserva espacio en desktop `xl` o superior.
+**CURRENT posterior a OX-SHELL-01A:**
+
+- AppHeader mínimo persistente desktop y móvil, con contexto compacto de página y UserMenu; no introduce otro h1 ni main.
+- El botón de navegación sólo está disponible por debajo de xl; conserva relación y estado accesibles del drawer.
+- UserMenu es un disclosure con botón nativo, nombre accesible que incluye la identidad visible, aria-expanded/aria-controls, enlace real a Cambiar contraseña y botón Cerrar sesión. Conserva teclado, Escape y restauración de foco; delega en el logout existente.
+- Con drawer móvil abierto, UserMenu se retira temporalmente para evitar un control interactuable detrás del dialog; vuelve cerrado al cerrar el drawer.
+
+**DEC-OX-050: PARCIALMENTE IMPLEMENTADA.** DEC-OX-049/055/056 sustentan la reubicación de cuenta y la navegación operativa. La autorización Stage 3 fue exclusiva de este slice, no de toda la top bar ni de Stage 3 general. No se implementaron Company selector, notificaciones, calendario, reloj, branding, mensajes, perfil editable ni cambios de Dashboard derivados de este incremento.
 
 ## 7. Estrategia responsive
+
+**Baseline UX-01 (histórica):**
 
 ```text
 mobile / tablet / laptop menor a xl
@@ -96,8 +90,20 @@ desktop xl o superior
 → Sidebar persistente + sin AppHeader
 ```
 
-Los breakpoints están expresados en clases compartidas. UX-01 no rediseñó
-Table ni resolvió todavía tablas responsive avanzadas.
+**CURRENT posterior a OX-SHELL-01A:**
+
+```text
+por debajo de xl
+→ AppHeader persistente + UserMenu + navegación mediante drawer
+  (UserMenu temporalmente retirado mientras el drawer esté abierto)
+
+desde xl
+→ Sidebar operativa persistente, expandida/colapsada + AppHeader + UserMenu
+```
+
+El xl construido corresponde a 80rem. Al entrar a desktop con drawer abierto, se cierra su estado, se restaura el scroll y se retiran listeners; no se restaura foco al botón móvil oculto. Si el foco queda en el drawer/su trigger/body se mueve al main existente, conservando un foco que ya esté en otro control. Volver a móvil no reabre el drawer. La media query interna debe mantenerse alineada si cambia el breakpoint del tema.
+
+Los breakpoints usan las clases compartidas; la sincronización de estado del drawer usa matchMedia. No se rediseñó Table ni se resolvieron tablas responsive avanzadas. La evidencia de OX-SHELL-01A —111/111 locales, checks y CI API/Web PASS, QA manual PASS reportado por el usuario— y su historial se registran en el [ticket](../project/OX_SHELL_01A_TICKET.md). No se atribuye esta evidencia nueva al cierre UX-01.6 de 2026-08-28 que se conserva más abajo.
 
 ## 8. Layout primitives
 

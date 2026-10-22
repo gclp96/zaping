@@ -1,12 +1,42 @@
 # OX-SHELL-01A — Menú de usuario y reubicación de acciones de cuenta
 
-**Estado actual:** QA ACCEPTED / CODE REVIEW COMPLETED / P2-01 CLOSED / P2-02 CLOSED / LOCAL COMMIT AUTHORIZED / NOT MERGED.
+**Estado vigente:** DONE / MERGED — OX-SHELL-01A. **Cierre administrativo documental:** preparado para revisión, sin commit documental todavía.
+**Workstream:** M-OX1 — Great Operational Experience — OPEN; no se inicia otro incremento UX.
+**Started:** 2026-10-21. **Merged:** 2026-10-22. **Actualización de cierre:** 2026-10-22.
+**PR integrado:** [#107](https://github.com/gclp96/zaping/pull/107).
+**Commit funcional:** `27a5c6c0c4ab7ecc78cb534aba3cef1e5b802792`.
+**Merge SHA:** `a5b46f1c683a8aa581ef9b295fad2a7ee67e1149`, verificado como integrado en origin/main.
+
+## Cierre post-merge — estado actual
+
+La implementación de UserMenu y la navegación exclusivamente operativa está integrada. Los criterios de aceptación están aceptados, Code Review realizado y ambos hallazgos **P2-01 CLOSED / P2-02 CLOSED**. Se conserva el alcance mínimo aprobado: AppHeader persistente desktop/móvil, acciones de contraseña/logout fuera de Sidebar, ruta y título /change-password, y el mecanismo de sesión/logout existente. No se declara completado M-OX1, DEC-OX-050 ni Stage 3 general.
+
+| Gate | Evidencia de cierre |
+| --- | --- |
+| QA automatizada local posterior a los fixes | **111/111 PASS en ocho suites**: 32 UserMenu/AppShell y 79 regresiones relacionadas; cuatro roles cubiertos. |
+| Checks locales | **Typecheck frontend, ESLint, build Next.js, Prettier focal y whitespace PASS**, conservados de la versión funcional aprobada. |
+| QA manual | **PASS reportado y aceptado por el usuario**: desktop, responsive, zoom 200 %, accesibilidad, teclado, foco, logout y roles; transición xl y nombre accesible acreditados en el reporte. Codex no ejecutó esa QA manual. |
+| Code Review | Realizado; P2-01/P2-02 corregidos, con regresiones y aceptación posterior. |
+| CI remota del PR | [CI #333](https://github.com/gclp96/zaping/actions/runs/39746006362): jobs **API SUCCESS / Web SUCCESS**, sobre el commit funcional. No se atribuyen cantidades locales de pruebas a CI ni se afirma una ejecución post-merge adicional. |
+| Integración | PR #107 MERGED, merge SHA verificado en origin/main; fecha 2026-10-22. |
+
+La deuda histórica del **focus trap completo del drawer permanece OPEN e independiente**, registrada en [UX Improvement Backlog, accesibilidad del drawer](../ux/UX_IMPROVEMENT_BACKLOG.md#4-accesibilidad--drawer). No se resolvió ni se aceptó formalmente su cierre por integrar este slice. [CURRENT del shell](../ux/UX_DECISIONS.md#4-appshell-v2) y [Project Board](PROJECT_BOARD.md) se sincronizan en este cierre documental.
+
+**Métricas vigentes:** 5 SP exclusivamente **preliminares**. Sin Target, Forecast, Commitment, Actual SP, velocidad ni asignación Sprint 01 aprobados. No imputar OX-SHELL-01A al Sprint 1 histórico de Healthcare. Se conserva Started acreditado y se registra Merged verificado; no se deducen horas/esfuerzo de fechas Git. Tiempo estimado/real y duración de bloqueo/retrabajo siguen sin registro cuantificado.
+
+**Límites y autorización actuales:** este cierre sólo modifica los tres documentos aprobados, en rama documental independiente desde origin/main. Sin staging, commit, push o PR documental todavía. El merge funcional ya ocurrió; las restricciones previas de no commit/push/merge que aparecen más abajo son historia de cada etapa, no restricciones actuales de la implementación integrada. La autorización Stage 3 sigue limitada únicamente a OX-SHELL-01A. DONE / MERGED no equivale a despliegue o habilitación general de producción.
+
+## Historial conservado de preparación, correcciones y aceptación
+
+Los registros siguientes reflejan lo conocido y autorizado en cada momento. Sus estados NOT MERGED, QA PENDING, READY FOR PR y restricciones de entrega fueron históricos y están supersedidos por el cierre post-merge anterior; no se eliminan ni reescriben sus evidencias.
+
+**Estado histórico al preparar el commit funcional:** QA ACCEPTED / CODE REVIEW COMPLETED / P2-01 CLOSED / P2-02 CLOSED / LOCAL COMMIT AUTHORIZED / NOT MERGED.
 **Preparación documental:** 2026-10-21. **Consolidación de QA reportada:** 2026-10-22.
 **Base:** main@10a532714a1634b0fd82e79d82827bfd191cbc1b; coincidencia con refs/heads/main remoto comprobada durante esta preparación.
-**Aislamiento:** worktree ox-shell-01a-readiness; rama feat/ox-shell-01a-account-menu desde la base main indicada. Ningún cambio Healthcare sin integrar copiado, modificado ni incorporado.
-**Entrega actual:** implementación local acotada a once archivos frontend del inventario y actualización de este ticket; validaciones locales PASS y QA manual aceptada por reporte del usuario (§15); staging explícito de las doce rutas y commit local autorizados. Sin autorización de push, PR o merge. El Board y el workflow existentes siguen gobernando ejecución y prioridades.
+**Aislamiento histórico de implementación:** worktree ox-shell-01a-readiness; rama feat/ox-shell-01a-account-menu desde la base main indicada. Ningún cambio Healthcare sin integrar copiado, modificado ni incorporado.
+**Entrega histórica previa a la publicación:** implementación local acotada a once archivos frontend del inventario y actualización de este ticket; validaciones locales PASS y QA manual aceptada por reporte del usuario (§15); staging explícito de las doce rutas y commit local autorizados. Sin autorización de push, PR o merge. El Board y el workflow existentes siguen gobernando ejecución y prioridades.
 
-## Estado vigente — autorización específica e implementación
+## Estado registrado durante la implementación — histórico
 
 El responsable autorizó explícitamente **OX-SHELL-01A — Account Menu & Operational Navigation**, workstream **M-OX1 — Great Operational Experience**, mediante la instrucción «Authorized Implementation». Esta autorización posterior al readiness **levanta el gate de discovery únicamente para este incremento**. No habilita la implementación general de Stage 3 ni declara completada DEC-OX-050. Los apartados 1–11 conservan el análisis y las decisiones propuestas durante el readiness histórico; cualquier referencia allí a falta de autorización corresponde a ese momento y queda resuelta por esta autorización específica.
 
@@ -14,11 +44,11 @@ Se aceptó el host **AppHeader mínimo persistente en desktop y móvil**, el com
 
 Implementado: una sola instancia de UserMenu en AppHeader; nombre con fallback email/Cuenta; enlace real a /change-password y callback de logout existente; disclosure con Enter/Espacio, Tab/Shift+Tab, Escape y restauración de foco, click exterior y cierre al cambiar de pathname. El menú se desmonta al abrir drawer y vuelve cerrado; el drawer conserva sus mecanismos existentes. Sidebar ya no contiene acciones de cuenta, expandida, colapsada ni móvil. El contexto de /change-password se conserva separado de navigationGroups. AppHeader mantiene altura/tokens y no añade otro h1/main; sólo el botón del drawer queda oculto desde xl.
 
-**DoR actual:** alcance y footprint autorizados, inventario validado, contrato de sesión conservado, AC y estrategia QA definidos antes de implementar, dependencias disponibles mediante instalación aislada. La estimación sigue siendo **5 SP preliminares**, sin Target aprobado, Commitment, Forecast ni Actual. No se condiciona artificialmente esta autorización de implementación a convertir la estimación en un compromiso.
+**DoR registrada durante implementación:** alcance y footprint autorizados, inventario validado, contrato de sesión conservado, AC y estrategia QA definidos antes de implementar, dependencias disponibles mediante instalación aislada. La estimación sigue siendo **5 SP preliminares**, sin Target aprobado, Commitment, Forecast ni Actual. No se condiciona artificialmente esta autorización de implementación a convertir la estimación en un compromiso.
 
-**Métricas:** Started de implementación registrado en esta sesión (2026-10-21, fecha de trabajo comunicada por el entorno); Merged no ocurrido; Target SP, Actual SP y tiempo estimado/real no establecidos. Descarga inicial de dependencias lenta: impedimento temporal de QA, duración no medida. No se inventan horas, fechas de integración ni retrabajo.
+**Métricas registradas antes de la integración:** Started de implementación registrado en esta sesión (2026-10-21, fecha de trabajo comunicada por el entorno); Merged no ocurrido; Target SP, Actual SP y tiempo estimado/real no establecidos. Descarga inicial de dependencias lenta: impedimento temporal de QA, duración no medida. No se inventan horas, fechas de integración ni retrabajo.
 
-**QA local vigente tras los fixes P2:** 111/111 PASS en ocho suites (32 en UserMenu/AppShell y 79 en las seis suites relacionadas), con --maxWorkers=1; typecheck frontend, ESLint, Prettier focal y build Next.js PASS. La evidencia anterior de 106/106 se conserva como histórica en §12; la cronología del fix está en §13. QA manual aceptada mediante el reporte final del usuario (§15), que cierra los pendientes de evidencia identificados en §14. Se conserva separada la evidencia automatizada de la manual externa: jsdom no sustituye el navegador y Codex no ejecutó esa QA manual. No se repitieron suites para este cierre documental y commit local.
+**QA local registrada tras los fixes P2:** 111/111 PASS en ocho suites (32 en UserMenu/AppShell y 79 en las seis suites relacionadas), con --maxWorkers=1; typecheck frontend, ESLint, Prettier focal y build Next.js PASS. La evidencia anterior de 106/106 se conserva como histórica en §12; la cronología del fix está en §13. QA manual aceptada mediante el reporte final del usuario (§15), que cierra los pendientes de evidencia identificados en §14. Se conserva separada la evidencia automatizada de la manual externa: jsdom no sustituye el navegador y Codex no ejecutó esa QA manual. No se repitieron suites para este cierre documental y commit local.
 
 ## Historial de readiness — apartados 1–11
 
