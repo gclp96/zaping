@@ -87,6 +87,8 @@ type PurchaseReceiptCreateArgs = {
     purchaseId: string;
     receivedBy?: string;
     notes?: string;
+    supplierDocumentType?: string;
+    supplierDocumentNumber?: string;
     folio: string;
     receivedAt: Date;
   };
@@ -329,6 +331,39 @@ describe('PurchaseReceiptsService', () => {
   ) {
     return service.create(companyId, receivedBy, idempotencyKey, dto);
   }
+
+  it('registra el documento del proveedor sin afectar las partidas', async () => {
+    const dto = arrangeLotTrackingReceipt([
+      createLotTrackingItem(ProductLotTracking.OPTIONAL),
+    ]);
+    dto.supplierDocumentType = 'REMISION';
+    dto.supplierDocumentNumber = 'REM-INSAP-042';
+
+    await expect(
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
+    ).resolves.toBeDefined();
+
+    expect(transactionClient.purchaseReceipt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          supplierDocumentType: 'REMISION',
+          supplierDocumentNumber: 'REM-INSAP-042',
+        }),
+      }),
+    );
+  });
+
+  it('rechaza documento del proveedor incompleto sin registrar recepción', async () => {
+    const dto = arrangeLotTrackingReceipt([
+      createLotTrackingItem(ProductLotTracking.OPTIONAL),
+    ]);
+    dto.supplierDocumentType = 'FACTURA';
+
+    await expect(
+      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
+    ).rejects.toThrow('Selecciona el tipo y número del documento del proveedor');
+    expectNoReceiptMutations();
+  });
 
   function arrangeLotTrackingReceipt(
     items: LotTrackingReceiptItemFixture[],
