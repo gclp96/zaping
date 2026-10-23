@@ -73,6 +73,8 @@ export function isPhysicalUniqueViolation(error: unknown): boolean {
 export type PositionKey = {
   productId: string;
   inventoryBatchId: string | null;
+  // Calendar day, never an instant. Omission/null retains the legacy identity.
+  expirationDate?: string | null;
 } & (
   | { state: 'AVAILABLE'; contextType: null; contextId: null }
   | { state: 'CUSTODY'; contextType: string; contextId: string }
@@ -114,13 +116,32 @@ export type PhysicalResult = {
 };
 
 export function positionIdentity(key: PositionKey): string {
-  return JSON.stringify([
+  const identity = [
     key.productId,
     key.inventoryBatchId,
     key.state,
     key.contextType,
     key.contextId,
-  ]);
+  ];
+  const day = normalizePositionExpirationDate(key.expirationDate);
+  if (day !== null) identity.push(day);
+  return JSON.stringify(identity);
+}
+
+export function normalizePositionExpirationDate(
+  value: string | null | undefined,
+): string | null {
+  if (value === undefined || value === null) return null;
+  requirePhysical(
+    typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value),
+  );
+  const date = new Date(`${value}T00:00:00.000Z`);
+  requirePhysical(
+    Number.isFinite(date.getTime()) &&
+      date.toISOString().slice(0, 10) === value &&
+      value >= '0001-01-01',
+  );
+  return value;
 }
 function uuid(value: string): string {
   requirePhysical(typeof value === 'string' && isUUID(value));
@@ -135,11 +156,15 @@ function text(value: string, max: number): string {
   );
   return value;
 }
-function position(key: PositionKey): PositionKey {
+export function normalizePositionKey(key: PositionKey): PositionKey {
   requirePhysical(key && typeof key === 'object');
   const productId = uuid(key.productId);
   const inventoryBatchId =
     key.inventoryBatchId === null ? null : uuid(key.inventoryBatchId);
+  const expirationDate = normalizePositionExpirationDate(key.expirationDate);
+  requirePhysical(inventoryBatchId === null || expirationDate === null);
+  // Do not append a null field: historical request serialization must not change.
+  const expiry = expirationDate === null ? {} : { expirationDate };
   if (key.state === 'AVAILABLE') {
     requirePhysical(key.contextType === null && key.contextId === null);
     return {
@@ -148,6 +173,7 @@ function position(key: PositionKey): PositionKey {
       state: 'AVAILABLE',
       contextType: null,
       contextId: null,
+      ...expiry,
     };
   }
   requirePhysical(key.state === 'CUSTODY');
@@ -159,6 +185,7 @@ function position(key: PositionKey): PositionKey {
     state: 'CUSTODY',
     contextType,
     contextId: text(key.contextId, 128),
+    ...expiry,
   };
 }
 function quantity(value: number): number {
@@ -249,7 +276,7 @@ export function normalizePhysicalRequest(
   if (op.kind === 'CREDIT') {
     const credits = op.credits.map((item) => {
       requirePhysical(item && typeof item === 'object');
-      const target = position(item.target);
+      const target = normalizePositionKey(item.target);
       requirePhysical(target.state === 'AVAILABLE');
       return { target, quantity: quantity(item.quantity) };
     });
@@ -260,7 +287,7 @@ export function normalizePhysicalRequest(
   } else if (op.kind === 'TRANSFER') {
     const transfers = op.transfers.map((item) => ({
       ...source(item),
-      target: position(item.target),
+      target: normalizePositionKey(item.target),
     }));
     operation = {
       kind: 'TRANSFER',

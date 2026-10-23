@@ -23,6 +23,21 @@ import {
 } from './physical-inventory.contract';
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
 import {
+  authorizeSaleConsumption,
+  assertSaleConsumptionSources,
+  SaleConsumptionContext,
+  SaleConsumptionInput,
+} from './sale-consumption.authorization';
+import {
+  authorizePurchaseReceiptCredit,
+  PurchaseReceiptCreditContext,
+  PurchaseReceiptCreditInput,
+} from './purchase-receipt-credit.authorization';
+import {
+  physicalExpirationEligibility,
+  storedExpirationDay,
+} from './physical-expiration-policy';
+import {
   DispatchCorrectionMaterialInput,
   CorrectionContext,
   loadCorrectionContext,
@@ -48,12 +63,39 @@ function positionKey(position: InventoryPosition): PositionKey {
     state: position.state,
     contextType: position.contextType,
     contextId: position.contextId,
+    ...(position.expirationDate
+      ? { expirationDate: position.expirationDate.toISOString().slice(0, 10) }
+      : {}),
   } as PositionKey;
 }
 
 @Injectable()
 export class PhysicalInventoryService {
   constructor(private readonly repository: PhysicalInventoryRepository) {}
+
+  async consumeConfirmedSale(
+    tx: Prisma.TransactionClient,
+    input: SaleConsumptionInput,
+  ): Promise<PhysicalResult> {
+    try {
+      const sale = await authorizeSaleConsumption(tx, input);
+      return await this.mutate(tx, sale.request, undefined, undefined, sale);
+    } catch (error) {
+      throw physicalPersistenceError(error);
+    }
+  }
+
+  async creditPurchaseReceipt(
+    tx: Prisma.TransactionClient,
+    input: PurchaseReceiptCreditInput,
+  ): Promise<PhysicalResult> {
+    try {
+      const receipt = await authorizePurchaseReceiptCredit(tx, input);
+      return await this.mutate(tx, receipt.request, undefined, receipt);
+    } catch (error) {
+      throw physicalPersistenceError(error);
+    }
+  }
 
   async classifyCommittedDispatchCorrectionMaterial(
     tx: Prisma.TransactionClient,
@@ -147,6 +189,10 @@ export class PhysicalInventoryService {
       // PrismaClient is structurally assignable to TransactionClient in TS.
       // Reject that accidental non-transactional call before any database access.
       requirePhysical(tx && typeof tx === 'object' && !('$transaction' in tx));
+      requirePhysical(
+        input.origin?.type !== 'PURCHASE_RECEIPT',
+        'PHYSICAL_EFFECT_MISMATCH',
+      );
       return await this.mutate(tx, normalizePhysicalRequest(input));
     } catch (error) {
       throw physicalPersistenceError(error);
@@ -177,6 +223,8 @@ export class PhysicalInventoryService {
     tx: Prisma.TransactionClient,
     request: PhysicalRequest,
     correction?: CorrectionContext,
+    receipt?: PurchaseReceiptCreditContext,
+    sale?: SaleConsumptionContext,
   ): Promise<PhysicalResult> {
     const classify = () =>
       correction
@@ -216,6 +264,7 @@ export class PhysicalInventoryService {
     );
     if (correction)
       await assertCorrectionSources(tx, correction, request, discovered);
+    if (sale) assertSaleConsumptionSources(sale, discovered);
     const productIds = sortedUnique([
       ...discovered.map((p) => p.productId),
       ...targets.map((p) => p.productId),
@@ -251,6 +300,7 @@ export class PhysicalInventoryService {
     );
     if (correction)
       await assertCorrectionSources(tx, correction, request, positions);
+    if (sale) assertSaleConsumptionSources(sale, positions);
     const byId = new Map(positions.map((p) => [p.id, p]));
     requirePhysical(
       sourceIds.every((id) => byId.has(id)),
@@ -261,7 +311,29 @@ export class PhysicalInventoryService {
     );
     const productMap = new Map(products.map((p) => [p.id, p]));
     const batchMap = new Map(batches.map((b) => [b.id, b]));
-    const now = new Date();
+    // Read configuration only after Product -> Batch -> Position locks. This is
+    // a plain tenant-scoped read: no new Company lock or lock-order change.
+    const hasKnownExpiry =
+      targets.some((key) => key.expirationDate != null) ||
+      positions.some((p) => p.expirationDate != null) ||
+      batches.some((batch) => batch.expirationDate != null);
+    const company = hasKnownExpiry
+      ? await tx.company.findUnique({
+          where: { id: request.companyId },
+          select: { timezone: true },
+        })
+      : null;
+    if (hasKnownExpiry) requirePhysical(company, 'INVENTORY_TENANT_MISMATCH');
+    const asOf = new Date();
+    const assertNotExpired = (day: string | null) => {
+      if (day === null) return;
+      requirePhysical(company, 'INVENTORY_TENANT_MISMATCH');
+      requirePhysical(
+        physicalExpirationEligibility(day, company.timezone, asOf) !==
+          'EXPIRED',
+        'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+      );
+    };
     const plan = new Map<string, PlannedLine>();
     const add = (
       key: PositionKey,
@@ -270,7 +342,7 @@ export class PhysicalInventoryService {
     ) => {
       const product = productMap.get(key.productId);
       requirePhysical(product, 'PRODUCT_NOT_FOUND');
-      this.validateKey(key, product, batchMap, now);
+      this.validateKey(key, product, batchMap, assertNotExpired, receipt, sale);
       const identity = positionIdentity(key);
       const existing = plan.get(identity);
       requirePhysical(
@@ -312,7 +384,9 @@ export class PhysicalInventoryService {
           const source = byId.get(transfer.sourceId)!;
           requirePhysical(
             source.productId === transfer.target.productId &&
-              source.inventoryBatchId === transfer.target.inventoryBatchId,
+              source.inventoryBatchId === transfer.target.inventoryBatchId &&
+              (positionKey(source).expirationDate ?? null) ===
+                (transfer.target.expirationDate ?? null),
             'INVENTORY_BATCH_PRODUCT_MISMATCH',
           );
           add(transfer.target, transfer.quantity);
@@ -420,14 +494,27 @@ export class PhysicalInventoryService {
     key: PositionKey,
     product: Product,
     batches: Map<string, InventoryBatch>,
-    now: Date,
+    assertNotExpired: (day: string | null) => void,
+    receipt?: PurchaseReceiptCreditContext,
+    sale?: SaleConsumptionContext,
   ) {
+    assertNotExpired(key.expirationDate ?? null);
+    // Only reconstructed receipt CREDIT / confirmed Sale OUT authorize dates.
+    // Generic credits, debits, transfers and counts keep the S2 gate.
+    requirePhysical(
+      key.expirationDate == null || receipt || sale,
+      'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+    );
     requirePhysical(product.inventoryTracking === 'QUANTITY');
     requirePhysical(
-      product.lotTracking !== 'REQUIRED' || key.inventoryBatchId !== null,
+      receipt ||
+        product.lotTracking !== 'REQUIRED' ||
+        key.inventoryBatchId !== null,
     );
     requirePhysical(
-      product.lotTracking !== 'NONE' || key.inventoryBatchId === null,
+      receipt ||
+        product.lotTracking !== 'NONE' ||
+        key.inventoryBatchId === null,
     );
     const batch = key.inventoryBatchId
       ? batches.get(key.inventoryBatchId)
@@ -438,13 +525,11 @@ export class PhysicalInventoryService {
         batch.productId === product.id && batch.companyId === product.companyId,
         'INVENTORY_BATCH_PRODUCT_MISMATCH',
       );
+      assertNotExpired(storedExpirationDay(batch.expirationDate));
     }
     if (key.state === 'AVAILABLE') {
       requirePhysical(
-        product.isActive &&
-          (!batch ||
-            (batch.isActive &&
-              (!batch.expirationDate || batch.expirationDate > now))),
+        product.isActive && (!batch || batch.isActive),
         'PHYSICAL_SOURCE_NOT_ELIGIBLE',
       );
     }

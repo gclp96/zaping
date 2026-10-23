@@ -356,26 +356,23 @@ export class SalesPhysicalIntegrationService {
     actorId: string,
     sale: Sale,
   ) {
-    const { plan, products } = await this.resolver.resolve(
+    const { plan, products } = await this.resolver.planConfirmedSaleSources(
       tx,
       companyId,
       sale.items,
     );
-    const result = await this.physical.definitiveOut(
-      tx,
-      {
-        companyId,
-        actorId,
-        origin: { type: 'SALE', id: sale.id, operation: 'CONFIRM' },
-      },
-      plan.flatMap((item) =>
+    const result = await this.physical.consumeConfirmedSale(tx, {
+      companyId,
+      actorId,
+      saleId: sale.id,
+      sources: plan.flatMap((item) =>
         item.sources.map((source) => ({
           sourceId: source.positionId,
           quantity: source.quantity,
           expectedSourceRevision: source.expectedRevision,
         })),
       ),
-    );
+    });
     requirePhysical(!result.replay, 'SALE_PHYSICAL_STATE_INCONSISTENT');
     await this.projections.apply(tx, companyId, result);
     await this.history.writeSale(
