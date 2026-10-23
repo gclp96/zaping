@@ -83,6 +83,8 @@ export type PurchaseReceiptListItem = {
   receivedAt: string;
   receivedBy: string | null;
   notes: string | null;
+  supplierDocumentType: string | null;
+  supplierDocumentNumber: string | null;
   receivedByUser: ReceiptUser | null;
   purchase: ReceiptPurchaseSummary;
   items: PurchaseReceiptListItemLine[];
