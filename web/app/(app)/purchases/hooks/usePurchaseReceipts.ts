@@ -31,6 +31,8 @@ export function usePurchaseReceipts({
   >([]);
 
   const [receiptNotes, setReceiptNotes] = useState('');
+  const [supplierDocumentType, setSupplierDocumentType] = useState('');
+  const [supplierDocumentNumber, setSupplierDocumentNumber] = useState('');
   const [receiptSaving, setReceiptSaving] = useState(false);
   const [createdReceipt, setCreatedReceipt] =
     useState<CreatedPurchaseReceipt | null>(null);
@@ -46,6 +48,8 @@ export function usePurchaseReceipts({
     setPurchaseToReceive(null);
     setReceiptFormItems([]);
     setReceiptNotes('');
+    setSupplierDocumentType('');
+    setSupplierDocumentNumber('');
     setReceiptFormError('');
     setReceiptFieldErrors({});
     setReceiptIdempotencyKey(null);
@@ -130,6 +134,8 @@ export function usePurchaseReceipts({
     setPurchaseToReceive(purchase);
     setReceiptFormItems(formItems);
     setReceiptNotes('');
+    setSupplierDocumentType('');
+    setSupplierDocumentNumber('');
     setReceiptFormError('');
     setReceiptFieldErrors({});
     setReceiptIdempotencyKey(crypto.randomUUID());
@@ -229,6 +235,11 @@ export function usePurchaseReceipts({
     setReceiptFormError('');
     setReceiptFieldErrors({});
 
+    if (Boolean(supplierDocumentType) !== Boolean(supplierDocumentNumber.trim())) {
+      setReceiptFormError('Selecciona el tipo y número del documento del proveedor, o deja ambos vacíos.');
+      return;
+    }
+
     const selectedItems = receiptFormItems.filter(
       (item) =>
         item.quantityReceived.trim() !== '',
@@ -315,6 +326,8 @@ export function usePurchaseReceipts({
           purchaseId: purchaseToReceive.id,
           notes:
             receiptNotes.trim() || undefined,
+          supplierDocumentType: supplierDocumentType || undefined,
+          supplierDocumentNumber: supplierDocumentNumber.trim() || undefined,
           items: selectedItems.map((item) => ({
             purchaseItemId:
               item.purchaseItemId,
@@ -364,6 +377,10 @@ export function usePurchaseReceipts({
     purchaseToReceive,
     receiptFormItems,
     receiptNotes,
+    supplierDocumentType,
+    supplierDocumentNumber,
+    setSupplierDocumentType,
+    setSupplierDocumentNumber,
     receiptSaving,
     receiptFormError,
     receiptFieldErrors,
