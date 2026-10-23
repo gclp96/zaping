@@ -1,7 +1,7 @@
 # ADR-015 — Identidad física de existencias sin lote con caducidad
 
 **Estado de decisión:** ACCEPTED (OX-PUR-05B; issues #115 y #116)
-**Estado de implementación:** Foundation A y recepción PHYSICAL W1 implementadas para revisión independiente; consumo/transferencias fechadas y FEFO permanecen bloqueados. QA e integración se registran en el incremento de CI posterior.
+**Estado de implementación:** extracción A+B en revisión local; Foundation S1/S2/S3a/S3b-R y recepción W1 incluidas. Sin planificación S3b-S, Ventas W2a ni Healthcare W2b. QA-AB-01 local y PostgreSQL 16 efímero PASS; CI remoto del futuro PR pendiente. No V1 completa ni autorización de merge.
 **Fecha:** 2026-10-22
 **Área:** Zaping ERP / Compras, Recepciones e Inventory Physical
 **PR base:** #114 integrado en `main`
@@ -164,3 +164,31 @@ Los gates locales cubren identidad/hash, fechas locales, lectura SQL, crédito d
 **Validaciones locales W1:** 241/241 pruebas en 12 suites PASS; TypeScript productivo y focal de los tests, ESLint, Prettier, build API y `git diff --check` PASS. PostgreSQL se reserva al servicio efímero de CI, sin conexiones a bases locales. El resultado CI del commit debe verificarse separadamente.
 
 **Estado de entrega:** W1 implementado para revisión; PR #119 permanece DRAFT hasta W2/S4. Sin merge ni habilitación de consumidores fechados.
+
+## 15. Historial previo a QA-AB-01 — evidencia local y gate de integración
+
+- **Rama:** `codex/insap-auto-01b-foundation-receipts`, worktree independiente desde `main@226f5af0dad9d27e0a19d080ff7b2b27c952122a`. Cambios sin staging ni commit. Las referencias CI de PR #119 son evidencia histórica, no una ejecución de esta rama.
+- **Unitarias y regresiones locales:** 428/428 PASS en 20 suites: motor/identidad y hashes golden, política temporal, lecturas, autorización W1, documentos y hash de recepción, recepción LEGACY, compras, opening/cutover/autoridad, Ventas históricas y Dispatch/Reconciliation/Correction existentes. Tras completar el mock histórico de proyecciones exigido por TypeScript, Ventas se revalidó: 32/32 PASS. Tras precisar los orígenes y estados de las regresiones Healthcare, identidad/gates se revalidó: 33/33 PASS. No sumar estas repeticiones al total de cobertura.
+- **Checks locales:** TypeScript productivo PASS; typecheck focal de fuentes/pruebas y ambos E2E mediante `test/tsconfig.insap-ab.json` PASS; ESLint API PASS y revalidación focal posterior; build API PASS. Formato/whitespace se comprueban sobre tracked y nuevos antes de entregar.
+- **PostgreSQL:** NO EJECUTADO en esta extracción. Ninguna conexión ni migración local. Compilar tests no acredita atomicidad, concurrencia ni constraints reales. El selector PHYSICAL del fixture W1 es test-only: no acredita un cutover operativo.
+
+### Plan CI PostgreSQL efímero
+
+1. Ejecutar el workflow sobre el SHA exacto que se autorice publicar posteriormente: instalación aislada, generación Prisma, migraciones en el servicio PostgreSQL 16 descartable y validación de schema. No usar ni adaptar estos comandos para bases locales.
+2. Ejecutar las suites existentes de concurrencia, W1 de recepción y Foundation identidad/política/lecturas. Foundation añade comprobaciones reales del resolver histórico NULL junto a fechas conocidas y del agregado `available` de REQUIRED sin habilitar consumo. W1 conserva sus carreras de dos clientes/PIDs, replay, parciales, rollback y documentos, sin pruebas de W2a.
+3. Exigir resultados API/Web y typecheck focal; revisar cantidades y cero omisiones de los casos habilitados. Ninguna bandera local debe simular GitHub Actions para evitar el aislamiento CI de los E2E.
+4. **Gate adicional antes de integrar:** validar la actualización desde una base anterior a S1 con evidencia v1 persistida y comparar IDs, cantidades, revisiones, hashes y replay después de migrar, exclusivamente en CI efímero. Los tests actuales que crean una posición NULL después del deploy no sustituyen esa prueba de upgrade histórico.
+
+**Riesgos y aceptación:** migración e índices requieren PostgreSQL 16 y revisión de despliegue; la política local de Batch afecta consumidores compartidos y necesita regresión real. `available` es saldo físico elegible, no garantía de consumo por cualquier operación; la propuesta de utilizabilidad del §13 no cambia contratos públicos. REQUIRED sin lote (#120), custodia vencida (#121), SQL v1/v2 y Healthcare fechado (#122), UI OX-PUR-05 y habilitación de consumidores siguen pendientes. M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, intermitencia EQUIPMENT sin causa confirmada y el antecedente de 70 errores históricos del typecheck global no se cierran por esta extracción; el PASS focal/productivo no acredita un typecheck global de specs.
+
+**Veredicto de la extracción:** GO para revisión y QA efímero de A+B; NO-GO para merge, cierre de V1 o activación operativa hasta acreditar sus gates. No se depende de implementar Healthcare W2b-2 para validar el crédito W1.
+
+## 16. QA-AB-01 — revisión y PostgreSQL efímero de A+B
+
+Estado actual: GO para preparar PR independiente A+B; no merge ni cierre V1. [Informe QA-AB-01](../../project/QA_AB_01_REPORT.md): upgrade con 46 migraciones pre-S1 y fixtures persistidos antes de A, 9/9 verificaciones; Foundation 31/31, W1 reforzado 23/23 y LEGACY 5/5 E2E PASS, sin skipped. API 2921/2921 y Web 882/882 PASS; typecheck, lint y builds PASS. La corrida PostgreSQL fue ejecutada por el agente en contenedores nuevos tmpfs, no por el usuario ni mediante CI remoto. Los antecedentes de §15 permanecen como historial.
+
+Sin cambios productivos durante QA: se reforzaron exclusivamente tests/autorización efímera. La autoridad de los fixtures W1 se fija a PHYSICAL y toma shared fence real; no demuestra cutover operativo. El informe distingue available físico de utilizabilidad, enumera los intentos de preparación fallidos y los límites de cobertura histórica. En el cierre QA-AB-01 seguían pendientes CI del SHA final y automatización del upgrade; INT-AB-01 registra su implementación posterior a continuación. Los gates de FEFO, REQUIRED, Healthcare fechado y custodia vencida permanecen cerrados. El ADR del worktree original y sus §§17–18 no se modificaron.
+
+### INT-AB-01 — automatización histórica y entrega independiente
+
+Se implementa el job independiente `historical-upgrade` con historia Git completa y PostgreSQL 16 nuevo en tmpfs, sin compartir el servicio API. Reutiliza el launcher con `--upgrade-only`, fija las migraciones al baseline y falla si no pasan exactamente nueve checks. Sus controles de SHA/checkout desacoplado y exit code tienen nueve regresiones Node PASS; upgrade dedicado 9/9 y revalidación A+B/LEGACY PASS. El resultado remoto sigue PENDING hasta autorización de publicación. Véanse [informe actualizado](../../project/QA_AB_01_REPORT.md) y [descripción del PR](../../project/INT_AB_01_PR_DESCRIPTION.md). INT autoriza commits locales; no push, merge, cutover ni V1 completa. Se conserva en el informe el primer fallo Web y su revalidación sin modificar frontend.
