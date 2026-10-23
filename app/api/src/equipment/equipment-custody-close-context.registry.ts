@@ -7,6 +7,13 @@ export interface EquipmentCustodyCloseContextAdapter {
   readonly key: string;
   readonly originType: string;
   readonly originOperation: string;
+  // DEC-HC-DSP-COR-01D-01: only the correction origin may resolve persisted
+  // metadata. This is not a caller-supplied hash/date override.
+  dispatchCorrectionMetadata?(
+    tx: Prisma.TransactionClient,
+    command: EquipmentCustodyCloseCommand,
+    mode: 'APPLY' | 'REPLAY',
+  ): Promise<{ requestHash: string; closedAt: Date }>;
   // Authenticate retained domain evidence and actor permission in the caller tx.
   // Read only: no physical writes or late row locks. Command references are not proof.
   validate(
@@ -43,6 +50,33 @@ export class EquipmentCustodyCloseContextRegistry {
     if (new Set(adapters.map((a) => a.key)).size !== adapters.length)
       throw new Error('Duplicate Equipment custody close adapter');
     this.adapters = Object.freeze([...adapters]);
+  }
+  async dispatchCorrectionMetadata(
+    tx: Prisma.TransactionClient,
+    c: EquipmentCustodyCloseCommand,
+    mode: 'APPLY' | 'REPLAY',
+  ) {
+    const adapter = this.adapters.find(
+      (a) => a.key === 'CASE_DISPATCH_CORRECTION_ITEM',
+    );
+    equipmentPhysicalAssert(
+      adapter?.dispatchCorrectionMetadata &&
+        c.validatedContext.adapterKey === adapter.key &&
+        adapter.originType === 'CASE_DISPATCH_CORRECTION_ITEM' &&
+        c.durableOrigin.type === adapter.originType &&
+        adapter.originOperation === 'COMPENSATE_NO_HANDOFF_EQUIPMENT' &&
+        c.durableOrigin.operation === adapter.originOperation,
+      'RESOURCE_STATE_CHANGED',
+    );
+    const metadata = await adapter.dispatchCorrectionMetadata(tx, c, mode);
+    equipmentPhysicalAssert(
+      /^[a-f0-9]{64}$/.test(metadata.requestHash) &&
+        metadata.closedAt instanceof Date &&
+        Number.isFinite(metadata.closedAt.getTime()),
+      'RESOURCE_STATE_CHANGED',
+    );
+    await this.validate(tx, c, metadata.requestHash, mode);
+    return metadata;
   }
   async validate(
     tx: Prisma.TransactionClient,

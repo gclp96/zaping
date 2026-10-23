@@ -48,7 +48,6 @@ export class EquipmentCustodyCloseService {
         c.companyId,
         c.assetId,
       );
-      const hash = equipmentCustodyCloseHash(c);
       const previous = await this.repository.findPhysicalEventByOrigin(
         tx,
         c.companyId,
@@ -57,6 +56,15 @@ export class EquipmentCustodyCloseService {
         c.durableOrigin.id,
         c.durableOrigin.operation,
       );
+      const correction =
+        c.durableOrigin.type === 'CASE_DISPATCH_CORRECTION_ITEM'
+          ? await this.contexts.dispatchCorrectionMetadata(
+              tx,
+              c,
+              previous ? 'REPLAY' : 'APPLY',
+            )
+          : null;
+      const hash = correction?.requestHash ?? equipmentCustodyCloseHash(c);
       if (previous) {
         equipmentPhysicalAssert(
           previous.requestHash === hash,
@@ -128,14 +136,14 @@ export class EquipmentCustodyCloseService {
         clock?.closedAt instanceof Date && clock.closedAt >= custody.openedAt,
         'EQUIPMENT_PHYSICAL_PERSISTENCE_ERROR',
       );
+      const closedAt = correction?.closedAt ?? clock.closedAt;
+      equipmentPhysicalAssert(
+        closedAt >= custody.openedAt && closedAt <= clock.closedAt,
+        'EQUIPMENT_PHYSICAL_PERSISTENCE_ERROR',
+      );
       await this.history.requireReceiptActor(tx, c.companyId, c.actorId);
       await this.contexts.validate(tx, c, hash, 'APPLY');
-      await this.repository.closeCustodyCas(
-        tx,
-        custody,
-        clock.closedAt,
-        c.actorId,
-      );
+      await this.repository.closeCustodyCas(tx, custody, closedAt, c.actorId);
       await this.repository.closeAssetFromCustodyCas(
         tx,
         asset,
@@ -147,7 +155,7 @@ export class EquipmentCustodyCloseService {
         asset,
         c,
         hash,
-        clock.closedAt,
+        closedAt,
       );
       return this.result(event, 'CLOSED');
     } catch (error) {

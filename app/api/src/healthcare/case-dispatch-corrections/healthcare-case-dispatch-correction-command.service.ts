@@ -21,6 +21,7 @@ import {
   assertValidHealthcareCompanyTransactionTimeoutPolicy,
 } from '../common/healthcare-company-transaction-timeout-policy';
 import { acquireHealthcareCompanyLock } from '../common/healthcare-company-lock';
+import { HealthcareCaseDispatchCorrectionEquipmentOrchestrator } from './healthcare-case-dispatch-correction-equipment.orchestrator';
 
 // No decorator, module registration, controller or productive caller.
 export class HealthcareCaseDispatchCorrectionCommandService {
@@ -31,6 +32,7 @@ export class HealthcareCaseDispatchCorrectionCommandService {
     private readonly projections: InventoryCompatibilityProjectionService,
     private readonly authority: InventoryAuthorityResolver,
     private readonly runtime: InventoryRuntimeCompatibilityService,
+    private readonly equipment?: HealthcareCaseDispatchCorrectionEquipmentOrchestrator,
   ) {
     assertValidHealthcareCompanyTransactionTimeoutPolicy(policy);
   }
@@ -44,12 +46,18 @@ export class HealthcareCaseDispatchCorrectionCommandService {
     await this.repo.authorize(tx, c);
     const witness = await this.repo.replayWitness(tx, c, hash);
     if (!witness) return null;
+    if (this.equipment && !(await this.equipment.replay(tx, c, witness)))
+      return { replay: true, witness };
     const evidence =
-      await this.physical.classifyCommittedDispatchCorrectionMaterial(tx, {
-        ...c,
-        ...intent,
-        correctionId: witness.id,
-      });
+      await this.physical.classifyCommittedDispatchCorrectionMaterial(
+        tx,
+        {
+          ...c,
+          ...intent,
+          correctionId: witness.id,
+        },
+        ...(this.equipment ? ([true] as const) : []),
+      );
     assertMaterialCommand(evidence?.replay, 'CORRECTION_EVIDENCE_INCONSISTENT');
     return { replay: true, witness };
   }
@@ -67,22 +75,30 @@ export class HealthcareCaseDispatchCorrectionCommandService {
         this.policy,
       );
       if (replay) return replay;
+      const material = this.equipment
+        ? await this.repo.read(async (tx) => {
+            await this.repo.authorize(tx, c);
+            return this.equipment!.hasMaterial(tx, c);
+          }, this.policy)
+        : true;
       try {
         return await this.repo.write(async (tx) => {
-          await inventoryAuthorityFence(tx, c.companyId, 'shared');
-          const control = await this.repo.control(tx, c.companyId);
-          if (!control)
-            throw new InventoryAuthorityError('PHYSICAL_AUTHORITY_REQUIRED');
-          const authority = await this.authority.resolve(tx, c.companyId);
-          if (authority === 'LEGACY')
-            throw new InventoryAuthorityError('PHYSICAL_AUTHORITY_REQUIRED');
-          if (authority !== 'PHYSICAL')
-            throw new InventoryAuthorityError(
-              control.status === 'RECOVERY_REQUIRED'
-                ? 'RECOVERY_REQUIRED'
-                : 'CUTOVER_FROZEN',
-            );
-          this.runtime.identity();
+          if (material) {
+            await inventoryAuthorityFence(tx, c.companyId, 'shared');
+            const control = await this.repo.control(tx, c.companyId);
+            if (!control)
+              throw new InventoryAuthorityError('PHYSICAL_AUTHORITY_REQUIRED');
+            const authority = await this.authority.resolve(tx, c.companyId);
+            if (authority === 'LEGACY')
+              throw new InventoryAuthorityError('PHYSICAL_AUTHORITY_REQUIRED');
+            if (authority !== 'PHYSICAL')
+              throw new InventoryAuthorityError(
+                control.status === 'RECOVERY_REQUIRED'
+                  ? 'RECOVERY_REQUIRED'
+                  : 'CUTOVER_FROZEN',
+              );
+            this.runtime.identity();
+          }
           const winner = await this.replay(tx, c, i, n.hash);
           if (winner) return winner;
           const id = randomUUID();
@@ -97,7 +113,18 @@ export class HealthcareCaseDispatchCorrectionCommandService {
           });
           const source = await this.repo.lockStructure(tx, c);
           await this.repo.assertNoCorrection(tx, c);
-          await this.repo.assertSource(tx, c, source);
+          if (this.equipment) await this.repo.assertSource(tx, c, source, true);
+          else await this.repo.assertSource(tx, c, source);
+          const materialSource = {
+            ...source,
+            items: source.items.filter((i) => i.type === 'MATERIAL'),
+          };
+          assertMaterialCommand(
+            material === materialSource.items.length > 0,
+            'CORRECTION_EVIDENCE_INCONSISTENT',
+          );
+          if (this.equipment)
+            await this.equipment.lockAssignments(tx, c, source);
           await this.repo.authorize(tx, c);
           const at = await this.repo.serverTime(tx);
           const root = await this.repo.createRoot(tx, {
@@ -113,16 +140,28 @@ export class HealthcareCaseDispatchCorrectionCommandService {
             requestHash: n.hash,
             idempotencyRecordId: claim.id,
           });
-          const result = await this.physical.transferDispatchCorrectionMaterial(
-            tx,
-            { ...c, ...i, correctionId: id },
-          );
-          assertMaterialCommand(
-            !result.replay,
-            'CORRECTION_EVIDENCE_INCONSISTENT',
-          );
-          await this.projections.apply(tx, c.companyId, result);
-          await this.repo.createEvidenceItems(tx, c, root, source, result);
+          if (material) {
+            const result =
+              await this.physical.transferDispatchCorrectionMaterial(
+                tx,
+                { ...c, ...i, correctionId: id },
+                ...(this.equipment ? ([true] as const) : []),
+              );
+            assertMaterialCommand(
+              !result.replay,
+              'CORRECTION_EVIDENCE_INCONSISTENT',
+            );
+            await this.projections.apply(tx, c.companyId, result);
+            await this.repo.createEvidenceItems(
+              tx,
+              c,
+              root,
+              this.equipment ? materialSource : source,
+              result,
+            );
+          }
+          if (this.equipment)
+            await this.equipment.compensate(tx, c, root, source);
           const actor = await this.repo.authorize(tx, c);
           await this.repo.seal(tx, root, source, actor);
           await this.repo.authorize(tx, c);

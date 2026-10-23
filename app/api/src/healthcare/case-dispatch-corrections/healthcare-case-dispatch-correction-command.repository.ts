@@ -144,6 +144,7 @@ export class HealthcareCaseDispatchCorrectionCommandRepository {
     tx: Tx,
     c: MaterialCorrectionContext,
     source: MaterialCorrectionSource,
+    equipment = false,
   ) {
     assertMaterialCommand(
       source.companyId === c.companyId &&
@@ -158,7 +159,9 @@ export class HealthcareCaseDispatchCorrectionCommandRepository {
     assertMaterialCommand(
       source.items.length > 0 &&
         source.items.length <= 1000 &&
-        source.items.every((i) => i.type === 'MATERIAL'),
+        source.items.every(
+          (i) => i.type === 'MATERIAL' || (equipment && i.type === 'EQUIPMENT'),
+        ),
       'CORRECTION_MATERIAL_ONLY',
     );
     const rr = await tx.healthcareCaseReconciliation.findFirst({
@@ -319,7 +322,7 @@ export class HealthcareCaseDispatchCorrectionCommandRepository {
       'CORRECTION_EVIDENCE_INCONSISTENT',
     );
     const snapshots =
-      await tx.$executeRaw`UPDATE "HealthcareCaseDispatchCorrectionItem" SET snapshot=public.dispatch_correction_item_snapshot(id) WHERE "correctionId"=${root.id} AND "companyId"=${c.companyId}`;
+      await tx.$executeRaw`UPDATE "HealthcareCaseDispatchCorrectionItem" SET snapshot=public.dispatch_correction_item_snapshot(id) WHERE "correctionId"=${root.id} AND "companyId"=${c.companyId} AND type='MATERIAL'`;
     assertMaterialCommand(
       snapshots === data.length,
       'CORRECTION_EVIDENCE_INCONSISTENT',

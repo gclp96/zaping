@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.spec.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": [
+    "../src/healthcare/case-dispatch-corrections/healthcare-case-dispatch-correction-equipment*.ts",
+    "../src/healthcare/case-dispatch-corrections/healthcare-case-dispatch-correction-command*.ts",
+    "../src/equipment/equipment-custody-close*.ts"
+  ]
+}

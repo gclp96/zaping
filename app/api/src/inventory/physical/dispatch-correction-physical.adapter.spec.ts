@@ -4,6 +4,7 @@ import { createDispatchCorrectionRequestHash } from '../../healthcare/case-dispa
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
 import { PhysicalInventoryService } from './physical-inventory.service';
 import { DispatchCorrectionMaterialInput } from './dispatch-correction-physical.adapter';
+import { loadCorrectionContext } from './dispatch-correction-physical.adapter';
 import {
   materialQaUrl,
   MATERIAL_QA_MARKER,
@@ -214,6 +215,23 @@ function fixture() {
 }
 
 describe('01C-A specific material contract', () => {
+  it('01D selects MATERIAL from a mixed durable source without changing default MATERIAL-only admission', async () => {
+    const f = fixture();
+    const equipment = {
+      ...f.item,
+      id: randomUUID(),
+      type: 'EQUIPMENT',
+      quantity: null,
+    };
+    f.source.items.push(equipment as unknown as typeof f.item);
+    await expect(loadCorrectionContext(f.db, f.input)).rejects.toHaveProperty(
+      'code',
+      'CORRECTION_MATERIAL_ONLY',
+    );
+    const context = await loadCorrectionContext(f.db, f.input, true);
+    expect(context?.source.items).toEqual([f.item]);
+    expect(f.repo.mutatePosition).not.toHaveBeenCalled();
+  });
   const before = { ...process.env };
   beforeEach(() => {
     process.env.INVENTORY_AUTHORITY_PROTOCOL = 'inventory-authority-v1';
