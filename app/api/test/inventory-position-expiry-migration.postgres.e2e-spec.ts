@@ -4,6 +4,7 @@ import { PhysicalInventoryRepository } from '../src/inventory/physical/physical-
 import { PhysicalInventoryService } from '../src/inventory/physical/physical-inventory.service';
 import { companyLocalDay } from '../src/inventory/physical/physical-expiration-policy';
 import { PhysicalInventoryReadService } from '../src/inventory/physical/physical-inventory-read.service';
+import { SalesPhysicalSourceResolver } from '../src/inventory/physical/sales-physical-source-resolver';
 import {
   PhysicalRequest,
   PositionKey,
@@ -226,6 +227,435 @@ suite(
           },
         }),
       ).rejects.toThrow();
+    });
+
+    describe('S3b-S plan-only FEFO and closed production entry', () => {
+      const repository = new PhysicalInventoryRepository();
+      const planner = new SalesPhysicalSourceResolver(repository);
+      const core = new PhysicalInventoryService(repository);
+      async function fixture() {
+        const company = await db.company.create({
+          data: {
+            name: 'S3b-S CI',
+            rfc: randomUUID(),
+            timezone: 'America/Hermosillo',
+          },
+        });
+        const product = await db.product.create({
+          data: {
+            companyId: company.id,
+            name: 'planner material',
+            sku: randomUUID(),
+            inventoryTracking: 'QUANTITY',
+            lotTracking: 'OPTIONAL',
+          },
+        });
+        const actor = await db.user.create({
+          data: {
+            companyId: company.id,
+            firstName: 'S3b-S',
+            lastName: 'CI',
+            email: `${randomUUID()}@example.invalid`,
+            passwordHash: 'not-a-login',
+            role: 'ADMIN',
+          },
+        });
+        const day = new Date(
+          `${companyLocalDay(company.timezone, new Date())}T00:00:00Z`,
+        ).getTime();
+        const rows: InventoryPosition[] = [];
+        for (const [offset, quantity] of [
+          [0, 2],
+          [1, 3],
+          [2, 4],
+          [null, 5],
+          [-1, 9],
+          [3, 0],
+        ] as const) {
+          rows.push(
+            await db.inventoryPosition.create({
+              data: {
+                companyId: company.id,
+                productId: product.id,
+                inventoryBatchId: null,
+                expirationDate:
+                  offset === null ? null : new Date(day + offset * 86400000),
+                state: 'AVAILABLE',
+                quantity,
+              },
+            }),
+          );
+        }
+        await db.inventoryPosition.create({
+          data: {
+            companyId: company.id,
+            productId: product.id,
+            state: 'CUSTODY',
+            contextType: 'CASE',
+            contextId: 'planner fixture',
+            quantity: 11,
+          },
+        });
+        const batch = await db.inventoryBatch.create({
+          data: {
+            companyId: company.id,
+            productId: product.id,
+            lotNumber: randomUUID(),
+          },
+        });
+        await db.inventoryPosition.create({
+          data: {
+            companyId: company.id,
+            productId: product.id,
+            inventoryBatchId: batch.id,
+            state: 'AVAILABLE',
+            quantity: 13,
+          },
+        });
+        const item = { id: randomUUID(), productId: product.id, quantity: 12 };
+        return { company, product, actor, rows, item };
+      }
+      function gate() {
+        let release!: () => void;
+        let reject!: (error: unknown) => void;
+        const wait = new Promise<void>((resolve, fail) => {
+          release = resolve;
+          reject = fail;
+        });
+        return { wait, release, reject };
+      }
+      function clients() {
+        const url = new URL(process.env.DATABASE_URL!);
+        url.searchParams.set('connection_limit', '1');
+        return [1, 2].map(
+          () =>
+            new PrismaClient({ datasources: { db: { url: url.toString() } } }),
+        );
+      }
+
+      it('plans three dates FEFO then unknown with partial quantities and no writes; dated execution remains forbidden', async () => {
+        const f = await fixture();
+        const before = await db.inventoryPosition.findMany({
+          where: { companyId: f.company.id },
+          orderBy: { id: 'asc' },
+        });
+        const result = await db.$transaction((tx) =>
+          planner.planUnbatchedSources(tx, f.company.id, [f.item]),
+        );
+        expect(result.plan[0].sources).toEqual(
+          f.rows.slice(0, 4).map((p, i) => ({
+            positionId: p.id,
+            quantity: i === 3 ? 3 : p.quantity,
+            expectedRevision: 0,
+          })),
+        );
+        expect(
+          await db.inventoryPosition.findMany({
+            where: { companyId: f.company.id },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(before);
+        await expect(
+          db.$transaction((tx) =>
+            core.definitiveOut(
+              tx,
+              {
+                companyId: f.company.id,
+                actorId: f.actor.id,
+                origin: {
+                  type: 'INV01A_TEST',
+                  id: randomUUID(),
+                  operation: 'OUT',
+                },
+              },
+              result.plan[0].sources.map((s) => ({
+                sourceId: s.positionId,
+                quantity: s.quantity,
+                expectedSourceRevision: s.expectedRevision,
+              })),
+            ),
+          ),
+        ).rejects.toMatchObject({ code: 'PHYSICAL_SOURCE_NOT_ELIGIBLE' });
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+        expect(
+          await db.inventoryPosition.findMany({
+            where: { companyId: f.company.id },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(before);
+      });
+
+      it('rejects insufficient unbatched eligible stock despite expired, custody and real Batch quantities', async () => {
+        const f = await fixture();
+        await expect(
+          db.$transaction((tx) =>
+            planner.planUnbatchedSources(tx, f.company.id, [
+              { ...f.item, quantity: 15 },
+            ]),
+          ),
+        ).rejects.toMatchObject({ code: 'INSUFFICIENT_PHYSICAL_AVAILABILITY' });
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+      });
+
+      it('keeps production resolution undated-only and preserves REQUIRED and tenant rejection', async () => {
+        const f = await fixture();
+        const result = await db.$transaction((tx) =>
+          planner.resolve(tx, f.company.id, [{ ...f.item, quantity: 3 }]),
+        );
+        expect(result.plan[0].sources).toEqual([
+          { positionId: f.rows[3].id, quantity: 3, expectedRevision: 0 },
+        ]);
+        const foreign = await fixture();
+        await expect(
+          db.$transaction((tx) =>
+            planner.planUnbatchedSources(tx, foreign.company.id, [f.item]),
+          ),
+        ).rejects.toMatchObject({ code: 'SALE_PHYSICAL_SOURCE_INVALID' });
+        await db.product.update({
+          where: { id: f.product.id },
+          data: { lotTracking: 'REQUIRED' },
+        });
+        for (const method of ['resolve', 'planUnbatchedSources'] as const) {
+          await expect(
+            db.$transaction((tx) =>
+              planner[method](tx, f.company.id, [f.item]),
+            ),
+          ).rejects.toThrow(
+            `El producto ${f.product.name} requiere selección de lote para completar la venta`,
+          );
+        }
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+      });
+
+      it('serializes two physical connections and plans from the refreshed locked revision without consuming dated stock', async () => {
+        const f = await fixture();
+        const [first, second] = clients();
+        const ready = gate(),
+          release = gate();
+        let ownerPid = 0,
+          contenderPid = 0;
+        const command = {
+          companyId: f.company.id,
+          actorId: f.actor.id,
+          origin: { type: 'INV01A_TEST', id: randomUUID(), operation: 'OUT' },
+        };
+        const debit = [
+          { sourceId: f.rows[3].id, quantity: 2, expectedSourceRevision: 0 },
+        ];
+        const owner = first.$transaction(
+          async (tx) => {
+            const [session] = await tx.$queryRaw<
+              { pid: number }[]
+            >`SELECT pg_backend_pid() AS pid`;
+            ownerPid = session.pid;
+            const initial = await planner.planUnbatchedSources(
+              tx,
+              f.company.id,
+              [f.item],
+            );
+            expect(initial.plan[0].sources[3].expectedRevision).toBe(0);
+            ready.release();
+            await release.wait;
+            // Existing undated core operation only. The FEFO preview is not
+            // executed, and every reentrant core root is already held by this tx.
+            await core.definitiveOut(tx, command, debit);
+          },
+          { timeout: 15000 },
+        );
+        void owner.catch(ready.reject);
+        try {
+          await ready.wait;
+          const started = gate();
+          const contender = second.$transaction(
+            async (tx) => {
+              await tx.$executeRaw`SET LOCAL statement_timeout = '7s'`;
+              const [session] = await tx.$queryRaw<
+                { pid: number }[]
+              >`SELECT pg_backend_pid() AS pid`;
+              contenderPid = session.pid;
+              started.release();
+              return planner.planUnbatchedSources(tx, f.company.id, [f.item]);
+            },
+            { timeout: 12000 },
+          );
+          const outcome = contender.then(
+            (value) => ({ value, error: null }),
+            (error: unknown) => ({ value: null, error }),
+          );
+          void contender.catch(started.reject);
+          await started.wait;
+          expect(ownerPid).not.toBe(contenderPid);
+          let blocked = false;
+          const deadline = Date.now() + 5000;
+          while (!blocked && Date.now() < deadline) {
+            const [row] = await db.$queryRaw<
+              { blocked: boolean }[]
+            >`SELECT ${ownerPid}::integer = ANY(pg_blocking_pids(${contenderPid}::integer)) AS blocked`;
+            blocked = row.blocked;
+          }
+          expect(blocked).toBe(true);
+          release.release();
+          const result = await outcome;
+          expect(result.error).toBeNull();
+          expect(result.value?.plan[0].sources).toEqual(
+            f.rows.slice(0, 4).map((p, i) => ({
+              positionId: p.id,
+              quantity: i === 3 ? 3 : p.quantity,
+              expectedRevision: i === 3 ? 1 : 0,
+            })),
+          );
+          const replay = await db.$transaction((tx) =>
+            core.definitiveOut(tx, command, debit),
+          );
+          expect(replay.replay).toBe(true);
+          expect(
+            await db.inventoryPhysicalEffect.count({
+              where: { companyId: f.company.id },
+            }),
+          ).toBe(1);
+          expect(
+            await db.inventoryPosition.findUniqueOrThrow({
+              where: { id: f.rows[3].id },
+            }),
+          ).toMatchObject({ quantity: 3, revision: 1 });
+          expect(
+            await db.inventoryPosition.count({
+              where: {
+                id: { in: f.rows.slice(0, 3).map((p) => p.id) },
+                revision: 0,
+              },
+            }),
+          ).toBe(3);
+        } finally {
+          release.release();
+          await owner.finally(() =>
+            Promise.all([first.$disconnect(), second.$disconnect()]),
+          );
+        }
+      });
+
+      it('rejects a stale retained revision on the existing undated path, without creating another Effect', async () => {
+        const f = await fixture();
+        const plan = await db.$transaction((tx) =>
+          planner.resolve(tx, f.company.id, [{ ...f.item, quantity: 1 }]),
+        );
+        const command = {
+          companyId: f.company.id,
+          actorId: f.actor.id,
+          origin: { type: 'INV01A_TEST', id: randomUUID(), operation: 'OUT' },
+        };
+        await db.$transaction((tx) =>
+          core.definitiveOut(tx, command, [
+            { sourceId: f.rows[3].id, quantity: 1, expectedSourceRevision: 0 },
+          ]),
+        );
+        await expect(
+          db.$transaction((tx) =>
+            core.definitiveOut(
+              tx,
+              { ...command, origin: { ...command.origin, id: randomUUID() } },
+              plan.plan[0].sources.map((s) => ({
+                sourceId: s.positionId,
+                quantity: s.quantity,
+                expectedSourceRevision: s.expectedRevision,
+              })),
+            ),
+          ),
+        ).rejects.toMatchObject({ code: 'STALE_INVENTORY_REVISION' });
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(1);
+        expect(
+          await db.inventoryPosition.findUniqueOrThrow({
+            where: { id: f.rows[3].id },
+          }),
+        ).toMatchObject({ quantity: 4, revision: 1 });
+      });
+
+      it('rolls back all core writes and evidence after a test-only fault on the existing undated execution path', async () => {
+        const f = await fixture();
+        const before = await db.inventoryPosition.findMany({
+          where: { companyId: f.company.id },
+          orderBy: { id: 'asc' },
+        });
+        let reached = false;
+        class FailingRepository extends PhysicalInventoryRepository {
+          override async appendLines(
+            ...args: Parameters<PhysicalInventoryRepository['appendLines']>
+          ): Promise<never> {
+            await super.appendLines(...args);
+            reached = true;
+            throw new Error('S3b-S test-only fault after evidence');
+          }
+        }
+        await expect(
+          db.$transaction(async (tx) => {
+            const plan = await planner.resolve(tx, f.company.id, [
+              { ...f.item, quantity: 1 },
+            ]);
+            return new PhysicalInventoryService(
+              new FailingRepository(),
+            ).definitiveOut(
+              tx,
+              {
+                companyId: f.company.id,
+                actorId: f.actor.id,
+                origin: {
+                  type: 'INV01A_TEST',
+                  id: randomUUID(),
+                  operation: 'OUT',
+                },
+              },
+              plan.plan[0].sources.map((s) => ({
+                sourceId: s.positionId,
+                quantity: s.quantity,
+                expectedSourceRevision: s.expectedRevision,
+              })),
+            );
+          }),
+        ).rejects.toMatchObject({
+          code: 'INVENTORY_PHYSICAL_PERSISTENCE_ERROR',
+        });
+        expect(reached).toBe(true);
+        expect(
+          await db.inventoryPosition.findMany({
+            where: { companyId: f.company.id },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(before);
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+        expect(
+          await db.inventoryPhysicalEffectLine.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+        expect(
+          await db.inventoryMovement.count({
+            where: { companyId: f.company.id },
+          }),
+        ).toBe(0);
+        expect(
+          await db.product.findUniqueOrThrow({ where: { id: f.product.id } }),
+        ).toMatchObject({ stock: f.product.stock });
+      });
     });
 
     describe('S3b-R consistent calendar-aware physical reads', () => {

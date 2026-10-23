@@ -104,7 +104,9 @@ describe('Sales Candidate C resolver', () => {
           productId: { in: [productId] },
           state: 'AVAILABLE',
           inventoryBatchId: null,
+          expirationDate: null,
         },
+        select: { id: true },
       });
     },
   );
@@ -262,7 +264,7 @@ describe('Sales physical replay and outer retry', () => {
     );
     const resolver = { resolve: jest.fn() };
     const physical = { definitiveOut: jest.fn() };
-    const projections = { apply: jest.fn() };
+    const projections = { apply: jest.fn(), applyBatchDeltas: jest.fn() };
     const history = { writeSale: jest.fn() };
     const folios = { allocateNextAvailableFolio: jest.fn() };
     const service = new SalesPhysicalIntegrationService(
