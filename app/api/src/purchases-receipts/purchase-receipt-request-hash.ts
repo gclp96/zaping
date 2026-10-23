@@ -22,6 +22,8 @@ export function createPurchaseReceiptRequestHash(
   const canonicalRequest = {
     purchaseId: dto.purchaseId,
     notes: normalizeOptionalText(dto.notes),
+    supplierDocumentType: dto.supplierDocumentType ?? null,
+    supplierDocumentNumber: normalizeOptionalText(dto.supplierDocumentNumber),
     items: dto.items
       .map((item) => ({
         purchaseItemId: item.purchaseItemId,
