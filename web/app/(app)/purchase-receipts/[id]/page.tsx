@@ -364,6 +364,11 @@ export default function PurchaseReceiptDetailPage() {
             {formatReceiptDate(receipt.receivedAt)}
           </DetailField>
           <DetailField label="Responsable">{responsible}</DetailField>
+          <DetailField label="Documento proveedor">
+            {receipt.supplierDocumentType && receipt.supplierDocumentNumber
+              ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
+              : 'Sin documento registrado'}
+          </DetailField>
           <DetailField label="Notas">
             {receipt.notes || 'Sin notas'}
           </DetailField>

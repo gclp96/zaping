@@ -46,6 +46,10 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
         purchase={null}
         items={[]}
         notes=""
+        supplierDocumentType=""
+        supplierDocumentNumber=""
+        onSupplierDocumentTypeChange={vi.fn()}
+        onSupplierDocumentNumberChange={vi.fn()}
         saving={false}
         error=""
         fieldErrors={{}}
@@ -115,6 +119,10 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
           }),
         ]}
         notes=""
+        supplierDocumentType=""
+        supplierDocumentNumber=""
+        onSupplierDocumentTypeChange={vi.fn()}
+        onSupplierDocumentNumberChange={vi.fn()}
         saving={false}
         error=""
         fieldErrors={{}}

@@ -24,6 +24,10 @@ type PurchaseReceiptModalProps = {
 
   items: PurchaseReceiptFormItem[];
   notes: string;
+  supplierDocumentType: string;
+  supplierDocumentNumber: string;
+  onSupplierDocumentTypeChange: (value: string) => void;
+  onSupplierDocumentNumberChange: (value: string) => void;
   saving: boolean;
   error: string;
   fieldErrors?: PurchaseReceiptFieldErrors;
@@ -58,6 +62,10 @@ export default function PurchaseReceiptModal({
   purchase,
   items,
   notes,
+  supplierDocumentType,
+  supplierDocumentNumber,
+  onSupplierDocumentTypeChange,
+  onSupplierDocumentNumberChange,
   saving,
   error,
   fieldErrors = {},
@@ -497,6 +505,22 @@ export default function PurchaseReceiptModal({
               </div>
             </>
           )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="receipt-supplier-document-type" className="mb-2 block text-sm font-medium text-gray-700">Documento del proveedor (opcional)</label>
+              <select id="receipt-supplier-document-type" value={supplierDocumentType} onChange={(event) => onSupplierDocumentTypeChange(event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-sm">
+                <option value="">Sin documento</option>
+                <option value="FACTURA">Factura</option>
+                <option value="REMISION">Remisión</option>
+                <option value="NOTA_ENTREGA">Nota de entrega</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="receipt-supplier-document-number" className="mb-2 block text-sm font-medium text-gray-700">Número del documento</label>
+              <input id="receipt-supplier-document-number" maxLength={100} value={supplierDocumentNumber} onChange={(event) => onSupplierDocumentNumberChange(event.target.value)} placeholder="Ej. FAC-10293" className="w-full rounded-lg border border-gray-300 p-2 text-sm" />
+            </div>
+          </div>
 
           <div>
             <label

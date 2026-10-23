@@ -352,6 +352,10 @@ export default function Purchase360Page() {
     purchaseToReceive,
     receiptFormItems,
     receiptNotes,
+    supplierDocumentType,
+    supplierDocumentNumber,
+    setSupplierDocumentType,
+    setSupplierDocumentNumber,
     receiptSaving,
     receiptFormError,
     receiptFieldErrors,
@@ -783,6 +787,10 @@ export default function Purchase360Page() {
         purchase={purchaseToReceive}
         items={receiptFormItems}
         notes={receiptNotes}
+        supplierDocumentType={supplierDocumentType}
+        supplierDocumentNumber={supplierDocumentNumber}
+        onSupplierDocumentTypeChange={setSupplierDocumentType}
+        onSupplierDocumentNumberChange={setSupplierDocumentNumber}
         saving={receiptSaving}
         error={receiptFormError}
         fieldErrors={receiptFieldErrors}

@@ -459,6 +459,10 @@ const {
   purchaseToReceive,
   receiptFormItems,
   receiptNotes,
+  supplierDocumentType,
+  supplierDocumentNumber,
+  setSupplierDocumentType,
+  setSupplierDocumentNumber,
   receiptSaving,
   receiptFormError,
   receiptFieldErrors,
@@ -1177,6 +1181,10 @@ async function loadPageData() {
         purchase={purchaseToReceive}
         items={receiptFormItems}
         notes={receiptNotes}
+        supplierDocumentType={supplierDocumentType}
+        supplierDocumentNumber={supplierDocumentNumber}
+        onSupplierDocumentTypeChange={setSupplierDocumentType}
+        onSupplierDocumentNumberChange={setSupplierDocumentNumber}
         saving={receiptSaving}
         error={receiptFormError}
         fieldErrors={receiptFieldErrors}

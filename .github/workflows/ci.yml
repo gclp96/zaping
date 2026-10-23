@@ -71,6 +71,11 @@ jobs:
       - name: Run PostgreSQL concurrency E2E
         run: npm run test:concurrency
 
+      - name: Smoke supplier document receipt on ephemeral PHYSICAL PostgreSQL
+        env:
+          RUN_PURCHASE_RECEIPT_PG_SMOKE: "1"
+        run: npm run test:e2e -- --runInBand test/purchase-receipt-supplier-document.postgres.e2e-spec.ts
+
       - name: Typecheck production source
         run: npm run typecheck
 

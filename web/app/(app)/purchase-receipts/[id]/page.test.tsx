@@ -50,6 +50,8 @@ const quantityReceipt: PurchaseReceiptDetail = {
   receivedAt: '2026-08-26T18:00:00.000Z',
   receivedBy: 'user-quantity',
   notes: 'Recepción de insumo clínico',
+  supplierDocumentType: null,
+  supplierDocumentNumber: null,
   receivedByUser: {
     id: 'user-quantity',
     firstName: 'Leonardo',
