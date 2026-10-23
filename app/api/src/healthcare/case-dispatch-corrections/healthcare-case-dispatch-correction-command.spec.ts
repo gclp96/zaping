@@ -12,6 +12,7 @@ import {
 } from './healthcare-case-dispatch-correction-command.contract';
 import { PhysicalInventoryRepository } from '../../inventory/physical/physical-inventory.repository';
 import { PhysicalInventoryService } from '../../inventory/physical/physical-inventory.service';
+import { HealthcareCaseDispatchCorrectionEquipmentOrchestrator } from './healthcare-case-dispatch-correction-equipment.orchestrator';
 
 import { InventoryCompatibilityProjectionService } from '../../inventory/physical/inventory-compatibility-projection.service';
 import { InventoryRuntimeCompatibilityService } from '../../inventory/physical/inventory-runtime-compatibility.service';
@@ -39,7 +40,9 @@ const policy: HealthcareCompanyTransactionTimeoutPolicy = {
 };
 
 // Fixtures and negatives precede implementation. These are NOT PostgreSQL proof.
-function setup() {
+function setup(
+  equipment?: HealthcareCaseDispatchCorrectionEquipmentOrchestrator,
+) {
   const context = {
     companyId: randomUUID() as string,
     caseId: randomUUID(),
@@ -140,6 +143,7 @@ function setup() {
     projections as unknown as InventoryCompatibilityProjectionService,
     authority,
     runtime as unknown as InventoryRuntimeCompatibilityService,
+    equipment,
   );
   return {
     context,
@@ -156,6 +160,124 @@ function setup() {
     tx,
   };
 }
+
+describe('01D opt-in internal Equipment/MIXTO composition', () => {
+  function extended(material: boolean) {
+    const equipment = {
+      hasMaterial: jest.fn().mockResolvedValue(material),
+      lockAssignments: jest.fn().mockResolvedValue(undefined),
+      compensate: jest.fn().mockResolvedValue(undefined),
+      replay: jest.fn().mockResolvedValue(material),
+    };
+    const f = setup(
+      equipment as unknown as HealthcareCaseDispatchCorrectionEquipmentOrchestrator,
+    );
+    const eq = { id: randomUUID(), type: 'EQUIPMENT', quantity: 0 };
+    f.source.items = material ? [...f.source.items, eq] : [eq];
+    return { ...f, equipment };
+  }
+  it.each([false, true])(
+    'composes one Equipment-only/MIXTO transaction (material=%s)',
+    async (material) => {
+      const f = extended(material);
+      await expect(
+        f.service.execute(f.context, f.intent),
+      ).resolves.toHaveProperty('replay', false);
+      expect(f.repo.write).toHaveBeenCalledTimes(1);
+      expect(f.equipment.compensate).toHaveBeenCalledWith(
+        f.tx,
+        f.context,
+        expect.objectContaining({ requestHash: f.witness.requestHash }),
+        f.source,
+      );
+      expect(f.repo.assertSource).toHaveBeenCalledWith(
+        f.tx,
+        f.context,
+        f.source,
+        true,
+      );
+      if (material) {
+        expect(
+          f.physical.transferDispatchCorrectionMaterial,
+        ).toHaveBeenCalledWith(
+          f.tx,
+          expect.objectContaining({ correctionId: f.witness.id }),
+          true,
+        );
+        const evidenceArgs = f.repo.createEvidenceItems.mock
+          .calls[0] as unknown as [
+          unknown,
+          unknown,
+          unknown,
+          MaterialCorrectionSource,
+        ];
+        expect(
+          evidenceArgs[3].items.every(
+            (i: { type: string }) => i.type === 'MATERIAL',
+          ),
+        ).toBe(true);
+        expect(f.projections.apply.mock.invocationCallOrder[0]).toBeLessThan(
+          f.equipment.compensate.mock.invocationCallOrder[0],
+        );
+      } else {
+        expect(
+          f.physical.transferDispatchCorrectionMaterial,
+        ).not.toHaveBeenCalled();
+        expect(f.authority.resolve).not.toHaveBeenCalled();
+        expect(f.runtime.identity).not.toHaveBeenCalled();
+        expect(f.calls).not.toContain('fence');
+      }
+      expect(f.equipment.compensate.mock.invocationCallOrder[0]).toBeLessThan(
+        f.repo.seal.mock.invocationCallOrder[0],
+      );
+    },
+  );
+  it('propagates Equipment failure after MATERIAL/projections inside the same tx and never seals/commits', async () => {
+    const f = extended(true);
+    f.equipment.compensate.mockRejectedValue(new Error('Equipment fault'));
+    await expect(f.service.execute(f.context, f.intent)).rejects.toHaveProperty(
+      'code',
+      'CORRECTION_PERSISTENCE_ERROR',
+    );
+    expect(f.physical.transferDispatchCorrectionMaterial).toHaveBeenCalledTimes(
+      1,
+    );
+    expect(f.projections.apply).toHaveBeenCalledTimes(1);
+    expect(f.equipment.compensate).toHaveBeenCalledTimes(1);
+    expect(f.repo.seal).not.toHaveBeenCalled();
+    expect(f.repo.constraints).not.toHaveBeenCalled();
+    expect(f.calls).not.toContain('commit');
+    // A real PostgreSQL rollback assertion remains a separate QA gate.
+  });
+  it.each([false, true])(
+    'historical replay performs no write transaction (material=%s)',
+    async (material) => {
+      const f = extended(material);
+      f.repo.replayWitness.mockResolvedValue(f.witness);
+      await expect(f.service.execute(f.context, f.intent)).resolves.toEqual({
+        replay: true,
+        witness: f.witness,
+      });
+      expect(f.equipment.replay).toHaveBeenCalledTimes(1);
+      expect(f.equipment.hasMaterial).not.toHaveBeenCalled();
+      expect(f.equipment.compensate).not.toHaveBeenCalled();
+      expect(f.repo.write).not.toHaveBeenCalled();
+      expect(
+        f.physical.classifyCommittedDispatchCorrectionMaterial,
+      ).toHaveBeenCalledTimes(material ? 1 : 0);
+    },
+  );
+  it('rejects a changed material classification before staging a root', async () => {
+    const f = extended(false);
+    f.source.items.push({ id: randomUUID(), type: 'MATERIAL', quantity: 2 });
+    await expect(f.service.execute(f.context, f.intent)).rejects.toHaveProperty(
+      'code',
+      'CORRECTION_EVIDENCE_INCONSISTENT',
+    );
+    expect(f.repo.createRoot).not.toHaveBeenCalled();
+    expect(f.equipment.compensate).not.toHaveBeenCalled();
+  });
+});
 
 describe('01C-B internal atomic orchestration', () => {
   it('rejects incompatible runtime before any claim', async () => {

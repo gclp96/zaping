@@ -1,0 +1,15 @@
+{
+  "moduleFileExtensions": ["js", "json", "ts"],
+  "rootDir": ".",
+  "testEnvironment": "node",
+  "testRegex": "case-dispatch-correction-equipment\\.postgres\\.e2e-spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": [
+      "ts-jest",
+      { "tsconfig": "test/tsconfig.dispatch-correction-equipment-e2e.json" }
+    ]
+  },
+  "moduleNameMapper": {
+    "^@prisma/client$": "<rootDir>/helpers/dispatch-correction-equipment-client.ts"
+  }
+}

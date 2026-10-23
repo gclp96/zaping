@@ -73,6 +73,7 @@ export function correctionOrigin(id: string) {
 export async function loadCorrectionContext(
   tx: Prisma.TransactionClient,
   input: DispatchCorrectionMaterialInput,
+  mixedDispatch = false,
 ) {
   correctionTransaction(tx);
   for (const id of [
@@ -179,9 +180,20 @@ export async function loadCorrectionContext(
     'PHYSICAL_EFFECT_MISMATCH',
   );
   assertCorrection(
-    source.items.length > 0 && source.items.every((i) => i.type === 'MATERIAL'),
+    source.items.length > 0 &&
+      source.items.every(
+        (i) =>
+          i.type === 'MATERIAL' || (mixedDispatch && i.type === 'EQUIPMENT'),
+      ),
     'CORRECTION_MATERIAL_ONLY',
   );
+  // Only the internal 01D composition selects this path. SQL 01B still requires
+  // a terminal witness for EVERY ACTIVE source, including Equipment.
+  if (mixedDispatch) {
+    source.items = source.items.filter((i) => i.type === 'MATERIAL');
+    root.items = root.items.filter((i) => i.type === 'MATERIAL');
+  }
+  assertCorrection(source.items.length > 0, 'CORRECTION_MATERIAL_ONLY');
   return { root, source, input, requestHash: hash };
 }
 

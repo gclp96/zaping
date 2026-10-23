@@ -110,7 +110,10 @@ describe('Equipment custody close service', () => {
       requireReceiptActor: jest.fn().mockResolvedValue(c.actorId),
       appendCustodyClose: jest.fn().mockResolvedValue(event),
     };
-    const contexts = { validate: jest.fn().mockResolvedValue(undefined) };
+    const contexts = {
+      validate: jest.fn().mockResolvedValue(undefined),
+      dispatchCorrectionMetadata: jest.fn(),
+    };
     const service = new EquipmentCustodyCloseService(
       repo as unknown as EquipmentPhysicalRepository,
       history as unknown as EquipmentPhysicalHistoryService,
@@ -186,6 +189,73 @@ describe('Equipment custody close service', () => {
       'RESOURCE_STATE_CHANGED',
     );
     expect(f.repo.lockAssetForPhysicalMutation).not.toHaveBeenCalled();
+  });
+  it('uses validated correction hash/date for custody and event, preserving the temporal guard', async () => {
+    const f = fixture();
+    f.c.validatedContext.adapterKey = 'CASE_DISPATCH_CORRECTION_ITEM';
+    f.c.durableOrigin.type = 'CASE_DISPATCH_CORRECTION_ITEM';
+    f.c.durableOrigin.operation = 'COMPENSATE_NO_HANDOFF_EQUIPMENT';
+    const at = new Date('2026-10-01T12:00:00Z');
+    const hash = 'a'.repeat(64);
+    f.contexts.dispatchCorrectionMetadata.mockResolvedValue({
+      requestHash: hash,
+      closedAt: at,
+    });
+    await f.run();
+    expect(f.contexts.dispatchCorrectionMetadata).toHaveBeenCalledWith(
+      f.tx,
+      f.c,
+      'APPLY',
+    );
+    expect(f.repo.closeCustodyCas).toHaveBeenCalledWith(
+      f.tx,
+      f.custody,
+      at,
+      f.c.actorId,
+    );
+    expect(f.history.appendCustodyClose).toHaveBeenCalledWith(
+      f.tx,
+      f.asset,
+      f.c,
+      hash,
+      at,
+    );
+  });
+  it.each(['before opening', 'future'] as const)(
+    'rejects correction date %s without writes',
+    async (when) => {
+      const f = fixture();
+      f.c.durableOrigin.type = 'CASE_DISPATCH_CORRECTION_ITEM';
+      f.contexts.dispatchCorrectionMetadata.mockResolvedValue({
+        requestHash: 'a'.repeat(64),
+        closedAt: when === 'future' ? new Date('2027-01-01Z') : new Date(0),
+      });
+      await expect(f.run()).rejects.toHaveProperty(
+        'code',
+        'EQUIPMENT_PHYSICAL_PERSISTENCE_ERROR',
+      );
+      expect(f.repo.closeCustodyCas).not.toHaveBeenCalled();
+    },
+  );
+  it('uses the persisted correction hash on historical close replay without new writes', async () => {
+    const f = fixture();
+    f.c.durableOrigin.type = 'CASE_DISPATCH_CORRECTION_ITEM';
+    f.event.originType = f.c.durableOrigin.type;
+    f.event.requestHash = 'b'.repeat(64);
+    f.contexts.dispatchCorrectionMetadata.mockResolvedValue({
+      requestHash: f.event.requestHash,
+      closedAt: f.closedAt,
+    });
+    f.replay();
+    f.asset.physicalRevision = 99;
+    await expect(f.run()).resolves.toHaveProperty('outcome', 'REPLAY');
+    expect(f.contexts.dispatchCorrectionMetadata).toHaveBeenCalledWith(
+      f.tx,
+      f.c,
+      'REPLAY',
+    );
+    expect(f.repo.closeCustodyCas).not.toHaveBeenCalled();
+    expect(f.history.appendCustodyClose).not.toHaveBeenCalled();
   });
   it.each(['activeCustodyId', 'physicalLocation', 'physicalRevision'] as const)(
     'rejects current %s mismatch on APPLY',

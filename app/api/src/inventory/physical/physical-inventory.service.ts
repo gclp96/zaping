@@ -58,9 +58,10 @@ export class PhysicalInventoryService {
   async classifyCommittedDispatchCorrectionMaterial(
     tx: Prisma.TransactionClient,
     input: DispatchCorrectionMaterialInput,
+    mixedDispatch = false,
   ): Promise<PhysicalResult | null> {
     correctionTransaction(tx);
-    let c = await loadCorrectionContext(tx, input);
+    let c = await loadCorrectionContext(tx, input, mixedDispatch);
     const lookup: PhysicalRequest = {
       companyId: input.companyId,
       actorId: input.requesterId,
@@ -68,7 +69,7 @@ export class PhysicalInventoryService {
       operation: { kind: 'TRANSFER', transfers: [] },
     };
     const effect = await this.repository.findEffect(tx, lookup);
-    if (!c && effect) c = await loadCorrectionContext(tx, input);
+    if (!c && effect) c = await loadCorrectionContext(tx, input, mixedDispatch);
     if (!c) {
       requirePhysical(!effect, 'PHYSICAL_EFFECT_MISMATCH');
       return null;
@@ -79,14 +80,16 @@ export class PhysicalInventoryService {
   async transferDispatchCorrectionMaterial(
     tx: Prisma.TransactionClient,
     input: DispatchCorrectionMaterialInput,
+    mixedDispatch = false,
   ): Promise<PhysicalResult> {
     correctionTransaction(tx);
     const replay = await this.classifyCommittedDispatchCorrectionMaterial(
       tx,
       input,
+      mixedDispatch,
     );
     if (replay) return replay;
-    const c = await loadCorrectionContext(tx, input);
+    const c = await loadCorrectionContext(tx, input, mixedDispatch);
     requirePhysical(c, 'PHYSICAL_EFFECT_MISMATCH');
     await assertCorrectionWriterBoundary(tx, c);
     const request = await correctionTransferRequest(tx, c);
