@@ -343,14 +343,10 @@ describe('PurchaseReceiptsService', () => {
       createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).resolves.toBeDefined();
 
-    expect(transactionClient.purchaseReceipt.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          supplierDocumentType: 'REMISION',
-          supplierDocumentNumber: 'REM-INSAP-042',
-        }),
-      }),
-    );
+    const createdArgs = transactionClient.purchaseReceipt.create.mock
+      .calls[0]?.[0] as PurchaseReceiptCreateArgs | undefined;
+    expect(createdArgs?.data.supplierDocumentType).toBe('REMISION');
+    expect(createdArgs?.data.supplierDocumentNumber).toBe('REM-INSAP-042');
   });
 
   it('rechaza documento del proveedor incompleto sin registrar recepción', async () => {
@@ -361,7 +357,9 @@ describe('PurchaseReceiptsService', () => {
 
     await expect(
       createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
-    ).rejects.toThrow('Selecciona el tipo y número del documento del proveedor');
+    ).rejects.toThrow(
+      'Selecciona el tipo y número del documento del proveedor',
+    );
     expectNoReceiptMutations();
   });
 
