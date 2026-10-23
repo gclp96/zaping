@@ -155,6 +155,15 @@ export class PurchaseReceiptsService {
 
         this.validatePurchaseStatus(purchase.status);
 
+        const supplierDocumentNumber = this.normalizeOptionalText(
+          dto.supplierDocumentNumber,
+        );
+        if (Boolean(dto.supplierDocumentType) !== Boolean(supplierDocumentNumber)) {
+          throw new BadRequestException(
+            'Selecciona el tipo y número del documento del proveedor, o deja ambos vacíos',
+          );
+        }
+
         const purchaseItemsById = new Map(
           purchase.items.map((item) => [item.id, item]),
         );
@@ -267,6 +276,8 @@ export class PurchaseReceiptsService {
             receivedAt,
             receivedBy,
             notes: this.normalizeOptionalText(dto.notes),
+            supplierDocumentType: dto.supplierDocumentType,
+            supplierDocumentNumber,
           },
         });
 
