@@ -28,6 +28,7 @@ import {
   receiptMatchesSearch,
 } from './receipt-display';
 import type { PurchaseReceiptListItem } from './types';
+import CreateReceiptFlow from './CreateReceiptFlow';
 
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50] as const;
@@ -84,6 +85,8 @@ export default function PurchaseReceiptsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [forbidden, setForbidden] = useState(false);
+  const canUseReceiptFlow = sessionState.status === 'success' &&
+    hasRole(currentUserRole, WAREHOUSE_ROLES);
   const [search, setSearch] = useState('');
   const [sorting, setSorting] = useState<SortState>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -268,6 +271,7 @@ export default function PurchaseReceiptsPage() {
         <PageHeader
           title="Recepciones"
           description="Consulta las entradas de mercancía y su trazabilidad operativa."
+          action={canUseReceiptFlow ? <CreateReceiptFlow enabled={!forbidden} onReceiptCreated={loadReceipts} /> : undefined}
         />
       </div>
 
