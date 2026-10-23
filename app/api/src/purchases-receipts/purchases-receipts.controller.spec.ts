@@ -61,11 +61,10 @@ describe('PurchaseReceiptsController', () => {
     purchaseReceiptsService.getReceiptCapabilities.mockResolvedValue({
       authority: 'PHYSICAL',
     });
-    const spoofed = {
-      ...request,
+    const spoofed = Object.assign({}, request, {
       query: { companyId: 'foreign' },
       body: { companyId: 'foreign' },
-    };
+    });
     expect(await controller.getCapabilities(spoofed)).toEqual({
       authority: 'PHYSICAL',
     });
