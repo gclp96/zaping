@@ -158,7 +158,9 @@ export class PurchaseReceiptsService {
         const supplierDocumentNumber = this.normalizeOptionalText(
           dto.supplierDocumentNumber,
         );
-        if (Boolean(dto.supplierDocumentType) !== Boolean(supplierDocumentNumber)) {
+        if (
+          Boolean(dto.supplierDocumentType) !== Boolean(supplierDocumentNumber)
+        ) {
           throw new BadRequestException(
             'Selecciona el tipo y número del documento del proveedor, o deja ambos vacíos',
           );
