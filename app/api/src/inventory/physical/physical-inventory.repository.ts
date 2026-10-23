@@ -12,6 +12,7 @@ import {
   PositionKey,
   isPhysicalUniqueViolation,
   requirePhysical,
+  normalizePositionKey,
 } from './physical-inventory.contract';
 
 @Injectable()
@@ -112,7 +113,10 @@ export class PhysicalInventoryRepository {
     targets: PositionKey[],
   ) {
     const candidates = await tx.inventoryPosition.findMany({
-      where: { companyId, OR: [{ id: { in: sources } }, ...targets] },
+      where: {
+        companyId,
+        OR: [{ id: { in: sources } }, ...targets.map(positionData)],
+      },
       select: { id: true },
     });
     if (!candidates.length) return [];
@@ -128,7 +132,9 @@ export class PhysicalInventoryRepository {
     key: PositionKey,
   ) {
     try {
-      return await tx.inventoryPosition.create({ data: { companyId, ...key } });
+      return await tx.inventoryPosition.create({
+        data: { companyId, ...positionData(key) },
+      });
     } catch (error) {
       // Propagate immediately. No query may follow an aborted INSERT.
       if (isPhysicalUniqueViolation(error))
@@ -232,4 +238,14 @@ export class PhysicalInventoryRepository {
   ) {
     return tx.inventoryPhysicalEffectLine.create({ data });
   }
+}
+
+function positionData(key: PositionKey) {
+  const normalized = normalizePositionKey(key);
+  return {
+    ...normalized,
+    expirationDate: normalized.expirationDate
+      ? new Date(`${normalized.expirationDate}T00:00:00.000Z`)
+      : null,
+  };
 }
