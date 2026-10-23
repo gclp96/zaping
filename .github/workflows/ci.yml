@@ -76,6 +76,11 @@ jobs:
           RUN_PURCHASE_RECEIPT_PG_SMOKE: "1"
         run: npm run test:e2e -- --runInBand test/purchase-receipt-supplier-document.postgres.e2e-spec.ts
 
+      - name: Check unbatched expiry constraints on ephemeral PostgreSQL
+        env:
+          RUN_UNBATCHED_EXPIRY_MIGRATION_PG: "1"
+        run: npm run test:e2e -- --runInBand test/inventory-position-expiry-migration.postgres.e2e-spec.ts
+
       - name: Typecheck production source
         run: npm run typecheck
 

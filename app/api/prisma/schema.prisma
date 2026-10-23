@@ -157,6 +157,8 @@ model InventoryPosition {
   companyId        String
   productId        String
   inventoryBatchId String?
+  // Only for unbatched physical stock; batches own their own expiration.
+  expirationDate   DateTime? @db.Date
   state            InventoryPositionState
   contextType      String?                       @db.VarChar(64)
   contextId        String?                       @db.VarChar(128)
