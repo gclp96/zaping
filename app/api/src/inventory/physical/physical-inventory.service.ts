@@ -48,6 +48,9 @@ function positionKey(position: InventoryPosition): PositionKey {
     state: position.state,
     contextType: position.contextType,
     contextId: position.contextId,
+    ...(position.expirationDate
+      ? { expirationDate: position.expirationDate.toISOString().slice(0, 10) }
+      : {}),
   } as PositionKey;
 }
 
@@ -312,7 +315,9 @@ export class PhysicalInventoryService {
           const source = byId.get(transfer.sourceId)!;
           requirePhysical(
             source.productId === transfer.target.productId &&
-              source.inventoryBatchId === transfer.target.inventoryBatchId,
+              source.inventoryBatchId === transfer.target.inventoryBatchId &&
+              (positionKey(source).expirationDate ?? null) ===
+                (transfer.target.expirationDate ?? null),
             'INVENTORY_BATCH_PRODUCT_MISMATCH',
           );
           add(transfer.target, transfer.quantity);
@@ -422,6 +427,9 @@ export class PhysicalInventoryService {
     batches: Map<string, InventoryBatch>,
     now: Date,
   ) {
+    // S2 recognizes dated identities but cannot move them until eligibility is
+    // checked under lock against the Company's local day in the next phase.
+    requirePhysical(key.expirationDate == null, 'PHYSICAL_SOURCE_NOT_ELIGIBLE');
     requirePhysical(product.inventoryTracking === 'QUANTITY');
     requirePhysical(
       product.lotTracking !== 'REQUIRED' || key.inventoryBatchId !== null,

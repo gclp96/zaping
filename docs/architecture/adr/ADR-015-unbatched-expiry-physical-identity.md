@@ -1,12 +1,12 @@
 # ADR-015 — Identidad física de existencias sin lote con caducidad
 
 **Estado de decisión:** ACCEPTED (OX-PUR-05B; issues #115 y #116)
-**Estado de implementación:** IN PROGRESS — contrato inicial; código y migración todavía no implementados
+**Estado de implementación:** IN PROGRESS — S1 persistencia validada en CI; S2 identidad del motor implementada, pendiente de revisión; S3–S4 y habilitación operativa pendientes
 **Fecha:** 2026-10-22
 **Área:** Zaping ERP / Compras, Recepciones e Inventory Physical
 **PR base:** #114 integrado en `main`
 
-## 1. Problema comprobado
+## 1. Problema comprobado (baseline previo a S1)
 
 En INSAP se recibe material válido sin que el proveedor informe lote, número de serie o caducidad. No debemos fabricar estos datos ni impedir una recepción válida sólo porque falten.
 
@@ -20,7 +20,7 @@ Guardar la fecha sólo en `PurchaseReceiptItem` NO soluciona la disponibilidad f
 
 Ampliar **`InventoryPosition`**, no crear un subledger independiente en esta etapa:
 
-- Para QUANTITY sin lote de fabricante, `inventoryBatchId = NULL`. La identidad se discrimina adicionalmente por **caducidad opcional** (día calendario), separando fecha desconocida (`NULL`) de cada fecha conocida. `NULL` significa *dato desconocido*, no *no caduca*.
+- Para QUANTITY sin lote de fabricante, `inventoryBatchId = NULL`. La identidad se discrimina adicionalmente por **caducidad opcional** (día calendario), separando fecha desconocida (`NULL`) de cada fecha conocida. `NULL` significa _dato desconocido_, no _no caduca_.
 - Para existencias con lote real, `inventoryBatchId` apunta a `InventoryBatch`; su caducidad se conserva en ese Batch. La nueva fecha de Position queda `NULL` para evitar dos fuentes de verdad.
 - El número de lote de fabricante nunca se sintetiza a partir de recepción, fecha u otro dato interno.
 - Preservar permanentemente el ID y los efectos históricos de posiciones anteriores; sus caducidades no informadas se representarán como `NULL` sin reescribir evidencias.
@@ -89,3 +89,12 @@ No tocar `main`, `.env`, credenciales, DB local `zaping_dev`, `zaping_qa`, `zapi
 **Costo:** migración de identidad física y ajuste de contratos compartidos, índices, lecturas, selección de fuentes, pruebas y compatibilidad histórica.
 
 **No incluido:** multialmacén, remisiones de venta, captura de múltiples lotes en una misma partida, control completo de rechazos ni anexos posteriores de factura (#118).
+
+## 10. Estado por fase y contrato entregado en S2
+
+- **S1:** columna `InventoryPosition.expirationDate DATE NULL`, CHECK de fuente única e índices sin lote implementados en `20261023000001_inventory_position_unbatched_expiry`. CI API/Web SUCCESS sobre `4e6da4a223f2f76f6164868fa4a7950cda84cbc3` ([run #410](https://github.com/gclp96/zaping/actions/runs/39895257442)). No se aplicaron migraciones a bases locales.
+- **S2:** `PositionKey.expirationDate?: string | null` acepta exclusivamente día calendario válido `YYYY-MM-DD`; rechaza timestamps, offsets, fechas imposibles y fecha de Position junto con Batch real. Una fecha conocida participa en identidad, agrupación y hash; fecha omitida o `null` conserva exactamente la serialización anterior, sin insertar campos nulos en el hash versión 1. Los hashes de las cuatro operaciones históricas se fijaron antes del cambio como constantes de regresión.
+- Repository convierte el día a `DATE` mediante una representación a medianoche UTC exclusivamente para Prisma; esto **no determina elegibilidad ni convierte la caducidad en un instante de vencimiento**. Búsquedas de destino y creación expresan fecha exacta o `NULL` explícito. Fuentes por ID conservan su identidad, y el motor incorpora la fecha persistida al construir sus claves bajo lock.
+- **Gate operativo cerrado:** CREDIT, TRANSFER, DEFINITIVE_OUT y COUNT_CORRECTION sobre posiciones con fecha conocida se rechazan antes del claim y de cualquier mutación. Transferencia exige igualdad de la dimensión de caducidad. La clasificación histórica de un Effect ya confirmado permanece anterior a la lectura del estado físico actual. No se habilitan recepción ni consumidores de pools con fecha conocida en esta fase.
+- **QA S2:** pruebas unitarias focales y de regresión de motor, adapter de corrección, opening, ventas y recepción; TypeScript productivo y focal de tests; ESLint, Prettier y build API. La suite PostgreSQL de S1 se amplía con 10 casos S2: identidad AVAILABLE/CUSTODY NULL/A/B, crédito/replay histórico y revision stale, cuatro rechazos atómicos, dos verificaciones de locks con clientes/PIDs independientes y crédito concurrente con un único Effect. Se ejecuta exclusivamente sobre el servicio PostgreSQL efímero de CI; no admite ejecución local por su gate de entorno. Consultar los checks del commit S2 en [PR #119](https://github.com/gclp96/zaping/pull/119) para su resultado; preparación de pruebas no equivale a PostgreSQL PASS.
+- **S3–S4 pendientes:** elegibilidad validada bajo lock respecto al día local de Company, conservación de fecha en consumidores, recepción autorizada sin lote, selección/FEFO, read models `owned` frente a `usable`, integración y QA completa. No se cambia la obligatoriedad de Batch de los writers actuales, ni se activa la política de ingreso opcional. El PR permanece DRAFT y no se declara el ADR completamente implementado.
