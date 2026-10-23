@@ -23,6 +23,12 @@ import {
 } from './physical-inventory.contract';
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
 import {
+  authorizeSaleConsumption,
+  assertSaleConsumptionSources,
+  SaleConsumptionContext,
+  SaleConsumptionInput,
+} from './sale-consumption.authorization';
+import {
   authorizePurchaseReceiptCredit,
   PurchaseReceiptCreditContext,
   PurchaseReceiptCreditInput,
@@ -66,6 +72,18 @@ function positionKey(position: InventoryPosition): PositionKey {
 @Injectable()
 export class PhysicalInventoryService {
   constructor(private readonly repository: PhysicalInventoryRepository) {}
+
+  async consumeConfirmedSale(
+    tx: Prisma.TransactionClient,
+    input: SaleConsumptionInput,
+  ): Promise<PhysicalResult> {
+    try {
+      const sale = await authorizeSaleConsumption(tx, input);
+      return await this.mutate(tx, sale.request, undefined, undefined, sale);
+    } catch (error) {
+      throw physicalPersistenceError(error);
+    }
+  }
 
   async creditPurchaseReceipt(
     tx: Prisma.TransactionClient,
@@ -206,6 +224,7 @@ export class PhysicalInventoryService {
     request: PhysicalRequest,
     correction?: CorrectionContext,
     receipt?: PurchaseReceiptCreditContext,
+    sale?: SaleConsumptionContext,
   ): Promise<PhysicalResult> {
     const classify = () =>
       correction
@@ -245,6 +264,7 @@ export class PhysicalInventoryService {
     );
     if (correction)
       await assertCorrectionSources(tx, correction, request, discovered);
+    if (sale) assertSaleConsumptionSources(sale, discovered);
     const productIds = sortedUnique([
       ...discovered.map((p) => p.productId),
       ...targets.map((p) => p.productId),
@@ -280,6 +300,7 @@ export class PhysicalInventoryService {
     );
     if (correction)
       await assertCorrectionSources(tx, correction, request, positions);
+    if (sale) assertSaleConsumptionSources(sale, positions);
     const byId = new Map(positions.map((p) => [p.id, p]));
     requirePhysical(
       sourceIds.every((id) => byId.has(id)),
@@ -321,7 +342,7 @@ export class PhysicalInventoryService {
     ) => {
       const product = productMap.get(key.productId);
       requirePhysical(product, 'PRODUCT_NOT_FOUND');
-      this.validateKey(key, product, batchMap, assertNotExpired, receipt);
+      this.validateKey(key, product, batchMap, assertNotExpired, receipt, sale);
       const identity = positionIdentity(key);
       const existing = plan.get(identity);
       requirePhysical(
@@ -475,12 +496,13 @@ export class PhysicalInventoryService {
     batches: Map<string, InventoryBatch>,
     assertNotExpired: (day: string | null) => void,
     receipt?: PurchaseReceiptCreditContext,
+    sale?: SaleConsumptionContext,
   ) {
     assertNotExpired(key.expirationDate ?? null);
-    // Only a reconstructed receipt context authorizes dated CREDIT in W1.
+    // Only reconstructed receipt CREDIT / confirmed Sale OUT authorize dates.
     // Generic credits, debits, transfers and counts keep the S2 gate.
     requirePhysical(
-      key.expirationDate == null || receipt,
+      key.expirationDate == null || receipt || sale,
       'PHYSICAL_SOURCE_NOT_ELIGIBLE',
     );
     requirePhysical(product.inventoryTracking === 'QUANTITY');

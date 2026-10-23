@@ -9,6 +9,7 @@ import { requireTransaction } from './inventory-compatibility-projection.service
 import {
   physicalExpirationEligibility,
   storedExpirationDay,
+  companyLocalDay,
 } from './physical-expiration-policy';
 
 export type SalesPhysicalItem = {
@@ -97,12 +98,29 @@ export class SalesPhysicalSourceResolver {
     return { products, positions };
   }
 
-  // Plan-only preparation for S3b-W. No business mutation, Effect, projection or
-  // production caller. The Physical S2 gate remains authoritative and closed.
+  // Locks belong to the caller transaction. A plan never authorizes a mutation;
+  // W2a's Sale boundary separately proves durable confirmation and allocations.
   async planUnbatchedSources(
     tx: Prisma.TransactionClient,
     companyId: string,
     items: SalesPhysicalItem[],
+  ) {
+    return this.plan(tx, companyId, items, false);
+  }
+
+  async planConfirmedSaleSources(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    items: SalesPhysicalItem[],
+  ) {
+    return this.plan(tx, companyId, items, true);
+  }
+
+  private async plan(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    items: SalesPhysicalItem[],
+    diagnoseSaleShortfall: boolean,
   ) {
     const { products, positions } = await this.lockUnbatched(
       tx,
@@ -184,7 +202,40 @@ export class SalesPhysicalSourceResolver {
         });
         remaining -= quantity;
       }
-      requirePhysical(remaining === 0, 'INSUFFICIENT_PHYSICAL_AVAILABILITY');
+      if (remaining > 0) {
+        const product = products.find((p) => p.id === item.productId)!;
+        // Diagnostic only: no Batch allocation or new lock acquisition. Preserve
+        // the historical OPTIONAL shortfall error using the same local day.
+        if (diagnoseSaleShortfall && product.lotTracking === 'OPTIONAL') {
+          const batchQuantity = await tx.inventoryPosition.aggregate({
+            where: {
+              companyId,
+              productId: item.productId,
+              state: 'AVAILABLE',
+              inventoryBatchId: { not: null },
+              batch: {
+                isActive: true,
+                OR: [
+                  { expirationDate: null },
+                  {
+                    expirationDate: {
+                      gte: new Date(
+                        `${companyLocalDay(company.timezone, asOf)}T00:00:00.000Z`,
+                      ),
+                    },
+                  },
+                ],
+              },
+            },
+            _sum: { quantity: true },
+          });
+          requirePhysical(
+            !batchQuantity._sum.quantity,
+            'SALE_PHYSICAL_SOURCE_REQUIRED',
+          );
+        }
+        requirePhysical(false, 'INSUFFICIENT_PHYSICAL_AVAILABILITY');
+      }
       plan.push({
         saleItemId: item.id,
         productId: item.productId,
@@ -195,7 +246,8 @@ export class SalesPhysicalSourceResolver {
     return { plan, products };
   }
 
-  // The sole production entry remains undated-only until explicit S3b-W approval.
+  // Historical undated resolver retained for compatibility; W2a fulfillment
+  // calls the locked FEFO planner and the separate durable Sale boundary.
   async resolve(
     tx: Prisma.TransactionClient,
     companyId: string,

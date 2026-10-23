@@ -243,7 +243,7 @@ describe('S3b-S internal locked unbatched planner', () => {
       expect(f.client.inventoryPosition.findMany).not.toHaveBeenCalled();
     },
   );
-  it('keeps the production entry undated-only and rejects a dated row returned after locking', async () => {
+  it('keeps the historical resolver undated-only and rejects a dated row returned after locking', async () => {
     const f = arrange();
     f.rows.splice(0, f.rows.length, f.a);
     await expect(
@@ -260,6 +260,41 @@ describe('S3b-S internal locked unbatched planner', () => {
       select: { id: true },
     });
     expect(f.client.company.findUnique).not.toHaveBeenCalled();
+    expect(f.writes).not.toHaveBeenCalled();
+  });
+  it('preserves OPTIONAL Batch shortfall diagnosis using local D, without allocating Batch', async () => {
+    const f = arrange();
+    f.rows.splice(0, f.rows.length);
+    f.client.inventoryPosition.aggregate.mockResolvedValue({
+      _sum: { quantity: 2 },
+    });
+    await expect(
+      f.resolver.planUnbatchedSources(f.tx, companyId, [
+        { ...item, quantity: 1 },
+      ]),
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_PHYSICAL_AVAILABILITY' });
+    expect(f.client.inventoryPosition.aggregate).not.toHaveBeenCalled();
+    await expect(
+      f.resolver.planConfirmedSaleSources(f.tx, companyId, [
+        { ...item, quantity: 1 },
+      ]),
+    ).rejects.toMatchObject({ code: 'SALE_PHYSICAL_SOURCE_REQUIRED' });
+    expect(f.client.inventoryPosition.aggregate).toHaveBeenCalledWith({
+      where: {
+        companyId,
+        productId,
+        state: 'AVAILABLE',
+        inventoryBatchId: { not: null },
+        batch: {
+          isActive: true,
+          OR: [
+            { expirationDate: null },
+            { expirationDate: { gte: new Date('2028-08-15T00:00:00.000Z') } },
+          ],
+        },
+      },
+      _sum: { quantity: true },
+    });
     expect(f.writes).not.toHaveBeenCalled();
   });
   it('does not allocate stock whose revision cannot be incremented', async () => {

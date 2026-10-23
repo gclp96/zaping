@@ -262,8 +262,8 @@ describe('Sales physical replay and outer retry', () => {
     const transaction = jest.fn((fn: (t: typeof tx) => Promise<unknown>) =>
       fn(tx),
     );
-    const resolver = { resolve: jest.fn() };
-    const physical = { definitiveOut: jest.fn() };
+    const resolver = { planConfirmedSaleSources: jest.fn() };
+    const physical = { consumeConfirmedSale: jest.fn() };
     const projections = { apply: jest.fn(), applyBatchDeltas: jest.fn() };
     const history = { writeSale: jest.fn() };
     const folios = { allocateNextAvailableFolio: jest.fn() };
@@ -300,14 +300,45 @@ describe('Sales physical replay and outer retry', () => {
     });
     for (const spy of [
       f.tx.sale.updateMany,
-      f.resolver.resolve,
-      f.physical.definitiveOut,
+      f.resolver.planConfirmedSaleSources,
+      f.physical.consumeConfirmedSale,
       f.projections.apply,
       f.history.writeSale,
       f.folios.allocateNextAvailableFolio,
     ])
       expect(spy).not.toHaveBeenCalled();
     expect(f.transaction).toHaveBeenCalledWith(expect.any(Function));
+  });
+  it('uses the locked FEFO planner and the durable Sale boundary on fresh approval', async () => {
+    const f = setup();
+    f.tx.inventoryPhysicalEffect.findUnique.mockResolvedValue(null);
+    f.tx.sale.findFirst.mockResolvedValue({ ...sale(), status: 'DRAFT' });
+    f.tx.sale.updateMany.mockImplementation(() => {
+      f.tx.sale.findFirst.mockResolvedValue(sale());
+      return Promise.resolve({ count: 1 });
+    });
+    const sources = [{ positionId, quantity: 3, expectedRevision: 8 }];
+    f.resolver.planConfirmedSaleSources.mockResolvedValue({
+      plan: [{ sources }],
+      products: [{ id: productId, cost: 5 }],
+    });
+    f.physical.consumeConfirmedSale.mockResolvedValue({ replay: false });
+    await f.service.approve(companyId, actorId, saleId);
+    expect(f.resolver.planConfirmedSaleSources).toHaveBeenCalledWith(
+      f.tx,
+      companyId,
+      expect.any(Array),
+    );
+    expect(f.physical.consumeConfirmedSale).toHaveBeenCalledWith(f.tx, {
+      companyId,
+      actorId,
+      saleId,
+      sources: [
+        { sourceId: positionId, quantity: 3, expectedSourceRevision: 8 },
+      ],
+    });
+    expect(f.projections.apply).toHaveBeenCalledTimes(1);
+    expect(f.history.writeSale).toHaveBeenCalledTimes(1);
   });
   it('rejects certified membership even on the coherent Effect replay path', async () => {
     const f = setup();
@@ -316,7 +347,7 @@ describe('Sales physical replay and outer retry', () => {
       f.service.approve(companyId, actorId, saleId),
     ).rejects.toMatchObject({ code: 'SALE_PHYSICAL_STATE_INCONSISTENT' });
     expect(f.tx.sale.updateMany).not.toHaveBeenCalled();
-    expect(f.physical.definitiveOut).not.toHaveBeenCalled();
+    expect(f.physical.consumeConfirmedSale).not.toHaveBeenCalled();
   });
   it('different actor preserves business rejection without checking historical activity', async () => {
     const f = setup();
@@ -324,7 +355,7 @@ describe('Sales physical replay and outer retry', () => {
       f.service.approve(companyId, randomUUID(), saleId),
     ).rejects.toThrow('La venta ya fue aprobada');
     expect(f.tx.user.findFirst).toHaveBeenCalledTimes(1);
-    expect(f.physical.definitiveOut).not.toHaveBeenCalled();
+    expect(f.physical.consumeConfirmedSale).not.toHaveBeenCalled();
   });
   it('requires current authorization even for replay', async () => {
     const f = setup();
@@ -349,7 +380,7 @@ describe('Sales physical replay and outer retry', () => {
     await expect(f.service.approve(companyId, actorId, saleId)).rejects.toThrow(
       'SALE_PHYSICAL_STATE_INCONSISTENT',
     );
-    expect(f.resolver.resolve).not.toHaveBeenCalled();
+    expect(f.resolver.planConfirmedSaleSources).not.toHaveBeenCalled();
     expect(f.tx.sale.updateMany).not.toHaveBeenCalled();
   });
   it('checks immutable allocations rather than current revision', async () => {
@@ -404,7 +435,7 @@ describe('Sales physical replay and outer retry', () => {
       id: saleId,
     });
     expect(f.transaction).toHaveBeenCalledTimes(2);
-    expect(f.physical.definitiveOut).not.toHaveBeenCalled();
+    expect(f.physical.consumeConfirmedSale).not.toHaveBeenCalled();
   });
   it('Quote replay uses canonical identity without allocating a folio', async () => {
     const f = setup();
@@ -421,7 +452,7 @@ describe('Sales physical replay and outer retry', () => {
       await f.service.createFromQuote(companyId, actorId, quoteId),
     ).toMatchObject({ id: saleId });
     expect(f.folios.allocateNextAvailableFolio).not.toHaveBeenCalled();
-    expect(f.physical.definitiveOut).not.toHaveBeenCalled();
+    expect(f.physical.consumeConfirmedSale).not.toHaveBeenCalled();
   });
   it('Quote flag and canonical identity mismatch fails closed', async () => {
     const f = setup();
