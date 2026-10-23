@@ -344,8 +344,7 @@ describe('PurchaseReceiptsService', () => {
     ).resolves.toBeDefined();
 
     const firstCall = transactionClient.purchaseReceipt.create.mock.calls[0] as
-      | [PurchaseReceiptCreateArgs]
-      | undefined;
+      [PurchaseReceiptCreateArgs] | undefined;
     const createdArgs = firstCall?.[0];
     expect(createdArgs?.data.supplierDocumentType).toBe('REMISION');
     expect(createdArgs?.data.supplierDocumentNumber).toBe('REM-INSAP-042');
