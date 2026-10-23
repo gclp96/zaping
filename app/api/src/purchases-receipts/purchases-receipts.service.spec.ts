@@ -343,8 +343,9 @@ describe('PurchaseReceiptsService', () => {
       createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
     ).resolves.toBeDefined();
 
-    const createdArgs = transactionClient.purchaseReceipt.create.mock
-      .calls[0]?.[0] as PurchaseReceiptCreateArgs | undefined;
+    const firstCall = transactionClient.purchaseReceipt.create.mock
+      .calls[0] as [PurchaseReceiptCreateArgs] | undefined;
+    const createdArgs = firstCall?.[0];
     expect(createdArgs?.data.supplierDocumentType).toBe('REMISION');
     expect(createdArgs?.data.supplierDocumentNumber).toBe('REM-INSAP-042');
   });
