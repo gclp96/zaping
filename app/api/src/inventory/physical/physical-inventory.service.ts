@@ -23,6 +23,10 @@ import {
 } from './physical-inventory.contract';
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
 import {
+  physicalExpirationEligibility,
+  storedExpirationDay,
+} from './physical-expiration-policy';
+import {
   DispatchCorrectionMaterialInput,
   CorrectionContext,
   loadCorrectionContext,
@@ -264,7 +268,29 @@ export class PhysicalInventoryService {
     );
     const productMap = new Map(products.map((p) => [p.id, p]));
     const batchMap = new Map(batches.map((b) => [b.id, b]));
-    const now = new Date();
+    // Read configuration only after Product -> Batch -> Position locks. This is
+    // a plain tenant-scoped read: no new Company lock or lock-order change.
+    const hasKnownExpiry =
+      targets.some((key) => key.expirationDate != null) ||
+      positions.some((p) => p.expirationDate != null) ||
+      batches.some((batch) => batch.expirationDate != null);
+    const company = hasKnownExpiry
+      ? await tx.company.findUnique({
+          where: { id: request.companyId },
+          select: { timezone: true },
+        })
+      : null;
+    if (hasKnownExpiry) requirePhysical(company, 'INVENTORY_TENANT_MISMATCH');
+    const asOf = new Date();
+    const assertNotExpired = (day: string | null) => {
+      if (day === null) return;
+      requirePhysical(company, 'INVENTORY_TENANT_MISMATCH');
+      requirePhysical(
+        physicalExpirationEligibility(day, company.timezone, asOf) !==
+          'EXPIRED',
+        'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+      );
+    };
     const plan = new Map<string, PlannedLine>();
     const add = (
       key: PositionKey,
@@ -273,7 +299,7 @@ export class PhysicalInventoryService {
     ) => {
       const product = productMap.get(key.productId);
       requirePhysical(product, 'PRODUCT_NOT_FOUND');
-      this.validateKey(key, product, batchMap, now);
+      this.validateKey(key, product, batchMap, assertNotExpired);
       const identity = positionIdentity(key);
       const existing = plan.get(identity);
       requirePhysical(
@@ -425,10 +451,10 @@ export class PhysicalInventoryService {
     key: PositionKey,
     product: Product,
     batches: Map<string, InventoryBatch>,
-    now: Date,
+    assertNotExpired: (day: string | null) => void,
   ) {
-    // S2 recognizes dated identities but cannot move them until eligibility is
-    // checked under lock against the Company's local day in the next phase.
+    assertNotExpired(key.expirationDate ?? null);
+    // S3a installs temporal validation without authorizing S3b writers.
     requirePhysical(key.expirationDate == null, 'PHYSICAL_SOURCE_NOT_ELIGIBLE');
     requirePhysical(product.inventoryTracking === 'QUANTITY');
     requirePhysical(
@@ -446,13 +472,11 @@ export class PhysicalInventoryService {
         batch.productId === product.id && batch.companyId === product.companyId,
         'INVENTORY_BATCH_PRODUCT_MISMATCH',
       );
+      assertNotExpired(storedExpirationDay(batch.expirationDate));
     }
     if (key.state === 'AVAILABLE') {
       requirePhysical(
-        product.isActive &&
-          (!batch ||
-            (batch.isActive &&
-              (!batch.expirationDate || batch.expirationDate > now))),
+        product.isActive && (!batch || batch.isActive),
         'PHYSICAL_SOURCE_NOT_ELIGIBLE',
       );
     }

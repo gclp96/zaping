@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { InventoryPosition, PrismaClient } from '@prisma/client';
 import { PhysicalInventoryRepository } from '../src/inventory/physical/physical-inventory.repository';
 import { PhysicalInventoryService } from '../src/inventory/physical/physical-inventory.service';
+import { companyLocalDay } from '../src/inventory/physical/physical-expiration-policy';
 import {
   PhysicalRequest,
   PositionKey,
@@ -593,6 +594,285 @@ suite(
           start.release();
           await Promise.all([first.$disconnect(), second.$disconnect()]);
         }
+      });
+
+      describe('S3a persisted Company day after the existing locks', () => {
+        async function batchFixture(
+          timezone = 'America/Hermosillo',
+          expirationDate: Date | null = null,
+        ) {
+          const company = await db.company.create({
+            data: { name: 'S3a isolated CI', rfc: randomUUID(), timezone },
+          });
+          const product = await db.product.create({
+            data: {
+              companyId: company.id,
+              name: 'S3a batch',
+              sku: randomUUID(),
+              inventoryTracking: 'QUANTITY',
+              lotTracking: 'OPTIONAL',
+            },
+          });
+          const actor = await db.user.create({
+            data: {
+              companyId: company.id,
+              firstName: 'S3a',
+              lastName: 'CI',
+              email: `${randomUUID()}@example.invalid`,
+              passwordHash: 'not-a-login',
+              role: 'ADMIN',
+            },
+          });
+          const batch = await db.inventoryBatch.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              lotNumber: randomUUID(),
+              expirationDate,
+            },
+          });
+          const position = await db.inventoryPosition.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              inventoryBatchId: batch.id,
+              state: 'AVAILABLE',
+              quantity: 4,
+            },
+          });
+          const request: PhysicalRequest = {
+            companyId: company.id,
+            actorId: actor.id,
+            origin: { type: 'INV01A_TEST', id: randomUUID(), operation: 'OUT' },
+            operation: {
+              kind: 'DEFINITIVE_OUT',
+              debits: [
+                {
+                  sourceId: position.id,
+                  quantity: 1,
+                  expectedSourceRevision: 0,
+                },
+              ],
+            },
+          };
+          return { company, product, actor, batch, position, request };
+        }
+
+        it.each(['America/Hermosillo', 'Asia/Tokyo'])(
+          'permits today throughout the persisted Company day in %s; replay survives later expiry',
+          async (timezone) => {
+            const day = companyLocalDay(timezone, new Date());
+            const f = await batchFixture(
+              timezone,
+              new Date(`${day}T00:00:00Z`),
+            );
+            const applied = await db.$transaction((tx) =>
+              physical.apply(tx, f.request),
+            );
+            expect(applied.replay).toBe(false);
+            expect(applied.effect.lines).toHaveLength(1);
+            expect(applied.effect.lines[0]).toMatchObject({
+              positionId: f.position.id,
+              delta: -1,
+              quantityBefore: 4,
+              quantityAfter: 3,
+              revisionBefore: 0,
+              revisionAfter: 1,
+            });
+            await db.inventoryBatch.update({
+              where: { id: f.batch.id },
+              data: { expirationDate: new Date('2000-01-01') },
+            });
+            await db.company.update({
+              where: { id: f.company.id },
+              data: { timezone: 'Invalid/Timezone' },
+            });
+            const replay = await db.$transaction((tx) =>
+              physical.apply(tx, f.request),
+            );
+            expect(replay.replay).toBe(true);
+            expect(replay.effect.id).toBe(applied.effect.id);
+            expect(
+              await db.inventoryPhysicalEffect.count({
+                where: { companyId: f.company.id },
+              }),
+            ).toBe(1);
+            expect(
+              await db.inventoryPosition.findUniqueOrThrow({
+                where: { id: f.position.id },
+              }),
+            ).toMatchObject({ quantity: 3, revision: 1 });
+          },
+        );
+
+        it('allows an unknown Batch expiry without inventing a day', async () => {
+          const f = await batchFixture();
+          await db.$transaction((tx) => physical.apply(tx, f.request));
+          expect(
+            await db.inventoryBatch.findUniqueOrThrow({
+              where: { id: f.batch.id },
+            }),
+          ).toMatchObject({ expirationDate: null });
+          expect(
+            await db.inventoryPosition.findUniqueOrThrow({
+              where: { id: f.position.id },
+            }),
+          ).toMatchObject({ quantity: 3, revision: 1 });
+        });
+
+        it('rejects expired Batch atomically and does not conflate the failure with replay', async () => {
+          const f = await batchFixture(
+            'America/Hermosillo',
+            new Date('2000-01-01'),
+          );
+          await expect(
+            db.$transaction((tx) => physical.apply(tx, f.request)),
+          ).rejects.toMatchObject({ code: 'PHYSICAL_SOURCE_NOT_ELIGIBLE' });
+          expect(
+            await db.inventoryPhysicalEffect.count({
+              where: { companyId: f.company.id },
+            }),
+          ).toBe(0);
+          expect(
+            await db.inventoryPosition.findUniqueOrThrow({
+              where: { id: f.position.id },
+            }),
+          ).toMatchObject({ quantity: 4, revision: 0 });
+        });
+
+        it('rolls back a valid dated-Batch mutation and its persisted lines after a test-only injected failure', async () => {
+          const f = await batchFixture(
+            'America/Hermosillo',
+            new Date('2099-01-01'),
+          );
+          let reached = false;
+          class FailingRepository extends PhysicalInventoryRepository {
+            override async appendLines(
+              ...args: Parameters<PhysicalInventoryRepository['appendLines']>
+            ): Promise<never> {
+              await super.appendLines(...args);
+              reached = true;
+              throw new Error('S3a test-only fault after lines');
+            }
+          }
+          const failing = new PhysicalInventoryService(new FailingRepository());
+          await expect(
+            db.$transaction((tx) => failing.apply(tx, f.request)),
+          ).rejects.toMatchObject({
+            code: 'INVENTORY_PHYSICAL_PERSISTENCE_ERROR',
+          });
+          expect(reached).toBe(true);
+          expect(
+            await db.inventoryPhysicalEffect.count({
+              where: { companyId: f.company.id },
+            }),
+          ).toBe(0);
+          expect(
+            await db.inventoryPhysicalEffectLine.count({
+              where: { companyId: f.company.id },
+            }),
+          ).toBe(0);
+          expect(
+            await db.inventoryPosition.findUniqueOrThrow({
+              where: { id: f.position.id },
+            }),
+          ).toMatchObject({ quantity: 4, revision: 0 });
+        });
+
+        it.each(['expired-batch', 'invalid-zone'] as const)(
+          'observes %s committed while waiting for Batch lock on a separate connection',
+          async (scenario) => {
+            const f = await batchFixture(
+              'America/Hermosillo',
+              new Date('2099-01-01'),
+            );
+            const [first, second] = clients();
+            const ready = gate();
+            const release = gate();
+            let ownerPid = 0;
+            let contenderPid = 0;
+            const owner = first.$transaction(
+              async (tx) => {
+                const [session] = await tx.$queryRaw<
+                  { pid: number }[]
+                >`SELECT pg_backend_pid() AS pid`;
+                ownerPid = session.pid;
+                await tx.inventoryBatch.update({
+                  where: { id: f.batch.id },
+                  data: {
+                    expirationDate: new Date(
+                      scenario === 'expired-batch'
+                        ? '2000-01-01'
+                        : '2099-01-01',
+                    ),
+                  },
+                });
+                if (scenario === 'invalid-zone')
+                  await tx.company.update({
+                    where: { id: f.company.id },
+                    data: { timezone: 'Invalid/Timezone' },
+                  });
+                ready.release();
+                await release.wait;
+              },
+              { timeout: 15000 },
+            );
+            void owner.catch(ready.reject);
+            try {
+              await ready.wait;
+              const started = gate();
+              const contender = second.$transaction(
+                async (tx) => {
+                  await tx.$executeRaw`SET LOCAL statement_timeout = '7s'`;
+                  const [session] = await tx.$queryRaw<
+                    { pid: number }[]
+                  >`SELECT pg_backend_pid() AS pid`;
+                  contenderPid = session.pid;
+                  started.release();
+                  return physical.apply(tx, f.request);
+                },
+                { timeout: 12000 },
+              );
+              const outcome = contender.then(
+                (value) => ({ value, error: null }),
+                (error: unknown) => ({ value: null, error }),
+              );
+              void contender.catch(started.reject);
+              await started.wait;
+              expect(ownerPid).not.toBe(contenderPid);
+              let blocked = false;
+              const deadline = Date.now() + 5000;
+              while (!blocked && Date.now() < deadline) {
+                const [row] = await db.$queryRaw<
+                  { blocked: boolean }[]
+                >`SELECT ${ownerPid}::integer = ANY(pg_blocking_pids(${contenderPid}::integer)) AS blocked`;
+                blocked = row.blocked;
+              }
+              expect(blocked).toBe(true);
+              release.release();
+              const result = await outcome;
+              expect(result.value).toBeNull();
+              expect(result.error).toMatchObject({
+                code: 'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+              });
+              expect(
+                await db.inventoryPhysicalEffect.count({
+                  where: { companyId: f.company.id },
+                }),
+              ).toBe(0);
+              expect(
+                await db.inventoryPosition.findUniqueOrThrow({
+                  where: { id: f.position.id },
+                }),
+              ).toMatchObject({ quantity: 4, revision: 0 });
+            } finally {
+              release.release();
+              await owner.finally(() =>
+                Promise.all([first.$disconnect(), second.$disconnect()]),
+              );
+            }
+          },
+        );
       });
     });
   },

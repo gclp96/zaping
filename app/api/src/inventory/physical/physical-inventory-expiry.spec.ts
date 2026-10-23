@@ -254,6 +254,11 @@ describe('ADR-015 S2 motor safety gate', () => {
       appendLines: jest.fn().mockResolvedValue([]),
     };
     const tx = {
+      company: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ timezone: 'America/Hermosillo' }),
+      },
       inventoryPosition: {
         groupBy: jest
           .fn()
