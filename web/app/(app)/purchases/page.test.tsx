@@ -392,7 +392,7 @@ function getVisiblePurchaseFolios() {
   return screen
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell')[0].textContent?.trim());
+    .map((row) => within(row).getByRole('link').textContent?.trim());
 }
 
 async function openActionsMenu(
@@ -490,6 +490,43 @@ describe('PurchasesPage — normalización de lista', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     cleanup();
+  });
+
+  it('presenta contexto, contador filtrado y progreso accesible sin cambiar el enlace al detalle', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([purchase, partialPurchase]);
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    expect(screen.getByRole('heading', { name: 'Compras', level: 1 })).toBeTruthy();
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+    const progress = screen.getByRole('progressbar', {
+      name: `Unidades recibidas de ${purchase.folio}`,
+    });
+    expect(progress.getAttribute('max')).toBe('10');
+    expect(progress.getAttribute('value')).toBe('4');
+    expect(within(screen.getByRole('link', { name: purchase.folio }).closest('td')!)
+      .getByText('Recepción: 4 de 10 uds.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: purchase.folio }).getAttribute('href'))
+      .toBe('/purchases/purchase-1');
+
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar compras' }), 'OC-0002');
+    expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+  });
+
+  it('permite abrir acciones con teclado y restaura el foco al cerrar con Escape', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    const actions = await screen.findByRole('button', { name: 'Acciones de compra OC-0001' });
+    actions.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menuitem', { name: 'Descargar PDF' })).toBe(document.activeElement);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(actions);
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it('busca por folio, proveedor, contacto, email, SKU y producto', async () => {
@@ -676,14 +713,14 @@ describe('PurchasesPage — normalización de lista', () => {
     expect(folioHeader.getAttribute('aria-sort')).toBe('ascending');
     expect(
       screen.getAllByRole('row').slice(1).map((row) =>
-        within(row).getAllByRole('cell')[0].textContent?.trim(),
+        within(row).getByRole('link').textContent?.trim(),
       ),
     ).toEqual(['OC-0001', 'OC-0002', 'OC-0010']);
 
     await user.click(screen.getByRole('button', { name: 'Total' }));
     expect(
       screen.getAllByRole('row').slice(1).map((row) =>
-        within(row).getAllByRole('cell')[0].textContent?.trim(),
+        within(row).getByRole('link').textContent?.trim(),
       ),
     ).toEqual(['OC-0010', 'OC-0001', 'OC-0002']);
   });
