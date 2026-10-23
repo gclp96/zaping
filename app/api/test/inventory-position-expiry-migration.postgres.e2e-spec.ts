@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { InventoryPosition, PrismaClient } from '@prisma/client';
+import { InventoryPosition, Prisma, PrismaClient } from '@prisma/client';
 import { PhysicalInventoryRepository } from '../src/inventory/physical/physical-inventory.repository';
 import { PhysicalInventoryService } from '../src/inventory/physical/physical-inventory.service';
 import { companyLocalDay } from '../src/inventory/physical/physical-expiration-policy';
+import { PhysicalInventoryReadService } from '../src/inventory/physical/physical-inventory-read.service';
 import {
   PhysicalRequest,
   PositionKey,
@@ -225,6 +226,285 @@ suite(
           },
         }),
       ).rejects.toThrow();
+    });
+
+    describe('S3b-R consistent calendar-aware physical reads', () => {
+      const reads = new PhysicalInventoryReadService();
+      async function readFixture(timezone = 'America/Hermosillo') {
+        const company = await db.company.create({
+          data: { name: 'S3b-R CI', rfc: randomUUID(), timezone },
+        });
+        const product = await db.product.create({
+          data: {
+            companyId: company.id,
+            sku: randomUUID(),
+            name: 'S3b-R aggregate',
+            stock: 999,
+            inventoryTracking: 'QUANTITY',
+            lotTracking: 'OPTIONAL',
+          },
+        });
+        const today = companyLocalDay(timezone, new Date());
+        const midnight = new Date(`${today}T00:00:00Z`).getTime();
+        const dates = {
+          unknown: null,
+          today: new Date(`${today}T00:00:00Z`),
+          expired: new Date(midnight - 86400000),
+          future: new Date(midnight + 86400000),
+        };
+        for (const [expirationDate, quantity, custody] of [
+          [dates.unknown, 2, false],
+          [dates.today, 3, false],
+          [dates.expired, 5, false],
+          [dates.future, 7, false],
+          [dates.expired, 11, true],
+          [dates.unknown, 13, true],
+        ] as const) {
+          await db.inventoryPosition.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              inventoryBatchId: null,
+              expirationDate,
+              quantity,
+              ...(custody
+                ? { state: 'CUSTODY', contextType: 'CASE', contextId: 'S3b-R' }
+                : { state: 'AVAILABLE' }),
+            },
+          });
+        }
+        const batches = {} as Record<
+          'expired' | 'today' | 'unknown' | 'future' | 'inactive',
+          string
+        >;
+        for (const [name, expirationDate, quantity, isActive] of [
+          ['expired', dates.expired, 17, true],
+          ['today', dates.today, 19, true],
+          ['unknown', null, 23, true],
+          ['future', dates.future, 29, true],
+          ['inactive', dates.future, 31, false],
+        ] as const) {
+          const batch = await db.inventoryBatch.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              lotNumber: randomUUID(),
+              expirationDate,
+              isActive,
+            },
+          });
+          batches[name] = batch.id;
+          await db.inventoryPosition.create({
+            data: {
+              companyId: company.id,
+              productId: product.id,
+              inventoryBatchId: batch.id,
+              state: 'AVAILABLE',
+              quantity,
+            },
+          });
+        }
+        await db.inventoryPosition.create({
+          data: {
+            companyId: company.id,
+            productId: product.id,
+            inventoryBatchId: batches.expired,
+            state: 'CUSTODY',
+            contextType: 'CASE',
+            contextId: 'S3b-R',
+            quantity: 37,
+          },
+        });
+        return { company, product, batches };
+      }
+      const expected = {
+        authority: 'PHYSICAL_POSITIONS',
+        owned: 197,
+        available: 83,
+        inCustody: 61,
+        hasPositions: true,
+      };
+
+      // These Company days are always different (UTC-11 vs UTC+14). Together,
+      // local yesterday/today detect an accidental server/UTC cutoff at any hour.
+      it.each(['Pacific/Pago_Pago', 'Pacific/Kiritimati'])(
+        'separates NULL/D/past/future and retains expired owned/custody using Company %s',
+        async (timezone) => {
+          const f = await readFixture(timezone);
+          expect(await reads.product(db, f.company.id, f.product.id)).toEqual(
+            expected,
+          );
+          expect(
+            await db.product.findUniqueOrThrow({ where: { id: f.product.id } }),
+          ).toMatchObject({ stock: 999 });
+          expect(
+            await db.inventoryPhysicalEffect.count({
+              where: { companyId: f.company.id },
+            }),
+          ).toBe(0);
+        },
+      );
+
+      it('keeps product and real-Batch reads coherent, including expired custody and inactive Batch', async () => {
+        const f = await readFixture();
+        const results = [
+          ['expired', 54, 0, 37],
+          ['today', 19, 19, 0],
+          ['unknown', 23, 23, 0],
+          ['future', 29, 29, 0],
+          ['inactive', 31, 0, 0],
+        ] as const;
+        for (const [name, owned, available, inCustody] of results) {
+          expect(
+            await reads.batch(db, f.company.id, f.product.id, f.batches[name]),
+          ).toEqual({
+            authority: 'PHYSICAL_POSITIONS',
+            owned,
+            available,
+            inCustody,
+            hasPositions: true,
+          });
+        }
+        expect(await reads.product(db, f.company.id, f.product.id)).toEqual(
+          expected,
+        );
+      });
+
+      it('preserves the historical Batch stored calendar component independently of session timezone', async () => {
+        const f = await readFixture();
+        const day = companyLocalDay(f.company.timezone, new Date());
+        await db.inventoryBatch.update({
+          where: { id: f.batches.today },
+          data: { expirationDate: new Date(`${day}T23:59:59Z`) },
+        });
+        await db.$transaction(async (tx) => {
+          await tx.$executeRaw`SET LOCAL TIME ZONE 'Pacific/Kiritimati'`;
+          expect(await reads.product(tx, f.company.id, f.product.id)).toEqual(
+            expected,
+          );
+          expect(
+            await reads.batch(tx, f.company.id, f.product.id, f.batches.today),
+          ).toMatchObject({ owned: 19, available: 19 });
+        });
+      });
+
+      it('keeps physical totals when Product is inactive and returns zeroes without legacy fallback when empty', async () => {
+        const f = await readFixture();
+        await db.product.update({
+          where: { id: f.product.id },
+          data: { isActive: false },
+        });
+        expect(await reads.product(db, f.company.id, f.product.id)).toEqual({
+          ...expected,
+          available: 0,
+        });
+        const empty = await db.product.create({
+          data: {
+            companyId: f.company.id,
+            name: 'empty physical',
+            sku: randomUUID(),
+            stock: 123,
+          },
+        });
+        expect(await reads.product(db, f.company.id, empty.id)).toEqual({
+          authority: 'PHYSICAL_POSITIONS',
+          owned: 0,
+          available: 0,
+          inCustody: 0,
+          hasPositions: false,
+        });
+        const batch = await db.inventoryBatch.create({
+          data: {
+            companyId: f.company.id,
+            productId: empty.id,
+            lotNumber: randomUUID(),
+          },
+        });
+        expect(
+          await reads.batch(db, f.company.id, empty.id, batch.id),
+        ).toMatchObject({
+          owned: 0,
+          available: 0,
+          inCustody: 0,
+          hasPositions: false,
+        });
+      });
+
+      it('isolates Company and rejects foreign or mismatched Batch without exposing their quantities', async () => {
+        const f = await readFixture();
+        const foreign = await readFixture('Asia/Tokyo');
+        await expect(
+          reads.product(db, f.company.id, foreign.product.id),
+        ).rejects.toMatchObject({ code: 'PRODUCT_NOT_FOUND' });
+        await expect(
+          reads.batch(db, f.company.id, f.product.id, foreign.batches.today),
+        ).rejects.toMatchObject({ code: 'INVENTORY_BATCH_NOT_FOUND' });
+        const other = await db.product.create({
+          data: {
+            companyId: f.company.id,
+            name: 'other product',
+            sku: randomUUID(),
+          },
+        });
+        await expect(
+          reads.batch(db, f.company.id, other.id, f.batches.today),
+        ).rejects.toMatchObject({ code: 'INVENTORY_BATCH_PRODUCT_MISMATCH' });
+        expect(await reads.product(db, f.company.id, f.product.id)).toEqual(
+          expected,
+        );
+      });
+
+      it('uses fresh statement time in an already started transaction, with one aggregate snapshot', async () => {
+        const f = await readFixture();
+        await db.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT transaction_timestamp()`;
+          let statements = 0;
+          const observed = {
+            $queryRaw: async (sql: Prisma.Sql) => {
+              statements++;
+              expect(sql.text).toContain(
+                'statement_timestamp() AT TIME ZONE c.timezone',
+              );
+              expect(sql.text).not.toMatch(
+                /CURRENT_DATE|CURRENT_TIMESTAMP|transaction_timestamp|\bnow\(/i,
+              );
+              // Real SQL, not a fabricated aggregate. The wrapper only observes
+              // the two clocks in the same statement as the production query.
+              const rows = await tx.$queryRaw<
+                Array<{ fresh: boolean }>
+              >(Prisma.sql`
+              SELECT result.*, statement_timestamp() > transaction_timestamp() AS fresh
+              FROM (${sql}) result
+            `);
+              expect(rows[0].fresh).toBe(true);
+              return rows;
+            },
+          } as unknown as Prisma.TransactionClient;
+          expect(
+            await reads.product(observed, f.company.id, f.product.id),
+          ).toEqual(expected);
+          expect(statements).toBe(1);
+        });
+      });
+
+      it('fails closed for invalid persisted Company timezone rather than returning misleading availability', async () => {
+        const f = await readFixture();
+        await db.company.update({
+          where: { id: f.company.id },
+          data: { timezone: 'Invalid/Timezone' },
+        });
+        await expect(
+          reads.product(db, f.company.id, f.product.id),
+        ).rejects.toMatchObject({
+          code: 'INVENTORY_PHYSICAL_PERSISTENCE_ERROR',
+        });
+        expect(
+          await db.inventoryPosition.aggregate({
+            where: { companyId: f.company.id },
+            _sum: { quantity: true },
+          }),
+        ).toMatchObject({ _sum: { quantity: 197 } });
+      });
     });
 
     describe('S2 repository identity, replay and closed operational gate', () => {

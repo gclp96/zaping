@@ -42,17 +42,25 @@ export class PhysicalInventoryReadService {
           isUUID(productId) &&
           (batchId === undefined || isUUID(batchId)),
       );
-      const asOf = new Date();
       // Product existence, requested Batch coherence, eligibility and sums all
-      // share one statement snapshot. Legacy stock is never selected.
+      // share one statement snapshot. statement_timestamp() is fresh per read,
+      // unlike CURRENT_DATE/now(), even in an older caller transaction.
+      // Batch is historical TIMESTAMP WITHOUT TIME ZONE: ::date preserves its
+      // stored calendar component, matching storedExpirationDay in S3a.
       const rows = await tx.$queryRaw<AggregateRow[]>(Prisma.sql`
         SELECT COALESCE(SUM(pos.quantity),0)::bigint AS owned,
           COALESCE(SUM(CASE WHEN pos.state='AVAILABLE' AND p."isActive"
-            AND (pos."inventoryBatchId" IS NULL OR (b."isActive" AND (b."expirationDate" IS NULL OR b."expirationDate">${asOf})))
+            AND (
+              (pos."inventoryBatchId" IS NULL AND (pos."expirationDate" IS NULL
+                OR pos."expirationDate">=(statement_timestamp() AT TIME ZONE c.timezone)::date))
+              OR (pos."inventoryBatchId" IS NOT NULL AND b."isActive" AND (b."expirationDate" IS NULL
+                OR b."expirationDate"::date>=(statement_timestamp() AT TIME ZONE c.timezone)::date))
+            )
             THEN pos.quantity ELSE 0 END),0)::bigint AS available,
           COALESCE(SUM(CASE WHEN pos.state='CUSTODY' THEN pos.quantity ELSE 0 END),0)::bigint AS "inCustody",
           COUNT(pos.id)::bigint AS count, requested.id AS "batchId", requested."productId" AS "batchProductId"
         FROM "Product" p
+        JOIN "Company" c ON c.id=p."companyId"
         LEFT JOIN "InventoryBatch" requested ON requested.id=${batchId ?? null} AND requested."companyId"=p."companyId"
         LEFT JOIN "InventoryPosition" pos ON pos."productId"=p.id AND pos."companyId"=p."companyId"
           ${batchId === undefined ? Prisma.empty : Prisma.sql`AND pos."inventoryBatchId"=${batchId}`}

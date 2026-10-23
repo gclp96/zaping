@@ -1,7 +1,7 @@
 # ADR-015 — Identidad física de existencias sin lote con caducidad
 
 **Estado de decisión:** ACCEPTED (OX-PUR-05B; issues #115 y #116)
-**Estado de implementación:** IN PROGRESS — S1–S2 validadas en CI; S3a política temporal implementada, pendiente de revisión; S3b–S4 y habilitación de posiciones fechadas pendientes
+**Estado de implementación:** IN PROGRESS — S1–S3a validadas en CI; S3b-R lecturas alineadas, pendiente de revisión; writers S3b–S4 y habilitación de posiciones fechadas pendientes
 **Fecha:** 2026-10-22
 **Área:** Zaping ERP / Compras, Recepciones e Inventory Physical
 **PR base:** #114 integrado en `main`
@@ -112,3 +112,16 @@ No tocar `main`, `.env`, credenciales, DB local `zaping_dev`, `zaping_qa`, `zapi
 - **QA S3a:** unitarias de medianoche, zonas distintas, DST, D inclusivo, NULL, configuración inválida, espera por lock que cruza medianoche y origen persistido de zona. Siete casos PostgreSQL adicionales en el servicio efímero de CI: D local en dos zonas y replay tras vencimiento, NULL, rechazo atómico de vencido, rollback real tras insertar líneas de Effect y dos esperas verificadas con clientes/PIDs independientes (Batch vence o cambia configuración antes de adquirir el lock). No se simula una medianoche real de PostgreSQL mediante hooks o reloj productivo; ese límite lo cubren las unitarias controlando exclusivamente el reloj del test. Resultado del commit S3a: consultar checks de [PR #119](https://github.com/gclp96/zaping/pull/119).
 
 **Pendiente:** autorización de writers S3b, integración de recepción/consumidores, FEFO, read models y QA S4. El ADR continúa IN PROGRESS y el PR DRAFT, sin merge ni activación operativa de posiciones fechadas.
+
+## 12. S3b-R — Lecturas consistentes por día local de Company
+
+**Base verificada:** S3a `855f9908595d0c0e5ef345849e05374c0315af6d`, [CI #414 SUCCESS](https://github.com/gclp96/zaping/actions/runs/39908490562), PostgreSQL 21/21 PASS. Los pendientes de la sección 11 describen su cierre histórico; S3b-R completa sólo la alineación de `PhysicalInventoryReadService`.
+
+- Se mantiene una única sentencia SQL para existencia de Product, pertenencia de Batch, Company, posiciones y agregados. `Company.timezone` procede del JOIN por Company del Product; no hay parámetro de zona o instante controlado por el solicitante ni lectura separada que mezcle snapshots.
+- `owned` suma todas las posiciones físicas, incluidas vencidas, inactivas y CUSTODY. `inCustody` conserva todo el saldo CUSTODY, sin filtrarlo por caducidad. No se toma `Product.stock` como fallback ni se cambian autoridad, límites numéricos, `hasPositions` o errores de identidad existentes.
+- `available` incluye sólo AVAILABLE con Product activo y, cuando hay Batch real, Batch activo. Para posiciones sin lote compara `InventoryPosition.expirationDate DATE` contra el día local; para Batch compara `expirationDate::date`, conservando el componente calendario almacenado de su `TIMESTAMP(3)` histórico sin zona. No se convierte la fecha de Batch a otro huso. `NULL` permanece desconocida y D conserva elegibilidad durante todo D local; D anterior se excluye únicamente de `available`.
+- El día de evaluación es `(statement_timestamp() AT TIME ZONE Company.timezone)::date`: un único instante estable para todas las filas de esa sentencia y renovado para cada lectura. No se usa `CURRENT_DATE`, `now()` ni `transaction_timestamp()` como corte, porque quedan anclados al inicio de una transacción anterior; tampoco se usa un reloj volátil por fila. Cambiar el timezone de sesión no sustituye el de Company. Un error al interpretar configuración temporal no se transforma en stock cero o disponibilidad exitosa.
+- La consulta por lote conserva la pertenencia Company/Product y usa exactamente la misma regla temporal que la consulta por Product. Un lote sin posiciones devuelve ceros explícitos; lote extranjero o incoherente conserva su rechazo.
+- **QA S3b-R:** unitarias de SQL generado, predicados, reloj de sentencia, parámetros, mapeo, límites y errores; regresiones de la política S3a y hashes/gate S2. Ocho casos PostgreSQL adicionales cubren múltiples fechas sin lote, D−1/D/D+1 y NULL, lotes reales, Product/Batch inactivos, `owned`/`available`/`inCustody`, producto vacío, aislamiento por Company, coherencia por lote y timezone de sesión. Se usan zonas UTC−11/UTC+14 y días relativos para detectar un corte UTC incorrecto a cualquier hora. Una observación test-only delega en SQL real y verifica reloj de sentencia posterior al de transacción dentro de una transacción ya iniciada; no simula un cruce de medianoche real ni introduce hooks productivos. Ejecución PostgreSQL exclusivamente en CI efímero; resultado del commit: checks de [PR #119](https://github.com/gclp96/zaping/pull/119).
+
+**Límites conservados:** gate S2 cerrado para créditos/salidas/movimientos de posiciones fechadas, incluso si la lectura las considera temporalmente disponibles. Lectura elegible no autoriza mutación. No se modifican Recepciones, Ventas, FEFO, writers, hashes, locks, schema o migraciones. Writers S3b, integración de consumidores y QA S4 continúan pendientes; ADR IN PROGRESS y PR DRAFT, sin merge.
