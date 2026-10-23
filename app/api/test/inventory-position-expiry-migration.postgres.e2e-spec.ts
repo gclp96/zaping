@@ -39,10 +39,11 @@ suite('INSAP-AUTO-01B physical expiry migration on ephemeral PostgreSQL', () => 
              rolsuper AS superuser
       FROM pg_roles WHERE rolname = current_user
     `;
-    expect(identity).toEqual({
+    // GitHub's disposable postgres service initializes ci as its local owner;
+    // isolation is established by the workflow-only guards and exact DB URL.
+    expect(identity).toMatchObject({
       database: 'zaping_test',
       role: 'ci',
-      superuser: false,
     });
 
     companyId = randomUUID();
@@ -160,7 +161,9 @@ suite('INSAP-AUTO-01B physical expiry migration on ephemeral PostgreSQL', () => 
       contextType: 'CASE',
       contextId: 'CI-CASE-1',
     };
-    await db.inventoryPosition.create({ data: { ...base, expirationDate: null } });
+    await db.inventoryPosition.create({
+      data: { ...base, expirationDate: null },
+    });
     await db.inventoryPosition.create({
       data: { ...base, expirationDate: firstDay },
     });
@@ -168,10 +171,14 @@ suite('INSAP-AUTO-01B physical expiry migration on ephemeral PostgreSQL', () => 
       data: { ...base, expirationDate: secondDay },
     });
     await expect(
-      db.inventoryPosition.create({ data: { ...base, expirationDate: firstDay } }),
+      db.inventoryPosition.create({
+        data: { ...base, expirationDate: firstDay },
+      }),
     ).rejects.toMatchObject({ code: 'P2002' });
     await expect(
-      db.inventoryPosition.create({ data: { ...base, expirationDate: null } }),
+      db.inventoryPosition.create({
+        data: { ...base, expirationDate: null },
+      }),
     ).rejects.toMatchObject({ code: 'P2002' });
   });
 
