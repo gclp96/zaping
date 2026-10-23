@@ -154,6 +154,7 @@ const roleMatrix: RoleMatrix[] = [
   {
     controller: PurchaseReceiptsController,
     methods: {
+      getCapabilities: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findAll: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findByPurchase: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findOne: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],

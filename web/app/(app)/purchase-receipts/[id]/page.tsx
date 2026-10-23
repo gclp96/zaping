@@ -35,6 +35,7 @@ import { getApiErrorMessage } from '@/services/errors';
 
 import {
   formatReceiptDate,
+  formatReceiptExpirationDate,
   formatReceiptMoney,
   getReceiptResponsibleLabel,
 } from '../receipt-display';
@@ -198,7 +199,7 @@ export default function PurchaseReceiptDetailPage() {
       header: 'Caducidad',
       cell: (item) =>
         item.expirationDate
-          ? formatReceiptDate(item.expirationDate)
+          ? formatReceiptExpirationDate(item.expirationDate)
           : '—',
     },
     {

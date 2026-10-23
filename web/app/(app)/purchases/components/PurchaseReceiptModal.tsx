@@ -5,7 +5,10 @@ import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
+import { hasOptionalReceiptTraceability } from '../receipt-traceability';
+
 import type {
+  ReceiptAuthority,
   CreatedPurchaseReceipt,
   PurchaseReceiptFieldErrors,
   PurchaseReceiptFormField,
@@ -22,6 +25,9 @@ type PurchaseReceiptModalProps = {
     };
   } | null;
 
+  receiptAuthority: ReceiptAuthority | null;
+  receiptAuthorityError: string;
+  onRetryAuthority: () => void;
   items: PurchaseReceiptFormItem[];
   notes: string;
   supplierDocumentType: string;
@@ -60,6 +66,9 @@ function getReceiptFieldId(
 export default function PurchaseReceiptModal({
   isOpen,
   purchase,
+  receiptAuthority,
+  receiptAuthorityError,
+  onRetryAuthority,
   items,
   notes,
   supplierDocumentType,
@@ -77,6 +86,11 @@ export default function PurchaseReceiptModal({
   onViewReceipt,
   onViewInventory,
 }: PurchaseReceiptModalProps) {
+  // Keep the diagnostic code in receiptAuthorityError; translate only its presentation.
+  const authorityErrorMessage =
+    receiptAuthorityError === 'CUTOVER_FROZEN'
+      ? 'No es posible registrar recepciones mientras se realiza la transición del inventario. Contacta al administrador.'
+      : receiptAuthorityError;
   const hasAssetItems = items.some(
     (item) => item.inventoryTracking === 'ASSET',
   );
@@ -148,6 +162,28 @@ export default function PurchaseReceiptModal({
             <p className="font-semibold">{purchase.supplier.name}</p>
           </div>
 
+          {!receiptAuthority ? (
+            receiptAuthorityError ? (
+              <div
+                role="alert"
+                className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              >
+                <p>{authorityErrorMessage}</p>
+                <Button variant="secondary" onClick={onRetryAuthority}>
+                  Reintentar verificación
+                </Button>
+              </div>
+            ) : (
+              <p role="status">Verificando disponibilidad de recepción...</p>
+            )
+          ) : null}
+          {receiptAuthority === 'PHYSICAL' &&
+          items.some((item) => item.inventoryTracking === 'QUANTITY') ? (
+            <p className="text-sm text-gray-600">
+              Para productos por cantidad, lote y caducidad son opcionales e
+              independientes. Captúralos si el proveedor los informa.
+            </p>
+          ) : null}
           {items.length === 0 ? (
             <div className="rounded-lg border border-gray-200 p-4">
               <p className="text-sm text-gray-600">
@@ -176,7 +212,8 @@ export default function PurchaseReceiptModal({
               >
                 <table className="w-full min-w-[760px] text-sm">
                   <caption className="sr-only">
-                    Líneas pendientes de la recepción de la compra {purchase.folio}
+                    Líneas pendientes de la recepción de la compra{' '}
+                    {purchase.folio}
                   </caption>
 
                   <thead className="bg-gray-50">
@@ -241,7 +278,10 @@ export default function PurchaseReceiptModal({
                             <p className="text-xs text-gray-500">{item.sku}</p>
 
                             {item.inventoryTracking === 'ASSET' ? (
-                              <p className="mt-2 text-xs text-blue-800" role="note">
+                              <p
+                                className="mt-2 text-xs text-blue-800"
+                                role="note"
+                              >
                                 Al registrar esta recepción se generarán equipos
                                 individuales para esta partida.
                               </p>
@@ -262,6 +302,7 @@ export default function PurchaseReceiptModal({
 
                           <td className="px-3 py-3">
                             <Input
+                              disabled={saving || !receiptAuthority}
                               id={quantityId}
                               label="Recibir ahora"
                               aria-label={`Cantidad recibida de ${item.name}`}
@@ -282,7 +323,11 @@ export default function PurchaseReceiptModal({
                           </td>
 
                           <td className="px-3 py-3">
-                            {item.lotTracking === 'NONE' ? (
+                            {item.lotTracking === 'NONE' &&
+                            !hasOptionalReceiptTraceability(
+                              receiptAuthority,
+                              item,
+                            ) ? (
                               <span
                                 aria-label="Lote: no aplica"
                                 className="text-gray-500"
@@ -291,19 +336,34 @@ export default function PurchaseReceiptModal({
                               </span>
                             ) : (
                               <Input
+                                disabled={saving || !receiptAuthority}
                                 id={lotId}
                                 label={
-                                  item.lotTracking === 'REQUIRED'
+                                  item.lotTracking === 'REQUIRED' &&
+                                  !hasOptionalReceiptTraceability(
+                                    receiptAuthority,
+                                    item,
+                                  )
                                     ? 'Lote'
                                     : 'Lote (opcional)'
                                 }
                                 aria-label={`Lote de ${item.name}`}
                                 placeholder="Ej. LOTE-001"
-                                required={item.lotTracking === 'REQUIRED'}
+                                required={
+                                  item.lotTracking === 'REQUIRED' &&
+                                  !hasOptionalReceiptTraceability(
+                                    receiptAuthority,
+                                    item,
+                                  )
+                                }
                                 value={item.lotNumber}
                                 error={itemErrors?.lotNumber}
                                 helperText={
-                                  item.lotTracking === 'REQUIRED'
+                                  item.lotTracking === 'REQUIRED' &&
+                                  !hasOptionalReceiptTraceability(
+                                    receiptAuthority,
+                                    item,
+                                  )
                                     ? 'Requerido para esta partida.'
                                     : 'Opcional.'
                                 }
@@ -319,7 +379,11 @@ export default function PurchaseReceiptModal({
                           </td>
 
                           <td className="px-3 py-3">
-                            {item.lotTracking === 'NONE' ? (
+                            {item.lotTracking === 'NONE' &&
+                            !hasOptionalReceiptTraceability(
+                              receiptAuthority,
+                              item,
+                            ) ? (
                               <span
                                 aria-label="Caducidad: no aplica"
                                 className="text-gray-500"
@@ -328,12 +392,20 @@ export default function PurchaseReceiptModal({
                               </span>
                             ) : (
                               <DateInput
+                                disabled={saving || !receiptAuthority}
                                 id={expirationId}
                                 label="Caducidad (opcional)"
                                 aria-label={`Caducidad de ${item.name}`}
                                 value={item.expirationDate}
                                 error={itemErrors?.expirationDate}
-                                helperText="Requiere número de lote."
+                                helperText={
+                                  hasOptionalReceiptTraceability(
+                                    receiptAuthority,
+                                    item,
+                                  )
+                                    ? 'Opcional, incluso sin lote.'
+                                    : 'Requiere número de lote.'
+                                }
                                 onValueChange={(value) =>
                                   onItemChange(
                                     item.purchaseItemId,
@@ -382,7 +454,10 @@ export default function PurchaseReceiptModal({
                       className="rounded-lg border border-gray-200 p-4"
                     >
                       <div>
-                        <h3 id={identityId} className="font-semibold text-gray-900">
+                        <h3
+                          id={identityId}
+                          className="font-semibold text-gray-900"
+                        >
                           {item.name}
                         </h3>
                         <p className="text-sm text-gray-500">{item.sku}</p>
@@ -419,6 +494,7 @@ export default function PurchaseReceiptModal({
 
                       <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
                         <Input
+                          disabled={saving || !receiptAuthority}
                           id={quantityId}
                           label="Recibir ahora"
                           aria-label={`Cantidad recibida de ${item.name}`}
@@ -439,7 +515,11 @@ export default function PurchaseReceiptModal({
                         />
                       </div>
 
-                      {item.lotTracking === 'NONE' ? (
+                      {item.lotTracking === 'NONE' &&
+                      !hasOptionalReceiptTraceability(
+                        receiptAuthority,
+                        item,
+                      ) ? (
                         <p className="mt-4 text-sm text-gray-500">
                           Lote y caducidad: no aplica.
                         </p>
@@ -450,19 +530,34 @@ export default function PurchaseReceiptModal({
                           </legend>
 
                           <Input
+                            disabled={saving || !receiptAuthority}
                             id={lotId}
                             label={
-                              item.lotTracking === 'REQUIRED'
+                              item.lotTracking === 'REQUIRED' &&
+                              !hasOptionalReceiptTraceability(
+                                receiptAuthority,
+                                item,
+                              )
                                 ? 'Lote'
                                 : 'Lote (opcional)'
                             }
                             aria-label={`Lote de ${item.name}`}
                             placeholder="Ej. LOTE-001"
-                            required={item.lotTracking === 'REQUIRED'}
+                            required={
+                              item.lotTracking === 'REQUIRED' &&
+                              !hasOptionalReceiptTraceability(
+                                receiptAuthority,
+                                item,
+                              )
+                            }
                             value={item.lotNumber}
                             error={itemErrors?.lotNumber}
                             helperText={
-                              item.lotTracking === 'REQUIRED'
+                              item.lotTracking === 'REQUIRED' &&
+                              !hasOptionalReceiptTraceability(
+                                receiptAuthority,
+                                item,
+                              )
                                 ? 'Requerido para esta partida.'
                                 : 'Opcional.'
                             }
@@ -476,12 +571,20 @@ export default function PurchaseReceiptModal({
                           />
 
                           <DateInput
+                            disabled={saving || !receiptAuthority}
                             id={expirationId}
                             label="Caducidad (opcional)"
                             aria-label={`Caducidad de ${item.name}`}
                             value={item.expirationDate}
                             error={itemErrors?.expirationDate}
-                            helperText="Requiere número de lote."
+                            helperText={
+                              hasOptionalReceiptTraceability(
+                                receiptAuthority,
+                                item,
+                              )
+                                ? 'Opcional, incluso sin lote.'
+                                : 'Requiere número de lote.'
+                            }
                             onValueChange={(value) =>
                               onItemChange(
                                 item.purchaseItemId,
@@ -508,8 +611,21 @@ export default function PurchaseReceiptModal({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="receipt-supplier-document-type" className="mb-2 block text-sm font-medium text-gray-700">Documento del proveedor (opcional)</label>
-              <select id="receipt-supplier-document-type" value={supplierDocumentType} onChange={(event) => onSupplierDocumentTypeChange(event.target.value)} className="w-full rounded-lg border border-gray-300 p-2 text-sm">
+              <label
+                htmlFor="receipt-supplier-document-type"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Documento del proveedor (opcional)
+              </label>
+              <select
+                disabled={saving || !receiptAuthority}
+                id="receipt-supplier-document-type"
+                value={supplierDocumentType}
+                onChange={(event) =>
+                  onSupplierDocumentTypeChange(event.target.value)
+                }
+                className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+              >
                 <option value="">Sin documento</option>
                 <option value="FACTURA">Factura</option>
                 <option value="REMISION">Remisión</option>
@@ -517,8 +633,23 @@ export default function PurchaseReceiptModal({
               </select>
             </div>
             <div>
-              <label htmlFor="receipt-supplier-document-number" className="mb-2 block text-sm font-medium text-gray-700">Número del documento</label>
-              <input id="receipt-supplier-document-number" maxLength={100} value={supplierDocumentNumber} onChange={(event) => onSupplierDocumentNumberChange(event.target.value)} placeholder="Ej. FAC-10293" className="w-full rounded-lg border border-gray-300 p-2 text-sm" />
+              <label
+                htmlFor="receipt-supplier-document-number"
+                className="mb-2 block text-sm font-medium text-gray-700"
+              >
+                Número del documento
+              </label>
+              <input
+                disabled={saving || !receiptAuthority}
+                id="receipt-supplier-document-number"
+                maxLength={100}
+                value={supplierDocumentNumber}
+                onChange={(event) =>
+                  onSupplierDocumentNumberChange(event.target.value)
+                }
+                placeholder="Ej. FAC-10293"
+                className="w-full rounded-lg border border-gray-300 p-2 text-sm"
+              />
             </div>
           </div>
 
@@ -531,6 +662,7 @@ export default function PurchaseReceiptModal({
             </label>
 
             <textarea
+              disabled={saving || !receiptAuthority}
               id="receipt-notes"
               rows={3}
               maxLength={1000}
@@ -565,7 +697,7 @@ export default function PurchaseReceiptModal({
               className="w-full sm:w-auto"
               loading={saving}
               loadingText="Registrando..."
-              disabled={saving || items.length === 0}
+              disabled={saving || !receiptAuthority || items.length === 0}
               onClick={onSubmit}
             >
               Registrar recepción

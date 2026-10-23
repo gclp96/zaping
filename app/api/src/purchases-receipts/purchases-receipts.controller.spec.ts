@@ -1,3 +1,4 @@
+import { HEADERS_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { UserRole } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -8,6 +9,7 @@ import { PurchaseReceiptsController } from './purchases-receipts.controller';
 import { PurchaseReceiptsService } from './purchases-receipts.service';
 
 type PurchaseReceiptsServiceMock = {
+  getReceiptCapabilities: jest.Mock;
   create: jest.Mock;
   findAll: jest.Mock;
   findOne: jest.Mock;
@@ -22,6 +24,7 @@ describe('PurchaseReceiptsController', () => {
 
   beforeEach(async () => {
     purchaseReceiptsService = {
+      getReceiptCapabilities: jest.fn(),
       create: jest.fn(),
       findAll: jest.fn(),
       findOne: jest.fn(),
@@ -52,6 +55,35 @@ describe('PurchaseReceiptsController', () => {
         role: UserRole.ADMIN,
       },
     } as AuthenticatedRequest;
+  });
+
+  it('reads capabilities only for the authenticated Company, ignoring requester-supplied identity', async () => {
+    purchaseReceiptsService.getReceiptCapabilities.mockResolvedValue({
+      authority: 'PHYSICAL',
+    });
+    const spoofed = {
+      ...request,
+      query: { companyId: 'foreign' },
+      body: { companyId: 'foreign' },
+    };
+    expect(await controller.getCapabilities(spoofed)).toEqual({
+      authority: 'PHYSICAL',
+    });
+    expect(purchaseReceiptsService.getReceiptCapabilities).toHaveBeenCalledWith(
+      request.user.companyId,
+    );
+    expect(purchaseReceiptsService.create).not.toHaveBeenCalled();
+  });
+
+  it('declares the static capabilities route without caching authority', () => {
+    const handler = Object.getOwnPropertyDescriptor(
+      PurchaseReceiptsController.prototype,
+      'getCapabilities',
+    )?.value as object;
+    expect(Reflect.getMetadata(PATH_METADATA, handler)).toBe('capabilities');
+    expect(Reflect.getMetadata(HEADERS_METADATA, handler)).toEqual([
+      { name: 'Cache-Control', value: 'no-store' },
+    ]);
   });
 
   it('should be defined', () => {

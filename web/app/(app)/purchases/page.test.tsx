@@ -258,6 +258,7 @@ const previousReceipt = {
 
 type ConfigureApiMocksOptions = {
   companyTimezone?: string;
+  receiptAuthority?: 'LEGACY' | 'PHYSICAL';
   authMeError?: Error;
   role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 };
@@ -270,7 +271,9 @@ function configureApiMocks(
     async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: options.receiptAuthority ?? 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         if (options.authMeError) {
           throw options.authMeError;
         }
@@ -986,7 +989,9 @@ describe('PurchasesPage — normalización de lista', () => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         return {
           data: { companyTimezone: 'America/Hermosillo' },
         } as never;
@@ -2016,6 +2021,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
 
+    if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
     if (endpoint === '/auth/me') {
       return {
         data: {
@@ -2184,6 +2191,7 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
       name: /registrar recepci[oó]n/i,
     }),
   );
+  await waitFor(() => expect(getReceiptSubmitButton().hasAttribute('disabled')).toBe(false));
   const receiptDesktop = screen.getByTestId('receipt-desktop-items');
   await user.type(
     within(receiptDesktop).getByRole('spinbutton', {
@@ -2388,7 +2396,9 @@ describe('PurchasesPage — formulario de compra', () => {
       async (url) => {
         const endpoint = String(url);
 
-        if (endpoint === '/auth/me') {
+        if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
           return {
             data: {
               id: 'user-1',
@@ -2728,7 +2738,9 @@ describe('PurchasesPage — formulario de compra', () => {
       async (url) => {
         const endpoint = String(url);
 
-        if (endpoint === '/auth/me') {
+        if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
           return {
             data: {
               id: 'user-1',
@@ -2834,7 +2846,9 @@ describe('PurchasesPage — formulario de compra', () => {
     async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         return {
           data: {
             id: 'user-1',
@@ -3022,4 +3036,41 @@ describe('PurchasesPage — formulario de compra', () => {
   revokeObjectURLSpy.mockRestore();
   linkClickSpy.mockRestore();
 });
+});
+
+
+describe('OX-PUR-05 — integración PHYSICAL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(receiptIdempotencyKey);
+    routerMock.search = '';
+  });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); clearAuthenticatedSessionCache(); });
+
+it.each(['desktop', 'mobile'])('PHYSICAL REQUIRED envía fecha sin lote desde %s, sin perder documento ni key', async (layout) => {
+  const user = userEvent.setup();
+  const physicalPurchase = { ...purchase, items: [{ ...purchase.items[0], product: { ...purchase.items[0].product, lotTracking: 'REQUIRED' as const } }] };
+  configureApiMocks([physicalPurchase], { receiptAuthority: 'PHYSICAL' });
+  const originalGet = vi.mocked(api.get).getMockImplementation()!;
+  vi.mocked(api.get).mockImplementation((url, config) => String(url) === '/purchases/purchase-1'
+    ? Promise.resolve({ data: physicalPurchase }) as never : originalGet(url, config));
+  vi.mocked(api.post).mockResolvedValue({ data: { id: 'receipt-physical', folio: 'REC-PHYSICAL' } } as never);
+  render(<PurchasesPage />);
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: /registrar recepci[oó]n/i }));
+  await screen.findByText(/lote y caducidad son opcionales e independientes/i);
+  const editor = within(screen.getByTestId('receipt-' + layout + '-items'));
+  await user.type(editor.getByLabelText('Cantidad recibida de Producto médico'), '2');
+  fireEvent.change(editor.getByLabelText('Caducidad de Producto médico'), { target: { value: '2029-06-30' } });
+  await user.selectOptions(screen.getByLabelText('Documento del proveedor (opcional)'), 'REMISION');
+  await user.type(screen.getByLabelText('Número del documento'), 'REM-5');
+  await user.click(getReceiptSubmitButton());
+  await screen.findByRole('heading', { name: 'Recepción registrada correctamente' });
+  expect(api.post).toHaveBeenCalledExactlyOnceWith('/purchase-receipts', {
+    purchaseId: 'purchase-1', notes: undefined, supplierDocumentType: 'REMISION', supplierDocumentNumber: 'REM-5',
+    items: [{ purchaseItemId: 'purchase-item-1', quantityReceived: 2, lotNumber: undefined, expirationDate: '2029-06-30' }],
+  }, { headers: { 'Idempotency-Key': receiptIdempotencyKey } });
+});
+
 });

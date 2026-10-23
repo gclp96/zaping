@@ -43,6 +43,9 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
     render(
       <PurchaseReceiptModal
         isOpen
+        receiptAuthority="LEGACY"
+        receiptAuthorityError=""
+        onRetryAuthority={vi.fn()}
         purchase={null}
         items={[]}
         notes=""
@@ -77,10 +80,7 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
     await user.click(inventoryButton);
 
     expect(onViewReceipt).toHaveBeenCalledWith('receipt-123');
-    expect(onViewInventory).toHaveBeenCalledWith(
-      'receipt-123',
-      'REC-000123',
-    );
+    expect(onViewInventory).toHaveBeenCalledWith('receipt-123', 'REC-000123');
   });
 
   it('mantiene tabla y editor responsive con tracking por partida', async () => {
@@ -89,6 +89,9 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
     render(
       <PurchaseReceiptModal
         isOpen
+        receiptAuthority="LEGACY"
+        receiptAuthorityError=""
+        onRetryAuthority={vi.fn()}
         purchase={{
           folio: 'OC-0001',
           supplier: { name: 'Proveedor médico' },
@@ -143,18 +146,14 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
     expect(desktop.className).toContain('xl:block');
     expect(mobile.className).toContain('xl:hidden');
     expect(within(table).getByText(/líneas pendientes/i)).toBeTruthy();
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(7);
     expect(
-      within(table).getAllByRole('columnheader'),
-    ).toHaveLength(7);
-    expect(
-      within(table).getAllByRole('columnheader').every(
-        (header) => header.getAttribute('scope') === 'col',
-      ),
+      within(table)
+        .getAllByRole('columnheader')
+        .every((header) => header.getAttribute('scope') === 'col'),
     ).toBe(true);
 
-    expect(
-      within(desktop).getAllByText('No aplica'),
-    ).toHaveLength(2);
+    expect(within(desktop).getAllByText('No aplica')).toHaveLength(2);
     expect(
       within(mobile).getByText('Lote y caducidad: no aplica.'),
     ).toBeTruthy();
@@ -191,5 +190,121 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
       'lotNumber',
       'ASSET-LOT-001',
     );
+  });
+});
+
+describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
+  function show(
+    overrides: Partial<React.ComponentProps<typeof PurchaseReceiptModal>> = {},
+  ) {
+    const props = {
+      isOpen: true,
+      purchase: { folio: 'OC-1', supplier: { name: 'Proveedor' } },
+      receiptAuthority: 'PHYSICAL' as const,
+      receiptAuthorityError: '',
+      onRetryAuthority: vi.fn(),
+      items: [createReceiptItem()],
+      notes: '',
+      supplierDocumentType: '',
+      supplierDocumentNumber: '',
+      onSupplierDocumentTypeChange: vi.fn(),
+      onSupplierDocumentNumberChange: vi.fn(),
+      saving: false,
+      error: '',
+      fieldErrors: {},
+      createdReceipt: null,
+      onClose: vi.fn(),
+      onItemChange: vi.fn(),
+      onNotesChange: vi.fn(),
+      onSubmit: vi.fn(),
+      onViewReceipt: vi.fn(),
+      onViewInventory: vi.fn(),
+      ...overrides,
+    };
+    render(<PurchaseReceiptModal {...props} />);
+    return props;
+  }
+  it.each(['NONE', 'OPTIONAL', 'REQUIRED'] as const)(
+    'PHYSICAL QUANTITY %s ofrece lote y fecha independientes en desktop y móvil',
+    (lotTracking) => {
+      const { onItemChange } = show({
+        items: [
+          createReceiptItem({
+            lotTracking,
+            lotNumber: 'REAL-1',
+            expirationDate: '2029-06-30',
+          }),
+        ],
+      });
+      for (const layout of ['desktop', 'mobile']) {
+        const group = within(
+          screen.getByTestId('receipt-' + layout + '-items'),
+        );
+        const lot = group.getByLabelText(
+          'Lote de Producto por cantidad',
+        ) as HTMLInputElement;
+        expect(lot.required).toBe(false);
+        expect(lot.value).toBe('REAL-1');
+        expect(lot.matches(':disabled')).toBe(false);
+        const date = group.getByLabelText('Caducidad de Producto por cantidad');
+        expect(group.getByText('Opcional, incluso sin lote.')).toBeTruthy();
+        fireEvent.change(lot, { target: { value: '' } });
+        expect(onItemChange).toHaveBeenCalledWith(
+          'purchase-item-1',
+          'lotNumber',
+          '',
+        );
+        expect(date.matches(':disabled')).toBe(false);
+      }
+    },
+  );
+  it.each(['ASSET', 'SERIALIZED'] as const)(
+    'conserva REQUIRED para %s en PHYSICAL',
+    (inventoryTracking) => {
+      show({
+        items: [
+          createReceiptItem({ inventoryTracking, lotTracking: 'REQUIRED' }),
+        ],
+      });
+      for (const layout of ['desktop', 'mobile']) {
+        const group = within(
+          screen.getByTestId('receipt-' + layout + '-items'),
+        );
+        expect(
+          (
+            group.getByLabelText(
+              'Lote de Producto por cantidad',
+            ) as HTMLInputElement
+          ).required,
+        ).toBe(true);
+        expect(group.getByText('Requiere número de lote.')).toBeTruthy();
+      }
+    },
+  );
+  it('mantiene campos y envío bloqueados durante carga o CUTOVER, con reintento explícito', async () => {
+    const user = userEvent.setup();
+    const props = show({
+      receiptAuthority: null,
+      receiptAuthorityError: 'CUTOVER_FROZEN',
+    });
+    expect(screen.getByRole('alert').querySelector('p')?.textContent).toBe(
+      'No es posible registrar recepciones mientras se realiza la transición del inventario. Contacta al administrador.',
+    );
+    expect(screen.queryByText('CUTOVER_FROZEN')).toBeNull();
+    expect(props.receiptAuthorityError).toBe('CUTOVER_FROZEN');
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Registrar recepción',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    for (const input of screen.getAllByRole('spinbutton'))
+      expect(input.matches(':disabled')).toBe(true);
+    await user.click(
+      screen.getByRole('button', { name: 'Reintentar verificación' }),
+    );
+    expect(props.onRetryAuthority).toHaveBeenCalledOnce();
+    expect(props.onSubmit).not.toHaveBeenCalled();
   });
 });

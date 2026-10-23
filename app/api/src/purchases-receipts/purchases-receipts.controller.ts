@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Headers,
+  Header,
   Param,
   Post,
   Req,
@@ -45,6 +46,14 @@ export class PurchaseReceiptsController {
   @Get()
   findAll(@Req() request: AuthenticatedRequest) {
     return this.purchaseReceiptsService.findAll(request.user.companyId);
+  }
+
+  @Get('capabilities')
+  @Header('Cache-Control', 'no-store')
+  getCapabilities(@Req() request: AuthenticatedRequest) {
+    return this.purchaseReceiptsService.getReceiptCapabilities(
+      request.user.companyId,
+    );
   }
 
   @Get('purchase/:purchaseId')

@@ -457,6 +457,9 @@ const {
   //propiedades de recepcion
 const {
   purchaseToReceive,
+  receiptAuthority,
+  receiptAuthorityError,
+  retryReceiptAuthority,
   receiptFormItems,
   receiptNotes,
   supplierDocumentType,
@@ -1179,6 +1182,9 @@ async function loadPageData() {
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}
+        receiptAuthority={receiptAuthority}
+        receiptAuthorityError={receiptAuthorityError}
+        onRetryAuthority={retryReceiptAuthority}
         items={receiptFormItems}
         notes={receiptNotes}
         supplierDocumentType={supplierDocumentType}
