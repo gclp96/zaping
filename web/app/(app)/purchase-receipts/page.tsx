@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Eye } from 'lucide-react';
+import { Eye, RotateCcw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
@@ -9,12 +9,12 @@ import { hasRole, WAREHOUSE_ROLES } from '@/app/erp-role-access';
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import Button from '@/app/components/ui/Button';
 import DataTable, {
-  DataTableToolbar,
   type DataTableColumn,
   type SortState,
 } from '@/app/components/ui/DataTable';
 import EmptyState from '@/app/components/ui/EmptyState';
 import Loading from '@/app/components/ui/Loading';
+import Input from '@/app/components/ui/Input';
 import PageContainer from '@/app/components/ui/layout/PageContainer';
 import PageHeader from '@/app/components/ui/layout/PageHeader';
 import Section from '@/app/components/ui/layout/Section';
@@ -168,11 +168,14 @@ export default function PurchaseReceiptsPage() {
       header: 'Folio',
       sortable: true,
       priority: 'primary',
-      minWidth: 150,
+      minWidth: 130,
       cell: (receipt) => (
-        <span className="font-semibold text-gray-900">
+        <Link
+          href={`/purchase-receipts/${receipt.id}`}
+          className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+        >
           {receipt.folio}
-        </span>
+        </Link>
       ),
     },
     {
@@ -180,61 +183,77 @@ export default function PurchaseReceiptsPage() {
       header: 'Compra',
       sortable: true,
       priority: 'primary',
-      minWidth: 150,
-      cell: (receipt) => receipt.purchase.folio,
+      minWidth: 120,
+      cell: (receipt) => (
+        <span className="font-medium text-text-secondary">
+          {receipt.purchase.folio}
+        </span>
+      ),
     },
     {
       id: 'supplier',
       header: 'Proveedor',
       sortable: true,
       priority: 'primary',
-      minWidth: 190,
-      cell: (receipt) => receipt.purchase.supplier.name,
+      minWidth: 150,
+      cell: (receipt) => (
+        <span className="block max-w-56 break-words font-medium text-text">
+          {receipt.purchase.supplier.name}
+        </span>
+      ),
     },
     {
       id: 'receivedAt',
       header: 'Fecha de recepción',
       sortable: true,
       priority: 'secondary',
-      minWidth: 170,
+      minWidth: 160,
       cell: (receipt) => formatReceiptDate(receipt.receivedAt),
     },
     {
       id: 'responsible',
       header: 'Responsable',
       priority: 'secondary',
-      minWidth: 170,
+      minWidth: 140,
       cell: (receipt) =>
         getReceiptResponsibleLabel(receipt.receivedByUser),
     },
     {
       id: 'items',
       header: 'Partidas',
+      align: 'end',
       priority: 'tertiary',
-      minWidth: 100,
-      cell: (receipt) => receipt.items.length,
+      minWidth: 85,
+      cell: (receipt) => (
+        <span className="tabular-nums">{receipt.items.length}</span>
+      ),
     },
     {
       id: 'units',
       header: 'Unidades',
+      align: 'end',
       priority: 'tertiary',
-      minWidth: 105,
-      cell: (receipt) =>
-        receipt.items.reduce(
-          (total, item) => total + item.quantityReceived,
-          0,
-        ),
+      minWidth: 90,
+      cell: (receipt) => (
+        <span className="font-semibold tabular-nums">
+          {receipt.items.reduce(
+            (total, item) => total + item.quantityReceived,
+            0,
+          )}
+        </span>
+      ),
     },
     {
       id: 'actions',
       header: 'Acciones',
+      align: 'end',
       priority: 'primary',
-      minWidth: 110,
+      minWidth: 100,
       cell: (receipt) => (
         <Link
           href={`/purchase-receipts/${receipt.id}`}
           aria-label={`Ver recepción ${receipt.folio}`}
-          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
         >
           <Eye aria-hidden="true" size={16} />
           Ver
@@ -245,10 +264,12 @@ export default function PurchaseReceiptsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Recepciones"
-        description="Consulta las entradas de mercancía y su trazabilidad operativa."
-      />
+      <div className="rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0">
+        <PageHeader
+          title="Recepciones"
+          description="Consulta las entradas de mercancía y su trazabilidad operativa."
+        />
+      </div>
 
       {forbidden || sessionForbidsAccess ? (
         <ForbiddenState />
@@ -281,6 +302,9 @@ export default function PurchaseReceiptsPage() {
           title="Historial de recepciones"
           description="Recepciones registradas para las compras de la compañía."
         >
+          <p className="text-sm text-text-muted sm:hidden">
+            Desliza la tabla para consultar todos los datos y acciones.
+          </p>
           <DataTable
             caption="Listado de recepciones"
             rows={paginatedReceipts}
@@ -291,20 +315,29 @@ export default function PurchaseReceiptsPage() {
               onChange: setSorting,
             }}
             toolbar={
-              <DataTableToolbar
-                search={{
-                  value: search,
-                  label: 'Buscar recepciones',
-                  placeholder:
-                    'Folio, compra, proveedor, responsable o producto',
-                  onChange: (value) => {
-                    setSearch(value);
+              <div role="group" aria-label="Controles de tabla" className="space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5">
+                <Input
+                  label="Buscar recepciones"
+                  type="search"
+                  value={search}
+                  placeholder="Folio de recepción, OC o proveedor"
+                  helperText="También puedes buscar por responsable, producto o SKU."
+                  startAdornment={<Search aria-hidden="true" size={17} />}
+                  onChange={(event) => {
+                    setSearch(event.target.value);
                     setPageIndex(0);
-                  },
-                }}
-                onReset={clearFilters}
-                resetDisabled={!Boolean(search.trim())}
-              />
+                  }}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                  <p role="status" className="text-sm text-text-muted">
+                    {filteredReceipts.length} de {receipts.length} recepciones
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={clearFilters} disabled={!Boolean(search.trim())}>
+                    <RotateCcw aria-hidden="true" size={16} />
+                    Limpiar filtros
+                  </Button>
+                </div>
+              </div>
             }
             pagination={{
               pageIndex,

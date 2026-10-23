@@ -25,6 +25,11 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+const sessionMock = vi.hoisted(() => vi.fn());
+vi.mock('@/app/auth-session', () => ({
+  useAuthenticatedSession: sessionMock,
+}));
+
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
@@ -177,6 +182,7 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 describe('PurchaseReceiptsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sessionMock.mockReturnValue({ status: 'success', user: { role: 'ADMIN' } });
     vi.mocked(api.get).mockResolvedValue({
       data: [primaryReceipt, secondaryReceipt],
     } as never);
@@ -263,6 +269,50 @@ describe('PurchaseReceiptsPage', () => {
     );
   });
 
+  it('presenta contador filtrado, limpieza y enlaces canónicos sin crear acciones nuevas', async () => {
+    const user = userEvent.setup();
+    render(<PurchaseReceiptsPage />);
+    const folio = await screen.findByRole('link', { name: primaryReceipt.folio });
+    expect(folio.getAttribute('href')).toBe('/purchase-receipts/receipt-alpha');
+    expect(screen.getByRole('heading', { name: 'Recepciones', level: 1 })).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('2 de 2 recepciones');
+    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
+    folio.focus();
+    expect(document.activeElement).toBe(folio);
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar recepciones' }), 'ALPHA');
+    expect(screen.getByRole('status').textContent).toBe('1 de 2 recepciones');
+    await user.clear(screen.getByRole('searchbox', { name: 'Buscar recepciones' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar recepciones' }), 'sin coincidencia');
+    expect(screen.getByRole('status').textContent).toBe('0 de 2 recepciones');
+    expect(screen.queryByRole('table')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByRole('status').textContent).toBe('2 de 2 recepciones');
+  });
+
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'])('mantiene consulta para %s', async (role) => {
+    sessionMock.mockReturnValue({ status: 'success', user: { role } });
+    render(<PurchaseReceiptsPage />);
+    expect(await screen.findByRole('link', { name: primaryReceipt.folio })).toBeTruthy();
+    expect(api.get).toHaveBeenCalledWith('/purchase-receipts');
+  });
+
+  it('bloquea SALES sin consultar recepciones', () => {
+    sessionMock.mockReturnValue({ status: 'success', user: { role: 'SALES' } });
+    render(<PurchaseReceiptsPage />);
+    expect(api.get).not.toHaveBeenCalled();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+
+  it('oculta datos y contador ante forbidden de la API', async () => {
+    vi.mocked(api.get).mockRejectedValue({ response: { status: 403 } });
+    render(<PurchaseReceiptsPage />);
+    await screen.findByRole('heading', { name: 'Sin permisos' });
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
   it('ordena por folio y fecha usando valores reales sin mutar la respuesta', async () => {
     const user = userEvent.setup();
     const receipts = [
@@ -340,6 +390,7 @@ describe('PurchaseReceiptsPage', () => {
     await screen.findByText('REC-0001');
 
     expect(screen.getByText('Mostrando 1-25 de 30')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('30 de 30 recepciones');
     expect(screen.queryByText('REC-0026')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Página siguiente' }));
@@ -357,6 +408,7 @@ describe('PurchaseReceiptsPage', () => {
       'REC-0030',
     );
     expect(screen.getByText('Mostrando 1-1 de 1')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe('1 de 30 recepciones');
     expect(screen.getByText('REC-0030')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
@@ -418,6 +470,8 @@ describe('PurchaseReceiptsPage', () => {
     expect(
       await screen.findByText('Recepciones temporalmente inaccesibles'),
     ).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Reintentar' }));
 
@@ -437,6 +491,8 @@ describe('PurchaseReceiptsPage', () => {
     render(<PurchaseReceiptsPage />);
 
     expect(screen.getByText('Cargando recepciones...')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('muestra un estado vacío útil cuando no existen recepciones', async () => {
