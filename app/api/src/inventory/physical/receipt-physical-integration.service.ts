@@ -109,10 +109,11 @@ export class ReceiptPhysicalIntegrationService {
           : null;
         requirePhysical(
           !expirationDate ||
-            (lotNumber &&
-              Number.isFinite(expirationDate.getTime()) &&
-              expirationDate.toISOString().slice(0, 10) >=
-                now.toISOString().slice(0, 10)),
+            (Number.isFinite(expirationDate.getTime()) &&
+              (item.product.inventoryTracking === 'QUANTITY' ||
+                (lotNumber &&
+                  expirationDate.toISOString().slice(0, 10) >=
+                    now.toISOString().slice(0, 10)))),
         );
         return {
           item,
@@ -143,10 +144,12 @@ export class ReceiptPhysicalIntegrationService {
     for (const i of inputs) {
       const p = products.find((p) => p.id === i.item.productId)!;
       requirePhysical(p.inventoryTracking === i.item.product.inventoryTracking);
-      requirePhysical(
-        p.lotTracking !== 'NONE' || (!i.lotNumber && !i.expirationDate),
-      );
-      requirePhysical(p.lotTracking !== 'REQUIRED' || i.lotNumber);
+      if (p.inventoryTracking !== 'QUANTITY') {
+        requirePhysical(
+          p.lotTracking !== 'NONE' || (!i.lotNumber && !i.expirationDate),
+        );
+        requirePhysical(p.lotTracking !== 'REQUIRED' || i.lotNumber);
+      }
     }
     const batchKeys = inputs
       .filter((i) => i.lotNumber)
@@ -250,29 +253,19 @@ export class ReceiptPhysicalIntegrationService {
         products.find((p) => p.id === i.productId)!.inventoryTracking ===
         'QUANTITY',
     );
+    // Bind the durable claim before issuing the specialized credit. This remains
+    // invisible to other transactions until receipt, Effect and audit all commit.
+    await tx.idempotencyRecord.update({
+      where: { id: claim.id },
+      data: { resourceId: receipt.id },
+    });
     if (quantityItems.length) {
-      const result = await this.physical.creditAvailable(
-        tx,
-        {
-          companyId,
-          actorId,
-          origin: {
-            type: 'PURCHASE_RECEIPT',
-            id: receipt.id,
-            operation: 'RECEIVE_QUANTITY',
-          },
-        },
-        quantityItems.map((i) => ({
-          target: {
-            productId: i.productId,
-            inventoryBatchId: i.batchId,
-            state: 'AVAILABLE',
-            contextType: null,
-            contextId: null,
-          },
-          quantity: i.quantityReceived,
-        })),
-      );
+      const result = await this.physical.creditPurchaseReceipt(tx, {
+        companyId,
+        actorId,
+        receiptId: receipt.id,
+        idempotencyKey: key,
+      });
       requirePhysical(!result.replay);
       await this.projections.apply(tx, companyId, result);
       await this.history.write(tx, result, quantityItems);
@@ -326,10 +319,6 @@ export class ReceiptPhysicalIntegrationService {
     await tx.purchase.update({
       where: { id: purchase.id },
       data: { status: full ? 'RECEIVED' : 'PARTIALLY_RECEIVED' },
-    });
-    await tx.idempotencyRecord.update({
-      where: { id: claim.id },
-      data: { resourceId: receipt.id },
     });
     return { ...receipt, items: receiptItems };
   }

@@ -75,6 +75,8 @@ export class SalesPhysicalSourceResolver {
         productId: { in: ids },
         state: 'AVAILABLE',
         inventoryBatchId: null,
+        // A+B: preserve historical NULL-only sales beside new receipt pools.
+        expirationDate: null,
       },
     });
     // Candidate C has no eligible batches. No batch is selected even for a shortfall.
@@ -97,6 +99,7 @@ export class SalesPhysicalSourceResolver {
           pool.companyId === companyId &&
             pool.state === 'AVAILABLE' &&
             pool.inventoryBatchId === null &&
+            pool.expirationDate === null &&
             pool.contextType === null &&
             pool.contextId === null,
           'SALE_PHYSICAL_SOURCE_INVALID',

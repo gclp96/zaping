@@ -1,0 +1,16 @@
+{
+  "extends": "../tsconfig.spec.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "incremental": false
+  },
+  "include": [
+    "../src/inventory/physical/**/*.ts",
+    "../src/purchases-receipts/**/*.ts",
+    "../src/purchases/**/*.ts",
+    "../src/healthcare/case-dispatches/healthcare-case-dispatch-confirm.spec.ts",
+    "../src/healthcare/case-reconciliations/healthcare-case-reconciliation-confirm.spec.ts",
+    "./inventory-position-expiry-migration.postgres.e2e-spec.ts",
+    "./purchase-receipt-supplier-document.postgres.e2e-spec.ts"
+  ]
+}

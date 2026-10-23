@@ -1,0 +1,194 @@
+# ADR-015 — Identidad física de existencias sin lote con caducidad
+
+**Estado de decisión:** ACCEPTED (OX-PUR-05B; issues #115 y #116)
+**Estado de implementación:** extracción A+B en revisión local; Foundation S1/S2/S3a/S3b-R y recepción W1 incluidas. Sin planificación S3b-S, Ventas W2a ni Healthcare W2b. QA-AB-01 local y PostgreSQL 16 efímero PASS; CI remoto del futuro PR pendiente. No V1 completa ni autorización de merge.
+**Fecha:** 2026-10-22
+**Área:** Zaping ERP / Compras, Recepciones e Inventory Physical
+**PR base:** #114 integrado en `main`
+
+## 1. Problema comprobado (baseline previo a S1)
+
+En INSAP se recibe material válido sin que el proveedor informe lote, número de serie o caducidad. No debemos fabricar estos datos ni impedir una recepción válida sólo porque falten.
+
+Actualmente `ProductLotTracking.REQUIRED` bloquea las entradas sin lote en el writer PHYSICAL y `PhysicalInventoryService.validateKey` exige un Batch también en movimientos posteriores. `SalesPhysicalSourceResolver` rechaza ventas de REQUIRED antes de resolver existencias.
+
+La identidad de `InventoryPosition` y los índices UNIQUE actuales sólo permiten un pool AVAILABLE sin lote por Company/Product; cuando dos recepciones sin lote tienen fechas de caducidad distintas, sumar ambas cantidades hace imposible conocer cuántas unidades de cada fecha se conservan después de una salida parcial.
+
+Guardar la fecha sólo en `PurchaseReceiptItem` NO soluciona la disponibilidad física ni la trazabilidad de consumos.
+
+## 2. Decisión
+
+Ampliar **`InventoryPosition`**, no crear un subledger independiente en esta etapa:
+
+- Para QUANTITY sin lote de fabricante, `inventoryBatchId = NULL`. La identidad se discrimina adicionalmente por **caducidad opcional** (día calendario), separando fecha desconocida (`NULL`) de cada fecha conocida. `NULL` significa _dato desconocido_, no _no caduca_.
+- Para existencias con lote real, `inventoryBatchId` apunta a `InventoryBatch`; su caducidad se conserva en ese Batch. La nueva fecha de Position queda `NULL` para evitar dos fuentes de verdad.
+- El número de lote de fabricante nunca se sintetiza a partir de recepción, fecha u otro dato interno.
+- Preservar permanentemente el ID y los efectos históricos de posiciones anteriores; sus caducidades no informadas se representarán como `NULL` sin reescribir evidencias.
+- `ProductLotTracking` permanece como metadato de configuración; la política opcional de ingreso OX-PUR-05B se aplica explícitamente en la recepción autorizada, no mediante cambio masivo a `NONE`.
+
+## 3. Contrato de fechas
+
+- Persistir fecha calendario como `DATE` PostgreSQL (Prisma `DateTime? @db.Date` si compatible con el esquema existente), sin tratar el día de caducidad como timestamp UTC de expiración.
+- Elegibilidad evaluada respecto al **día local de la Company**, a través de su zona horaria configurada, no el huso horario del servidor.
+- Una unidad con caducidad `D` conserva elegibilidad durante el día local `D`; a partir del día local siguiente NO puede seleccionarse para ventas ni nuevas entregas ordinarias.
+- Un material con fecha de caducidad conocida **anterior al día de recepción** no ingresa al pool comercial disponible. El contrato de mercancía rechazada/aislada se resolverá en su ticket propio.
+- Fecha desconocida permanece distinguible de fecha futura y fecha vencida; un producto sin fecha no debe ser marcado como vencido automáticamente.
+
+## 4. Identidad, persistencia y migración
+
+Implementar mediante una migración **nueva, aditiva y explícita** (no editar migraciones ya aplicadas):
+
+1. Agregar campo nullable de caducidad a `InventoryPosition`.
+2. Establecer CHECK de fuente única: Position con `inventoryBatchId IS NOT NULL` no repite caducidad; posición sin Batch puede conservarla.
+3. Sustituir sólo los índices UNIQUE parciales de posiciones **sin Batch** (AVAILABLE y CUSTODY) por claves que incluyen caducidad; preservar unicidad de `NULL` con índices `NULLS NOT DISTINCT` PostgreSQL 16 o una estrategia equivalente **probada**. No cambiar los índices para posiciones con Batch.
+4. Conservar cantidades, revisiones, relaciones, contextos, IDs y efectos existentes. No eliminar ni fusionar posiciones históricas.
+5. Validar ejecución en PostgreSQL efímero con migraciones históricas, constraints y rollback de cambios transaccionales. No ejecutar contra bases locales o productivas.
+
+Los detalles exactos de DDL e índices quedan sujetos a revisión del diff antes de aplicar.
+
+## 5. Contrato del motor Physical
+
+- Actualizar `PositionKey`, normalización, identidad y búsqueda/lock de posiciones para distinguir fechas, incluyendo `NULL` explícito en predicados de posiciones sin lote. Un filtro sin fecha NO debe coincidir accidentalmente con todas las posiciones del mismo producto.
+- Mantener compatibilidad de la serialización de solicitudes anteriores **sin caducidad** y su `physicalRequestHash`: no invalidar replays o evidencias históricas por añadir un campo nulo nuevo. Cualquier cambio de esquema del hash requiere versionado o canonización retrocompatible y pruebas de replay.
+- Validar caducidad tanto al seleccionar la fuente como bajo el lock del movimiento, para evitar que un pool vencido se consuma por una condición de carrera.
+- Transferencia/custodia debe preservar exactamente la dimensión de caducidad. No se pueden mezclar dos fechas diferentes dentro de la misma posición de destino.
+- Mantener `owned` incluyendo vencidos; computar `available/usable` excluyendo material vencido. No confundir saldo físico con vendible.
+- Nunca permitir que una excepción destinada a recepciones abra créditos físicos arbitrarios. Conservar el origen `PURCHASE_RECEIPT`, tenant, actor, permisos, idempotencia, CAS revision, atomicidad y evidencia de efecto.
+- Mantener una vía auditada para gestionar material vencido/no conforme sin habilitar su consumo comercial; no inferir que un `DEFINITIVE_OUT` ordinario de material vencido ya está permitido.
+
+## 6. Consumidores que deben examinarse y regresiones
+
+- `ReceiptPhysicalIntegrationService` + `PurchaseReceiptsService` (LEGACY/PHYSICAL y documento del proveedor del PR #114).
+- `PhysicalInventoryService`, `PhysicalInventoryRepository`, `physical-inventory.contract`, proyecciones y read service.
+- `SalesPhysicalSourceResolver` y flujos genéricos: múltiples pools sin lote, fechas diferentes y selección determinista de fuentes elegibles; lotes conocidos no se deben consumir silenciosamente.
+- Inventario manual; opening/cutover; healthcare dispatch, custody, reconciliation y correction.
+- SERIALIZED/ASSET: sin regresión; no equiparar lote opcional con obligatoriedad de serie individual.
+
+## 7. Casos mínimos de aceptación / QA
+
+- Mismo Product con (sin lote/sin fecha), (sin lote/fecha A), (sin lote/fecha B), (lote real/fecha C): cuatro saldos/identidades independientes.
+- Dos ingresos de la misma identidad reutilizan posición; fechas distintas no colisionan; reintentos no duplican stock, movimiento ni efecto.
+- Movimientos parciales y transferencias preservan las fechas; no mezclan cantidades.
+- Venta/consumo de `REQUIRED` sin lote es posible sólo para pools sin lote **elegibles**; cuando existan varios se define orden determinista de asignación (FEFO para conocidos no vencidos, desconocidos en último lugar) con evidencia por `sourceId`; lotes reales siguen bajo selección autorizada.
+- A partir del día posterior a D, pool vencido sigue en `owned` pero se excluye de `available/usable` y operaciones comerciales.
+- CONTROLES: saldo insuficiente, revision stale, concurrencia, rollback, tenant cruzado, replay hash histórico, lecturas, cutover/opening/healthcare y migración histórica.
+- API test, PostgreSQL E2E en CI efímera, typecheck, lint, build y smoke de regresión del documento de proveedor.
+
+## 8. Scope y gates
+
+**Primero:** contrato/migración + motor e índices con QA específico. **Después:** integración de receipt y consumidores, seguida por Web (issue #115).
+
+No tocar `main`, `.env`, credenciales, DB local `zaping_dev`, `zaping_qa`, `zaping_spike_test` o producción. No realizar merge automático.
+
+**STOP obligatorio** sólo ante inconsistencia nueva: necesidad de reescribir evidencia histórica, imposibilidad de garantizar no mezcla de fechas o control bajo lock, o incompatibilidad no resuelta con opening/cutover/healthcare.
+
+## 9. Consecuencias
+
+**Beneficio:** entradas rápidas sin lote ficticio y control real de vencimiento por unidad de inventario agregada.
+
+**Costo:** migración de identidad física y ajuste de contratos compartidos, índices, lecturas, selección de fuentes, pruebas y compatibilidad histórica.
+
+**No incluido:** multialmacén, remisiones de venta, captura de múltiples lotes en una misma partida, control completo de rechazos ni anexos posteriores de factura (#118).
+
+## 10. Estado por fase y contrato entregado en S2
+
+- **S1:** columna `InventoryPosition.expirationDate DATE NULL`, CHECK de fuente única e índices sin lote implementados en `20261023000001_inventory_position_unbatched_expiry`. CI API/Web SUCCESS sobre `4e6da4a223f2f76f6164868fa4a7950cda84cbc3` ([run #410](https://github.com/gclp96/zaping/actions/runs/39895257442)). No se aplicaron migraciones a bases locales.
+- **S2:** `PositionKey.expirationDate?: string | null` acepta exclusivamente día calendario válido `YYYY-MM-DD`; rechaza timestamps, offsets, fechas imposibles y fecha de Position junto con Batch real. Una fecha conocida participa en identidad, agrupación y hash; fecha omitida o `null` conserva exactamente la serialización anterior, sin insertar campos nulos en el hash versión 1. Los hashes de las cuatro operaciones históricas se fijaron antes del cambio como constantes de regresión.
+- Repository convierte el día a `DATE` mediante una representación a medianoche UTC exclusivamente para Prisma; esto **no determina elegibilidad ni convierte la caducidad en un instante de vencimiento**. Búsquedas de destino y creación expresan fecha exacta o `NULL` explícito. Fuentes por ID conservan su identidad, y el motor incorpora la fecha persistida al construir sus claves bajo lock.
+- **Gate operativo cerrado:** CREDIT, TRANSFER, DEFINITIVE_OUT y COUNT_CORRECTION sobre posiciones con fecha conocida se rechazan antes del claim y de cualquier mutación. Transferencia exige igualdad de la dimensión de caducidad. La clasificación histórica de un Effect ya confirmado permanece anterior a la lectura del estado físico actual. No se habilitan recepción ni consumidores de pools con fecha conocida en esta fase.
+- **QA S2:** pruebas unitarias focales y de regresión de motor, adapter de corrección, opening, ventas y recepción; TypeScript productivo y focal de tests; ESLint, Prettier y build API. La suite PostgreSQL de S1 se amplía con 10 casos S2: identidad AVAILABLE/CUSTODY NULL/A/B, crédito/replay histórico y revision stale, cuatro rechazos atómicos, dos verificaciones de locks con clientes/PIDs independientes y crédito concurrente con un único Effect. Se ejecuta exclusivamente sobre el servicio PostgreSQL efímero de CI; no admite ejecución local por su gate de entorno. Consultar los checks del commit S2 en [PR #119](https://github.com/gclp96/zaping/pull/119) para su resultado; preparación de pruebas no equivale a PostgreSQL PASS.
+- **S3–S4 pendientes:** elegibilidad validada bajo lock respecto al día local de Company, conservación de fecha en consumidores, recepción autorizada sin lote, selección/FEFO, read models `owned` frente a `usable`, integración y QA completa. No se cambia la obligatoriedad de Batch de los writers actuales, ni se activa la política de ingreso opcional. El PR permanece DRAFT y no se declara el ADR completamente implementado.
+
+## 11. S3a — Política temporal bajo los locks existentes
+
+**Base verificada:** S2 `95940cd5842ae23537701998942a9fe072865519`, [CI #412 SUCCESS](https://github.com/gclp96/zaping/actions/runs/39897028170), incluida la suite PostgreSQL de identidad 14/14 PASS. El estado de pendientes de la sección 10 refleja el cierre de S2; esta sección registra el incremento S3a.
+
+- `physical-expiration-policy` separa decodificación del día persistido, día local de Company y clasificación `UNKNOWN` / `NOT_EXPIRED` / `EXPIRED`. Fecha D permanece no vencida durante todo D en la zona de Company, incluido el cambio de horario; sólo D anterior al día local se considera vencido. No se transforma D en un instante UTC de vencimiento.
+- `InventoryPosition.expirationDate @db.Date` se decodifica como `YYYY-MM-DD`. Para `InventoryBatch.expirationDate` histórico, que permanece `DateTime?`, se conserva su componente calendario UTC almacenado como día informado; no se desplaza ese día a la zona de Company ni se reescribe el dato. Su elegibilidad se compara contra el día local, sustituyendo el corte anterior por instante `expirationDate > now`. No se modifica schema ni migración.
+- El motor conserva Product → Batch → Position. Tras adquirir esos locks obtiene `Company.timezone` mediante lectura por `request.companyId` y captura el instante de evaluación. No añade un lock de Company, no cambia el orden transaccional y no usa zona/hora recibidas del solicitante. La configuración se lee una vez para la decisión del comando; no se congela para otras transacciones. Si no interviene ninguna caducidad conocida, conserva el flujo histórico sin requerir una consulta temporal.
+- La fecha de fuente procede de la Position bloqueada; la de lote procede del Batch bloqueado. Se valida antes de claim, CAS y líneas de Effect. Caducidad conocida vencida o configuración temporal inválida rechaza la operación; tampoco se infiere una excepción para salidas ordinarias de CUSTODY con Batch vencido. Una eventual vía auditada de material vencido continúa fuera de este incremento.
+- **Gate S2 conservado:** incluso una Position con día conocido no vencido sigue rechazada hasta autorización S3b. No se habilitan recepción sin lote, selector de Ventas, read models ni rutas públicas. Los Batch existentes sí utilizan la política temporal local en el motor; los consumidores y read models restantes requieren alineación posterior y no se declaran migrados por S3a.
+- Replay de evidencia histórica confirmada se clasifica antes de releer fecha/configuración actuales y no repite efectos. Zona, instante de evaluación y estado actual de caducidad no se incorporan a la intención ni a los hashes de idempotencia; las regresiones de hashes S2 se conservan.
+- **QA S3a:** unitarias de medianoche, zonas distintas, DST, D inclusivo, NULL, configuración inválida, espera por lock que cruza medianoche y origen persistido de zona. Siete casos PostgreSQL adicionales en el servicio efímero de CI: D local en dos zonas y replay tras vencimiento, NULL, rechazo atómico de vencido, rollback real tras insertar líneas de Effect y dos esperas verificadas con clientes/PIDs independientes (Batch vence o cambia configuración antes de adquirir el lock). No se simula una medianoche real de PostgreSQL mediante hooks o reloj productivo; ese límite lo cubren las unitarias controlando exclusivamente el reloj del test. Resultado del commit S3a: consultar checks de [PR #119](https://github.com/gclp96/zaping/pull/119).
+
+**Pendiente:** autorización de writers S3b, integración de recepción/consumidores, FEFO, read models y QA S4. El ADR continúa IN PROGRESS y el PR DRAFT, sin merge ni activación operativa de posiciones fechadas.
+
+## 12. S3b-R — Lecturas consistentes por día local de Company
+
+**Base verificada:** S3a `855f9908595d0c0e5ef345849e05374c0315af6d`, [CI #414 SUCCESS](https://github.com/gclp96/zaping/actions/runs/39908490562), PostgreSQL 21/21 PASS. Los pendientes de la sección 11 describen su cierre histórico; S3b-R completa sólo la alineación de `PhysicalInventoryReadService`.
+
+- Se mantiene una única sentencia SQL para existencia de Product, pertenencia de Batch, Company, posiciones y agregados. `Company.timezone` procede del JOIN por Company del Product; no hay parámetro de zona o instante controlado por el solicitante ni lectura separada que mezcle snapshots.
+- `owned` suma todas las posiciones físicas, incluidas vencidas, inactivas y CUSTODY. `inCustody` conserva todo el saldo CUSTODY, sin filtrarlo por caducidad. No se toma `Product.stock` como fallback ni se cambian autoridad, límites numéricos, `hasPositions` o errores de identidad existentes.
+- `available` incluye sólo AVAILABLE con Product activo y, cuando hay Batch real, Batch activo. Para posiciones sin lote compara `InventoryPosition.expirationDate DATE` contra el día local; para Batch compara `expirationDate::date`, conservando el componente calendario almacenado de su `TIMESTAMP(3)` histórico sin zona. No se convierte la fecha de Batch a otro huso. `NULL` permanece desconocida y D conserva elegibilidad durante todo D local; D anterior se excluye únicamente de `available`.
+- El día de evaluación es `(statement_timestamp() AT TIME ZONE Company.timezone)::date`: un único instante estable para todas las filas de esa sentencia y renovado para cada lectura. No se usa `CURRENT_DATE`, `now()` ni `transaction_timestamp()` como corte, porque quedan anclados al inicio de una transacción anterior; tampoco se usa un reloj volátil por fila. Cambiar el timezone de sesión no sustituye el de Company. Un error al interpretar configuración temporal no se transforma en stock cero o disponibilidad exitosa.
+- La consulta por lote conserva la pertenencia Company/Product y usa exactamente la misma regla temporal que la consulta por Product. Un lote sin posiciones devuelve ceros explícitos; lote extranjero o incoherente conserva su rechazo.
+- **QA S3b-R:** unitarias de SQL generado, predicados, reloj de sentencia, parámetros, mapeo, límites y errores; regresiones de la política S3a y hashes/gate S2. Ocho casos PostgreSQL adicionales cubren múltiples fechas sin lote, D−1/D/D+1 y NULL, lotes reales, Product/Batch inactivos, `owned`/`available`/`inCustody`, producto vacío, aislamiento por Company, coherencia por lote y timezone de sesión. Se usan zonas UTC−11/UTC+14 y días relativos para detectar un corte UTC incorrecto a cualquier hora. Una observación test-only delega en SQL real y verifica reloj de sentencia posterior al de transacción dentro de una transacción ya iniciada; no simula un cruce de medianoche real ni introduce hooks productivos. Ejecución PostgreSQL exclusivamente en CI efímero; resultado del commit: checks de [PR #119](https://github.com/gclp96/zaping/pull/119).
+
+**Límites conservados:** gate S2 cerrado para créditos/salidas/movimientos de posiciones fechadas, incluso si la lectura las considera temporalmente disponibles. Lectura elegible no autoriza mutación. No se modifican Recepciones, Ventas, FEFO, writers, hashes, locks, schema o migraciones. Writers S3b, integración de consumidores y QA S4 continúan pendientes; ADR IN PROGRESS y PR DRAFT, sin merge.
+
+## 13. Extracción A+B — alcance vigente de esta rama
+
+Base: `main@226f5af0dad9d27e0a19d080ff7b2b27c952122a`. Referencia de origen: `220ddef6d66767a02f4f646ade32f2c5c78f28b5` de PR #119. Se recuperan por archivo las dependencias Foundation hasta `a0050b9` y W1 de `1685688`; no se incorporan commits completos. El test PostgreSQL de identidad/lecturas se toma antes del planificador y el de recepción antes de W2a. No se modifica la rama de origen ni su ADR local §§15–18.
+
+Las evidencias CI citadas en las secciones anteriores son históricas del PR origen; no certifican esta extracción. La suite y los gates de la rama resultante deben validarse separadamente. El workflow mantiene exclusivamente el servicio PostgreSQL 16 efímero y sus gates de identidad y recepción; no se ejecutan migraciones ni conexiones locales.
+
+### Límites funcionales y autoridad
+
+- W1 autoriza únicamente el crédito QUANTITY reconstruido desde evidencia durable de la recepción PHYSICAL, incluida la omisión de lote para NONE/OPTIONAL/REQUIRED. LEGACY y ASSET/SERIALIZED conservan sus reglas. No se activa cutover ni se presupone que una Company real tenga autoridad PHYSICAL.
+- Se excluyen el planificador FEFO S3b-S, la autorización de consumo W2a y sus pruebas. Ventas conserva su resolver histórico, con una dependencia mínima de aislamiento: descubrimiento explícito `expirationDate: null` y revalidación NULL de la Position bloqueada, para que los pools W1 fechados no rompan ventas históricas del pool NULL. No incorpora planificación, reparto ni consumo de fechas; créditos genéricos, consumos, conteos y transferencias de Positions fechadas permanecen bloqueados. Healthcare no recibe adapters ni testigos SQL nuevos.
+- REQUIRED sin lote sigue bloqueado fuera de la recepción autorizada (#120). Material vencido durante CUSTODY permanece registrado sin retorno/consumo ordinario automático (#121). Healthcare fechado y coexistencia SQL v1/v2 continúan bloqueados (#122); no son dependencias del crédito de recepción.
+- La UI OX-PUR-05 continúa pendiente y no se cambia en este incremento. No se declara cerrado #115, #116 ni Compras/Recepciones V1.
+
+### Disponibilidad física frente a disponibilidad utilizable — propuesta, no cambio público
+
+`owned` conserva todo el saldo físico; `inCustody` conserva CUSTODY; `available` conserva el agregado físico AVAILABLE de Product/Batch activos y temporalmente elegibles. Este agregado no demuestra procedencia elegible ni autorización de un consumidor. Puede incluir REQUIRED sin lote, Positions fechadas o lotes reales que el selector automático histórico de Ventas no admite. No se renombra ni filtra `available` para ocultar esa diferencia.
+
+Contrato mínimo propuesto para un incremento separado: representar utilizabilidad por operación y autoridad, como resultado de su política vigente, junto al saldo físico; no publicar un único número universal de stock utilizable. Un preview no reserva stock ni autoriza consumo y debe revalidarse bajo locks al ejecutar. En esta rama, REQUIRED sin lote y todo movimiento de Position fechada tienen la capacidad de salida bloqueada; ello no transforma `available` en cero. La definición y exposición pública/UI requieren aprobación antes de implementarse.
+
+### Calidad y pendientes de aceptación
+
+Los gates locales cubren identidad/hash, fechas locales, lectura SQL, crédito durable, documentos y regresiones de consumidores sin conectar a PostgreSQL. La CI efímera debe acreditar parciales/totales, configuraciones de lote, fechas conocidas/desconocidas, D−1/D/D+1, Batch real, un Effect y auditoría por recepción, replays, roles/tenant, rollback y concurrencia. La integración y V1 siguen NO-GO hasta esa evidencia y la UI posterior.
+
+## 14. Historial del PR origen — S3b-W1 — Crédito de recepción acreditado en su transacción
+
+**Base verificada:** S3b-S `6eb6b4a3d3fe46527dd97c447ce82884c0a6d623`, [CI #418 SUCCESS](https://github.com/gclp96/zaping/actions/runs/39913698468), API 2910 pruebas y suite PostgreSQL ADR-015 35/35 PASS. Son resultados históricos; los checks del commit W1 en [PR #119](https://github.com/gclp96/zaping/pull/119) acreditan exclusivamente su ejecución posterior. Los pendientes de la sección 13 se conservan como historial.
+
+- Se autoriza exclusivamente la recepción PHYSICAL de QUANTITY: sin lote/fecha usa Batch NULL y fecha NULL; sin lote con fecha conserva el DateTime recibido en `PurchaseReceiptItem` y su día calendario en la identidad DATE de Position; con lote real mantiene InventoryBatch y su caducidad histórica. No fabrica lotes. NONE, OPTIONAL y REQUIRED pueden conservar información disponible u omitirla en esta recepción; ASSET/SERIALIZED mantienen las validaciones anteriores. No se modifica DTO público, schema ni migraciones.
+- `PhysicalInventoryService.creditPurchaseReceipt` recibe sólo Company, actor, Receipt ID y key. Reconstruye las cantidades y destinos a partir del root y sus partidas persistidas; no acepta overrides de hash, fecha, cantidad ni un flag de excepción. Valida actor activo ADMIN/MANAGER/WAREHOUSE, tenant, receptor, OC confirmada/parcial, pertenencia de partidas/productos, costo, cantidades positivas y total acumulado dentro de lo ordenado, Batch real coherente, par documental y claim vinculado cuya intención canónica coincide. Rechaza una recepción con auditoría previa. El crédito genérico rechaza el origen PURCHASE_RECEIPT: el texto del origen por sí solo no acredita autorización.
+- La evidencia exige versiones de root, partidas y claim de la misma transacción PostgreSQL mediante `xmin = pg_current_xact_id()::xid`. `xmin` acredita la transacción de la **versión de fila**, no un registro inmutable de su inserción original. El flujo autorizado crea root/partidas y vincula el claim antes de invocar el crédito, todo en una transacción; una recepción ya confirmada no es un permiso reutilizable. Esto protege la frontera del caller interno, no pretende restringir a un operador con acceso SQL arbitrario. No se usan savepoints en esta ruta: evidencia creada en una subtransacción distinta se rechaza conservadoramente. Véanse [identidad de transacción PostgreSQL 16](https://www.postgresql.org/docs/16/transaction-id.html) y [funciones de información de transacción](https://www.postgresql.org/docs/16/functions-info.html).
+- Se conserva authority/shared fence del caller existente y el orden claim de recepción → Purchase → Product → Batch → Position. La comprobación del permiso vuelve a adquirir el mismo Purchase ya bloqueado por la integración; es reentrante, no una nueva raíz adquirida después de Product. El motor conserva sus locks, CAS, límites y validación temporal después de bloquear. Company.timezone sigue siendo persistida; D es elegible durante D local, D anterior rechaza ingreso a AVAILABLE, tanto sin lote como con Batch. El claim, recepción, partidas, Batch, Effect/líneas, saldo, proyecciones, auditoría y estado de OC se confirman o revierten juntos.
+- Se conservan sin cambios los algoritmos de hash de recepción y Physical. Para solicitudes históricas sin fecha o con Batch real se reconstruye la misma intención. Factura/remisión/nota de entrega del PR #114 se mantienen en el root y en el hash. El replay histórico utiliza la ruta existente de PurchaseReceiptsService/integración antes de crear otro crédito: no exige que el material siga disponible/no vencido ni repite proyecciones. La autorización de crédito nuevo no sustituye esa ruta de replay ni reclasifica errores como éxitos.
+- **Gate restante:** la excepción sólo llega al CREDIT reconstruido de recepción. Crédito manual, salidas, transferencias y conteos de posiciones fechadas siguen rechazados; Ventas, su resolver productivo y FEFO no se modifican. REQUIRED continúa con sus reglas fuera de esta recepción. Una lectura `available` o un preview FEFO no habilitan consumo. Stock recibido que requiera esos consumidores permanece sujeto a W2/S4; no se declara el flujo comercial completo.
+- **QA W1:** unitarias de autorización durable, roles/tenant, OC/cantidades, claim/hash, Batch, auditoría previa y origen falsificado; regresiones de documentos, hashes, motor, corrección, opening y Ventas. Se amplía la suite PostgreSQL efímera de recepción a 15 casos: tres fechas y NULL con NONE/OPTIONAL/REQUIRED, parcial/replay/intención distinta, lote real, vencimiento en ambos tipos de pool, rollback posterior a auditoría realmente escrita, identidad/roles, replay histórico tras cambio de día local, ASSET/SERIALIZED, origen falsificado/permiso confirmado y dos carreras con clientes/PIDs distintos para misma key y keys distintas. Las barreras test-only esperan bloqueo observado con `pg_blocking_pids`, sin sleeps ni mocks de Prisma. El selector de autoridad del smoke sigue fijado a PHYSICAL; la suite no acredita un cutover real. No se ejecuta PostgreSQL local. Preparar estos casos no equivale a PASS; consultar los checks del commit W1.
+
+**Validaciones locales W1:** 241/241 pruebas en 12 suites PASS; TypeScript productivo y focal de los tests, ESLint, Prettier, build API y `git diff --check` PASS. PostgreSQL se reserva al servicio efímero de CI, sin conexiones a bases locales. El resultado CI del commit debe verificarse separadamente.
+
+**Estado de entrega:** W1 implementado para revisión; PR #119 permanece DRAFT hasta W2/S4. Sin merge ni habilitación de consumidores fechados.
+
+## 15. Historial previo a QA-AB-01 — evidencia local y gate de integración
+
+- **Rama:** `codex/insap-auto-01b-foundation-receipts`, worktree independiente desde `main@226f5af0dad9d27e0a19d080ff7b2b27c952122a`. Cambios sin staging ni commit. Las referencias CI de PR #119 son evidencia histórica, no una ejecución de esta rama.
+- **Unitarias y regresiones locales:** 428/428 PASS en 20 suites: motor/identidad y hashes golden, política temporal, lecturas, autorización W1, documentos y hash de recepción, recepción LEGACY, compras, opening/cutover/autoridad, Ventas históricas y Dispatch/Reconciliation/Correction existentes. Tras completar el mock histórico de proyecciones exigido por TypeScript, Ventas se revalidó: 32/32 PASS. Tras precisar los orígenes y estados de las regresiones Healthcare, identidad/gates se revalidó: 33/33 PASS. No sumar estas repeticiones al total de cobertura.
+- **Checks locales:** TypeScript productivo PASS; typecheck focal de fuentes/pruebas y ambos E2E mediante `test/tsconfig.insap-ab.json` PASS; ESLint API PASS y revalidación focal posterior; build API PASS. Formato/whitespace se comprueban sobre tracked y nuevos antes de entregar.
+- **PostgreSQL:** NO EJECUTADO en esta extracción. Ninguna conexión ni migración local. Compilar tests no acredita atomicidad, concurrencia ni constraints reales. El selector PHYSICAL del fixture W1 es test-only: no acredita un cutover operativo.
+
+### Plan CI PostgreSQL efímero
+
+1. Ejecutar el workflow sobre el SHA exacto que se autorice publicar posteriormente: instalación aislada, generación Prisma, migraciones en el servicio PostgreSQL 16 descartable y validación de schema. No usar ni adaptar estos comandos para bases locales.
+2. Ejecutar las suites existentes de concurrencia, W1 de recepción y Foundation identidad/política/lecturas. Foundation añade comprobaciones reales del resolver histórico NULL junto a fechas conocidas y del agregado `available` de REQUIRED sin habilitar consumo. W1 conserva sus carreras de dos clientes/PIDs, replay, parciales, rollback y documentos, sin pruebas de W2a.
+3. Exigir resultados API/Web y typecheck focal; revisar cantidades y cero omisiones de los casos habilitados. Ninguna bandera local debe simular GitHub Actions para evitar el aislamiento CI de los E2E.
+4. **Gate adicional antes de integrar:** validar la actualización desde una base anterior a S1 con evidencia v1 persistida y comparar IDs, cantidades, revisiones, hashes y replay después de migrar, exclusivamente en CI efímero. Los tests actuales que crean una posición NULL después del deploy no sustituyen esa prueba de upgrade histórico.
+
+**Riesgos y aceptación:** migración e índices requieren PostgreSQL 16 y revisión de despliegue; la política local de Batch afecta consumidores compartidos y necesita regresión real. `available` es saldo físico elegible, no garantía de consumo por cualquier operación; la propuesta de utilizabilidad del §13 no cambia contratos públicos. REQUIRED sin lote (#120), custodia vencida (#121), SQL v1/v2 y Healthcare fechado (#122), UI OX-PUR-05 y habilitación de consumidores siguen pendientes. M-HC1 OPEN, RISK-006 OPEN / NOT REPRODUCED, intermitencia EQUIPMENT sin causa confirmada y el antecedente de 70 errores históricos del typecheck global no se cierran por esta extracción; el PASS focal/productivo no acredita un typecheck global de specs.
+
+**Veredicto de la extracción:** GO para revisión y QA efímero de A+B; NO-GO para merge, cierre de V1 o activación operativa hasta acreditar sus gates. No se depende de implementar Healthcare W2b-2 para validar el crédito W1.
+
+## 16. QA-AB-01 — revisión y PostgreSQL efímero de A+B
+
+Estado actual: GO para preparar PR independiente A+B; no merge ni cierre V1. [Informe QA-AB-01](../../project/QA_AB_01_REPORT.md): upgrade con 46 migraciones pre-S1 y fixtures persistidos antes de A, 9/9 verificaciones; Foundation 31/31, W1 reforzado 23/23 y LEGACY 5/5 E2E PASS, sin skipped. API 2921/2921 y Web 882/882 PASS; typecheck, lint y builds PASS. La corrida PostgreSQL fue ejecutada por el agente en contenedores nuevos tmpfs, no por el usuario ni mediante CI remoto. Los antecedentes de §15 permanecen como historial.
+
+Sin cambios productivos durante QA: se reforzaron exclusivamente tests/autorización efímera. La autoridad de los fixtures W1 se fija a PHYSICAL y toma shared fence real; no demuestra cutover operativo. El informe distingue available físico de utilizabilidad, enumera los intentos de preparación fallidos y los límites de cobertura histórica. En el cierre QA-AB-01 seguían pendientes CI del SHA final y automatización del upgrade; INT-AB-01 registra su implementación posterior a continuación. Los gates de FEFO, REQUIRED, Healthcare fechado y custodia vencida permanecen cerrados. El ADR del worktree original y sus §§17–18 no se modificaron.
+
+### INT-AB-01 — automatización histórica y entrega independiente
+
+Se implementa el job independiente `historical-upgrade` con historia Git completa y PostgreSQL 16 nuevo en tmpfs, sin compartir el servicio API. Reutiliza el launcher con `--upgrade-only`, fija las migraciones al baseline y falla si no pasan exactamente nueve checks. Sus controles de SHA/checkout desacoplado y exit code tienen nueve regresiones Node PASS; upgrade dedicado 9/9 y revalidación A+B/LEGACY PASS. El resultado remoto sigue PENDING hasta autorización de publicación. Véanse [informe actualizado](../../project/QA_AB_01_REPORT.md) y [descripción del PR](../../project/INT_AB_01_PR_DESCRIPTION.md). INT autoriza commits locales; no push, merge, cutover ni V1 completa. Se conserva en el informe el primer fallo Web y su revalidación sin modificar frontend.

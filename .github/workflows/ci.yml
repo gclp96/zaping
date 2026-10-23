@@ -12,6 +12,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  historical-upgrade:
+    name: Historical upgrade pre-S1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # No service/database shared with the API job. The launcher owns a new tmpfs server.
+    env:
+      NODE_ENV: test
+      QA_AB_EXPECTED_HEAD: ${{ github.sha }}
+    defaults:
+      run:
+        working-directory: app/api
+    steps:
+      - name: Checkout baseline history and candidate
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Check runner repository guards
+        run: node --test test/qa-ab-ci-runner.test.cjs
+
+      - name: Pull PostgreSQL 16 for the isolated upgrade server
+        run: docker pull postgres:16
+
+      - name: Generate candidate Prisma client
+        run: npx prisma generate
+
+      - name: Build candidate API
+        run: npm run build
+
+      - name: Verify nine pre-S1 upgrade checks on disposable PostgreSQL
+        run: node test/qa-ab-01.run.cjs --upgrade-only
+
   api:
     name: API
     runs-on: ubuntu-latest
@@ -76,8 +118,16 @@ jobs:
           RUN_PURCHASE_RECEIPT_PG_SMOKE: "1"
         run: npm run test:e2e -- --runInBand test/purchase-receipt-supplier-document.postgres.e2e-spec.ts
 
+      - name: Check unbatched expiry constraints on ephemeral PostgreSQL
+        env:
+          RUN_UNBATCHED_EXPIRY_MIGRATION_PG: "1"
+        run: npm run test:e2e -- --runInBand test/inventory-position-expiry-migration.postgres.e2e-spec.ts
+
       - name: Typecheck production source
         run: npm run typecheck
+
+      - name: Typecheck A+B receipt and identity tests
+        run: npx tsc --noEmit -p test/tsconfig.insap-ab.json
 
       - name: Build API
         run: npm run build
