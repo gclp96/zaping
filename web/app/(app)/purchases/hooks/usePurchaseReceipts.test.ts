@@ -1,24 +1,10 @@
-import {
-  act,
-  cleanup,
-  renderHook,
-} from '@testing-library/react';
+import { act, cleanup, renderHook } from '@testing-library/react';
 
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '@/services/api';
 
-import type {
-  Purchase,
-  PurchaseReceipt,
-} from '../types';
+import type { Purchase, PurchaseReceipt } from '../types';
 
 import { usePurchaseReceipts } from './usePurchaseReceipts';
 
@@ -30,10 +16,8 @@ vi.mock('@/services/api', () => ({
 }));
 
 vi.mock('@/services/errors', () => ({
-  getApiErrorMessage: (
-    _error: unknown,
-    fallbackMessage: string,
-  ) => fallbackMessage,
+  getApiErrorMessage: (_error: unknown, fallbackMessage: string) =>
+    fallbackMessage,
 }));
 
 const purchase: Purchase = {
@@ -93,8 +77,7 @@ const previousReceipt: PurchaseReceipt = {
       productId: 'product-1',
       quantityReceived: 4,
       lotNumber: 'LOTE-001',
-      expirationDate:
-        '2028-12-31T00:00:00.000Z',
+      expirationDate: '2028-12-31T00:00:00.000Z',
       unitCost: 100,
       batchId: 'batch-1',
       product: {
@@ -105,8 +88,7 @@ const previousReceipt: PurchaseReceipt = {
       batch: {
         id: 'batch-1',
         lotNumber: 'LOTE-001',
-        expirationDate:
-          '2028-12-31T00:00:00.000Z',
+        expirationDate: '2028-12-31T00:00:00.000Z',
         initialQuantity: 4,
         availableQuantity: 4,
         unitCost: 100,
@@ -115,10 +97,8 @@ const previousReceipt: PurchaseReceipt = {
   ],
 };
 
-const firstIdempotencyKey =
-  '11111111-1111-4111-8111-111111111111';
-const secondIdempotencyKey =
-  '22222222-2222-4222-8222-222222222222';
+const firstIdempotencyKey = '11111111-1111-4111-8111-111111111111';
+const secondIdempotencyKey = '22222222-2222-4222-8222-222222222222';
 
 const noneLotPurchase: Purchase = {
   ...purchase,
@@ -151,14 +131,10 @@ const requiredLotPurchase: Purchase = {
 };
 
 function setupHook(
-  purchaseReceipts: PurchaseReceipt[] = [
-    previousReceipt,
-  ],
+  purchaseReceipts: PurchaseReceipt[] = [previousReceipt],
   receiptHistoryReady = true,
 ) {
-  const onReceiptCreated = vi
-    .fn()
-    .mockResolvedValue(undefined);
+  const onReceiptCreated = vi.fn().mockResolvedValue(undefined);
 
   const hook = renderHook(() =>
     usePurchaseReceipts({
@@ -180,10 +156,12 @@ describe('usePurchaseReceipts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.post).mockReset();
-    vi.spyOn(
-      globalThis.crypto,
-      'randomUUID',
-    ).mockReturnValue(firstIdempotencyKey);
+    vi.mocked(api.get)
+      .mockReset()
+      .mockResolvedValue({ data: { authority: 'LEGACY' } } as never);
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      firstIdempotencyKey,
+    );
 
     consoleErrorSpy = vi
       .spyOn(console, 'error')
@@ -196,33 +174,27 @@ describe('usePurchaseReceipts', () => {
     cleanup();
   });
 
-  it('no abre la recepción si el historial no está disponible', () => {
+  it('no abre la recepción si el historial no está disponible', async () => {
     const { result } = setupHook([], false);
 
     let opened = true;
 
-    act(() => {
+    await act(async () => {
       opened = result.current.openReceiptModal(purchase);
     });
 
     expect(opened).toBe(false);
     expect(result.current.purchaseToReceive).toBeNull();
     expect(result.current.receiptFormItems).toEqual([]);
-    expect(
-      globalThis.crypto.randomUUID,
-    ).not.toHaveBeenCalled();
+    expect(globalThis.crypto.randomUUID).not.toHaveBeenCalled();
   });
 
-  it('inicia con el formulario cerrado y vacío', () => {
+  it('inicia con el formulario cerrado y vacío', async () => {
     const { result } = setupHook();
 
-    expect(
-      result.current.purchaseToReceive,
-    ).toBeNull();
+    expect(result.current.purchaseToReceive).toBeNull();
 
-    expect(
-      result.current.receiptFormItems,
-    ).toEqual([]);
+    expect(result.current.receiptFormItems).toEqual([]);
 
     expect(result.current.receiptNotes).toBe('');
     expect(result.current.receiptSaving).toBe(false);
@@ -230,16 +202,14 @@ describe('usePurchaseReceipts', () => {
     expect(result.current.createdReceipt).toBeNull();
   });
 
-  it('calcula las cantidades recibidas y pendientes', () => {
+  it('calcula las cantidades recibidas y pendientes', async () => {
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    expect(
-      result.current.purchaseToReceive,
-    ).toEqual(purchase);
+    expect(result.current.purchaseToReceive).toEqual(purchase);
 
     expect(result.current.receiptFormItems).toEqual([
       {
@@ -259,10 +229,10 @@ describe('usePurchaseReceipts', () => {
     ]);
   });
 
-  it('propaga tracking desde el producto sin solicitar productos aparte', () => {
+  it('propaga tracking desde el producto sin solicitar productos aparte', async () => {
     const { result } = setupHook([]);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
@@ -270,7 +240,7 @@ describe('usePurchaseReceipts', () => {
       inventoryTracking: 'QUANTITY',
       lotTracking: 'OPTIONAL',
     });
-    expect(api.get).not.toHaveBeenCalled();
+    expect(api.get).toHaveBeenCalledWith('/purchase-receipts/capabilities');
   });
 
   it('no envía datos de lote stale para una línea NONE', async () => {
@@ -283,7 +253,7 @@ describe('usePurchaseReceipts', () => {
 
     const { result } = setupHook([]);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(noneLotPurchase);
       result.current.handleReceiptItemChange(
         'purchase-item-1',
@@ -327,7 +297,7 @@ describe('usePurchaseReceipts', () => {
   it('mantiene la regla REQUIRED cerca de la línea antes de enviar', async () => {
     const { result } = setupHook([]);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(requiredLotPurchase);
       result.current.handleReceiptItemChange(
         'purchase-item-1',
@@ -351,7 +321,7 @@ describe('usePurchaseReceipts', () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
-  it('excluye los productos recibidos completamente', () => {
+  it('excluye los productos recibidos completamente', async () => {
     const completeReceipt: PurchaseReceipt = {
       ...previousReceipt,
       items: [
@@ -362,23 +332,19 @@ describe('usePurchaseReceipts', () => {
       ],
     };
 
-    const { result } = setupHook([
-      completeReceipt,
-    ]);
+    const { result } = setupHook([completeReceipt]);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    expect(
-      result.current.receiptFormItems,
-    ).toEqual([]);
+    expect(result.current.receiptFormItems).toEqual([]);
   });
 
   it('muestra un error cuando no se captura ninguna cantidad', async () => {
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
@@ -396,11 +362,11 @@ describe('usePurchaseReceipts', () => {
   it('rechaza una cantidad mayor que la pendiente', async () => {
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -422,11 +388,11 @@ describe('usePurchaseReceipts', () => {
   it('rechaza una fecha de caducidad sin número de lote', async () => {
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -452,8 +418,7 @@ describe('usePurchaseReceipts', () => {
   });
 
   it('registra la recepción, conserva su identidad y reinicia el formulario', async () => {
-    const { result, onReceiptCreated } =
-      setupHook();
+    const { result, onReceiptCreated } = setupHook();
 
     vi.mocked(api.post).mockResolvedValue({
       data: {
@@ -462,11 +427,11 @@ describe('usePurchaseReceipts', () => {
       },
     } as never);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -510,30 +475,21 @@ describe('usePurchaseReceipts', () => {
       },
       {
         headers: {
-          'Idempotency-Key':
-            firstIdempotencyKey,
+          'Idempotency-Key': firstIdempotencyKey,
         },
       },
     );
 
-    expect(
-      globalThis.crypto.randomUUID,
-    ).toHaveBeenCalledTimes(1);
-    expect(
-      vi.mocked(api.post).mock.calls[0]?.[1],
-    ).not.toHaveProperty('idempotencyKey');
+    expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(api.post).mock.calls[0]?.[1]).not.toHaveProperty(
+      'idempotencyKey',
+    );
 
-    expect(
-      onReceiptCreated,
-    ).toHaveBeenCalledTimes(1);
+    expect(onReceiptCreated).toHaveBeenCalledTimes(1);
 
-    expect(
-      result.current.purchaseToReceive,
-    ).toBeNull();
+    expect(result.current.purchaseToReceive).toBeNull();
 
-    expect(
-      result.current.receiptFormItems,
-    ).toEqual([]);
+    expect(result.current.receiptFormItems).toEqual([]);
 
     expect(result.current.receiptNotes).toBe('');
     expect(result.current.receiptFormError).toBe('');
@@ -548,9 +504,7 @@ describe('usePurchaseReceipts', () => {
     const { result } = setupHook();
 
     vi.mocked(api.post)
-      .mockRejectedValueOnce(
-        new Error('Error transitorio'),
-      )
+      .mockRejectedValueOnce(new Error('Error transitorio'))
       .mockResolvedValueOnce({
         data: {
           id: 'receipt-retry',
@@ -558,11 +512,11 @@ describe('usePurchaseReceipts', () => {
         },
       } as never);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -575,9 +529,7 @@ describe('usePurchaseReceipts', () => {
     });
 
     expect(result.current.createdReceipt).toBeNull();
-    expect(
-      result.current.receiptFormItems[0].quantityReceived,
-    ).toBe('2');
+    expect(result.current.receiptFormItems[0].quantityReceived).toBe('2');
 
     await act(async () => {
       await result.current.handleCreateReceipt();
@@ -594,9 +546,7 @@ describe('usePurchaseReceipts', () => {
         'Idempotency-Key': firstIdempotencyKey,
       },
     });
-    expect(
-      globalThis.crypto.randomUUID,
-    ).toHaveBeenCalledTimes(1);
+    expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
     expect(result.current.createdReceipt).toEqual({
       id: 'receipt-retry',
       folio: 'RC-RETRY',
@@ -618,10 +568,10 @@ describe('usePurchaseReceipts', () => {
       },
     } as never);
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -632,20 +582,18 @@ describe('usePurchaseReceipts', () => {
       await result.current.handleCreateReceipt();
     });
 
-    act(() => {
+    await act(async () => {
       result.current.closeReceiptModal();
     });
 
     expect(result.current.createdReceipt).toBeNull();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    expect(
-      result.current.receiptFormItems[0].quantityReceived,
-    ).toBe('');
-    act(() => {
+    expect(result.current.receiptFormItems[0].quantityReceived).toBe('');
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -669,24 +617,20 @@ describe('usePurchaseReceipts', () => {
   });
 
   it('bloquea un segundo envío mientras el primero sigue pendiente', async () => {
-    let resolvePost:
-      | ((value: unknown) => void)
-      | undefined;
+    let resolvePost: ((value: unknown) => void) | undefined;
 
     const pendingPost = new Promise((resolve) => {
       resolvePost = resolve;
     });
 
-    vi.mocked(api.post).mockReturnValue(
-      pendingPost as never,
-    );
+    vi.mocked(api.post).mockReturnValue(pendingPost as never);
 
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -694,18 +638,12 @@ describe('usePurchaseReceipts', () => {
       );
     });
 
-    let firstSubmission:
-      | Promise<void>
-      | undefined;
-    let secondSubmission:
-      | Promise<void>
-      | undefined;
+    let firstSubmission: Promise<void> | undefined;
+    let secondSubmission: Promise<void> | undefined;
 
-    act(() => {
-      firstSubmission =
-        result.current.handleCreateReceipt();
-      secondSubmission =
-        result.current.handleCreateReceipt();
+    await act(async () => {
+      firstSubmission = result.current.handleCreateReceipt();
+      secondSubmission = result.current.handleCreateReceipt();
     });
 
     expect(api.post).toHaveBeenCalledTimes(1);
@@ -718,10 +656,7 @@ describe('usePurchaseReceipts', () => {
         },
       });
 
-      await Promise.all([
-        firstSubmission,
-        secondSubmission,
-      ]);
+      await Promise.all([firstSubmission, secondSubmission]);
     });
 
     expect(api.post).toHaveBeenCalledTimes(1);
@@ -732,18 +667,15 @@ describe('usePurchaseReceipts', () => {
   });
 
   it('mantiene abierto el formulario cuando el backend falla', async () => {
-    const { result, onReceiptCreated } =
-      setupHook();
+    const { result, onReceiptCreated } = setupHook();
 
-    vi.mocked(api.post).mockRejectedValue(
-      new Error('Error del servidor'),
-    );
+    vi.mocked(api.post).mockRejectedValue(new Error('Error del servidor'));
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
     });
 
-    act(() => {
+    await act(async () => {
       result.current.handleReceiptItemChange(
         'purchase-item-1',
         'quantityReceived',
@@ -759,18 +691,11 @@ describe('usePurchaseReceipts', () => {
       'No fue posible registrar la recepción.',
     );
 
-    expect(
-      result.current.purchaseToReceive,
-    ).toEqual(purchase);
+    expect(result.current.purchaseToReceive).toEqual(purchase);
 
-    expect(
-      result.current.receiptFormItems[0]
-        .quantityReceived,
-    ).toBe('2');
+    expect(result.current.receiptFormItems[0].quantityReceived).toBe('2');
 
-    expect(
-      onReceiptCreated,
-    ).not.toHaveBeenCalled();
+    expect(onReceiptCreated).not.toHaveBeenCalled();
 
     expect(result.current.receiptSaving).toBe(false);
     expect(result.current.createdReceipt).toBeNull();
@@ -790,7 +715,7 @@ describe('usePurchaseReceipts', () => {
 
     const { result } = setupHook();
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
       result.current.handleReceiptNotesChange('Intento cancelado');
       result.current.closeReceiptModal();
@@ -799,7 +724,7 @@ describe('usePurchaseReceipts', () => {
     expect(result.current.purchaseToReceive).toBeNull();
     expect(result.current.receiptNotes).toBe('');
 
-    act(() => {
+    await act(async () => {
       result.current.openReceiptModal(purchase);
       result.current.handleReceiptItemChange(
         'purchase-item-1',
@@ -817,6 +742,216 @@ describe('usePurchaseReceipts', () => {
       headers: {
         'Idempotency-Key': secondIdempotencyKey,
       },
+    });
+  });
+});
+
+describe('OX-PUR-05 — autoridad y trazabilidad opcional', () => {
+  beforeEach(() => {
+    vi.mocked(api.get)
+      .mockReset()
+      .mockResolvedValue({ data: { authority: 'PHYSICAL' } } as never);
+    vi.mocked(api.post)
+      .mockReset()
+      .mockResolvedValue({
+        data: { id: 'receipt-new', folio: 'REC-NEW' },
+      } as never);
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+      firstIdempotencyKey,
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it.each(['NONE', 'OPTIONAL', 'REQUIRED'] as const)(
+    'PHYSICAL QUANTITY %s conserva cada combinación exacta de lote/fecha',
+    async (lotTracking) => {
+      for (const [lotNumber, expirationDate] of [
+        ['', ''],
+        ['', '2029-06-30'],
+        ['REAL-001', ''],
+        ['REAL-001', '2029-06-30'],
+      ]) {
+        vi.mocked(api.post).mockClear();
+        const { result, unmount } = setupHook([]);
+        const currentPurchase = {
+          ...purchase,
+          items: [
+            {
+              ...purchase.items[0],
+              product: { ...purchase.items[0].product, lotTracking },
+            },
+          ],
+        };
+        await act(async () => {
+          result.current.openReceiptModal(currentPurchase);
+        });
+        expect(result.current.receiptAuthority).toBe('PHYSICAL');
+        act(() => {
+          result.current.handleReceiptItemChange(
+            'purchase-item-1',
+            'quantityReceived',
+            '2',
+          );
+          result.current.handleReceiptItemChange(
+            'purchase-item-1',
+            'lotNumber',
+            lotNumber,
+          );
+          result.current.handleReceiptItemChange(
+            'purchase-item-1',
+            'expirationDate',
+            expirationDate,
+          );
+          result.current.setSupplierDocumentType('FACTURA');
+          result.current.setSupplierDocumentNumber(' FAC-123 ');
+        });
+        expect(result.current.receiptFormItems[0]).toMatchObject({
+          lotNumber,
+          expirationDate,
+        });
+        await act(async () => {
+          await result.current.handleCreateReceipt();
+        });
+        expect(api.post).toHaveBeenCalledExactlyOnceWith(
+          '/purchase-receipts',
+          {
+            purchaseId: 'purchase-1',
+            notes: undefined,
+            supplierDocumentType: 'FACTURA',
+            supplierDocumentNumber: 'FAC-123',
+            items: [
+              {
+                purchaseItemId: 'purchase-item-1',
+                quantityReceived: 2,
+                lotNumber: lotNumber || undefined,
+                expirationDate: expirationDate || undefined,
+              },
+            ],
+          },
+          { headers: { 'Idempotency-Key': firstIdempotencyKey } },
+        );
+        unmount();
+      }
+    },
+  );
+
+  it.each(['ASSET', 'SERIALIZED'] as const)(
+    'PHYSICAL no flexibiliza %s REQUIRED',
+    async (inventoryTracking) => {
+      const { result } = setupHook([]);
+      const current = {
+        ...requiredLotPurchase,
+        items: [
+          {
+            ...requiredLotPurchase.items[0],
+            product: {
+              ...requiredLotPurchase.items[0].product,
+              inventoryTracking,
+            },
+          },
+        ],
+      };
+      await act(async () => {
+        result.current.openReceiptModal(current);
+      });
+      act(() => {
+        result.current.handleReceiptItemChange(
+          'purchase-item-1',
+          'quantityReceived',
+          '1',
+        );
+      });
+      await act(async () => {
+        await result.current.handleCreateReceipt();
+      });
+      expect(api.post).not.toHaveBeenCalled();
+      expect(
+        result.current.receiptFieldErrors['purchase-item-1'].lotNumber,
+      ).toContain('requiere número de lote');
+    },
+  );
+
+  it.each([{ authority: 'CUTOVER' }, {}, { authority: 'physical' }])(
+    'rechaza capacidades inválidas: %j',
+    async (data) => {
+      vi.mocked(api.get).mockResolvedValue({ data } as never);
+      const { result } = setupHook([]);
+      await act(async () => {
+        result.current.openReceiptModal(purchase);
+      });
+      act(() => {
+        result.current.handleReceiptItemChange(
+          'purchase-item-1',
+          'quantityReceived',
+          '1',
+        );
+      });
+      await act(async () => {
+        await result.current.handleCreateReceipt();
+      });
+      expect(result.current.receiptAuthority).toBeNull();
+      expect(result.current.receiptAuthorityError).not.toBe('');
+      expect(api.post).not.toHaveBeenCalled();
+    },
+  );
+
+  it('bloquea carga/CUTOVER, reintenta sin perder datos ni key y descarta respuestas tras cerrar', async () => {
+    let resolve!: (value: unknown) => void;
+    vi.mocked(api.get).mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }) as never,
+    );
+    const { result } = setupHook([]);
+    act(() => {
+      result.current.openReceiptModal(purchase);
+    });
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '2',
+      );
+    });
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+    expect(api.post).not.toHaveBeenCalled();
+    act(() => {
+      result.current.closeReceiptModal();
+    });
+    await act(async () => {
+      resolve({ data: { authority: 'PHYSICAL' } });
+    });
+    expect(result.current.receiptAuthority).toBeNull();
+    vi.mocked(api.get).mockRejectedValueOnce({
+      response: { status: 503, data: { code: 'CUTOVER_FROZEN' } },
+    });
+    await act(async () => {
+      result.current.openReceiptModal(purchase);
+    });
+    expect(result.current.receiptAuthorityError).not.toBe('');
+    act(() => {
+      result.current.handleReceiptItemChange(
+        'purchase-item-1',
+        'quantityReceived',
+        '2',
+      );
+    });
+    await act(async () => {
+      result.current.retryReceiptAuthority();
+    });
+    expect(result.current.receiptAuthority).toBe('PHYSICAL');
+    expect(result.current.receiptFormItems[0].quantityReceived).toBe('2');
+    await act(async () => {
+      await result.current.handleCreateReceipt();
+    });
+    expect(vi.mocked(api.post).mock.calls[0]?.[2]).toEqual({
+      headers: { 'Idempotency-Key': firstIdempotencyKey },
     });
   });
 });

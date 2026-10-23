@@ -350,6 +350,9 @@ export default function Purchase360Page() {
 
   const {
     purchaseToReceive,
+    receiptAuthority,
+    receiptAuthorityError,
+    retryReceiptAuthority,
     receiptFormItems,
     receiptNotes,
     supplierDocumentType,
@@ -785,6 +788,9 @@ export default function Purchase360Page() {
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}
+        receiptAuthority={receiptAuthority}
+        receiptAuthorityError={receiptAuthorityError}
+        onRetryAuthority={retryReceiptAuthority}
         items={receiptFormItems}
         notes={receiptNotes}
         supplierDocumentType={supplierDocumentType}

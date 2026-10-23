@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { formatReceiptExpirationDate } from '../../purchase-receipts/receipt-display';
 
 import Button from '@/app/components/ui/Button';
 
@@ -166,7 +167,7 @@ export default function PurchaseReceiptsHistory({
 
                         <td className="px-3 py-3">
                           {item.expirationDate
-                            ? formatDate(item.expirationDate)
+                            ? formatReceiptExpirationDate(item.expirationDate)
                             : '—'}
                         </td>
 

@@ -1,9 +1,12 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
+import { hasOptionalReceiptTraceability } from '../receipt-traceability';
+
 import type {
+  ReceiptAuthority,
   CreatedPurchaseReceipt,
   Purchase,
   PurchaseReceipt,
@@ -23,12 +26,52 @@ export function usePurchaseReceipts({
   receiptHistoryReady,
   onReceiptCreated,
 }: UsePurchaseReceiptsParams) {
-  const [purchaseToReceive, setPurchaseToReceive] =
-    useState<Purchase | null>(null);
+  const [purchaseToReceive, setPurchaseToReceive] = useState<Purchase | null>(
+    null,
+  );
 
   const [receiptFormItems, setReceiptFormItems] = useState<
     PurchaseReceiptFormItem[]
   >([]);
+
+  const [receiptAuthority, setReceiptAuthority] =
+    useState<ReceiptAuthority | null>(null);
+  const [receiptAuthorityError, setReceiptAuthorityError] = useState('');
+  const [authorityAttempt, setAuthorityAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!purchaseToReceive) return;
+    let active = true;
+    async function load() {
+      try {
+        const { data } = await api.get<{ authority: ReceiptAuthority }>(
+          '/purchase-receipts/capabilities',
+        );
+        if (data?.authority !== 'PHYSICAL' && data?.authority !== 'LEGACY') {
+          throw new Error('Invalid receipt capability');
+        }
+        if (active) setReceiptAuthority(data.authority);
+      } catch (error: unknown) {
+        if (active)
+          setReceiptAuthorityError(
+            getApiErrorMessage(
+              error,
+              'No fue posible verificar si la empresa puede recibir mercancía. Reintenta antes de registrar la recepción.',
+            ),
+          );
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [purchaseToReceive, authorityAttempt]);
+
+  function retryReceiptAuthority() {
+    setReceiptAuthority(null);
+    setReceiptAuthorityError('');
+    setAuthorityAttempt((attempt) => attempt + 1);
+  }
 
   const [receiptNotes, setReceiptNotes] = useState('');
   const [supplierDocumentType, setSupplierDocumentType] = useState('');
@@ -36,16 +79,18 @@ export function usePurchaseReceipts({
   const [receiptSaving, setReceiptSaving] = useState(false);
   const [createdReceipt, setCreatedReceipt] =
     useState<CreatedPurchaseReceipt | null>(null);
-  const [receiptIdempotencyKey, setReceiptIdempotencyKey] =
-    useState<string | null>(null);
-  const [receiptFormError, setReceiptFormError] =
-    useState('');
+  const [receiptIdempotencyKey, setReceiptIdempotencyKey] = useState<
+    string | null
+  >(null);
+  const [receiptFormError, setReceiptFormError] = useState('');
   const [receiptFieldErrors, setReceiptFieldErrors] =
     useState<PurchaseReceiptFieldErrors>({});
   const receiptSubmissionInFlight = useRef(false);
 
   function clearReceiptAttempt() {
     setPurchaseToReceive(null);
+    setReceiptAuthority(null);
+    setReceiptAuthorityError('');
     setReceiptFormItems([]);
     setReceiptNotes('');
     setSupplierDocumentType('');
@@ -74,63 +119,49 @@ export function usePurchaseReceipts({
     const receiptsForForm =
       options?.verifiedPurchaseReceipts ?? purchaseReceipts;
 
-    const formItems: PurchaseReceiptFormItem[] =
-      purchase.items
-        .map((purchaseItem) => {
-          const receivedQuantity =
-            receiptsForForm.reduce(
-              (total, receipt) => {
-                const receivedFromReceipt =
-                  receipt.items
-                    .filter(
-                      (receiptItem) =>
-                        receiptItem.purchaseItemId ===
-                        purchaseItem.id,
-                    )
-                    .reduce(
-                      (
-                        receiptTotal,
-                        receiptItem,
-                      ) =>
-                        receiptTotal +
-                        receiptItem.quantityReceived,
-                      0,
-                    );
-
-                return total + receivedFromReceipt;
-              },
+    const formItems: PurchaseReceiptFormItem[] = purchase.items
+      .map((purchaseItem) => {
+        const receivedQuantity = receiptsForForm.reduce((total, receipt) => {
+          const receivedFromReceipt = receipt.items
+            .filter(
+              (receiptItem) => receiptItem.purchaseItemId === purchaseItem.id,
+            )
+            .reduce(
+              (receiptTotal, receiptItem) =>
+                receiptTotal + receiptItem.quantityReceived,
               0,
             );
 
-          const pendingQuantity = Math.max(
-            purchaseItem.quantity -
-              receivedQuantity,
-            0,
-          );
+          return total + receivedFromReceipt;
+        }, 0);
 
-          return {
-            purchaseItemId: purchaseItem.id,
-            productId: purchaseItem.productId,
-            sku: purchaseItem.product.sku,
-            name: purchaseItem.product.name,
-            inventoryTracking:
-              purchaseItem.product.inventoryTracking,
-            lotTracking: purchaseItem.product.lotTracking,
-
-            orderedQuantity: purchaseItem.quantity,
-            receivedQuantity,
-            pendingQuantity,
-
-            quantityReceived: '',
-            lotNumber: '',
-            expirationDate: '',
-          };
-        })
-        .filter(
-          (item) => item.pendingQuantity > 0,
+        const pendingQuantity = Math.max(
+          purchaseItem.quantity - receivedQuantity,
+          0,
         );
 
+        return {
+          purchaseItemId: purchaseItem.id,
+          productId: purchaseItem.productId,
+          sku: purchaseItem.product.sku,
+          name: purchaseItem.product.name,
+          inventoryTracking: purchaseItem.product.inventoryTracking,
+          lotTracking: purchaseItem.product.lotTracking,
+
+          orderedQuantity: purchaseItem.quantity,
+          receivedQuantity,
+          pendingQuantity,
+
+          quantityReceived: '',
+          lotNumber: '',
+          expirationDate: '',
+        };
+      })
+      .filter((item) => item.pendingQuantity > 0);
+
     setCreatedReceipt(null);
+    setReceiptAuthority(null);
+    setReceiptAuthorityError('');
     setPurchaseToReceive(purchase);
     setReceiptFormItems(formItems);
     setReceiptNotes('');
@@ -159,9 +190,9 @@ export function usePurchaseReceipts({
     setReceiptFormItems((currentItems) =>
       currentItems.map((item) =>
         item.purchaseItemId === purchaseItemId
-          ? item.lotTracking === 'NONE' &&
-            (field === 'lotNumber' ||
-              field === 'expirationDate')
+          ? !hasOptionalReceiptTraceability(receiptAuthority, item) &&
+            item.lotTracking === 'NONE' &&
+            (field === 'lotNumber' || field === 'expirationDate')
             ? {
                 ...item,
                 lotNumber: '',
@@ -226,6 +257,7 @@ export function usePurchaseReceipts({
   async function handleCreateReceipt() {
     if (
       !purchaseToReceive ||
+      !receiptAuthority ||
       !receiptIdempotencyKey ||
       receiptSubmissionInFlight.current
     ) {
@@ -235,14 +267,17 @@ export function usePurchaseReceipts({
     setReceiptFormError('');
     setReceiptFieldErrors({});
 
-    if (Boolean(supplierDocumentType) !== Boolean(supplierDocumentNumber.trim())) {
-      setReceiptFormError('Selecciona el tipo y número del documento del proveedor, o deja ambos vacíos.');
+    if (
+      Boolean(supplierDocumentType) !== Boolean(supplierDocumentNumber.trim())
+    ) {
+      setReceiptFormError(
+        'Selecciona el tipo y número del documento del proveedor, o deja ambos vacíos.',
+      );
       return;
     }
 
     const selectedItems = receiptFormItems.filter(
-      (item) =>
-        item.quantityReceived.trim() !== '',
+      (item) => item.quantityReceived.trim() !== '',
     );
 
     if (selectedItems.length === 0) {
@@ -252,19 +287,15 @@ export function usePurchaseReceipts({
       return;
     }
 
-    const invalidQuantityItem = selectedItems.find(
-      (item) => {
-        const parsedQuantity = Number(
-          item.quantityReceived,
-        );
+    const invalidQuantityItem = selectedItems.find((item) => {
+      const parsedQuantity = Number(item.quantityReceived);
 
-        return (
-          !Number.isInteger(parsedQuantity) ||
-          parsedQuantity < 1 ||
-          parsedQuantity > item.pendingQuantity
-        );
-      },
-    );
+      return (
+        !Number.isInteger(parsedQuantity) ||
+        parsedQuantity < 1 ||
+        parsedQuantity > item.pendingQuantity
+      );
+    });
 
     if (invalidQuantityItem) {
       const message = `La cantidad de ${invalidQuantityItem.name} debe ser un entero entre 1 y ${invalidQuantityItem.pendingQuantity}.`;
@@ -280,6 +311,7 @@ export function usePurchaseReceipts({
 
     const missingRequiredLot = selectedItems.find(
       (item) =>
+        !hasOptionalReceiptTraceability(receiptAuthority, item) &&
         item.lotTracking === 'REQUIRED' &&
         item.lotNumber.trim() === '',
     );
@@ -296,13 +328,13 @@ export function usePurchaseReceipts({
       return;
     }
 
-    const expirationWithoutLot =
-      selectedItems.find(
-        (item) =>
-          item.lotTracking !== 'NONE' &&
-          item.expirationDate.trim() !== '' &&
-          item.lotNumber.trim() === '',
-      );
+    const expirationWithoutLot = selectedItems.find(
+      (item) =>
+        !hasOptionalReceiptTraceability(receiptAuthority, item) &&
+        item.lotTracking !== 'NONE' &&
+        item.expirationDate.trim() !== '' &&
+        item.lotNumber.trim() === '',
+    );
 
     if (expirationWithoutLot) {
       const message = `Captura el número de lote de ${expirationWithoutLot.name} para registrar su caducidad.`;
@@ -324,25 +356,22 @@ export function usePurchaseReceipts({
         '/purchase-receipts',
         {
           purchaseId: purchaseToReceive.id,
-          notes:
-            receiptNotes.trim() || undefined,
+          notes: receiptNotes.trim() || undefined,
           supplierDocumentType: supplierDocumentType || undefined,
           supplierDocumentNumber: supplierDocumentNumber.trim() || undefined,
           items: selectedItems.map((item) => ({
-            purchaseItemId:
-              item.purchaseItemId,
-            quantityReceived: Number(
-              item.quantityReceived,
-            ),
+            purchaseItemId: item.purchaseItemId,
+            quantityReceived: Number(item.quantityReceived),
             lotNumber:
+              !hasOptionalReceiptTraceability(receiptAuthority, item) &&
               item.lotTracking === 'NONE'
                 ? undefined
                 : item.lotNumber.trim() || undefined,
             expirationDate:
+              !hasOptionalReceiptTraceability(receiptAuthority, item) &&
               item.lotTracking === 'NONE'
                 ? undefined
-                : item.expirationDate.trim() ||
-                  undefined,
+                : item.expirationDate.trim() || undefined,
           })),
         },
         {
@@ -360,12 +389,8 @@ export function usePurchaseReceipts({
         folio: response.data.folio,
       });
     } catch (error: unknown) {
-
       setReceiptFormError(
-        getApiErrorMessage(
-          error,
-          'No fue posible registrar la recepción.',
-        ),
+        getApiErrorMessage(error, 'No fue posible registrar la recepción.'),
       );
     } finally {
       receiptSubmissionInFlight.current = false;
@@ -375,6 +400,9 @@ export function usePurchaseReceipts({
 
   return {
     purchaseToReceive,
+    receiptAuthority,
+    receiptAuthorityError,
+    retryReceiptAuthority,
     receiptFormItems,
     receiptNotes,
     supplierDocumentType,

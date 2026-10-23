@@ -210,6 +210,8 @@ function setupApi({
   role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation((endpoint: string) => {
+    if (endpoint === '/purchase-receipts/capabilities') return Promise.resolve({ data: { authority: 'LEGACY' } }) as never;
+
     if (endpoint === '/auth/me') {
       return Promise.resolve({
         data: {

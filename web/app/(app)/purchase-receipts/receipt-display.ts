@@ -1,7 +1,4 @@
-import type {
-  PurchaseReceiptListItem,
-  ReceiptUser,
-} from './types';
+import type { PurchaseReceiptListItem, ReceiptUser } from './types';
 
 const receiptDateFormatter = new Intl.DateTimeFormat('es-MX', {
   dateStyle: 'medium',
@@ -22,13 +19,28 @@ export function formatReceiptDate(value: string): string {
   return receiptDateFormatter.format(date);
 }
 
+// Expiration is a calendar DATE, never a timestamp in the browser timezone.
+export function formatReceiptExpirationDate(value: string): string {
+  const day = value.slice(0, 10);
+  const date = new Date(day + 'T00:00:00.000Z');
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+    Number.isNaN(date.getTime()) ||
+    date.toISOString().slice(0, 10) !== day
+  ) {
+    return 'Fecha no disponible';
+  }
+  return new Intl.DateTimeFormat('es-MX', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
 export function formatReceiptMoney(value: number): string {
   return receiptMoneyFormatter.format(value);
 }
 
-export function getReceiptResponsibleLabel(
-  user: ReceiptUser | null,
-): string {
+export function getReceiptResponsibleLabel(user: ReceiptUser | null): string {
   if (!user) {
     return '—';
   }
@@ -55,10 +67,7 @@ export function receiptMatchesSearch(
     receipt.receivedByUser?.firstName,
     receipt.receivedByUser?.lastName,
     receipt.receivedByUser?.email,
-    ...receipt.items.flatMap((item) => [
-      item.product.sku,
-      item.product.name,
-    ]),
+    ...receipt.items.flatMap((item) => [item.product.sku, item.product.name]),
   ];
 
   return searchableValues.some((value) =>
