@@ -332,29 +332,39 @@ describe('PurchaseReceiptsService', () => {
     return service.create(companyId, receivedBy, idempotencyKey, dto);
   }
 
-  it('registra el documento del proveedor sin afectar las partidas', async () => {
+  it.each(['FACTURA', 'REMISION', 'NOTA_ENTREGA'] as const)(
+    'registra %s normalizado sin afectar las partidas LEGACY',
+    async (type) => {
+      const dto = arrangeLotTrackingReceipt([
+        createLotTrackingItem(ProductLotTracking.OPTIONAL),
+      ]);
+      dto.supplierDocumentType = type;
+      dto.supplierDocumentNumber = '  DOC-INSAP-042  ';
+
+      await expect(
+        createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
+      ).resolves.toBeDefined();
+
+      const firstCall = transactionClient.purchaseReceipt.create.mock
+        .calls[0] as [PurchaseReceiptCreateArgs] | undefined;
+      const createdArgs = firstCall?.[0];
+      expect(createdArgs?.data.supplierDocumentType).toBe(type);
+      expect(createdArgs?.data.supplierDocumentNumber).toBe('DOC-INSAP-042');
+    },
+  );
+
+  it.each([
+    { supplierDocumentType: 'FACTURA' as const },
+    {
+      supplierDocumentType: 'REMISION' as const,
+      supplierDocumentNumber: '   ',
+    },
+    { supplierDocumentNumber: 'DOC-42' },
+  ])('rechaza documento incompleto antes de LEGACY: %j', async (document) => {
     const dto = arrangeLotTrackingReceipt([
       createLotTrackingItem(ProductLotTracking.OPTIONAL),
     ]);
-    dto.supplierDocumentType = 'REMISION';
-    dto.supplierDocumentNumber = 'REM-INSAP-042';
-
-    await expect(
-      createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
-    ).resolves.toBeDefined();
-
-    const firstCall = transactionClient.purchaseReceipt.create.mock.calls[0] as
-      [PurchaseReceiptCreateArgs] | undefined;
-    const createdArgs = firstCall?.[0];
-    expect(createdArgs?.data.supplierDocumentType).toBe('REMISION');
-    expect(createdArgs?.data.supplierDocumentNumber).toBe('REM-INSAP-042');
-  });
-
-  it('rechaza documento del proveedor incompleto sin registrar recepción', async () => {
-    const dto = arrangeLotTrackingReceipt([
-      createLotTrackingItem(ProductLotTracking.OPTIONAL),
-    ]);
-    dto.supplierDocumentType = 'FACTURA';
+    Object.assign(dto, document);
 
     await expect(
       createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto),
@@ -362,7 +372,55 @@ describe('PurchaseReceiptsService', () => {
       'Selecciona el tipo y número del documento del proveedor',
     );
     expectNoReceiptMutations();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('conserva la compatibilidad LEGACY sin documento', async () => {
+    const dto = arrangeLotTrackingReceipt([
+      createLotTrackingItem(ProductLotTracking.OPTIONAL),
+    ]);
+    await createReceipt(lotTrackingCompanyId, lotTrackingUserId, dto);
+    expect(transactionClient.purchaseReceipt.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        supplierDocumentType: undefined,
+        supplierDocumentNumber: undefined,
+      }) as unknown,
+    });
+  });
+
+  it.each(['same', 'type', 'number'] as const)(
+    'verifica documento y replay LEGACY: %s',
+    async (change) => {
+      const dto = arrangeLotTrackingReceipt([
+        createLotTrackingItem(ProductLotTracking.OPTIONAL),
+      ]);
+      dto.supplierDocumentType = 'FACTURA';
+      dto.supplierDocumentNumber = 'DOC-42';
+      const receipt = {
+        id: 'receipt',
+        supplierDocumentType: 'FACTURA',
+        supplierDocumentNumber: 'DOC-42',
+      };
+      prisma.idempotencyRecord.findUnique.mockResolvedValue({
+        requestHash: createPurchaseReceiptRequestHash(dto),
+        resourceId: receipt.id,
+      });
+      prisma.purchaseReceipt.findFirst.mockResolvedValue(receipt);
+      const input = { ...dto, supplierDocumentNumber: '  DOC-42  ' };
+      if (change === 'type') input.supplierDocumentType = 'REMISION';
+      if (change === 'number') input.supplierDocumentNumber = 'DOC-43';
+      const result = createReceipt(
+        lotTrackingCompanyId,
+        lotTrackingUserId,
+        input,
+      );
+      if (change === 'same') await expect(result).resolves.toEqual(receipt);
+      else await expect(result).rejects.toBeInstanceOf(ConflictException);
+      expectNoReceiptMutations();
+      expect(transactionClient.idempotencyRecord.create).not.toHaveBeenCalled();
+      expect(transactionClient.idempotencyRecord.update).not.toHaveBeenCalled();
+    },
+  );
 
   function arrangeLotTrackingReceipt(
     items: LotTrackingReceiptItemFixture[],

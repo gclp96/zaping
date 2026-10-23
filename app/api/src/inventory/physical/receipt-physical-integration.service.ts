@@ -220,6 +220,8 @@ export class ReceiptPhysicalIntegrationService {
         receivedBy: actorId,
         receivedAt: now,
         notes: dto.notes?.trim() || null,
+        supplierDocumentType: dto.supplierDocumentType,
+        supplierDocumentNumber: dto.supplierDocumentNumber,
       },
     });
     const receiptItems: PurchaseReceiptItem[] = [];
