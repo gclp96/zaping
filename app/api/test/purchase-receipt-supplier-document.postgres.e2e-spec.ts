@@ -136,9 +136,7 @@ describePg('INSAP-AUTO-01A supplier document PHYSICAL PostgreSQL smoke', () => {
       purchaseId: purchase.id,
       supplierDocumentType: 'REMISION' as const,
       supplierDocumentNumber: '  REM-CI-0001  ',
-      items: [
-        { purchaseItemId: purchase.items[0].id, quantityReceived: 2 },
-      ],
+      items: [{ purchaseItemId: purchase.items[0].id, quantityReceived: 2 }],
     };
     const requestKey = randomUUID();
     const created = await receipts.create(companyId, actorId, requestKey, dto);
@@ -167,10 +165,14 @@ describePg('INSAP-AUTO-01A supplier document PHYSICAL PostgreSQL smoke', () => {
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(
-      await db.purchaseReceipt.count({ where: { companyId, purchaseId: purchase.id } }),
+      await db.purchaseReceipt.count({
+        where: { companyId, purchaseId: purchase.id },
+      }),
     ).toBe(1);
     expect(
-      await db.purchaseReceiptItem.count({ where: { companyId, receiptId: created.id } }),
+      await db.purchaseReceiptItem.count({
+        where: { companyId, receiptId: created.id },
+      }),
     ).toBe(1);
     expect(
       await db.inventoryPhysicalEffect.count({
@@ -189,7 +191,11 @@ describePg('INSAP-AUTO-01A supplier document PHYSICAL PostgreSQL smoke', () => {
     ).toBe(1);
     expect(
       await db.inventoryMovement.count({
-        where: { companyId, referenceType: 'PURCHASE_RECEIPT', referenceId: created.id },
+        where: {
+          companyId,
+          referenceType: 'PURCHASE_RECEIPT',
+          referenceId: created.id,
+        },
       }),
     ).toBe(1);
     expect(
@@ -203,9 +209,11 @@ describePg('INSAP-AUTO-01A supplier document PHYSICAL PostgreSQL smoke', () => {
     });
     expect(updatedProduct.stock).toBe(2);
     expect(
-      (await db.purchase.findFirstOrThrow({
-        where: { id: purchase.id, companyId },
-      })).status,
+      (
+        await db.purchase.findFirstOrThrow({
+          where: { id: purchase.id, companyId },
+        })
+      ).status,
     ).toBe('PARTIALLY_RECEIVED');
   }, 20000);
 });
