@@ -68,7 +68,7 @@ describe('supplier documents across the PHYSICAL receipt boundary', () => {
       lockBatches: jest.fn(),
     };
     const physical = {
-      creditAvailable: jest.fn().mockResolvedValue({ replay: false }),
+      creditPurchaseReceipt: jest.fn().mockResolvedValue({ replay: false }),
     };
     const projections = { apply: jest.fn() };
     const history = { write: jest.fn() };
@@ -138,7 +138,7 @@ describe('supplier documents across the PHYSICAL receipt boundary', () => {
         },
       });
       expect(tx.purchaseReceiptItem.create).toHaveBeenCalledTimes(1);
-      expect(physical.creditAvailable).toHaveBeenCalledTimes(1);
+      expect(physical.creditPurchaseReceipt).toHaveBeenCalledTimes(1);
       expect(input.supplierDocumentNumber).toBe('  DOC-42  ');
     },
   );
@@ -206,7 +206,7 @@ describe('supplier documents across the PHYSICAL receipt boundary', () => {
       expect(tx.purchaseReceipt.create).not.toHaveBeenCalled();
       expect(tx.purchaseReceiptItem.create).not.toHaveBeenCalled();
       expect(tx.purchase.update).not.toHaveBeenCalled();
-      expect(physical.creditAvailable).not.toHaveBeenCalled();
+      expect(physical.creditPurchaseReceipt).not.toHaveBeenCalled();
       expect(projections.apply).not.toHaveBeenCalled();
       expect(history.write).not.toHaveBeenCalled();
     },
@@ -236,6 +236,6 @@ describe('supplier documents across the PHYSICAL receipt boundary', () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.idempotencyRecord.create).not.toHaveBeenCalled();
     expect(tx.purchaseReceipt.create).not.toHaveBeenCalled();
-    expect(physical.creditAvailable).not.toHaveBeenCalled();
+    expect(physical.creditPurchaseReceipt).not.toHaveBeenCalled();
   });
 });

@@ -23,6 +23,11 @@ import {
 } from './physical-inventory.contract';
 import { PhysicalInventoryRepository } from './physical-inventory.repository';
 import {
+  authorizePurchaseReceiptCredit,
+  PurchaseReceiptCreditContext,
+  PurchaseReceiptCreditInput,
+} from './purchase-receipt-credit.authorization';
+import {
   physicalExpirationEligibility,
   storedExpirationDay,
 } from './physical-expiration-policy';
@@ -61,6 +66,18 @@ function positionKey(position: InventoryPosition): PositionKey {
 @Injectable()
 export class PhysicalInventoryService {
   constructor(private readonly repository: PhysicalInventoryRepository) {}
+
+  async creditPurchaseReceipt(
+    tx: Prisma.TransactionClient,
+    input: PurchaseReceiptCreditInput,
+  ): Promise<PhysicalResult> {
+    try {
+      const receipt = await authorizePurchaseReceiptCredit(tx, input);
+      return await this.mutate(tx, receipt.request, undefined, receipt);
+    } catch (error) {
+      throw physicalPersistenceError(error);
+    }
+  }
 
   async classifyCommittedDispatchCorrectionMaterial(
     tx: Prisma.TransactionClient,
@@ -154,6 +171,10 @@ export class PhysicalInventoryService {
       // PrismaClient is structurally assignable to TransactionClient in TS.
       // Reject that accidental non-transactional call before any database access.
       requirePhysical(tx && typeof tx === 'object' && !('$transaction' in tx));
+      requirePhysical(
+        input.origin?.type !== 'PURCHASE_RECEIPT',
+        'PHYSICAL_EFFECT_MISMATCH',
+      );
       return await this.mutate(tx, normalizePhysicalRequest(input));
     } catch (error) {
       throw physicalPersistenceError(error);
@@ -184,6 +205,7 @@ export class PhysicalInventoryService {
     tx: Prisma.TransactionClient,
     request: PhysicalRequest,
     correction?: CorrectionContext,
+    receipt?: PurchaseReceiptCreditContext,
   ): Promise<PhysicalResult> {
     const classify = () =>
       correction
@@ -299,7 +321,7 @@ export class PhysicalInventoryService {
     ) => {
       const product = productMap.get(key.productId);
       requirePhysical(product, 'PRODUCT_NOT_FOUND');
-      this.validateKey(key, product, batchMap, assertNotExpired);
+      this.validateKey(key, product, batchMap, assertNotExpired, receipt);
       const identity = positionIdentity(key);
       const existing = plan.get(identity);
       requirePhysical(
@@ -452,16 +474,25 @@ export class PhysicalInventoryService {
     product: Product,
     batches: Map<string, InventoryBatch>,
     assertNotExpired: (day: string | null) => void,
+    receipt?: PurchaseReceiptCreditContext,
   ) {
     assertNotExpired(key.expirationDate ?? null);
-    // S3a installs temporal validation without authorizing S3b writers.
-    requirePhysical(key.expirationDate == null, 'PHYSICAL_SOURCE_NOT_ELIGIBLE');
+    // Only a reconstructed receipt context authorizes dated CREDIT in W1.
+    // Generic credits, debits, transfers and counts keep the S2 gate.
+    requirePhysical(
+      key.expirationDate == null || receipt,
+      'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+    );
     requirePhysical(product.inventoryTracking === 'QUANTITY');
     requirePhysical(
-      product.lotTracking !== 'REQUIRED' || key.inventoryBatchId !== null,
+      receipt ||
+        product.lotTracking !== 'REQUIRED' ||
+        key.inventoryBatchId !== null,
     );
     requirePhysical(
-      product.lotTracking !== 'NONE' || key.inventoryBatchId === null,
+      receipt ||
+        product.lotTracking !== 'NONE' ||
+        key.inventoryBatchId === null,
     );
     const batch = key.inventoryBatchId
       ? batches.get(key.inventoryBatchId)
