@@ -11,6 +11,7 @@ import { Response } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePurchaseDto } from './dto/create-purchase.dto';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
+import { PurchasesFolioService } from './purchases-folio.service';
 
 type PurchaseWithReceiptItems = {
   items: Array<{
@@ -21,103 +22,112 @@ type PurchaseWithReceiptItems = {
 
 @Injectable()
 export class PurchasesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly folios: PurchasesFolioService,
+  ) {}
 
   async create(companyId: string, dto: CreatePurchaseDto) {
-    const productIds = dto.items.map((item) => item.productId);
-    const uniqueProductIds = new Set(productIds);
+    return this.prisma.$transaction(async (tx) => {
+      const productIds = dto.items.map((item) => item.productId);
+      const uniqueProductIds = new Set(productIds);
 
-    if (uniqueProductIds.size !== productIds.length) {
-      throw new BadRequestException(
-        'No se permiten productos duplicados en una compra',
-      );
-    }
-
-    const supplier = await this.prisma.supplier.findFirst({
-      where: {
-        id: dto.supplierId,
-        companyId,
-      },
-    });
-
-    if (!supplier) {
-      throw new NotFoundException('Proveedor no encontrado');
-    }
-
-    const products = await this.prisma.product.findMany({
-      where: {
-        companyId,
-        id: {
-          in: productIds,
-        },
-      },
-    });
-
-    const productsById = new Map(
-      products.map((product) => [product.id, product]),
-    );
-
-    const missingProductId = productIds.find(
-      (productId) => !productsById.has(productId),
-    );
-
-    if (missingProductId) {
-      throw new NotFoundException(`Producto ${missingProductId} no encontrado`);
-    }
-
-    const purchaseItems: Array<{
-      productId: string;
-      quantity: number;
-      price: number;
-      subtotal: number;
-    }> = [];
-
-    let subtotal = 0;
-
-    for (const item of dto.items) {
-      const product = productsById.get(item.productId);
-
-      if (!product) {
-        throw new NotFoundException(`Producto ${item.productId} no encontrado`);
+      if (uniqueProductIds.size !== productIds.length) {
+        throw new BadRequestException(
+          'No se permiten productos duplicados en una compra',
+        );
       }
 
-      const itemSubtotal = this.roundMoney(item.quantity * product.cost);
-
-      subtotal = this.roundMoney(subtotal + itemSubtotal);
-
-      purchaseItems.push({
-        productId: product.id,
-
-        quantity: item.quantity,
-        price: product.cost,
-        subtotal: itemSubtotal,
-      });
-    }
-
-    const iva = this.roundMoney(subtotal * 0.16);
-    const total = this.roundMoney(subtotal + iva);
-    const folio = `OC-${Date.now()}`;
-
-    return this.prisma.purchase.create({
-      data: {
-        companyId,
-        supplierId: dto.supplierId,
-        folio,
-        subtotal,
-        iva,
-        total,
-        items: {
-          create: purchaseItems,
+      const supplier = await tx.supplier.findFirst({
+        where: {
+          id: dto.supplierId,
+          companyId,
         },
-      },
-      include: {
-        supplier: true,
-        items: {
-          include: {
-            product: true,
+      });
+
+      if (!supplier) {
+        throw new NotFoundException('Proveedor no encontrado');
+      }
+
+      const products = await tx.product.findMany({
+        where: {
+          companyId,
+          id: {
+            in: productIds,
           },
         },
-      },
+      });
+
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+
+      const missingProductId = productIds.find(
+        (productId) => !productsById.has(productId),
+      );
+
+      if (missingProductId) {
+        throw new NotFoundException(
+          `Producto ${missingProductId} no encontrado`,
+        );
+      }
+
+      const purchaseItems: Array<{
+        productId: string;
+        quantity: number;
+        price: number;
+        subtotal: number;
+      }> = [];
+
+      let subtotal = 0;
+
+      for (const item of dto.items) {
+        const product = productsById.get(item.productId);
+
+        if (!product) {
+          throw new NotFoundException(
+            `Producto ${item.productId} no encontrado`,
+          );
+        }
+
+        const itemSubtotal = this.roundMoney(item.quantity * product.cost);
+
+        subtotal = this.roundMoney(subtotal + itemSubtotal);
+
+        purchaseItems.push({
+          productId: product.id,
+
+          quantity: item.quantity,
+          price: product.cost,
+          subtotal: itemSubtotal,
+        });
+      }
+
+      const iva = this.roundMoney(subtotal * 0.16);
+      const total = this.roundMoney(subtotal + iva);
+      const folio = await this.folios.allocateNextAvailableFolio(tx, companyId);
+
+      return tx.purchase.create({
+        data: {
+          companyId,
+          supplierId: dto.supplierId,
+          folio,
+          subtotal,
+          iva,
+          total,
+          items: {
+            create: purchaseItems,
+          },
+        },
+        include: {
+          supplier: true,
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
     });
   }
 

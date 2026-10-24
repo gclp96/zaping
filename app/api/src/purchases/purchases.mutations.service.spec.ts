@@ -4,6 +4,7 @@ import { PurchaseStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdatePurchaseDto } from './dto/update-purchase.dto';
 import { PurchasesService } from './purchases.service';
+import { PurchasesFolioService } from './purchases-folio.service';
 
 describe('PurchasesService — tenant-safe mutations', () => {
   const companyId = '11111111-1111-4111-8111-111111111111';
@@ -63,7 +64,10 @@ describe('PurchasesService — tenant-safe mutations', () => {
       ),
     };
 
-    service = new PurchasesService(prisma as unknown as PrismaService);
+    service = new PurchasesService(
+      prisma as unknown as PrismaService,
+      {} as PurchasesFolioService,
+    );
   });
 
   const updateDto: UpdatePurchaseDto = {

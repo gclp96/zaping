@@ -409,6 +409,7 @@ model Purchase {
   items    PurchaseItem[]
   receipts PurchaseReceipt[]
 
+  @@unique([companyId, folio])
   @@index([companyId])
   @@index([supplierId])
   @@index([status])
