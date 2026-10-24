@@ -1213,7 +1213,7 @@ describe('PurchasesPage — recepciones', () => {
       await screen.findByText('OC-0001');
 
       const receiveButton = screen.queryByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       });
 
       if (canReceive) {
@@ -1236,6 +1236,32 @@ describe('PurchasesPage — recepciones', () => {
     },
   );
 
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE', 'SALES'] as const)(
+    'conserva el acceso a Recibir para el rol %s',
+    async (role) => {
+      clearAuthenticatedSessionCache();
+      configureApiMocks([purchase], { role });
+      render(<PurchasesPage />);
+      if (role === 'SALES') {
+        await screen.findByRole('heading', { name: 'Sin permisos' });
+        expect(screen.queryByText('OC-0001')).toBeNull();
+      } else {
+        await screen.findByText('OC-0001');
+      }
+
+      const button = screen.queryByRole('button', { name: 'Recibir' });
+      if (role === 'SALES') {
+        expect(button).toBeNull();
+      } else {
+        expect(button).not.toBeNull();
+        const descriptionId = button!.getAttribute('aria-describedby');
+        expect(document.getElementById(descriptionId!)?.textContent)
+          .toBe('Registrar recepción de la compra OC-0001');
+      }
+      expect(api.post).not.toHaveBeenCalled();
+    },
+  );
+
   it('prepara la recepción directa sin abrir el detalle de compra', async () => {
     const user = userEvent.setup();
 
@@ -1244,7 +1270,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1302,7 +1328,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1350,7 +1376,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1411,7 +1437,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0002');
 
     const receiveButtons = screen.getAllByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
 
     await user.click(receiveButtons[0]);
@@ -1477,7 +1503,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1525,7 +1551,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1564,7 +1590,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
 
     const receiveButton = screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
 
     await user.click(receiveButton);
@@ -1609,7 +1635,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
 
     const receiveButton = screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
     await user.click(receiveButton);
 
@@ -1647,7 +1673,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1714,7 +1740,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 
   await user.click(
     screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     }),
   );
 
@@ -1785,7 +1811,7 @@ it('mantiene el progreso por purchaseItemId con múltiples recepciones y product
 
   await user.click(
     screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     }),
   );
 
@@ -1818,7 +1844,7 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1848,7 +1874,7 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1888,7 +1914,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1940,7 +1966,7 @@ it('envía correctamente la recepción al backend', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2124,7 +2150,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2176,7 +2202,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2225,7 +2251,7 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
   await waitFor(() => expect(getReceiptSubmitButton().hasAttribute('disabled')).toBe(false));
@@ -2267,7 +2293,7 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2633,20 +2659,20 @@ describe('PurchasesPage — formulario de compra', () => {
     {
       purchaseForStatus: draftPurchase,
       primaryAction: /^aprobar$/i,
-      hiddenPrimaryAction: /registrar recepci[oó]n/i,
+      hiddenPrimaryAction: /recibir/i,
       menuActions: [/^editar$/i, /descargar pdf/i, /cancelar/i],
       omittedMenuActions: [/ver detalle/i],
     },
     {
       purchaseForStatus: purchase,
-      primaryAction: /registrar recepci[oó]n/i,
+      primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: partialPurchase,
-      primaryAction: /registrar recepci[oó]n/i,
+      primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
@@ -2654,14 +2680,14 @@ describe('PurchasesPage — formulario de compra', () => {
     {
       purchaseForStatus: receivedPurchase,
       primaryAction: null,
-      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      hiddenPrimaryAction: /recibir|aprobar/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: cancelledPurchase,
       primaryAction: null,
-      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      hiddenPrimaryAction: /recibir|aprobar/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
@@ -2752,7 +2778,7 @@ describe('PurchasesPage — formulario de compra', () => {
       within(row).queryByRole('button', { name: /^aprobar$/i }),
     ).toBeNull();
     expect(
-      within(row).queryByRole('button', { name: /registrar recepción/i }),
+      within(row).queryByRole('button', { name: /recibir/i }),
     ).toBeNull();
 
     const menu = await openActionsMenu(user, draftPurchase.folio);
@@ -3095,7 +3121,7 @@ it.each(['desktop', 'mobile'])('PHYSICAL REQUIRED envía fecha sin lote desde %s
   vi.mocked(api.post).mockResolvedValue({ data: { id: 'receipt-physical', folio: 'REC-PHYSICAL' } } as never);
   render(<PurchasesPage />);
   await screen.findByText('OC-0001');
-  await user.click(screen.getByRole('button', { name: /registrar recepci[oó]n/i }));
+  await user.click(screen.getByRole('button', { name: /recibir/i }));
   await screen.findByText(/lote y caducidad son opcionales e independientes/i);
   const editor = within(screen.getByTestId('receipt-' + layout + '-items'));
   await user.type(editor.getByLabelText('Cantidad recibida de Producto médico'), '2');

@@ -1001,7 +1001,7 @@ async function loadPageData() {
         ];
 
         return (
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="relative flex flex-wrap items-center justify-end gap-2">
             {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
@@ -1025,29 +1025,36 @@ async function loadPageData() {
             ) : null}
 
             {canEdit && canRegisterPurchaseReceipt(purchase.status) ? (
-            <Button
-              variant="success"
-              size="sm"
-              className="min-w-0 whitespace-normal"
-              loading={
-                directReceiveState?.status === 'loading' &&
-                directReceiveState.purchase.id === purchase.id
-              }
-              loadingText="Preparando..."
-              disabled={
-                directReceiveState?.status === 'loading'
-              }
-              onClick={() => void handleDirectReceive(purchase)}
-            >
-              Registrar recepción
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 min-w-0 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                aria-describedby={`receive-purchase-${purchase.id}`}
+                loading={
+                  directReceiveState?.status === 'loading' &&
+                  directReceiveState.purchase.id === purchase.id
+                }
+                loadingText="Preparando..."
+                disabled={directReceiveState?.status === 'loading'}
+                onClick={() => void handleDirectReceive(purchase)}
+              >
+                Recibir
+              </Button>
             ) : null}
 
-            <RowActionsMenu
-              row={purchase}
-              label={`Acciones de compra ${purchase.folio}`}
-              actions={rowActions}
-            />
+            {canEdit && canRegisterPurchaseReceipt(purchase.status) ? (
+              <span id={`receive-purchase-${purchase.id}`} className="sr-only">
+                Registrar recepción de la compra {purchase.folio}
+              </span>
+            ) : null}
+
+            <div className="inline-flex [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
+              <RowActionsMenu
+                row={purchase}
+                label={`Acciones de compra ${purchase.folio}`}
+                actions={rowActions}
+              />
+            </div>
           </div>
         );
       },
