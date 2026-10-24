@@ -189,12 +189,13 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
   return (
     <>
       {enabled ? <span ref={launcher} className="inline-flex">
-        <Button onClick={start}><Plus aria-hidden="true" size={18} />Nueva recepción</Button>
+        <Button onClick={start}><Plus aria-hidden="true" size={18} />Registrar recepción</Button>
       </span> : null}
       <Modal isOpen={enabled && open && !captureReady && !receipt.createdReceipt} onClose={close}
         title="Seleccionar orden de compra"
         description="Selecciona una compra. Verificaremos su detalle, recepciones y movimientos antes de continuar.">
         <div className="space-y-4">
+          <p className="text-sm text-text-muted">Las cantidades se verifican al seleccionar la orden.</p>
           {loading ? <p role="status">Cargando compras...</p> : null}
           {error ? <div role="alert" className="space-y-3 rounded-lg bg-red-50 p-4 text-red-800">
             <p>{error}</p>
@@ -214,7 +215,7 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
                   <p className="break-words font-semibold text-blue-800">{purchase.folio}</p>
                   <p className="break-words text-sm">{purchase.supplier.name}</p>
                   <p className="text-sm text-text-muted">{Number.isFinite(purchase.receiptProgress?.pendingUnits)
-                    ? `Pendientes según resumen: ${purchase.receiptProgress.pendingUnits} uds.`
+                    ? `Pendientes estimados: ${purchase.receiptProgress.pendingUnits} unidades`
                     : 'Pendientes por verificar'}</p>
                 </div>
                 <Button variant="outline" loading={preparingId === purchase.id} loadingText="Verificando..."
@@ -227,8 +228,8 @@ export default function CreateReceiptFlow({ enabled, onReceiptCreated }: {
           <div className="flex flex-wrap items-center gap-3">
             {!loading ? <Button variant="outline" disabled={Boolean(preparingId)} onClick={() => {
               receipt.closeReceiptModal(); setSelectedId(null); void loadPurchases();
-            }}>Actualizar compras</Button> : null}
-            <Button variant="secondary" onClick={close}>Cerrar selector</Button>
+            }}>Actualizar</Button> : null}
+            <Button variant="secondary" onClick={close}>Cerrar</Button>
           </div>
         </div>
       </Modal>

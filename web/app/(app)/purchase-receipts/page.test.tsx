@@ -218,7 +218,7 @@ function deferredResponse() {
 }
 
 async function openSelector(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(await screen.findByRole('button', { name: 'Nueva recepción' }));
+  await user.click(await screen.findByRole('button', { name: 'Registrar recepción' }));
   return screen.findByRole('dialog', { name: 'Seleccionar orden de compra' });
 }
 
@@ -233,7 +233,7 @@ async function submitCapture(user: ReturnType<typeof userEvent.setup>) {
   const input = within(screen.getByTestId('receipt-desktop-items'))
     .getByRole('spinbutton', { name: 'Cantidad recibida de Material B3' });
   await user.type(input, '2');
-  await user.click(screen.getByRole('button', { name: 'Registrar recepción' }));
+  await user.click(within(screen.getByRole('dialog', { name: 'Registrar recepción · OC-B3' })).getByRole('button', { name: 'Registrar recepción' }));
 }
 
 describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
@@ -254,18 +254,18 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
 
   it.each(['unauthenticated', 'loading', 'error'])('no ofrece creación con sesión %s', (status) => {
     sessionMock.mockReturnValue({ status }); render(<PurchaseReceiptsPage />);
-    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
   });
 
   it('no ofrece creación a SALES ni tras 403', async () => {
     sessionMock.mockReturnValue({ status: 'success', user: { role: 'SALES' } });
     const view = render(<PurchaseReceiptsPage />);
-    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
     view.unmount();
     sessionMock.mockReturnValue({ status: 'success', user: { role: 'ADMIN' } });
     creationApi({ '/purchase-receipts': () => Promise.reject({ response: { status: 403 } }) });
     render(<PurchaseReceiptsPage />); await screen.findByRole('heading', { name: 'Sin permisos' });
-    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
   });
 
   it('excluye estados no elegibles y resúmenes sin pendientes; permite buscar proveedor', async () => {
@@ -279,6 +279,37 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     expect(within(dialog).queryByRole('button', { name: /Seleccionar (DRAFT|CANCELLED|RECEIVED|OC-COMPLETE)/ })).toBeNull();
     await user.type(screen.getByRole('searchbox', { name: 'Buscar OC por folio o proveedor' }), 'proveedor b3');
     expect(screen.getByRole('button', { name: 'Seleccionar OC-B3' })).toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('presenta pendientes estimados dinámicos, aclara la verificación y conserva búsqueda, actualización y cierre', async () => {
+    creationApi({ '/purchases': () => Promise.resolve({ data: [{
+      ...candidate, receiptProgress: { ...candidate.receiptProgress, pendingUnits: 25 },
+    }, secondCandidate] }) });
+    const user = userEvent.setup(); render(<PurchaseReceiptsPage />);
+    const dialog = await openSelector(user);
+    expect(await within(dialog).findByText('Pendientes estimados: 25 unidades')).toBeTruthy();
+    expect(within(dialog).getByText('Pendientes estimados: 10 unidades')).toBeTruthy();
+    expect(within(dialog).getByText('Las cantidades se verifican al seleccionar la orden.')).toBeTruthy();
+    expect(within(dialog).queryByText(/Pendientes según resumen/)).toBeNull();
+
+    const search = within(dialog).getByRole('searchbox', { name: 'Buscar OC por folio o proveedor' });
+    await user.type(search, 'OC-B3');
+    expect(within(dialog).getByRole('button', { name: 'Seleccionar OC-B3' })).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'Seleccionar OC-SECOND' })).toBeNull();
+    await user.clear(search);
+    const refresh = deferredResponse();
+    creationApi({ '/purchases': () => refresh.promise });
+    await user.click(within(dialog).getByRole('button', { name: 'Actualizar' }));
+    expect(within(dialog).getByRole('status').textContent).toBe('Cargando compras...');
+    expect(within(dialog).queryByRole('button', { name: 'Actualizar' })).toBeNull();
+    await act(async () => { refresh.resolve({ data: [{
+      ...candidate, receiptProgress: { ...candidate.receiptProgress, pendingUnits: 7 },
+    }] }); });
+    expect(await within(dialog).findByText('Pendientes estimados: 7 unidades')).toBeTruthy();
+    await user.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Registrar recepción' }));
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -352,7 +383,7 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     creationApi({ [path]: () => old.promise });
     const user = userEvent.setup(); render(<PurchaseReceiptsPage />); await openSelector(user);
     if (stage !== 'list') await user.click(await screen.findByRole('button', { name: 'Seleccionar OC-B3' }));
-    await user.click(screen.getByRole('button', { name: 'Cerrar selector' }));
+    await user.click(screen.getByRole('button', { name: 'Cerrar' }));
     creationApi(); await openSelector(user);
     await user.click(await screen.findByRole('button', { name: 'Seleccionar OC-SECOND' }));
     await screen.findByRole('dialog', { name: 'Registrar recepción · OC-SECOND' });
@@ -373,17 +404,17 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     const user = userEvent.setup(); render(<PurchaseReceiptsPage />);
     await openSelector(user); await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Nueva recepción' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Registrar recepción' }));
     await openCapture(user); await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Nueva recepción' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Registrar recepción' }));
   });
 
   it.each(['CUTOVER_FROZEN', 'Authority unavailable'])('conserva bloqueo por authority %s', async (message) => {
     creationApi({ '/purchase-receipts/capabilities': () => Promise.reject(new Error(message)) });
     const user = userEvent.setup(); render(<PurchaseReceiptsPage />); await openCapture(user);
     await screen.findByRole('button', { name: 'Reintentar verificación' });
-    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toHaveProperty('disabled', true);
+    expect(within(screen.getByRole('dialog', { name: 'Registrar recepción · OC-B3' })).getByRole('button', { name: 'Registrar recepción' })).toHaveProperty('disabled', true);
     expect(api.post).not.toHaveBeenCalled();
   });
 
@@ -403,7 +434,7 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     vi.mocked(api.post).mockRejectedValueOnce(new Error('POST failed')).mockImplementationOnce(() => pending.promise as never);
     const user = userEvent.setup(); render(<PurchaseReceiptsPage />); await submitCapture(user);
     await screen.findByText('POST failed');
-    const submit = screen.getByRole('button', { name: 'Registrar recepción' });
+    const submit = within(screen.getByRole('dialog', { name: 'Registrar recepción · OC-B3' })).getByRole('button', { name: 'Registrar recepción' });
     fireEvent.click(submit); fireEvent.click(submit);
     expect(api.post).toHaveBeenCalledTimes(2);
     const firstKey = vi.mocked(api.post).mock.calls[0][2]?.headers?.['Idempotency-Key'];
@@ -439,7 +470,6 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     expect(screen.getByRole('heading', { name: 'Sin permisos' })).toBeTruthy();
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByRole('link', { name: primaryReceipt.folio })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
     expect(within(confirmation).queryByText('Proveedor B3')).toBeNull();
     expect(api.post).toHaveBeenCalledTimes(1);
@@ -447,7 +477,7 @@ describe('OX-PUR-06B3 — creación mediante el flujo existente', () => {
     expect(key).toBeTruthy();
     await user.click(within(confirmation).getByRole('button', { name: 'Cerrar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Nueva recepción' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Sin permisos' })).toBeTruthy();
     expect(api.post).toHaveBeenCalledTimes(1);
   });
@@ -550,7 +580,7 @@ describe('PurchaseReceiptsPage', () => {
     expect(folio.getAttribute('href')).toBe('/purchase-receipts/receipt-alpha');
     expect(screen.getByRole('heading', { name: 'Recepciones', level: 1 })).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe('2 de 2 recepciones');
-    expect(screen.getByRole('button', { name: 'Nueva recepción' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeTruthy();
     folio.focus();
     expect(document.activeElement).toBe(folio);
     await user.type(screen.getByRole('searchbox', { name: 'Buscar recepciones' }), 'ALPHA');
