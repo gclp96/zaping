@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.spec.json",
+  "compilerOptions": { "noEmit": true, "incremental": false },
+  "include": [
+    "../src/purchases/**/*.ts",
+    "../src/company-sequences/**/*.ts",
+    "./purchase-annual-folio.postgres.e2e-spec.ts"
+  ]
+}
