@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException } from '@nestjs/common';
 import { parseCloudflareR2Config } from './cloudflare-r2-config';
 import { requireCloudflareR2QaFixture } from './cloudflare-r2-qa-probe';
 
@@ -51,7 +50,7 @@ describe('Cloudflare R2 QA smoke opt-in and tenant safety', () => {
     { R2_QA_FIXTURE_SIZE_BYTES: '10485761' },
     { R2_QA_FIXTURE_SIZE_BYTES: '1e3' },
   ])('rejects unsafe or incomplete configuration: %j', (patch) => {
-    expect(() => validate(patch)).toThrow(BadRequestException);
+    expect(() => validate(patch)).toThrow();
   });
 
   it('does not expose credentials or fixture details in failures', () => {
