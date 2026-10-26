@@ -34,9 +34,7 @@ describe('Cloudflare R2 configuration validation', () => {
       ...valid,
       R2_JURISDICTION: jurisdiction,
     });
-    expect(config?.endpoint).toBe(
-      `https://${valid.R2_ACCOUNT_ID}.${suffix}`,
-    );
+    expect(config?.endpoint).toBe(`https://${valid.R2_ACCOUNT_ID}.${suffix}`);
   });
 
   it.each([
@@ -49,9 +47,9 @@ describe('Cloudflare R2 configuration validation', () => {
     [{ R2_READ_ACCESS_KEY_ID: '' }, 'credentials'],
     [{ R2_READ_SECRET_ACCESS_KEY: 'bad secret\nvalue' }, 'credentials'],
   ])('rejects unsafe configuration %j', (patch, expectedError) => {
-    expect(() =>
-      parseCloudflareR2Config({ ...valid, ...patch }),
-    ).toThrow(expectedError);
+    expect(() => parseCloudflareR2Config({ ...valid, ...patch })).toThrow(
+      expectedError,
+    );
   });
 
   it('never interpolates credential values into validation errors', () => {
