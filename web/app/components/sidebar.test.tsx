@@ -13,6 +13,7 @@ const expectedNavigation = [
   ["Proveedores", "/suppliers"],
   ["Compras", "/purchases"],
   ["Recepciones", "/purchase-receipts"],
+  ["Documentos de proveedor", "/supplier-documents"],
   ["Productos", "/products"],
   ["Inventario", "/inventory"],
   ["Equipos", "/equipment"],
@@ -101,6 +102,7 @@ describe("Sidebar", () => {
           "Proveedores",
           "Compras",
           "Recepciones",
+          "Documentos de proveedor",
           "Equipos",
           "Usuarios",
         ],
@@ -121,7 +123,7 @@ describe("Sidebar", () => {
           "Hospitales",
           "Categorías",
         ],
-        hidden: ["Clientes", "Cotizaciones", "Ventas", "Usuarios"],
+        hidden: ["Clientes", "Cotizaciones", "Ventas", "Documentos de proveedor", "Usuarios"],
       },
     ];
 
