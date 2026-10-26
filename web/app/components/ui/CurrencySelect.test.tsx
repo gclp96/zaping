@@ -1,7 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import CurrencySelect, { isSupportedCurrency } from "./CurrencySelect";
+
+afterEach(() => cleanup());
 
 describe("CurrencySelect", () => {
   it("only allows selection of MXN or USD", async () => {
