@@ -147,6 +147,119 @@ describe('ReceiptSupplierDocuments', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 
+  it('filters documents by receipt supplier and posts the selected ID', async () => {
+    vi.mocked(api.get).mockImplementation(async (path) =>
+      ({
+        data:
+          path === '/supplier-documents'
+            ? [
+                {
+                  id: 'document-1',
+                  supplierId: 'supplier-1',
+                  type: 'REMISION',
+                  series: 'A',
+                  number: '000123',
+                  status: 'ACTIVE',
+                  identityOccurrence: 1,
+                },
+                {
+                  id: 'document-2',
+                  supplierId: 'supplier-1',
+                  type: 'REMISION',
+                  series: 'A',
+                  number: '000123',
+                  status: 'ACTIVE',
+                  identityOccurrence: 2,
+                },
+              ]
+            : [],
+      }) as never,
+    );
+    vi.mocked(api.post).mockResolvedValue({ data: {} } as never);
+    const user = userEvent.setup();
+    render(
+      <ReceiptSupplierDocuments
+        receiptId="receipt-1"
+        supplierId="supplier-1"
+        legacyReference="REMISION · 000123"
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Vincular documento existente' }),
+    );
+    expect(api.get).toHaveBeenCalledWith('/supplier-documents', {
+      params: { supplierId: 'supplier-1' },
+    });
+    await user.selectOptions(
+      screen.getByLabelText('Documento del proveedor'),
+      'document-2',
+    );
+    await user.click(screen.getByRole('button', { name: 'Confirmar vínculo' }));
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        '/supplier-documents/receipts/receipt-1/links',
+        { documentId: 'document-2' },
+      ),
+    );
+  });
+
+  it('rejects documents from another supplier returned by the API', async () => {
+    vi.mocked(api.get).mockImplementation(async (path) =>
+      ({
+        data:
+          path === '/supplier-documents'
+            ? [{
+                id: 'foreign-document',
+                supplierId: 'other-supplier',
+                type: 'FACTURA',
+                series: null,
+                number: '777',
+                status: 'ACTIVE',
+                identityOccurrence: 1,
+              }]
+            : [],
+      }) as never,
+    );
+    const user = userEvent.setup();
+    render(
+      <ReceiptSupplierDocuments
+        receiptId="receipt-1"
+        supplierId="supplier-1"
+        legacyReference={null}
+      />,
+    );
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Vincular documento existente' }),
+    );
+    expect(
+      await screen.findByText('No fue posible cargar los documentos del proveedor.'),
+    ).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Confirmar vínculo' })).toBeNull();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('does not request a link without a selected document', async () => {
+    vi.mocked(api.get).mockImplementation(async () => ({ data: [] }) as never);
+    const user = userEvent.setup();
+    render(
+      <ReceiptSupplierDocuments
+        receiptId="receipt-1"
+        supplierId="supplier-1"
+        legacyReference={null}
+      />,
+    );
+    await user.click(
+      await screen.findByRole('button', { name: 'Vincular documento existente' }),
+    );
+    expect(await screen.findByText(/No hay documentos recientes disponibles/)).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Confirmar vínculo' }).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
   it('reports a request failure and supports retry', async () => {
     vi.mocked(api.get)
       .mockRejectedValueOnce(new Error('offline'))
