@@ -6,7 +6,9 @@ import {
   SupplierDocumentType,
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { SupplierDocumentAttachmentsService } from '../src/supplier-documents/supplier-document-attachments.service';
+import {
+  SupplierDocumentAttachmentsService,
+} from '../src/supplier-documents/supplier-document-attachments.service';
 
 const describePg =
   process.env.RUN_SUPPLIER_ATTACHMENTS_PG === '1' ? describe : describe.skip;
@@ -19,7 +21,11 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     const companyId = randomUUID();
     const actorId = randomUUID();
     await db.company.create({
-      data: { id: companyId, name: 'PDOC-01B isolated fixture', rfc: companyId },
+      data: {
+        id: companyId,
+        name: 'PDOC-01B isolated fixture',
+        rfc: companyId,
+      },
     });
     await db.user.create({
       data: {
@@ -94,7 +100,7 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     await db?.$disconnect();
   });
 
-  it('quarantines new metadata and only lists a positively scanned attachment', async () => {
+  it('only lists attachments after a clean scan', async () => {
     const f = await fixture();
     const metadata = await db.supplierDocumentAttachment.create({
       data: attachment(f),
@@ -128,7 +134,7 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     ]);
   });
 
-  it('does not expose attachments or document existence across tenants', async () => {
+  it('blocks attachments from other tenants', async () => {
     const a = await fixture();
     const b = await fixture();
     await db.supplierDocumentAttachment.create({ data: attachment(a) });
@@ -147,7 +153,7 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     ).rejects.toThrow();
   });
 
-  it('blocks available-on-create, spoofed mime, oversize and invalid checksum', async () => {
+  it('rejects spoofed MIME, size, digest and scan state', async () => {
     const f = await fixture();
     await expect(
       db.supplierDocumentAttachment.create({
