@@ -29,6 +29,10 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+vi.mock('../ReceiptSupplierDocuments', () => ({
+  default: () => null,
+}));
+
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
