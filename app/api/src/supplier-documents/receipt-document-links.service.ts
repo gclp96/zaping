@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -11,6 +12,7 @@ export class ReceiptDocumentLinksService {
 
   async list(companyId: string, receiptId: string) {
     await this.requireReceipt(companyId, receiptId);
+
     return this.prisma.purchaseReceiptSupplierDocumentLink.findMany({
       where: { companyId, receiptId, removedAt: null },
       include: {
@@ -29,50 +31,99 @@ export class ReceiptDocumentLinksService {
     });
   }
 
-  async link(companyId: string, actorId: string, receiptId: string, documentId: string) {
+  async link(
+    companyId: string,
+    actorId: string,
+    receiptId: string,
+    documentId: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const receipt = await tx.purchaseReceipt.findFirst({
         where: { id: receiptId, companyId },
-        select: { id: true, purchase: { select: { supplierId: true } } },
+        select: {
+          id: true,
+          purchaseId: true,
+          purchase: { select: { supplierId: true } },
+        },
       });
-      if (!receipt) throw new NotFoundException('Recepción no encontrada');
+      if (!receipt) {
+        throw new NotFoundException('Recepción no encontrada');
+      }
 
       const document = await tx.supplierDocument.findFirst({
         where: { id: documentId, companyId },
         select: { id: true, supplierId: true, status: true },
       });
-      if (!document) throw new NotFoundException('Documento no encontrado');
+      if (!document) {
+        throw new NotFoundException('Documento no encontrado');
+      }
       if (receipt.purchase.supplierId !== document.supplierId) {
-        throw new ConflictException('El proveedor del documento no coincide con la recepción');
+        throw new ConflictException(
+          'El proveedor del documento no coincide con la recepción',
+        );
       }
       if (document.status !== 'ACTIVE') {
-        throw new ConflictException('No se puede vincular un documento cancelado');
+        throw new ConflictException(
+          'No se puede vincular un documento cancelado',
+        );
       }
 
-      const previous = await tx.purchaseReceiptSupplierDocumentLink.findUnique({
-        where: { companyId_receiptId_documentId: { companyId, receiptId, documentId } },
+      // PostgreSQL's partial unique index serializes simultaneous inserts.
+      // createMany/skipDuplicates makes a replay return the existing active link.
+      await tx.purchaseReceiptSupplierDocumentLink.createMany({
+        data: [
+          {
+            companyId,
+            purchaseId: receipt.purchaseId,
+            supplierId: document.supplierId,
+            receiptId,
+            documentId,
+            createdById: actorId,
+          },
+        ],
+        skipDuplicates: true,
       });
-      if (previous) {
-        if (previous.removedAt === null) return previous;
-        return tx.purchaseReceiptSupplierDocumentLink.update({
-          where: { id: previous.id },
-          data: { removedAt: null, removedById: null, reason: null, createdById: actorId, createdAt: new Date() },
+
+      const current =
+        await tx.purchaseReceiptSupplierDocumentLink.findFirst({
+          where: { companyId, receiptId, documentId, removedAt: null },
         });
+      if (!current) {
+        throw new ConflictException(
+          'No fue posible recuperar el vínculo documental',
+        );
       }
-
-      return tx.purchaseReceiptSupplierDocumentLink.create({
-        data: { companyId, receiptId, documentId, createdById: actorId },
-      });
+      return current;
     });
   }
 
-  async unlink(companyId: string, actorId: string, receiptId: string, documentId: string, reason: string) {
+  async unlink(
+    companyId: string,
+    actorId: string,
+    receiptId: string,
+    documentId: string,
+    reason: string,
+  ) {
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 10) {
+      throw new BadRequestException(
+        'El motivo debe tener al menos 10 caracteres',
+      );
+    }
+
     await this.requireReceipt(companyId, receiptId);
-    const changed = await this.prisma.purchaseReceiptSupplierDocumentLink.updateMany({
-      where: { companyId, receiptId, documentId, removedAt: null },
-      data: { removedAt: new Date(), removedById: actorId, reason: reason.trim() },
-    });
-    if (changed.count === 0) throw new NotFoundException('Vínculo documental activo no encontrado');
+    const changed =
+      await this.prisma.purchaseReceiptSupplierDocumentLink.updateMany({
+        where: { companyId, receiptId, documentId, removedAt: null },
+        data: {
+          removedAt: new Date(),
+          removedById: actorId,
+          reason: normalizedReason,
+        },
+      });
+    if (changed.count === 0) {
+      throw new NotFoundException('Vínculo documental activo no encontrado');
+    }
     return { unlinked: true };
   }
 
@@ -81,6 +132,8 @@ export class ReceiptDocumentLinksService {
       where: { id: receiptId, companyId },
       select: { id: true },
     });
-    if (!receipt) throw new NotFoundException('Recepción no encontrada');
+    if (!receipt) {
+      throw new NotFoundException('Recepción no encontrada');
+    }
   }
 }

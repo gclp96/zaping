@@ -418,6 +418,7 @@ model Purchase {
   receipts PurchaseReceipt[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
+  documentLinks PurchaseReceiptSupplierDocumentLink[]
 
   @@unique([id, companyId, supplierId])
   @@unique([companyId, folio])
@@ -2070,22 +2071,27 @@ model PurchaseReceiptReconciliationApproval {
 
 /// Nonmonetary document link. Financial allocations remain in PurchaseReceiptDocument.
 model PurchaseReceiptSupplierDocumentLink {
-  id String @id @default(uuid())
-  companyId String
-  receiptId String
-  documentId String
+  id          String    @id @default(uuid())
+  companyId   String
+  purchaseId  String
+  supplierId  String
+  receiptId   String
+  documentId  String
   createdById String
-  createdAt DateTime @default(now())
+  createdAt   DateTime  @default(now())
   removedById String?
-  removedAt DateTime?
-  reason String? @db.VarChar(1000)
+  removedAt   DateTime?
+  reason      String?   @db.VarChar(1000)
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  receipt PurchaseReceipt @relation(fields: [receiptId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
-  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
-  createdBy User @relation("ReceiptDocumentLinkCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
-  removedBy User? @relation("ReceiptDocumentLinkRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  purchase  Purchase        @relation(fields: [purchaseId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  receipt   PurchaseReceipt @relation(fields: [receiptId, companyId, purchaseId], references: [id, companyId, purchaseId], onDelete: Restrict, onUpdate: Restrict)
+  document  SupplierDocument @relation(fields: [documentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User            @relation("ReceiptDocumentLinkCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  removedBy User?           @relation("ReceiptDocumentLinkRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
-  @@unique([companyId, receiptId, documentId])
+  // One active link per pair, enforced by a partial unique index in migration SQL.
+  // Historical removed rows remain immutable for auditability.
+  @@index([companyId, receiptId, documentId])
   @@index([companyId, documentId])
 }

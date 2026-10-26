@@ -25,7 +25,10 @@ import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
 import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
-import { CreateReceiptDocumentLinkDto, RemoveReceiptDocumentLinkDto } from './dto/receipt-document-link.dto';
+import {
+  CreateReceiptDocumentLinkDto,
+  RemoveReceiptDocumentLinkDto,
+} from './dto/receipt-document-link.dto';
 import {
   ConfirmSupplierDocumentBasisDto,
   CreateSupplierDocumentAllocationDto,
@@ -55,18 +58,41 @@ export class SupplierDocumentsController {
   }
 
   @Get('receipts/:receiptId/links')
-  listReceiptLinks(@Req() req: AuthenticatedRequest, @Param('receiptId') receiptId: string) {
+  listReceiptLinks(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+  ) {
     return this.receiptLinks.list(req.user.companyId, receiptId);
   }
 
   @Post('receipts/:receiptId/links')
-  createReceiptLink(@Req() req: AuthenticatedRequest, @Param('receiptId') receiptId: string, @Body() dto: CreateReceiptDocumentLinkDto) {
-    return this.receiptLinks.link(req.user.companyId, req.user.id, receiptId, dto.documentId);
+  createReceiptLink(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+    @Body() dto: CreateReceiptDocumentLinkDto,
+  ) {
+    return this.receiptLinks.link(
+      req.user.companyId,
+      req.user.id,
+      receiptId,
+      dto.documentId,
+    );
   }
 
   @Delete('receipts/:receiptId/links/:documentId')
-  removeReceiptLink(@Req() req: AuthenticatedRequest, @Param('receiptId') receiptId: string, @Param('documentId') documentId: string, @Body() dto: RemoveReceiptDocumentLinkDto) {
-    return this.receiptLinks.unlink(req.user.companyId, req.user.id, receiptId, documentId, dto.reason);
+  removeReceiptLink(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+    @Param('documentId') documentId: string,
+    @Body() dto: RemoveReceiptDocumentLinkDto,
+  ) {
+    return this.receiptLinks.unlink(
+      req.user.companyId,
+      req.user.id,
+      receiptId,
+      documentId,
+      dto.reason,
+    );
   }
 
   @Get(':id')
