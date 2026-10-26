@@ -230,7 +230,6 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
     ).toBe(1);
   });
 
-
   it('keeps one document when the same idempotency key is submitted concurrently', async () => {
     const f = await fixture();
     const key = randomUUID();
@@ -243,7 +242,9 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
       await db.supplierDocument.count({ where: { companyId: f.companyId } }),
     ).toBe(1);
     expect(
-      await db.supplierDocumentAudit.count({ where: { companyId: f.companyId } }),
+      await db.supplierDocumentAudit.count({
+        where: { companyId: f.companyId },
+      }),
     ).toBe(1);
   });
 
@@ -283,22 +284,21 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
     );
     const detail = await service.detail(f.companyId, document.id);
     const audit = detail.audits[0];
-    expect(audit.change).toEqual(
-      expect.objectContaining({
-        snapshot: expect.objectContaining({
-          withholdingAmount: '20.00',
-          supplierId: f.supplierId,
-          issuerRfc: 'AAA010101AAA',
-          receiverRfc: 'BBB010101BBB',
-          taxBreakdowns: [
-            expect.objectContaining({
-              baseAmount: '1000.00',
-              ivaAmount: '160.00',
-            }),
-          ],
-        }),
-      }),
-    );
+    const change = audit.change as {
+      snapshot: {
+        withholdingAmount: string | null;
+        supplierId: string;
+        issuerRfc: string | null;
+        receiverRfc: string | null;
+        taxBreakdowns: { baseAmount: string; ivaAmount: string }[];
+      };
+    };
+    expect(change.snapshot.withholdingAmount).toBe('20.00');
+    expect(change.snapshot.supplierId).toBe(f.supplierId);
+    expect(change.snapshot.issuerRfc).toBe('AAA010101AAA');
+    expect(change.snapshot.receiverRfc).toBe('BBB010101BBB');
+    expect(change.snapshot.taxBreakdowns[0].baseAmount).toBe('1000.00');
+    expect(change.snapshot.taxBreakdowns[0].ivaAmount).toBe('160.00');
     await expect(
       db.supplierDocumentAudit.update({
         where: { id: audit.id },
