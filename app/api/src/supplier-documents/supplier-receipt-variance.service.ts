@@ -122,6 +122,8 @@ export class SupplierReceiptVarianceService {
         where: { companyId, receiptId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
+    const approvalCurrent =
+      approval?.allocationSnapshotHash === state.hash;
     return {
       receiptId,
       supplierId: state.supplierId,
@@ -131,7 +133,20 @@ export class SupplierReceiptVarianceService {
       activeInvoiceCount: state.active.length,
       snapshotHash: state.hash,
       latestApprovalId: approval?.id ?? null,
-      approvalCurrent: approval?.allocationSnapshotHash === state.hash,
+      approvalCurrent,
+      receiptReviewStatus: approvalCurrent
+        ? 'APPROVED_VARIANCE'
+        : 'REQUIRES_REVIEW',
+      receiptComparableNetAmount: approvalCurrent
+        ? approval.receiptNetAmount.toFixed(2)
+        : null,
+      receiptCurrency: approvalCurrent ? approval.currency : null,
+      approvedDifferenceAmount: approvalCurrent
+        ? approval.differenceAmount.toFixed(2)
+        : null,
+      automaticCoverageComplete: false,
+      // Legacy Float costs do not establish an authoritative receipt ceiling.
+      receiptCeilingVerified: false,
     };
   }
 
