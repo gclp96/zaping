@@ -6,9 +6,7 @@ import {
   SupplierDocumentType,
 } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
-import {
-  SupplierDocumentAttachmentsService,
-} from '../src/supplier-documents/supplier-document-attachments.service';
+import { SupplierDocumentAttachmentsService } from '../src/supplier-documents/supplier-document-attachments.service';
 
 const describePg =
   process.env.RUN_SUPPLIER_ATTACHMENTS_PG === '1' ? describe : describe.skip;
