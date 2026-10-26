@@ -116,6 +116,15 @@ describe("api base URL", () => {
     ).toBe("https://api.example.test");
   });
 
+  it("uses the configured IPv4 QA API URL instead of the localhost fallback", () => {
+    expect(
+      resolveApiBaseUrl({
+        NODE_ENV: "development",
+        NEXT_PUBLIC_API_URL: "http://127.0.0.1:3001",
+      }),
+    ).toBe("http://127.0.0.1:3001");
+  });
+
   it("uses the localhost API fallback outside production", () => {
     expect(
       resolveApiBaseUrl({
