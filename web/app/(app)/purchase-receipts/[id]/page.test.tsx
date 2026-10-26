@@ -42,6 +42,7 @@ const product = {
   id: 'product-quantity',
   sku: 'LF1837',
   name: 'BLUNT TIP',
+  inventoryTracking: 'QUANTITY' as const,
 };
 
 const quantityReceipt: PurchaseReceiptDetail = {
@@ -146,6 +147,7 @@ const assetReceipt: PurchaseReceiptDetail = {
         id: 'product-asset',
         sku: 'EQP-001',
         name: 'Equipo de monitoreo',
+        inventoryTracking: 'ASSET',
       },
       batch: null,
       equipmentAssets: [
@@ -241,7 +243,7 @@ describe('PurchaseReceiptDetailPage', () => {
         'No hay movimientos de inventario asociados a esta recepción.',
       ),
     ).toBeNull();
-    expect(screen.getByText('Esta recepción no generó equipos.')).toBeTruthy();
+    expect(screen.queryByText('Equipos generados')).toBeNull();
   });
 
   it('aplana y traduce los equipos generados por una recepción ASSET', async () => {
@@ -279,6 +281,17 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(
       screen.getAllByText('ITEM-ASSET-LOT').length,
     ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('advierte si llega un producto ASSET sin activos generados', async () => {
+    const missingAssets: PurchaseReceiptDetail = {
+      ...assetReceipt,
+      items: assetReceipt.items.map((item) => ({ ...item, equipmentAssets: [] })),
+    };
+    vi.mocked(api.get).mockResolvedValue({ data: missingAssets } as never);
+    render(<PurchaseReceiptDetailPage />);
+    expect(await screen.findByText(/no tiene activos generados/i)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Equipos generados' })).toBeTruthy();
   });
 
   it('trata la ausencia histórica de movimientos y equipos como estados normales', async () => {
