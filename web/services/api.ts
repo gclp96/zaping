@@ -14,7 +14,12 @@ function isHttpUrl(value: string) {
 export function resolveApiBaseUrl(
   env: Partial<
     Pick<NodeJS.ProcessEnv, "NODE_ENV" | "NEXT_PUBLIC_API_URL">
-  > = process.env,
+  > = {
+    // Next.js replaces only direct process.env.NEXT_PUBLIC_* references
+    // in browser bundles. Passing process.env dynamically loses this value.
+    NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  },
 ) {
   const configuredApiUrl = env.NEXT_PUBLIC_API_URL?.trim();
 
