@@ -5,6 +5,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
+import { getApiErrorStatus } from '@/services/errors';
 import Button from '@/app/components/ui/Button';
 
 export  default function LoginPage() {
@@ -25,8 +26,12 @@ export  default function LoginPage() {
             localStorage.setItem('token', response.data.token);
 
             router.push('/home');
-        }   catch {
-            alert('Credenciales inválidas');
+        } catch (error: unknown) {
+            if (getApiErrorStatus(error) === 401) {
+                alert('Credenciales inválidas');
+            } else {
+                alert('No fue posible conectar con la API. Intenta nuevamente.');
+            }
         }
     }
 
