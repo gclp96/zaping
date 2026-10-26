@@ -25,6 +25,7 @@ import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
 import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
+import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
 import {
   CreateReceiptDocumentLinkDto,
   RemoveReceiptDocumentLinkDto,
@@ -47,6 +48,7 @@ export class SupplierDocumentsController {
     private readonly reconciliation: SupplierDocumentReconciliationService,
     private readonly variance: SupplierReceiptVarianceService,
     private readonly receiptLinks: ReceiptDocumentLinksService,
+    private readonly attachments: SupplierDocumentAttachmentsService,
   ) {}
 
   @Get()
@@ -93,6 +95,14 @@ export class SupplierDocumentsController {
       documentId,
       dto.reason,
     );
+  }
+
+  @Get(':id/attachments')
+  listAvailableAttachments(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.attachments.listAvailable(req.user.companyId, id);
   }
 
   @Get(':id')
