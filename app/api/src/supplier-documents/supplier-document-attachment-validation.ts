@@ -38,7 +38,11 @@ export function inspectSupplierAttachment(
   if (
     !name ||
     Buffer.byteLength(name, 'utf8') > 255 ||
-    /[\\/\u0000-\u001f\u007f]/u.test(name) ||
+    /[\\/]/u.test(name) ||
+    Array.from(name).some((char) => {
+      const code = char.codePointAt(0) ?? 0;
+      return code < 32 || code === 127;
+    }) ||
     name === '.' ||
     name === '..'
   ) {
@@ -49,7 +53,9 @@ export function inspectSupplierAttachment(
   const isPdf =
     bytes.length >= 12 &&
     bytes.subarray(0, 5).equals(Buffer.from('%PDF-')) &&
-    bytes.subarray(Math.max(0, bytes.length - 2048)).includes(Buffer.from('%%EOF'));
+    bytes
+      .subarray(Math.max(0, bytes.length - 2048))
+      .includes(Buffer.from('%%EOF'));
 
   // JPEG: SOI, byte after SOI, and EOI. No other image formats are accepted.
   const isJpeg =
@@ -76,7 +82,9 @@ export function inspectSupplierAttachment(
   }
 
   if (claimedMime !== contentType) {
-    throw new BadRequestException('El MIME declarado no coincide con el archivo');
+    throw new BadRequestException(
+      'El MIME declarado no coincide con el archivo',
+    );
   }
 
   return {
