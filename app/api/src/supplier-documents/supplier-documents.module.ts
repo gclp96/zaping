@@ -6,6 +6,10 @@ import { SupplierDocumentReconciliationService } from './supplier-document-recon
 import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
 import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
+import {
+  PrivateAttachmentObjectStore,
+  UnconfiguredPrivateAttachmentStore,
+} from './private-attachment-object-store';
 
 @Module({
   imports: [PrismaModule],
@@ -16,6 +20,10 @@ import { SupplierDocumentAttachmentsService } from './supplier-document-attachme
     SupplierReceiptVarianceService,
     ReceiptDocumentLinksService,
     SupplierDocumentAttachmentsService,
+    {
+      provide: PrivateAttachmentObjectStore,
+      useClass: UnconfiguredPrivateAttachmentStore,
+    },
   ],
 })
 export class SupplierDocumentsModule {}
