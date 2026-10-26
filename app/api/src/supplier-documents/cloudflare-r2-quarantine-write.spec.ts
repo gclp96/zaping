@@ -1,12 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
-import {
-  BadRequestException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import {
-  CloudflareR2QuarantineWriter,
-} from './cloudflare-r2-quarantine-write';
+import { CloudflareR2QuarantineWriter } from './cloudflare-r2-quarantine-write';
 import {
   createR2ObjectKeys,
   requireTenantQuarantineR2Key,
@@ -29,7 +24,8 @@ const payload: ValidatedQuarantinePayload = {
 describe('R2 quarantine PutObject create-once writer', () => {
   const client = new S3Client({
     region: 'auto',
-    endpoint: 'https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com',
+    endpoint:
+      'https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com',
     credentials: {
       accessKeyId: 'not-real',
       secretAccessKey: 'not-real',
@@ -96,17 +92,19 @@ describe('R2 quarantine PutObject create-once writer', () => {
   });
 
   it('never returns the provider error, object key or bucket name', async () => {
-    send.mockRejectedValueOnce(new Error('R2 secret/key should not be exposed'));
-    await expect(writer.put(companyId, keys.quarantineKey, payload)).rejects.toThrow(
-      'Carga a cuarentena no confirmada',
+    send.mockRejectedValueOnce(
+      new Error('R2 secret/key should not be exposed'),
     );
+    await expect(
+      writer.put(companyId, keys.quarantineKey, payload),
+    ).rejects.toThrow('Carga a cuarentena no confirmada');
     expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('enforces Company ownership on opaque quarantine keys', () => {
-    expect(
-      requireTenantQuarantineR2Key(keys.quarantineKey, companyId),
-    ).toBe(keys.quarantineKey);
+    expect(requireTenantQuarantineR2Key(keys.quarantineKey, companyId)).toBe(
+      keys.quarantineKey,
+    );
     expect(() =>
       requireTenantQuarantineR2Key(keys.quarantineKey, randomUUID()),
     ).toThrow(BadRequestException);
