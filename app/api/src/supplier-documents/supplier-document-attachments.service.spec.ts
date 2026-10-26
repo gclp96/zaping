@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { Readable } from 'node:stream';
 import { NotFoundException } from '@nestjs/common';
 import { SupplierDocumentAttachmentStatus } from '@prisma/client';
 import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
@@ -56,6 +58,31 @@ describe('SupplierDocumentAttachmentsService', () => {
       }),
     );
     expect(storage.openReadOnly).not.toHaveBeenCalled();
+  });
+
+  it('passes the authenticated Company to the private storage boundary', async () => {
+    const bytes = Buffer.from('verified-private-object');
+    const hash = createHash('sha256').update(bytes).digest('hex');
+    prisma.supplierDocumentAttachment.findFirst.mockResolvedValue({
+      storageKey: 'private-internal-key',
+      originalName: 'attachment.pdf',
+      contentType: 'application/pdf',
+      sizeBytes: bytes.length,
+      sha256: hash,
+    });
+    storage.openReadOnly.mockResolvedValueOnce(Readable.from([bytes]));
+
+    await expect(
+      service.verifiedDownload('company-a', 'document-a', 'attachment-a'),
+    ).resolves.toMatchObject({
+      bytes,
+      contentType: 'application/pdf',
+      originalName: 'attachment.pdf',
+    });
+    expect(storage.openReadOnly).toHaveBeenCalledWith(
+      'private-internal-key',
+      'company-a',
+    );
   });
 
   it('returns only available metadata and never the private object key', async () => {
