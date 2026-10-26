@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException } from '@nestjs/common';
 
-const UUID =
-  '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
-const PRIVATE_KEY = new RegExp(
-  `^private/(${UUID})/(${UUID})/(${UUID})$`,
-  'i',
-);
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const PRIVATE_KEY = new RegExp(`^private/(${UUID})/(${UUID})/(${UUID})import { randomUUID } from 'node:crypto';
+import { BadRequestException } from '@nestjs/common';
+
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+, 'i');
 
 function assertUuid(value: string): void {
   if (!new RegExp(`^${UUID}$`, 'i').test(value)) {
