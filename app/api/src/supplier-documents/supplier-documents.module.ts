@@ -5,6 +5,7 @@ import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
 import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import { ReceiptDocumentLinksService } from './receipt-document-links.service';
+import { SupplierDocumentAttachmentsService } from './supplier-document-attachments.service';
 
 @Module({
   imports: [PrismaModule],
@@ -14,6 +15,7 @@ import { ReceiptDocumentLinksService } from './receipt-document-links.service';
     SupplierDocumentReconciliationService,
     SupplierReceiptVarianceService,
     ReceiptDocumentLinksService,
+    SupplierDocumentAttachmentsService,
   ],
 })
 export class SupplierDocumentsModule {}
