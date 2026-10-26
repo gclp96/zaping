@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { SUPPLIER_ATTACHMENT_MAX_BYTES } from './supplier-document-attachment-validation';
 import { requireTenantQuarantineR2Key } from './cloudflare-r2-object-keys';
