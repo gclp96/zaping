@@ -401,8 +401,18 @@ export default function SupplierDocumentsPage() {
                       <td className="p-3">{documentDateLabel(doc.documentDate)}</td>
                       <td className="p-3 tabular-nums">{formatSupplierMoney(doc.totalAmount, doc.currency)}</td>
                       <td className="p-3">
-                        {doc.status === "CANCELLED" ? "Cancelado" :
-                          doc.basisStatus === "CONFIRMED" ? "Base confirmada" : "Pendiente de revisión"}
+                        {doc.status === "CANCELLED"
+                          ? "Cancelado"
+                          : doc.type !== "FACTURA"
+                            ? "Registrado · Sin conciliación monetaria"
+                            : doc.basisStatus === "CONFIRMED"
+                              ? "Base confirmada"
+                              : "Pendiente de revisión"}
+                        {doc.identityOccurrence > 1 && (
+                          <p className="text-xs text-amber-800">
+                            Excepción de folio #{doc.identityOccurrence}
+                          </p>
+                        )}
                       </td>
                     </tr>
                   ))}
