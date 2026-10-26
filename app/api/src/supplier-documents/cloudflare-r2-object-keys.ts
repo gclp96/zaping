@@ -3,6 +3,10 @@ import { BadRequestException } from '@nestjs/common';
 
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
 const PRIVATE_KEY = new RegExp(`^private/(${UUID})/(${UUID})/(${UUID})$`, 'i');
+const QUARANTINE_KEY = new RegExp(
+  `^quarantine/(${UUID})/(${UUID})/(${UUID})$`,
+  'i',
+);
 
 function assertUuid(value: string): void {
   if (!new RegExp(`^${UUID}$`, 'i').test(value)) {
@@ -27,6 +31,22 @@ export function createR2ObjectKeys(
     quarantineKey: `quarantine/${suffix}`,
     privateKey: `private/${suffix}`,
   };
+}
+
+/**
+ * Internal quarantine scope. This must never be used by the approved-object
+ * download provider.
+ */
+export function requireTenantQuarantineR2Key(
+  key: string,
+  companyId: string,
+): string {
+  assertUuid(companyId);
+  const match = QUARANTINE_KEY.exec(key);
+  if (!match || match[1].toLowerCase() !== companyId.toLowerCase()) {
+    throw new BadRequestException('Clave de cuarentena inválida');
+  }
+  return key;
 }
 
 export function requireTenantPrivateR2Key(
