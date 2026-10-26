@@ -283,6 +283,9 @@ export class SupplierDocumentReconciliationService {
         const staysActive = dto.action !== AllocationRevisionAction.DEACTIVATE;
         const revisedAmount = amount ?? link.allocatedSubtotal;
         if (staysActive) {
+          if (!doc.currency) {
+            throw new ConflictException('Factura sin moneda confirmada');
+          }
           await this.receiptAllocatedInCurrency(
             tx,
             companyId,
