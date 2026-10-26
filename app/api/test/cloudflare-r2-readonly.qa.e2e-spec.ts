@@ -1,9 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ListObjectsV2Command, type S3Client } from '@aws-sdk/client-s3';
 import { BadRequestException } from '@nestjs/common';
-import {
-  parseCloudflareR2Config,
-} from '../src/config/cloudflare-r2-config';
+import { parseCloudflareR2Config } from '../src/config/cloudflare-r2-config';
 import {
   requireCloudflareR2QaFixture,
   type CloudflareR2QaFixture,
@@ -13,9 +11,7 @@ import {
   createCloudflareR2S3Client,
   CloudflareR2SdkTransport,
 } from '../src/supplier-documents/cloudflare-r2-sdk-transport';
-import {
-  consumeAndVerifyPrivateAttachment,
-} from '../src/supplier-documents/supplier-document-attachment-download';
+import { consumeAndVerifyPrivateAttachment } from '../src/supplier-documents/supplier-document-attachment-download';
 
 const describeQa =
   process.env.RUN_CLOUDFLARE_R2_QA_SMOKE === '1' ? describe : describe.skip;
@@ -69,10 +65,7 @@ describeQa('Cloudflare R2 QA real read-only smoke', () => {
   }, 45_000);
 
   it('downloads and verifies exact SHA-256 and length for a synthetic file', async () => {
-    const body = await store.openReadOnly(
-      fixture.objectKey,
-      fixture.companyId,
-    );
+    const body = await store.openReadOnly(fixture.objectKey, fixture.companyId);
     const bytes = await consumeAndVerifyPrivateAttachment(
       body,
       fixture.sizeBytes,
