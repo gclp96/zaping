@@ -70,7 +70,9 @@ export class SupplierDocumentReconciliationService {
           throw new ConflictException('Solo facturas permiten conciliación');
         }
         if (doc.basisStatus === SupplierDocumentBasisStatus.CONFIRMED) {
-          throw new ConflictException('Base ya confirmada; usar corrección auditada');
+          throw new ConflictException(
+            'Base ya confirmada; usar corrección auditada',
+          );
         }
         const before = {
           goodsNetAmount: doc.goodsNetAmount?.toFixed(2) ?? null,
@@ -115,7 +117,8 @@ export class SupplierDocumentReconciliationService {
     dto: CreateSupplierDocumentAllocationDto,
   ) {
     const amount = documentMoney(dto.allocatedSubtotal)!;
-    if (amount.lte(0)) throw new BadRequestException('Importe debe ser positivo');
+    if (amount.lte(0))
+      throw new BadRequestException('Importe debe ser positivo');
     const payload = {
       documentId,
       receiptId: dto.receiptId,
@@ -135,7 +138,9 @@ export class SupplierDocumentReconciliationService {
           !doc.goodsNetAmount ||
           !doc.currency
         ) {
-          throw new ConflictException('Factura requiere base y moneda verificadas');
+          throw new ConflictException(
+            'Factura requiere base y moneda verificadas',
+          );
         }
         const receipt = await tx.purchaseReceipt.findFirst({
           where: { id: dto.receiptId, companyId },
@@ -166,7 +171,9 @@ export class SupplierDocumentReconciliationService {
         const previous = sum._sum.allocatedSubtotal ?? new Prisma.Decimal(0);
         const next = previous.plus(amount);
         if (next.gt(doc.goodsNetAmount)) {
-          throw new ConflictException('Se excede el neto conciliable de la factura');
+          throw new ConflictException(
+            'Se excede el neto conciliable de la factura',
+          );
         }
         const link = await tx.purchaseReceiptDocument.create({
           data: {
@@ -342,7 +349,9 @@ export class SupplierDocumentReconciliationService {
     });
     if (!record) return null;
     if (record.requestHash !== hash) {
-      throw new ConflictException('Idempotency-Key reutilizada con otro contenido');
+      throw new ConflictException(
+        'Idempotency-Key reutilizada con otro contenido',
+      );
     }
     if (!record.resourceId) {
       throw new ConflictException('Operación idempotente incompleta');

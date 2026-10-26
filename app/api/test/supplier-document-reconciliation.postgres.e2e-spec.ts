@@ -5,8 +5,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierDocumentsService } from '../src/supplier-documents/supplier-documents.service';
 import { SupplierDocumentReconciliationService } from '../src/supplier-documents/supplier-document-reconciliation.service';
 
-const describePg =
-  process.env.RUN_R2A02_PG === '1' ? describe : describe.skip;
+const describePg = process.env.RUN_R2A02_PG === '1' ? describe : describe.skip;
 
 describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
   let db: PrismaClient;
@@ -89,15 +88,22 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
 
   beforeAll(async () => {
     const url = process.env.DATABASE_URL;
-    if (!url || process.env.GITHUB_ACTIONS !== 'true' ||
-        process.env.CI !== 'true') {
-      throw new Error('R2A-02 PostgreSQL tests require isolated GitHub Actions');
+    if (
+      !url ||
+      process.env.GITHUB_ACTIONS !== 'true' ||
+      process.env.CI !== 'true'
+    ) {
+      throw new Error(
+        'R2A-02 PostgreSQL tests require isolated GitHub Actions',
+      );
     }
     const target = new URL(url);
-    if (!['127.0.0.1', 'localhost'].includes(target.hostname) ||
-        target.port !== '5432' ||
-        target.pathname !== '/zaping_test' ||
-        target.username !== 'ci') {
+    if (
+      !['127.0.0.1', 'localhost'].includes(target.hostname) ||
+      target.port !== '5432' ||
+      target.pathname !== '/zaping_test' ||
+      target.username !== 'ci'
+    ) {
       throw new Error('Unsafe R2A-02 PostgreSQL test target');
     }
     db = new PrismaClient({ datasources: { db: { url } } });
@@ -125,7 +131,11 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
       f.actorId,
       randomUUID(),
       doc.id,
-      { receiptId: a.receiptId, allocatedSubtotal: '60.00', expectedRevision: 1 },
+      {
+        receiptId: a.receiptId,
+        allocatedSubtotal: '60.00',
+        expectedRevision: 1,
+      },
     );
     expect(first.revision).toBe(2);
     const second = await reconciliation.createAllocation(
@@ -141,8 +151,12 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     expect(links.map((link) => link.purchaseId).sort()).toEqual(
       [a.purchaseId, b.purchaseId].sort(),
     );
-    expect(links.reduce((sum, link) => sum + Number(link.allocatedSubtotal), 0)).toBe(100);
-    expect(await db.inventoryMovement.count({ where: { companyId: f.companyId } })).toBe(0);
+    expect(
+      links.reduce((sum, link) => sum + Number(link.allocatedSubtotal), 0),
+    ).toBe(100);
+    expect(
+      await db.inventoryMovement.count({ where: { companyId: f.companyId } }),
+    ).toBe(0);
   });
 
   it('cannot exceed invoice net merchandise base', async () => {
@@ -151,16 +165,30 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const a = await receipt(f.companyId, f.supplierId);
     const b = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
       { receiptId: a.receiptId, allocatedSubtotal: '90', expectedRevision: 1 },
     );
-    await expect(reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: b.receiptId, allocatedSubtotal: '11', expectedRevision: 2 },
-    )).rejects.toBeInstanceOf(ConflictException);
-    expect(await db.purchaseReceiptDocument.count({
-      where: { companyId: f.companyId, documentId: doc.id },
-    })).toBe(1);
+    await expect(
+      reconciliation.createAllocation(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          receiptId: b.receiptId,
+          allocatedSubtotal: '11',
+          expectedRevision: 2,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await db.purchaseReceiptDocument.count({
+        where: { companyId: f.companyId, documentId: doc.id },
+      }),
+    ).toBe(1);
   });
 
   it('rejects cross-supplier and cross-company receipt associations', async () => {
@@ -173,14 +201,21 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const wrongSupplier = await receipt(a.companyId, otherSupplier.id);
     const wrongCompany = await receipt(b.companyId, b.supplierId);
     for (const receiptId of [wrongSupplier.receiptId, wrongCompany.receiptId]) {
-      await expect(reconciliation.createAllocation(
-        a.companyId, a.actorId, randomUUID(), doc.id,
-        { receiptId, allocatedSubtotal: '10', expectedRevision: 1 },
-      )).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        reconciliation.createAllocation(
+          a.companyId,
+          a.actorId,
+          randomUUID(),
+          doc.id,
+          { receiptId, allocatedSubtotal: '10', expectedRevision: 1 },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
     }
-    expect(await db.purchaseReceiptDocument.count({
-      where: { companyId: a.companyId },
-    })).toBe(0);
+    expect(
+      await db.purchaseReceiptDocument.count({
+        where: { companyId: a.companyId },
+      }),
+    ).toBe(0);
   });
 
   it('serializes simultaneous invoice allocations without overspending', async () => {
@@ -190,16 +225,34 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const b = await receipt(f.companyId, f.supplierId);
     const results = await Promise.allSettled([
       reconciliation.createAllocation(
-        f.companyId, f.actorId, randomUUID(), doc.id,
-        { receiptId: a.receiptId, allocatedSubtotal: '70', expectedRevision: 1 },
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          receiptId: a.receiptId,
+          allocatedSubtotal: '70',
+          expectedRevision: 1,
+        },
       ),
       reconciliation.createAllocation(
-        f.companyId, f.actorId, randomUUID(), doc.id,
-        { receiptId: b.receiptId, allocatedSubtotal: '70', expectedRevision: 1 },
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          receiptId: b.receiptId,
+          allocatedSubtotal: '70',
+          expectedRevision: 1,
+        },
       ),
     ]);
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
     const links = await reconciliation.allocations(f.companyId, doc.id);
     expect(links).toHaveLength(1);
     expect(links[0].allocatedSubtotal.toFixed(2)).toBe('70.00');
@@ -217,19 +270,32 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
       expectedRevision: 1,
     };
     const first = await reconciliation.createAllocation(
-      f.companyId, f.actorId, key, doc.id, payload,
+      f.companyId,
+      f.actorId,
+      key,
+      doc.id,
+      payload,
     );
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
       { receiptId: b.receiptId, allocatedSubtotal: '25', expectedRevision: 2 },
     );
     const replay = await reconciliation.createAllocation(
-      f.companyId, f.actorId, key, doc.id, payload,
+      f.companyId,
+      f.actorId,
+      key,
+      doc.id,
+      payload,
     );
     expect(replay).toEqual(first);
-    await expect(reconciliation.createAllocation(
-      f.companyId, f.actorId, key, doc.id,
-      { ...payload, allocatedSubtotal: '26' },
-    )).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      reconciliation.createAllocation(f.companyId, f.actorId, key, doc.id, {
+        ...payload,
+        allocatedSubtotal: '26',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 });

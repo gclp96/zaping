@@ -80,10 +80,7 @@ export class SupplierDocumentsController {
   }
 
   @Get(':id/allocations')
-  listAllocations(
-    @Req() req: AuthenticatedRequest,
-    @Param('id') id: string,
-  ) {
+  listAllocations(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.reconciliation.allocations(req.user.companyId, id);
   }
 
