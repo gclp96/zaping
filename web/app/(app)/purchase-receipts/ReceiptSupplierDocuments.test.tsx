@@ -141,9 +141,9 @@ describe('ReceiptSupplierDocuments', () => {
       data: [{ ...link('association-1', 'doc-1'), documentId: 'different-id' }],
     } as never);
     render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
-    expect(
-      await screen.findByRole('alert'),
-    ).toHaveTextContent('La respuesta de vínculos documentales no es válida.');
+    expect((await screen.findByRole('alert')).textContent).toContain(
+      'La respuesta de vínculos documentales no es válida.',
+    );
     expect(screen.queryByRole('link')).toBeNull();
   });
 
