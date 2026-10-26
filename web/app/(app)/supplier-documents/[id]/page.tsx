@@ -8,6 +8,7 @@ import { useAuthenticatedSession } from "@/app/auth-session";
 import { hasRole, MANAGEMENT_ROLES } from "@/app/erp-role-access";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
+import CurrencySelect, { isSupportedCurrency } from "@/app/components/ui/CurrencySelect";
 import ForbiddenState from "@/app/components/ui/ForbiddenState";
 import Loading from "@/app/components/ui/Loading";
 import PageContainer from "@/app/components/ui/layout/PageContainer";
@@ -174,8 +175,9 @@ export default function SupplierDocumentDetailPage() {
 
   async function onConfirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!document || !MONEY.test(basisAmount)) {
-      setActionError("Indica una base neta con máximo dos decimales.");
+    if (!document || !MONEY.test(basisAmount) ||
+        !isSupportedCurrency(basisCurrency)) {
+      setActionError("Indica una base neta con máximo dos decimales y moneda MXN o USD.");
       return;
     }
     const payload = {
@@ -190,9 +192,9 @@ export default function SupplierDocumentDetailPage() {
   async function onCorrectBasis(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!document || !MONEY.test(basisAmount) ||
-        !/^[A-Z]{3}$/.test(basisCurrency) ||
+        !isSupportedCurrency(basisCurrency) ||
         basisReason.trim().length < 10) {
-      setActionError("Indica base neta, moneda ISO de tres letras y motivo de al menos 10 caracteres.");
+      setActionError("Indica base neta, moneda MXN o USD y motivo de al menos 10 caracteres.");
       return;
     }
     const payload = {
@@ -321,16 +323,27 @@ export default function SupplierDocumentDetailPage() {
             </div>
           )}
         </dl>
+        {document.type === "FACTURA" && (
+          <p className="mt-3 text-sm text-text-muted">
+            La base neta de mercancía corresponde a productos tras descuentos de mercancía,
+            sin IVA, retenciones ni fletes facturados por separado. No es el total a pagar.
+          </p>
+        )}
         <p className="mt-3 text-sm text-text-muted">Documento recibido: Zaping no realiza timbrado ni verificación fiscal ante el SAT.</p>
       </Section>
       {actionError && <div role="alert" className="my-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{actionError}</div>}
       {active && document.type === "FACTURA" && document.basisStatus === "PENDING_REVIEW" && (
         <Section title="Confirmar base de mercancía">
+          <p className="mb-3 text-sm text-text-muted">
+            Captura el valor neto de los productos de la factura, después de descuentos de
+            mercancía y antes del IVA; excluye retenciones y flete separado. Ejemplo:
+            $1,000 en productos menos $100 de descuento = $900 de base.
+          </p>
           <form onSubmit={(event) => void onConfirm(event)} className="grid gap-3 md:grid-cols-3">
             <Input label="Base neta" required inputMode="decimal" value={basisAmount}
               onChange={(e) => setBasisAmount(e.target.value)} />
-            <Input label="Moneda" required maxLength={3} value={basisCurrency}
-              onChange={(e) => setBasisCurrency(e.target.value.toUpperCase())} />
+            <CurrencySelect label="Moneda" required value={basisCurrency}
+              onChange={setBasisCurrency} />
             <Input label="Justificación" required minLength={10} value={basisReason}
               onChange={(e) => setBasisReason(e.target.value)} />
             <Button type="submit" disabled={saving}>Confirmar base revisada</Button>
@@ -346,8 +359,8 @@ export default function SupplierDocumentDetailPage() {
           <form onSubmit={(event) => void onCorrectBasis(event)} className="grid gap-3 md:grid-cols-3">
             <Input label="Base neta corregida" inputMode="decimal" required
               value={basisAmount} onChange={(event) => setBasisAmount(event.target.value)} />
-            <Input label="Moneda corregida" maxLength={3} required
-              value={basisCurrency} onChange={(event) => setBasisCurrency(event.target.value.toUpperCase())} />
+            <CurrencySelect label="Moneda corregida" required value={basisCurrency}
+              onChange={setBasisCurrency} />
             <Input label="Justificación de corrección" minLength={10} required
               value={basisReason} onChange={(event) => setBasisReason(event.target.value)} />
             <div className="md:col-span-3">

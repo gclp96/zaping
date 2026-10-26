@@ -51,6 +51,21 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("R2A-03 supplier documents", () => {
+  it("limits invoice currency to the MXN/USD selector and explains merchandise net basis", async () => {
+    const user = userEvent.setup();
+    render(<SupplierDocumentsPage />);
+    await screen.findByText("A-4618");
+    await user.click(screen.getByRole("button", { name: "Nuevo documento" }));
+    const currency = screen.getByRole("combobox", { name: /Moneda/ });
+    expect(currency.getAttribute("value")).toBeNull();
+    expect((currency as HTMLSelectElement).value).toBe("MXN");
+    expect(screen.getByRole("option", { name: /USD/ })).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Moneda" })).toBeNull();
+    await user.selectOptions(currency, "USD");
+    expect((currency as HTMLSelectElement).value).toBe("USD");
+    expect(screen.getByText(/productos \$1,000/)).toBeTruthy();
+  });
+
   it("shows invoice status and missing basis without auto-confirmation", async () => {
     render(<SupplierDocumentsPage />);
     expect(await screen.findByText("A-4618")).toBeTruthy();

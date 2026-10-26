@@ -9,6 +9,7 @@ import { useAuthenticatedSession } from "@/app/auth-session";
 import { hasRole, MANAGEMENT_ROLES } from "@/app/erp-role-access";
 import Button from "@/app/components/ui/Button";
 import Input from "@/app/components/ui/Input";
+import CurrencySelect, { isSupportedCurrency } from "@/app/components/ui/CurrencySelect";
 import ForbiddenState from "@/app/components/ui/ForbiddenState";
 import Loading from "@/app/components/ui/Loading";
 import PageContainer from "@/app/components/ui/layout/PageContainer";
@@ -141,6 +142,10 @@ export default function SupplierDocumentsPage() {
     ].filter(Boolean);
     if (moneyFields.some((value) => !MONEY.test(value))) {
       setSaveError("Los importes deben ser positivos o cero y contener máximo dos decimales.");
+      return;
+    }
+    if (!isSupportedCurrency(form.currency)) {
+      setSaveError("Selecciona MXN o USD.");
       return;
     }
     const payload: NewSupplierDocument = {
@@ -299,8 +304,8 @@ export default function SupplierDocumentsPage() {
                 onChange={(event) => updateField("series", event.target.value)} />
               <Input label="Folio / número" maxLength={160} required value={form.number}
                 onChange={(event) => updateField("number", event.target.value)} />
-              <Input label="Moneda" maxLength={3} value={form.currency}
-                onChange={(event) => updateField("currency", event.target.value.toUpperCase())} />
+              <CurrencySelect label="Moneda" value={form.currency} required
+                onChange={(value) => updateField("currency", value)} />
               {form.type === "FACTURA" && (
                 <>
                   <Input label="UUID CFDI (si está disponible)" value={form.cfdiUuid}
@@ -319,7 +324,7 @@ export default function SupplierDocumentsPage() {
                 onChange={(event) => updateField("totalAmount", event.target.value)} />
               {form.type === "FACTURA" && (
                 <Input label="Base neta de mercancía (por revisar)" inputMode="decimal"
-                  helperText="No incluye el flete. Debe confirmarse antes de asignar recepciones."
+                  helperText="Importe de productos después de descuentos de mercancía, sin IVA, retenciones ni flete separado. Ejemplo: productos $1,000 − descuento $100 = base $900. Se confirma antes de conciliar."
                   value={form.goodsNetAmount}
                   onChange={(event) => updateField("goodsNetAmount", event.target.value)} />
               )}
