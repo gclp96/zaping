@@ -1,8 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { Readable } from 'node:stream';
-import {
-  PrivateAttachmentObjectStore,
-} from './private-attachment-object-store';
+import { PrivateAttachmentObjectStore } from './private-attachment-object-store';
 import { requireTenantPrivateR2Key } from './cloudflare-r2-object-keys';
 
 /**
