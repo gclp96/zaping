@@ -632,6 +632,165 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it('rejects mixing MXN and USD invoices on one receipt', async () => {
+    const f = await fixture();
+    const mxn = await confirmed(f);
+    const usd = await documents.create(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      {
+        supplierId: f.supplierId,
+        type: SupplierDocumentType.FACTURA,
+        number: randomUUID(),
+        documentDate: '2026-10-25',
+        goodsNetAmount: '100',
+        currency: 'USD',
+      },
+    );
+    await reconciliation.confirmBasis(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      usd.id,
+      {
+        goodsNetAmount: '100',
+        currency: 'USD',
+        reason: 'Revisión de factura emitida en dólares',
+        expectedRevision: 0,
+      },
+    );
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      mxn.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '70',
+        expectedRevision: 1,
+      },
+    );
+    await expect(
+      reconciliation.createAllocation(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        usd.id,
+        {
+          receiptId: entry.receiptId,
+          allocatedSubtotal: '20',
+          expectedRevision: 1,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    const overview = await variance.overview(f.companyId, entry.receiptId);
+    expect(overview.allocatedTotalAmount).toBe('70.00');
+    expect(overview.activeInvoiceCount).toBe(1);
+  });
+
+  it('requires review for aggregate receipt coverage even when invoice ceilings pass', async () => {
+    const f = await fixture();
+    const docA = await confirmed(f);
+    const docB = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      docA.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '80', expectedRevision: 1 },
+    );
+    await reconciliation.createAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      docB.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    const unreviewed = await variance.overview(f.companyId, entry.receiptId);
+    expect(unreviewed.allocatedTotalAmount).toBe('140.00');
+    expect(unreviewed.activeInvoiceCount).toBe(2);
+    expect(unreviewed.receiptReviewStatus).toBe('REQUIRES_REVIEW');
+    expect(unreviewed.receiptComparableNetAmount).toBeNull();
+    expect(unreviewed.receiptCeilingVerified).toBe(false);
+    expect(unreviewed.automaticCoverageComplete).toBe(false);
+
+    await variance.approve(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      entry.receiptId,
+      {
+        receiptComparableNetAmount: '100',
+        receiptCurrency: 'MXN',
+        reason: 'Diferencia total comprobada contra la recepción',
+        evidenceReference: 'Acta de recepción y desglose del proveedor',
+        expectedSnapshotHash: unreviewed.snapshotHash,
+      },
+    );
+    const reviewed = await variance.overview(f.companyId, entry.receiptId);
+    expect(reviewed.receiptReviewStatus).toBe('APPROVED_VARIANCE');
+    expect(reviewed.receiptComparableNetAmount).toBe('100.00');
+    expect(reviewed.approvedDifferenceAmount).toBe('40.00');
+    expect(reviewed.automaticCoverageComplete).toBe(false);
+    expect(reviewed.receiptCeilingVerified).toBe(false);
+  });
+
+  it('reactivates a deactivated allocation under audit without a duplicate link', async () => {
+    const f = await fixture();
+    const document = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      document.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '35.00',
+        expectedRevision: 1,
+      },
+    );
+    const [initial] = await reconciliation.allocations(f.companyId, document.id);
+    await reconciliation.reviseAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      document.id,
+      {
+        allocationId: initial.id,
+        action: AllocationRevisionAction.DEACTIVATE,
+        reason: 'Suspensión del vínculo por revisión documental',
+        expectedRevision: 2,
+        expectedAllocationRevision: 0,
+      },
+    );
+    const replay = await reconciliation.reviseAllocation(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      document.id,
+      {
+        allocationId: initial.id,
+        action: AllocationRevisionAction.REACTIVATE,
+        reason: 'Reactivación aprobada tras verificar evidencia',
+        expectedRevision: 3,
+        expectedAllocationRevision: 1,
+      },
+    );
+    expect(replay.operation).toBe('ALLOCATION_REVISED');
+    const links = await reconciliation.allocations(f.companyId, document.id);
+    expect(links).toHaveLength(1);
+    expect(links[0].id).toBe(initial.id);
+    expect(links[0].isActive).toBe(true);
+    expect(links[0].revision).toBe(2);
+    expect(links[0].allocatedSubtotal.toFixed(2)).toBe('35.00');
+    const doc = await documents.detail(f.companyId, document.id);
+    expect(doc.audits.at(-1)?.operation).toBe('ALLOCATION_REVISED');
+  });
+
   it('replays an old allocation result even after the document revision changes', async () => {
     const f = await fixture();
     const doc = await confirmed(f);
