@@ -1613,9 +1613,15 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
       (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
         .stock,
     ).toBe(3);
-    expect(
-      await db.inventoryPosition.findUniqueOrThrow({ where: { id: dated.id } }),
-    ).toMatchObject({ ...dated, quantity: 1, revision: dated.revision + 1 });
+    const datedAfterSale = await db.inventoryPosition.findUniqueOrThrow({
+      where: { id: dated.id },
+    });
+    expect(datedAfterSale).toMatchObject({
+      ...dated,
+      quantity: 1,
+      revision: dated.revision + 1,
+      updatedAt: expect.any(Date),
+    });
     expect(
       await db.inventoryPosition.findFirstOrThrow({
         where: { companyId: f.companyId, expirationDate: null },
@@ -1635,7 +1641,7 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
     ).toBe(0);
     expect(
       await db.inventoryPosition.findUniqueOrThrow({ where: { id: dated.id } }),
-    ).toMatchObject({ ...dated, quantity: 1, revision: dated.revision + 1 });
+    ).toEqual(datedAfterSale);
     expect(
       (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
         .stock,
