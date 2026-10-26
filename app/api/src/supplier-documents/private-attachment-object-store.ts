@@ -16,9 +16,11 @@ export abstract class PrivateAttachmentObjectStore {
  */
 @Injectable()
 export class UnconfiguredPrivateAttachmentStore extends PrivateAttachmentObjectStore {
-  async openReadOnly(_storageKey: string): Promise<Readable> {
-    throw new ServiceUnavailableException(
-      'Descargas no disponibles hasta configurar almacenamiento privado y escaneo',
+  openReadOnly(): Promise<Readable> {
+    return Promise.reject(
+      new ServiceUnavailableException(
+        'Descargas no disponibles hasta configurar almacenamiento privado y escaneo',
+      ),
     );
   }
 }
