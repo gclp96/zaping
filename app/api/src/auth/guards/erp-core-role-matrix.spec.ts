@@ -29,6 +29,7 @@ import { PurchasesController } from '../../purchases/purchases.controller';
 import { QuotesController } from '../../quotes/quotes.controller';
 import { SalesController } from '../../sales/sales.controller';
 import { SuppliersController } from '../../suppliers/suppliers.controller';
+import { SupplierDocumentsController } from '../../supplier-documents/supplier-documents.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guards';
 
@@ -53,6 +54,15 @@ const allRoles = [
 ];
 
 const roleMatrix: RoleMatrix[] = [
+  {
+    controller: SupplierDocumentsController,
+    methods: {
+      findAll: [UserRole.ADMIN, UserRole.MANAGER],
+      findOne: [UserRole.ADMIN, UserRole.MANAGER],
+      create: [UserRole.ADMIN, UserRole.MANAGER],
+      createException: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+  },
   {
     controller: HealthcareCaseReconciliationsController,
     methods: {

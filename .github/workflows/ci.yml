@@ -113,6 +113,11 @@ jobs:
       - name: Run PostgreSQL concurrency E2E
         run: npm run test:concurrency
 
+      - name: Verify R2A-01 supplier documents on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_DOC_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-documents.postgres.e2e-spec.ts
+
       - name: Smoke supplier document receipt on ephemeral PHYSICAL PostgreSQL
         env:
           RUN_PURCHASE_RECEIPT_PG_SMOKE: "1"
