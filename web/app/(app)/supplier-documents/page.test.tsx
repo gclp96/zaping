@@ -60,7 +60,7 @@ describe("R2A-03 supplier documents", () => {
 
   it("shows the exception only after a verified duplicate identity and requires evidence", async () => {
     vi.stubGlobal("crypto", { randomUUID: () => "test-idempotency-key" });
-    vi.mocked(createSupplierDocument).mockRejectedValueOnce(
+    vi.mocked(createSupplierDocument).mockRejectedValue(
       Object.assign(new Error("El folio ya existe"), {
         isAxiosError: true,
         response: {
@@ -96,6 +96,11 @@ describe("R2A-03 supplier documents", () => {
     expect(screen.getByRole("link", { name: "Consultar el documento existente" })
       .getAttribute("href")).toBe("/supplier-documents/doc-original");
     expect(createSupplierDocumentException).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Cerrar captura" }));
+    await user.click(screen.getByRole("button", { name: "Nuevo documento" }));
+    expect(screen.queryByText("Excepción administrativa por folio repetido")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Guardar documento" }));
+    expect(await screen.findByText("Excepción administrativa por folio repetido")).toBeTruthy();
     await user.type(screen.getByRole("textbox", { name: "Motivo excepcional" }),
       "Envío nuevo, folio legítimamente repetido");
     await user.type(screen.getByRole("textbox", { name: "Referencia de evidencia" }),
