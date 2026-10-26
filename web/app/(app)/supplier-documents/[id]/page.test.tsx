@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -6,7 +6,8 @@ import { api } from "@/services/api";
 import { clearAuthenticatedSessionCache } from "@/app/auth-session";
 import {
   getSupplierDocument, getDocumentAllocations, listSupplierDocuments,
-  correctSupplierDocumentBasis,
+  correctSupplierDocumentBasis, getReceiptReconciliation,
+  type ReceiptReconciliation,
 } from "@/services/supplier-documents";
 import SupplierDocumentDetailPage from "./page";
 
@@ -18,6 +19,7 @@ vi.mock("@/services/supplier-documents", async (importOriginal) => {
     ...real,
     getSupplierDocument: vi.fn(), getDocumentAllocations: vi.fn(),
     listSupplierDocuments: vi.fn(), correctSupplierDocumentBasis: vi.fn(),
+    getReceiptReconciliation: vi.fn(),
   };
 });
 
@@ -140,6 +142,42 @@ describe("R2A-03 supplier document detail", () => {
       }),
       "correction-operation-key",
     ));
+  });
+
+
+  it.each(["success", "failure"])("ignores a late reconciliation %s for a previously selected receipt", async (outcome) => {
+    vi.mocked(getDocumentAllocations).mockResolvedValue(["receipt-1", "receipt-2"].map((receiptId) => ({
+      id: "link-" + receiptId, receiptId, purchaseId: "purchase-1", documentId: "doc-1",
+      allocatedSubtotal: "50.00", isActive: true, revision: 0,
+      receipt: { id: receiptId, folio: receiptId, purchaseId: "purchase-1" },
+    })));
+    let resolveFirst!: (value: ReceiptReconciliation) => void;
+    let rejectFirst!: (reason: Error) => void;
+    const first = new Promise<ReceiptReconciliation>((resolve, reject) => {
+      resolveFirst = resolve; rejectFirst = reject;
+    });
+    const result: ReceiptReconciliation = {
+      receiptId: "receipt-2", allocatedTotalAmount: "222.00", activeInvoiceCount: 1,
+      snapshotHash: "snapshot-2", receiptReviewStatus: "REQUIRES_REVIEW",
+      receiptComparableNetAmount: null, approvedDifferenceAmount: null, receiptCurrency: "MXN",
+      automaticCoverageComplete: false, receiptCeilingVerified: false, approvalCurrent: false,
+    };
+    vi.mocked(getReceiptReconciliation).mockImplementation((id) =>
+      id === "receipt-1" ? first : Promise.resolve(result));
+    const user = userEvent.setup();
+    render(<SupplierDocumentDetailPage />);
+    await screen.findByText("Documento A-4618");
+    const buttons = screen.getAllByRole("button", { name: "Revisar cobertura" });
+    await user.click(buttons[0]);
+    await user.click(buttons[1]);
+    expect(await screen.findByText("Asignado: 222.00 MXN")).toBeTruthy();
+    await act(async () => {
+      if (outcome === "success") resolveFirst({ ...result, receiptId: "receipt-1", allocatedTotalAmount: "111.00" });
+      else rejectFirst(new Error("Respuesta anterior fallida"));
+    });
+    expect(screen.getByText("Asignado: 222.00 MXN")).toBeTruthy();
+    expect(screen.queryByText("Asignado: 111.00 MXN")).toBeNull();
+    expect(screen.queryByText("Respuesta anterior fallida")).toBeNull();
   });
 
   it.each(["WAREHOUSE", "SALES"])("does not fetch tax documents for %s", async (role) => {

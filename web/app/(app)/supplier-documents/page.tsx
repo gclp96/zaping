@@ -114,10 +114,17 @@ export default function SupplierDocumentsPage() {
   async function refresh() {
     try {
       setLoadError("");
-      const result = await listSupplierDocuments();
+      const [result, suppliersResponse] = await Promise.all([
+        listSupplierDocuments(),
+        api.get<SupplierOption[]>("/suppliers"),
+      ]);
       setDocuments(result);
+      setSuppliers(suppliersResponse.data);
     } catch (error: unknown) {
+      if (isForbiddenError(error)) setForbidden(true);
       setLoadError(getApiErrorMessage(error, "No fue posible actualizar documentos."));
+    } finally {
+      setLoading(false);
     }
   }
 

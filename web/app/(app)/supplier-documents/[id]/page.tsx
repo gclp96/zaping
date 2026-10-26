@@ -54,6 +54,7 @@ export default function SupplierDocumentDetailPage() {
   const [forbidden, setForbidden] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState("");
+  const reviewRequest = useRef(0);
   const pending = useRef(new Map<string, { signature: string; key: string }>());
 
   const [basisAmount, setBasisAmount] = useState("");
@@ -163,12 +164,19 @@ export default function SupplierDocumentDetailPage() {
   }
 
   async function showReview(targetId: string) {
+    const request = ++reviewRequest.current;
     setReviewReceiptId(targetId);
+    setReviewNet("");
+    setReviewReason("");
+    setReviewEvidence("");
     setReview(null);
     setReviewError("");
     try {
-      setReview(await getReceiptReconciliation(targetId));
+      const result = await getReceiptReconciliation(targetId);
+      if (request !== reviewRequest.current) return;
+      setReview(result);
     } catch (error: unknown) {
+      if (request !== reviewRequest.current) return;
       setReviewError(getApiErrorMessage(error, "No se pudo consultar la conciliación."));
     }
   }
@@ -267,7 +275,7 @@ export default function SupplierDocumentDetailPage() {
 
   async function onApprove(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!review || !document || !MONEY.test(reviewNet) || !reviewReceiptId || !document.currency) {
+    if (!review || review.receiptId !== reviewReceiptId || !document || !MONEY.test(reviewNet) || !reviewReceiptId || !document.currency) {
       setActionError("Falta importe neto revisado o moneda confirmada.");
       return;
     }
@@ -400,7 +408,7 @@ export default function SupplierDocumentDetailPage() {
                   </Link>
                   <p>{formatSupplierMoney(link.allocatedSubtotal, document.currency)} · {link.isActive ? "Activa" : "Inactiva"}</p>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => void showReview(link.receiptId)}>
+                <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => void showReview(link.receiptId)}>
                   Revisar cobertura
                 </Button>
               </div>

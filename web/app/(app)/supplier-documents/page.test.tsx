@@ -187,6 +187,19 @@ describe("R2A-03 supplier documents", () => {
     });
   });
 
+
+  it("recovers documents and supplier options after an initial load failure", async () => {
+    vi.mocked(listSupplierDocuments).mockRejectedValueOnce(new Error("Sin conexión"));
+    const user = userEvent.setup();
+    render(<SupplierDocumentsPage />);
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText("A-4618")).toBeTruthy();
+    expect(screen.getByText("Distribuidora Médica")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Nuevo documento" }));
+    expect(screen.getByRole("option", { name: "Distribuidora Médica" })).toBeTruthy();
+  });
+
   it.each(["SALES", "WAREHOUSE"])("does not fetch tax documents for %s", async (role) => {
     vi.mocked(api.get).mockResolvedValue(auth(role) as never);
     render(<SupplierDocumentsPage />);
