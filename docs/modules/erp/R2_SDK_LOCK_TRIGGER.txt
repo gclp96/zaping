@@ -1,0 +1,1 @@
+Generate and lock @aws-sdk/client-s3 using npm in a one-shot, branch-scoped workflow. Remove this trigger and the workflow after success. No Cloudflare resources or secrets are used.
