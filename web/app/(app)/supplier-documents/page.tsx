@@ -259,7 +259,14 @@ export default function SupplierDocumentsPage() {
         title="Documentos de proveedor"
         description="Facturas, remisiones y notas de entrega. La captura no valida CFDI ante el SAT ni modifica inventario."
         action={
-          <Button type="button" onClick={() => { setCreating((v) => !v); setSaveError(""); }}>
+          <Button type="button" onClick={() => {
+            setCreating((v) => !v);
+            setSaveError("");
+            setExceptionCandidate(null);
+            setExceptionReason("");
+            setExceptionEvidence("");
+            exceptionRetry.current = null;
+          }}>
             <FilePlus2 aria-hidden="true" size={18} />
             {creating ? "Cerrar captura" : "Nuevo documento"}
           </Button>
