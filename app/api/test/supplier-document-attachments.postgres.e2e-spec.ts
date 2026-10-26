@@ -91,6 +91,9 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     expect(identity).toEqual({ database: 'zaping_test', role: 'ci' });
     service = new SupplierDocumentAttachmentsService(
       db as unknown as PrismaService,
+      { openReadOnly: async () => {
+        throw new Error('Storage reads must not occur in metadata E2E');
+      } } as never,
     );
   });
 
