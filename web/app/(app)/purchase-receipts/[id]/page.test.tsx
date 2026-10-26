@@ -29,6 +29,16 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
+vi.mock('../ReceiptSupplierDocuments', () => ({
+  default: ({ legacyReference }: { legacyReference: string | null }) => (
+    <span>
+      {legacyReference
+        ? `Referencia registrada: ${legacyReference}`
+        : 'Sin documento vinculado por ID.'}
+    </span>
+  ),
+}));
+
 vi.mock('@/services/errors', () => ({
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
@@ -347,7 +357,7 @@ describe('PurchaseReceiptDetailPage', () => {
     const table = await screen.findByRole('table', { name: 'Partidas recibidas' });
     expect(within(table).getByText(lotLabel!)).toBeTruthy();
     expect(within(table).getByText(expiryLabel!)).toBeTruthy();
-    expect(screen.getByText('Sin documento registrado')).toBeTruthy();
+    expect(screen.getByText('Sin documento vinculado por ID.')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'Partidas recibidas desplazables' }).getAttribute('tabindex')).toBe('0');
   });
 
@@ -359,7 +369,7 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText('BLUNT TIP')).toBeNull();
     resolveReceipt({ data: { ...quantityReceipt, supplierDocumentType: 'FACTURA', supplierDocumentNumber: null } });
-    expect(await screen.findByText('Sin documento registrado')).toBeTruthy();
+    expect(await screen.findByText('Sin documento vinculado por ID.')).toBeTruthy();
     expect(screen.queryByText('FACTURA')).toBeNull();
   });
 
@@ -393,7 +403,7 @@ it('presenta caducidad conocida sin lote ni Batch, conservando documento del pro
     items: [{ ...quantityReceipt.items[0], lotNumber: null, batchId: null, batch: null, expirationDate: '2028-12-31T00:00:00.000Z' }],
   } } as never);
   render(<PurchaseReceiptDetailPage />);
-  await screen.findByText('REMISION · REM-77');
+  await screen.findByText('Referencia registrada: REMISION · REM-77');
   expect(screen.queryByText('BATCH-LOT-PREFERRED')).toBeNull();
   expect(screen.queryByText('ITEM-LOT-IGNORED')).toBeNull();
   expect(screen.getAllByText('31 dic 2028').length).toBeGreaterThan(0);

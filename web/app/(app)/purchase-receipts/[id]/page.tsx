@@ -40,6 +40,7 @@ import {
   getReceiptResponsibleLabel,
 } from '../receipt-display';
 import { getPurchaseReceiptInventoryHref } from '../receipt-navigation';
+import ReceiptSupplierDocuments from '../ReceiptSupplierDocuments';
 import type {
   PurchaseReceiptDetail,
   ReceiptEquipmentAsset,
@@ -412,9 +413,14 @@ export default function PurchaseReceiptDetailPage() {
           </DetailField>
           <DetailField label="Responsable">{responsible}</DetailField>
           <DetailField label="Documento proveedor">
-            {receipt.supplierDocumentType && receipt.supplierDocumentNumber
-              ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
-              : 'Sin documento registrado'}
+            <ReceiptSupplierDocuments
+              receiptId={receipt.id}
+              legacyReference={
+                receipt.supplierDocumentType && receipt.supplierDocumentNumber
+                  ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
+                  : null
+              }
+            />
           </DetailField>
           <DetailField label="Notas" wide>
             {receipt.notes || 'Sin notas'}
