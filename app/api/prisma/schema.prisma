@@ -464,7 +464,9 @@ model PurchaseReceipt {
   items PurchaseReceiptItem[]
   supplierDocumentAllocations PurchaseReceiptDocument[]
   supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
+  documentLinks PurchaseReceiptSupplierDocumentLink[]
 
+  @@unique([id, companyId])
   @@unique([id, companyId, purchaseId])
   @@unique([companyId, folio])
   @@index([companyId])
@@ -547,6 +549,7 @@ model Company {
   supplierDocuments                     SupplierDocument[]
   supplierDocumentAllocations           PurchaseReceiptDocument[]
   supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
+  receiptDocumentLinks                  PurchaseReceiptSupplierDocumentLink[]
   purchaseReceipts                      PurchaseReceipt[]
   purchaseReceiptItems                  PurchaseReceiptItem[]
   products                              Product[]
@@ -689,6 +692,8 @@ model User {
   supplierDocumentAllocationCreators PurchaseReceiptDocument[] @relation("SupplierDocumentAllocationCreator")
   supplierDocumentCancellationActors SupplierDocument[] @relation("SupplierDocumentCancelledBy")
   supplierDocumentApprovalActors PurchaseReceiptReconciliationApproval[] @relation("SupplierDocumentApprovalActor")
+  receiptDocumentLinkCreators PurchaseReceiptSupplierDocumentLink[] @relation("ReceiptDocumentLinkCreatedBy")
+  receiptDocumentLinkRemovers PurchaseReceiptSupplierDocumentLink[] @relation("ReceiptDocumentLinkRemovedBy")
 
   equipmentInspections EquipmentInspection[] @relation("EquipmentInspectedBy")
   retiredEquipment     EquipmentAsset[]      @relation("EquipmentRetiredBy")
@@ -1959,6 +1964,7 @@ model SupplierDocument {
   taxBreakdowns SupplierDocumentTaxBreakdown[]
   audits SupplierDocumentAudit[]
   allocations PurchaseReceiptDocument[]
+  receiptLinks PurchaseReceiptSupplierDocumentLink[]
   cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
   replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
@@ -2059,4 +2065,27 @@ model PurchaseReceiptReconciliationApproval {
 
   @@index([companyId, receiptId, createdAt, id])
   @@unique([companyId, receiptId, allocationSnapshotHash], map: "PurchaseReceiptApproval_snapshot_key")
+}
+
+
+/// Nonmonetary document link. Financial allocations remain in PurchaseReceiptDocument.
+model PurchaseReceiptSupplierDocumentLink {
+  id String @id @default(uuid())
+  companyId String
+  receiptId String
+  documentId String
+  createdById String
+  createdAt DateTime @default(now())
+  removedById String?
+  removedAt DateTime?
+  reason String? @db.VarChar(1000)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  receipt PurchaseReceipt @relation(fields: [receiptId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User @relation("ReceiptDocumentLinkCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  removedBy User? @relation("ReceiptDocumentLinkRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, receiptId, documentId])
+  @@index([companyId, documentId])
 }
