@@ -22,9 +22,7 @@ function validBucket(name: string): boolean {
   return /^[a-z0-9](?:[a-z0-9-]{1,61})[a-z0-9]$/.test(name);
 }
 
-export function parseCloudflareR2Config(
-  env: Env,
-): CloudflareR2Config | null {
+export function parseCloudflareR2Config(env: Env): CloudflareR2Config | null {
   const mode = env.R2_STORAGE_MODE?.trim() || 'disabled';
   if (!['disabled', 'r2'].includes(mode)) {
     throw new Error('R2_STORAGE_MODE must be disabled or r2');
