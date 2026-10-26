@@ -170,6 +170,23 @@ describe('environment configuration validation', () => {
     },
   );
 
+  it('keeps R2 optional and does not enable downloads by itself', () => {
+    expect(
+      validateEnvironment(productionConfig).R2_STORAGE_MODE,
+    ).toBeUndefined();
+  });
+
+  it('rejects incomplete R2 configuration without echoing credentials', () => {
+    const error = validationError({
+      ...productionConfig,
+      R2_STORAGE_MODE: 'r2',
+      R2_ACCOUNT_ID: 'incorrect',
+      R2_READ_SECRET_ACCESS_KEY: 'private-do-not-log-me',
+    });
+    expect(error?.message).toContain('R2_ACCOUNT_ID');
+    expect(error?.message).not.toContain('private-do-not-log-me');
+  });
+
   it('requires email settings in production', () => {
     const missingApiKey = { ...productionConfig };
     delete missingApiKey.RESEND_API_KEY;
