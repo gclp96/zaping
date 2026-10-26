@@ -10,7 +10,7 @@ import type { ValidatedQuarantinePayload } from './cloudflare-r2-quarantine-payl
 
 /**
  * Internal-only quarantine writer. Its S3Client must use a separate,
- * bucket-scoped Object Write token, never the read-only private-bucket token.
+ * bucket-scoped Object Read & Write token, never the private-bucket read token.
  *
  * This adapter is intentionally NOT wired into a controller/provider.
  * No database record, scan approval or download permission is created here.
