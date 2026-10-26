@@ -128,6 +128,12 @@ jobs:
           RUN_SUPPLIER_ATTACHMENTS_PG: "1"
         run: npm run test:e2e -- --runInBand test/supplier-document-attachments.postgres.e2e-spec.ts
 
+      - name: Compile optional Cloudflare R2 QA smoke without network or secrets
+        env:
+          RUN_CLOUDFLARE_R2_QA_SMOKE: "0"
+          R2_STORAGE_MODE: "disabled"
+        run: npm run test:e2e -- --runInBand test/cloudflare-r2-readonly.qa.e2e-spec.ts
+
       - name: Verify R2A-01 supplier documents on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_DOC_PG: "1"
