@@ -1,6 +1,14 @@
 import {
-  BadRequestException, Body, Controller, Get, Headers, Param, Post, Query,
-  Req, UseGuards,
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface';
@@ -8,7 +16,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guards';
 import {
-  CreateSupplierDocumentDto, CreateSupplierDocumentExceptionDto,
+  CreateSupplierDocumentDto,
+  CreateSupplierDocumentExceptionDto,
   ListSupplierDocumentsQueryDto,
 } from './dto/create-supplier-document.dto';
 import { SupplierDocumentsService } from './supplier-documents.service';
@@ -39,7 +48,10 @@ export class SupplierDocumentsController {
     @Body() dto: CreateSupplierDocumentDto,
   ) {
     return this.documents.create(
-      req.user.companyId, req.user.id, this.requireKey(key), dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      dto,
     );
   }
 
@@ -50,7 +62,10 @@ export class SupplierDocumentsController {
     @Body() dto: CreateSupplierDocumentExceptionDto,
   ) {
     return this.documents.createException(
-      req.user.companyId, req.user.id, this.requireKey(key), dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      dto,
     );
   }
 
