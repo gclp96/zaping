@@ -85,7 +85,10 @@ describe('LoginPage', () => {
 
   it('does not redirect when credentials are invalid', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.post).mockRejectedValueOnce(new Error('Invalid credentials'));
+    vi.mocked(api.post).mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { status: 401 },
+    });
 
     render(<LoginPage />);
     await user.type(screen.getByLabelText('Correo'), 'user@example.com');
@@ -109,7 +112,9 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 
     await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith('Credenciales inválidas');
+      expect(window.alert).toHaveBeenCalledWith(
+        'No fue posible conectar con la API. Intenta nuevamente.',
+      );
     });
     expect(navigationMock.push).not.toHaveBeenCalled();
     expect(localStorage.getItem('token')).toBeNull();
