@@ -113,6 +113,11 @@ jobs:
       - name: Run PostgreSQL concurrency E2E
         run: npm run test:concurrency
 
+      - name: Verify R2A-02 invoice allocations on ephemeral PostgreSQL
+        env:
+          RUN_R2A02_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-document-reconciliation.postgres.e2e-spec.ts
+
       - name: Verify R2A-01 supplier documents on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_DOC_PG: "1"
