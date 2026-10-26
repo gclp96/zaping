@@ -429,7 +429,7 @@ export class SupplierDocumentReconciliationService {
     actorId: string,
     key: string,
     scope: IdempotencyScope,
-    payload: { documentId: string; expectedRevision: number },
+    payload: { documentId: string; expectedRevision: number; [key: string]: unknown },
     operation: (
       tx: Tx,
       document: SupplierDocument,
