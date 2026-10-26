@@ -81,7 +81,8 @@ export class SupplierDocumentAttachmentsService {
     if (!item) {
       throw new NotFoundException('Adjunto no encontrado');
     }
-    if (item.contentType !== 'application/pdf' && item.contentType !== 'image/jpeg') {
+    const contentType = item.contentType;
+    if (contentType !== 'application/pdf' && contentType !== 'image/jpeg') {
       throw new ConflictException('Tipo de archivo almacenado inválido');
     }
     const source = await this.storage.openReadOnly(item.storageKey);
@@ -92,7 +93,7 @@ export class SupplierDocumentAttachmentsService {
     );
     return {
       bytes,
-      contentType: item.contentType,
+      contentType,
       originalName: item.originalName,
     };
   }
