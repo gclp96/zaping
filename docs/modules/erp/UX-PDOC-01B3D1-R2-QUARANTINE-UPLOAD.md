@@ -18,7 +18,7 @@ Zaping debe aceptar PDF/JPEG sin exponer credenciales ni permitir acceso a archi
 
 ## Decisiones de seguridad
 
-- Usar **token separado de escritura** restringido exclusivamente a `zaping-quarantine-qa`, nunca el `zaping-r2-qa-readonly`. Las credenciales deben permanecer en gestor de secretos y jamás imprimirse ni introducirse en Git/ChatGPT.
+- Usar **token separado Object Read & Write** restringido exclusivamente a `zaping-quarantine-qa`, nunca el `zaping-r2-qa-readonly`. Esta es la opción de escritura del panel R2; no concede permisos sobre `zaping-private-qa`. En una evolución posterior, derivar credenciales temporales restringidas a la acción `PutObject` y al prefijo específico mediante firma local confiable, si resulta operativo. Las credenciales deben permanecer en gestor de secretos y jamás imprimirse ni introducirse en Git/ChatGPT.
 - La firma de bytes y SHA-256 detectan inconsistencias de formato, **NO** eliminan malware. El objeto solo existe en cuarentena hasta que haya escáner real; nunca se pone a disposición del usuario mediante descarga.
 - `PutObject` condicional con `If-None-Match: *` usa semántica atómica de create-once documentada en R2. Un timeout/error de red puede dejar el resultado ambiguo: **no repetir la escritura con la misma clave sin conciliar su estado**.
 - Los límites de memoria de este helper **no reemplazan** los límites HTTP a nivel proxy/multipart ni la cuota total de empresa/documento. Para habilitar carga deberá existir un parser streaming con límites de tamaño y cantidad de partes, tipo, autenticación y rechazo temprano.
@@ -39,7 +39,7 @@ Zaping debe aceptar PDF/JPEG sin exponer credenciales ni permitir acceso a archi
 
 - CI (Jest, typecheck, build, lint, Historical upgrade).
 - Revisar y evaluar separadamente R2 QA Object Write **por bucket de cuarentena**: no usar ni ampliar el token de lectura existente.
-- Test de objeto sintético contra R2 QA con permiso mínimo y operación de escritura explícitamente aprobada (no incluido en este PR).
+- Test de objeto sintético contra R2 QA con permiso `Object Read & Write` limitado al bucket de cuarentena y operación de escritura explícitamente aprobada (no incluido en este PR).
 - QA HTTP, PostgreSQL concurrente, protección contra malware y auditoría de promociones.
 - No cambiar `main`, `zaping_dev` ni `zaping_qa` mientras estos gates estén pendientes.
 
