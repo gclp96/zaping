@@ -21,12 +21,26 @@ import {
   ListSupplierDocumentsQueryDto,
 } from './dto/create-supplier-document.dto';
 import { SupplierDocumentsService } from './supplier-documents.service';
+import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
+import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
+import {
+  ConfirmSupplierDocumentBasisDto,
+  CreateSupplierDocumentAllocationDto,
+  ReviseSupplierDocumentAllocationDto,
+  CorrectSupplierDocumentBasisDto,
+  CancelSupplierDocumentDto,
+  ApproveReceiptVarianceDto,
+} from './dto/supplier-document-reconciliation.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.MANAGER)
 @Controller('supplier-documents')
 export class SupplierDocumentsController {
-  constructor(private readonly documents: SupplierDocumentsService) {}
+  constructor(
+    private readonly documents: SupplierDocumentsService,
+    private readonly reconciliation: SupplierDocumentReconciliationService,
+    private readonly variance: SupplierReceiptVarianceService,
+  ) {}
 
   @Get()
   findAll(
@@ -51,6 +65,115 @@ export class SupplierDocumentsController {
       req.user.companyId,
       req.user.id,
       this.requireKey(key),
+      dto,
+    );
+  }
+
+  @Post(':id/confirm-basis')
+  confirmBasis(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ConfirmSupplierDocumentBasisDto,
+  ) {
+    return this.reconciliation.confirmBasis(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Get(':id/allocations')
+  listAllocations(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    return this.reconciliation.allocations(req.user.companyId, id);
+  }
+
+  @Post(':id/allocations')
+  allocate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CreateSupplierDocumentAllocationDto,
+  ) {
+    return this.reconciliation.createAllocation(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Post(':id/allocations/revise')
+  reviseAllocation(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ReviseSupplierDocumentAllocationDto,
+  ) {
+    return this.reconciliation.reviseAllocation(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Post(':id/correct-basis')
+  correctBasis(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CorrectSupplierDocumentBasisDto,
+  ) {
+    return this.reconciliation.correctBasis(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Post(':id/cancel')
+  cancelDocument(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CancelSupplierDocumentDto,
+  ) {
+    return this.reconciliation.cancelDocument(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Get('receipts/:receiptId/reconciliation')
+  receiptReconciliation(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+  ) {
+    return this.variance.overview(req.user.companyId, receiptId);
+  }
+
+  @Post('receipts/:receiptId/approve-variance')
+  approveVariance(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ApproveReceiptVarianceDto,
+  ) {
+    return this.variance.approve(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      receiptId,
       dto,
     );
   }
