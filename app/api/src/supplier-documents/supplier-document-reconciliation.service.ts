@@ -259,8 +259,7 @@ export class SupplierDocumentReconciliationService {
         expectedRevision: dto.expectedRevision,
       },
       async (tx, doc) => {
-        const reactivating =
-          dto.action === AllocationRevisionAction.REACTIVATE;
+        const reactivating = dto.action === AllocationRevisionAction.REACTIVATE;
         const link = await tx.purchaseReceiptDocument.findFirst({
           where: {
             id: dto.allocationId,
