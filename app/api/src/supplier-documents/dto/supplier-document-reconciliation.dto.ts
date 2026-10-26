@@ -1,5 +1,6 @@
 import {
   IsEnum,
+  IsIn,
   IsOptional,
   IsInt,
   IsString,
@@ -19,7 +20,7 @@ export class ConfirmSupplierDocumentBasisDto {
   goodsNetAmount!: string;
 
   @IsString()
-  @Matches(/^[A-Z]{3}$/)
+  @IsIn(['MXN', 'USD'])
   currency!: string;
 
   @IsString()
@@ -83,7 +84,7 @@ export class CorrectSupplierDocumentBasisDto {
   goodsNetAmount!: string;
 
   @IsString()
-  @Matches(/^[A-Z]{3}$/)
+  @IsIn(['MXN', 'USD'])
   currency!: string;
 
   @IsString()
@@ -126,7 +127,7 @@ export class ApproveReceiptVarianceDto {
   receiptComparableNetAmount!: string;
 
   @IsString()
-  @Matches(/^[A-Z]{3}$/)
+  @IsIn(['MXN', 'USD'])
   receiptCurrency!: string;
 
   @IsString()

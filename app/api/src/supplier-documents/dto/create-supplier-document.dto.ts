@@ -1,7 +1,8 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsEnum,
   IsOptional,
   IsString,
@@ -50,7 +51,13 @@ export class CreateSupplierDocumentDto {
   @IsString()
   @Matches(/^[A-Za-zÑñ&]{3,4}\d{6}[A-Za-z0-9]{3}$/)
   receiverRfc?: string;
-  @IsOptional() @IsString() @Matches(/^[A-Za-z]{3}$/) currency?: string;
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.toUpperCase() : value,
+  )
+  @IsIn(['MXN', 'USD'])
+  currency?: string;
   @IsOptional() @IsString() @Matches(MONEY) subtotalAmount?: string;
   @IsOptional() @IsString() @Matches(MONEY) discountAmount?: string;
   @IsOptional() @IsString() @Matches(MONEY) freightAmount?: string;

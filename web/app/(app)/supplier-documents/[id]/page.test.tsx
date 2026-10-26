@@ -122,7 +122,7 @@ describe("R2A-03 supplier document detail", () => {
     expect(await screen.findByText("Documento A-4618")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Guardar corrección de base" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Confirmar base revisada" })).toBeNull();
-    const input = screen.getByRole("textbox", { name: "Base neta corregida" });
+    const input = screen.getByRole("textbox", { name: "Subtotal neto corregido" });
     await user.clear(input);
     await user.type(input, "85.50");
     await user.type(
