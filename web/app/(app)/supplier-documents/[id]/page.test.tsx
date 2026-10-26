@@ -79,6 +79,14 @@ describe("R2A-03 supplier document detail", () => {
     expect(screen.getByText(/Zaping no realiza timbrado/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Confirmar base revisada" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Vincular recepción" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Cancelar registro documental" })
+      .hasAttribute("disabled")).toBe(true);
+    const consent = screen.getByRole("checkbox", {
+      name: /Confirmo que cancelaré el registro documental/,
+    });
+    await userEvent.setup().click(consent);
+    expect(screen.getByRole("button", { name: "Cancelar registro documental" })
+      .hasAttribute("disabled")).toBe(false);
   });
 
   it("shows correction only for confirmed invoices and sends expected revision", async () => {
