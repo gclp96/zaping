@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { FilePlus2, RefreshCw } from "lucide-react";
+import axios from "axios";
 
 import { useAuthenticatedSession } from "@/app/auth-session";
 import { hasRole, MANAGEMENT_ROLES } from "@/app/erp-role-access";
@@ -17,6 +18,8 @@ import { api } from "@/services/api";
 import { getApiErrorMessage, isForbiddenError } from "@/services/errors";
 import {
   createSupplierDocument,
+  createSupplierDocumentException,
+  getSupplierDocument,
   documentDateLabel,
   documentTypeLabel,
   formatSupplierMoney,
@@ -62,6 +65,13 @@ export default function SupplierDocumentsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [form, setForm] = useState(emptyForm);
+  const [exceptionCandidate, setExceptionCandidate] = useState<{
+    payload: NewSupplierDocument;
+    duplicateOf: SupplierDocument;
+  } | null>(null);
+  const [exceptionReason, setExceptionReason] = useState("");
+  const [exceptionEvidence, setExceptionEvidence] = useState("");
+  const exceptionRetry = useRef<{ signature: string; key: string } | null>(null);
   const retry = useRef<{ signature: string; key: string } | null>(null);
 
   useEffect(() => {
@@ -114,6 +124,8 @@ export default function SupplierDocumentsPage() {
     field: K, value: ReturnType<typeof emptyForm>[K],
   ) {
     setForm((previous) => ({ ...previous, [field]: value }));
+    setExceptionCandidate(null);
+    setSaveError("");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -156,14 +168,80 @@ export default function SupplierDocumentsPage() {
       setSaveError("");
       await createSupplierDocument(payload, retry.current.key);
       retry.current = null;
+      setExceptionCandidate(null);
       setForm(emptyForm());
       setCreating(false);
       await refresh();
     } catch (error: unknown) {
-      setSaveError(getApiErrorMessage(error, "No fue posible registrar el documento."));
+      const body = axios.isAxiosError(error) ? error.response?.data as
+        { code?: string; existingDocumentId?: string } | undefined : undefined;
+      if (error && axios.isAxiosError(error) &&
+          error.response?.status === 409 &&
+          body?.code === "SUPPLIER_DOCUMENT_IDENTITY_EXISTS" &&
+          body.existingDocumentId) {
+        try {
+          const candidate = await getSupplierDocument(body.existingDocumentId);
+          const norm = (value: string | null | undefined) =>
+            (value ?? "").trim().normalize("NFC").toUpperCase();
+          if (candidate.identityOccurrence !== 1 ||
+              candidate.supplierId !== payload.supplierId ||
+              candidate.type !== payload.type ||
+              norm(candidate.series) !== norm(payload.series) ||
+              norm(candidate.number) !== norm(payload.number)) {
+            throw new Error("La identidad no coincide con el documento encontrado.");
+          }
+          setExceptionCandidate({ payload, duplicateOf: candidate });
+          setExceptionReason("");
+          setExceptionEvidence("");
+          exceptionRetry.current = null;
+          setSaveError("Ya existe ese folio. Verifica el documento previo; solo registra una excepción si es un documento comercial realmente distinto.");
+        } catch {
+          setExceptionCandidate(null);
+          setSaveError("Existe un conflicto de identidad, pero no fue posible verificar la referencia. Revisa la captura.");
+        }
+      } else {
+        setExceptionCandidate(null);
+        setSaveError(getApiErrorMessage(error, "No fue posible registrar el documento."));
+      }
     } finally {
       setSaving(false);
     }
+  }
+
+  async function submitException() {
+    if (!exceptionCandidate || saving || exceptionReason.trim().length < 10 ||
+        exceptionEvidence.trim().length < 5) {
+      setSaveError("Para autorizar esta excepción indica motivo (mínimo 10 caracteres) y referencia de evidencia (mínimo 5).");
+      return;
+    }
+    const request = {
+      ...exceptionCandidate.payload,
+      duplicateOfDocumentId: exceptionCandidate.duplicateOf.id,
+      reason: exceptionReason.trim(),
+      evidenceReference: exceptionEvidence.trim(),
+    };
+    const signature = JSON.stringify(request);
+    if (!exceptionRetry.current || exceptionRetry.current.signature !== signature) {
+      exceptionRetry.current = { signature, key: crypto.randomUUID() };
+    }
+    setSaving(true);
+    try {
+      setSaveError("");
+      await createSupplierDocumentException(request, exceptionRetry.current.key);
+    } catch (error: unknown) {
+      setSaveError(getApiErrorMessage(error, "No se pudo registrar la excepción."));
+      setSaving(false);
+      return;
+    }
+    exceptionRetry.current = null;
+    retry.current = null;
+    setExceptionCandidate(null);
+    setExceptionReason("");
+    setExceptionEvidence("");
+    setForm(emptyForm());
+    setCreating(false);
+    setSaving(false);
+    await refresh();
   }
 
   if (session.status === "loading") return <PageContainer><Loading message="Verificando sesión..." /></PageContainer>;
@@ -243,6 +321,31 @@ export default function SupplierDocumentsPage() {
             {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
             <Button type="submit" loading={saving}>Guardar documento</Button>
           </form>
+        </Section>
+      )}
+      {creating && exceptionCandidate && (
+        <Section title="Excepción administrativa por folio repetido">
+          <p className="text-sm text-text-muted">
+            Existe el documento {[exceptionCandidate.duplicateOf.series,
+              exceptionCandidate.duplicateOf.number].filter(Boolean).join("-")}.
+            Esta excepción no debe utilizarse para duplicar capturas ni cuando el UUID fiscal ya exista.
+          </p>
+          <Link className="text-blue-700 underline" href={
+            "/supplier-documents/" + encodeURIComponent(exceptionCandidate.duplicateOf.id)
+          }>Consultar el documento existente</Link>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <Input label="Motivo excepcional" minLength={10} required
+              value={exceptionReason} onChange={(event) => setExceptionReason(event.target.value)} />
+            <Input label="Referencia de evidencia" minLength={5} required
+              value={exceptionEvidence} onChange={(event) => setExceptionEvidence(event.target.value)} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Button type="button" disabled={saving} onClick={() => void submitException()}>
+              Registrar excepción auditada
+            </Button>
+            <Button type="button" variant="outline" disabled={saving}
+              onClick={() => setExceptionCandidate(null)}>No duplicar documento</Button>
+          </div>
         </Section>
       )}
       {loadError && (
