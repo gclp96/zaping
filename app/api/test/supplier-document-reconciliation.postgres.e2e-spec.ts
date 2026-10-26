@@ -635,19 +635,14 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
   it('rejects mixing MXN and USD invoices on one receipt', async () => {
     const f = await fixture();
     const mxn = await confirmed(f);
-    const usd = await documents.create(
-      f.companyId,
-      f.actorId,
-      randomUUID(),
-      {
-        supplierId: f.supplierId,
-        type: SupplierDocumentType.FACTURA,
-        number: randomUUID(),
-        documentDate: '2026-10-25',
-        goodsNetAmount: '100',
-        currency: 'USD',
-      },
-    );
+    const usd = await documents.create(f.companyId, f.actorId, randomUUID(), {
+      supplierId: f.supplierId,
+      type: SupplierDocumentType.FACTURA,
+      number: randomUUID(),
+      documentDate: '2026-10-25',
+      goodsNetAmount: '100',
+      currency: 'USD',
+    });
     await reconciliation.confirmBasis(
       f.companyId,
       f.actorId,
@@ -700,14 +695,22 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
       f.actorId,
       randomUUID(),
       docA.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '80', expectedRevision: 1 },
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '80',
+        expectedRevision: 1,
+      },
     );
     await reconciliation.createAllocation(
       f.companyId,
       f.actorId,
       randomUUID(),
       docB.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
     );
     const unreviewed = await variance.overview(f.companyId, entry.receiptId);
     expect(unreviewed.allocatedTotalAmount).toBe('140.00');
@@ -753,7 +756,10 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
         expectedRevision: 1,
       },
     );
-    const [initial] = await reconciliation.allocations(f.companyId, document.id);
+    const [initial] = await reconciliation.allocations(
+      f.companyId,
+      document.id,
+    );
     await reconciliation.reviseAllocation(
       f.companyId,
       f.actorId,
