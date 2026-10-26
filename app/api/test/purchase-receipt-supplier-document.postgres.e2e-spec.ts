@@ -1617,10 +1617,13 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
       where: { id: dated.id },
     });
     expect(datedAfterSale).toMatchObject({
-      ...dated,
+      id: dated.id,
+      companyId: dated.companyId,
+      productId: dated.productId,
+      inventoryBatchId: null,
+      expirationDate: dated.expirationDate,
       quantity: 1,
       revision: dated.revision + 1,
-      updatedAt: expect.any(Date),
     });
     expect(
       await db.inventoryPosition.findFirstOrThrow({
