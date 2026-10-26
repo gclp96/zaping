@@ -30,7 +30,6 @@ export function createR2ObjectKeys(
   };
 }
 
-
 /**
  * Internal quarantine scope. This must never be used by the approved-object
  * download provider.
