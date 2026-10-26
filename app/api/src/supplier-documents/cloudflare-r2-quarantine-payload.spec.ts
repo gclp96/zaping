@@ -1,8 +1,6 @@
 import { Readable } from 'node:stream';
 import { BadRequestException } from '@nestjs/common';
-import {
-  consumeQuarantineUpload,
-} from './cloudflare-r2-quarantine-payload';
+import { consumeQuarantineUpload } from './cloudflare-r2-quarantine-payload';
 import { SUPPLIER_ATTACHMENT_MAX_BYTES } from './supplier-document-attachment-validation';
 
 const pdf = Buffer.from('%PDF-1.7\n1 0 obj\n<<>>\nendobj\n%%EOF\n');
