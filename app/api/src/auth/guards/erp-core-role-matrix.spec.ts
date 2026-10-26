@@ -67,6 +67,8 @@ const roleMatrix: RoleMatrix[] = [
       reviseAllocation: [UserRole.ADMIN, UserRole.MANAGER],
       correctBasis: [UserRole.ADMIN, UserRole.MANAGER],
       cancelDocument: [UserRole.ADMIN, UserRole.MANAGER],
+      receiptReconciliation: [UserRole.ADMIN, UserRole.MANAGER],
+      approveVariance: [UserRole.ADMIN, UserRole.MANAGER],
     },
   },
   {

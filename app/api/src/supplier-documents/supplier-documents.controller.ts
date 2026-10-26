@@ -22,12 +22,14 @@ import {
 } from './dto/create-supplier-document.dto';
 import { SupplierDocumentsService } from './supplier-documents.service';
 import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
+import { SupplierReceiptVarianceService } from './supplier-receipt-variance.service';
 import {
   ConfirmSupplierDocumentBasisDto,
   CreateSupplierDocumentAllocationDto,
   ReviseSupplierDocumentAllocationDto,
   CorrectSupplierDocumentBasisDto,
   CancelSupplierDocumentDto,
+  ApproveReceiptVarianceDto,
 } from './dto/supplier-document-reconciliation.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,6 +39,7 @@ export class SupplierDocumentsController {
   constructor(
     private readonly documents: SupplierDocumentsService,
     private readonly reconciliation: SupplierDocumentReconciliationService,
+    private readonly variance: SupplierReceiptVarianceService,
   ) {}
 
   @Get()
@@ -137,6 +140,27 @@ export class SupplierDocumentsController {
   ) {
     return this.reconciliation.cancelDocument(
       req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+    );
+  }
+
+  @Get('receipts/:receiptId/reconciliation')
+  receiptReconciliation(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+  ) {
+    return this.variance.overview(req.user.companyId, receiptId);
+  }
+
+  @Post('receipts/:receiptId/approve-variance')
+  approveVariance(
+    @Req() req: AuthenticatedRequest,
+    @Param('receiptId') receiptId: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ApproveReceiptVarianceDto,
+  ) {
+    return this.variance.approve(
+      req.user.companyId, req.user.id, this.requireKey(key),
+      receiptId, dto,
     );
   }
 

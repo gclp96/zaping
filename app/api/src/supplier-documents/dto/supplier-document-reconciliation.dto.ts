@@ -118,3 +118,27 @@ export class CancelSupplierDocumentDto {
   @Min(0)
   expectedRevision!: number;
 }
+
+export class ApproveReceiptVarianceDto {
+  @IsString()
+  @Matches(MONEY)
+  receiptComparableNetAmount!: string;
+
+  @IsString()
+  @Matches(/^[A-Z]{3}$/)
+  receiptCurrency!: string;
+
+  @IsString()
+  @MinLength(5)
+  @MaxLength(1000)
+  evidenceReference!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(1000)
+  reason!: string;
+
+  @IsString()
+  @Matches(/^[a-f0-9]{64}$/)
+  expectedSnapshotHash!: string;
+}
