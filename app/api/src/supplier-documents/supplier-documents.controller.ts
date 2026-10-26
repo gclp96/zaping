@@ -127,7 +127,10 @@ export class SupplierDocumentsController {
     response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
     return new StreamableFile(file.bytes, {
       type: file.contentType,
-      disposition: safeAttachmentDisposition(file.originalName, file.contentType),
+      disposition: safeAttachmentDisposition(
+        file.originalName,
+        file.contentType,
+      ),
       length: file.bytes.length,
     });
   }
