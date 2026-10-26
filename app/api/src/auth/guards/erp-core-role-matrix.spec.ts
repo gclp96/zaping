@@ -61,6 +61,9 @@ const roleMatrix: RoleMatrix[] = [
       findOne: [UserRole.ADMIN, UserRole.MANAGER],
       create: [UserRole.ADMIN, UserRole.MANAGER],
       createException: [UserRole.ADMIN, UserRole.MANAGER],
+      confirmBasis: [UserRole.ADMIN, UserRole.MANAGER],
+      listAllocations: [UserRole.ADMIN, UserRole.MANAGER],
+      allocate: [UserRole.ADMIN, UserRole.MANAGER],
     },
   },
   {

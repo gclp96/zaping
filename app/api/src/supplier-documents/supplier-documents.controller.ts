@@ -21,12 +21,20 @@ import {
   ListSupplierDocumentsQueryDto,
 } from './dto/create-supplier-document.dto';
 import { SupplierDocumentsService } from './supplier-documents.service';
+import { SupplierDocumentReconciliationService } from './supplier-document-reconciliation.service';
+import {
+  ConfirmSupplierDocumentBasisDto,
+  CreateSupplierDocumentAllocationDto,
+} from './dto/supplier-document-reconciliation.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN, UserRole.MANAGER)
 @Controller('supplier-documents')
 export class SupplierDocumentsController {
-  constructor(private readonly documents: SupplierDocumentsService) {}
+  constructor(
+    private readonly documents: SupplierDocumentsService,
+    private readonly reconciliation: SupplierDocumentReconciliationService,
+  ) {}
 
   @Get()
   findAll(
@@ -51,6 +59,46 @@ export class SupplierDocumentsController {
       req.user.companyId,
       req.user.id,
       this.requireKey(key),
+      dto,
+    );
+  }
+
+  @Post(':id/confirm-basis')
+  confirmBasis(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ConfirmSupplierDocumentBasisDto,
+  ) {
+    return this.reconciliation.confirmBasis(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
+    );
+  }
+
+  @Get(':id/allocations')
+  listAllocations(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
+    return this.reconciliation.allocations(req.user.companyId, id);
+  }
+
+  @Post(':id/allocations')
+  allocate(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CreateSupplierDocumentAllocationDto,
+  ) {
+    return this.reconciliation.createAllocation(
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
       dto,
     );
   }
