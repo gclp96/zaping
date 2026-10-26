@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useAuthenticatedSession } from '@/app/auth-session';
 import { hasRole, MANAGEMENT_ROLES } from '@/app/erp-role-access';
 import Button from '@/app/components/ui/Button';
+import Select from '@/app/components/ui/Select';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/services/errors';
 
@@ -22,6 +23,11 @@ type LinkedSupplierDocument = {
   };
 };
 
+type AvailableSupplierDocument = LinkedSupplierDocument['document'] & {
+  supplierId: string;
+  identityOccurrence: number;
+};
+
 type LoadedLinks = {
   receiptId: string;
   links: LinkedSupplierDocument[];
@@ -35,9 +41,11 @@ function documentLabel(document: LinkedSupplierDocument['document']) {
 export default function ReceiptSupplierDocuments({
   receiptId,
   legacyReference,
+  supplierId,
 }: {
   receiptId: string;
   legacyReference: string | null;
+  supplierId: string;
 }) {
   const session = useAuthenticatedSession();
   const role = session.status === 'success' ? session.user.role : null;
@@ -45,6 +53,14 @@ export default function ReceiptSupplierDocuments({
   const [loaded, setLoaded] = useState<LoadedLinks | null>(null);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  const [picker, setPicker] = useState<{
+    supplierId: string;
+    documents: AvailableSupplierDocument[];
+  } | null>(null);
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [selection, setSelection] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     if (!canView) return;
@@ -89,6 +105,82 @@ export default function ReceiptSupplierDocuments({
   }, [canView, receiptId, reload]);
 
   const links = loaded?.receiptId === receiptId ? loaded.links : null;
+
+  const available = picker?.supplierId === supplierId
+    ? picker.documents.filter(
+        (doc) =>
+          doc.status === 'ACTIVE' &&
+          !links?.some((link) => link.documentId === doc.id),
+      )
+    : null;
+
+  async function openPicker() {
+    if (!canView || pickerLoading || saving) return;
+    setPickerLoading(true);
+    setActionError('');
+    setPicker(null);
+    setSelection('');
+    try {
+      const response = await api.get<AvailableSupplierDocument[]>(
+        '/supplier-documents',
+        { params: { supplierId } },
+      );
+      if (
+        !Array.isArray(response.data) ||
+        response.data.some(
+          (doc) =>
+            !doc.id ||
+            doc.supplierId !== supplierId ||
+            !doc.number ||
+            !['ACTIVE', 'CANCELLED'].includes(doc.status),
+        )
+      ) {
+        throw new Error('Respuesta de documentos del proveedor inválida.');
+      }
+      setPicker({ supplierId, documents: response.data });
+    } catch (requestError: unknown) {
+      setActionError(
+        getApiErrorMessage(
+          requestError,
+          'No fue posible cargar los documentos del proveedor.',
+        ),
+      );
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function attachDocument() {
+    if (!canView || saving || !selection || !available) return;
+    const selected = available.find((doc) => doc.id === selection);
+    if (!selected) {
+      setActionError('El documento seleccionado ya no está disponible.');
+      return;
+    }
+    setSaving(true);
+    setActionError('');
+    try {
+      await api.post(
+        `/supplier-documents/receipts/${encodeURIComponent(receiptId)}/links`,
+        { documentId: selected.id },
+      );
+      setPicker(null);
+      setSelection('');
+      setLoaded(null);
+      setReload((value) => value + 1);
+    } catch (requestError: unknown) {
+      setActionError(
+        getApiErrorMessage(
+          requestError,
+          'No fue posible vincular el documento seleccionado.',
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
 
   return (
     <div className="space-y-2 text-sm font-normal">
@@ -142,6 +234,74 @@ export default function ReceiptSupplierDocuments({
             ? 'Referencia documental sin vínculo por ID. No se puede abrir por folio.'
             : 'Sin documento vinculado por ID.'}
         </p>
+      )}
+
+      {canView && !error && links !== null && (
+        <div className="mt-3 space-y-2 border-t border-border pt-3">
+          {!picker && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              loading={pickerLoading}
+              onClick={() => void openPicker()}
+            >
+              Vincular documento existente
+            </Button>
+          )}
+
+          {picker?.supplierId === supplierId && (
+            <div className="space-y-2">
+              <p className="text-text-muted">
+                Solo documentos activos del proveedor de esta compra.
+                Se muestran hasta 50 documentos recientes; el vínculo
+                no modifica la conciliación monetaria.
+              </p>
+              {available?.length === 0 ? (
+                <p className="text-text-muted">
+                  No hay documentos recientes disponibles para vincular.
+                </p>
+              ) : (
+                <Select
+                  label="Documento del proveedor"
+                  value={selection}
+                  onChange={(event) => setSelection(event.target.value)}
+                  options={(available ?? []).map((doc) => ({
+                    value: doc.id,
+                    label: `${documentLabel(doc)} · Ocurrencia #${doc.identityOccurrence}`,
+                  }))}
+                  placeholder="Selecciona el documento exacto"
+                  disabled={saving}
+                />
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  loading={saving}
+                  disabled={!selection || !(available ?? []).some((doc) => doc.id === selection)}
+                  onClick={() => void attachDocument()}
+                >
+                  Confirmar vínculo
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={saving}
+                  onClick={() => {
+                    setPicker(null);
+                    setSelection('');
+                    setActionError('');
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+          {actionError && <p role="alert" className="text-red-700">{actionError}</p>}
+        </div>
       )}
 
       {canView && !error && links && links.length > 0 && (
