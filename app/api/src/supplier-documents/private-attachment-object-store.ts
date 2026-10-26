@@ -7,7 +7,10 @@ import type { Readable } from 'node:stream';
  * Never accept user-supplied URLs, buckets or object keys.
  */
 export abstract class PrivateAttachmentObjectStore {
-  abstract openReadOnly(storageKey: string, companyId: string): Promise<Readable>;
+  abstract openReadOnly(
+    storageKey: string,
+    companyId: string,
+  ): Promise<Readable>;
 }
 
 /**
