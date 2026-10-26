@@ -323,8 +323,8 @@ export default function SupplierDocumentsPage() {
               <Input label="Total" inputMode="decimal" value={form.totalAmount}
                 onChange={(event) => updateField("totalAmount", event.target.value)} />
               {form.type === "FACTURA" && (
-                <Input label="Base neta de mercancía (por revisar)" inputMode="decimal"
-                  helperText="Importe de productos después de descuentos de mercancía, sin IVA, retenciones ni flete separado. Ejemplo: productos $1,000 − descuento $100 = base $900. Se confirma antes de conciliar."
+                <Input label="Subtotal neto de mercancía (por revisar)" inputMode="decimal"
+                  helperText="Subtotal de los productos después de descuentos comerciales, sin IVA, retenciones ni flete separado. Ejemplo: productos $1,000 − descuento $100 = subtotal neto $900. Se confirma antes de conciliar."
                   value={form.goodsNetAmount}
                   onChange={(event) => updateField("goodsNetAmount", event.target.value)} />
               )}
