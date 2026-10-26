@@ -294,6 +294,18 @@ describe('PurchaseReceiptDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Equipos generados' })).toBeTruthy();
   });
 
+  it('conserva la trazabilidad de equipos en una recepción mixta', async () => {
+    const mixedReceipt: PurchaseReceiptDetail = {
+      ...quantityReceipt,
+      items: [...quantityReceipt.items, ...assetReceipt.items],
+    };
+    vi.mocked(api.get).mockResolvedValue({ data: mixedReceipt } as never);
+    render(<PurchaseReceiptDetailPage />);
+    expect(await screen.findByRole('heading', { name: 'Equipos generados' })).toBeTruthy();
+    expect(screen.getByLabelText('Estado del equipo EQ-000021: Retirado')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Movimientos de inventario' })).toBeTruthy();
+  });
+
   it('trata la ausencia histórica de movimientos y equipos como estados normales', async () => {
     const historicalReceipt: PurchaseReceiptDetail = {
       ...quantityReceipt,
@@ -319,7 +331,7 @@ describe('PurchaseReceiptDetailPage', () => {
         'No hay movimientos de inventario asociados a esta recepción.',
       ),
     ).toBeTruthy();
-    expect(screen.getByText('Esta recepción no generó equipos.')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Equipos generados' })).toBeNull();
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
