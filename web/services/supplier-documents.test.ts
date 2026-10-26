@@ -18,6 +18,10 @@ describe("supplier document API client", () => {
     expect(documentDateLabel("2026-10-16T00:00:00.000Z")).toBe("2026-10-16");
     expect(formatSupplierMoney(null, "MXN")).toBe("Sin capturar");
     expect(formatSupplierMoney("0.00", "MXN")).toBe("0.00 MXN");
+    expect(formatSupplierMoney("9999999999999999.99", "MXN")).toBe(
+      "9,999,999,999,999,999.99 MXN",
+    );
+    expect(formatSupplierMoney("-125.50", "MXN")).toBe("-125.50 MXN");
     expect(documentTypeLabel("NOTA_ENTREGA")).toBe("Nota de entrega");
   });
 
