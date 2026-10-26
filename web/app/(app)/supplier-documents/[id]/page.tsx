@@ -131,23 +131,30 @@ export default function SupplierDocumentDetailPage() {
     const previous = pending.current.get(action);
     const key = previous?.signature === signature ? previous.key : crypto.randomUUID();
     pending.current.set(action, { signature, key });
+    setSaving(true);
+    setActionError("");
     try {
-      setSaving(true);
-      setActionError("");
       await call(key);
-      pending.current.delete(action);
-      await load();
-      if (reviewReceiptId) {
-        const result = await getReceiptReconciliation(reviewReceiptId);
-        setReview(result);
-      }
-      return true;
     } catch (error: unknown) {
       setActionError(getApiErrorMessage(error, "No se pudo completar la operación."));
+      setSaving(false);
       return false;
+    }
+    // A successful mutation is never retried because the subsequent GET fails.
+    pending.current.delete(action);
+    try {
+      await load();
+      if (reviewReceiptId) {
+        setReview(await getReceiptReconciliation(reviewReceiptId));
+      }
+    } catch (error: unknown) {
+      setActionError(
+        getApiErrorMessage(error, "Operación guardada, pero no fue posible actualizar los datos. Recarga esta página."),
+      );
     } finally {
       setSaving(false);
     }
+    return true;
   }
 
   async function showReview(targetId: string) {
@@ -326,7 +333,11 @@ export default function SupplierDocumentDetailPage() {
             {active && (
               <form onSubmit={(event) => void onRevise(event)} className="grid gap-3 rounded-xl border border-border p-4 md:grid-cols-2">
                 <label className="text-sm font-medium">Asignación que se va a corregir
-                  <select className={selectClass} value={revisionId} onChange={(e) => { setRevisionId(e.target.value); setRevisionAction("REPLACE_AMOUNT"); }} required>
+                  <select className={selectClass} value={revisionId} onChange={(e) => {
+                      setRevisionId(e.target.value);
+                      const selected = allocations.find((link) => link.id === e.target.value);
+                      setRevisionAction(selected?.isActive ? "REPLACE_AMOUNT" : "REACTIVATE");
+                    }} required>
                     <option value="">Seleccionar vínculo</option>
                     {allocations.map((link) => <option key={link.id} value={link.id}>{link.receipt.folio} · {link.isActive ? "Activa" : "Inactiva"}</option>)}
                   </select>
