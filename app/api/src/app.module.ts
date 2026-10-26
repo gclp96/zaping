@@ -13,6 +13,7 @@ import { QuotesModule } from './quotes/quotes.module';
 import { PurchasesModule } from './purchases/purchases.module';
 import { SalesModule } from './sales/sales.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { SupplierDocumentsModule } from './supplier-documents/supplier-documents.module';
 import { CategoriesModule } from './categories/categories.module';
 import { UsersModule } from './users/users.module';
 import { PurchaseReceiptsModule } from './purchases-receipts/purchases-receipts.module';
@@ -50,6 +51,7 @@ import { healthcareCompanyTransactionTimeoutConfiguration } from './healthcare/c
     PurchaseReceiptsModule,
     SalesModule,
     SuppliersModule,
+    SupplierDocumentsModule,
     CategoriesModule,
     UsersModule,
     EquipmentModule,
