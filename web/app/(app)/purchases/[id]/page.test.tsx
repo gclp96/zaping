@@ -210,6 +210,8 @@ function setupApi({
   role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 } = {}) {
   vi.mocked(api.get).mockImplementation((endpoint: string) => {
+    if (endpoint === '/purchase-receipts/capabilities') return Promise.resolve({ data: { authority: 'LEGACY' } }) as never;
+
     if (endpoint === '/auth/me') {
       return Promise.resolve({
         data: {
@@ -343,6 +345,46 @@ describe('Purchase360Page', () => {
     expect(screen.getAllByText('3').length).toBeGreaterThan(0);
   });
 
+  it('preserves financial values and semantic section hierarchy', async () => {
+    render(<Purchase360Page />);
+    await screen.findByRole('heading', { name: 'Compra OC-0001', level: 1 });
+    expect(screen.getAllByRole('heading', { level: 2 }).map((el) => el.textContent))
+      .toEqual(['Resumen', 'Partidas', 'Resumen financiero', 'Recepciones', 'Trazabilidad']);
+    const financial = screen.getByRole('heading', { name: 'Resumen financiero' }).closest('section')!;
+    expect(within(financial).getByText('$1,000.00')).toBeTruthy();
+    expect(within(financial).getByText('$160.00')).toBeTruthy();
+    expect(within(financial).getByText('$1,160.00')).toBeTruthy();
+    expect(screen.getByRole('table', { name: 'Partidas de la compra OC-0001' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Partidas desplazables' }).getAttribute('tabindex')).toBe('0');
+  });
+
+  it('withholds aggregate progress during history loading and recovers after an error and retry', async () => {
+    const baseGet = vi.mocked(api.get).getMockImplementation()!;
+    let rejectHistory!: (reason: Error) => void;
+    const pendingHistory = new Promise((_, reject) => { rejectHistory = reject; });
+    let historyCalls = 0;
+    vi.mocked(api.get).mockImplementation((endpoint: string) => {
+      if (endpoint === '/purchase-receipts/purchase/purchase-1') {
+        historyCalls += 1;
+        return historyCalls === 1 ? pendingHistory as never : Promise.resolve({ data: [receipt] }) as never;
+      }
+      return baseGet(endpoint);
+    });
+    const user = userEvent.setup();
+    render(<Purchase360Page />);
+    await screen.findByRole('heading', { name: 'Compra OC-0001' });
+    expect(await screen.findByText('Verificando recepciones...')).toBeTruthy();
+    expect(screen.queryByText('4 / 10 uds. · 6 pendientes')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toHaveProperty('disabled', true);
+    rejectHistory(new Error('History unavailable'));
+    expect(await screen.findByText('Recepción sin verificar')).toBeTruthy();
+    expect(screen.queryByText('1 / 2 partidas')).toBeNull();
+    expect(screen.queryByText('4 / 10 uds. · 6 pendientes')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Reintentar recepciones' }));
+    expect(await screen.findByText('4 / 10 uds. · 6 pendientes')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toHaveProperty('disabled', false);
+  });
+
   it('shows neutral item progress while receipt history is unavailable', async () => {
     vi.mocked(api.get).mockImplementation((endpoint: string) => {
       if (endpoint === '/auth/me') {
@@ -384,6 +426,8 @@ describe('Purchase360Page', () => {
       screen.getByRole('button', { name: 'Registrar recepción' }),
     ).toHaveProperty('disabled', true);
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Recepción sin verificar')).toBeTruthy();
+    expect(screen.queryByText('4 / 10 uds. · 6 pendientes')).toBeNull();
   });
 
   it('isolates related resource errors and supports local retries', async () => {

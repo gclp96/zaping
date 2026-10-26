@@ -1,6 +1,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 
 import { PurchasesService } from './purchases.service';
+import { PurchasesFolioService } from './purchases-folio.service';
 
 function createPurchase(
   id: string,
@@ -61,7 +62,10 @@ describe('PurchasesService — receipt progress', () => {
       },
     };
 
-    service = new PurchasesService(prismaMock as unknown as PrismaService);
+    service = new PurchasesService(
+      prismaMock as unknown as PrismaService,
+      {} as PurchasesFolioService,
+    );
   });
 
   it('returns zero progress for a purchase without receipts', async () => {

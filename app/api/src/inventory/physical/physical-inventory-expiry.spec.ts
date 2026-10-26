@@ -315,6 +315,61 @@ describe('ADR-015 S2 motor safety gate', () => {
     },
   );
 
+  it.each([
+    ['CASE_DISPATCH', 'CONFIRM_QUANTITY'],
+    ['CASE_RECONCILIATION', 'CONFIRM_RETURNED'],
+    ['CASE_RECONCILIATION', 'CONFIRM_USED'],
+  ])(
+    'keeps the dated Healthcare gate closed for %s/%s',
+    async (type, operation) => {
+      const { source, repository, tx, service } = arrange(
+        new Date('2099-08-15'),
+      );
+      if (operation !== 'CONFIRM_QUANTITY') {
+        Object.assign(source, {
+          state: 'CUSTODY',
+          contextType: 'CASE_DISPATCH_ITEM',
+          contextId: 'item',
+        });
+      }
+      const context = {
+        ...command,
+        origin: { type, id: 'hc-gate', operation },
+      };
+      const run =
+        operation === 'CONFIRM_USED'
+          ? service.definitiveOut(tx, context, [
+              { sourceId, quantity: 1, expectedSourceRevision: 4 },
+            ])
+          : service.transfer(tx, context, [
+              {
+                sourceId,
+                quantity: 1,
+                expectedSourceRevision: 4,
+                // Matching dates isolate the authorization gate from identity mismatch.
+                target:
+                  operation === 'CONFIRM_RETURNED'
+                    ? { ...target, expirationDate: '2099-08-15' }
+                    : {
+                        ...target,
+                        expirationDate: '2099-08-15',
+                        state: 'CUSTODY',
+                        contextType: 'CASE_DISPATCH_ITEM',
+                        contextId: 'item',
+                      },
+              },
+            ]);
+      await expect(run).rejects.toMatchObject({
+        code: 'PHYSICAL_SOURCE_NOT_ELIGIBLE',
+      });
+      expect(repository.lockPositions).toHaveBeenCalled();
+      expect(repository.claimEffect).not.toHaveBeenCalled();
+      expect(repository.mutatePosition).not.toHaveBeenCalled();
+      expect(repository.appendLines).not.toHaveBeenCalled();
+      expect(source.quantity).toBe(10);
+    },
+  );
+
   it('does not mistake a dated position for the legacy target even if returned by a broad caller', async () => {
     const { source, repository, tx, service } = arrange(null);
     repository.findSources.mockResolvedValue([]);

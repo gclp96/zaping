@@ -84,6 +84,13 @@ export class PurchaseReceiptsService {
     private readonly physical: ReceiptPhysicalIntegrationService,
   ) {}
 
+  // Advisory UI capability only; create() resolves authority again under its own fence.
+  async getReceiptCapabilities(companyId: string) {
+    return this.authority.run(companyId, (_tx, authority) =>
+      Promise.resolve({ authority }),
+    );
+  }
+
   async create(
     companyId: string,
     receivedBy: string | undefined,

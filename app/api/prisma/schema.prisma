@@ -263,6 +263,14 @@ enum IdempotencyScope {
   HEALTHCARE_CASE_DISPATCH_CANCEL
   INVENTORY_MANUAL_PHYSICAL_MUTATION
   PURCHASE_RECEIPT_CREATE
+  SUPPLIER_DOCUMENT_CREATE
+  SUPPLIER_DOCUMENT_EXCEPTION_CREATE
+  SUPPLIER_DOCUMENT_BASIS_CONFIRM
+  SUPPLIER_DOCUMENT_ALLOCATION_CREATE
+  SUPPLIER_DOCUMENT_ALLOCATION_REVISE
+  SUPPLIER_DOCUMENT_CORRECT
+  SUPPLIER_DOCUMENT_CANCEL
+  SUPPLIER_DOCUMENT_VARIANCE_APPROVE
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_CREATE
   HEALTHCARE_EQUIPMENT_ASSIGNMENT_REPLACE
   HEALTHCARE_EQUIPMENT_COVERAGE_NOTE_CREATE
@@ -408,7 +416,11 @@ model Purchase {
   company  Company           @relation(fields: [companyId], references: [id])
   items    PurchaseItem[]
   receipts PurchaseReceipt[]
+  supplierDocumentAllocations PurchaseReceiptDocument[]
+  supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
 
+  @@unique([id, companyId, supplierId])
+  @@unique([companyId, folio])
   @@index([companyId])
   @@index([supplierId])
   @@index([status])
@@ -450,7 +462,10 @@ model PurchaseReceipt {
   receivedByUser User? @relation("PurchaseReceiptReceivedBy", fields: [receivedBy], references: [id], onDelete: SetNull)
 
   items PurchaseReceiptItem[]
+  supplierDocumentAllocations PurchaseReceiptDocument[]
+  supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
 
+  @@unique([id, companyId, purchaseId])
   @@unique([companyId, folio])
   @@index([companyId])
   @@index([purchaseId])
@@ -529,6 +544,9 @@ model Company {
   equipmentInspections                  EquipmentInspection[]
   companySequences                      CompanySequence[]
   idempotencyRecords                    IdempotencyRecord[]
+  supplierDocuments                     SupplierDocument[]
+  supplierDocumentAllocations           PurchaseReceiptDocument[]
+  supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
   purchaseReceipts                      PurchaseReceipt[]
   purchaseReceiptItems                  PurchaseReceiptItem[]
   products                              Product[]
@@ -665,6 +683,12 @@ model User {
   company Company @relation(fields: [companyId], references: [id])
 
   receivedPurchaseReceipts PurchaseReceipt[] @relation("PurchaseReceiptReceivedBy")
+  supplierDocumentsCreated SupplierDocument[] @relation("SupplierDocumentCreatedBy")
+  supplierDocumentExceptionsReviewed SupplierDocument[] @relation("SupplierDocumentExceptionReviewer")
+  supplierDocumentAuditActions SupplierDocumentAudit[] @relation("SupplierDocumentAuditActor")
+  supplierDocumentAllocationCreators PurchaseReceiptDocument[] @relation("SupplierDocumentAllocationCreator")
+  supplierDocumentCancellationActors SupplierDocument[] @relation("SupplierDocumentCancelledBy")
+  supplierDocumentApprovalActors PurchaseReceiptReconciliationApproval[] @relation("SupplierDocumentApprovalActor")
 
   equipmentInspections EquipmentInspection[] @relation("EquipmentInspectedBy")
   retiredEquipment     EquipmentAsset[]      @relation("EquipmentRetiredBy")
@@ -1317,7 +1341,11 @@ model Supplier {
   company   Company    @relation(fields: [companyId], references: [id])
   isActive  Boolean    @default(true)
   purchases Purchase[]
+  supplierDocuments SupplierDocument[]
+  supplierDocumentAllocations PurchaseReceiptDocument[]
+  supplierDocumentApprovals PurchaseReceiptReconciliationApproval[]
 
+  @@unique([id, companyId])
   @@unique([companyId, name])
   @@index([companyId])
 }
@@ -1833,4 +1861,202 @@ model HealthcareCaseDispatchCorrectionItem {
 
   @@unique([companyId, correctionId, sourceDispatchItemId], map: "DispatchCorrectionItem_source_key")
   @@index([companyId, sourceDispatchItemId], map: "DispatchCorrectionItem_source_idx")
+}
+
+
+enum SupplierDocumentType {
+  FACTURA
+  REMISION
+  NOTA_ENTREGA
+}
+
+enum SupplierDocumentStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum SupplierDocumentBasisStatus {
+  PENDING_REVIEW
+  CONFIRMED
+}
+
+enum SupplierDocumentTaxTreatment {
+  TAXABLE_16
+  TAXABLE_0
+  EXEMPT
+}
+
+enum SupplierDocumentTaxArea {
+  GOODS
+  SHIPPING
+  UNSPECIFIED
+}
+
+enum SupplierDocumentAuditOperation {
+  DOCUMENT_CREATED
+  DOCUMENT_CREATED_BY_EXCEPTION
+  BASIS_CONFIRMED
+  ALLOCATION_CREATED
+  ALLOCATION_REVISED
+  DOCUMENT_CORRECTED
+  DOCUMENT_CANCELLED
+  VARIANCE_APPROVED
+}
+
+enum SupplierDocumentCancellationSource {
+  INTERNAL_RECORD_ERROR
+  EXTERNAL_REPORTED
+}
+
+model SupplierDocument {
+  id                         String  @id @default(uuid())
+  companyId                  String
+  supplierId                 String
+  type                       SupplierDocumentType
+  series                     String? @db.VarChar(80)
+  number                     String  @db.VarChar(160)
+  normalizedSeries           String  @default("") @db.VarChar(80)
+  normalizedNumber           String  @db.VarChar(160)
+  identityOccurrence         Int     @default(1)
+  documentDate               DateTime @db.Date
+  cfdiUuid                   String? @db.Uuid
+  issuerRfc                  String? @db.VarChar(13)
+  receiverRfc                String? @db.VarChar(13)
+  currency                   String? @db.VarChar(3)
+
+  subtotalAmount             Decimal? @db.Decimal(18, 2)
+  discountAmount             Decimal? @db.Decimal(18, 2)
+  freightAmount              Decimal? @db.Decimal(18, 2)
+  ivaAmount                  Decimal? @db.Decimal(18, 2)
+  withholdingAmount          Decimal? @db.Decimal(18, 2)
+  totalAmount                Decimal? @db.Decimal(18, 2)
+  goodsNetAmount             Decimal? @db.Decimal(18, 2)
+  basisStatus                SupplierDocumentBasisStatus @default(PENDING_REVIEW)
+  status                     SupplierDocumentStatus @default(ACTIVE)
+  revision                   Int @default(0)
+  cancellationSource         SupplierDocumentCancellationSource?
+  cancellationReason         String? @db.VarChar(1000)
+  cancelledAt                DateTime?
+  cancelledById              String?
+  replacedByDocumentId       String?
+
+  exceptionBasedOnDocumentId String?
+  exceptionReason            String? @db.VarChar(1000)
+  exceptionEvidenceReference String? @db.VarChar(1000)
+  exceptionReviewedById      String?
+  exceptionReviewedAt        DateTime?
+
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supplier Supplier @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User @relation("SupplierDocumentCreatedBy", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  exceptionReviewer User? @relation("SupplierDocumentExceptionReviewer", fields: [exceptionReviewedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  exceptionBase SupplierDocument? @relation("SupplierDocumentExceptionBase", fields: [exceptionBasedOnDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  exceptions SupplierDocument[] @relation("SupplierDocumentExceptionBase")
+  taxBreakdowns SupplierDocumentTaxBreakdown[]
+  audits SupplierDocumentAudit[]
+  allocations PurchaseReceiptDocument[]
+  cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
+
+  @@unique([id, companyId])
+  @@unique([id, companyId, supplierId])
+  @@unique([companyId, cfdiUuid], map: "SupplierDocument_company_cfdi_uuid_key")
+  @@unique([companyId, supplierId, type, normalizedSeries, normalizedNumber, identityOccurrence], map: "SupplierDocument_commercial_occurrence_key")
+  @@index([companyId, supplierId, type, normalizedSeries, normalizedNumber], map: "SupplierDocument_identity_search_idx")
+  @@index([companyId, supplierId, documentDate])
+  @@index([companyId, replacedByDocumentId])
+}
+
+model SupplierDocumentTaxBreakdown {
+  id          String @id @default(uuid())
+  companyId   String
+  documentId  String
+  area        SupplierDocumentTaxArea
+  treatment   SupplierDocumentTaxTreatment
+  baseAmount  Decimal @db.Decimal(18, 2)
+  ivaAmount   Decimal @db.Decimal(18, 2)
+
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, documentId, area, treatment], map: "SupplierDocumentTaxBreakdown_identity_key")
+  @@index([companyId, documentId])
+}
+
+model SupplierDocumentAudit {
+  id             String @id @default(uuid())
+  companyId      String
+  documentId     String
+  operation      SupplierDocumentAuditOperation
+  actorId        String
+  revisionBefore Int?
+  revisionAfter  Int
+  reason         String? @db.VarChar(1000)
+  change         Json @db.JsonB
+  createdAt      DateTime @default(now())
+
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  actor User @relation("SupplierDocumentAuditActor", fields: [actorId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, documentId, revisionAfter], map: "SupplierDocumentAudit_revision_key")
+  @@index([companyId, documentId, createdAt, id])
+}
+
+
+/// R2A-02: one monetary coverage link per document/receipt. Revisions and audit preserve history.
+model PurchaseReceiptDocument {
+  id                 String @id @default(uuid())
+  companyId          String
+  supplierId         String
+  purchaseId         String
+  receiptId          String
+  documentId         String
+  allocatedSubtotal  Decimal @db.Decimal(18, 2)
+  isActive           Boolean @default(true)
+  revision           Int @default(0)
+  createdById        String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supplier Supplier @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  purchase Purchase @relation(fields: [purchaseId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  receipt PurchaseReceipt @relation(fields: [receiptId, companyId, purchaseId], references: [id, companyId, purchaseId], onDelete: Restrict, onUpdate: Restrict)
+  document SupplierDocument @relation(fields: [documentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User @relation("SupplierDocumentAllocationCreator", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, documentId, receiptId], map: "PurchaseReceiptDocument_pair_key")
+  @@index([companyId, receiptId, isActive])
+  @@index([companyId, documentId, isActive])
+}
+
+/// R2A-02: append-only snapshot of approval for a receipt including multiple documents.
+model PurchaseReceiptReconciliationApproval {
+  id                      String @id @default(uuid())
+  companyId               String
+  supplierId              String
+  purchaseId              String
+  receiptId               String
+  currency                String @db.VarChar(3)
+  receiptNetAmount        Decimal @db.Decimal(18, 2)
+  allocatedTotalAmount    Decimal @db.Decimal(18, 2)
+  differenceAmount        Decimal @db.Decimal(18, 2)
+  allocationSnapshotHash  String @db.VarChar(64)
+  allocationSnapshot      Json @db.JsonB
+  reason                  String @db.VarChar(1000)
+  approvedById            String
+  createdAt               DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  supplier Supplier @relation(fields: [supplierId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  purchase Purchase @relation(fields: [purchaseId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
+  receipt PurchaseReceipt @relation(fields: [receiptId, companyId, purchaseId], references: [id, companyId, purchaseId], onDelete: Restrict, onUpdate: Restrict)
+  approvedBy User @relation("SupplierDocumentApprovalActor", fields: [approvedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, receiptId, createdAt, id])
+  @@unique([companyId, receiptId, allocationSnapshotHash], map: "PurchaseReceiptApproval_snapshot_key")
 }

@@ -1,3 +1,5 @@
+export type ReceiptAuthority = 'LEGACY' | 'PHYSICAL';
+
 import type { StatusTone } from '@/app/components/business/StatusBadge';
 
 export type PurchaseStatus =

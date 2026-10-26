@@ -60,7 +60,7 @@ const moneyFormatter = new Intl.NumberFormat('es-MX', {
 const backLink = (
   <Link
     href="/purchases"
-    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100"
+    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 font-medium text-text-secondary transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
   >
     <ArrowLeft aria-hidden="true" size={18} />
     Volver a compras
@@ -350,6 +350,9 @@ export default function Purchase360Page() {
 
   const {
     purchaseToReceive,
+    receiptAuthority,
+    receiptAuthorityError,
+    retryReceiptAuthority,
     receiptFormItems,
     receiptNotes,
     supplierDocumentType,
@@ -492,80 +495,82 @@ export default function Purchase360Page() {
   return (
     <>
       <PageContainer size="wide">
-        <PageHeader
-          title={`Compra ${purchase.folio}`}
-          description={`Proveedor: ${purchase.supplier.name}`}
-          action={
-            <>
-              {purchase.status === 'DRAFT' && (canApprove || canEdit) ? (
-                <>
-                  {canApprove ? (
-                    <Button
-                      variant="success"
-                      onClick={() => openApproveDialog(purchase)}
-                    >
-                      Aprobar
-                    </Button>
-                  ) : null}
+        <div className="space-y-4 rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div:first-child]:mb-0 [&>div:first-child]:flex-col [&>div:first-child]:items-stretch">
+          <PageHeader
+            title={`Compra ${purchase.folio}`}
+            description={`Proveedor: ${purchase.supplier.name}`}
+            action={
+              <>
+                {purchase.status === 'DRAFT' && (canApprove || canEdit) ? (
+                  <>
+                    {canApprove ? (
+                      <Button
+                        variant="success"
+                        onClick={() => openApproveDialog(purchase)}
+                      >
+                        Aprobar
+                      </Button>
+                    ) : null}
 
-                  {canEdit ? (
-                    <Button
-                      variant="outline"
-                      loading={catalogLoading}
-                      loadingText="Preparando..."
-                      onClick={() => void handleEditPurchase(purchase)}
-                    >
-                      Editar
-                    </Button>
-                  ) : null}
+                    {canEdit ? (
+                      <Button
+                        variant="outline"
+                        loading={catalogLoading}
+                        loadingText="Preparando..."
+                        onClick={() => void handleEditPurchase(purchase)}
+                      >
+                        Editar
+                      </Button>
+                    ) : null}
 
-                  {canApprove ? (
-                    <Button
-                      variant="danger"
-                      onClick={() => openCancelDialog(purchase)}
-                    >
-                      Cancelar
-                    </Button>
-                  ) : null}
-                </>
-              ) : null}
+                    {canApprove ? (
+                      <Button
+                        variant="danger"
+                        onClick={() => openCancelDialog(purchase)}
+                      >
+                        Cancelar
+                      </Button>
+                    ) : null}
+                  </>
+                ) : null}
 
-              {canReceive || receiveBlocked ? (
+                {canReceive || receiveBlocked ? (
+                  <Button
+                    variant="success"
+                    disabled={!canReceive}
+                    onClick={() => handleReceivePurchase(purchase)}
+                  >
+                    Registrar recepción
+                  </Button>
+                ) : null}
+
                 <Button
-                  variant="success"
-                  disabled={!canReceive}
-                  onClick={() => handleReceivePurchase(purchase)}
+                  variant="outline"
+                  loading={downloadingPurchaseId === purchase.id}
+                  loadingText="Descargando..."
+                  onClick={() => void handleDownloadPdf(purchase)}
                 >
-                  Registrar recepción
+                  Descargar PDF
                 </Button>
-              ) : null}
 
-              <Button
-                variant="outline"
-                loading={downloadingPurchaseId === purchase.id}
-                loadingText="Descargando..."
-                onClick={() => void handleDownloadPdf(purchase)}
-              >
-                Descargar PDF
-              </Button>
-
-              {backLink}
-            </>
-          }
-        />
-
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge
-            label={statusDescriptor.label}
-            tone={statusDescriptor.tone}
-            ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
+                {backLink}
+              </>
+            }
           />
 
-          {receiveBlocked ? (
-            <span className="text-sm text-gray-500">
-              Verifica las recepciones antes de registrar una nueva.
-            </span>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-3">
+            <StatusBadge
+              label={statusDescriptor.label}
+              tone={statusDescriptor.tone}
+              ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
+            />
+
+            {receiveBlocked ? (
+              <span className="text-sm text-gray-500">
+                Verifica las recepciones antes de registrar una nueva.
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {actionError || catalogError ? (
@@ -592,33 +597,36 @@ export default function Purchase360Page() {
         ) : null}
 
         <Section title="Resumen">
-          <dl className="grid gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2 xl:grid-cols-4">
-            <div>
+          <dl className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
               <dt className="text-sm text-gray-500">Proveedor</dt>
-              <dd className="mt-1 font-medium text-gray-900">
+              <dd className="mt-2 break-words font-semibold text-text">
                 {purchase.supplier.name}
               </dd>
             </div>
 
-            <div>
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
               <dt className="text-sm text-gray-500">Fecha</dt>
               <dd className="mt-1 font-medium text-gray-900">
                 {formatDate(purchase.createdAt)}
               </dd>
             </div>
 
-            <div>
+            <div className="min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5">
               <dt className="text-sm text-gray-500">Recepción</dt>
               <dd className="mt-1 font-medium text-gray-900">
                 {purchase.status === 'DRAFT'
                   ? 'Pendiente de aprobación'
                   : purchase.status === 'CANCELLED'
                     ? 'No aplica'
-                    : `${purchase.receiptProgress.completedLines} / ${purchase.receiptProgress.orderedLines} partidas`}
+                    : receiptHistoryStatus !== 'success'
+                      ? receiptsLoading ? 'Verificando recepciones...' : 'Recepción sin verificar'
+                      : `${purchase.receiptProgress.completedLines} / ${purchase.receiptProgress.orderedLines} partidas`}
               </dd>
               {purchase.status !== 'DRAFT' &&
-              purchase.status !== 'CANCELLED' ? (
-                <dd className="mt-1 text-sm text-gray-600">
+              purchase.status !== 'CANCELLED' &&
+              receiptHistoryStatus === 'success' ? (
+                <dd className="mt-2 text-sm tabular-nums text-text-secondary">
                   {purchase.receiptProgress.receivedUnits} /{' '}
                   {purchase.receiptProgress.orderedUnits} uds. ·{' '}
                   {purchase.receiptProgress.pendingUnits} pendientes
@@ -626,9 +634,9 @@ export default function Purchase360Page() {
               ) : null}
             </div>
 
-            <div>
+            <div className="min-w-0 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:p-5">
               <dt className="text-sm text-gray-500">Total</dt>
-              <dd className="mt-1 text-xl font-semibold text-gray-900">
+              <dd className="mt-2 break-words text-2xl font-semibold tabular-nums text-blue-900">
                 {formatMoney(purchase.total)}
               </dd>
             </div>
@@ -636,12 +644,18 @@ export default function Purchase360Page() {
         </Section>
 
         <Section title="Partidas">
-          <div className="overflow-x-auto rounded-lg border border-gray-200">
-            <table className="w-full min-w-[760px] text-sm">
+          <p className="text-sm text-text-muted sm:hidden">Desliza la tabla para consultar cantidades e importes.</p>
+          <div
+            role="region"
+            aria-label="Partidas desplazables"
+            tabIndex={0}
+            className="overflow-x-auto rounded-xl border border-border bg-surface focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+          >
+            <table className="w-full min-w-[760px] text-sm tabular-nums">
               <caption className="sr-only">
                 Partidas de la compra {purchase.folio}
               </caption>
-              <thead className="bg-gray-50">
+              <thead className="bg-surface-subtle text-text-secondary">
                 <tr>
                   <th scope="col" className="px-3 py-2 text-left">
                     SKU
@@ -679,24 +693,24 @@ export default function Purchase360Page() {
                     receiptHistoryStatus === 'success';
 
                   return (
-                    <tr key={item.id} className="border-t border-gray-200">
-                      <td className="px-3 py-3">{item.product.sku}</td>
-                      <td className="px-3 py-3 font-medium text-gray-900">
+                    <tr key={item.id} className="border-t border-border hover:bg-surface-subtle">
+                      <td className="px-3 py-4 text-xs font-medium text-text-muted">{item.product.sku}</td>
+                      <td className="min-w-48 px-3 py-4 font-semibold text-text">
                         {item.product.name}
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-3 py-4 text-right font-medium">
                         {item.quantity}
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="bg-blue-50/50 px-3 py-4 text-right font-semibold text-blue-900">
                         {progressAvailable ? receivedQuantity : '—'}
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="px-3 py-4 text-right font-semibold">
                         {progressAvailable ? pendingQuantity : '—'}
                       </td>
-                      <td className="px-3 py-3 text-right">
+                      <td className="whitespace-nowrap px-3 py-4 text-right">
                         {formatMoney(item.price)}
                       </td>
-                      <td className="px-3 py-3 text-right font-medium">
+                      <td className="whitespace-nowrap px-3 py-4 text-right font-semibold">
                         {formatMoney(item.subtotal)}
                       </td>
                     </tr>
@@ -708,7 +722,7 @@ export default function Purchase360Page() {
         </Section>
 
         <Section title="Resumen financiero">
-          <dl className="max-w-xl space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm">
+          <dl className="ml-auto w-full max-w-xl space-y-4 rounded-xl border border-border bg-surface p-5 text-sm tabular-nums sm:p-6">
             <div className="flex justify-between gap-4">
               <dt className="text-gray-600">Subtotal</dt>
               <dd className="font-medium text-gray-900">
@@ -723,34 +737,38 @@ export default function Purchase360Page() {
               </dd>
             </div>
 
-            <div className="flex justify-between gap-4 border-t border-gray-200 pt-3 text-lg font-semibold text-gray-900">
+            <div className="flex flex-wrap justify-between gap-4 border-t border-blue-200 pt-4 text-xl font-semibold text-blue-900">
               <dt>Total</dt>
               <dd>{formatMoney(purchase.total)}</dd>
             </div>
           </dl>
         </Section>
 
-        <Section title="Recepciones">
-          <PurchaseReceiptsHistory
-            receipts={receipts}
-            loading={receiptsLoading}
-            error={receiptsError}
-            onRetry={() => void loadReceipts()}
-            formatDate={formatDate}
-            formatMoney={formatMoney}
-          />
-        </Section>
+        <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
+          <Section title="Recepciones">
+            <PurchaseReceiptsHistory
+              receipts={receipts}
+              loading={receiptsLoading}
+              error={receiptsError}
+              onRetry={() => void loadReceipts()}
+              formatDate={formatDate}
+              formatMoney={formatMoney}
+            />
+          </Section>
+        </div>
 
-        <Section title="Trazabilidad">
-          <PurchaseInventoryMovements
-            movements={movements}
-            loading={movementsLoading}
-            error={movementsError}
-            onRetry={() => void loadMovements()}
-            formatDate={formatDate}
-            formatMoney={formatMoney}
-          />
-        </Section>
+        <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
+          <Section title="Trazabilidad">
+            <PurchaseInventoryMovements
+              movements={movements}
+              loading={movementsLoading}
+              error={movementsError}
+              onRetry={() => void loadMovements()}
+              formatDate={formatDate}
+              formatMoney={formatMoney}
+            />
+          </Section>
+        </div>
       </PageContainer>
 
       <PurchaseFormModal
@@ -785,6 +803,9 @@ export default function Purchase360Page() {
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}
+        receiptAuthority={receiptAuthority}
+        receiptAuthorityError={receiptAuthorityError}
+        onRetryAuthority={retryReceiptAuthority}
         items={receiptFormItems}
         notes={receiptNotes}
         supplierDocumentType={supplierDocumentType}

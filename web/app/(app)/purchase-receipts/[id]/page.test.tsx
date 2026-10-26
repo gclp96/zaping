@@ -2,6 +2,7 @@ import {
   cleanup,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
@@ -318,7 +319,7 @@ describe('PurchaseReceiptDetailPage', () => {
     render(<PurchaseReceiptDetailPage />);
 
     expect(await screen.findByText('Recepción no encontrada')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Volver' }).getAttribute('href')).toBe(
+    expect(screen.getByRole('link', { name: 'Volver a recepciones' }).getAttribute('href')).toBe(
       '/purchase-receipts',
     );
 
@@ -331,4 +332,69 @@ describe('PurchaseReceiptDetailPage', () => {
     ).toBeTruthy();
     expect(api.get).toHaveBeenCalledTimes(2);
   });
+
+  it.each([
+    ['LOTE-REAL', '2027-12-15', 'LOTE-REAL', '15 dic 2027'],
+    [null, '2027-12-15', 'Sin lote informado', '15 dic 2027'],
+    ['LOTE-REAL', null, 'LOTE-REAL', 'No informada'],
+    [null, null, 'Sin lote informado', 'No informada'],
+  ])('distingue lote %s y caducidad %s sin inventar datos', async (lotNumber, expirationDate, lotLabel, expiryLabel) => {
+    vi.mocked(api.get).mockResolvedValue({ data: {
+      ...quantityReceipt,
+      items: [{ ...quantityReceipt.items[0], batch: null, batchId: null, lotNumber, expirationDate }],
+    } } as never);
+    render(<PurchaseReceiptDetailPage />);
+    const table = await screen.findByRole('table', { name: 'Partidas recibidas' });
+    expect(within(table).getByText(lotLabel!)).toBeTruthy();
+    expect(within(table).getByText(expiryLabel!)).toBeTruthy();
+    expect(screen.getByText('Sin documento registrado')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Partidas recibidas desplazables' }).getAttribute('tabindex')).toBe('0');
+  });
+
+  it('preserva documentos incompletos como ausencia y no muestra datos mientras carga', async () => {
+    let resolveReceipt!: (value: unknown) => void;
+    vi.mocked(api.get).mockReturnValue(new Promise((resolve) => { resolveReceipt = resolve; }) as never);
+    render(<PurchaseReceiptDetailPage />);
+    expect(screen.getByText('Cargando detalle de la recepción...')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText('BLUNT TIP')).toBeNull();
+    resolveReceipt({ data: { ...quantityReceipt, supplierDocumentType: 'FACTURA', supplierDocumentNumber: null } });
+    expect(await screen.findByText('Sin documento registrado')).toBeTruthy();
+    expect(screen.queryByText('FACTURA')).toBeNull();
+  });
+
+  it('no expone detalle ante una respuesta ausente', async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: null } as never);
+    render(<PurchaseReceiptDetailPage />);
+    expect(await screen.findByText('Recepción no encontrada.')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText(quantityReceipt.folio)).toBeNull();
+  });
+
+  it.each([
+    { ...quantityReceipt, items: undefined },
+    { ...quantityReceipt, purchase: null },
+    { ...quantityReceipt, inventoryMovements: undefined },
+    { ...quantityReceipt, items: [{ ...quantityReceipt.items[0], equipmentAssets: undefined }] },
+  ])('oculta respuestas estructuralmente incompletas y permite reintentar', async (incomplete) => {
+    vi.mocked(api.get).mockResolvedValue({ data: incomplete } as never);
+    render(<PurchaseReceiptDetailPage />);
+    expect(await screen.findByText('El detalle de la recepción está incompleto. Vuelve a intentarlo.')).toBeTruthy();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByText(quantityReceipt.folio)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
+  });
+});
+
+
+it('presenta caducidad conocida sin lote ni Batch, conservando documento del proveedor', async () => {
+  vi.mocked(api.get).mockResolvedValue({ data: {
+    ...quantityReceipt, supplierDocumentType: 'REMISION', supplierDocumentNumber: 'REM-77',
+    items: [{ ...quantityReceipt.items[0], lotNumber: null, batchId: null, batch: null, expirationDate: '2028-12-31T00:00:00.000Z' }],
+  } } as never);
+  render(<PurchaseReceiptDetailPage />);
+  await screen.findByText('REMISION · REM-77');
+  expect(screen.queryByText('BATCH-LOT-PREFERRED')).toBeNull();
+  expect(screen.queryByText('ITEM-LOT-IGNORED')).toBeNull();
+  expect(screen.getAllByText('31 dic 2028').length).toBeGreaterThan(0);
 });

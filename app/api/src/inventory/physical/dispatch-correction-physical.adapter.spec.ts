@@ -356,6 +356,27 @@ describe('01C-A specific material contract', () => {
     expect(f.repo.claimDispatchCorrectionEffect).not.toHaveBeenCalled();
   });
 
+  it('does not authorize a dated source through the existing correction adapter', async () => {
+    const f = fixture();
+    Object.assign(f.tx, {
+      company: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ timezone: 'America/Hermosillo' }),
+      },
+    });
+    f.repo.lockPositions.mockResolvedValue([
+      { ...f.position, expirationDate: new Date('2099-08-15') },
+    ] as never);
+    await expect(
+      f.service.transferDispatchCorrectionMaterial(f.db, f.input),
+    ).rejects.toMatchObject({ code: 'PHYSICAL_SOURCE_NOT_ELIGIBLE' });
+    expect(f.repo.lockPositions).toHaveBeenCalled();
+    expect(f.repo.claimDispatchCorrectionEffect).not.toHaveBeenCalled();
+    expect(f.repo.mutatePosition).not.toHaveBeenCalled();
+    expect(f.repo.appendLines).not.toHaveBeenCalled();
+  });
+
   it('retains current Product eligibility', async () => {
     const f = fixture();
     f.repo.lockProducts.mockResolvedValue([

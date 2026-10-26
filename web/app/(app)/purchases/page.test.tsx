@@ -258,6 +258,7 @@ const previousReceipt = {
 
 type ConfigureApiMocksOptions = {
   companyTimezone?: string;
+  receiptAuthority?: 'LEGACY' | 'PHYSICAL';
   authMeError?: Error;
   role?: 'ADMIN' | 'MANAGER' | 'SALES' | 'WAREHOUSE';
 };
@@ -270,7 +271,9 @@ function configureApiMocks(
     async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: options.receiptAuthority ?? 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         if (options.authMeError) {
           throw options.authMeError;
         }
@@ -389,7 +392,7 @@ function getVisiblePurchaseFolios() {
   return screen
     .getAllByRole('row')
     .slice(1)
-    .map((row) => within(row).getAllByRole('cell')[0].textContent?.trim());
+    .map((row) => within(row).getByRole('link').textContent?.trim());
 }
 
 async function openActionsMenu(
@@ -487,6 +490,43 @@ describe('PurchasesPage — normalización de lista', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     cleanup();
+  });
+
+  it('presenta contexto, contador filtrado y progreso accesible sin cambiar el enlace al detalle', async () => {
+    const user = userEvent.setup();
+    configureApiMocks([purchase, partialPurchase]);
+    render(<PurchasesPage />);
+
+    await screen.findByText(purchase.folio);
+    expect(screen.getByRole('heading', { name: 'Compras', level: 1 })).toBeTruthy();
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+    const progress = screen.getByRole('progressbar', {
+      name: `Unidades recibidas de ${purchase.folio}`,
+    });
+    expect(progress.getAttribute('max')).toBe('10');
+    expect(progress.getAttribute('value')).toBe('4');
+    expect(within(screen.getByRole('link', { name: purchase.folio }).closest('td')!)
+      .getByText('Recepción: 4 de 10 uds.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: purchase.folio }).getAttribute('href'))
+      .toBe('/purchases/purchase-1');
+
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar compras' }), 'OC-0002');
+    expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+  });
+
+  it('permite abrir acciones con teclado y restaura el foco al cerrar con Escape', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    const actions = await screen.findByRole('button', { name: 'Acciones de compra OC-0001' });
+    actions.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('menuitem', { name: 'Descargar PDF' })).toBe(document.activeElement);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(actions);
+    expect(api.post).not.toHaveBeenCalled();
   });
 
   it('busca por folio, proveedor, contacto, email, SKU y producto', async () => {
@@ -673,14 +713,14 @@ describe('PurchasesPage — normalización de lista', () => {
     expect(folioHeader.getAttribute('aria-sort')).toBe('ascending');
     expect(
       screen.getAllByRole('row').slice(1).map((row) =>
-        within(row).getAllByRole('cell')[0].textContent?.trim(),
+        within(row).getByRole('link').textContent?.trim(),
       ),
     ).toEqual(['OC-0001', 'OC-0002', 'OC-0010']);
 
     await user.click(screen.getByRole('button', { name: 'Total' }));
     expect(
       screen.getAllByRole('row').slice(1).map((row) =>
-        within(row).getAllByRole('cell')[0].textContent?.trim(),
+        within(row).getByRole('link').textContent?.trim(),
       ),
     ).toEqual(['OC-0010', 'OC-0001', 'OC-0002']);
   });
@@ -986,7 +1026,9 @@ describe('PurchasesPage — normalización de lista', () => {
     vi.mocked(api.get).mockImplementation(async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         return {
           data: { companyTimezone: 'America/Hermosillo' },
         } as never;
@@ -1171,7 +1213,7 @@ describe('PurchasesPage — recepciones', () => {
       await screen.findByText('OC-0001');
 
       const receiveButton = screen.queryByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       });
 
       if (canReceive) {
@@ -1194,6 +1236,32 @@ describe('PurchasesPage — recepciones', () => {
     },
   );
 
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE', 'SALES'] as const)(
+    'conserva el acceso a Recibir para el rol %s',
+    async (role) => {
+      clearAuthenticatedSessionCache();
+      configureApiMocks([purchase], { role });
+      render(<PurchasesPage />);
+      if (role === 'SALES') {
+        await screen.findByRole('heading', { name: 'Sin permisos' });
+        expect(screen.queryByText('OC-0001')).toBeNull();
+      } else {
+        await screen.findByText('OC-0001');
+      }
+
+      const button = screen.queryByRole('button', { name: 'Recibir' });
+      if (role === 'SALES') {
+        expect(button).toBeNull();
+      } else {
+        expect(button).not.toBeNull();
+        const descriptionId = button!.getAttribute('aria-describedby');
+        expect(document.getElementById(descriptionId!)?.textContent)
+          .toBe('Registrar recepción de la compra OC-0001');
+      }
+      expect(api.post).not.toHaveBeenCalled();
+    },
+  );
+
   it('prepara la recepción directa sin abrir el detalle de compra', async () => {
     const user = userEvent.setup();
 
@@ -1202,7 +1270,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1260,7 +1328,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1308,7 +1376,7 @@ describe('PurchasesPage — recepciones', () => {
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1369,7 +1437,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0002');
 
     const receiveButtons = screen.getAllByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
 
     await user.click(receiveButtons[0]);
@@ -1435,7 +1503,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1483,7 +1551,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
     await user.click(
       screen.getByRole('button', {
-        name: 'Registrar recepción',
+        name: 'Recibir',
       }),
     );
 
@@ -1522,7 +1590,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
 
     const receiveButton = screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
 
     await user.click(receiveButton);
@@ -1567,7 +1635,7 @@ describe('PurchasesPage — recepciones', () => {
     await screen.findByText('OC-0001');
 
     const receiveButton = screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     });
     await user.click(receiveButton);
 
@@ -1605,7 +1673,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1672,7 +1740,7 @@ it('calcula la cantidad recibida y pendiente al abrir el formulario', async () =
 
   await user.click(
     screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     }),
   );
 
@@ -1743,7 +1811,7 @@ it('mantiene el progreso por purchaseItemId con múltiples recepciones y product
 
   await user.click(
     screen.getByRole('button', {
-      name: 'Registrar recepción',
+      name: 'Recibir',
     }),
   );
 
@@ -1776,7 +1844,7 @@ it('muestra un error cuando no se captura ninguna cantidad', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1806,7 +1874,7 @@ it('rechaza una cantidad mayor que la pendiente', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1846,7 +1914,7 @@ it('rechaza una fecha de caducidad sin número de lote', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -1898,7 +1966,7 @@ it('envía correctamente la recepción al backend', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2016,6 +2084,8 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
   vi.mocked(api.get).mockImplementation(async (url) => {
     const endpoint = String(url);
 
+    if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
     if (endpoint === '/auth/me') {
       return {
         data: {
@@ -2080,7 +2150,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2132,7 +2202,7 @@ it('refresca compra e historial, cierra el éxito y abre un intento fresco', asy
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2181,9 +2251,10 @@ it('mantiene el handoff cuando la recepción completa la compra', async () => {
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
+  await waitFor(() => expect(getReceiptSubmitButton().hasAttribute('disabled')).toBe(false));
   const receiptDesktop = screen.getByTestId('receipt-desktop-items');
   await user.type(
     within(receiptDesktop).getByRole('spinbutton', {
@@ -2222,7 +2293,7 @@ it('muestra un error cuando el backend no puede registrar la recepción', async 
 
   await user.click(
     screen.getByRole('button', {
-      name: /registrar recepci[oó]n/i,
+      name: /recibir/i,
     }),
   );
 
@@ -2388,7 +2459,9 @@ describe('PurchasesPage — formulario de compra', () => {
       async (url) => {
         const endpoint = String(url);
 
-        if (endpoint === '/auth/me') {
+        if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
           return {
             data: {
               id: 'user-1',
@@ -2586,20 +2659,20 @@ describe('PurchasesPage — formulario de compra', () => {
     {
       purchaseForStatus: draftPurchase,
       primaryAction: /^aprobar$/i,
-      hiddenPrimaryAction: /registrar recepci[oó]n/i,
+      hiddenPrimaryAction: /recibir/i,
       menuActions: [/^editar$/i, /descargar pdf/i, /cancelar/i],
       omittedMenuActions: [/ver detalle/i],
     },
     {
       purchaseForStatus: purchase,
-      primaryAction: /registrar recepci[oó]n/i,
+      primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: partialPurchase,
-      primaryAction: /registrar recepci[oó]n/i,
+      primaryAction: /recibir/i,
       hiddenPrimaryAction: /^aprobar$/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
@@ -2607,14 +2680,14 @@ describe('PurchasesPage — formulario de compra', () => {
     {
       purchaseForStatus: receivedPurchase,
       primaryAction: null,
-      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      hiddenPrimaryAction: /recibir|aprobar/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
     {
       purchaseForStatus: cancelledPurchase,
       primaryAction: null,
-      hiddenPrimaryAction: /registrar recepci[oó]n|aprobar/i,
+      hiddenPrimaryAction: /recibir|aprobar/i,
       menuActions: [/descargar pdf/i],
       omittedMenuActions: [/^editar$/i, /cancelar/i, /ver detalle/i],
     },
@@ -2705,7 +2778,7 @@ describe('PurchasesPage — formulario de compra', () => {
       within(row).queryByRole('button', { name: /^aprobar$/i }),
     ).toBeNull();
     expect(
-      within(row).queryByRole('button', { name: /registrar recepción/i }),
+      within(row).queryByRole('button', { name: /recibir/i }),
     ).toBeNull();
 
     const menu = await openActionsMenu(user, draftPurchase.folio);
@@ -2728,7 +2801,9 @@ describe('PurchasesPage — formulario de compra', () => {
       async (url) => {
         const endpoint = String(url);
 
-        if (endpoint === '/auth/me') {
+        if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
           return {
             data: {
               id: 'user-1',
@@ -2834,7 +2909,9 @@ describe('PurchasesPage — formulario de compra', () => {
     async (url) => {
       const endpoint = String(url);
 
-      if (endpoint === '/auth/me') {
+      if (endpoint === '/purchase-receipts/capabilities') return { data: { authority: 'LEGACY' } } as never;
+
+    if (endpoint === '/auth/me') {
         return {
           data: {
             id: 'user-1',
@@ -3022,4 +3099,41 @@ describe('PurchasesPage — formulario de compra', () => {
   revokeObjectURLSpy.mockRestore();
   linkClickSpy.mockRestore();
 });
+});
+
+
+describe('OX-PUR-05 — integración PHYSICAL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(receiptIdempotencyKey);
+    routerMock.search = '';
+  });
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); clearAuthenticatedSessionCache(); });
+
+it.each(['desktop', 'mobile'])('PHYSICAL REQUIRED envía fecha sin lote desde %s, sin perder documento ni key', async (layout) => {
+  const user = userEvent.setup();
+  const physicalPurchase = { ...purchase, items: [{ ...purchase.items[0], product: { ...purchase.items[0].product, lotTracking: 'REQUIRED' as const } }] };
+  configureApiMocks([physicalPurchase], { receiptAuthority: 'PHYSICAL' });
+  const originalGet = vi.mocked(api.get).getMockImplementation()!;
+  vi.mocked(api.get).mockImplementation((url, config) => String(url) === '/purchases/purchase-1'
+    ? Promise.resolve({ data: physicalPurchase }) as never : originalGet(url, config));
+  vi.mocked(api.post).mockResolvedValue({ data: { id: 'receipt-physical', folio: 'REC-PHYSICAL' } } as never);
+  render(<PurchasesPage />);
+  await screen.findByText('OC-0001');
+  await user.click(screen.getByRole('button', { name: /recibir/i }));
+  await screen.findByText(/lote y caducidad son opcionales e independientes/i);
+  const editor = within(screen.getByTestId('receipt-' + layout + '-items'));
+  await user.type(editor.getByLabelText('Cantidad recibida de Producto médico'), '2');
+  fireEvent.change(editor.getByLabelText('Caducidad de Producto médico'), { target: { value: '2029-06-30' } });
+  await user.selectOptions(screen.getByLabelText('Documento del proveedor (opcional)'), 'REMISION');
+  await user.type(screen.getByLabelText('Número del documento'), 'REM-5');
+  await user.click(getReceiptSubmitButton());
+  await screen.findByRole('heading', { name: 'Recepción registrada correctamente' });
+  expect(api.post).toHaveBeenCalledExactlyOnceWith('/purchase-receipts', {
+    purchaseId: 'purchase-1', notes: undefined, supplierDocumentType: 'REMISION', supplierDocumentNumber: 'REM-5',
+    items: [{ purchaseItemId: 'purchase-item-1', quantityReceived: 2, lotNumber: undefined, expirationDate: '2029-06-30' }],
+  }, { headers: { 'Idempotency-Key': receiptIdempotencyKey } });
+});
+
 });

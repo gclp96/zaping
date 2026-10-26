@@ -1,14 +1,5 @@
-import {
-  cleanup,
-  render,
-  screen,
-} from '@testing-library/react';
-import {
-  afterEach,
-  describe,
-  expect,
-  it,
-} from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import Button from './Button';
 
@@ -30,9 +21,9 @@ describe('Button', () => {
     render(<Button>Guardar</Button>);
 
     expect(
-      screen.getByRole('button', { name: 'Guardar' }).classList.contains(
-        'w-full',
-      ),
+      screen
+        .getByRole('button', { name: 'Guardar' })
+        .classList.contains('w-full'),
     ).toBe(false);
   });
 
@@ -40,20 +31,29 @@ describe('Button', () => {
     ['primary', 'bg-blue-600'],
     ['secondary', 'bg-gray-600'],
     ['danger', 'bg-red-600'],
-    ['success', 'bg-green-600'],
+    ['success', 'bg-green-700'],
     ['outline', 'border-gray-300'],
-  ] as const)(
-    'conserva la variante %s',
-    (variant, expectedClass) => {
-      render(<Button variant={variant}>Acción {variant}</Button>);
+  ] as const)('conserva la variante %s', (variant, expectedClass) => {
+    render(<Button variant={variant}>Acción {variant}</Button>);
 
-      expect(
-        screen.getByRole('button', {
+    expect(
+      screen
+        .getByRole('button', {
           name: `Acción ${variant}`,
-        }).classList.contains(expectedClass),
-      ).toBe(true);
-    },
-  );
+        })
+        .classList.contains(expectedClass),
+    ).toBe(true);
+  });
+
+  it('success conserva texto blanco y un hover más oscuro sin cambiar la semántica del botón', () => {
+    render(<Button variant="success">Registrar recepción</Button>);
+    const button = screen.getByRole('button', { name: 'Registrar recepción' });
+    expect(button.classList.contains('bg-green-700')).toBe(true);
+    expect(button.classList.contains('hover:bg-green-800')).toBe(true);
+    expect(button.classList.contains('text-white')).toBe(true);
+    expect(button.classList.contains('bg-green-600')).toBe(false);
+    expect(button.hasAttribute('disabled')).toBe(false);
+  });
 
   it('conserva el estado de carga y deshabilita la acción', () => {
     render(

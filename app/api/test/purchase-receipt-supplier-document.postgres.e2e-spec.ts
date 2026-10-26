@@ -1,3 +1,8 @@
+import { inventoryAuthorityFence } from '../src/inventory/physical/inventory-authority-fence';
+import { SalesPhysicalIntegrationService } from '../src/inventory/physical/sales-physical-integration.service';
+import { SalesPhysicalSourceResolver } from '../src/inventory/physical/sales-physical-source-resolver';
+import { SalesFolioService } from '../src/sales/sales-folio.service';
+import { openQaAbPostgres } from './helpers/qa-ab-ephemeral-postgres';
 import { randomUUID } from 'node:crypto';
 import { ConflictException } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -16,17 +21,21 @@ import { companyLocalDay } from '../src/inventory/physical/physical-expiration-p
 import { PhysicalResult } from '../src/inventory/physical/physical-inventory.contract';
 import { PhysicalInventoryReadService } from '../src/inventory/physical/physical-inventory-read.service';
 import { ReceiptHistoryItem } from '../src/inventory/physical/inventory-compatibility-history.service';
-import { SalesPhysicalIntegrationService } from '../src/inventory/physical/sales-physical-integration.service';
-import { SalesPhysicalSourceResolver } from '../src/inventory/physical/sales-physical-source-resolver';
-import { SalesFolioService } from '../src/sales/sales-folio.service';
 
-const enabled = process.env.RUN_PURCHASE_RECEIPT_PG_SMOKE === '1';
+const enabled =
+  process.env.RUN_PURCHASE_RECEIPT_PG_SMOKE === '1' ||
+  process.env.RUN_QA_AB_PG === '1';
 const describePg = enabled ? describe : describe.skip;
 
 describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
   let db: PrismaClient;
 
   beforeAll(async () => {
+    if (process.env.RUN_QA_AB_PG === '1') {
+      db = await openQaAbPostgres();
+      // Continue fixture setup below for Foundation; W1 has no shared fixture.
+    }
+    if (process.env.RUN_QA_AB_PG === '1') return;
     const raw = process.env.DATABASE_URL;
     if (
       !raw ||
@@ -136,21 +145,28 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
     // Same selector isolation as the historical smoke; no Prisma/SQL mocks.
     const authority = {
       run: <T>(
-        _company: string,
+        company: string,
         action: (
           tx: Prisma.TransactionClient,
           mode: 'LEGACY' | 'PHYSICAL',
         ) => Promise<T>,
       ) =>
-        client.$transaction((tx) => action(tx, 'PHYSICAL'), {
-          isolationLevel: 'ReadCommitted',
-          maxWait: 5000,
-          timeout: 15000,
-        }),
+        client.$transaction(
+          async (tx) => {
+            await inventoryAuthorityFence(tx, company, 'shared');
+            return action(tx, 'PHYSICAL');
+          },
+          {
+            isolationLevel: 'ReadCommitted',
+            maxWait: 5000,
+            timeout: 15000,
+          },
+        ),
     } as InventoryAuthorityTransactionService;
     return {
       physical,
       integration,
+      authority,
       receipts: new PurchaseReceiptsService(
         client as PrismaService,
         equipment,
@@ -968,55 +984,58 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
     20000,
   );
 
-  it('keeps a real Batch, its timestamp, documents and stock without double credit', async () => {
-    const f = await fixture();
-    const { receipts } = services();
-    const expirationDate = `${day(2)}T13:45:00.000Z`;
-    const dto = {
-      purchaseId: f.purchase.id,
-      supplierDocumentType: 'REMISION' as const,
-      supplierDocumentNumber: 'R-W1',
-      items: [
-        {
-          purchaseItemId: f.purchaseItemId,
-          quantityReceived: 2,
-          lotNumber: 'REAL-LOT',
-          expirationDate,
-        },
-      ],
-    };
-    for (let i = 0; i < 2; i++) {
-      const key = randomUUID();
-      const receipt = await receipts.create(f.companyId, f.actorId, key, dto);
-      expect((await receipts.create(f.companyId, f.actorId, key, dto)).id).toBe(
-        receipt.id,
-      );
-    }
-    const batches = await db.inventoryBatch.findMany({
-      where: { companyId: f.companyId },
-    });
-    expect(batches).toHaveLength(1);
-    expect(batches[0]).toMatchObject({
-      lotNumber: 'REAL-LOT',
-      expirationDate: new Date(expirationDate),
-      availableQuantity: 4,
-      initialQuantity: 4,
-    });
-    const positions = await db.inventoryPosition.findMany({
-      where: { companyId: f.companyId },
-    });
-    expect(positions).toHaveLength(1);
-    expect(positions[0]).toMatchObject({
-      inventoryBatchId: batches[0].id,
-      expirationDate: null,
-      quantity: 4,
-      revision: 2,
-    });
-    expect(
-      (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
-        .stock,
-    ).toBe(4);
-  });
+  it.each(['NONE', 'OPTIONAL', 'REQUIRED'] as const)(
+    'keeps a real Batch, its timestamp, documents and stock without double credit for %s',
+    async (tracking) => {
+      const f = await fixture(tracking);
+      const { receipts } = services();
+      const expirationDate = `${day(2)}T13:45:00.000Z`;
+      const dto = {
+        purchaseId: f.purchase.id,
+        supplierDocumentType: 'REMISION' as const,
+        supplierDocumentNumber: 'R-W1',
+        items: [
+          {
+            purchaseItemId: f.purchaseItemId,
+            quantityReceived: 2,
+            lotNumber: 'REAL-LOT',
+            expirationDate,
+          },
+        ],
+      };
+      for (let i = 0; i < 2; i++) {
+        const key = randomUUID();
+        const receipt = await receipts.create(f.companyId, f.actorId, key, dto);
+        expect(
+          (await receipts.create(f.companyId, f.actorId, key, dto)).id,
+        ).toBe(receipt.id);
+      }
+      const batches = await db.inventoryBatch.findMany({
+        where: { companyId: f.companyId },
+      });
+      expect(batches).toHaveLength(1);
+      expect(batches[0]).toMatchObject({
+        lotNumber: 'REAL-LOT',
+        expirationDate: new Date(expirationDate),
+        availableQuantity: 4,
+        initialQuantity: 4,
+      });
+      const positions = await db.inventoryPosition.findMany({
+        where: { companyId: f.companyId },
+      });
+      expect(positions).toHaveLength(1);
+      expect(positions[0]).toMatchObject({
+        inventoryBatchId: batches[0].id,
+        expirationDate: null,
+        quantity: 4,
+        revision: 2,
+      });
+      expect(
+        (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
+          .stock,
+      ).toBe(4);
+    },
+  );
 
   it.each([false, true])(
     'rejects expired incoming material atomically (real Batch=%s)',
@@ -1410,6 +1429,303 @@ describePg('INSAP receipt PHYSICAL documents and ADR-015 W1 PostgreSQL', () => {
     },
     25000,
   );
+
+  it.each(['ADMIN', 'MANAGER', 'WAREHOUSE'] as const)(
+    'completes one purchase through two receipts and replay as %s',
+    async (role) => {
+      const f = await fixture('OPTIONAL');
+      await db.user.update({ where: { id: f.actorId }, data: { role } });
+      const { receipts } = services();
+      for (const [index, quantity] of [8, 12].entries()) {
+        const key = randomUUID();
+        const dto = {
+          purchaseId: f.purchase.id,
+          supplierDocumentType: 'FACTURA' as const,
+          supplierDocumentNumber: 'TOTAL-' + index,
+          items: [
+            {
+              purchaseItemId: f.purchaseItemId,
+              quantityReceived: quantity,
+              ...(index ? { expirationDate: day(1) } : {}),
+            },
+          ],
+        };
+        const created = await receipts.create(f.companyId, f.actorId, key, dto);
+        expect(
+          (await receipts.create(f.companyId, f.actorId, key, dto)).id,
+        ).toBe(created.id);
+        expect(
+          (
+            await db.purchase.findUniqueOrThrow({
+              where: { id: f.purchase.id },
+            })
+          ).status,
+        ).toBe(index ? 'RECEIVED' : 'PARTIALLY_RECEIVED');
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId: f.companyId, originId: created.id },
+          }),
+        ).toBe(1);
+        expect(
+          await db.inventoryMovement.count({
+            where: { companyId: f.companyId, referenceId: created.id },
+          }),
+        ).toBe(1);
+      }
+      expect(
+        await db.purchaseReceipt.count({ where: { companyId: f.companyId } }),
+      ).toBe(2);
+      expect(
+        await db.idempotencyRecord.count({ where: { companyId: f.companyId } }),
+      ).toBe(2);
+      expect(
+        (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
+          .stock,
+      ).toBe(20);
+      const positions = await db.inventoryPosition.findMany({
+        where: { companyId: f.companyId },
+        orderBy: { quantity: 'asc' },
+      });
+      expect(positions).toHaveLength(2);
+      expect(
+        positions.map((p) => ({
+          q: p.quantity,
+          rev: p.revision,
+          date: p.expirationDate?.toISOString().slice(0, 10) ?? null,
+        })),
+      ).toEqual([
+        { q: 8, rev: 1, date: null },
+        { q: 12, rev: 1, date: day(1) },
+      ]);
+      await expect(
+        receipts.create(f.companyId, f.actorId, randomUUID(), {
+          purchaseId: f.purchase.id,
+          items: [{ purchaseItemId: f.purchaseItemId, quantityReceived: 1 }],
+        }),
+      ).rejects.toThrow();
+      expect(
+        await db.purchaseReceipt.count({ where: { companyId: f.companyId } }),
+      ).toBe(2);
+      expect(
+        (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
+          .stock,
+      ).toBe(20);
+    },
+  );
+
+  it('rejects an existing foreign actor and foreign purchase without changing either tenant', async () => {
+    const a = await fixture('NONE'),
+      b = await fixture('OPTIONAL');
+    const { receipts } = services();
+    await expect(
+      receipts.create(a.companyId, b.actorId, randomUUID(), {
+        purchaseId: a.purchase.id,
+        items: [{ purchaseItemId: a.purchaseItemId, quantityReceived: 1 }],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      receipts.create(a.companyId, a.actorId, randomUUID(), {
+        purchaseId: b.purchase.id,
+        items: [{ purchaseItemId: b.purchaseItemId, quantityReceived: 1 }],
+      }),
+    ).rejects.toThrow();
+    await assertEmpty(a);
+    await assertEmpty(b);
+  });
+
+  it('executes W2a Sales from dated stock first, replays once and preserves the NULL sibling', async () => {
+    const f = await fixture('OPTIONAL');
+    await db.user.update({ where: { id: f.actorId }, data: { role: 'ADMIN' } });
+    const { receipts, authority } = services();
+    for (const expirationDate of [undefined, day(1)])
+      await receipts.create(f.companyId, f.actorId, randomUUID(), {
+        purchaseId: f.purchase.id,
+        items: [
+          {
+            purchaseItemId: f.purchaseItemId,
+            quantityReceived: 2,
+            expirationDate,
+          },
+        ],
+      });
+    const dated = await db.inventoryPosition.findFirstOrThrow({
+      where: { companyId: f.companyId, expirationDate: { not: null } },
+    });
+    const customer = await db.customer.create({
+      data: { companyId: f.companyId, name: 'QA historical Sales' },
+    });
+    const createSale = (quantity: number) =>
+      db.sale.create({
+        data: {
+          companyId: f.companyId,
+          customerId: customer.id,
+          folio: randomUUID(),
+          status: 'DRAFT',
+          subtotal: quantity * 20,
+          iva: 0,
+          total: quantity * 20,
+          items: {
+            create: [
+              {
+                productId: f.productId,
+                quantity,
+                price: 20,
+                subtotal: quantity * 20,
+              },
+            ],
+          },
+        },
+      });
+    const sales = new SalesPhysicalIntegrationService(
+      db as PrismaService,
+      new SalesFolioService(new CompanySequenceAllocatorService()),
+      new SalesPhysicalSourceResolver(new PhysicalInventoryRepository()),
+      new PhysicalInventoryService(new PhysicalInventoryRepository()),
+      new InventoryCompatibilityProjectionService(),
+      new InventoryCompatibilityHistoryService(),
+      authority,
+    );
+    const sale = await createSale(1);
+    await sales.approve(f.companyId, f.actorId, sale.id);
+    await sales.approve(f.companyId, f.actorId, sale.id);
+    expect(
+      (await db.sale.findUniqueOrThrow({ where: { id: sale.id } })).status,
+    ).toBe('CONFIRMED');
+    expect(
+      await db.inventoryPhysicalEffect.count({
+        where: {
+          companyId: f.companyId,
+          originType: 'SALE',
+          originId: sale.id,
+        },
+      }),
+    ).toBe(1);
+    expect(
+      await db.inventoryMovement.count({
+        where: {
+          companyId: f.companyId,
+          referenceType: 'SALE',
+          referenceId: sale.id,
+        },
+      }),
+    ).toBe(1);
+    expect(
+      (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
+        .stock,
+    ).toBe(3);
+    expect(
+      await db.inventoryPosition.findUniqueOrThrow({ where: { id: dated.id } }),
+    ).toMatchObject({ ...dated, quantity: 1, revision: dated.revision + 1 });
+    expect(
+      await db.inventoryPosition.findFirstOrThrow({
+        where: { companyId: f.companyId, expirationDate: null },
+      }),
+    ).toMatchObject({ quantity: 2, revision: 1 });
+    const short = await createSale(4);
+    await expect(
+      sales.approve(f.companyId, f.actorId, short.id),
+    ).rejects.toThrow();
+    expect(
+      (await db.sale.findUniqueOrThrow({ where: { id: short.id } })).status,
+    ).toBe('DRAFT');
+    expect(
+      await db.inventoryPhysicalEffect.count({
+        where: { companyId: f.companyId, originId: short.id },
+      }),
+    ).toBe(0);
+    expect(
+      await db.inventoryPosition.findUniqueOrThrow({ where: { id: dated.id } }),
+    ).toMatchObject({ ...dated, quantity: 1, revision: dated.revision + 1 });
+    expect(
+      (await db.product.findUniqueOrThrow({ where: { id: f.productId } }))
+        .stock,
+    ).toBe(3);
+  });
+
+  it('shared authority fence blocks receipt before claim while an exclusive fence is held', async () => {
+    const f = await fixture();
+    const url = new URL(process.env.DATABASE_URL!);
+    url.searchParams.set('connection_limit', '1');
+    const first = new PrismaClient({
+        datasources: { db: { url: url.toString() } },
+      }),
+      second = new PrismaClient({
+        datasources: { db: { url: url.toString() } },
+      });
+    let ready!: () => void, release!: () => void;
+    const acquired = new Promise<void>((r) => {
+        ready = r;
+      }),
+      held = new Promise<void>((r) => {
+        release = r;
+      });
+    const [{ pid: a }] = await first.$queryRawUnsafe<{ pid: number }[]>(
+      'SELECT pg_backend_pid() AS pid',
+    );
+    const [{ pid: b }] = await second.$queryRawUnsafe<{ pid: number }[]>(
+      'SELECT pg_backend_pid() AS pid',
+    );
+    expect(a).not.toBe(b);
+    const owner = first.$transaction(
+      async (tx) => {
+        await inventoryAuthorityFence(tx, f.companyId, 'exclusive');
+        ready();
+        await held;
+      },
+      { timeout: 15000 },
+    );
+    let contender: ReturnType<PurchaseReceiptsService['create']> | undefined;
+    try {
+      await acquired;
+      contender = services(second).receipts.create(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        {
+          purchaseId: f.purchase.id,
+          items: [
+            {
+              purchaseItemId: f.purchaseItemId,
+              quantityReceived: 1,
+              expirationDate: day(1),
+            },
+          ],
+        },
+      );
+      void contender.catch(() => undefined);
+      let blocked = false;
+      const deadline = Date.now() + 5000;
+      while (!blocked && Date.now() < deadline) {
+        const [row] = await db.$queryRawUnsafe<{ blocked: boolean }[]>(
+          'SELECT $1::integer = ANY(pg_blocking_pids($2::integer)) AS blocked',
+          a,
+          b,
+        );
+        blocked = row.blocked;
+      }
+      expect(blocked).toBe(true);
+      expect(
+        await db.idempotencyRecord.count({ where: { companyId: f.companyId } }),
+      ).toBe(0);
+      expect(
+        await db.purchaseReceipt.count({ where: { companyId: f.companyId } }),
+      ).toBe(0);
+      release();
+      await Promise.all([owner, contender]);
+      expect(
+        await db.inventoryPhysicalEffect.count({
+          where: { companyId: f.companyId },
+        }),
+      ).toBe(1);
+      expect(
+        await db.inventoryMovement.count({ where: { companyId: f.companyId } }),
+      ).toBe(1);
+    } finally {
+      release();
+      await Promise.allSettled([owner, ...(contender ? [contender] : [])]);
+      await Promise.all([first.$disconnect(), second.$disconnect()]);
+    }
+  }, 25000);
 
   it('persists remittance once across PHYSICAL creation and idempotent retry', async () => {
     const companyId = randomUUID();

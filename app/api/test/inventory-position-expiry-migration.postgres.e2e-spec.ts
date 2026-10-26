@@ -1,3 +1,4 @@
+import { openQaAbPostgres } from './helpers/qa-ab-ephemeral-postgres';
 import { createHash, randomUUID } from 'node:crypto';
 import { InventoryPosition, Prisma, PrismaClient } from '@prisma/client';
 import { PhysicalInventoryRepository } from '../src/inventory/physical/physical-inventory.repository';
@@ -10,7 +11,9 @@ import {
   PositionKey,
 } from '../src/inventory/physical/physical-inventory.contract';
 
-const enabled = process.env.RUN_UNBATCHED_EXPIRY_MIGRATION_PG === '1';
+const enabled =
+  process.env.RUN_UNBATCHED_EXPIRY_MIGRATION_PG === '1' ||
+  process.env.RUN_QA_AB_PG === '1';
 const suite = enabled ? describe : describe.skip;
 
 suite(
@@ -23,39 +26,45 @@ suite(
     const secondDay = new Date('2028-11-20T00:00:00.000Z');
 
     beforeAll(async () => {
-      const raw = process.env.DATABASE_URL;
-      if (
-        !raw ||
-        process.env.GITHUB_ACTIONS !== 'true' ||
-        process.env.CI !== 'true'
-      ) {
-        throw new Error('Expiry migration smoke is CI-only');
+      if (process.env.RUN_QA_AB_PG === '1') {
+        db = await openQaAbPostgres();
+        // Continue fixture setup below for Foundation; W1 has no shared fixture.
       }
-      const url = new URL(raw);
-      if (
-        !['localhost', '127.0.0.1'].includes(url.hostname) ||
-        url.port !== '5432' ||
-        url.pathname !== '/zaping_test' ||
-        url.username !== 'ci'
-      ) {
-        throw new Error('Unsafe PostgreSQL expiry test target');
-      }
+      if (process.env.RUN_QA_AB_PG !== '1') {
+        const raw = process.env.DATABASE_URL;
+        if (
+          !raw ||
+          process.env.GITHUB_ACTIONS !== 'true' ||
+          process.env.CI !== 'true'
+        ) {
+          throw new Error('Expiry migration smoke is CI-only');
+        }
+        const url = new URL(raw);
+        if (
+          !['localhost', '127.0.0.1'].includes(url.hostname) ||
+          url.port !== '5432' ||
+          url.pathname !== '/zaping_test' ||
+          url.username !== 'ci'
+        ) {
+          throw new Error('Unsafe PostgreSQL expiry test target');
+        }
 
-      db = new PrismaClient({ datasources: { db: { url: raw } } });
-      const [identity] = await db.$queryRaw<
-        { database: string; role: string; superuser: boolean }[]
-      >`
+        db = new PrismaClient({ datasources: { db: { url: raw } } });
+        const [identity] = await db.$queryRaw<
+          { database: string; role: string; superuser: boolean }[]
+        >`
         SELECT current_database() AS database,
                current_user AS role,
                rolsuper AS superuser
         FROM pg_roles WHERE rolname = current_user
       `;
-      // GitHub's disposable postgres service initializes ci as its local owner;
-      // isolation is established by the workflow-only guards and exact DB URL.
-      expect(identity).toMatchObject({
-        database: 'zaping_test',
-        role: 'ci',
-      });
+        // GitHub's disposable postgres service initializes ci as its local owner;
+        // isolation is established by the workflow-only guards and exact DB URL.
+        expect(identity).toMatchObject({
+          database: 'zaping_test',
+          role: 'ci',
+        });
+      }
 
       companyId = randomUUID();
       productId = randomUUID();
@@ -1050,6 +1059,108 @@ suite(
           }
         },
       );
+
+      it('keeps historical Sales restricted to NULL when dated receipt identities coexist', async () => {
+        const { id, positions } = await pools();
+        await db.inventoryPosition.updateMany({
+          where: { companyId, productId: id },
+          data: { quantity: 9 },
+        });
+        const before = await db.inventoryPosition.findMany({
+          where: { companyId, productId: id },
+          orderBy: { id: 'asc' },
+        });
+        const result = await db.$transaction((tx) =>
+          new SalesPhysicalSourceResolver(repository).resolve(tx, companyId, [
+            { id: randomUUID(), productId: id, quantity: 3 },
+          ]),
+        );
+        expect(result.plan).toHaveLength(1);
+        expect(result.plan[0].sources).toEqual([
+          { positionId: positions[0].id, quantity: 3, expectedRevision: 0 },
+        ]);
+        expect(
+          await db.inventoryPosition.findMany({
+            where: { companyId, productId: id },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(before);
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: {
+              companyId,
+              lines: { some: { position: { productId: id } } },
+            },
+          }),
+        ).toBe(0);
+      });
+
+      it('reports physical availability for REQUIRED without authorizing its unbatched consumption', async () => {
+        const { id, positions } = await pools();
+        await db.product.update({
+          where: { id },
+          data: { lotTracking: 'REQUIRED' },
+        });
+        await db.inventoryPosition.updateMany({
+          where: { companyId, productId: id },
+          data: { quantity: 2 },
+        });
+        const company = await db.company.findUniqueOrThrow({
+          where: { id: companyId },
+        });
+        const today = companyLocalDay(company.timezone, new Date());
+        for (const index of [1, 2]) {
+          await db.inventoryPosition.update({
+            where: { id: positions[index].id },
+            data: {
+              expirationDate: new Date(
+                new Date(today + 'T00:00:00Z').getTime() + index * 86400000,
+              ),
+            },
+          });
+        }
+        const before = await db.inventoryPosition.findMany({
+          where: { companyId, productId: id },
+          orderBy: { id: 'asc' },
+        });
+        expect(
+          await new PhysicalInventoryReadService().product(db, companyId, id),
+        ).toMatchObject({ owned: 6, available: 6, inCustody: 0 });
+        await expect(
+          db.$transaction((tx) =>
+            new SalesPhysicalSourceResolver(repository).resolve(tx, companyId, [
+              { id: randomUUID(), productId: id, quantity: 1 },
+            ]),
+          ),
+        ).rejects.toThrow('requiere selección de lote');
+        const origin = {
+          type: 'AB_REQUIRED_GATE',
+          id: randomUUID(),
+          operation: 'OUT',
+        };
+        await expect(
+          db.$transaction((tx) =>
+            physical.definitiveOut(tx, { companyId, actorId, origin }, [
+              {
+                sourceId: positions[0].id,
+                quantity: 1,
+                expectedSourceRevision: 0,
+              },
+            ]),
+          ),
+        ).rejects.toMatchObject({ code: 'INVALID_PHYSICAL_REQUEST' });
+        expect(
+          await db.inventoryPosition.findMany({
+            where: { companyId, productId: id },
+            orderBy: { id: 'asc' },
+          }),
+        ).toEqual(before);
+        expect(
+          await db.inventoryPhysicalEffect.count({
+            where: { companyId, originId: origin.id },
+          }),
+        ).toBe(0);
+      });
 
       it('credits/replays the historical NULL pool without touching dated siblings; stale revision still fails', async () => {
         const { keys, positions } = await pools();

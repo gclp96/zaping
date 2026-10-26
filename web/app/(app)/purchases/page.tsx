@@ -11,7 +11,7 @@ import {
 } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { RotateCcw, Search } from 'lucide-react';
+import { Plus, RotateCcw, Search } from 'lucide-react';
 
 import { paginateRows, stableSort } from '@/app/client-table.utils';
 import { useAuthenticatedSession } from '@/app/auth-session';
@@ -457,6 +457,9 @@ const {
   //propiedades de recepcion
 const {
   purchaseToReceive,
+  receiptAuthority,
+  receiptAuthorityError,
+  retryReceiptAuthority,
   receiptFormItems,
   receiptNotes,
   supplierDocumentType,
@@ -671,16 +674,17 @@ async function loadPageData() {
       <div
         role="group"
         aria-label="Controles de tabla"
-        className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"
+        className="space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5"
       >
-        <div className="grid min-w-0 flex-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
           <Input
             label="Buscar compras"
             type="search"
             value={search}
-            placeholder="Folio, proveedor, email, SKU o producto"
+            placeholder="Folio, proveedor o producto"
+            helperText="También puedes buscar por contacto, email o SKU."
             startAdornment={<Search size={17} />}
-            containerClassName="sm:col-span-2 lg:col-span-1"
+            containerClassName="sm:col-span-2"
             onChange={(event) => {
               setSearch(event.target.value);
               setPageIndex(0);
@@ -726,28 +730,33 @@ async function loadPageData() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-          {companyTimezoneState.status === 'error' ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+          <p className="text-sm text-text-muted">
+            {filteredPurchases.length} de {purchases.length} órdenes
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {companyTimezoneState.status === 'error' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void loadCompanyTimezone()}
+              >
+                Reintentar zona horaria
+              </Button>
+            ) : null}
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => void loadCompanyTimezone()}
+              disabled={resetDisabled}
+              onClick={clearFilters}
             >
-              Reintentar zona horaria
+              <RotateCcw aria-hidden="true" size={16} />
+              Limpiar filtros
             </Button>
-          ) : null}
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={resetDisabled}
-            onClick={clearFilters}
-          >
-            <RotateCcw aria-hidden="true" size={16} />
-            Limpiar filtros
-          </Button>
+          </div>
         </div>
 
         {dateRangeMessage ? (
@@ -757,7 +766,7 @@ async function loadPageData() {
               dateRangeInvalid || dateRangeUnavailable ? 'alert' : undefined
             }
             className={[
-              'text-sm xl:basis-full',
+              'text-sm',
               dateRangeInvalid || dateRangeUnavailable
                 ? 'text-red-600'
                 : 'text-gray-500',
@@ -828,14 +837,22 @@ async function loadPageData() {
       header: 'Folio',
       sortable: true,
       priority: 'primary',
-      minWidth: 120,
+      minWidth: 110,
       cell: (purchase) => (
-        <Link
-          href={`/purchases/${encodeURIComponent(purchase.id)}`}
-          className="font-medium text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
-        >
-          {purchase.folio}
-        </Link>
+        <div className="space-y-2">
+          <Link
+            href={`/purchases/${encodeURIComponent(purchase.id)}`}
+            className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+          >
+            {purchase.folio}
+          </Link>
+          {purchase.status !== 'DRAFT' && purchase.status !== 'CANCELLED' ? (
+            <p className="text-xs text-text-muted sm:hidden">
+              Recepción: {purchase.receiptProgress.receivedUnits} de{' '}
+              {purchase.receiptProgress.orderedUnits} uds.
+            </p>
+          ) : null}
+        </div>
       ),
     },
     {
@@ -843,15 +860,19 @@ async function loadPageData() {
       header: 'Proveedor',
       sortable: true,
       priority: 'primary',
-      minWidth: 200,
-      cell: (purchase) => purchase.supplier.name,
+      minWidth: 140,
+      cell: (purchase) => (
+        <span className="block max-w-56 break-words font-medium">
+          {purchase.supplier.name}
+        </span>
+      ),
     },
     {
       id: 'date',
       header: 'Fecha',
       sortable: true,
       priority: 'secondary',
-      minWidth: 130,
+      minWidth: 110,
       cell: (purchase) => formatDate(purchase.createdAt),
     },
     {
@@ -859,14 +880,14 @@ async function loadPageData() {
       header: 'Partidas',
       sortable: true,
       priority: 'tertiary',
-      minWidth: 100,
+      minWidth: 80,
       cell: (purchase) => purchase.items.length,
     },
     {
       id: 'receiptProgress',
       header: 'Recepción',
       priority: 'secondary',
-      minWidth: 175,
+      minWidth: 150,
       cell: (purchase) => {
         if (purchase.status === 'DRAFT') {
           return (
@@ -883,7 +904,7 @@ async function loadPageData() {
         return (
           <div
             aria-label={`Progreso de recepción: ${purchase.receiptProgress.completedLines} de ${purchase.receiptProgress.orderedLines} partidas`}
-            className="flex flex-col"
+            className="flex min-w-32 flex-col gap-1.5 tabular-nums"
           >
             <span className="font-medium">
               {purchase.receiptProgress.completedLines} /{' '}
@@ -893,6 +914,14 @@ async function loadPageData() {
               {purchase.receiptProgress.receivedUnits} /{' '}
               {purchase.receiptProgress.orderedUnits} uds.
             </span>
+            {purchase.receiptProgress.orderedUnits > 0 ? (
+              <progress
+                aria-label={`Unidades recibidas de ${purchase.folio}`}
+                max={purchase.receiptProgress.orderedUnits}
+                value={purchase.receiptProgress.receivedUnits}
+                className="h-1.5 w-full accent-blue-600"
+              />
+            ) : null}
           </div>
         );
       },
@@ -900,17 +929,22 @@ async function loadPageData() {
     {
       id: 'total',
       header: 'Total',
+      align: 'end',
       sortable: true,
       priority: 'secondary',
-      minWidth: 130,
-      cell: (purchase) => formatMoney(purchase.total),
+      minWidth: 110,
+      cell: (purchase) => (
+        <span className="whitespace-nowrap font-semibold tabular-nums">
+          {formatMoney(purchase.total)}
+        </span>
+      ),
     },
     {
       id: 'status',
       header: 'Estado',
       sortable: true,
       priority: 'primary',
-      minWidth: 190,
+      minWidth: 155,
       cell: (purchase) => {
         const statusDescriptor =
           getPurchaseStatusDescriptor(purchase.status);
@@ -920,6 +954,7 @@ async function loadPageData() {
             label={statusDescriptor.label}
             tone={statusDescriptor.tone}
             ariaLabel={`Estado de la compra: ${statusDescriptor.label}`}
+            className="max-w-36 [white-space:normal]"
           />
         );
       },
@@ -927,8 +962,9 @@ async function loadPageData() {
     {
       id: 'actions',
       header: 'Acciones',
+      align: 'end',
       priority: 'primary',
-      minWidth: 210,
+      minWidth: 180,
       cell: (purchase) => {
         const rowActions: DataTableRowAction<Purchase>[] = [
           ...(canEdit && canApprove && purchase.status === 'DRAFT'
@@ -965,7 +1001,7 @@ async function loadPageData() {
         ];
 
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="relative flex flex-wrap items-center justify-end gap-2">
             {purchase.status === 'DRAFT' && canApprove ? (
               <Button
                 variant="success"
@@ -989,29 +1025,36 @@ async function loadPageData() {
             ) : null}
 
             {canEdit && canRegisterPurchaseReceipt(purchase.status) ? (
-            <Button
-              variant="success"
-              size="sm"
-              className="min-w-36"
-              loading={
-                directReceiveState?.status === 'loading' &&
-                directReceiveState.purchase.id === purchase.id
-              }
-              loadingText="Preparando..."
-              disabled={
-                directReceiveState?.status === 'loading'
-              }
-              onClick={() => void handleDirectReceive(purchase)}
-            >
-              Registrar recepción
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 min-w-0 whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring"
+                aria-describedby={`receive-purchase-${purchase.id}`}
+                loading={
+                  directReceiveState?.status === 'loading' &&
+                  directReceiveState.purchase.id === purchase.id
+                }
+                loadingText="Preparando..."
+                disabled={directReceiveState?.status === 'loading'}
+                onClick={() => void handleDirectReceive(purchase)}
+              >
+                Recibir
+              </Button>
             ) : null}
 
-            <RowActionsMenu
-              row={purchase}
-              label={`Acciones de compra ${purchase.folio}`}
-              actions={rowActions}
-            />
+            {canEdit && canRegisterPurchaseReceipt(purchase.status) ? (
+              <span id={`receive-purchase-${purchase.id}`} className="sr-only">
+                Registrar recepción de la compra {purchase.folio}
+              </span>
+            ) : null}
+
+            <div className="inline-flex [&>div>button]:border-transparent [&>div>button]:bg-transparent [&>div>button]:hover:bg-surface-subtle">
+              <RowActionsMenu
+                row={purchase}
+                label={`Acciones de compra ${purchase.folio}`}
+                actions={rowActions}
+              />
+            </div>
           </div>
         );
       },
@@ -1022,15 +1065,18 @@ async function loadPageData() {
     <>
       {/* Página de compras */}
       <PageContainer>
-        <PageHeader
-          title="Compras"
-          description="Administra las órdenes de compra registradas."
-          action={canEdit ? (
-            <Button onClick={openCreateModal}>
-              Nueva compra
-            </Button>
-          ) : undefined}
-        />
+        <div className="rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0">
+          <PageHeader
+            title="Compras"
+            description="Administra órdenes de compra y da seguimiento a sus recepciones."
+            action={canEdit ? (
+              <Button className="w-full sm:w-auto" onClick={openCreateModal}>
+                <Plus aria-hidden="true" size={18} />
+                Nueva compra
+              </Button>
+            ) : undefined}
+          />
+        </div>
 
         {actionError && !actionErrorHasDialog ? (
           <div
@@ -1102,6 +1148,9 @@ async function loadPageData() {
           />
         ) : (
           <Section>
+            <p className="text-sm text-text-muted sm:hidden">
+              Desliza la tabla para ver el estado y las acciones de cada compra.
+            </p>
             <DataTable
               caption="Listado de compras"
               rows={paginatedPurchases}
@@ -1179,6 +1228,9 @@ async function loadPageData() {
       <PurchaseReceiptModal
         isOpen={purchaseToReceive !== null || createdReceipt !== null}
         purchase={purchaseToReceive}
+        receiptAuthority={receiptAuthority}
+        receiptAuthorityError={receiptAuthorityError}
+        onRetryAuthority={retryReceiptAuthority}
         items={receiptFormItems}
         notes={receiptNotes}
         supplierDocumentType={supplierDocumentType}

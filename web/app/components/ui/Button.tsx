@@ -33,7 +33,7 @@ const variants = {
     'bg-red-600 hover:bg-red-700 text-white',
 
     success:
-    'bg-green-600 hover:bg-green-700 text-white',
+    'bg-green-700 hover:bg-green-800 text-white',
 
   outline:
     'border border-gray-300 bg-white hover:bg-gray-100 text-gray-700',

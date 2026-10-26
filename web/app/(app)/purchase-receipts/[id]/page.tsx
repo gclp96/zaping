@@ -35,6 +35,7 @@ import { getApiErrorMessage } from '@/services/errors';
 
 import {
   formatReceiptDate,
+  formatReceiptExpirationDate,
   formatReceiptMoney,
   getReceiptResponsibleLabel,
 } from '../receipt-display';
@@ -47,6 +48,7 @@ import type {
 type DetailFieldProps = {
   label: string;
   children: ReactNode;
+  wide?: boolean;
 };
 
 type EquipmentRow = {
@@ -58,11 +60,24 @@ type ReceivedItemRow = PurchaseReceiptDetail['items'][number];
 type InventoryMovementRow =
   PurchaseReceiptDetail['inventoryMovements'][number];
 
-function DetailField({ label, children }: DetailFieldProps) {
+function DetailField({ label, children, wide = false }: DetailFieldProps) {
   return (
-    <div>
-      <dt className="text-sm font-medium text-gray-500">{label}</dt>
-      <dd className="mt-1 text-gray-900">{children}</dd>
+    <div className={`min-w-0 rounded-xl border border-border bg-surface p-4 sm:p-5 ${wide ? 'sm:col-span-2 xl:col-span-4' : ''}`}>
+      <dt className="text-sm font-medium text-text-muted">{label}</dt>
+      <dd className="mt-2 break-words whitespace-pre-wrap font-medium text-text">{children}</dd>
+    </div>
+  );
+}
+
+function TableRegion({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div
+      role="region"
+      aria-label={label}
+      tabIndex={0}
+      className="overflow-x-auto rounded-xl border border-border bg-surface text-sm tabular-nums focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600 [&>div]:overflow-visible [&>div]:shadow-none [&_tr]:border-border [&_thead]:bg-surface-subtle"
+    >
+      {children}
     </div>
   );
 }
@@ -70,15 +85,15 @@ function DetailField({ label, children }: DetailFieldProps) {
 const backLink = (
   <Link
     href="/purchase-receipts"
-    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-100"
+    className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 font-medium text-text-secondary transition-colors hover:bg-surface-subtle focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
   >
     <ArrowLeft aria-hidden="true" size={18} />
-    Volver
+    Volver a recepciones
   </Link>
 );
 
 const traceabilityActionClassName =
-  'inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100';
+  'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600';
 
 export default function PurchaseReceiptDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -95,6 +110,24 @@ export default function PurchaseReceiptDetailPage() {
       const response = await api.get<PurchaseReceiptDetail>(
         `/purchase-receipts/${id}`,
       );
+
+      // Do not render a partial detail or flatten missing related collections.
+      const detail = response.data;
+      if (
+        detail && (
+          !detail.purchase?.supplier ||
+          !Array.isArray(detail.items) ||
+          !Array.isArray(detail.inventoryMovements) ||
+          detail.items.some((item) =>
+            !item?.product ||
+            !Array.isArray(item.equipmentAssets) ||
+            item.equipmentAssets.some((asset) => !asset?.product),
+          ) ||
+          detail.inventoryMovements.some((movement) => !movement?.product)
+        )
+      ) {
+        throw new Error('El detalle de la recepción está incompleto. Vuelve a intentarlo.');
+      }
 
       setReceipt(response.data);
     } catch (requestError: unknown) {
@@ -171,39 +204,48 @@ export default function PurchaseReceiptDetailPage() {
     {
       id: 'sku',
       header: 'SKU',
-      cell: (item) => item.product.sku,
+      minWidth: 100,
+      cell: (item) => <span className="text-xs font-medium text-text-muted">{item.product.sku}</span>,
     },
     {
       id: 'product',
       header: 'Producto',
-      cell: (item) => item.product.name,
+      minWidth: 190,
+      cell: (item) => <span className="font-semibold text-text">{item.product.name}</span>,
     },
     {
       id: 'quantity',
       header: 'Cantidad recibida',
-      cell: (item) => item.quantityReceived,
+      align: 'end',
+      minWidth: 130,
+      cell: (item) => <span className="font-semibold tabular-nums text-blue-900">{item.quantityReceived}</span>,
     },
     {
       id: 'unitCost',
       header: 'Costo unitario',
-      cell: (item) => formatReceiptMoney(item.unitCost),
+      align: 'end',
+      minWidth: 125,
+      cell: (item) => <span className="whitespace-nowrap tabular-nums">{formatReceiptMoney(item.unitCost)}</span>,
     },
     {
       id: 'batch',
       header: 'Lote',
-      cell: (item) => item.batch?.lotNumber ?? item.lotNumber ?? '—',
+      minWidth: 130,
+      cell: (item) => item.batch?.lotNumber ?? item.lotNumber ?? 'Sin lote informado',
     },
     {
       id: 'expiration',
       header: 'Caducidad',
+      minWidth: 135,
       cell: (item) =>
         item.expirationDate
-          ? formatReceiptDate(item.expirationDate)
-          : '—',
+          ? formatReceiptExpirationDate(item.expirationDate)
+          : 'No informada',
     },
     {
       id: 'equipment',
       header: 'Equipo generado',
+      align: 'end',
       cell: (item) => item.equipmentAssets.length,
     },
   ];
@@ -248,16 +290,19 @@ export default function PurchaseReceiptDetailPage() {
     {
       id: 'quantity',
       header: 'Cantidad',
+      align: 'end',
       cell: (movement) => movement.quantity,
     },
     {
       id: 'balance',
       header: 'Saldo',
+      align: 'end',
       cell: (movement) => movement.balance ?? 'No disponible',
     },
     {
       id: 'unitCost',
       header: 'Costo unitario',
+      align: 'end',
       cell: (movement) =>
         movement.unitCost == null
           ? '—'
@@ -278,7 +323,7 @@ export default function PurchaseReceiptDetailPage() {
         <Link
           href={`/equipment?assetId=${encodeURIComponent(asset.id)}`}
           aria-label={`Ver equipo ${asset.assetCode}`}
-          className="font-semibold text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900"
+          className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
         >
           {asset.assetCode}
         </Link>
@@ -351,14 +396,16 @@ export default function PurchaseReceiptDetailPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title={`Recepción ${receipt.folio}`}
-        description={`${formatReceiptDate(receipt.receivedAt)} | ${responsible}`}
-        action={backLink}
-      />
+      <div className="rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0">
+        <PageHeader
+          title={`Recepción ${receipt.folio}`}
+          description={`${formatReceiptDate(receipt.receivedAt)} | ${responsible}`}
+          action={backLink}
+        />
+      </div>
 
       <Section title="General">
-        <dl className="grid gap-x-8 gap-y-5 border-t border-gray-200 pt-5 sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <DetailField label="Folio">{receipt.folio}</DetailField>
           <DetailField label="Fecha de recepción">
             {formatReceiptDate(receipt.receivedAt)}
@@ -369,13 +416,13 @@ export default function PurchaseReceiptDetailPage() {
               ? `${receipt.supplierDocumentType.replace('_', ' ')} · ${receipt.supplierDocumentNumber}`
               : 'Sin documento registrado'}
           </DetailField>
-          <DetailField label="Notas">
+          <DetailField label="Notas" wide>
             {receipt.notes || 'Sin notas'}
           </DetailField>
         </dl>
       </Section>
 
-      <div className="border-t border-gray-200 pt-8">
+      <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
         <Section
           title="Compra y proveedor"
           action={
@@ -388,8 +435,8 @@ export default function PurchaseReceiptDetailPage() {
             </Link>
           }
         >
-          <dl className="grid gap-x-8 gap-y-5 sm:grid-cols-2 xl:grid-cols-4">
-            <DetailField label="Compra">{receipt.purchase.folio}</DetailField>
+          <dl className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <DetailField label="Compra"><span className="font-semibold text-blue-800">{receipt.purchase.folio}</span></DetailField>
             <DetailField label="Estado de compra">
               <StatusBadge
                 label={purchaseStatus.label}
@@ -401,28 +448,31 @@ export default function PurchaseReceiptDetailPage() {
               {receipt.purchase.supplier.name}
             </DetailField>
             <DetailField label="Total de compra">
-              {formatReceiptMoney(receipt.purchase.total)}
+              <span className="text-xl font-semibold tabular-nums text-blue-900">{formatReceiptMoney(receipt.purchase.total)}</span>
             </DetailField>
           </dl>
         </Section>
       </div>
 
-      <div className="border-t border-gray-200 pt-8">
+      <div className="space-y-4">
         <Section
           title="Partidas recibidas"
           description="Productos y costos registrados en esta recepción."
         >
-          <StaticTable
-            caption="Partidas recibidas"
-            columns={receivedItemColumns}
-            rows={receipt.items}
-            getRowKey={(item) => item.id}
-            emptyState="Sin registros"
-          />
+          <p className="text-sm text-text-muted sm:hidden">Desliza la tabla para consultar lote, caducidad y costos.</p>
+          <TableRegion label="Partidas recibidas desplazables">
+            <StaticTable
+              caption="Partidas recibidas"
+              columns={receivedItemColumns}
+              rows={receipt.items}
+              getRowKey={(item) => item.id}
+              emptyState="Sin registros"
+            />
+          </TableRegion>
         </Section>
       </div>
 
-      <div className="border-t border-gray-200 pt-8">
+      <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
         <Section
           title="Movimientos de inventario"
           description="Entradas asociadas directamente con esta recepción."
@@ -441,18 +491,20 @@ export default function PurchaseReceiptDetailPage() {
               No hay movimientos de inventario asociados a esta recepción.
             </p>
           ) : (
-            <StaticTable
-              caption="Movimientos de inventario"
-              columns={inventoryMovementColumns}
-              rows={receipt.inventoryMovements}
-              getRowKey={(movement) => movement.id}
-              emptyState="Sin registros"
-            />
+            <TableRegion label="Movimientos de inventario desplazables">
+              <StaticTable
+                caption="Movimientos de inventario"
+                columns={inventoryMovementColumns}
+                rows={receipt.inventoryMovements}
+                getRowKey={(movement) => movement.id}
+                emptyState="Sin registros"
+              />
+            </TableRegion>
           )}
         </Section>
       </div>
 
-      <div className="border-t border-gray-200 pt-8">
+      <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
         <Section
           title="Equipos generados"
           description="Unidades físicas creadas por las partidas recibidas."
@@ -462,13 +514,15 @@ export default function PurchaseReceiptDetailPage() {
               Esta recepción no generó equipos.
             </p>
           ) : (
-            <StaticTable
-              caption="Equipos generados"
-              columns={equipmentColumns}
-              rows={equipmentRows}
-              getRowKey={({ asset }) => asset.id}
-              emptyState="Sin registros"
-            />
+            <TableRegion label="Equipos generados desplazables">
+              <StaticTable
+                caption="Equipos generados"
+                columns={equipmentColumns}
+                rows={equipmentRows}
+                getRowKey={({ asset }) => asset.id}
+                emptyState="Sin registros"
+              />
+            </TableRegion>
           )}
         </Section>
       </div>

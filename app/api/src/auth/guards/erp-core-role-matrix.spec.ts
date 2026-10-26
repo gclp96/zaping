@@ -29,6 +29,7 @@ import { PurchasesController } from '../../purchases/purchases.controller';
 import { QuotesController } from '../../quotes/quotes.controller';
 import { SalesController } from '../../sales/sales.controller';
 import { SuppliersController } from '../../suppliers/suppliers.controller';
+import { SupplierDocumentsController } from '../../supplier-documents/supplier-documents.controller';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guards';
 
@@ -53,6 +54,23 @@ const allRoles = [
 ];
 
 const roleMatrix: RoleMatrix[] = [
+  {
+    controller: SupplierDocumentsController,
+    methods: {
+      findAll: [UserRole.ADMIN, UserRole.MANAGER],
+      findOne: [UserRole.ADMIN, UserRole.MANAGER],
+      create: [UserRole.ADMIN, UserRole.MANAGER],
+      createException: [UserRole.ADMIN, UserRole.MANAGER],
+      confirmBasis: [UserRole.ADMIN, UserRole.MANAGER],
+      listAllocations: [UserRole.ADMIN, UserRole.MANAGER],
+      allocate: [UserRole.ADMIN, UserRole.MANAGER],
+      reviseAllocation: [UserRole.ADMIN, UserRole.MANAGER],
+      correctBasis: [UserRole.ADMIN, UserRole.MANAGER],
+      cancelDocument: [UserRole.ADMIN, UserRole.MANAGER],
+      receiptReconciliation: [UserRole.ADMIN, UserRole.MANAGER],
+      approveVariance: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+  },
   {
     controller: HealthcareCaseReconciliationsController,
     methods: {
@@ -154,6 +172,7 @@ const roleMatrix: RoleMatrix[] = [
   {
     controller: PurchaseReceiptsController,
     methods: {
+      getCapabilities: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findAll: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findByPurchase: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
       findOne: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAREHOUSE],
