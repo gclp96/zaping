@@ -48,6 +48,7 @@ export class CreateSupplierDocumentAllocationDto {
 export enum AllocationRevisionAction {
   REPLACE_AMOUNT = 'REPLACE_AMOUNT',
   DEACTIVATE = 'DEACTIVATE',
+  REACTIVATE = 'REACTIVATE',
 }
 
 export class ReviseSupplierDocumentAllocationDto {
