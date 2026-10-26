@@ -335,7 +335,7 @@ describe('AuthenticatedAppLayout', () => {
       within(purchasesGroup as HTMLElement)
         .getAllByRole('link')
         .map((link) => link.textContent),
-    ).toEqual(['Proveedores', 'Compras', 'Recepciones']);
+    ).toEqual(['Proveedores', 'Compras', 'Recepciones', 'Documentos de proveedor']);
   });
 
   it('marks Dashboard active for the Dashboard route', () => {
