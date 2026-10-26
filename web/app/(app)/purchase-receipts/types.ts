@@ -11,6 +11,7 @@ export type ReceiptProduct = {
   id: string;
   sku: string;
   name: string;
+  inventoryTracking?: 'QUANTITY' | 'SERIALIZED' | 'ASSET';
 };
 
 export type ReceiptBatch = {

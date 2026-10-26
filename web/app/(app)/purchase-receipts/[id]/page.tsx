@@ -147,6 +147,8 @@ export default function PurchaseReceiptDetailPage() {
     void loadReceipt();
   }, [loadReceipt]);
 
+  const hasAssetItems = receipt?.items.some((item) => item.product.inventoryTracking === 'ASSET') ?? false;
+
   const equipmentRows = useMemo<EquipmentRow[]>(
     () =>
       receipt?.items.flatMap((item) =>
@@ -504,6 +506,7 @@ export default function PurchaseReceiptDetailPage() {
         </Section>
       </div>
 
+      {(equipmentRows.length > 0 || hasAssetItems) && (
       <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
         <Section
           title="Equipos generados"
@@ -511,7 +514,7 @@ export default function PurchaseReceiptDetailPage() {
         >
           {equipmentRows.length === 0 ? (
             <p className="border-l-4 border-gray-300 py-2 pl-4 text-gray-600">
-              Esta recepción no generó equipos.
+              Esta recepción incluye productos de tipo equipo, pero no tiene activos generados. Revisa la trazabilidad.
             </p>
           ) : (
             <TableRegion label="Equipos generados desplazables">
@@ -526,6 +529,7 @@ export default function PurchaseReceiptDetailPage() {
           )}
         </Section>
       </div>
+      )}
     </PageContainer>
   );
 }
