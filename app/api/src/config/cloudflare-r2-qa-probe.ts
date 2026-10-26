@@ -46,7 +46,9 @@ export function requireCloudflareR2QaFixture(
     !Number.isSafeInteger(sizeBytes) ||
     sizeBytes > SUPPLIER_ATTACHMENT_MAX_BYTES
   ) {
-    throw new BadRequestException('R2 QA fixture exceeds attachment size limits');
+    throw new BadRequestException(
+      'R2 QA fixture exceeds attachment size limits',
+    );
   }
   requireTenantPrivateR2Key(objectKey, companyId);
 
