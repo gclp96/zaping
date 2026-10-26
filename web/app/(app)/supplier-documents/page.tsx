@@ -1,0 +1,302 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { FilePlus2, RefreshCw } from "lucide-react";
+
+import { useAuthenticatedSession } from "@/app/auth-session";
+import { hasRole, MANAGEMENT_ROLES } from "@/app/erp-role-access";
+import Button from "@/app/components/ui/Button";
+import Input from "@/app/components/ui/Input";
+import ForbiddenState from "@/app/components/ui/ForbiddenState";
+import Loading from "@/app/components/ui/Loading";
+import PageContainer from "@/app/components/ui/layout/PageContainer";
+import PageHeader from "@/app/components/ui/layout/PageHeader";
+import Section from "@/app/components/ui/layout/Section";
+import { api } from "@/services/api";
+import { getApiErrorMessage, isForbiddenError } from "@/services/errors";
+import {
+  createSupplierDocument,
+  documentDateLabel,
+  documentTypeLabel,
+  formatSupplierMoney,
+  listSupplierDocuments,
+  type NewSupplierDocument,
+  type SupplierDocument,
+  type SupplierDocumentType,
+} from "@/services/supplier-documents";
+
+type SupplierOption = { id: string; name: string };
+const MONEY = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/;
+const basicInput = "w-full rounded-lg border border-gray-300 bg-white p-3 text-text focus:outline-none focus:ring-2 focus:ring-blue-500";
+
+function emptyForm() {
+  return {
+    supplierId: "",
+    type: "FACTURA" as SupplierDocumentType,
+    series: "",
+    number: "",
+    documentDate: "",
+    currency: "MXN",
+    cfdiUuid: "",
+    issuerRfc: "",
+    receiverRfc: "",
+    subtotalAmount: "",
+    ivaAmount: "",
+    totalAmount: "",
+    goodsNetAmount: "",
+  };
+}
+
+export default function SupplierDocumentsPage() {
+  const session = useAuthenticatedSession();
+  const role = session.status === "success" ? session.user.role : null;
+  const hasAccess = hasRole(role, MANAGEMENT_ROLES);
+  const [documents, setDocuments] = useState<SupplierDocument[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [forbidden, setForbidden] = useState(false);
+  const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const retry = useRef<{ signature: string; key: string } | null>(null);
+
+  useEffect(() => {
+    if (session.status !== "success" || !hasAccess) return;
+    let active = true;
+    Promise.all([
+      listSupplierDocuments(),
+      api.get<SupplierOption[]>("/suppliers"),
+    ])
+      .then(([docs, suppliersResponse]) => {
+        if (!active) return;
+        setDocuments(docs);
+        setSuppliers(suppliersResponse.data);
+        setLoadError("");
+        setLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (isForbiddenError(error)) setForbidden(true);
+        setLoadError(getApiErrorMessage(error, "No fue posible cargar documentos."));
+        setLoading(false);
+      });
+    return () => { active = false; };
+  }, [hasAccess, session.status]);
+
+  const supplierNames = useMemo(
+    () => new Map(suppliers.map((item) => [item.id, item.name])),
+    [suppliers],
+  );
+  const visible = useMemo(() => {
+    const text = search.trim().toLocaleLowerCase("es-MX");
+    if (!text) return documents;
+    return documents.filter((doc) =>
+      [doc.number, doc.series, doc.cfdiUuid, supplierNames.get(doc.supplierId)]
+        .some((value) => value?.toLocaleLowerCase("es-MX").includes(text)),
+    );
+  }, [documents, search, supplierNames]);
+
+  async function refresh() {
+    try {
+      setLoadError("");
+      const result = await listSupplierDocuments();
+      setDocuments(result);
+    } catch (error: unknown) {
+      setLoadError(getApiErrorMessage(error, "No fue posible actualizar documentos."));
+    }
+  }
+
+  function updateField<K extends keyof ReturnType<typeof emptyForm>>(
+    field: K, value: ReturnType<typeof emptyForm>[K],
+  ) {
+    setForm((previous) => ({ ...previous, [field]: value }));
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving) return;
+    const number = form.number.trim();
+    if (!form.supplierId || !number || !/^\d{4}-\d{2}-\d{2}$/.test(form.documentDate)) {
+      setSaveError("Selecciona un proveedor, folio y fecha.");
+      return;
+    }
+    const moneyFields = [
+      form.subtotalAmount, form.ivaAmount, form.totalAmount, form.goodsNetAmount,
+    ].filter(Boolean);
+    if (moneyFields.some((value) => !MONEY.test(value))) {
+      setSaveError("Los importes deben ser positivos o cero y contener máximo dos decimales.");
+      return;
+    }
+    const payload: NewSupplierDocument = {
+      supplierId: form.supplierId,
+      type: form.type,
+      number,
+      documentDate: form.documentDate,
+    };
+    for (const field of ["series", "currency", "cfdiUuid", "issuerRfc", "receiverRfc",
+      "subtotalAmount", "ivaAmount", "totalAmount", "goodsNetAmount"] as const) {
+      const value = form[field].trim();
+      if (value) Object.assign(payload, { [field]: value });
+    }
+    const signature = JSON.stringify(payload);
+    if (!retry.current || retry.current.signature !== signature) {
+      retry.current = { signature, key: crypto.randomUUID() };
+    }
+    try {
+      setSaving(true);
+      setSaveError("");
+      await createSupplierDocument(payload, retry.current.key);
+      retry.current = null;
+      setForm(emptyForm());
+      setCreating(false);
+      await refresh();
+    } catch (error: unknown) {
+      setSaveError(getApiErrorMessage(error, "No fue posible registrar el documento."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (session.status === "loading") return <PageContainer><Loading message="Verificando sesión..." /></PageContainer>;
+  if (session.status === "success" && !hasAccess) {
+    return <PageContainer><ForbiddenState /></PageContainer>;
+  }
+  if (session.status !== "success") {
+    return <PageContainer><p role="alert">No fue posible verificar la sesión.</p></PageContainer>;
+  }
+  if (forbidden) return <PageContainer><ForbiddenState /></PageContainer>;
+
+  return (
+    <PageContainer>
+      <PageHeader
+        title="Documentos de proveedor"
+        description="Facturas, remisiones y notas de entrega. La captura no valida CFDI ante el SAT ni modifica inventario."
+        action={
+          <Button type="button" onClick={() => { setCreating((v) => !v); setSaveError(""); }}>
+            <FilePlus2 aria-hidden="true" size={18} />
+            {creating ? "Cerrar captura" : "Nuevo documento"}
+          </Button>
+        }
+      />
+      {creating && (
+        <Section title="Registrar documento del proveedor">
+          <form onSubmit={(event) => void submit(event)} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <label className="block text-sm font-medium">
+                Proveedor *
+                <select aria-label="Proveedor" className={basicInput} value={form.supplierId}
+                  onChange={(event) => updateField("supplierId", event.target.value)} required>
+                  <option value="">Seleccionar proveedor</option>
+                  {suppliers.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-medium">
+                Tipo *
+                <select aria-label="Tipo de documento" className={basicInput} value={form.type}
+                  onChange={(event) => updateField("type", event.target.value as SupplierDocumentType)}>
+                  <option value="FACTURA">Factura</option>
+                  <option value="REMISION">Remisión</option>
+                  <option value="NOTA_ENTREGA">Nota de entrega</option>
+                </select>
+              </label>
+              <Input label="Fecha del documento" required type="date" value={form.documentDate}
+                onChange={(event) => updateField("documentDate", event.target.value)} />
+              <Input label="Serie" maxLength={80} value={form.series}
+                onChange={(event) => updateField("series", event.target.value)} />
+              <Input label="Folio / número" maxLength={160} required value={form.number}
+                onChange={(event) => updateField("number", event.target.value)} />
+              <Input label="Moneda" maxLength={3} value={form.currency}
+                onChange={(event) => updateField("currency", event.target.value.toUpperCase())} />
+              {form.type === "FACTURA" && (
+                <>
+                  <Input label="UUID CFDI (si está disponible)" value={form.cfdiUuid}
+                    onChange={(event) => updateField("cfdiUuid", event.target.value)} />
+                  <Input label="RFC emisor" maxLength={13} value={form.issuerRfc}
+                    onChange={(event) => updateField("issuerRfc", event.target.value.toUpperCase())} />
+                  <Input label="RFC receptor" maxLength={13} value={form.receiverRfc}
+                    onChange={(event) => updateField("receiverRfc", event.target.value.toUpperCase())} />
+                </>
+              )}
+              <Input label="Subtotal" inputMode="decimal" value={form.subtotalAmount}
+                onChange={(event) => updateField("subtotalAmount", event.target.value)} />
+              <Input label="IVA" inputMode="decimal" value={form.ivaAmount}
+                onChange={(event) => updateField("ivaAmount", event.target.value)} />
+              <Input label="Total" inputMode="decimal" value={form.totalAmount}
+                onChange={(event) => updateField("totalAmount", event.target.value)} />
+              {form.type === "FACTURA" && (
+                <Input label="Base neta de mercancía (por revisar)" inputMode="decimal"
+                  helperText="No incluye el flete. Debe confirmarse antes de asignar recepciones."
+                  value={form.goodsNetAmount}
+                  onChange={(event) => updateField("goodsNetAmount", event.target.value)} />
+              )}
+            </div>
+            <p className="text-sm text-text-muted">Los importes no informados quedan sin capturar, nunca se interpretan como cero.</p>
+            {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
+            <Button type="submit" loading={saving}>Guardar documento</Button>
+          </form>
+        </Section>
+      )}
+      {loadError && (
+        <div role="alert" className="my-4 rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+          {loadError} <Button type="button" variant="outline" onClick={() => void refresh()}>Reintentar</Button>
+        </div>
+      )}
+      {loading ? <Loading message="Cargando documentos..." /> : (
+        <Section title="Documentos registrados" description="Últimos 50 documentos disponibles en la API.">
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div className="min-w-60 flex-1">
+              <Input label="Buscar por proveedor, folio o UUID" type="search" value={search}
+                onChange={(event) => setSearch(event.target.value)} />
+            </div>
+            <Button type="button" variant="outline" onClick={() => void refresh()}>
+              <RefreshCw aria-hidden="true" size={16} /> Actualizar
+            </Button>
+          </div>
+          {visible.length === 0 ? (
+            <p className="rounded-lg border border-border bg-surface p-6 text-text-muted">
+              No hay documentos que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border bg-surface">
+              <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+                <thead className="bg-surface-subtle text-text-muted">
+                  <tr>
+                    <th scope="col" className="p-3">Folio</th>
+                    <th scope="col" className="p-3">Proveedor</th>
+                    <th scope="col" className="p-3">Tipo</th>
+                    <th scope="col" className="p-3">Fecha</th>
+                    <th scope="col" className="p-3">Total</th>
+                    <th scope="col" className="p-3">Control</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((doc) => (
+                    <tr key={doc.id} className="border-t border-border">
+                      <td className="p-3 font-semibold">
+                        <Link className="text-blue-700 underline" href={"/supplier-documents/" + encodeURIComponent(doc.id)}>
+                          {[doc.series, doc.number].filter(Boolean).join("-")}
+                        </Link>
+                      </td>
+                      <td className="p-3">{supplierNames.get(doc.supplierId) ?? "Proveedor no disponible"}</td>
+                      <td className="p-3">{documentTypeLabel(doc.type)}</td>
+                      <td className="p-3">{documentDateLabel(doc.documentDate)}</td>
+                      <td className="p-3 tabular-nums">{formatSupplierMoney(doc.totalAmount, doc.currency)}</td>
+                      <td className="p-3">
+                        {doc.status === "CANCELLED" ? "Cancelado" :
+                          doc.basisStatus === "CONFIRMED" ? "Base confirmada" : "Pendiente de revisión"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Section>
+      )}
+    </PageContainer>
+  );
+}
