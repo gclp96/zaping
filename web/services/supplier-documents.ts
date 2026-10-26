@@ -146,6 +146,42 @@ export async function createSupplierDocument(payload: NewSupplierDocument, key: 
   return result.data;
 }
 
+export type SupplierDocumentExceptionRequest = NewSupplierDocument & {
+  duplicateOfDocumentId: string;
+  reason: string;
+  evidenceReference: string;
+};
+
+export async function createSupplierDocumentException(
+  payload: SupplierDocumentExceptionRequest,
+  key: string,
+) {
+  const result = await api.post<SupplierDocument>(
+    "/supplier-documents/exceptions",
+    payload,
+    { headers: { "Idempotency-Key": key } },
+  );
+  return result.data;
+}
+
+export async function correctSupplierDocumentBasis(
+  id: string,
+  payload: {
+    goodsNetAmount: string;
+    currency: string;
+    reason: string;
+    expectedRevision: number;
+  },
+  key: string,
+) {
+  const result = await api.post<ReconciliationEvent>(
+    "/supplier-documents/" + encodeURIComponent(id) + "/correct-basis",
+    payload,
+    { headers: { "Idempotency-Key": key } },
+  );
+  return result.data;
+}
+
 export async function getDocumentAllocations(id: string) {
   const result = await api.get<SupplierDocumentAllocation[]>(
     "/supplier-documents/" + encodeURIComponent(id) + "/allocations",
