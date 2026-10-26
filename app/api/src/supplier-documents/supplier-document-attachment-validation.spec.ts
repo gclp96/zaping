@@ -58,7 +58,10 @@ describe('supplier document attachment validation', () => {
   });
 
   it('rejects empty and oversized buffers', () => {
-    for (const bytes of [Buffer.alloc(0), Buffer.alloc(SUPPLIER_ATTACHMENT_MAX_BYTES + 1)]) {
+    for (const bytes of [
+      Buffer.alloc(0),
+      Buffer.alloc(SUPPLIER_ATTACHMENT_MAX_BYTES + 1),
+    ]) {
       expect(() =>
         inspectSupplierAttachment({
           originalName: 'invoice.pdf',
