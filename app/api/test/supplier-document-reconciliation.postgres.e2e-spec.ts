@@ -1,9 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { ConflictException, NotFoundException } from '@nestjs/common';
-import { PrismaClient, SupplierDocumentType } from '@prisma/client';
+import {
+  PrismaClient,
+  SupplierDocumentType,
+  SupplierDocumentCancellationSource,
+} from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierDocumentsService } from '../src/supplier-documents/supplier-documents.service';
 import { SupplierDocumentReconciliationService } from '../src/supplier-documents/supplier-document-reconciliation.service';
+import { AllocationRevisionAction } from '../src/supplier-documents/dto/supplier-document-reconciliation.dto';
 
 const describePg = process.env.RUN_R2A02_PG === '1' ? describe : describe.skip;
 
@@ -256,6 +261,136 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const links = await reconciliation.allocations(f.companyId, doc.id);
     expect(links).toHaveLength(1);
     expect(links[0].allocatedSubtotal.toFixed(2)).toBe('70.00');
+  });
+
+
+  it('revises an allocation amount while preserving before and after audit', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    const [link] = await reconciliation.allocations(f.companyId, doc.id);
+    const event = await reconciliation.reviseAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        allocationId: link.id, action: AllocationRevisionAction.REPLACE_AMOUNT,
+        allocatedSubtotal: '75', reason: 'Precio neto actualizado por proveedor',
+        expectedRevision: 2, expectedAllocationRevision: 0,
+      },
+    );
+    expect(event.revision).toBe(3);
+    const [current] = await reconciliation.allocations(f.companyId, doc.id);
+    expect(current.allocatedSubtotal.toFixed(2)).toBe('75.00');
+    expect(current.revision).toBe(1);
+    const detail = await documents.detail(f.companyId, doc.id);
+    expect(detail.audits[3].operation).toBe('ALLOCATION_REVISED');
+  });
+
+  it('deactivates an allocation without deleting its historical link', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    const [link] = await reconciliation.allocations(f.companyId, doc.id);
+    await reconciliation.reviseAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        allocationId: link.id, action: AllocationRevisionAction.DEACTIVATE,
+        reason: 'Vínculo documental asignado por equivocación',
+        expectedRevision: 2, expectedAllocationRevision: 0,
+      },
+    );
+    const [saved] = await reconciliation.allocations(f.companyId, doc.id);
+    expect(saved.isActive).toBe(false);
+    expect(saved.allocatedSubtotal.toFixed(2)).toBe('60.00');
+    expect(saved.revision).toBe(1);
+  });
+
+  it('rejects a basis correction below active links, then permits an audited correction', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '80', expectedRevision: 1 },
+    );
+    await expect(reconciliation.correctBasis(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        goodsNetAmount: '70', currency: 'MXN',
+        reason: 'Corrección por factura del proveedor', expectedRevision: 2,
+      },
+    )).rejects.toBeInstanceOf(ConflictException);
+    const event = await reconciliation.correctBasis(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        goodsNetAmount: '90', currency: 'MXN',
+        reason: 'Corrección por factura del proveedor', expectedRevision: 2,
+      },
+    );
+    expect(event.revision).toBe(3);
+    expect((await documents.detail(f.companyId, doc.id)).goodsNetAmount?.toFixed(2))
+      .toBe('90.00');
+  });
+
+  it('cancels a document, retains links and references a distinct replacement without transferring coverage', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const replacement = await invoice(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '90', expectedRevision: 1 },
+    );
+    const result = await reconciliation.cancelDocument(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        source: SupplierDocumentCancellationSource.INTERNAL_RECORD_ERROR,
+        reason: 'La factura original fue capturada con folio erróneo',
+        replacedByDocumentId: replacement.id, expectedRevision: 2,
+      },
+    );
+    expect(result.operation).toBe('DOCUMENT_CANCELLED');
+    const old = await documents.detail(f.companyId, doc.id);
+    expect(old.status).toBe('CANCELLED');
+    expect(old.replacedByDocumentId).toBe(replacement.id);
+    const [link] = await reconciliation.allocations(f.companyId, doc.id);
+    expect(link.isActive).toBe(false);
+    expect(link.allocatedSubtotal.toFixed(2)).toBe('90.00');
+    expect(await reconciliation.allocations(f.companyId, replacement.id)).toEqual([]);
+    await expect(reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '10', expectedRevision: 3 },
+    )).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('requires evidence for reported external cancellation and blocks other-supplier substitution', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    await expect(reconciliation.cancelDocument(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        source: SupplierDocumentCancellationSource.EXTERNAL_REPORTED,
+        reason: 'Cancelación emitida por proveedor externo', expectedRevision: 1,
+      },
+    )).rejects.toThrow();
+    const different = await db.supplier.create({
+      data: { companyId: f.companyId, name: 'Proveedor sustituto inválido' },
+    });
+    const replacement = await documents.create(
+      f.companyId, f.actorId, randomUUID(), {
+        supplierId: different.id, type: SupplierDocumentType.FACTURA,
+        number: randomUUID(), documentDate: '2026-10-25',
+      },
+    );
+    await expect(reconciliation.cancelDocument(
+      f.companyId, f.actorId, randomUUID(), doc.id, {
+        source: SupplierDocumentCancellationSource.INTERNAL_RECORD_ERROR,
+        reason: 'Documento original incorrecto',
+        replacedByDocumentId: replacement.id, expectedRevision: 1,
+      },
+    )).rejects.toBeInstanceOf(NotFoundException);
+    expect((await documents.detail(f.companyId, doc.id)).status).toBe('ACTIVE');
   });
 
   it('replays an old allocation result even after the document revision changes', async () => {
