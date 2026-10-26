@@ -21,6 +21,7 @@ import {
   approveReceiptVariance,
   cancelSupplierDocument,
   confirmDocumentBasis,
+  correctSupplierDocumentBasis,
   documentDateLabel,
   documentTypeLabel,
   formatSupplierMoney,
@@ -85,6 +86,8 @@ export default function SupplierDocumentDetailPage() {
     setAllocations(links);
     setReceipts(receiptResponse.data);
     setOtherDocuments(docList);
+    setBasisAmount(doc.goodsNetAmount ?? "");
+    setBasisCurrency(doc.currency ?? "MXN");
   }, [id]);
 
   useEffect(() => {
@@ -180,6 +183,27 @@ export default function SupplierDocumentDetailPage() {
     };
     if (await write("confirm", payload, (key) =>
       confirmDocumentBasis(id, payload, key))) setBasisReason("");
+  }
+
+
+  async function onCorrectBasis(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!document || !MONEY.test(basisAmount) ||
+        !/^[A-Z]{3}$/.test(basisCurrency) ||
+        basisReason.trim().length < 10) {
+      setActionError("Indica base neta, moneda ISO de tres letras y motivo de al menos 10 caracteres.");
+      return;
+    }
+    const payload = {
+      goodsNetAmount: basisAmount,
+      currency: basisCurrency,
+      reason: basisReason.trim(),
+      expectedRevision: document.revision,
+    };
+    if (await write("correct-basis", payload, (key) =>
+      correctSupplierDocumentBasis(id, payload, key))) {
+      setBasisReason("");
+    }
   }
 
   async function onAllocate(event: FormEvent<HTMLFormElement>) {
@@ -291,6 +315,25 @@ export default function SupplierDocumentDetailPage() {
             <Input label="Justificación" required minLength={10} value={basisReason}
               onChange={(e) => setBasisReason(e.target.value)} />
             <Button type="submit" disabled={saving}>Confirmar base revisada</Button>
+          </form>
+        </Section>
+      )}
+      {active && document.type === "FACTURA" && document.basisStatus === "CONFIRMED" && (
+        <Section title="Corrección auditada de base confirmada">
+          <p className="mb-3 text-sm text-text-muted">
+            Una corrección menor que lo asignado requiere primero corregir los vínculos.
+            No puedes cambiar la moneda si existen asignaciones activas.
+          </p>
+          <form onSubmit={(event) => void onCorrectBasis(event)} className="grid gap-3 md:grid-cols-3">
+            <Input label="Base neta corregida" inputMode="decimal" required
+              value={basisAmount} onChange={(event) => setBasisAmount(event.target.value)} />
+            <Input label="Moneda corregida" maxLength={3} required
+              value={basisCurrency} onChange={(event) => setBasisCurrency(event.target.value.toUpperCase())} />
+            <Input label="Justificación de corrección" minLength={10} required
+              value={basisReason} onChange={(event) => setBasisReason(event.target.value)} />
+            <div className="md:col-span-3">
+              <Button type="submit" disabled={saving}>Guardar corrección de base</Button>
+            </div>
           </form>
         </Section>
       )}
