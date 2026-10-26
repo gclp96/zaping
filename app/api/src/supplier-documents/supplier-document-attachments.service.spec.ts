@@ -10,7 +10,7 @@ describe('SupplierDocumentAttachmentsService', () => {
   const storage = { openReadOnly: jest.fn() };
   const service = new SupplierDocumentAttachmentsService(
     prisma as never,
-    storage as never,
+    storage,
   );
 
   beforeEach(() => {
