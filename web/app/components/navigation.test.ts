@@ -27,6 +27,18 @@ describe("operational navigation and independent account titles", () => {
       expect(items.find((item) => item.href === "/dashboard")).toBeTruthy();
     },
   );
+  it("restricts supplier tax documents to ADMIN and MANAGER navigation", () => {
+    for (const role of ["ADMIN", "MANAGER", "SALES", "WAREHOUSE"] as const) {
+      const urls = getVisibleNavigationGroups(role).flatMap((group) =>
+        group.items.map((item) => item.href),
+      );
+      expect(urls.includes("/supplier-documents")).toBe(
+        role === "ADMIN" || role === "MANAGER",
+      );
+    }
+    expect(getRouteTitle("/supplier-documents/id")).toBe("Documentos de proveedor");
+  });
+
   it("preserves account context without an operational navigation item", () => {
     expect(getRouteTitle("/change-password")).toBe("Cambiar contraseña");
     expect(getRouteTitle("/change-password/child")).toBe("Cambiar contraseña");
