@@ -93,7 +93,7 @@ export class SupplierDocumentAttachmentsService {
     if (contentType !== 'application/pdf' && contentType !== 'image/jpeg') {
       throw new ConflictException('Tipo de archivo almacenado inválido');
     }
-    const source = await this.storage.openReadOnly(item.storageKey);
+    const source = await this.storage.openReadOnly(item.storageKey, companyId);
     const bytes = await consumeAndVerifyPrivateAttachment(
       source,
       item.sizeBytes,
