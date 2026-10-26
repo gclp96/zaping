@@ -54,7 +54,11 @@ export class SupplierDocumentAttachmentsService {
     companyId: string,
     documentId: string,
     attachmentId: string,
-  ) {
+  ): Promise<{
+    bytes: Buffer;
+    contentType: 'application/pdf' | 'image/jpeg';
+    originalName: string;
+  }> {
     const document = await this.prisma.supplierDocument.findFirst({
       where: { companyId, id: documentId },
       select: { id: true },
