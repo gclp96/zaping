@@ -169,6 +169,12 @@ export class SupplierDocumentReconciliationService {
         if (duplicate) {
           throw new ConflictException('Ya existe vínculo factura-recepción');
         }
+        const receiptTotalBefore = await this.receiptAllocatedInCurrency(
+          tx,
+          companyId,
+          receipt.id,
+          doc.currency,
+        );
         const sum = await tx.purchaseReceiptDocument.aggregate({
           where: { companyId, documentId, isActive: true },
           _sum: { allocatedSubtotal: true },
@@ -210,6 +216,9 @@ export class SupplierDocumentReconciliationService {
             allocatedSubtotal: amount.toFixed(2),
             sumBefore: previous.toFixed(2),
             sumAfter: next.toFixed(2),
+            receiptAllocatedBefore: receiptTotalBefore.toFixed(2),
+            receiptAllocatedAfter: receiptTotalBefore.plus(amount).toFixed(2),
+            receiptAmountVerification: 'REQUIRES_REVIEW',
           },
         );
       },
@@ -250,12 +259,14 @@ export class SupplierDocumentReconciliationService {
         expectedRevision: dto.expectedRevision,
       },
       async (tx, doc) => {
+        const reactivating =
+          dto.action === AllocationRevisionAction.REACTIVATE;
         const link = await tx.purchaseReceiptDocument.findFirst({
           where: {
             id: dto.allocationId,
             documentId,
             companyId,
-            isActive: true,
+            isActive: !reactivating,
           },
         });
         if (!link)
@@ -269,16 +280,27 @@ export class SupplierDocumentReconciliationService {
         });
         const beforeTotal =
           totals._sum.allocatedSubtotal ?? new Prisma.Decimal(0);
+        const staysActive = dto.action !== AllocationRevisionAction.DEACTIVATE;
+        const revisedAmount = amount ?? link.allocatedSubtotal;
+        if (staysActive) {
+          await this.receiptAllocatedInCurrency(
+            tx,
+            companyId,
+            link.receiptId,
+            doc.currency,
+          );
+        }
         const afterTotal = beforeTotal
-          .minus(link.allocatedSubtotal)
-          .plus(amount ?? new Prisma.Decimal(0));
+          .minus(link.isActive ? link.allocatedSubtotal : new Prisma.Decimal(0))
+          .plus(staysActive ? revisedAmount : new Prisma.Decimal(0));
         if (!doc.goodsNetAmount || afterTotal.gt(doc.goodsNetAmount)) {
           throw new ConflictException('Corrección excede el neto conciliable');
         }
         await tx.purchaseReceiptDocument.update({
           where: { id: link.id },
           data: {
-            ...(amount ? { allocatedSubtotal: amount } : { isActive: false }),
+            allocatedSubtotal: revisedAmount,
+            isActive: staysActive,
             revision: { increment: 1 },
           },
         });
@@ -304,8 +326,8 @@ export class SupplierDocumentReconciliationService {
               documentAllocatedTotal: beforeTotal.toFixed(2),
             },
             after: {
-              amount: amount?.toFixed(2) ?? link.allocatedSubtotal.toFixed(2),
-              active: Boolean(amount),
+              amount: revisedAmount.toFixed(2),
+              active: staysActive,
               revision: link.revision + 1,
               documentAllocatedTotal: afterTotal.toFixed(2),
             },
@@ -505,6 +527,36 @@ export class SupplierDocumentReconciliationService {
           },
         );
       },
+    );
+  }
+
+  private async receiptAllocatedInCurrency(
+    tx: Tx,
+    companyId: string,
+    receiptId: string,
+    currency: string,
+  ): Promise<Prisma.Decimal> {
+    const existing = await tx.purchaseReceiptDocument.findMany({
+      where: { companyId, receiptId, isActive: true },
+      select: {
+        allocatedSubtotal: true,
+        document: { select: { currency: true, status: true } },
+      },
+    });
+    if (
+      existing.some(
+        (link) =>
+          link.document.status !== SupplierDocumentStatus.ACTIVE ||
+          link.document.currency !== currency,
+      )
+    ) {
+      throw new ConflictException(
+        'La recepción ya tiene facturas activas con moneda incompatible',
+      );
+    }
+    return existing.reduce(
+      (sum, link) => sum.plus(link.allocatedSubtotal),
+      new Prisma.Decimal(0),
     );
   }
 
