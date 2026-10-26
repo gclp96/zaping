@@ -26,7 +26,9 @@ export async function consumeAndVerifyPrivateAttachment(
       const chunk = Buffer.from(rawChunk as Uint8Array);
       total += chunk.length;
       if (total > declaredBytes || total > SUPPLIER_ATTACHMENT_MAX_BYTES) {
-        throw new ConflictException('El tamaño del objeto privado es incorrecto');
+        throw new ConflictException(
+          'El tamaño del objeto privado es incorrecto',
+        );
       }
       digest.update(chunk);
       chunks.push(chunk);
