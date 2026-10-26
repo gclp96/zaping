@@ -1,0 +1,46 @@
+name: Prepare R2 SDK lockfile (one-shot)
+
+# An isolated, branch-only dependency preparation. This workflow NEVER
+# deploys, accesses Cloudflare credentials, or changes main.
+on:
+  push:
+    branches:
+      - feat/ux-pdoc-01b3b-cloudflare-r2-sdk
+    paths:
+      - docs/modules/erp/R2_SDK_LOCK_TRIGGER.txt
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/feat/ux-pdoc-01b3b-cloudflare-r2-sdk'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check out dedicated feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 1
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.20.0'
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+      - name: Generate coherent SDK dependency and lockfile
+        working-directory: app/api
+        run: |
+          npm ci --ignore-scripts
+          npm install --save-exact --ignore-scripts --no-audit --no-fund @aws-sdk/client-s3
+          npm ls @aws-sdk/client-s3 --depth=0
+          git diff --exit-code -- package.json package-lock.json && exit 1 || true
+      - name: Commit only dependency metadata to dedicated branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/api/package.json app/api/package-lock.json
+          git diff --cached --quiet && exit 1
+          git commit -m "build(r2): lock AWS SDK S3 dependency with npm"
+          git push origin HEAD:refs/heads/feat/ux-pdoc-01b3b-cloudflare-r2-sdk
