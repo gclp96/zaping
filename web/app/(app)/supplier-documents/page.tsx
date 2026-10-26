@@ -395,6 +395,9 @@ export default function SupplierDocumentsPage() {
                         <Link className="text-blue-700 underline" href={"/supplier-documents/" + encodeURIComponent(doc.id)}>
                           {[doc.series, doc.number].filter(Boolean).join("-")}
                         </Link>
+                        <p className="mt-1 text-xs font-normal text-text-muted">
+                          Serie: {doc.series || "Sin serie"} · Número: {doc.number}
+                        </p>
                       </td>
                       <td className="p-3">{supplierNames.get(doc.supplierId) ?? "Proveedor no disponible"}</td>
                       <td className="p-3">{documentTypeLabel(doc.type)}</td>
