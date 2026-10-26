@@ -300,6 +300,8 @@ export default function SupplierDocumentDetailPage() {
         action={<Link className="text-blue-700 underline" href="/supplier-documents">Volver a documentos</Link>} />
       <Section title="Información y estado">
         <dl className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-3">
+          <div><dt className="text-text-muted">Serie</dt><dd>{document.series || "Sin serie"}</dd></div>
+          <div><dt className="text-text-muted">Número de documento</dt><dd>{document.number}</dd></div>
           <div><dt className="text-text-muted">Estado</dt><dd className="font-semibold">{active ? "Activo" : "Cancelado"}</dd></div>
           <div><dt className="text-text-muted">{document.type === "FACTURA" ? "Base conciliable" : "Control documental"}</dt>
             <dd>{document.type === "FACTURA"
