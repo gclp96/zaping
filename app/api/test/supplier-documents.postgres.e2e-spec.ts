@@ -13,7 +13,8 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierDocumentsService } from '../src/supplier-documents/supplier-documents.service';
 
-const describePg = process.env.RUN_SUPPLIER_DOC_PG === '1' ? describe : describe.skip;
+const describePg =
+  process.env.RUN_SUPPLIER_DOC_PG === '1' ? describe : describe.skip;
 
 describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
   let db: PrismaClient;
@@ -114,7 +115,12 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
 
   it('rejects duplicate identity without creating another document', async () => {
     const f = await fixture();
-    await service.create(f.companyId, f.actorId, randomUUID(), input(f.supplierId));
+    await service.create(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      input(f.supplierId),
+    );
     await expect(
       service.create(f.companyId, f.actorId, randomUUID(), input(f.supplierId)),
     ).rejects.toBeInstanceOf(ConflictException);
@@ -126,7 +132,12 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
   it('replays exact idempotency keys and rejects incompatible reuse', async () => {
     const f = await fixture();
     const key = randomUUID();
-    const first = await service.create(f.companyId, f.actorId, key, input(f.supplierId));
+    const first = await service.create(
+      f.companyId,
+      f.actorId,
+      key,
+      input(f.supplierId),
+    );
     const replay = await service.create(f.companyId, f.actorId, key, {
       ...input(f.supplierId),
       subtotalAmount: '1000',
@@ -149,9 +160,9 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
       randomUUID(),
       input(first.supplierId),
     );
-    await expect(service.detail(second.companyId, doc.id)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.detail(second.companyId, doc.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
       service.create(
         first.companyId,
@@ -208,12 +219,12 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
       service.create(f.companyId, f.actorId, randomUUID(), input(f.supplierId)),
       service.create(f.companyId, f.actorId, randomUUID(), input(f.supplierId)),
     ]);
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(
-      1,
-    );
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(
-      1,
-    );
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(1);
     expect(
       await db.supplierDocument.count({ where: { companyId: f.companyId } }),
     ).toBe(1);
