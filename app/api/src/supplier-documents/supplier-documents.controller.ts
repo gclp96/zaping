@@ -25,6 +25,9 @@ import { SupplierDocumentReconciliationService } from './supplier-document-recon
 import {
   ConfirmSupplierDocumentBasisDto,
   CreateSupplierDocumentAllocationDto,
+  ReviseSupplierDocumentAllocationDto,
+  CorrectSupplierDocumentBasisDto,
+  CancelSupplierDocumentDto,
 } from './dto/supplier-document-reconciliation.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -97,6 +100,43 @@ export class SupplierDocumentsController {
       this.requireKey(key),
       id,
       dto,
+    );
+  }
+
+
+  @Post(':id/allocations/revise')
+  reviseAllocation(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: ReviseSupplierDocumentAllocationDto,
+  ) {
+    return this.reconciliation.reviseAllocation(
+      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+    );
+  }
+
+  @Post(':id/correct-basis')
+  correctBasis(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CorrectSupplierDocumentBasisDto,
+  ) {
+    return this.reconciliation.correctBasis(
+      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+    );
+  }
+
+  @Post(':id/cancel')
+  cancelDocument(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Headers('idempotency-key') key: string | undefined,
+    @Body() dto: CancelSupplierDocumentDto,
+  ) {
+    return this.reconciliation.cancelDocument(
+      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
     );
   }
 

@@ -13,11 +13,16 @@ import {
   SupplierDocumentBasisStatus,
   SupplierDocumentStatus,
   SupplierDocumentType,
+  SupplierDocumentCancellationSource,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ConfirmSupplierDocumentBasisDto,
   CreateSupplierDocumentAllocationDto,
+  ReviseSupplierDocumentAllocationDto,
+  AllocationRevisionAction,
+  CorrectSupplierDocumentBasisDto,
+  CancelSupplierDocumentDto,
 } from './dto/supplier-document-reconciliation.dto';
 import { documentMoney } from './supplier-document-normalization';
 
@@ -205,6 +210,214 @@ export class SupplierDocumentReconciliationService {
             allocatedSubtotal: amount.toFixed(2),
             sumBefore: previous.toFixed(2),
             sumAfter: next.toFixed(2),
+          },
+        );
+      },
+    );
+  }
+
+
+  async reviseAllocation(
+    companyId: string, actorId: string, key: string, documentId: string,
+    dto: ReviseSupplierDocumentAllocationDto,
+  ) {
+    const reason = dto.reason.trim();
+    if (!reason) throw new BadRequestException('Motivo obligatorio');
+    const replace = dto.action === AllocationRevisionAction.REPLACE_AMOUNT;
+    if (replace !== (dto.allocatedSubtotal !== undefined)) {
+      throw new BadRequestException('Importe requerido solo para REPLACE_AMOUNT');
+    }
+    const amount = replace ? documentMoney(dto.allocatedSubtotal)! : null;
+    if (amount && amount.lte(0)) {
+      throw new BadRequestException('Importe corregido debe ser positivo');
+    }
+    return this.execute(
+      companyId, actorId, key, IdempotencyScope.SUPPLIER_DOCUMENT_ALLOCATION_REVISE,
+      {
+        documentId, allocationId: dto.allocationId, action: dto.action,
+        amount: amount?.toFixed(2) ?? null, reason,
+        expectedAllocationRevision: dto.expectedAllocationRevision,
+        expectedRevision: dto.expectedRevision,
+      },
+      async (tx, doc) => {
+        const link = await tx.purchaseReceiptDocument.findFirst({
+          where: { id: dto.allocationId, documentId, companyId, isActive: true },
+        });
+        if (!link) throw new NotFoundException('Asignación activa no encontrada');
+        if (link.revision !== dto.expectedAllocationRevision) {
+          throw new ConflictException('Versión de asignación obsoleta');
+        }
+        const totals = await tx.purchaseReceiptDocument.aggregate({
+          where: { companyId, documentId, isActive: true },
+          _sum: { allocatedSubtotal: true },
+        });
+        const beforeTotal = totals._sum.allocatedSubtotal ?? new Prisma.Decimal(0);
+        const afterTotal = beforeTotal.minus(link.allocatedSubtotal).plus(
+          amount ?? new Prisma.Decimal(0),
+        );
+        if (!doc.goodsNetAmount || afterTotal.gt(doc.goodsNetAmount)) {
+          throw new ConflictException('Corrección excede el neto conciliable');
+        }
+        await tx.purchaseReceiptDocument.update({
+          where: { id: link.id },
+          data: {
+            ...(amount ? { allocatedSubtotal: amount } : { isActive: false }),
+            revision: { increment: 1 },
+          },
+        });
+        await tx.supplierDocument.update({
+          where: { id: doc.id },
+          data: { revision: { increment: 1 } },
+        });
+        return this.audit(
+          tx, companyId, actorId, doc.id,
+          SupplierDocumentAuditOperation.ALLOCATION_REVISED, doc.revision, reason,
+          {
+            allocationId: link.id, receiptId: link.receiptId,
+            before: {
+              amount: link.allocatedSubtotal.toFixed(2),
+              active: link.isActive, revision: link.revision,
+              documentAllocatedTotal: beforeTotal.toFixed(2),
+            },
+            after: {
+              amount: amount?.toFixed(2) ?? link.allocatedSubtotal.toFixed(2),
+              active: Boolean(amount), revision: link.revision + 1,
+              documentAllocatedTotal: afterTotal.toFixed(2),
+            },
+          },
+        );
+      },
+    );
+  }
+
+  async correctBasis(
+    companyId: string, actorId: string, key: string, documentId: string,
+    dto: CorrectSupplierDocumentBasisDto,
+  ) {
+    const amount = documentMoney(dto.goodsNetAmount)!;
+    const reason = dto.reason.trim();
+    if (!reason) throw new BadRequestException('Motivo obligatorio');
+    return this.execute(
+      companyId, actorId, key, IdempotencyScope.SUPPLIER_DOCUMENT_CORRECT,
+      {
+        documentId, expectedRevision: dto.expectedRevision,
+        amount: amount.toFixed(2), currency: dto.currency, reason,
+      },
+      async (tx, doc) => {
+        if (doc.type !== SupplierDocumentType.FACTURA ||
+            doc.basisStatus !== SupplierDocumentBasisStatus.CONFIRMED) {
+          throw new ConflictException('Solo factura confirmada permite corrección');
+        }
+        const active = await tx.purchaseReceiptDocument.aggregate({
+          where: { documentId, companyId, isActive: true },
+          _sum: { allocatedSubtotal: true },
+          _count: { _all: true },
+        });
+        const allocated = active._sum.allocatedSubtotal ?? new Prisma.Decimal(0);
+        if (allocated.gt(amount)) {
+          throw new ConflictException('Reducir primero las asignaciones activas');
+        }
+        if (active._count._all > 0 && dto.currency !== doc.currency) {
+          throw new ConflictException('No cambiar moneda con vínculos activos');
+        }
+        if (amount.eq(doc.goodsNetAmount ?? -1) && dto.currency === doc.currency) {
+          throw new ConflictException('No hay diferencias que corregir');
+        }
+        const before = {
+          goodsNetAmount: doc.goodsNetAmount?.toFixed(2) ?? null,
+          currency: doc.currency,
+        };
+        await tx.supplierDocument.update({
+          where: { id: doc.id },
+          data: { goodsNetAmount: amount, currency: dto.currency,
+            revision: { increment: 1 } },
+        });
+        return this.audit(
+          tx, companyId, actorId, doc.id,
+          SupplierDocumentAuditOperation.DOCUMENT_CORRECTED, doc.revision, reason,
+          {
+            before, after: { goodsNetAmount: amount.toFixed(2), currency: dto.currency },
+            allocatedAtCorrection: allocated.toFixed(2),
+          },
+        );
+      },
+    );
+  }
+
+  async cancelDocument(
+    companyId: string, actorId: string, key: string, documentId: string,
+    dto: CancelSupplierDocumentDto,
+  ) {
+    const reason = dto.reason.trim();
+    const evidenceReference = dto.evidenceReference?.trim() || null;
+    if (!reason) throw new BadRequestException('Motivo obligatorio');
+    if (dto.source === SupplierDocumentCancellationSource.EXTERNAL_REPORTED &&
+        !evidenceReference) {
+      throw new BadRequestException('Reporte externo requiere evidencia');
+    }
+    if (dto.replacedByDocumentId === documentId) {
+      throw new BadRequestException('No puede sustituirse a sí misma');
+    }
+    return this.execute(
+      companyId, actorId, key, IdempotencyScope.SUPPLIER_DOCUMENT_CANCEL,
+      {
+        documentId, expectedRevision: dto.expectedRevision,
+        source: dto.source, reason, evidenceReference,
+        replacedByDocumentId: dto.replacedByDocumentId ?? null,
+      },
+      async (tx, doc) => {
+        if (doc.type !== SupplierDocumentType.FACTURA) {
+          throw new ConflictException('Solo facturas admiten esta cancelación');
+        }
+        if (dto.replacedByDocumentId) {
+          const replacement = await tx.supplierDocument.findFirst({
+            where: {
+              id: dto.replacedByDocumentId, companyId, supplierId: doc.supplierId,
+              type: SupplierDocumentType.FACTURA,
+              status: SupplierDocumentStatus.ACTIVE,
+              replacedByDocumentId: null,
+            },
+          });
+          if (!replacement) {
+            throw new NotFoundException('Factura sustituta activa no encontrada');
+          }
+          const prior = await tx.supplierDocument.findFirst({
+            where: { companyId, supplierId: doc.supplierId,
+              replacedByDocumentId: replacement.id },
+            select: { id: true },
+          });
+          if (prior) throw new ConflictException('La sustituta ya fue utilizada');
+        }
+        const links = await tx.purchaseReceiptDocument.findMany({
+          where: { companyId, documentId, isActive: true },
+          orderBy: { id: 'asc' },
+        });
+        await tx.purchaseReceiptDocument.updateMany({
+          where: { companyId, documentId, isActive: true },
+          data: { isActive: false, revision: { increment: 1 } },
+        });
+        await tx.supplierDocument.update({
+          where: { id: doc.id },
+          data: {
+            status: SupplierDocumentStatus.CANCELLED,
+            cancellationSource: dto.source, cancellationReason: reason,
+            cancelledAt: new Date(), cancelledById: actorId,
+            replacedByDocumentId: dto.replacedByDocumentId ?? null,
+            revision: { increment: 1 },
+          },
+        });
+        return this.audit(
+          tx, companyId, actorId, doc.id,
+          SupplierDocumentAuditOperation.DOCUMENT_CANCELLED, doc.revision, reason,
+          {
+            source: dto.source, evidenceReference,
+            replacedByDocumentId: dto.replacedByDocumentId ?? null,
+            deactivatedAllocations: links.map((link) => ({
+              id: link.id, receiptId: link.receiptId,
+              amount: link.allocatedSubtotal.toFixed(2),
+              revisionBefore: link.revision,
+            })),
+            zeroActiveCoverageAfterCancellation: true,
           },
         );
       },
