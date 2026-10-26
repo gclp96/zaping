@@ -40,7 +40,7 @@ describe('supplier document attachment validation', () => {
     ).toThrow(BadRequestException);
   });
 
-  it('does not trust declared MIME or a PDF-shaped filename without signature', () => {
+  it('does not trust declared MIME or extension', () => {
     expect(() =>
       inspectSupplierAttachment({
         originalName: 'invoice.pdf',
