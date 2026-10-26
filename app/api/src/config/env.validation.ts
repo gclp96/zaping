@@ -1,3 +1,5 @@
+import { parseCloudflareR2Config } from './cloudflare-r2-config';
+
 const LOCAL_FRONTEND_URL = 'http://localhost:3000';
 const DEFAULT_PORT = 3001;
 const DEFAULT_TRUST_PROXY_HOPS = 0;
@@ -162,6 +164,10 @@ export function validateEnvironment(
     ),
     nodeEnv,
   );
+
+  // Validate an explicitly selected provider without enabling downloads.
+  // R2 credentials alone never replace the quarantined/unconfigured store.
+  parseCloudflareR2Config(environment);
 
   const validatedEnvironment: EnvironmentVariables = {
     ...environment,
