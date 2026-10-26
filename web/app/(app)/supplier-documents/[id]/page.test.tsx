@@ -89,6 +89,21 @@ describe("R2A-03 supplier document detail", () => {
       .hasAttribute("disabled")).toBe(false);
   });
 
+  it("does not mislabel a remission as an invoice awaiting net-basis approval", async () => {
+    const initial = await getSupplierDocument("doc-1");
+    vi.mocked(getSupplierDocument).mockResolvedValue({
+      ...initial,
+      type: "REMISION",
+      identityOccurrence: 2,
+    });
+    render(<SupplierDocumentDetailPage />);
+    expect(await screen.findByText("Documento A-4618")).toBeTruthy();
+    expect(screen.getByText("Registrado · Sin conciliación monetaria")).toBeTruthy();
+    expect(screen.getByText("Excepción de folio #2")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Confirmar base revisada" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancelar registro documental" })).toBeNull();
+  });
+
   it("shows correction only for confirmed invoices and sends expected revision", async () => {
     vi.stubGlobal("crypto", { randomUUID: () => "correction-operation-key" });
     const initial = await getSupplierDocument("doc-1");
