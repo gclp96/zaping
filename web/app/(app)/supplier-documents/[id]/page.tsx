@@ -67,6 +67,7 @@ export default function SupplierDocumentDetailPage() {
   const [cancelSource, setCancelSource] = useState<"INTERNAL_RECORD_ERROR" | "EXTERNAL_REPORTED">("INTERNAL_RECORD_ERROR");
   const [cancelReason, setCancelReason] = useState("");
   const [cancelEvidence, setCancelEvidence] = useState("");
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [replacementId, setReplacementId] = useState("");
   const [reviewReceiptId, setReviewReceiptId] = useState("");
   const [review, setReview] = useState<ReceiptReconciliation | null>(null);
@@ -245,6 +246,10 @@ export default function SupplierDocumentDetailPage() {
   async function onCancel(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!document) return;
+    if (!cancelConfirmed) {
+      setActionError("Debes confirmar expresamente la cancelación documental.");
+      return;
+    }
     const payload = {
       source: cancelSource, reason: cancelReason,
       ...(cancelEvidence.trim() ? { evidenceReference: cancelEvidence.trim() } : {}),
@@ -252,7 +257,10 @@ export default function SupplierDocumentDetailPage() {
       expectedRevision: document.revision,
     };
     if (await write("cancel", payload, (key) =>
-      cancelSupplierDocument(id, payload, key))) setCancelReason("");
+      cancelSupplierDocument(id, payload, key))) {
+      setCancelReason("");
+      setCancelConfirmed(false);
+    }
   }
 
   async function onApprove(event: FormEvent<HTMLFormElement>) {
@@ -443,8 +451,16 @@ export default function SupplierDocumentDetailPage() {
               onChange={(e) => setCancelReason(e.target.value)} />
             <Input label="Referencia de evidencia" required={cancelSource === "EXTERNAL_REPORTED"}
               minLength={5} value={cancelEvidence} onChange={(e) => setCancelEvidence(e.target.value)} />
+            <label className="md:col-span-2 flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={cancelConfirmed}
+                onChange={(event) => setCancelConfirmed(event.target.checked)} />
+              Confirmo que cancelaré el registro documental en Zaping,
+              sin tramitar la cancelación fiscal ante el SAT.
+            </label>
             <div className="md:col-span-2">
-              <Button type="submit" variant="danger" disabled={saving}>Cancelar registro documental</Button>
+              <Button type="submit" variant="danger" disabled={saving || !cancelConfirmed}>
+                Cancelar registro documental
+              </Button>
             </div>
           </form>
         </Section>
