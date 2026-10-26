@@ -137,8 +137,13 @@ export default function SupplierDocumentsPage() {
       number,
       documentDate: form.documentDate,
     };
-    for (const field of ["series", "currency", "cfdiUuid", "issuerRfc", "receiverRfc",
-      "subtotalAmount", "ivaAmount", "totalAmount", "goodsNetAmount"] as const) {
+    const fields = [
+      "series", "currency", "subtotalAmount", "ivaAmount", "totalAmount",
+      ...(form.type === "FACTURA"
+        ? ["cfdiUuid", "issuerRfc", "receiverRfc", "goodsNetAmount"] as const
+        : []),
+    ] as const;
+    for (const field of fields) {
       const value = form[field].trim();
       if (value) Object.assign(payload, { [field]: value });
     }
