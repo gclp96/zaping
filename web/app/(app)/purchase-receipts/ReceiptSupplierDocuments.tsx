@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 import { useAuthenticatedSession } from '@/app/auth-session';
 import { hasRole, MANAGEMENT_ROLES } from '@/app/erp-role-access';
@@ -61,6 +61,14 @@ export default function ReceiptSupplierDocuments({
   const [selection, setSelection] = useState('');
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [unlinkTarget, setUnlinkTarget] = useState<{
+    receiptId: string;
+    linkId: string;
+    documentId: string;
+  } | null>(null);
+  const [unlinkReason, setUnlinkReason] = useState('');
+  const [unlinkError, setUnlinkError] = useState('');
+  const [unlinking, setUnlinking] = useState(false);
 
   useEffect(() => {
     if (!canView) return;
@@ -115,7 +123,7 @@ export default function ReceiptSupplierDocuments({
     : null;
 
   async function openPicker() {
-    if (!canView || pickerLoading || saving) return;
+    if (!canView || pickerLoading || saving || unlinking || unlinkTarget) return;
     setPickerLoading(true);
     setActionError('');
     setPicker(null);
@@ -151,7 +159,7 @@ export default function ReceiptSupplierDocuments({
   }
 
   async function attachDocument() {
-    if (!canView || saving || !selection || !available) return;
+    if (!canView || saving || unlinking || unlinkTarget || !selection || !available) return;
     const selected = available.find((doc) => doc.id === selection);
     if (!selected) {
       setActionError('El documento seleccionado ya no está disponible.');
@@ -181,6 +189,45 @@ export default function ReceiptSupplierDocuments({
   }
 
 
+
+  async function unlinkDocument(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canView || unlinking || saving || !unlinkTarget) return;
+    const target = unlinkTarget;
+    if (target.receiptId !== receiptId || !links?.some(
+      (link) => link.id === target.linkId && link.documentId === target.documentId,
+    )) {
+      setUnlinkError('El vínculo seleccionado ya no está disponible.');
+      return;
+    }
+    const reason = unlinkReason.trim();
+    if (reason.length < 10 || reason.length > 1000) {
+      setUnlinkError('Escribe un motivo de 10 a 1000 caracteres.');
+      return;
+    }
+
+    setUnlinking(true);
+    setUnlinkError('');
+    try {
+      await api.delete(
+        `/supplier-documents/receipts/${encodeURIComponent(receiptId)}/links/${encodeURIComponent(target.documentId)}`,
+        { data: { reason } },
+      );
+      setUnlinkTarget(null);
+      setUnlinkReason('');
+      setLoaded(null);
+      setReload((value) => value + 1);
+    } catch (requestError: unknown) {
+      setUnlinkError(
+        getApiErrorMessage(
+          requestError,
+          'No fue posible desvincular el documento. Inténtalo de nuevo.',
+        ),
+      );
+    } finally {
+      setUnlinking(false);
+    }
+  }
 
   return (
     <div className="space-y-2 text-sm font-normal">
@@ -244,6 +291,7 @@ export default function ReceiptSupplierDocuments({
               variant="outline"
               size="sm"
               loading={pickerLoading}
+              disabled={unlinking || Boolean(unlinkTarget)}
               onClick={() => void openPicker()}
             >
               Vincular documento existente
@@ -307,18 +355,95 @@ export default function ReceiptSupplierDocuments({
       {canView && !error && links && links.length > 0 && (
         <ul className="space-y-2" aria-label="Documentos vinculados a esta recepción">
           {links.map((link) => (
-            <li key={link.id} className="flex flex-wrap items-center gap-2">
-              <span className="text-text-secondary">
-                {documentLabel(link.document)}
-                {link.document.status === 'CANCELLED' && ' (registro cancelado)'}
-              </span>
-              <Link
-                href={`/supplier-documents/${encodeURIComponent(link.document.id)}`}
-                aria-label={`Ver documento ${documentLabel(link.document)}`}
-                className="font-semibold text-blue-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-              >
-                Ver documento
-              </Link>
+            <li key={link.id} className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-text-secondary">
+                  {documentLabel(link.document)}
+                  {link.document.status === 'CANCELLED' && ' (registro cancelado)'}
+                </span>
+                <Link
+                  href={`/supplier-documents/${encodeURIComponent(link.document.id)}`}
+                  aria-label={`Ver documento ${documentLabel(link.document)}`}
+                  className="font-semibold text-blue-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+                >
+                  Ver documento
+                </Link>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={unlinking || saving || Boolean(picker)}
+                  onClick={() => {
+                    setUnlinkTarget({
+                      receiptId,
+                      linkId: link.id,
+                      documentId: link.documentId,
+                    });
+                    setUnlinkReason('');
+                    setUnlinkError('');
+                  }}
+                  aria-label={`Desvincular documento ${documentLabel(link.document)}`}
+                >
+                  Desvincular
+                </Button>
+              </div>
+              {unlinkTarget?.receiptId === receiptId &&
+                unlinkTarget.linkId === link.id &&
+                unlinkTarget.documentId === link.documentId && (
+                  <form
+                    onSubmit={(event) => void unlinkDocument(event)}
+                    className="space-y-2 rounded-lg border border-border bg-surface-subtle p-3"
+                  >
+                    <p className="text-text-secondary">
+                      Se quitará el vínculo con esta recepción, no el documento.
+                      El motivo y la desvinculación quedarán en el historial.
+                    </p>
+                    <label
+                      htmlFor={`unlink-reason-${link.id}`}
+                      className="block font-medium text-text"
+                    >
+                      Motivo de desvinculación (mínimo 10 caracteres)
+                    </label>
+                    <textarea
+                      id={`unlink-reason-${link.id}`}
+                      required
+                      minLength={10}
+                      maxLength={1000}
+                      rows={3}
+                      value={unlinkReason}
+                      disabled={unlinking}
+                      onChange={(event) => setUnlinkReason(event.target.value)}
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-text focus-visible:outline-2 focus-visible:outline-blue-600"
+                    />
+                    {unlinkError && (
+                      <p role="alert" className="text-red-700">{unlinkError}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="danger"
+                        loading={unlinking}
+                        disabled={unlinkReason.trim().length < 10 || saving}
+                      >
+                        Confirmar desvinculación
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={unlinking}
+                        onClick={() => {
+                          setUnlinkTarget(null);
+                          setUnlinkReason('');
+                          setUnlinkError('');
+                        }}
+                      >
+                        Cancelar desvinculación
+                      </Button>
+                    </div>
+                  </form>
+                )}
             </li>
           ))}
         </ul>
