@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierDocumentsService } from '../src/supplier-documents/supplier-documents.service';
 import { SupplierDocumentReconciliationService } from '../src/supplier-documents/supplier-document-reconciliation.service';
+import { SupplierReceiptVarianceService } from '../src/supplier-documents/supplier-receipt-variance.service';
 import { AllocationRevisionAction } from '../src/supplier-documents/dto/supplier-document-reconciliation.dto';
 
 const describePg = process.env.RUN_R2A02_PG === '1' ? describe : describe.skip;
@@ -16,6 +17,7 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
   let db: PrismaClient;
   let documents: SupplierDocumentsService;
   let reconciliation: SupplierDocumentReconciliationService;
+  let variance: SupplierReceiptVarianceService;
 
   async function fixture() {
     const companyId = randomUUID();
@@ -118,6 +120,9 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     expect(identity).toEqual({ database: 'zaping_test', role: 'ci' });
     documents = new SupplierDocumentsService(db as unknown as PrismaService);
     reconciliation = new SupplierDocumentReconciliationService(
+      db as unknown as PrismaService,
+    );
+    variance = new SupplierReceiptVarianceService(
       db as unknown as PrismaService,
     );
   });
@@ -391,6 +396,108 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
       },
     )).rejects.toBeInstanceOf(NotFoundException);
     expect((await documents.detail(f.companyId, doc.id)).status).toBe('ACTIVE');
+  });
+
+
+  it('approves a documented difference with an immutable, idempotent snapshot', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    const state = await variance.overview(f.companyId, entry.receiptId);
+    expect(state.approvalCurrent).toBe(false);
+    expect(state.allocatedTotalAmount).toBe('60.00');
+    const key = randomUUID();
+    const dto = {
+      receiptComparableNetAmount: '55.00',
+      receiptCurrency: 'MXN',
+      reason: 'Diferencia de precio aceptada tras revisión documental',
+      evidenceReference: 'Cotización corregida y correo del proveedor',
+      expectedSnapshotHash: state.snapshotHash,
+    };
+    const approved = await variance.approve(
+      f.companyId, f.actorId, key, entry.receiptId, dto,
+    );
+    expect(approved.differenceAmount.toFixed(2)).toBe('5.00');
+    expect((await variance.overview(f.companyId, entry.receiptId)).approvalCurrent)
+      .toBe(true);
+    expect((await variance.approve(f.companyId, f.actorId, key, entry.receiptId, dto)).id)
+      .toBe(approved.id);
+    await expect(db.purchaseReceiptReconciliationApproval.update({
+      where: { id: approved.id }, data: { reason: 'Alterado' },
+    })).rejects.toThrow();
+  });
+
+  it('automatically invalidates variance approval after changing an allocation', async () => {
+    const f = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    const before = await variance.overview(f.companyId, entry.receiptId);
+    await variance.approve(
+      f.companyId, f.actorId, randomUUID(), entry.receiptId,
+      {
+        receiptComparableNetAmount: '55',
+        receiptCurrency: 'MXN',
+        reason: 'Diferencia revisada según evidencia original',
+        evidenceReference: 'Carta del proveedor con desglose',
+        expectedSnapshotHash: before.snapshotHash,
+      },
+    );
+    const [link] = await reconciliation.allocations(f.companyId, doc.id);
+    await reconciliation.reviseAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      {
+        allocationId: link.id,
+        action: AllocationRevisionAction.REPLACE_AMOUNT,
+        allocatedSubtotal: '50',
+        reason: 'Importe ajustado por corrección documental',
+        expectedRevision: 2,
+        expectedAllocationRevision: 0,
+      },
+    );
+    const now = await variance.overview(f.companyId, entry.receiptId);
+    expect(now.approvalCurrent).toBe(false);
+    await expect(variance.approve(
+      f.companyId, f.actorId, randomUUID(), entry.receiptId,
+      {
+        receiptComparableNetAmount: '45',
+        receiptCurrency: 'MXN',
+        reason: 'Intento con snapshot anterior obsoleto',
+        evidenceReference: 'Referencia documental antigua',
+        expectedSnapshotHash: before.snapshotHash,
+      },
+    )).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('rejects unverified currency and cross-company receipt approval', async () => {
+    const f = await fixture();
+    const stranger = await fixture();
+    const doc = await confirmed(f);
+    const entry = await receipt(f.companyId, f.supplierId);
+    await reconciliation.createAllocation(
+      f.companyId, f.actorId, randomUUID(), doc.id,
+      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+    );
+    await expect(variance.overview(stranger.companyId, entry.receiptId))
+      .rejects.toBeInstanceOf(NotFoundException);
+    const before = await variance.overview(f.companyId, entry.receiptId);
+    await expect(variance.approve(
+      f.companyId, f.actorId, randomUUID(), entry.receiptId,
+      {
+        receiptComparableNetAmount: '55',
+        receiptCurrency: 'USD',
+        reason: 'Intento con moneda no homogénea',
+        evidenceReference: 'Referencia de costo externo',
+        expectedSnapshotHash: before.snapshotHash,
+      },
+    )).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('replays an old allocation result even after the document revision changes', async () => {
