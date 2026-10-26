@@ -21,10 +21,7 @@ const env: NodeJS.ProcessEnv = {
 
 function validate(overrides: NodeJS.ProcessEnv = {}) {
   const input = { ...env, ...overrides };
-  return requireCloudflareR2QaFixture(
-    input,
-    parseCloudflareR2Config(input),
-  );
+  return requireCloudflareR2QaFixture(input, parseCloudflareR2Config(input));
 }
 
 describe('Cloudflare R2 QA smoke opt-in and tenant safety', () => {
