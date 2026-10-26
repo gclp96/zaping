@@ -115,13 +115,14 @@ export function documentTypeLabel(type: SupplierDocumentType): string {
 
 export function formatSupplierMoney(value: string | null, currency: string | null) {
   if (value === null) return "Sin capturar";
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return value;
-  return new Intl.NumberFormat("es-MX", {
-    style: "decimal",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(parsed) + (currency ? " " + currency : "");
+  // Never round Decimal(18,2) through JavaScript Number.
+  if (!/^-?\d+(?:\.\d{1,2})?$/.test(value)) return value;
+  const sign = value.startsWith("-") ? "-" : "";
+  const positive = sign ? value.slice(1) : value;
+  const [whole, cents = ""] = positive.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return sign + grouped + "." + cents.padEnd(2, "0") +
+    (currency ? " " + currency : "");
 }
 
 export async function listSupplierDocuments(supplierId?: string) {
