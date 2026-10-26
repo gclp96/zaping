@@ -66,20 +66,34 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
     companyId: string,
     supplierId: string,
     occurrence = 1,
+    basedOnDocumentId?: string,
   ) {
+    if (occurrence > 1 && !basedOnDocumentId) {
+      throw new Error('An identity exception must reference its base document');
+    }
+    const creator = await db.user.findFirstOrThrow({
+      where: { companyId },
+      select: { id: true },
+    });
     return db.supplierDocument.create({
       data: {
         companyId,
         supplierId,
-        createdById: (await db.user.findFirstOrThrow({
-          where: { companyId },
-          select: { id: true },
-        })).id,
+        createdById: creator.id,
         type: SupplierDocumentType.REMISION,
         number: 'REM-123',
         normalizedNumber: 'REM-123',
         identityOccurrence: occurrence,
         documentDate: new Date('2026-10-26T00:00:00.000Z'),
+        ...(occurrence > 1
+          ? {
+              exceptionBasedOnDocumentId: basedOnDocumentId,
+              exceptionReason: 'Folio documental duplicado revisado para QA',
+              exceptionEvidenceReference: 'Expediente aislado UX-PDOC-01A',
+              exceptionReviewedById: creator.id,
+              exceptionReviewedAt: new Date('2026-10-26T00:00:00.000Z'),
+            }
+          : {}),
       },
     });
   }
@@ -120,7 +134,12 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
     const f = await fixture();
     const receipt = await makeReceipt(f.companyId, f.supplierId);
     const firstDoc = await makeDocument(f.companyId, f.supplierId);
-    const secondDoc = await makeDocument(f.companyId, f.supplierId, 2);
+    const secondDoc = await makeDocument(
+      f.companyId,
+      f.supplierId,
+      2,
+      firstDoc.id,
+    );
 
     const link = await links.link(
       f.companyId,
