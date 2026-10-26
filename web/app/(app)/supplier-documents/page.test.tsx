@@ -87,7 +87,7 @@ describe("R2A-03 supplier documents", () => {
     await user.selectOptions(screen.getByRole("combobox", { name: "Proveedor" }), "supplier-1");
     await user.type(screen.getByRole("textbox", { name: "Serie" }), "A");
     await user.type(screen.getByRole("textbox", { name: "Folio / número" }), "4618");
-    fireEvent.change(screen.getByLabelText("Fecha del documento"), {
+    fireEvent.change(screen.getByLabelText(/Fecha del documento/), {
       target: { value: "2026-10-16" },
     });
     await user.click(screen.getByRole("button", { name: "Guardar documento" }));
