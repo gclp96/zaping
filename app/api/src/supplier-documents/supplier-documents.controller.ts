@@ -106,7 +106,6 @@ export class SupplierDocumentsController {
     );
   }
 
-
   @Post(':id/allocations/revise')
   reviseAllocation(
     @Req() req: AuthenticatedRequest,
@@ -115,7 +114,11 @@ export class SupplierDocumentsController {
     @Body() dto: ReviseSupplierDocumentAllocationDto,
   ) {
     return this.reconciliation.reviseAllocation(
-      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
     );
   }
 
@@ -127,7 +130,11 @@ export class SupplierDocumentsController {
     @Body() dto: CorrectSupplierDocumentBasisDto,
   ) {
     return this.reconciliation.correctBasis(
-      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
     );
   }
 
@@ -139,7 +146,11 @@ export class SupplierDocumentsController {
     @Body() dto: CancelSupplierDocumentDto,
   ) {
     return this.reconciliation.cancelDocument(
-      req.user.companyId, req.user.id, this.requireKey(key), id, dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      id,
+      dto,
     );
   }
 
@@ -159,8 +170,11 @@ export class SupplierDocumentsController {
     @Body() dto: ApproveReceiptVarianceDto,
   ) {
     return this.variance.approve(
-      req.user.companyId, req.user.id, this.requireKey(key),
-      receiptId, dto,
+      req.user.companyId,
+      req.user.id,
+      this.requireKey(key),
+      receiptId,
+      dto,
     );
   }
 
