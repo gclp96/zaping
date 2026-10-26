@@ -33,9 +33,9 @@ describe('Cloudflare R2 opaque object paths', () => {
       [`private/${companyId}/../bad`, companyId],
       ['private/not-an-id/file', companyId],
     ]) {
-      expect(() =>
-        requireTenantPrivateR2Key(key, tenant),
-      ).toThrow(BadRequestException);
+      expect(() => requireTenantPrivateR2Key(key, tenant)).toThrow(
+        BadRequestException,
+      );
     }
   });
 
