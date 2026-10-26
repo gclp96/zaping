@@ -11,7 +11,7 @@ import { SupplierDocumentAttachmentsService } from '../src/supplier-documents/su
 const describePg =
   process.env.RUN_SUPPLIER_ATTACHMENTS_PG === '1' ? describe : describe.skip;
 
-describePg('UX-PDOC-01B private attachment metadata isolated PostgreSQL', () => {
+describePg('Private supplier attachments on isolated PostgreSQL', () => {
   let db: PrismaClient;
   let service: SupplierDocumentAttachmentsService;
 
