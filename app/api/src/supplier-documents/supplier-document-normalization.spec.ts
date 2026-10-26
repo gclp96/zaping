@@ -14,6 +14,11 @@ describe('supplier-document normalization', () => {
       normalizedIdentity('FAC-0001'),
     );
   });
+
+  it('does not collapse compatibility glyphs into other legitimate folios', () => {
+    expect(normalizedIdentity('①')).not.toBe(normalizedIdentity('1'));
+    expect(normalizedIdentity('ＡＢ')).not.toBe(normalizedIdentity('AB'));
+  });
   it('rejects impossible civil dates', () => {
     expect(() => documentDate('2026-02-30')).toThrow(BadRequestException);
     expect(documentDate('2026-10-25').toISOString()).toBe(

@@ -124,10 +124,10 @@ export class SupplierDocumentsService {
 
           // SQL is constant and both values are bound parameters, never interpolated.
           // R2A document writes serialize per tenant/supplier; no stock locks or writes.
-          const locked = await tx.$queryRawUnsafe<Array<{ id: string }>>(
-            'SELECT "id" FROM "Supplier" WHERE "id" = $1 AND "companyId" = $2 FOR NO KEY UPDATE',
-            dto.supplierId,
-            companyId,
+          const locked = await tx.$queryRaw<Array<{ id: string }>>(
+            Prisma.sql`SELECT "id" FROM "Supplier"
+              WHERE "id" = ${dto.supplierId} AND "companyId" = ${companyId}
+              FOR NO KEY UPDATE`,
           );
           if (!locked.length)
             throw new NotFoundException('Proveedor no encontrado');
@@ -240,11 +240,14 @@ export class SupplierDocumentsService {
                 version: 1,
                 operation,
                 snapshot: {
+                  supplierId: document.supplierId,
                   type: document.type,
                   series: document.series,
                   number: document.number,
                   documentDate: dto.documentDate,
                   cfdiUuid: document.cfdiUuid,
+                  issuerRfc: document.issuerRfc,
+                  receiverRfc: document.receiverRfc,
                   currency: document.currency,
                   subtotalAmount: document.subtotalAmount?.toFixed(2) ?? null,
                   discountAmount: document.discountAmount?.toFixed(2) ?? null,
@@ -252,6 +255,14 @@ export class SupplierDocumentsService {
                   ivaAmount: document.ivaAmount?.toFixed(2) ?? null,
                   totalAmount: document.totalAmount?.toFixed(2) ?? null,
                   goodsNetAmount: document.goodsNetAmount?.toFixed(2) ?? null,
+                  withholdingAmount:
+                    document.withholdingAmount?.toFixed(2) ?? null,
+                  taxBreakdowns: taxBreakdowns.map((line) => ({
+                    area: line.area,
+                    treatment: line.treatment,
+                    baseAmount: documentMoney(line.baseAmount)!.toFixed(2),
+                    ivaAmount: documentMoney(line.ivaAmount)!.toFixed(2),
+                  })),
                   identityOccurrence: document.identityOccurrence,
                   exceptionBasedOnDocumentId,
                   evidenceReference: extra?.evidenceReference.trim() ?? null,

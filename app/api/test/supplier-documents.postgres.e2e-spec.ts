@@ -230,6 +230,86 @@ describePg('R2A-01 supplier documents on isolated PostgreSQL', () => {
     ).toBe(1);
   });
 
+
+  it('keeps one document when the same idempotency key is submitted concurrently', async () => {
+    const f = await fixture();
+    const key = randomUUID();
+    const results = await Promise.all([
+      service.create(f.companyId, f.actorId, key, input(f.supplierId)),
+      service.create(f.companyId, f.actorId, key, input(f.supplierId)),
+    ]);
+    expect(results[0].id).toBe(results[1].id);
+    expect(
+      await db.supplierDocument.count({ where: { companyId: f.companyId } }),
+    ).toBe(1);
+    expect(
+      await db.supplierDocumentAudit.count({ where: { companyId: f.companyId } }),
+    ).toBe(1);
+  });
+
+  it('rejects exceptions referring to another supplier of the same company', async () => {
+    const f = await fixture();
+    const other = await db.supplier.create({
+      data: { companyId: f.companyId, name: 'Otro proveedor CI R2A' },
+    });
+    const original = await service.create(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      input(f.supplierId),
+    );
+    await expect(
+      service.createException(f.companyId, f.actorId, randomUUID(), {
+        ...input(other.id),
+        duplicateOfDocumentId: original.id,
+        reason: 'Intento de excepción asociada a otro proveedor',
+        evidenceReference: 'QA cruce de proveedor',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('records all original amounts and tax lines in an immutable audit event', async () => {
+    const f = await fixture();
+    const document = await service.create(
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      {
+        ...input(f.supplierId),
+        withholdingAmount: '20.00',
+        issuerRfc: 'AAA010101AAA',
+        receiverRfc: 'BBB010101BBB',
+      },
+    );
+    const detail = await service.detail(f.companyId, document.id);
+    const audit = detail.audits[0];
+    expect(audit.change).toEqual(
+      expect.objectContaining({
+        snapshot: expect.objectContaining({
+          withholdingAmount: '20.00',
+          supplierId: f.supplierId,
+          issuerRfc: 'AAA010101AAA',
+          receiverRfc: 'BBB010101BBB',
+          taxBreakdowns: [
+            expect.objectContaining({
+              baseAmount: '1000.00',
+              ivaAmount: '160.00',
+            }),
+          ],
+        }),
+      }),
+    );
+    await expect(
+      db.supplierDocumentAudit.update({
+        where: { id: audit.id },
+        data: { reason: 'Tampered after creation' },
+      }),
+    ).rejects.toThrow();
+    expect(
+      await db.supplierDocumentAudit.count({ where: { id: audit.id } }),
+    ).toBe(1);
+  });
+
   it('rejects invalid exempt-tax breakdown before writes', async () => {
     const f = await fixture();
     await expect(

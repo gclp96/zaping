@@ -7,7 +7,7 @@ import {
 } from './dto/create-supplier-document.dto';
 
 export function normalizedIdentity(value: string): string {
-  return value.normalize('NFKC').trim().toUpperCase();
+  return value.normalize('NFC').trim().toUpperCase();
 }
 
 export function documentDate(value: string): Date {
