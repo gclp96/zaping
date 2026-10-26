@@ -177,7 +177,7 @@ export default function SupplierDocumentDetailPage() {
     event.preventDefault();
     if (!document || !MONEY.test(basisAmount) ||
         !isSupportedCurrency(basisCurrency)) {
-      setActionError("Indica una base neta con máximo dos decimales y moneda MXN o USD.");
+      setActionError("Indica un subtotal neto de mercancía con máximo dos decimales y moneda MXN o USD.");
       return;
     }
     const payload = {
@@ -194,7 +194,7 @@ export default function SupplierDocumentDetailPage() {
     if (!document || !MONEY.test(basisAmount) ||
         !isSupportedCurrency(basisCurrency) ||
         basisReason.trim().length < 10) {
-      setActionError("Indica base neta, moneda MXN o USD y motivo de al menos 10 caracteres.");
+      setActionError("Indica subtotal neto de mercancía, moneda MXN o USD y motivo de al menos 10 caracteres.");
       return;
     }
     const payload = {
@@ -314,7 +314,7 @@ export default function SupplierDocumentDetailPage() {
           <div><dt className="text-text-muted">Subtotal</dt><dd>{formatSupplierMoney(document.subtotalAmount, document.currency)}</dd></div>
           <div><dt className="text-text-muted">IVA</dt><dd>{formatSupplierMoney(document.ivaAmount, document.currency)}</dd></div>
           <div><dt className="text-text-muted">Total</dt><dd>{formatSupplierMoney(document.totalAmount, document.currency)}</dd></div>
-          <div><dt className="text-text-muted">Neto de mercancía</dt><dd>{formatSupplierMoney(document.goodsNetAmount, document.currency)}</dd></div>
+          <div><dt className="text-text-muted">Subtotal neto de mercancía</dt><dd>{formatSupplierMoney(document.goodsNetAmount, document.currency)}</dd></div>
           <div><dt className="text-text-muted">UUID CFDI</dt><dd className="break-all">{document.cfdiUuid ?? "No disponible"}</dd></div>
           <div><dt className="text-text-muted">Revisión</dt><dd>{document.revision}</dd></div>
           {document.identityOccurrence > 1 && (
@@ -325,7 +325,7 @@ export default function SupplierDocumentDetailPage() {
         </dl>
         {document.type === "FACTURA" && (
           <p className="mt-3 text-sm text-text-muted">
-            La base neta de mercancía corresponde a productos tras descuentos de mercancía,
+            El subtotal neto de mercancía corresponde a productos tras descuentos comerciales,
             sin IVA, retenciones ni fletes facturados por separado. No es el total a pagar.
           </p>
         )}
@@ -333,14 +333,14 @@ export default function SupplierDocumentDetailPage() {
       </Section>
       {actionError && <div role="alert" className="my-4 rounded-lg border border-red-300 bg-red-50 p-3 text-red-800">{actionError}</div>}
       {active && document.type === "FACTURA" && document.basisStatus === "PENDING_REVIEW" && (
-        <Section title="Confirmar base de mercancía">
+        <Section title="Confirmar subtotal neto de mercancía">
           <p className="mb-3 text-sm text-text-muted">
             Captura el valor neto de los productos de la factura, después de descuentos de
             mercancía y antes del IVA; excluye retenciones y flete separado. Ejemplo:
             $1,000 en productos menos $100 de descuento = $900 de base.
           </p>
           <form onSubmit={(event) => void onConfirm(event)} className="grid gap-3 md:grid-cols-3">
-            <Input label="Base neta" required inputMode="decimal" value={basisAmount}
+            <Input label="Subtotal neto" required inputMode="decimal" value={basisAmount}
               onChange={(e) => setBasisAmount(e.target.value)} />
             <CurrencySelect label="Moneda" required value={basisCurrency}
               onChange={setBasisCurrency} />
@@ -357,7 +357,7 @@ export default function SupplierDocumentDetailPage() {
             No puedes cambiar la moneda si existen asignaciones activas.
           </p>
           <form onSubmit={(event) => void onCorrectBasis(event)} className="grid gap-3 md:grid-cols-3">
-            <Input label="Base neta corregida" inputMode="decimal" required
+            <Input label="Subtotal neto corregido" inputMode="decimal" required
               value={basisAmount} onChange={(event) => setBasisAmount(event.target.value)} />
             <CurrencySelect label="Moneda corregida" required value={basisCurrency}
               onChange={setBasisCurrency} />
@@ -372,7 +372,7 @@ export default function SupplierDocumentDetailPage() {
       {active && document.type === "FACTURA" && document.basisStatus === "CONFIRMED" && (
         <Section title="Vincular factura a recepción">
           <p className="mb-3 text-sm text-text-muted">
-            La asignación utiliza el neto de mercancía; no modifica stock. La cobertura de la recepción requiere revisión administrativa.
+            La asignación utiliza el subtotal neto de mercancía; no modifica stock. La cobertura de la recepción requiere revisión administrativa.
           </p>
           <form onSubmit={(event) => void onAllocate(event)} className="grid gap-3 md:grid-cols-3">
             <label className="text-sm font-medium">Recepción del mismo proveedor
