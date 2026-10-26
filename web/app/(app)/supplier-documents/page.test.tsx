@@ -86,6 +86,32 @@ describe("R2A-03 supplier documents", () => {
     expect(screen.queryByText("Pendiente de revisión")).toBeNull();
   });
 
+  it("disambiguates identical display labels with distinct series and number fields", async () => {
+    const [invoice] = await listSupplierDocuments();
+    vi.mocked(listSupplierDocuments).mockResolvedValue([
+      {
+        ...invoice,
+        id: "with-series",
+        type: "REMISION",
+        series: "QA",
+        number: "REM-R2A03-001",
+      },
+      {
+        ...invoice,
+        id: "without-series",
+        type: "REMISION",
+        series: null,
+        number: "QA-REM-R2A03-001",
+      },
+    ]);
+    render(<SupplierDocumentsPage />);
+    expect(await screen.findAllByRole("link", {
+      name: "QA-REM-R2A03-001",
+    })).toHaveLength(2);
+    expect(screen.getByText("Serie: QA · Número: REM-R2A03-001")).toBeTruthy();
+    expect(screen.getByText("Serie: Sin serie · Número: QA-REM-R2A03-001")).toBeTruthy();
+  });
+
   it("shows the exception only after a verified duplicate identity and requires evidence", async () => {
     vi.stubGlobal("crypto", { randomUUID: () => "test-idempotency-key" });
     vi.mocked(createSupplierDocument).mockRejectedValue(
