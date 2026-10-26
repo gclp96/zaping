@@ -122,8 +122,7 @@ export class SupplierReceiptVarianceService {
         where: { companyId, receiptId },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       });
-    const approvalCurrent =
-      approval?.allocationSnapshotHash === state.hash;
+    const approvalCurrent = approval?.allocationSnapshotHash === state.hash;
     return {
       receiptId,
       supplierId: state.supplierId,
