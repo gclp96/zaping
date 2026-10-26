@@ -5,7 +5,9 @@ import type { CloudflareR2Config } from '../config/cloudflare-r2-config';
 import type { R2GetObjectTransport } from './cloudflare-r2-read-store';
 
 /** Build a strictly credentialed client. Never use the ambient AWS provider chain. */
-export function createCloudflareR2S3Client(config: CloudflareR2Config): S3Client {
+export function createCloudflareR2S3Client(
+  config: CloudflareR2Config,
+): S3Client {
   return new S3Client({
     region: config.region,
     endpoint: config.endpoint,
