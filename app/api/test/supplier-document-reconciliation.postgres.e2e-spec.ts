@@ -268,21 +268,34 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     expect(links[0].allocatedSubtotal.toFixed(2)).toBe('70.00');
   });
 
-
   it('revises an allocation amount while preserving before and after audit', async () => {
     const f = await fixture();
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
     );
     const [link] = await reconciliation.allocations(f.companyId, doc.id);
     const event = await reconciliation.reviseAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        allocationId: link.id, action: AllocationRevisionAction.REPLACE_AMOUNT,
-        allocatedSubtotal: '75', reason: 'Precio neto actualizado por proveedor',
-        expectedRevision: 2, expectedAllocationRevision: 0,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        allocationId: link.id,
+        action: AllocationRevisionAction.REPLACE_AMOUNT,
+        allocatedSubtotal: '75',
+        reason: 'Precio neto actualizado por proveedor',
+        expectedRevision: 2,
+        expectedAllocationRevision: 0,
       },
     );
     expect(event.revision).toBe(3);
@@ -298,15 +311,28 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
     );
     const [link] = await reconciliation.allocations(f.companyId, doc.id);
     await reconciliation.reviseAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        allocationId: link.id, action: AllocationRevisionAction.DEACTIVATE,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        allocationId: link.id,
+        action: AllocationRevisionAction.DEACTIVATE,
         reason: 'Vínculo documental asignado por equivocación',
-        expectedRevision: 2, expectedAllocationRevision: 0,
+        expectedRevision: 2,
+        expectedAllocationRevision: 0,
       },
     );
     const [saved] = await reconciliation.allocations(f.companyId, doc.id);
@@ -320,24 +346,46 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '80', expectedRevision: 1 },
-    );
-    await expect(reconciliation.correctBasis(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        goodsNetAmount: '70', currency: 'MXN',
-        reason: 'Corrección por factura del proveedor', expectedRevision: 2,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '80',
+        expectedRevision: 1,
       },
-    )).rejects.toBeInstanceOf(ConflictException);
+    );
+    await expect(
+      reconciliation.correctBasis(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          goodsNetAmount: '70',
+          currency: 'MXN',
+          reason: 'Corrección por factura del proveedor',
+          expectedRevision: 2,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
     const event = await reconciliation.correctBasis(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        goodsNetAmount: '90', currency: 'MXN',
-        reason: 'Corrección por factura del proveedor', expectedRevision: 2,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        goodsNetAmount: '90',
+        currency: 'MXN',
+        reason: 'Corrección por factura del proveedor',
+        expectedRevision: 2,
       },
     );
     expect(event.revision).toBe(3);
-    expect((await documents.detail(f.companyId, doc.id)).goodsNetAmount?.toFixed(2))
-      .toBe('90.00');
+    expect(
+      (await documents.detail(f.companyId, doc.id)).goodsNetAmount?.toFixed(2),
+    ).toBe('90.00');
   });
 
   it('cancels a document, retains links and references a distinct replacement without transferring coverage', async () => {
@@ -346,14 +394,26 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const replacement = await invoice(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '90', expectedRevision: 1 },
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '90',
+        expectedRevision: 1,
+      },
     );
     const result = await reconciliation.cancelDocument(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
         source: SupplierDocumentCancellationSource.INTERNAL_RECORD_ERROR,
         reason: 'La factura original fue capturada con folio erróneo',
-        replacedByDocumentId: replacement.id, expectedRevision: 2,
+        replacedByDocumentId: replacement.id,
+        expectedRevision: 2,
       },
     );
     expect(result.operation).toBe('DOCUMENT_CANCELLED');
@@ -363,49 +423,85 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const [link] = await reconciliation.allocations(f.companyId, doc.id);
     expect(link.isActive).toBe(false);
     expect(link.allocatedSubtotal.toFixed(2)).toBe('90.00');
-    expect(await reconciliation.allocations(f.companyId, replacement.id)).toEqual([]);
-    await expect(reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '10', expectedRevision: 3 },
-    )).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await reconciliation.allocations(f.companyId, replacement.id),
+    ).toEqual([]);
+    await expect(
+      reconciliation.createAllocation(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          receiptId: entry.receiptId,
+          allocatedSubtotal: '10',
+          expectedRevision: 3,
+        },
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('requires evidence for reported external cancellation and blocks other-supplier substitution', async () => {
     const f = await fixture();
     const doc = await confirmed(f);
-    await expect(reconciliation.cancelDocument(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        source: SupplierDocumentCancellationSource.EXTERNAL_REPORTED,
-        reason: 'Cancelación emitida por proveedor externo', expectedRevision: 1,
-      },
-    )).rejects.toThrow();
+    await expect(
+      reconciliation.cancelDocument(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          source: SupplierDocumentCancellationSource.EXTERNAL_REPORTED,
+          reason: 'Cancelación emitida por proveedor externo',
+          expectedRevision: 1,
+        },
+      ),
+    ).rejects.toThrow();
     const different = await db.supplier.create({
       data: { companyId: f.companyId, name: 'Proveedor sustituto inválido' },
     });
     const replacement = await documents.create(
-      f.companyId, f.actorId, randomUUID(), {
-        supplierId: different.id, type: SupplierDocumentType.FACTURA,
-        number: randomUUID(), documentDate: '2026-10-25',
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      {
+        supplierId: different.id,
+        type: SupplierDocumentType.FACTURA,
+        number: randomUUID(),
+        documentDate: '2026-10-25',
       },
     );
-    await expect(reconciliation.cancelDocument(
-      f.companyId, f.actorId, randomUUID(), doc.id, {
-        source: SupplierDocumentCancellationSource.INTERNAL_RECORD_ERROR,
-        reason: 'Documento original incorrecto',
-        replacedByDocumentId: replacement.id, expectedRevision: 1,
-      },
-    )).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      reconciliation.cancelDocument(
+        f.companyId,
+        f.actorId,
+        randomUUID(),
+        doc.id,
+        {
+          source: SupplierDocumentCancellationSource.INTERNAL_RECORD_ERROR,
+          reason: 'Documento original incorrecto',
+          replacedByDocumentId: replacement.id,
+          expectedRevision: 1,
+        },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
     expect((await documents.detail(f.companyId, doc.id)).status).toBe('ACTIVE');
   });
-
 
   it('approves a documented difference with an immutable, idempotent snapshot', async () => {
     const f = await fixture();
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
     );
     const state = await variance.overview(f.companyId, entry.receiptId);
     expect(state.approvalCurrent).toBe(false);
@@ -419,16 +515,33 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
       expectedSnapshotHash: state.snapshotHash,
     };
     const approved = await variance.approve(
-      f.companyId, f.actorId, key, entry.receiptId, dto,
+      f.companyId,
+      f.actorId,
+      key,
+      entry.receiptId,
+      dto,
     );
     expect(approved.differenceAmount.toFixed(2)).toBe('5.00');
-    expect((await variance.overview(f.companyId, entry.receiptId)).approvalCurrent)
-      .toBe(true);
-    expect((await variance.approve(f.companyId, f.actorId, key, entry.receiptId, dto)).id)
-      .toBe(approved.id);
-    await expect(db.purchaseReceiptReconciliationApproval.update({
-      where: { id: approved.id }, data: { reason: 'Alterado' },
-    })).rejects.toThrow();
+    expect(
+      (await variance.overview(f.companyId, entry.receiptId)).approvalCurrent,
+    ).toBe(true);
+    expect(
+      (
+        await variance.approve(
+          f.companyId,
+          f.actorId,
+          key,
+          entry.receiptId,
+          dto,
+        )
+      ).id,
+    ).toBe(approved.id);
+    await expect(
+      db.purchaseReceiptReconciliationApproval.update({
+        where: { id: approved.id },
+        data: { reason: 'Alterado' },
+      }),
+    ).rejects.toThrow();
   });
 
   it('automatically invalidates variance approval after changing an allocation', async () => {
@@ -436,12 +549,22 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
+      {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
     );
     const before = await variance.overview(f.companyId, entry.receiptId);
     await variance.approve(
-      f.companyId, f.actorId, randomUUID(), entry.receiptId,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      entry.receiptId,
       {
         receiptComparableNetAmount: '55',
         receiptCurrency: 'MXN',
@@ -452,7 +575,10 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     );
     const [link] = await reconciliation.allocations(f.companyId, doc.id);
     await reconciliation.reviseAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
       {
         allocationId: link.id,
         action: AllocationRevisionAction.REPLACE_AMOUNT,
@@ -464,16 +590,15 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     );
     const now = await variance.overview(f.companyId, entry.receiptId);
     expect(now.approvalCurrent).toBe(false);
-    await expect(variance.approve(
-      f.companyId, f.actorId, randomUUID(), entry.receiptId,
-      {
+    await expect(
+      variance.approve(f.companyId, f.actorId, randomUUID(), entry.receiptId, {
         receiptComparableNetAmount: '45',
         receiptCurrency: 'MXN',
         reason: 'Intento con snapshot anterior obsoleto',
         evidenceReference: 'Referencia documental antigua',
         expectedSnapshotHash: before.snapshotHash,
-      },
-    )).rejects.toBeInstanceOf(ConflictException);
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('rejects unverified currency and cross-company receipt approval', async () => {
@@ -482,22 +607,29 @@ describePg('R2A-02 supplier-document reconciliation PostgreSQL', () => {
     const doc = await confirmed(f);
     const entry = await receipt(f.companyId, f.supplierId);
     await reconciliation.createAllocation(
-      f.companyId, f.actorId, randomUUID(), doc.id,
-      { receiptId: entry.receiptId, allocatedSubtotal: '60', expectedRevision: 1 },
-    );
-    await expect(variance.overview(stranger.companyId, entry.receiptId))
-      .rejects.toBeInstanceOf(NotFoundException);
-    const before = await variance.overview(f.companyId, entry.receiptId);
-    await expect(variance.approve(
-      f.companyId, f.actorId, randomUUID(), entry.receiptId,
+      f.companyId,
+      f.actorId,
+      randomUUID(),
+      doc.id,
       {
+        receiptId: entry.receiptId,
+        allocatedSubtotal: '60',
+        expectedRevision: 1,
+      },
+    );
+    await expect(
+      variance.overview(stranger.companyId, entry.receiptId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    const before = await variance.overview(f.companyId, entry.receiptId);
+    await expect(
+      variance.approve(f.companyId, f.actorId, randomUUID(), entry.receiptId, {
         receiptComparableNetAmount: '55',
         receiptCurrency: 'USD',
         reason: 'Intento con moneda no homogénea',
         evidenceReference: 'Referencia de costo externo',
         expectedSnapshotHash: before.snapshotHash,
-      },
-    )).rejects.toBeInstanceOf(ConflictException);
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
   });
 
   it('replays an old allocation result even after the document revision changes', async () => {
