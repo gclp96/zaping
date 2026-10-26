@@ -47,7 +47,8 @@ export function safeAttachmentDisposition(
   originalName: string,
   contentType: 'application/pdf' | 'image/jpeg',
 ): string {
-  const fallback = contentType === 'application/pdf' ? 'attachment.pdf' : 'attachment.jpg';
+  const fallback =
+    contentType === 'application/pdf' ? 'attachment.pdf' : 'attachment.jpg';
   // RFC 5987 filename* is percent-encoded; use fixed ASCII fallback and
   // explicitly remove control characters even for historical metadata.
   const cleaned = Array.from(originalName)
@@ -57,6 +58,10 @@ export function safeAttachmentDisposition(
     })
     .join('')
     .trim();
-  const safeName = cleaned.slice(0, 255) || fallback;
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(safeName)}`;
+  const safeName = Array.from(cleaned).slice(0, 120).join('') || fallback;
+  const encodedName = encodeURIComponent(safeName).replace(
+    /[!'()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodedName}`;
 }
