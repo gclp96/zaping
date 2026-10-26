@@ -1,4 +1,4 @@
-import { parseCloudflareR2Config } from '../supplier-documents/cloudflare-r2-config';
+import { parseCloudflareR2Config } from './cloudflare-r2-config';
 
 const LOCAL_FRONTEND_URL = 'http://localhost:3000';
 const DEFAULT_PORT = 3001;
