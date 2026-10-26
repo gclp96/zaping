@@ -58,6 +58,34 @@ describe("R2A-03 supplier documents", () => {
     expect(screen.getByText("1,160.00 MXN")).toBeTruthy();
   });
 
+  it("labels remissions as non-monetary records and identifies documented folio exceptions", async () => {
+    const [invoice] = await listSupplierDocuments();
+    vi.mocked(listSupplierDocuments).mockResolvedValue([
+      {
+        ...invoice,
+        id: "remission-1",
+        type: "REMISION",
+        series: "QA",
+        number: "REM-R2A03-001",
+        totalAmount: null,
+      },
+      {
+        ...invoice,
+        id: "remission-2",
+        type: "REMISION",
+        series: "QA",
+        number: "REM-R2A03-001",
+        identityOccurrence: 2,
+        totalAmount: null,
+      },
+    ]);
+    render(<SupplierDocumentsPage />);
+    expect(await screen.findAllByText("QA-REM-R2A03-001")).toHaveLength(2);
+    expect(screen.getAllByText("Registrado · Sin conciliación monetaria")).toHaveLength(2);
+    expect(screen.getByText("Excepción de folio #2")).toBeTruthy();
+    expect(screen.queryByText("Pendiente de revisión")).toBeNull();
+  });
+
   it("shows the exception only after a verified duplicate identity and requires evidence", async () => {
     vi.stubGlobal("crypto", { randomUUID: () => "test-idempotency-key" });
     vi.mocked(createSupplierDocument).mockRejectedValue(
