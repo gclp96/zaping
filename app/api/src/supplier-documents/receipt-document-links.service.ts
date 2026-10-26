@@ -84,10 +84,9 @@ export class ReceiptDocumentLinksService {
         skipDuplicates: true,
       });
 
-      const current =
-        await tx.purchaseReceiptSupplierDocumentLink.findFirst({
-          where: { companyId, receiptId, documentId, removedAt: null },
-        });
+      const current = await tx.purchaseReceiptSupplierDocumentLink.findFirst({
+        where: { companyId, receiptId, documentId, removedAt: null },
+      });
       if (!current) {
         throw new ConflictException(
           'No fue posible recuperar el vínculo documental',

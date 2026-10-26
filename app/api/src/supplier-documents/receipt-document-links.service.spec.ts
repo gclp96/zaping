@@ -24,8 +24,8 @@ describe('ReceiptDocumentLinksService', () => {
   };
   const prisma = {
     ...tx,
-    $transaction: jest.fn(
-      (callback: (client: typeof tx) => Promise<unknown>) => callback(tx),
+    $transaction: jest.fn((callback: (client: typeof tx) => Promise<unknown>) =>
+      callback(tx),
     ),
   };
   const service = new ReceiptDocumentLinksService(prisma as never);
@@ -134,9 +134,9 @@ describe('ReceiptDocumentLinksService', () => {
 
   it('does not list links if the receipt is missing', async () => {
     tx.purchaseReceipt.findFirst.mockResolvedValue(null);
-    await expect(
-      service.list(companyId, receiptId),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.list(companyId, receiptId)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
     expect(links.findMany).not.toHaveBeenCalled();
   });
 
@@ -171,7 +171,7 @@ describe('ReceiptDocumentLinksService', () => {
     expect(links.updateMany).toHaveBeenCalledWith({
       where: { companyId, receiptId, documentId, removedAt: null },
       data: {
-        removedAt: expect.any(Date),
+        removedAt: expect.any(Date) as Date,
         removedById: actorId,
         reason: 'Remisión equivocada',
       },

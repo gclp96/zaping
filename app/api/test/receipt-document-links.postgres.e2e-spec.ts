@@ -5,9 +5,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ReceiptDocumentLinksService } from '../src/supplier-documents/receipt-document-links.service';
 
 const describePg =
-  process.env.RUN_RECEIPT_DOCUMENT_LINKS_PG === '1'
-    ? describe
-    : describe.skip;
+  process.env.RUN_RECEIPT_DOCUMENT_LINKS_PG === '1' ? describe : describe.skip;
 
 describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
   let db: PrismaClient;
@@ -121,9 +119,7 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
       { database: string; role: string }[]
     >('SELECT current_database() AS database, current_user AS role');
     expect(identity).toEqual({ database: 'zaping_test', role: 'ci' });
-    links = new ReceiptDocumentLinksService(
-      db as unknown as PrismaService,
-    );
+    links = new ReceiptDocumentLinksService(db as unknown as PrismaService);
   });
 
   afterAll(async () => {
@@ -234,19 +230,11 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
     const f = await fixture();
     const other = await fixture();
     const receipt = await makeReceipt(f.companyId, f.supplierId);
-    const wrongSupplier = await makeDocument(
-      f.companyId,
-      f.otherSupplierId,
-    );
+    const wrongSupplier = await makeDocument(f.companyId, f.otherSupplierId);
     const foreign = await makeDocument(other.companyId, other.supplierId);
 
     await expect(
-      links.link(
-        f.companyId,
-        f.actorId,
-        receipt.receiptId,
-        wrongSupplier.id,
-      ),
+      links.link(f.companyId, f.actorId, receipt.receiptId, wrongSupplier.id),
     ).rejects.toBeInstanceOf(ConflictException);
     await expect(
       links.link(f.companyId, f.actorId, receipt.receiptId, foreign.id),
@@ -260,10 +248,7 @@ describePg('UX-PDOC-01A receipt-document associations PostgreSQL', () => {
     const f = await fixture();
     const receipt = await makeReceipt(f.companyId, f.supplierId);
     const doc = await makeDocument(f.companyId, f.supplierId);
-    const wrongSupplier = await makeDocument(
-      f.companyId,
-      f.otherSupplierId,
-    );
+    const wrongSupplier = await makeDocument(f.companyId, f.otherSupplierId);
     await expect(
       db.purchaseReceiptSupplierDocumentLink.create({
         data: {
