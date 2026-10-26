@@ -12,7 +12,7 @@ vi.mock('@/app/auth-session', () => ({
 }));
 
 vi.mock('@/services/api', () => ({
-  api: { get: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn() },
 }));
 
 vi.mock('@/services/errors', () => ({
@@ -65,7 +65,7 @@ describe('ReceiptSupplierDocuments', () => {
     } as never);
     render(
       <ReceiptSupplierDocuments
-        receiptId="receipt-1"
+        receiptId="receipt-1" supplierId="supplier-1"
         legacyReference="REMISION · 000123"
       />,
     );
@@ -92,7 +92,7 @@ describe('ReceiptSupplierDocuments', () => {
         link('association-2', 'second-document'),
       ],
     } as never);
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments receiptId="receipt-1" supplierId="supplier-1" legacyReference={null} />);
 
     await screen.findByRole('list', {
       name: 'Documentos vinculados a esta recepción',
@@ -110,7 +110,7 @@ describe('ReceiptSupplierDocuments', () => {
   it('does not construct a document link from a legacy textual reference', async () => {
     render(
       <ReceiptSupplierDocuments
-        receiptId="receipt-1"
+        receiptId="receipt-1" supplierId="supplier-1"
         legacyReference="REMISION · 000123"
       />,
     );
@@ -126,7 +126,7 @@ describe('ReceiptSupplierDocuments', () => {
       setRole(role);
       render(
         <ReceiptSupplierDocuments
-          receiptId="receipt-1"
+          receiptId="receipt-1" supplierId="supplier-1"
           legacyReference="FACTURA · 451"
         />,
       );
@@ -140,7 +140,7 @@ describe('ReceiptSupplierDocuments', () => {
     vi.mocked(api.get).mockResolvedValue({
       data: [{ ...link('association-1', 'doc-1'), documentId: 'different-id' }],
     } as never);
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments receiptId="receipt-1" supplierId="supplier-1" legacyReference={null} />);
     expect((await screen.findByRole('alert')).textContent).toContain(
       'La respuesta de vínculos documentales no es válida.',
     );
@@ -155,7 +155,7 @@ describe('ReceiptSupplierDocuments', () => {
       } as never);
 
     const user = userEvent.setup();
-    render(<ReceiptSupplierDocuments receiptId="receipt-1" legacyReference={null} />);
+    render(<ReceiptSupplierDocuments receiptId="receipt-1" supplierId="supplier-1" legacyReference={null} />);
     expect(
       await screen.findByText('No fue posible consultar los documentos vinculados.'),
     ).toBeTruthy();
