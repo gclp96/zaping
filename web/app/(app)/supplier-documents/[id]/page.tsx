@@ -301,7 +301,11 @@ export default function SupplierDocumentDetailPage() {
       <Section title="Información y estado">
         <dl className="grid gap-3 rounded-lg border border-border bg-surface p-4 md:grid-cols-3">
           <div><dt className="text-text-muted">Estado</dt><dd className="font-semibold">{active ? "Activo" : "Cancelado"}</dd></div>
-          <div><dt className="text-text-muted">Base conciliable</dt><dd>{document.basisStatus === "CONFIRMED" ? "Confirmada" : "Pendiente de revisión"}</dd></div>
+          <div><dt className="text-text-muted">{document.type === "FACTURA" ? "Base conciliable" : "Control documental"}</dt>
+            <dd>{document.type === "FACTURA"
+              ? document.basisStatus === "CONFIRMED" ? "Confirmada" : "Pendiente de revisión"
+              : "Registrado · Sin conciliación monetaria"}</dd>
+          </div>
           <div><dt className="text-text-muted">Moneda</dt><dd>{document.currency ?? "No informada"}</dd></div>
           <div><dt className="text-text-muted">Subtotal</dt><dd>{formatSupplierMoney(document.subtotalAmount, document.currency)}</dd></div>
           <div><dt className="text-text-muted">IVA</dt><dd>{formatSupplierMoney(document.ivaAmount, document.currency)}</dd></div>
@@ -309,6 +313,11 @@ export default function SupplierDocumentDetailPage() {
           <div><dt className="text-text-muted">Neto de mercancía</dt><dd>{formatSupplierMoney(document.goodsNetAmount, document.currency)}</dd></div>
           <div><dt className="text-text-muted">UUID CFDI</dt><dd className="break-all">{document.cfdiUuid ?? "No disponible"}</dd></div>
           <div><dt className="text-text-muted">Revisión</dt><dd>{document.revision}</dd></div>
+          {document.identityOccurrence > 1 && (
+            <div><dt className="text-text-muted">Identidad comercial</dt>
+              <dd>Excepción de folio #{document.identityOccurrence}</dd>
+            </div>
+          )}
         </dl>
         <p className="mt-3 text-sm text-text-muted">Documento recibido: Zaping no realiza timbrado ni verificación fiscal ante el SAT.</p>
       </Section>
