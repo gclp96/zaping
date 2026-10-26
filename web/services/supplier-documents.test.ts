@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./api";
 import {
   createSupplierDocument,
+  createSupplierDocumentException,
+  correctSupplierDocumentBasis,
   documentDateLabel,
   documentTypeLabel,
   formatSupplierMoney,
@@ -43,6 +45,53 @@ describe("supplier document API client", () => {
       "/supplier-documents",
       expect.objectContaining({ number: "0007" }),
       { headers: { "Idempotency-Key": "operation-id" } },
+    );
+  });
+
+  it("submits documented duplicate-folio exception with a separate idempotency key", async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { id: "exception-1" } });
+    await createSupplierDocumentException(
+      {
+        supplierId: "supplier-1",
+        type: "REMISION",
+        series: "B",
+        number: "046",
+        documentDate: "2026-10-22",
+        duplicateOfDocumentId: "document-1",
+        reason: "Folio reutilizado en un envío comercial distinto",
+        evidenceReference: "Remisión original con firma",
+      },
+      "exception-key",
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/supplier-documents/exceptions",
+      expect.objectContaining({
+        duplicateOfDocumentId: "document-1",
+        number: "046",
+        evidenceReference: "Remisión original con firma",
+      }),
+      { headers: { "Idempotency-Key": "exception-key" } },
+    );
+  });
+
+  it("corrects confirmed invoice basis through the audited endpoint and CAS revision", async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: { revision: 3 } });
+    await correctSupplierDocumentBasis(
+      "document-1",
+      {
+        goodsNetAmount: "89.50",
+        currency: "MXN",
+        reason: "Corrección comprobada de la base gravable",
+        expectedRevision: 2,
+      },
+      "correction-key",
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/supplier-documents/document-1/correct-basis",
+      expect.objectContaining({
+        goodsNetAmount: "89.50", expectedRevision: 2,
+      }),
+      { headers: { "Idempotency-Key": "correction-key" } },
     );
   });
 
