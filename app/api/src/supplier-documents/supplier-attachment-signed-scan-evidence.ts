@@ -10,7 +10,8 @@ import {
  * This module is intentionally not registered in any NestJS controller,
  * Prisma repository, or worker. Only an isolated worker may hold the private key.
  */
-export type ScanEvidenceVerdict = 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' | 'SCAN_FAILED';
+export type ScanEvidenceVerdict =
+  'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' | 'SCAN_FAILED';
 
 export type ScanEvidenceClaims = Readonly<{
   protocol: 'zaping-scan-evidence-v1';
