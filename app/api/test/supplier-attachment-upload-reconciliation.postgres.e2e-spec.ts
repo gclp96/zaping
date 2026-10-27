@@ -10,7 +10,6 @@ import {
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SupplierAttachmentUploadReservationsService } from '../src/supplier-documents/supplier-attachment-upload-reservations.service';
 import { SupplierAttachmentUploadReconciliationService } from '../src/supplier-documents/supplier-attachment-upload-reconciliation.service';
-import { QuarantineObjectVerifier } from '../src/supplier-documents/cloudflare-r2-quarantine-verifier';
 
 const describePg =
   process.env.RUN_SUPPLIER_UPLOAD_RECONCILIATION_PG === '1'
@@ -101,7 +100,7 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
     );
     reconciliation = new SupplierAttachmentUploadReconciliationService(
       db as unknown as PrismaService,
-      verifier as unknown as QuarantineObjectVerifier,
+      verifier,
     );
   });
 
@@ -155,7 +154,9 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
 
   it('marks unavailable or ambiguous R2 read for review, keeps quota reserved', async () => {
     const f = await fixture();
-    verifier.verify.mockRejectedValueOnce(new Error('S3 credentials must never leak'));
+    verifier.verify.mockRejectedValueOnce(
+      new Error('S3 credentials must never leak'),
+    );
     const result = await reconciliation.reconcile(f);
     expect(result.status).toBe(
       SupplierAttachmentUploadReservationStatus.RECONCILE_REQUIRED,
@@ -238,7 +239,8 @@ describePg('B3d3 isolated PostgreSQL quarantine reconciliation', () => {
       db.supplierAttachmentUploadReservation.update({
         where: { id: f.reservationId },
         data: {
-          status: SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
+          status:
+            SupplierAttachmentUploadReservationStatus.RELEASED_VERIFIED_EMPTY,
         },
       }),
     ).rejects.toThrow();
