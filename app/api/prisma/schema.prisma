@@ -549,6 +549,7 @@ model Company {
   idempotencyRecords                    IdempotencyRecord[]
   supplierDocuments                     SupplierDocument[]
   supplierDocumentAttachments           SupplierDocumentAttachment[]
+  supplierAttachmentUploadReservations   SupplierAttachmentUploadReservation[]
   supplierDocumentAllocations           PurchaseReceiptDocument[]
   supplierDocumentApprovals             PurchaseReceiptReconciliationApproval[]
   receiptDocumentLinks                  PurchaseReceiptSupplierDocumentLink[]
@@ -693,6 +694,7 @@ model User {
   supplierAttachmentRemovers SupplierDocumentAttachment[] @relation("SupplierAttachmentRemovedBy")
   supplierDocumentExceptionsReviewed SupplierDocument[] @relation("SupplierDocumentExceptionReviewer")
   supplierDocumentAuditActions SupplierDocumentAudit[] @relation("SupplierDocumentAuditActor")
+  supplierAttachmentUploadReservations SupplierAttachmentUploadReservation[] @relation("SupplierAttachmentUploadReservationActor")
   supplierDocumentAllocationCreators PurchaseReceiptDocument[] @relation("SupplierDocumentAllocationCreator")
   supplierDocumentCancellationActors SupplierDocument[] @relation("SupplierDocumentCancelledBy")
   supplierDocumentApprovalActors PurchaseReceiptReconciliationApproval[] @relation("SupplierDocumentApprovalActor")
@@ -1977,6 +1979,7 @@ model SupplierDocument {
   allocations PurchaseReceiptDocument[]
   receiptLinks PurchaseReceiptSupplierDocumentLink[]
   attachments SupplierDocumentAttachment[]
+  uploadReservations SupplierAttachmentUploadReservation[]
   cancelledBy User? @relation("SupplierDocumentCancelledBy", fields: [cancelledById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   replacedBy SupplierDocument? @relation("SupplierDocumentReplacement", fields: [replacedByDocumentId, companyId, supplierId], references: [id, companyId, supplierId], onDelete: Restrict, onUpdate: Restrict)
   replaces SupplierDocument[] @relation("SupplierDocumentReplacement")
@@ -2109,6 +2112,41 @@ model PurchaseReceiptSupplierDocumentLink {
 
 /// UX-PDOC-01B: private object metadata. Never stores bytes or a public URL.
 /// No attachment is downloadable until an external scanner marks it AVAILABLE.
+enum SupplierAttachmentUploadReservationStatus {
+  RESERVED
+  RECONCILE_REQUIRED
+  REGISTERED
+  RELEASED_VERIFIED_EMPTY
+}
+
+/**
+ * Durable ledger for in-flight uploads. Reservations are NOT attachments.
+ * The registered attachment table remains scanner-gated and immutable.
+ */
+model SupplierAttachmentUploadReservation {
+  id            String @id @default(uuid())
+  companyId     String
+  documentId    String
+  createdById   String
+  requestKey    String @db.VarChar(128)
+  quarantineKey String @db.VarChar(300)
+  originalName  String @db.VarChar(255)
+  contentType   String @db.VarChar(32)
+  sizeBytes     Int
+  sha256        String @db.VarChar(64)
+  status        SupplierAttachmentUploadReservationStatus @default(RESERVED)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User @relation("SupplierAttachmentUploadReservationActor", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, documentId, requestKey], map: "SAR_company_document_request_key")
+  @@unique([companyId, quarantineKey], map: "SAR_company_quarantine_key")
+  @@index([companyId, documentId, status, createdAt], map: "SAR_company_document_status_created")
+}
+
 model SupplierDocumentAttachment {
   id            String @id @default(uuid())
   companyId     String
