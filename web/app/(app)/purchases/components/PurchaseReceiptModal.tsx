@@ -658,6 +658,8 @@ export default function PurchaseReceiptModal({
             </div>
           </div>
 
+          {attachmentPreview}
+
           <div>
             <label
               htmlFor="receipt-notes"
@@ -677,8 +679,6 @@ export default function PurchaseReceiptModal({
               onChange={(event) => onNotesChange(event.target.value)}
             />
           </div>
-
-          {attachmentPreview}
 
           {pendingAttachmentCount > 0 ? (
             <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
