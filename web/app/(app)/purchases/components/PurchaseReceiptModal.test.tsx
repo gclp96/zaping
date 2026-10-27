@@ -280,7 +280,7 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
 
     const context = screen.getByTestId('receipt-purchase-context');
     expect(within(context).getByText('OC-1')).toBeTruthy();
-    expect(within(context).getByText('Proveedor')).toBeTruthy();
+    expect(within(context).getAllByText('Proveedor')).toHaveLength(2);
 
     const items = screen.getByTestId('receipt-item-capture-section');
     expect(within(items).getByText('Partidas pendientes')).toBeTruthy();
