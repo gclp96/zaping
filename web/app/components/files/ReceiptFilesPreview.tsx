@@ -30,6 +30,8 @@ import {
 
 type Props = {
   receiptFolio: string;
+  mode?: 'detail' | 'registration';
+  onSelectionCountChange?: (count: number) => void;
 };
 
 /**
@@ -37,7 +39,11 @@ type Props = {
  * Only file name, size and category are retained in React state.
  * No file bytes, object URLs, persistence or scan claims are created.
  */
-export default function ReceiptFilesPreview({ receiptFolio }: Props) {
+export default function ReceiptFilesPreview({
+  receiptFolio,
+  mode = 'detail',
+  onSelectionCountChange,
+}: Props) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
@@ -86,6 +92,7 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
     }
 
     setFiles(preview);
+    onSelectionCountChange?.(preview.length);
     setError(errors.join(' '));
     setMessage(
       added > 0
@@ -128,21 +135,38 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
 
   function clearSelection() {
     setFiles([]);
+    onSelectionCountChange?.(0);
     setError('');
     setMessage('Selección local limpiada. No se había enviado ningún archivo.');
   }
 
   function removeFile(id: number) {
-    setFiles((current) => current.filter((file) => file.id !== id));
+    const remaining = files.filter((file) => file.id !== id);
+    setFiles(remaining);
+    onSelectionCountChange?.(remaining.length);
     setError('');
     setMessage('Archivo quitado de la vista previa. No había sido enviado.');
   }
 
   return (
-    <div className="rounded-xl border border-border bg-surface p-4 sm:p-6">
+    <div
+      className={
+        mode === 'registration'
+          ? 'rounded-xl border border-border bg-surface p-3 sm:p-4'
+          : 'rounded-xl border border-border bg-surface p-4 sm:p-6'
+      }
+    >
       <Section
-        title="Documentos adjuntos"
-        description={`Vista previa de documentos para la recepción ${receiptFolio}.`}
+        title={
+          mode === 'registration'
+            ? 'Adjuntos de la recepción'
+            : 'Documentos adjuntos'
+        }
+        description={
+          mode === 'registration'
+            ? `Comprobantes o fotografías de la orden ${receiptFolio}.`
+            : `Vista previa de documentos para la recepción ${receiptFolio}.`
+        }
         action={<Badge color="gray">Prototipo · Sin conexión</Badge>}
       >
         <div
@@ -154,6 +178,13 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
             Esta sección está en desarrollo. Los archivos seleccionados
             <strong> no se guardan ni se envían</strong> a Zaping, y la
             selección desaparecerá al salir o recargar la página.
+            {mode === 'registration' ? (
+              <>
+                {' '}No podrás registrar esta recepción mientras haya
+                archivos seleccionados. Quita o limpia la vista previa
+                para continuar sin adjuntos.
+              </>
+            ) : null}
           </p>
         </div>
 
