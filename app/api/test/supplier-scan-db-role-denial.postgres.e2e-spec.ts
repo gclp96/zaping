@@ -137,9 +137,7 @@ describePg('B3d5b3c2a separate non-owner PostgreSQL login denials', () => {
       if (!role) throw new Error('Role setup incomplete');
       for (const table of PROTECTED_TABLES) {
         for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
-          const [rights] = await owner.$queryRawUnsafe<
-            { allowed: boolean }[]
-          >(
+          const [rights] = await owner.$queryRawUnsafe<{ allowed: boolean }[]>(
             'SELECT has_table_privilege($1, $2, $3) AS allowed',
             role.name,
             '"' + table + '"',
@@ -160,9 +158,7 @@ describePg('B3d5b3c2a separate non-owner PostgreSQL login denials', () => {
         '"issue_supplier_attachment_scan_job"(text,text,integer)',
         '"consume_supplier_attachment_scan_job"(text,uuid)',
       ]) {
-        const [rights] = await owner.$queryRawUnsafe<
-          { allowed: boolean }[]
-        >(
+        const [rights] = await owner.$queryRawUnsafe<{ allowed: boolean }[]>(
           'SELECT has_function_privilege($1, $2, $3) AS allowed',
           role.name,
           routine,
@@ -173,45 +169,39 @@ describePg('B3d5b3c2a separate non-owner PostgreSQL login denials', () => {
     },
   );
 
-  it.each(ACTORS)(
-    '%s is denied actual DML forging attempts',
-    async (actor) => {
-      const role = roles.get(actor);
-      if (!role) throw new Error('Role setup incomplete');
-      const attacks = [
-        'INSERT INTO "SupplierAttachmentVerifiedScanEvidence" DEFAULT VALUES',
-        'INSERT INTO "SupplierAttachmentSignedEvidenceReceipt" DEFAULT VALUES',
-        'INSERT INTO "SupplierAttachmentScanAttempt" DEFAULT VALUES',
-        'UPDATE "SupplierDocumentAttachment" SET "status" = ' +
-          "'AVAILABLE' WHERE FALSE",
-        'UPDATE "SupplierAttachmentScanJob" SET "status" = ' +
-          "'CONSUMED' WHERE FALSE",
-      ];
-      for (const sql of attacks) {
-        await expect(role.connection.$executeRawUnsafe(sql)).rejects.toThrow(
-          /permission denied/i,
-        );
-      }
-    },
-  );
+  it.each(ACTORS)('%s is denied actual DML forging attempts', async (actor) => {
+    const role = roles.get(actor);
+    if (!role) throw new Error('Role setup incomplete');
+    const attacks = [
+      'INSERT INTO "SupplierAttachmentVerifiedScanEvidence" DEFAULT VALUES',
+      'INSERT INTO "SupplierAttachmentSignedEvidenceReceipt" DEFAULT VALUES',
+      'INSERT INTO "SupplierAttachmentScanAttempt" DEFAULT VALUES',
+      'UPDATE "SupplierDocumentAttachment" SET "status" = ' +
+        "'AVAILABLE' WHERE FALSE",
+      'UPDATE "SupplierAttachmentScanJob" SET "status" = ' +
+        "'CONSUMED' WHERE FALSE",
+    ];
+    for (const sql of attacks) {
+      await expect(role.connection.$executeRawUnsafe(sql)).rejects.toThrow(
+        /permission denied/i,
+      );
+    }
+  });
 
-  it.each(ACTORS)(
-    '%s is denied actual SQL function calls',
-    async (actor) => {
-      const role = roles.get(actor);
-      if (!role) throw new Error('Role setup incomplete');
-      await expect(
-        role.connection.$queryRawUnsafe(
-          'SELECT * FROM "issue_supplier_attachment_scan_job"(' +
-            "'no-company', 'no-reservation', 120)",
-        ),
-      ).rejects.toThrow(/permission denied/i);
-      await expect(
-        role.connection.$queryRawUnsafe(
-          'SELECT "consume_supplier_attachment_scan_job"(' +
-            "'no-company', '00000000-0000-4000-8000-000000000000'::uuid)",
-        ),
-      ).rejects.toThrow(/permission denied/i);
-    },
-  );
+  it.each(ACTORS)('%s is denied actual SQL function calls', async (actor) => {
+    const role = roles.get(actor);
+    if (!role) throw new Error('Role setup incomplete');
+    await expect(
+      role.connection.$queryRawUnsafe(
+        'SELECT * FROM "issue_supplier_attachment_scan_job"(' +
+          "'no-company', 'no-reservation', 120)",
+      ),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      role.connection.$queryRawUnsafe(
+        'SELECT "consume_supplier_attachment_scan_job"(' +
+          "'no-company', '00000000-0000-4000-8000-000000000000'::uuid)",
+      ),
+    ).rejects.toThrow(/permission denied/i);
+  });
 });
