@@ -20,6 +20,14 @@ Security:
 - This script deliberately does not modify DB status, upload files to R2, authorize download, or promote from quarantine.
 - Prefer a dedicated 3–4 GiB RAM scanner host/container allocation for planning; benchmark actual resource usage before choosing a hosting plan.
 
-Next: after obtaining a green real-daemon smoke, test the **actual** TypeScript `zINSTREAM` client against the same ephemeral clamd, validate signature age from authoritative engine metadata, pin and audit an image digest for release, and add durable worker-signed scan evidence with least-privilege DB permissions/replay protection before promotion.
+## CI evidence (2026-10-26 local; UTC 2026-10-27)
+
+On the disposable lab run https://github.com/gclp96/zaping/actions/runs/40438904182, the **real ClamAV** daemon with a preloaded database accepted the synthetic PDF and detected harmless EICAR. The actual Zaping TypeScript `ClamAvInstreamScanner` over a shared local Unix socket passed **3/3 E2E checks**: clean PDF, EICAR detection and empty input rejected.
+
+The image tag `clamav/clamav-debian:stable` is mutable and the preloaded signature database age/engine version were **not** verified against a freshness policy. The test uses a temporary host-mapped Unix socket in a dedicated GitHub runner and never accesses customers, PostgreSQL or R2. It must not be treated as an attestation of malware-cleanness for any user upload.
+
+## Next security gate
+
+Verify engine and signature freshness from ClamAV metadata using a versioned policy, pin the container image digest for deployment, test daemon outages/stale signatures, and design a durable worker-signed scan record with least-privilege DB role and replay protection. A verified scan must still be followed by controlled byte-for-byte promotion from quarantine to private storage before marking a file AVAILABLE. No user upload/download path can be activated from this PR alone.
 
 References: https://docs.clamav.net/manual/Usage/ClamdProtocol.html and https://docs.clamav.net/manual/Installing/Docker.html
