@@ -22,8 +22,8 @@ describeLive(
         !process.env.CLAMD_SOCKET.includes('/zaping-clamd-socket/')
       ) {
         throw new Error(
-        'Real ClamAV smoke requires disposable isolated CI socket',
-      );
+          'Real ClamAV smoke requires disposable isolated CI socket',
+        );
       }
       scanner = new ClamAvInstreamScanner(process.env.CLAMD_SOCKET, 20_000);
     });
