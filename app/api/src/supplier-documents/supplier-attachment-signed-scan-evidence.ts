@@ -132,9 +132,10 @@ function exactKeys(value: unknown, keys: readonly string[]): boolean {
     return false;
   }
   const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
   return (
-    actual.length === keys.length &&
-    actual.every((key, index) => key === [...keys].sort()[index])
+    actual.length === expected.length &&
+    actual.every((key, index) => key === expected[index])
   );
 }
 
@@ -154,7 +155,9 @@ function isValidClaims(value: unknown): value is ScanEvidenceClaims {
     typeof x.contentSha256 !== 'string' ||
     !SHA256.test(x.contentSha256) ||
     typeof x.bytesVerified !== 'boolean' ||
+    typeof x.policyVersion !== 'string' ||
     !NAME.test(x.policyVersion) ||
+    typeof x.workerIdentity !== 'string' ||
     !NAME.test(x.workerIdentity) ||
     typeof x.workerBuildDigest !== 'string' ||
     !SHA256.test(x.workerBuildDigest) ||
@@ -223,6 +226,7 @@ export function signScanEvidence(
   privateKey: KeyObject,
 ): SignedScanEvidence {
   if (
+    typeof keyId !== 'string' ||
     !NAME.test(keyId) ||
     !isValidClaims(claims) ||
     privateKey.type !== 'private' ||
