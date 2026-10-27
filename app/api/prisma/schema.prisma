@@ -2142,9 +2142,9 @@ model SupplierAttachmentUploadReservation {
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   createdBy User @relation("SupplierAttachmentUploadReservationActor", fields: [createdById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
-  @@unique([companyId, documentId, requestKey])
-  @@unique([companyId, quarantineKey])
-  @@index([companyId, documentId, status, createdAt])
+  @@unique([companyId, documentId, requestKey], map: "SAR_company_document_request_key")
+  @@unique([companyId, quarantineKey], map: "SAR_company_quarantine_key")
+  @@index([companyId, documentId, status, createdAt], map: "SAR_company_document_status_created")
 }
 
 model SupplierDocumentAttachment {
