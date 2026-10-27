@@ -6,9 +6,7 @@ import type {
 import type { ClamAvProtocolVerdict } from './clamav-instream-scanner';
 
 export interface ScannerVersionProbe {
-  verifyReadiness(
-    policy: ClamAvVersionPolicy,
-  ): Promise<ClamAvVersionEvidence>;
+  verifyReadiness(policy: ClamAvVersionPolicy): Promise<ClamAvVersionEvidence>;
 }
 
 export interface MalwareScanEngine {
