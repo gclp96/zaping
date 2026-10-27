@@ -1232,7 +1232,7 @@ describe('PurchasesPage — recepciones', () => {
     await user.click(
       within(dialog).getByRole('button', { name: 'Limpiar selección' }),
     );
-    expect(submit.disabled).toBe(false);
+    await waitFor(() => expect(submit.disabled).toBe(false));
     expect(within(dialog).getByText(/selección local \(0\/5\)/i))
       .toBeTruthy();
     expect(api.post).not.toHaveBeenCalled();
@@ -1250,11 +1250,13 @@ describe('PurchasesPage — recepciones', () => {
     expect(
       within(dialog).queryByText('Adjuntos de la recepción'),
     ).toBeNull();
-    expect(
-      (within(dialog).getByRole('button', {
-        name: 'Registrar recepción',
-      }) as HTMLButtonElement).disabled,
-    ).toBe(false);
+    await waitFor(() => {
+      expect(
+        (within(dialog).getByRole('button', {
+          name: 'Registrar recepción',
+        }) as HTMLButtonElement).disabled,
+      ).toBe(false);
+    });
   });
 
   it.each([
