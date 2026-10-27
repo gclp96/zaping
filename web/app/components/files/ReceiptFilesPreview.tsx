@@ -1,6 +1,12 @@
 'use client';
 
-import { useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from 'react';
 import {
   FileImage,
   FileText,
@@ -35,6 +41,8 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
+  const dragDepth = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [files, setFiles] = useState<LocalReceiptFile[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -53,11 +61,6 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
         continue;
       }
 
-      if (preview.length >= RECEIPT_FILE_MAX_COUNT) {
-        errors.push(`Máximo ${RECEIPT_FILE_MAX_COUNT} archivos en la vista previa.`);
-        break;
-      }
-
       if (
         preview.some(
           (item) => item.name === file.name && item.sizeBytes === file.size,
@@ -65,6 +68,11 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
       ) {
         errors.push(`${file.name}: ya está en la vista previa.`);
         continue;
+      }
+
+      if (preview.length >= RECEIPT_FILE_MAX_COUNT) {
+        errors.push(`Máximo ${RECEIPT_FILE_MAX_COUNT} archivos en la vista previa.`);
+        break;
       }
 
       // Retain metadata only. Never store File/Blob content or read its bytes.
@@ -92,9 +100,36 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
     event.target.value = '';
   }
 
+  function onDragEnter(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepth.current += 1;
+    setIsDragging(true);
+  }
+
+  function onDragLeave(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) {
+      setIsDragging(false);
+    }
+  }
+
+  function onDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
     prepareFiles(event.dataTransfer.files);
+  }
+
+  function clearSelection() {
+    setFiles([]);
+    setError('');
+    setMessage('Selección local limpiada. No se había enviado ningún archivo.');
   }
 
   function removeFile(id: number) {
@@ -123,9 +158,17 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
         </div>
 
         <div
-          onDragOver={(event) => event.preventDefault()}
+          role="group"
+          aria-label="Área de selección local de archivos"
+          onDragEnter={onDragEnter}
+          onDragLeave={onDragLeave}
+          onDragOver={onDragOver}
           onDrop={onDrop}
-          className="rounded-xl border-2 border-dashed border-border-strong bg-surface-subtle px-4 py-8 text-center sm:px-6"
+          className={`rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 ${
+            isDragging
+              ? 'border-blue-600 bg-blue-50'
+              : 'border-border-strong bg-surface-subtle'
+          }`}
         >
           <Upload
             aria-hidden="true"
@@ -136,7 +179,7 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
             Arrastra archivos aquí o selecciónalos
           </p>
           <p className="mt-1 text-sm text-text-muted">
-            PDF, JPG o JPEG · Hasta 10 MB cada uno · Máximo 5 archivos
+            PDF, JPG o JPEG · Hasta 10 MiB cada uno · Máximo 5 archivos
           </p>
 
           <input
@@ -182,7 +225,20 @@ export default function ReceiptFilesPreview({ receiptFolio }: Props) {
             <h3 className="font-semibold text-text">
               Selección local ({files.length}/{RECEIPT_FILE_MAX_COUNT})
             </h3>
-            <Badge color="gray">No enviados</Badge>
+            <div className="flex items-center gap-2">
+              <Badge color="gray">No enviados</Badge>
+              {files.length > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  <Trash2 aria-hidden="true" size={15} />
+                  Limpiar selección
+                </Button>
+              ) : null}
+            </div>
           </div>
 
           {files.length === 0 ? (
