@@ -14,6 +14,7 @@ import {
 
 const policy: ClamAvReadinessPolicy = {
   policyVersion: 'b3d4c-lab-v1',
+  daemonTimeZone: 'UTC',
   allowedEngineVersions: ['1.4.3'],
   maxDatabaseAgeMs: 48 * 60 * 60 * 1_000,
   maxFutureClockSkewMs: 5 * 60 * 1_000,
