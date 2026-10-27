@@ -123,6 +123,11 @@ jobs:
           RUN_RECEIPT_DOCUMENT_LINKS_PG: "1"
         run: npm run test:e2e -- --runInBand test/receipt-document-links.postgres.e2e-spec.ts
 
+      - name: Verify B3d3 R2 quarantine reconciliation on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_UPLOAD_RECONCILIATION_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-attachment-upload-reconciliation.postgres.e2e-spec.ts
+
       - name: Verify B3d2 quota reservations and concurrency on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_UPLOAD_RESERVATIONS_PG: "1"
