@@ -5,6 +5,8 @@ import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
+import ReceiptCaptureSummary from './ReceiptCaptureSummary';
+
 import { hasOptionalReceiptTraceability } from '../receipt-traceability';
 
 import type {
@@ -787,6 +789,17 @@ export default function PurchaseReceiptModal({
             />
           </div>
           </section>
+
+          {workspaceEnabled ? (
+            <div
+              data-testid="receipt-lower-area"
+              className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]"
+            >
+              <div className="min-w-0 lg:col-start-2">
+                <ReceiptCaptureSummary items={items} />
+              </div>
+            </div>
+          ) : null}
 
           {error ? (
             <p
