@@ -213,7 +213,7 @@ BEGIN
     RAISE EXCEPTION 'An active scan challenge already exists';
   END IF;
 
-  INSERT INTO "SupplierAttachmentScanJob" (
+  INSERT INTO "SupplierAttachmentScanJob" AS new_job (
     "companyId", "documentId", "attachmentId", "reservationId",
     "quarantineKey", "contentSizeBytes", "contentSha256", "expiresAt"
   )
@@ -222,7 +222,8 @@ BEGIN
     item."quarantineKey", item."sizeBytes", item."sha256",
     clock_timestamp() + make_interval(secs => p_ttl_seconds)
   )
-  RETURNING "id", "requestNonce", "issuedAt", "expiresAt" INTO issued;
+  RETURNING new_job."id", new_job."requestNonce",
+    new_job."issuedAt", new_job."expiresAt" INTO issued;
 
   RETURN QUERY SELECT issued."id", issued."requestNonce",
     issued."issuedAt", issued."expiresAt";
