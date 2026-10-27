@@ -2251,6 +2251,7 @@ model SupplierAttachmentSignedEvidenceReceipt {
 
   attempt SupplierAttachmentScanAttempt @relation(fields: [attemptId, companyId, requestNonce], references: [id, companyId, requestNonce], onDelete: Restrict, onUpdate: Restrict)
 
+  @@unique([attemptId, companyId, requestNonce], map: "SASER_attempt_company_nonce_key")
   @@unique([companyId, requestNonce], map: "SASER_company_nonce_key")
   @@index([companyId, recordedAt], map: "SASER_company_recorded_idx")
 }
