@@ -1890,6 +1890,13 @@ enum SupplierAttachmentScanVerdict {
   SCAN_FAILED
 }
 
+// B3d5b3b: ISSUED and CONSUMED do NOT mean trusted antimalware evidence.
+enum SupplierAttachmentScanJobStatus {
+  ISSUED
+  CONSUMED
+  EXPIRED
+}
+
 enum SupplierDocumentType {
   FACTURA
   REMISION
@@ -2147,6 +2154,7 @@ model SupplierAttachmentUploadReservation {
   updatedAt     DateTime @updatedAt
   reconcileEvents SupplierAttachmentReconcileEvent[]
   scanAttempts SupplierAttachmentScanAttempt[]
+  scanJobs SupplierAttachmentScanJob[]
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -2194,6 +2202,7 @@ model SupplierDocumentAttachment {
   removedById   String?
   removedAt     DateTime?
   scanAttempts SupplierAttachmentScanAttempt[]
+  scanJobs SupplierAttachmentScanJob[]
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -2254,4 +2263,30 @@ model SupplierAttachmentSignedEvidenceReceipt {
   @@unique([attemptId, companyId, requestNonce], map: "SASER_attempt_company_nonce_key")
   @@unique([companyId, requestNonce], map: "SASER_company_nonce_key")
   @@index([companyId, recordedAt], map: "SASER_company_recorded_idx")
+}
+
+
+/// B3d5b3b: a DB-issued, immutable, tenant-scoped challenge bound to one
+/// registered upload. CONSUMED only means a matching untrusted receipt was
+/// durably recorded; it does NOT certify signature validity or scan safety.
+/// Only owner-run lab functions can issue/consume until B3d5b3c role review.
+model SupplierAttachmentScanJob {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId        String
+  documentId       String
+  attachmentId     String
+  reservationId    String
+  requestNonce     String @unique(map: "SASJ_nonce_key") @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quarantineKey    String @db.VarChar(300)
+  contentSizeBytes Int
+  contentSha256    String @db.VarChar(64)
+  status           SupplierAttachmentScanJobStatus @default(ISSUED)
+  issuedAt         DateTime @default(now())
+  expiresAt        DateTime
+  consumedAt       DateTime?
+
+  attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  reservation SupplierAttachmentUploadReservation @relation(fields: [reservationId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, attachmentId, status, expiresAt], map: "SASJ_company_attachment_status_idx")
 }
