@@ -34,6 +34,7 @@ import {
 } from './purchase-date';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
+import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
 import PurchaseFormModal from './components/PurchaseFormModal';
 import { usePurchaseReceipts } from './hooks/usePurchaseReceipts';
@@ -255,6 +256,7 @@ const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
+const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
 const directReceiveRequestId = useRef(0);
 const directReceiveInFlight = useRef(false);
 const authenticatedCompanyTimezone =
@@ -533,6 +535,7 @@ const {
           verifiedPurchaseReceipts: result.purchaseReceipts,
         })
       ) {
+        setLocalAttachmentCount(0);
         setDirectReceiveState(null);
         return;
       }
@@ -556,8 +559,14 @@ const {
     }
   }
 
-function handleViewCreatedReceipt(receiptId: string) {
+function closeReceiptWithPreview() {
+  if (receiptSaving) return;
+  setLocalAttachmentCount(0);
   closeReceiptModal();
+}
+
+function handleViewCreatedReceipt(receiptId: string) {
+  closeReceiptWithPreview();
   router.push(`/purchase-receipts/${encodeURIComponent(receiptId)}`);
 }
 
@@ -565,7 +574,7 @@ function handleViewCreatedReceiptInventory(
   receiptId: string,
   receiptFolio: string,
 ) {
-  closeReceiptModal();
+  closeReceiptWithPreview();
   router.push(getPurchaseReceiptInventoryHref(receiptId, receiptFolio));
 }
 
@@ -1241,10 +1250,25 @@ async function loadPageData() {
         error={receiptFormError}
         fieldErrors={receiptFieldErrors}
         createdReceipt={createdReceipt}
-        onClose={closeReceiptModal}
+        onClose={closeReceiptWithPreview}
+        pendingAttachmentCount={localAttachmentCount}
+        attachmentPreview={
+          process.env.NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI === 'true' &&
+          purchaseToReceive &&
+          !createdReceipt ? (
+            <ReceiptFilesPreview
+              key={purchaseToReceive.id}
+              mode="registration"
+              receiptFolio={purchaseToReceive.folio}
+              onSelectionCountChange={setLocalAttachmentCount}
+            />
+          ) : null
+        }
         onItemChange={handleReceiptItemChange}
         onNotesChange={handleReceiptNotesChange}
-        onSubmit={() => void handleCreateReceipt()}
+        onSubmit={() => {
+          if (localAttachmentCount === 0) void handleCreateReceipt();
+        }}
         onViewReceipt={handleViewCreatedReceipt}
         onViewInventory={handleViewCreatedReceiptInventory}
       />
