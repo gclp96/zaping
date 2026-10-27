@@ -95,9 +95,45 @@ export default function PurchaseReceiptModal({
     (item) => item.inventoryTracking === 'ASSET',
   );
 
+  const workspaceEnabled =
+    process.env.NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE === 'true' &&
+    !createdReceipt;
+  // RR-002 uses the same validated inputs and callbacks in both entrypoints.
+  // Only presentation changes; the POST and permissions stay untouched.
+  const actions = (
+    <div
+      className={
+        workspaceEnabled
+          ? 'flex flex-col-reverse justify-end gap-3 sm:flex-row'
+          : 'sticky bottom-0 -mx-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4 sm:flex-row'
+      }
+    >
+      <Button
+        variant="secondary"
+        className="w-full sm:w-auto"
+        disabled={saving}
+        onClick={onClose}
+      >
+        Cancelar
+      </Button>
+      <Button
+        variant="success"
+        className="w-full sm:w-auto"
+        loading={saving}
+        loadingText="Registrando..."
+        disabled={saving || !receiptAuthority || items.length === 0}
+        onClick={onSubmit}
+      >
+        Registrar recepción
+      </Button>
+    </div>
+  );
+
   return (
     <Modal
       isOpen={isOpen}
+      layout={workspaceEnabled ? 'workspace' : 'default'}
+      footer={workspaceEnabled ? actions : undefined}
       onClose={onClose}
       title={
         createdReceipt
@@ -682,27 +718,7 @@ export default function PurchaseReceiptModal({
             </p>
           ) : null}
 
-          <div className="sticky bottom-0 -mx-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4 sm:flex-row">
-            <Button
-              variant="secondary"
-              className="w-full sm:w-auto"
-              disabled={saving}
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              variant="success"
-              className="w-full sm:w-auto"
-              loading={saving}
-              loadingText="Registrando..."
-              disabled={saving || !receiptAuthority || items.length === 0}
-              onClick={onSubmit}
-            >
-              Registrar recepción
-            </Button>
-          </div>
+          {!workspaceEnabled ? actions : null}
         </div>
       ) : null}
     </Modal>
