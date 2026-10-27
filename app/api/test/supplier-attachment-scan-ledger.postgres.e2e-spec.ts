@@ -67,7 +67,11 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
       documentId: document.id,
       reservationId: reservation.id,
     });
-    return { companyId, documentId: document.id, reservationId: reservation.id };
+    return {
+      companyId,
+      documentId: document.id,
+      reservationId: reservation.id,
+    };
   }
 
   function observed(
@@ -300,7 +304,9 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
     const attachment = await db.supplierDocumentAttachment.findUniqueOrThrow({
       where: { id: f.reservationId },
     });
-    expect(attachment.status).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
+    expect(attachment.status).toBe(
+      SupplierDocumentAttachmentStatus.PENDING_SCAN,
+    );
     await expect(
       db.supplierDocumentAttachment.update({
         where: { id: f.reservationId },
@@ -387,8 +393,12 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
 
   it('denies ordinary CI-created non-owner roles permission to insert receipts', async () => {
     // Roles exist solely in disposable GitHub Actions PostgreSQL.
-    await db.$executeRawUnsafe('CREATE ROLE zaping_scan_receipt_api_lab NOLOGIN');
-    await db.$executeRawUnsafe('CREATE ROLE zaping_scan_receipt_worker_lab NOLOGIN');
+    await db.$executeRawUnsafe(
+      'CREATE ROLE zaping_scan_receipt_api_lab NOLOGIN',
+    );
+    await db.$executeRawUnsafe(
+      'CREATE ROLE zaping_scan_receipt_worker_lab NOLOGIN',
+    );
     try {
       const privileges = await db.$queryRawUnsafe<
         { api_write: boolean; worker_write: boolean; worker_update: boolean }[]
@@ -409,5 +419,4 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
       await db.$executeRawUnsafe('DROP ROLE zaping_scan_receipt_api_lab');
     }
   });
-
 });
