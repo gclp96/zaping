@@ -77,8 +77,8 @@ export class IsolatedVerifiedScanEvidenceGateway {
             now < job.issuedAt.getTime() ||
             now >= job.expiresAt.getTime()
           ) {
-          throw invalid();
-        }
+            throw invalid();
+          }
 
           const claims = verifyScanEvidence(
             submitted,
@@ -101,8 +101,8 @@ export class IsolatedVerifiedScanEvidenceGateway {
             Date.parse(claims.completedAt) >
               job.expiresAt.getTime() + this.policy.maxFutureClockSkewMs
           ) {
-          throw invalid();
-        }
+            throw invalid();
+          }
 
           const e = submitted as SignedScanEvidence;
           const attempt = await tx.supplierAttachmentScanAttempt.create({
@@ -124,16 +124,17 @@ export class IsolatedVerifiedScanEvidenceGateway {
               failureCode: claims.failureCode,
             },
           });
-          const receipt = await tx.supplierAttachmentSignedEvidenceReceipt.create({
-            data: {
+          const receipt =
+            await tx.supplierAttachmentSignedEvidenceReceipt.create({
+              data: {
               companyId: job.companyId,
               attemptId: attempt.id,
               requestNonce: job.requestNonce,
               signingKeyId: e.keyId,
               signature: e.signature,
-              signedClaims: { ...claims },
-            },
-          });
+                signedClaims: { ...claims },
+              },
+            });
           const consumed = await tx.$queryRaw<{ ok: boolean }[]>(
             Prisma.sql`SELECT "consume_supplier_attachment_scan_job"(
               ${job.companyId}::text, ${job.requestNonce}::uuid
@@ -142,8 +143,9 @@ export class IsolatedVerifiedScanEvidenceGateway {
           if (consumed.length !== 1 || consumed[0].ok !== true) {
             throw invalid();
           }
-          const audit = await tx.supplierAttachmentVerifiedScanEvidence.create({
-            data: {
+          const audit =
+            await tx.supplierAttachmentVerifiedScanEvidence.create({
+              data: {
               id: randomUUID(),
               jobId: job.id,
               receiptId: receipt.id,
@@ -153,8 +155,8 @@ export class IsolatedVerifiedScanEvidenceGateway {
               signatureSha256: createHash('sha256')
                 .update(Buffer.from(e.signature, 'base64url'))
                 .digest('hex'),
-            },
-          });
+              },
+            });
           return {
             auditId: audit.id,
             verdict: claims.verdict,
