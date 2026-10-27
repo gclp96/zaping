@@ -1,9 +1,17 @@
 # RECEIPTS-REDESIGN-01 — Plan de implementación y control de alcance
 
-**Estado:** PLAN / no iniciado  
-**Base:** \`RECEIPTS_REDESIGN_01_SPEC.md\`  
+**Estado:** PLAN / RR-001 documentado; RR-002 y siguientes aún no iniciados  
+**Base:** `RECEIPTS_REDESIGN_01_SPEC.md`  
 **Responsable de decisión:** revisión de producto/UX en chat  
-**Política de ramas:** \`feat/receipts-redesign-01\` nace de \`main\`; **no modifica** PR #167 ni la cadena Draft R2/ClamAV.
+**Política de ramas:** `feat/receipts-redesign-01` nace de `main`; **no modifica** PR #167 ni la cadena Draft R2/ClamAV.
+
+## Contrato de layout RR-001
+
+Medidas, breakpoints, navegación, scroll, focus management y ubicación compacta
+de adjuntos: [`RECEIPTS_REDESIGN_01_RR001_LAYOUT_CONTRACT.md`](./RECEIPTS_REDESIGN_01_RR001_LAYOUT_CONTRACT.md).
+
+El contrato está **documentado**, pero no validado en navegador; no se debe
+dar por terminado el gate de implementación sin pruebas manuales de diseño.
 
 ## Objetivo de la iteración
 
@@ -15,7 +23,7 @@ Alinear la interfaz de captura de Purchase Receipts con el boceto aprobado: pane
 
 | ID | Ticket | SP | Dependencias | Acceptance / salida |
 | --- | --- | ---: | --- | --- |
-| RR-001 | Cerrar diseño UX (desktop/móvil, panel, footer y foco) | 3 | Spec | Layout aprobado, navegable y sin affordances de funciones inexistentes |
+| RR-001 | Definir layout UX (desktop/móvil, panel, footer, foco y descarte) | 3 | Spec | **Contrato documentado** en RR001_LAYOUT_CONTRACT; **QA visual/aceptación pendiente** |
 | RR-002 | Consolidar contenedor y estados compartidos de recepción | 5 | RR-001 | Dos entradas, mismo hook; ningún duplicado de reglas, flag OFF conserva modal |
 | RR-003 | Construir captura responsive de partidas y metadatos | 5 | RR-002 | Cantidades, lotes, caducidad, documentos y notas funcionalmente equivalentes |
 | RR-004 | Añadir resumen operativo derivado | 2 | RR-003 | Totales reales de unidades a ingresar y pendientes; cero campos de rechazo |
