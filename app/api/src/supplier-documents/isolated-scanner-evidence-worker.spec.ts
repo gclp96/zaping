@@ -158,10 +158,6 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
 
   it('never signs on post-scan probe failure', async () => {
     const f = fixture();
-    jest.mocked(f.readiness.check).mockRejectedValueOnce(
-      new Error('post-scan ClamAV offline'),
-    );
-    jest.mocked(f.readiness.check).mockClear();
     jest.mocked(f.readiness.check)
       .mockResolvedValueOnce({
         engineVersion: '1.4.3',
