@@ -112,7 +112,7 @@ describe('ReceiptFilesPreview — modo exclusivamente local', () => {
     );
     expect(screen.queryByText('nota.pdf')).toBeNull();
     expect(screen.queryByText('evidencia.jpg')).toBeNull();
-    expect(screen.getByText(/selección local \\(0\\/5\\)/i)).toBeTruthy();
+    expect(screen.getByText(/selección local \(0\/5\)/i)).toBeTruthy();
     expect(screen.getByText(/selección local limpiada/i)).toBeTruthy();
   });
 
