@@ -319,7 +319,7 @@ jobs:
 
   clamav-real-lab:
     name: ClamAV real lab (isolated, no R2)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke'
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness')) || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -345,6 +345,7 @@ jobs:
             --pids-limit 256 \
             --security-opt no-new-privileges \
             -e CLAMAV_NO_FRESHCLAMD=true \
+            -e TZ=UTC \
             --mount type=bind,source="$RUNNER_TEMP/zaping-clamd-socket",target=/tmp \
             --mount type=bind,source="$GITHUB_WORKSPACE/scripts/r2/clamav-smoke.sh",target=/opt/zaping/clamav-smoke.sh,readonly \
             clamav/clamav-debian:stable
@@ -403,6 +404,16 @@ jobs:
           CLAMD_SOCKET: ${{ runner.temp }}/zaping-clamd-socket/clamd.sock
           CI: 'true'
         run: npm run test:e2e -- --runInBand test/clamav-live.qa.e2e-spec.ts
+
+      - name: Verify real ClamAV PING and VERSION readiness prototype (B3d4c only)
+        if: github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness' || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository)
+        working-directory: app/api
+        env:
+          RUN_CLAMAV_READINESS_REAL_LAB: '1'
+          CLAMD_SOCKET: ${{ runner.temp }}/zaping-clamd-socket/clamd.sock
+          TZ: UTC
+          CI: 'true'
+        run: npm run test:e2e -- --runInBand test/clamav-readiness-live.qa.e2e-spec.ts
 
       - name: Dispose of laboratory container and socket
         if: always()
