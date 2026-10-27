@@ -1,5 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { generateKeyPairSync } from 'node:crypto';
+import type { ClamAvReadiness } from './clamav-readiness-probe';
+import type { ClamAvProtocolVerdict } from './clamav-instream-scanner';
 import {
   IsolatedScannerEvidenceWorker,
   type VerifiedQuarantineScanner,
@@ -49,18 +51,25 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
   };
 
   function fixture() {
-    const scanner: VerifiedQuarantineScanner = {
-      scan: jest.fn().mockResolvedValue('CLAMD_OK_UNATTESTED'),
-    };
-    const readiness: WorkerReadinessProbe = {
-      check: jest.fn(async (nowMs: number) => ({
+    const scanMock = jest.fn<
+      Promise<ClamAvProtocolVerdict>,
+      [string, string, number, string]
+    >(() => Promise.resolve('CLAMD_OK_UNATTESTED'));
+    const probeMock = jest.fn<Promise<ClamAvReadiness>, [number]>((nowMs) =>
+      Promise.resolve({
         engineVersion: '1.4.3',
         databaseVersion: 28001,
         databaseBuiltAt: BUILT,
         observedAt: new Date(nowMs).toISOString(),
         policyVersion: 'scanner-v1',
-        attested: false as const,
-      })),
+        attested: false,
+      }),
+    );
+    const scanner: VerifiedQuarantineScanner = {
+      scan: (companyId, key, size, sha) => scanMock(companyId, key, size, sha),
+    };
+    const readiness: WorkerReadinessProbe = {
+      check: (nowMs) => probeMock(nowMs),
     };
     const stamps = [T - 1000, T - 900, T - 500, T - 400];
     const worker = new IsolatedScannerEvidenceWorker(
@@ -75,7 +84,7 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
       },
       () => stamps.shift() ?? T,
     );
-    return { worker, scanner, readiness };
+    return { worker, scanMock, probeMock };
   }
 
   it('signs the same registered bytes only after two matching probes', async () => {
@@ -87,8 +96,8 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
     expect(verified.quarantineKey).toBe(
       'quarantine/' + COMPANY + '/' + DOCUMENT + '/' + FILE,
     );
-    expect(f.readiness.check).toHaveBeenCalledTimes(2);
-    expect(f.scanner.scan).toHaveBeenCalledWith(
+    expect(f.probeMock).toHaveBeenCalledTimes(2);
+    expect(f.scanMock).toHaveBeenCalledWith(
       COMPANY,
       verified.quarantineKey,
       42,
@@ -98,7 +107,7 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
 
   it('keeps a real malware detection out of the clean state', async () => {
     const f = fixture();
-    jest.mocked(f.scanner.scan).mockResolvedValue('MALWARE_DETECTED');
+    f.scanMock.mockResolvedValue('MALWARE_DETECTED');
     const signed = await f.worker.scan(job);
     const verified = verifyScanEvidence(signed, job, verification, T);
     expect(verified.verdict).toBe('MALWARE_DETECTED');
@@ -106,36 +115,34 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
 
   it('never scans when the initial readiness check fails', async () => {
     const f = fixture();
-    jest.mocked(f.readiness.check).mockRejectedValueOnce(
-      new Error('clamd unavailable'),
-    );
+    f.probeMock.mockRejectedValueOnce(new Error('clamd unavailable'));
     await expect(f.worker.scan(job)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(f.scanner.scan).not.toHaveBeenCalled();
+    expect(f.scanMock).not.toHaveBeenCalled();
   });
 
   it('never signs clean evidence if the quarantine read fails', async () => {
     const f = fixture();
-    jest.mocked(f.scanner.scan).mockRejectedValueOnce(
-      new Error('SHA-256 mismatch'),
-    );
+    f.scanMock.mockRejectedValueOnce(new Error('SHA-256 mismatch'));
     await expect(f.worker.scan(job)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(f.readiness.check).toHaveBeenCalledTimes(1);
+    expect(f.probeMock).toHaveBeenCalledTimes(1);
   });
 
   it('rejects changed ClamAV signatures during a scan', async () => {
     const f = fixture();
-    jest.mocked(f.readiness.check).mockImplementation(async (nowMs) => ({
+    f.probeMock.mockImplementation((nowMs) =>
+      Promise.resolve({
       engineVersion: '1.4.3',
       databaseVersion: nowMs >= T - 400 ? 28002 : 28001,
       databaseBuiltAt: BUILT,
       observedAt: new Date(nowMs).toISOString(),
       policyVersion: 'scanner-v1',
-      attested: false,
-    }));
+        attested: false,
+      }),
+    );
     await expect(f.worker.scan(job)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
@@ -143,14 +150,16 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
 
   it('rejects stale or inconsistent policy between probes', async () => {
     const f = fixture();
-    jest.mocked(f.readiness.check).mockImplementation(async (nowMs) => ({
+    f.probeMock.mockImplementation((nowMs) =>
+      Promise.resolve({
       engineVersion: '1.4.3',
       databaseVersion: 28001,
       databaseBuiltAt: BUILT,
       observedAt: new Date(nowMs).toISOString(),
       policyVersion: nowMs >= T - 400 ? 'scanner-v2' : 'scanner-v1',
-      attested: false,
-    }));
+        attested: false,
+      }),
+    );
     await expect(f.worker.scan(job)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
@@ -158,7 +167,7 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
 
   it('never signs on post-scan probe failure', async () => {
     const f = fixture();
-    jest.mocked(f.readiness.check)
+    f.probeMock
       .mockResolvedValueOnce({
         engineVersion: '1.4.3',
         databaseVersion: 28001,
@@ -171,6 +180,6 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
     await expect(f.worker.scan(job)).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
-    expect(f.scanner.scan).toHaveBeenCalledTimes(1);
+    expect(f.scanMock).toHaveBeenCalledTimes(1);
   });
 });
