@@ -31,6 +31,8 @@ CREATE TABLE "SupplierAttachmentSignedEvidenceReceipt" (
 
 CREATE UNIQUE INDEX "SASER_attempt_key"
   ON "SupplierAttachmentSignedEvidenceReceipt" ("attemptId");
+CREATE UNIQUE INDEX "SASER_attempt_company_nonce_key"
+  ON "SupplierAttachmentSignedEvidenceReceipt" ("attemptId", "companyId", "requestNonce");
 CREATE UNIQUE INDEX "SASER_company_nonce_key"
   ON "SupplierAttachmentSignedEvidenceReceipt" ("companyId", "requestNonce");
 CREATE INDEX "SASER_company_recorded_idx"
