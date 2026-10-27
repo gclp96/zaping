@@ -2,14 +2,11 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { createConnection } from 'node:net';
 import {
   ClamAvReadinessProbe,
-  evaluateClamAvVersion,
   type ClamAvReadinessPolicy,
 } from '../src/supplier-documents/clamav-readiness-probe';
 
 const describeLive =
-  process.env.RUN_CLAMAV_READINESS_REAL_LAB === '1'
-    ? describe
-    : describe.skip;
+  process.env.RUN_CLAMAV_READINESS_REAL_LAB === '1' ? describe : describe.skip;
 
 function readLiveVersion(socketPath: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -60,17 +57,19 @@ describeLive('B3d4c actual clamd readiness protocol lab', () => {
       !process.env.CLAMD_SOCKET?.startsWith('/') ||
       !process.env.CLAMD_SOCKET.includes('/zaping-clamd-socket/')
     ) {
-      throw new Error('B3d4c real readiness lab requires isolated UTC CI socket');
+      throw new Error(
+        'B3d4c real readiness lab requires isolated UTC CI socket',
+      );
     }
     socketPath = process.env.CLAMD_SOCKET;
   });
 
-  it('parses real zVERSION bytes and zPING with a deliberately synthetic clock', async () => {
+  it('parses real zVERSION bytes and zPING with a synthetic clock', async () => {
     const reply = await readLiveVersion(socketPath);
     const match = /^ClamAV (\d+\.\d+\.\d+)\/([1-9]\d*)\/(.+)$/u.exec(reply);
-    expect(match).not.toBeNull();
-    const engine = match![1];
-    const reportedTime = Date.parse(match![3] + ' GMT');
+    if (!match) throw new Error('Real clamd VERSION is incomplete');
+    const engine = match[1];
+    const reportedTime = Date.parse(match[3] + ' GMT');
     expect(Number.isFinite(reportedTime)).toBe(true);
 
     const policy: ClamAvReadinessPolicy = {
@@ -85,7 +84,7 @@ describeLive('B3d4c actual clamd readiness protocol lab', () => {
       observedAt,
     );
     expect(result.engineVersion).toBe(engine);
-    expect(result.databaseVersion).toBe(Number(match![2]));
+    expect(result.databaseVersion).toBe(Number(match[2]));
     expect(result.attested).toBe(false);
     expect(result.databaseBuiltAt).toBe(new Date(reportedTime).toISOString());
   });
