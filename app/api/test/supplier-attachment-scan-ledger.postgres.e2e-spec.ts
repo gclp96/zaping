@@ -67,7 +67,11 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
       documentId: document.id,
       reservationId: reservation.id,
     });
-    return { companyId, reservationId: reservation.id };
+    return {
+      companyId,
+      documentId: document.id,
+      reservationId: reservation.id,
+    };
   }
 
   function observed(
@@ -230,5 +234,189 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
         where: { id: attempt.id },
       }),
     ).rejects.toThrow();
+  });
+  function receiptClaims(
+    f: Awaited<ReturnType<typeof fixture>>,
+    attempt: {
+      requestNonce: string;
+      contentSizeBytes: number;
+      contentSha256: string;
+      verdict: SupplierAttachmentScanVerdict;
+      engineVersion: string | null;
+      databaseVersion: number | null;
+      policyVersion: string | null;
+      workerIdentity: string | null;
+      failureCode: string | null;
+    },
+  ) {
+    return {
+      protocol: 'zaping-scan-evidence-v1',
+      companyId: f.companyId,
+      documentId: f.documentId,
+      attachmentId: f.reservationId,
+      reservationId: f.reservationId,
+      requestNonce: attempt.requestNonce,
+      quarantineKey:
+        'quarantine/' +
+        f.companyId +
+        '/' +
+        f.documentId +
+        '/' +
+        f.reservationId,
+      contentSizeBytes: attempt.contentSizeBytes,
+      contentSha256: attempt.contentSha256,
+      bytesVerified: true,
+      verdict: attempt.verdict,
+      engineVersion: attempt.engineVersion,
+      databaseVersion: attempt.databaseVersion,
+      databaseBuiltAt: '2026-10-26T12:00:00.000Z',
+      readinessBeforeAt: '2026-10-26T12:01:00.000Z',
+      readinessAfterAt: '2026-10-26T12:02:00.000Z',
+      startedAt: '2026-10-26T12:01:10.000Z',
+      completedAt: '2026-10-26T12:01:50.000Z',
+      policyVersion: attempt.policyVersion,
+      workerIdentity: attempt.workerIdentity,
+      workerBuildDigest: 'f'.repeat(64),
+      failureCode: attempt.failureCode,
+    };
+  }
+
+  it('stores a matching signed receipt without making a file available', async () => {
+    const f = await fixture();
+    const attempt = await db.supplierAttachmentScanAttempt.create({
+      data: observed(f),
+    });
+    const recorded = await db.supplierAttachmentSignedEvidenceReceipt.create({
+      data: {
+        companyId: f.companyId,
+        attemptId: attempt.id,
+        requestNonce: attempt.requestNonce,
+        signingKeyId: 'test-key-not-trusted',
+        // Valid *shape* only: no SQL Ed25519 verification exists in B3d5b3a.
+        signature: 'A'.repeat(86),
+        signedClaims: receiptClaims(f, attempt),
+        recordedAt: new Date('2000-01-01T00:00:00.000Z'),
+      },
+    });
+    expect(recorded.recordedAt.getTime()).toBeGreaterThan(
+      new Date('2026-01-01T00:00:00.000Z').getTime(),
+    );
+    const attachment = await db.supplierDocumentAttachment.findUniqueOrThrow({
+      where: { id: f.reservationId },
+    });
+    expect(attachment.status).toBe(
+      SupplierDocumentAttachmentStatus.PENDING_SCAN,
+    );
+    await expect(
+      db.supplierDocumentAttachment.update({
+        where: { id: f.reservationId },
+        data: {
+          status: SupplierDocumentAttachmentStatus.AVAILABLE,
+          scanEngine: 'fake-receipt',
+          scannedAt: new Date(),
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.update({
+        where: { id: recorded.id },
+        data: { signingKeyId: 'forged' },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.delete({
+        where: { id: recorded.id },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects nonce, tenant, hash, object and signature-shape mismatches', async () => {
+    const a = await fixture();
+    const b = await fixture();
+    const attempt = await db.supplierAttachmentScanAttempt.create({
+      data: observed(a),
+    });
+    const data = {
+      companyId: a.companyId,
+      attemptId: attempt.id,
+      requestNonce: attempt.requestNonce,
+      signingKeyId: 'test-key-not-trusted',
+      signature: 'A'.repeat(86),
+      signedClaims: receiptClaims(a, attempt),
+    };
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({
+        data: { ...data, companyId: b.companyId },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({
+        data: { ...data, requestNonce: randomUUID() },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({
+        data: {
+          ...data,
+          signedClaims: {
+            ...data.signedClaims,
+            contentSha256: 'b'.repeat(64),
+          },
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({
+        data: {
+          ...data,
+          signedClaims: {
+            ...data.signedClaims,
+            quarantineKey: 'quarantine/another-company/forged',
+          },
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({
+        data: { ...data, signature: 'not-ed25519' },
+      }),
+    ).rejects.toThrow();
+
+    const receipt = await db.supplierAttachmentSignedEvidenceReceipt.create({
+      data,
+    });
+    expect(receipt.requestNonce).toBe(attempt.requestNonce);
+    await expect(
+      db.supplierAttachmentSignedEvidenceReceipt.create({ data }),
+    ).rejects.toThrow();
+  });
+
+  it('denies ordinary CI-created non-owner roles permission to insert receipts', async () => {
+    // Roles exist solely in disposable GitHub Actions PostgreSQL.
+    await db.$executeRawUnsafe(
+      'CREATE ROLE zaping_scan_receipt_api_lab NOLOGIN',
+    );
+    await db.$executeRawUnsafe(
+      'CREATE ROLE zaping_scan_receipt_worker_lab NOLOGIN',
+    );
+    try {
+      const privileges = await db.$queryRawUnsafe<
+        { api_write: boolean; worker_write: boolean; worker_update: boolean }[]
+      >(
+        `SELECT
+          has_table_privilege('zaping_scan_receipt_api_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'INSERT') AS api_write,
+          has_table_privilege('zaping_scan_receipt_worker_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'INSERT') AS worker_write,
+          has_table_privilege('zaping_scan_receipt_worker_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'UPDATE') AS worker_update`,
+      );
+      expect(privileges).toEqual([
+        { api_write: false, worker_write: false, worker_update: false },
+      ]);
+    } finally {
+      await db.$executeRawUnsafe('DROP ROLE zaping_scan_receipt_worker_lab');
+      await db.$executeRawUnsafe('DROP ROLE zaping_scan_receipt_api_lab');
+    }
   });
 });
