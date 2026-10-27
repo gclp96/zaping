@@ -70,6 +70,52 @@ describe('ReceiptFilesPreview — modo exclusivamente local', () => {
     expect(screen.getByText(/selección local \(0\/5\)/i)).toBeTruthy();
   });
 
+  it('resalta la zona al arrastrar y limpia el indicador al salir o soltar', () => {
+    render(<ReceiptFilesPreview receiptFolio="REC-DROP" />);
+    const zone = screen.getByRole('group', {
+      name: 'Área de selección local de archivos',
+    });
+
+    fireEvent.dragEnter(zone);
+    expect(zone.className).toContain('border-blue-600');
+
+    fireEvent.dragLeave(zone);
+    expect(zone.className).not.toContain('border-blue-600');
+
+    fireEvent.dragEnter(zone);
+    fireEvent.drop(zone, {
+      dataTransfer: { files: [makeFile('guia.pdf', 'application/pdf')] },
+    });
+    expect(zone.className).not.toContain('border-blue-600');
+    expect(screen.getByText('guia.pdf')).toBeTruthy();
+  });
+
+  it('permite limpiar todos los borradores sin guardarlos', () => {
+    render(<ReceiptFilesPreview receiptFolio="REC-CLEAR" />);
+    expect(
+      screen.queryByRole('button', { name: 'Limpiar selección' }),
+    ).toBeNull();
+    const picker = screen.getByLabelText(
+      'Seleccionar archivos para vista previa local',
+    );
+
+    fireEvent.change(picker, {
+      target: {
+        files: [
+          makeFile('nota.pdf', 'application/pdf'),
+          makeFile('evidencia.jpg', 'image/jpeg'),
+        ],
+      },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Limpiar selección' }),
+    );
+    expect(screen.queryByText('nota.pdf')).toBeNull();
+    expect(screen.queryByText('evidencia.jpg')).toBeNull();
+    expect(screen.getByText(/selección local \\(0\\/5\\)/i)).toBeTruthy();
+    expect(screen.getByText(/selección local limpiada/i)).toBeTruthy();
+  });
+
   it('rechaza archivo vacío, MIME contradictorio y tamaño excesivo', () => {
     render(<ReceiptFilesPreview receiptFolio="REC-004" />);
     const picker = screen.getByLabelText(
@@ -107,6 +153,11 @@ describe('ReceiptFilesPreview — modo exclusivamente local', () => {
     });
     expect(screen.getByRole('alert').textContent).toMatch(/máximo 5 archivos/i);
     expect(screen.queryByText('sexto.pdf')).toBeNull();
+
+    fireEvent.change(picker, {
+      target: { files: [makeFile('archivo-2.pdf', 'application/pdf')] },
+    });
+    expect(screen.getByRole('alert').textContent).toMatch(/ya está/i);
 
     fireEvent.click(
       screen.getByRole('button', {
