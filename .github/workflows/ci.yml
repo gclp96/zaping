@@ -319,7 +319,7 @@ jobs:
 
   clamav-real-lab:
     name: ClamAV real lab (isolated, no R2)
-    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness-policy')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

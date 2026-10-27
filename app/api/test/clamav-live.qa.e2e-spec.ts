@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { ClamAvInstreamScanner } from '../src/supplier-documents/clamav-instream-scanner';
+import { ClamAvUnixVersionProbe } from '../src/supplier-documents/clamav-unix-version-probe';
 
 const describeLive =
   process.env.RUN_CLAMAV_REAL_LAB === '1' ? describe : describe.skip;
@@ -26,6 +27,15 @@ describeLive(
         );
       }
       scanner = new ClamAvInstreamScanner(process.env.CLAMD_SOCKET, 20_000);
+    });
+
+    it('reads engine and definition metadata from real zVERSION Unix protocol', async () => {
+      const socketPath = process.env.CLAMD_SOCKET;
+      if (!socketPath) throw new Error('Laboratory Unix socket unavailable');
+      const version = await new ClamAvUnixVersionProbe(
+        socketPath,
+      ).readVersion();
+      expect(version).toMatch(/^ClamAV \d+\.\d+\.\d+\/\d+\/.{15,95}$/);
     });
 
     it('passes a synthetic clean PDF through the real Node zINSTREAM client', async () => {
