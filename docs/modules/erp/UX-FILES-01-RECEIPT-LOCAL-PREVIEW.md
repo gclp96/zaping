@@ -5,7 +5,7 @@
 ## Alcance
 
 El componente reutilizable `web/app/components/files/ReceiptFilesPreview.tsx` se monta **solo si** la variable `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI` es exactamente `true`, tanto:
-- En el formulario **Registrar recepción**, debajo de Notas y antes de confirmar, asociado a la orden de compra seleccionada.
+- En el formulario **Registrar recepción** tanto de **Compras → Recibir** como de **Recepciones → Registrar recepción**, después de Documento del proveedor/Número del documento y antes de Notas, asociado a la orden de compra seleccionada.
 - En `web/app/(app)/purchase-receipts/[id]/page.tsx`, debajo de "Partidas recibidas", para una recepción ya registrada.
 
 **Seguridad del formulario:** el backend no soporta todavía adjuntar documentos al crear la recepción. Para evitar pérdida silenciosa o la impresión de que se guardaron, **si hay archivos seleccionados solo para vista previa, el botón "Registrar recepción" permanece deshabilitado** y aparece una advertencia para quitar/limpiar la selección. Si no hay archivos, el flujo actual funciona sin cambios. El contador se reinicia al cerrar, reabrir o cambiar de orden de compra. Ningún archivo se añade al payload de la recepción.
@@ -52,3 +52,11 @@ Para ocultarla, eliminar la variable o asignar cualquier valor distinto de `true
 ## Fuera de alcance
 
 No hay nuevas rutas API, datos de ejemplo inventados en la respuesta de la recepción, campos de adjuntos añadidos a su DTO, cambios Prisma, conexión Cloudflare R2, ni posibilidad de descargar documentos. Las secciones del ERP siguen funcionando igual cuando el flag está deshabilitado.
+
+## Diagnóstico de una UI local que no muestra la sección
+
+- El botón **Registrar recepción** de la página de Recepciones solo está disponible a perfiles `ADMIN`, `MANAGER` y `WAREHOUSE`, y una sesión confirmada; en Compras, la acción **Recibir** usa la misma matriz. No se alteran permisos para mostrar la vista preliminar.
+- La ruta `/purchases` usa un punto de entrada distinto de `/purchase-receipts`; **ambos deben estar actualizados** con la misma rama y el mismo feature flag.
+- Comprueba `git branch --show-current` y `git rev-parse --short HEAD`. Tras actualizar una rama, **reinicia Next.js** desde la carpeta `web` con el flag establecido en el **mismo proceso**.
+- Si existe otro `next dev` en el puerto 3000 y el nuevo arranca en 3002, detén el proceso anterior; el navegador que sigue en `:3000` no está mostrando la compilación nueva. Comprueba los puertos que escucha Windows con `Get-NetTCPConnection -State Listen -LocalPort 3000,3002 | Select LocalPort,OwningProcess`. Si es necesario, inspecciona el proceso con `Get-Process -Id <PID>` antes de cerrarlo.
+- Verifica dentro del modal de Compras que aparece **Adjuntos de la recepción**. Con un archivo local seleccionado, **Registrar recepción** debe estar bloqueado; tras quitarlo, debe recuperarse el registro normal.
