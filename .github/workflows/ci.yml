@@ -319,7 +319,7 @@ jobs:
 
   clamav-real-lab:
     name: ClamAV real lab (isolated, no R2)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness')
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness')) || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -406,7 +406,7 @@ jobs:
         run: npm run test:e2e -- --runInBand test/clamav-live.qa.e2e-spec.ts
 
       - name: Verify real ClamAV PING and VERSION readiness prototype (B3d4c only)
-        if: github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness'
+        if: github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness' || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository)
         working-directory: app/api
         env:
           RUN_CLAMAV_READINESS_REAL_LAB: '1'
