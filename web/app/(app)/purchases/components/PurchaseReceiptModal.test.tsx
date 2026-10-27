@@ -265,6 +265,86 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
     expect(props.onSubmit).toHaveBeenCalledOnce();
   });
 
+  it('RR-003 agrupa partida y documento sin cambiar la captura ni sus callbacks', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onItemChange = vi.fn();
+    const onSupplierDocumentTypeChange = vi.fn();
+    const onSupplierDocumentNumberChange = vi.fn();
+    const onNotesChange = vi.fn();
+    show({
+      onItemChange,
+      onSupplierDocumentTypeChange,
+      onSupplierDocumentNumberChange,
+      onNotesChange,
+    });
+
+    const context = screen.getByTestId('receipt-purchase-context');
+    expect(within(context).getByText('OC-1')).toBeTruthy();
+    expect(within(context).getByText('Proveedor')).toBeTruthy();
+
+    const items = screen.getByTestId('receipt-item-capture-section');
+    expect(within(items).getByText('Partidas pendientes')).toBeTruthy();
+    const desktop = within(items).getByTestId('receipt-desktop-items');
+    const mobile = within(items).getByTestId('receipt-mobile-items');
+    expect(desktop.className).toContain('lg:block');
+    expect(mobile.className).toContain('lg:hidden');
+    expect(within(desktop).getByRole('table').className).toContain(
+      'min-w-[940px]',
+    );
+    expect(within(desktop).getByText('Pedido')).toBeTruthy();
+    expect(within(desktop).getByText('Recibido')).toBeTruthy();
+    expect(within(desktop).getByText('Pendiente')).toBeTruthy();
+
+    fireEvent.change(
+      within(desktop).getByLabelText('Cantidad recibida de Producto por cantidad'),
+      { target: { value: '3' } },
+    );
+    expect(onItemChange).toHaveBeenCalledWith(
+      'purchase-item-1',
+      'quantityReceived',
+      '3',
+    );
+
+    const documents = screen.getByTestId('receipt-supplier-document-section');
+    expect(
+      within(documents).getByText('Documento del proveedor y notas'),
+    ).toBeTruthy();
+    fireEvent.change(
+      within(documents).getByLabelText('Documento del proveedor (opcional)'),
+      { target: { value: 'REMISION' } },
+    );
+    fireEvent.change(within(documents).getByLabelText('Número del documento'), {
+      target: { value: 'REM-123' },
+    });
+    fireEvent.change(within(documents).getByLabelText('Notas'), {
+      target: { value: 'Tres piezas recibidas' },
+    });
+    expect(onSupplierDocumentTypeChange).toHaveBeenCalledWith('REMISION');
+    expect(onSupplierDocumentNumberChange).toHaveBeenCalledWith('REM-123');
+    expect(onNotesChange).toHaveBeenCalledWith('Tres piezas recibidas');
+    expect(screen.queryByText('Guardar borrador')).toBeNull();
+    expect(screen.queryByText('Rechazado')).toBeNull();
+  });
+
+  it('RR-003 conserva el layout clásico y las mismas partidas con la flag OFF', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+    show();
+    const context = screen.getByTestId('receipt-purchase-context');
+    expect(within(context).queryByText('OC-1')).toBeNull();
+    const items = screen.getByTestId('receipt-item-capture-section');
+    expect(within(items).queryByText('Partidas pendientes')).toBeNull();
+    const desktop = within(items).getByTestId('receipt-desktop-items');
+    const mobile = within(items).getByTestId('receipt-mobile-items');
+    expect(desktop.className).toContain('xl:block');
+    expect(mobile.className).toContain('xl:hidden');
+    expect(within(desktop).getByRole('table').className).toContain(
+      'min-w-[760px]',
+    );
+    expect(screen.getByRole('button', {
+      name: 'Registrar recepción',
+    })).toBeTruthy();
+  });
+
   it.each(['NONE', 'OPTIONAL', 'REQUIRED'] as const)(
     'PHYSICAL QUANTITY %s ofrece lote y fecha independientes en desktop y móvil',
     (lotTracking) => {
