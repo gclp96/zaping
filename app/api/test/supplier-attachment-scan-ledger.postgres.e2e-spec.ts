@@ -13,7 +13,7 @@ const describePg =
   process.env.RUN_SUPPLIER_SCAN_LEDGER_PG === '1' ? describe : describe.skip;
 
 /** Untrusted observations never authorize clean-file promotion or downloads. */
-describePg('B3d5a immutable scan observation ledger on isolated PostgreSQL', () => {
+describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
   let db: PrismaClient;
   let reservations: SupplierAttachmentUploadReservationsService;
   let reconciliation: SupplierAttachmentUploadReconciliationService;
