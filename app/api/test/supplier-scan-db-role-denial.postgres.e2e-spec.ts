@@ -58,8 +58,12 @@ describePg('B3d5b3c2a separate non-owner PostgreSQL login denials', () => {
       const name = 'z_c2_' + actor + '_' + suffix;
       const password = randomBytes(24).toString('hex');
       await owner.$executeRawUnsafe(
-        'CREATE ROLE "' + name + '" LOGIN NOINHERIT PASSWORD ' +
-          "'" + password + "'",
+        'CREATE ROLE "' +
+          name +
+          '" LOGIN NOINHERIT PASSWORD ' +
+          "'" +
+          password +
+          "'",
       );
       const url = new URL(raw);
       url.username = name;
@@ -79,122 +83,135 @@ describePg('B3d5b3c2a separate non-owner PostgreSQL login denials', () => {
     }
     if (owner) {
       for (const role of roles.values()) {
-        await owner.$executeRawUnsafe(
-          'DROP ROLE "' + role.name + '"',
-        );
+        await owner.$executeRawUnsafe('DROP ROLE "' + role.name + '"');
       }
       await owner.$disconnect();
     }
   });
 
-  it.each(ACTORS)('%s connects as a distinct non-owner LOGIN', async (actor) => {
-    const role = roles.get(actor);
-    if (!role) throw new Error('Role setup incomplete');
-    const [session] = await role.connection.$queryRawUnsafe<
-      { database: string; role: string; sessionRole: string }[]
-    >(
-      'SELECT current_database() AS database, current_user AS role, ' +
-        'session_user AS "sessionRole"',
-    );
-    expect(session).toEqual({
-      database: 'zaping_test',
-      role: role.name,
-      sessionRole: role.name,
-    });
-    const [attributes] = await owner.$queryRawUnsafe<
-      {
-        rolsuper: boolean;
-        rolcreatedb: boolean;
-        rolcreaterole: boolean;
-        rolreplication: boolean;
-        rolbypassrls: boolean;
-        rolinherit: boolean;
-      }[]
-    >(
-      'SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, ' +
-        'rolbypassrls, rolinherit FROM pg_roles WHERE rolname = $1',
-      role.name,
-    );
-    expect(attributes).toEqual({
-      rolsuper: false,
-      rolcreatedb: false,
-      rolcreaterole: false,
-      rolreplication: false,
-      rolbypassrls: false,
-      rolinherit: false,
-    });
-  });
+  it.each(ACTORS)(
+    '%s connects as a distinct non-owner LOGIN',
+    async (actor) => {
+      const role = roles.get(actor);
+      if (!role) throw new Error('Role setup incomplete');
+      const [session] = await role.connection.$queryRawUnsafe<
+        { database: string; role: string; sessionRole: string }[]
+      >(
+        'SELECT current_database() AS database, current_user AS role, ' +
+          'session_user AS "sessionRole"',
+      );
+      expect(session).toEqual({
+        database: 'zaping_test',
+        role: role.name,
+        sessionRole: role.name,
+      });
+      const [attributes] = await owner.$queryRawUnsafe<
+        {
+          rolsuper: boolean;
+          rolcreatedb: boolean;
+          rolcreaterole: boolean;
+          rolreplication: boolean;
+          rolbypassrls: boolean;
+          rolinherit: boolean;
+        }[]
+      >(
+        'SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, ' +
+          'rolbypassrls, rolinherit FROM pg_roles WHERE rolname = $1',
+        role.name,
+      );
+      expect(attributes).toEqual({
+        rolsuper: false,
+        rolcreatedb: false,
+        rolcreaterole: false,
+        rolreplication: false,
+        rolbypassrls: false,
+        rolinherit: false,
+      });
+    },
+  );
 
-  it.each(ACTORS)('%s has no direct protected-table privileges', async (actor) => {
-    const role = roles.get(actor);
-    if (!role) throw new Error('Role setup incomplete');
-    for (const table of PROTECTED_TABLES) {
-      for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+  it.each(ACTORS)(
+    '%s has no direct protected-table privileges',
+    async (actor) => {
+      const role = roles.get(actor);
+      if (!role) throw new Error('Role setup incomplete');
+      for (const table of PROTECTED_TABLES) {
+        for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE']) {
+          const [rights] = await owner.$queryRawUnsafe<
+            { allowed: boolean }[]
+          >(
+            'SELECT has_table_privilege($1, $2, $3) AS allowed',
+            role.name,
+            '"' + table + '"',
+            privilege,
+          );
+          expect(rights.allowed).toBe(false);
+        }
+      }
+    },
+  );
+
+  it.each(ACTORS)(
+    '%s cannot execute issue/consume functions',
+    async (actor) => {
+      const role = roles.get(actor);
+      if (!role) throw new Error('Role setup incomplete');
+      for (const routine of [
+        '"issue_supplier_attachment_scan_job"(text,text,integer)',
+        '"consume_supplier_attachment_scan_job"(text,uuid)',
+      ]) {
         const [rights] = await owner.$queryRawUnsafe<
           { allowed: boolean }[]
         >(
-          'SELECT has_table_privilege($1, $2, $3) AS allowed',
+          'SELECT has_function_privilege($1, $2, $3) AS allowed',
           role.name,
-          '"' + table + '"',
-          privilege,
+          routine,
+          'EXECUTE',
         );
         expect(rights.allowed).toBe(false);
       }
-    }
-  });
+    },
+  );
 
-  it.each(ACTORS)('%s cannot execute issue/consume functions', async (actor) => {
-    const role = roles.get(actor);
-    if (!role) throw new Error('Role setup incomplete');
-    for (const routine of [
-      '"issue_supplier_attachment_scan_job"(text,text,integer)',
-      '"consume_supplier_attachment_scan_job"(text,uuid)',
-    ]) {
-      const [rights] = await owner.$queryRawUnsafe<
-        { allowed: boolean }[]
-      >(
-        'SELECT has_function_privilege($1, $2, $3) AS allowed',
-        role.name,
-        routine,
-        'EXECUTE',
-      );
-      expect(rights.allowed).toBe(false);
-    }
-  });
+  it.each(ACTORS)(
+    '%s is denied actual DML forging attempts',
+    async (actor) => {
+      const role = roles.get(actor);
+      if (!role) throw new Error('Role setup incomplete');
+      const attacks = [
+        'INSERT INTO "SupplierAttachmentVerifiedScanEvidence" DEFAULT VALUES',
+        'INSERT INTO "SupplierAttachmentSignedEvidenceReceipt" DEFAULT VALUES',
+        'INSERT INTO "SupplierAttachmentScanAttempt" DEFAULT VALUES',
+        'UPDATE "SupplierDocumentAttachment" SET "status" = ' +
+          "'AVAILABLE' WHERE FALSE",
+        'UPDATE "SupplierAttachmentScanJob" SET "status" = ' +
+          "'CONSUMED' WHERE FALSE",
+      ];
+      for (const sql of attacks) {
+        await expect(role.connection.$executeRawUnsafe(sql)).rejects.toThrow(
+          /permission denied/i,
+        );
+      }
+    },
+  );
 
-  it.each(ACTORS)('%s is denied actual DML forging attempts', async (actor) => {
-    const role = roles.get(actor);
-    if (!role) throw new Error('Role setup incomplete');
-    const attacks = [
-      'INSERT INTO "SupplierAttachmentVerifiedScanEvidence" DEFAULT VALUES',
-      'INSERT INTO "SupplierAttachmentSignedEvidenceReceipt" DEFAULT VALUES',
-      'INSERT INTO "SupplierAttachmentScanAttempt" DEFAULT VALUES',
-      'UPDATE "SupplierDocumentAttachment" SET "status" = ' +
-        "'AVAILABLE' WHERE FALSE",
-      'UPDATE "SupplierAttachmentScanJob" SET "status" = ' +
-        "'CONSUMED' WHERE FALSE",
-    ];
-    for (const sql of attacks) {
-      await expect(role.connection.$executeRawUnsafe(sql)).rejects.toThrow(
-        /permission denied/i,
-      );
-    }
-  });
-
-  it.each(ACTORS)('%s is denied actual SQL function calls', async (actor) => {
-    const role = roles.get(actor);
-    if (!role) throw new Error('Role setup incomplete');
-    await expect(
-      role.connection.$queryRawUnsafe(
-        'SELECT * FROM "issue_supplier_attachment_scan_job"(' +
-          "'no-company', 'no-reservation', 120)",
-      ),
-    ).rejects.toThrow(/permission denied/i);
-    await expect(
-      role.connection.$queryRawUnsafe(
-        'SELECT "consume_supplier_attachment_scan_job"(' +
-          "'no-company', '00000000-0000-4000-8000-000000000000'::uuid)",
-      ),
-    ).rejects.toThrow(/permission denied/i);
-  });
+  it.each(ACTORS)(
+    '%s is denied actual SQL function calls',
+    async (actor) => {
+      const role = roles.get(actor);
+      if (!role) throw new Error('Role setup incomplete');
+      await expect(
+        role.connection.$queryRawUnsafe(
+          'SELECT * FROM "issue_supplier_attachment_scan_job"(' +
+            "'no-company', 'no-reservation', 120)",
+        ),
+      ).rejects.toThrow(/permission denied/i);
+      await expect(
+        role.connection.$queryRawUnsafe(
+          'SELECT "consume_supplier_attachment_scan_job"(' +
+            "'no-company', '00000000-0000-4000-8000-000000000000'::uuid)",
+        ),
+      ).rejects.toThrow(/permission denied/i);
+    },
+  );
 });
