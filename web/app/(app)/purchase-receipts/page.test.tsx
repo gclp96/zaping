@@ -598,6 +598,9 @@ describe('PurchaseReceiptsPage', () => {
     render(<PurchaseReceiptsPage />);
     expect(await screen.findByRole('link', { name: primaryReceipt.folio })).toBeTruthy();
     expect(api.get).toHaveBeenCalledWith('/purchase-receipts');
+    expect(
+      screen.getByRole('button', { name: 'Registrar recepción' }),
+    ).toBeTruthy();
   });
 
   it('bloquea SALES sin consultar recepciones', () => {
