@@ -135,11 +135,11 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
     const f = fixture();
     f.probeMock.mockImplementation((nowMs) =>
       Promise.resolve({
-      engineVersion: '1.4.3',
-      databaseVersion: nowMs >= T - 400 ? 28002 : 28001,
-      databaseBuiltAt: BUILT,
-      observedAt: new Date(nowMs).toISOString(),
-      policyVersion: 'scanner-v1',
+        engineVersion: '1.4.3',
+        databaseVersion: nowMs >= T - 400 ? 28002 : 28001,
+        databaseBuiltAt: BUILT,
+        observedAt: new Date(nowMs).toISOString(),
+        policyVersion: 'scanner-v1',
         attested: false,
       }),
     );
@@ -152,11 +152,11 @@ describe('B3d5b2 isolated scanner: fail-closed, no persistence', () => {
     const f = fixture();
     f.probeMock.mockImplementation((nowMs) =>
       Promise.resolve({
-      engineVersion: '1.4.3',
-      databaseVersion: 28001,
-      databaseBuiltAt: BUILT,
-      observedAt: new Date(nowMs).toISOString(),
-      policyVersion: nowMs >= T - 400 ? 'scanner-v2' : 'scanner-v1',
+        engineVersion: '1.4.3',
+        databaseVersion: 28001,
+        databaseBuiltAt: BUILT,
+        observedAt: new Date(nowMs).toISOString(),
+        policyVersion: nowMs >= T - 400 ? 'scanner-v2' : 'scanner-v1',
         attested: false,
       }),
     );
