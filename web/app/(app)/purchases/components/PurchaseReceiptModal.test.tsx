@@ -473,3 +473,58 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
     expect(props.onSubmit).not.toHaveBeenCalled();
   });
 });
+
+
+describe('RR-005 — preview de adjuntos sin persistencia', () => {
+  const props = {
+    isOpen: true,
+    receiptAuthority: 'PHYSICAL' as const,
+    receiptAuthorityError: '',
+    onRetryAuthority: vi.fn(),
+    purchase: { folio: 'OC-RR005', supplier: { name: 'Proveedor prueba' } },
+    items: [createReceiptItem()],
+    notes: '',
+    supplierDocumentType: '',
+    supplierDocumentNumber: '',
+    onSupplierDocumentTypeChange: vi.fn(),
+    onSupplierDocumentNumberChange: vi.fn(),
+    saving: false,
+    error: '',
+    fieldErrors: {},
+    createdReceipt: null,
+    onClose: vi.fn(),
+    onItemChange: vi.fn(),
+    onNotesChange: vi.fn(),
+    onSubmit: vi.fn(),
+    onViewReceipt: vi.fn(),
+    onViewInventory: vi.fn(),
+  };
+
+  it('coloca adjuntos a la izquierda del resumen en workspace', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    render(<PurchaseReceiptModal {...props} attachmentPreview={<div data-testid="rr005-files">Archivos locales</div>} />);
+    const lowerArea = screen.getByTestId('receipt-lower-area');
+    const children = Array.from(lowerArea.children);
+    expect(children).toHaveLength(2);
+    expect(children[0].contains(screen.getByTestId('rr005-files'))).toBe(true);
+    expect(children[1].contains(screen.getByTestId('receipt-capture-summary'))).toBe(true);
+  });
+
+  it('bloquea registro con selección local; no invoca callback de negocio', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onSubmit = vi.fn();
+    render(<PurchaseReceiptModal {...props} pendingAttachmentCount={2} onSubmit={onSubmit} />);
+    const submit = screen.getByRole('button', { name: 'Registrar recepción' }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.click(submit);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert').textContent).toContain('No se guardarán');
+  });
+
+  it('no altera la vista clásica al apagar el workspace', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+    render(<PurchaseReceiptModal {...props} />);
+    expect(screen.queryByTestId('receipt-lower-area')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeTruthy();
+  });
+});
