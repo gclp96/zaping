@@ -1,0 +1,86 @@
+name: ClamAV B3d4b live security smoke (isolated, opt-in)
+
+on:
+  # Dedicated QA branch only, to avoid a 4 GiB ClamAV daemon on every PR.
+  push:
+    branches:
+      - test/ux-pdoc-01b3d4b-clamav-live-qa
+    paths:
+      - .github/workflows/clamav-b3d4b-live-qa.yml
+      - scripts/r2/clamav-live-smoke.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clamav-b3d4b-live-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clamav-live:
+    name: Real ClamAV 1.4 LTS Unix socket + EICAR
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate smoke script syntax
+        run: node --check scripts/r2/clamav-live-smoke.mjs
+
+      - name: Start official ClamAV 1.4 LTS in an isolated Docker environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker network create zaping-clamav-lab
+          docker volume create zaping-clamd-socket
+          # 1.4 tracks supported 1.4.x security patches. The smoke script
+          # separately checks actual version >=1.4.6 and signature freshness.
+          docker pull clamav/clamav:1.4
+          docker run --detach \
+            --name zaping-clamd-lab \
+            --network zaping-clamav-lab \
+            --memory 4g --memory-swap 4g --cpus 2 \
+            --mount type=volume,source=zaping-clamd-socket,target=/tmp \
+            --env CLAMAV_NO_MILTERD=true \
+            --env FRESHCLAM_CHECKS=24 \
+            clamav/clamav:1.4
+          # Official Alpine ClamAV 1.4 default LocalSocket is /tmp/clamd.sock.
+          docker exec zaping-clamd-lab sh -c "grep -q '^LocalSocket /tmp/clamd.sock$' /etc/clamav/clamd.conf"
+          # No Docker --publish flags: clamd TCP port stays unexposed.
+
+      - name: Scan synthetic PDF/JPEG + harmless EICAR with actual daemon
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Runner is throwaway. The client has no network, GitHub token,
+          # writable workspace, Cloudflare credentials or PostgreSQL access.
+          docker run --rm \
+            --network none \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --read-only \
+            --mount type=volume,source=zaping-clamd-socket,target=/tmp,readonly \
+            --mount type=bind,source="$GITHUB_WORKSPACE",target=/work,readonly \
+            --workdir /work \
+            node:24-bookworm-slim \
+            node scripts/r2/clamav-live-smoke.mjs /tmp/clamd.sock
+
+      - name: Redacted diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          docker inspect --format '{{.State.Status}} / health={{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}' zaping-clamd-lab
+          # Do not print full daemon logs, signature names or credentials.
+
+      - name: Remove all QA containers, socket volume and dedicated network
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          docker rm -f zaping-clamd-lab >/dev/null 2>&1
+          docker volume rm -f zaping-clamd-socket >/dev/null 2>&1
+          docker network rm zaping-clamav-lab >/dev/null 2>&1
