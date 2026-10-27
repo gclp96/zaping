@@ -126,9 +126,11 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
 
     expect(await service.listAvailable(f.companyId, f.documentId)).toEqual([]);
     expect(
-      (await db.supplierDocumentAttachment.findUniqueOrThrow({
-        where: { id: metadata.id },
-      })).status,
+      (
+        await db.supplierDocumentAttachment.findUniqueOrThrow({
+          where: { id: metadata.id },
+        })
+      ).status,
     ).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
   });
 
