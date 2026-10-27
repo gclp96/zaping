@@ -32,7 +32,9 @@ describeLive(
     it('reads engine and definition metadata from real zVERSION Unix protocol', async () => {
       const socketPath = process.env.CLAMD_SOCKET;
       if (!socketPath) throw new Error('Laboratory Unix socket unavailable');
-      const version = await new ClamAvUnixVersionProbe(socketPath).readVersion();
+      const version = await new ClamAvUnixVersionProbe(
+        socketPath,
+      ).readVersion();
       expect(version).toMatch(/^ClamAV \d+\.\d+\.\d+\/\d+\/.{15,95}$/);
     });
 
