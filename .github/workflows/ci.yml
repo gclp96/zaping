@@ -128,6 +128,11 @@ jobs:
           RUN_SUPPLIER_UPLOAD_RECONCILIATION_PG: "1"
         run: npm run test:e2e -- --runInBand test/supplier-attachment-upload-reconciliation.postgres.e2e-spec.ts
 
+      - name: Verify B3d5a append-only untrusted scan ledger on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_SCAN_LEDGER_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-attachment-scan-ledger.postgres.e2e-spec.ts
+
       - name: Verify B3d2 quota reservations and concurrency on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_UPLOAD_RESERVATIONS_PG: "1"

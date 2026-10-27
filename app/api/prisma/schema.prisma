@@ -1883,6 +1883,13 @@ enum SupplierDocumentAttachmentStatus {
   REMOVED
 }
 
+// B3d5a: recorded observations are NOT trusted scan attestations.
+enum SupplierAttachmentScanVerdict {
+  CLEAN_CANDIDATE
+  MALWARE_DETECTED
+  SCAN_FAILED
+}
+
 enum SupplierDocumentType {
   FACTURA
   REMISION
@@ -2139,6 +2146,7 @@ model SupplierAttachmentUploadReservation {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   reconcileEvents SupplierAttachmentReconcileEvent[]
+  scanAttempts SupplierAttachmentScanAttempt[]
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
@@ -2185,12 +2193,41 @@ model SupplierDocumentAttachment {
   createdAt     DateTime @default(now())
   removedById   String?
   removedAt     DateTime?
+  scanAttempts SupplierAttachmentScanAttempt[]
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   document SupplierDocument @relation(fields: [documentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   uploadedBy User @relation("SupplierAttachmentUploadedBy", fields: [uploadedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   removedBy User? @relation("SupplierAttachmentRemovedBy", fields: [removedById, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
 
+  @@unique([id, companyId], map: "SDATT_id_company_key")
   @@unique([companyId, storageKey])
   @@index([companyId, documentId, status, createdAt])
+}
+
+/// B3d5a append-only, UNTRUSTED scan observations.
+/// No record here may authorize AVAILABLE or REJECTED until later signed
+/// worker attestation + private-object promotion gates are implemented.
+model SupplierAttachmentScanAttempt {
+  id               String @id @default(uuid())
+  companyId        String
+  attachmentId     String
+  reservationId    String
+  requestNonce     String @db.Uuid
+  contentSizeBytes Int
+  contentSha256    String @db.VarChar(64)
+  verdict          SupplierAttachmentScanVerdict
+  engineVersion    String? @db.VarChar(80)
+  databaseVersion  Int?
+  databaseBuiltAt  DateTime?
+  policyVersion    String? @db.VarChar(80)
+  workerIdentity   String? @db.VarChar(128)
+  failureCode      String? @db.VarChar(80)
+  createdAt        DateTime @default(now())
+
+  attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  reservation SupplierAttachmentUploadReservation @relation(fields: [reservationId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([companyId, requestNonce], map: "SASA_company_nonce_key")
+  @@index([companyId, attachmentId, createdAt], map: "SASA_company_attachment_created_idx")
 }
