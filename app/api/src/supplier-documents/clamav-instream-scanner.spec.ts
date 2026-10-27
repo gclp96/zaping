@@ -78,10 +78,7 @@ describe('ClamAV INSTREAM Unix socket fail-closed contract', () => {
       const scanner = new ClamAvInstreamScanner(f.socketPath);
       expect(await scanner.scan(bytes)).toBe('CLAMD_OK_UNATTESTED');
       expect(Buffer.concat(f.received)).toEqual(bytes);
-      expect(f.received.map((chunk) => chunk.length)).toEqual([
-        65_536,
-        4_464,
-      ]);
+      expect(f.received.map((chunk) => chunk.length)).toEqual([65_536, 4_464]);
     } finally {
       await f.close();
     }
@@ -143,12 +140,12 @@ describe('ClamAV INSTREAM Unix socket fail-closed contract', () => {
   });
 
   it('rejects malformed configuration and excessive data before opening socket', async () => {
-    expect(
-      () => new ClamAvInstreamScanner('tcp://127.0.0.1:3310'),
-    ).toThrow(BadRequestException);
-    expect(
-      () => new ClamAvInstreamScanner('/run/clamav/clamd.ctl', 0),
-    ).toThrow(BadRequestException);
+    expect(() => new ClamAvInstreamScanner('tcp://127.0.0.1:3310')).toThrow(
+      BadRequestException,
+    );
+    expect(() => new ClamAvInstreamScanner('/run/clamav/clamd.ctl', 0)).toThrow(
+      BadRequestException,
+    );
     const scanner = new ClamAvInstreamScanner('/nonexistent/zaping.sock');
     await expect(scanner.scan(Buffer.alloc(0))).rejects.toBeInstanceOf(
       BadRequestException,
