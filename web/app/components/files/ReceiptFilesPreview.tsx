@@ -195,7 +195,9 @@ export default function ReceiptFilesPreview({
           onDragLeave={onDragLeave}
           onDragOver={onDragOver}
           onDrop={onDrop}
-          className={`rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 ${
+          className={`rounded-xl border-2 border-dashed px-4 text-center transition-colors sm:px-6 ${
+            mode === 'registration' ? 'py-4' : 'py-8'
+          } ${
             isDragging
               ? 'border-blue-600 bg-blue-50'
               : 'border-border-strong bg-surface-subtle'
@@ -273,9 +275,10 @@ export default function ReceiptFilesPreview({
           </div>
 
           {files.length === 0 ? (
-            <div className="rounded-lg border border-border p-5 text-sm text-text-muted">
-              No hay documentos seleccionados. Todavía no se ha conectado
-              el listado de documentos almacenados.
+            <div className="rounded-lg border border-border p-4 text-sm text-text-muted">
+              {mode === 'registration'
+                ? 'No hay archivos seleccionados para esta recepción.'
+                : 'No hay documentos seleccionados. Todavía no se ha conectado el listado de documentos almacenados.'}
             </div>
           ) : (
             <ul className="space-y-2" aria-label="Documentos seleccionados">
