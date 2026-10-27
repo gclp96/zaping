@@ -34,11 +34,14 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
   const keys = generateKeyPairSync('ed25519');
   const policy: EvidenceVerificationPolicy = {
     trustedKeys: new Map([
-      ['scanner-ci-key', {
-        publicKey: keys.publicKey,
-        workerIdentity: 'scanner-ci-worker',
-        workerBuildDigest: 'b'.repeat(64),
-      }],
+      [
+        'scanner-ci-key',
+        {
+          publicKey: keys.publicKey,
+          workerIdentity: 'scanner-ci-worker',
+          workerBuildDigest: 'b'.repeat(64),
+        },
+      ],
     ]),
     allowedEngineVersions: new Set(['1.4.3']),
     allowedPolicyVersions: new Set(['scanner-ci-policy']),
@@ -95,13 +98,18 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
       documentId: document.id,
       reservationId: reservation.id,
     });
-    return { companyId, documentId: document.id, reservationId: reservation.id };
+    return {
+      companyId,
+      documentId: document.id,
+      reservationId: reservation.id,
+    };
   }
 
   async function issue(f: Fixture): Promise<Issued> {
     const rows = await db.$queryRawUnsafe<Issued[]>(
       'SELECT * FROM "issue_supplier_attachment_scan_job"($1::text, $2::text, 120)',
-      f.companyId, f.reservationId,
+      f.companyId,
+      f.reservationId,
     );
     if (rows.length !== 1) throw Error('Failed to issue lab job');
     return rows[0];
@@ -117,7 +125,10 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
       reservationId: f.reservationId,
       requestNonce: nonce,
       quarantineKey: [
-        'quarantine', f.companyId, f.documentId, f.reservationId,
+        'quarantine',
+        f.companyId,
+        f.documentId,
+        f.reservationId,
       ].join('/'),
       contentSizeBytes: 42,
       contentSha256: 'a'.repeat(64),
@@ -140,12 +151,16 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
 
   beforeAll(async () => {
     const raw = process.env.DATABASE_URL;
-    if (!raw || process.env.GITHUB_ACTIONS !== 'true' || process.env.CI !== 'true') {
+    if (
+      !raw ||
+      process.env.GITHUB_ACTIONS !== 'true' ||
+      process.env.CI !== 'true'
+    ) {
       throw Error('B3d5b3c1 must run in disposable GitHub Actions');
     }
     const target = new URL(raw);
     if (
-      !['localhost','127.0.0.1'].includes(target.hostname) ||
+      !['localhost', '127.0.0.1'].includes(target.hostname) ||
       target.port !== '5432' ||
       target.pathname !== '/zaping_test' ||
       target.username !== 'ci'
@@ -175,12 +190,18 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
     const job = await issue(f);
     const envelope = signed(f, job.requestNonce);
     const gateway = new IsolatedVerifiedScanEvidenceGateway(db, policy);
-    const outcome = await gateway.accept(f.companyId, job.requestNonce, envelope);
+    const outcome = await gateway.accept(
+      f.companyId,
+      job.requestNonce,
+      envelope,
+    );
     expect(outcome.verdict).toBe('CLEAN_CANDIDATE');
     expect(outcome.releaseAuthorized).toBe(false);
-    expect(await db.supplierAttachmentVerifiedScanEvidence.count({
-      where: { companyId: f.companyId, requestNonce: job.requestNonce },
-    })).toBe(1);
+    expect(
+      await db.supplierAttachmentVerifiedScanEvidence.count({
+        where: { companyId: f.companyId, requestNonce: job.requestNonce },
+      }),
+    ).toBe(1);
     const recorded = await db.supplierAttachmentScanJob.findUniqueOrThrow({
       where: { id: job.jobId },
     });
@@ -188,9 +209,12 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
     const attachment = await db.supplierDocumentAttachment.findUniqueOrThrow({
       where: { id: f.reservationId },
     });
-    expect(attachment.status).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
-    await expect(gateway.accept(f.companyId, job.requestNonce, envelope))
-      .rejects.toThrow();
+    expect(attachment.status).toBe(
+      SupplierDocumentAttachmentStatus.PENDING_SCAN,
+    );
+    await expect(
+      gateway.accept(f.companyId, job.requestNonce, envelope),
+    ).rejects.toThrow();
   });
 
   it('does not persist or consume a forged or cross-company signature', async () => {
@@ -202,18 +226,25 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
       ...envelope,
       claims: { ...envelope.claims, contentSha256: 'b'.repeat(64) },
     };
-    await expect(gateway.accept(f.companyId, job.requestNonce, altered))
-      .rejects.toThrow();
-    await expect(gateway.accept(randomUUID(), job.requestNonce, envelope))
-      .rejects.toThrow();
-    await expect(gateway.accept(f.companyId, randomUUID(), envelope))
-      .rejects.toThrow();
-    expect(await db.supplierAttachmentScanAttempt.count({
-      where: { companyId: f.companyId, requestNonce: job.requestNonce },
-    })).toBe(0);
-    expect(await db.supplierAttachmentVerifiedScanEvidence.count({
-      where: { companyId: f.companyId },
-    })).toBe(0);
+    await expect(
+      gateway.accept(f.companyId, job.requestNonce, altered),
+    ).rejects.toThrow();
+    await expect(
+      gateway.accept(randomUUID(), job.requestNonce, envelope),
+    ).rejects.toThrow();
+    await expect(
+      gateway.accept(f.companyId, randomUUID(), envelope),
+    ).rejects.toThrow();
+    expect(
+      await db.supplierAttachmentScanAttempt.count({
+        where: { companyId: f.companyId, requestNonce: job.requestNonce },
+      }),
+    ).toBe(0);
+    expect(
+      await db.supplierAttachmentVerifiedScanEvidence.count({
+        where: { companyId: f.companyId },
+      }),
+    ).toBe(0);
     const stillIssued = await db.supplierAttachmentScanJob.findUniqueOrThrow({
       where: { id: job.jobId },
     });
@@ -231,9 +262,11 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
     ]);
     expect(results.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
     expect(results.filter((x) => x.status === 'rejected')).toHaveLength(1);
-    expect(await db.supplierAttachmentVerifiedScanEvidence.count({
-      where: { companyId: f.companyId },
-    })).toBe(1);
+    expect(
+      await db.supplierAttachmentVerifiedScanEvidence.count({
+        where: { companyId: f.companyId },
+      }),
+    ).toBe(1);
   });
 
   it('never trusts an already consumed challenge with an unsigned fake receipt', async () => {
@@ -268,12 +301,18 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
     });
     const rows = await db.$queryRawUnsafe<{ ok: boolean }[]>(
       'SELECT "consume_supplier_attachment_scan_job"($1::text, $2::uuid) AS ok',
-      f.companyId, job.requestNonce,
+      f.companyId,
+      job.requestNonce,
     );
     expect(rows[0]?.ok).toBe(true);
     const gateway = new IsolatedVerifiedScanEvidenceGateway(db, policy);
-    await expect(gateway.accept(f.companyId, job.requestNonce, signed(f, job.requestNonce)))
-      .rejects.toThrow();
+    await expect(
+      gateway.accept(
+        f.companyId,
+        job.requestNonce,
+        signed(f, job.requestNonce),
+      ),
+    ).rejects.toThrow();
     expect(await db.supplierAttachmentVerifiedScanEvidence.count({
       where: { companyId: f.companyId },
     })).toBe(0);
