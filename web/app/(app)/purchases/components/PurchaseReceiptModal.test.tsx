@@ -588,6 +588,26 @@ describe('RR-006 — confirmación de descarte', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('Escape solicita descarte de notas no guardadas sin perder el contenido', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    render(<PurchaseReceiptModal {...base} notes="Notas importantes" onClose={onClose} />);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar captura' }));
+    expect((screen.getByLabelText('Notas') as HTMLTextAreaElement).value).toBe('Notas importantes');
+  });
+
+  it('documento incompleto también exige descarte', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    render(<PurchaseReceiptModal {...base} supplierDocumentNumber="REM-123" onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeTruthy();
+  });
+
   it('modo clásico conserva el cierre original', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
     const onClose = vi.fn();
