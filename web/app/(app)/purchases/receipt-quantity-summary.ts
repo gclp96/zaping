@@ -1,4 +1,4 @@
-import type { PurchaseReceiptFormItem } from '../types';
+import type { PurchaseReceiptFormItem } from './types';
 
 type QuantityFields = Pick<
   PurchaseReceiptFormItem,
