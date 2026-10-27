@@ -1,8 +1,9 @@
 import DateInput from '@/app/components/business/DateInput';
 import { CircleCheck } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
@@ -93,6 +94,33 @@ export default function PurchaseReceiptModal({
   onViewReceipt,
   onViewInventory,
 }: PurchaseReceiptModalProps) {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const hasUnsavedChanges =
+    items.some((item) =>
+      item.quantityReceived.trim() !== '' ||
+      item.lotNumber.trim() !== '' ||
+      item.expirationDate.trim() !== '',
+    ) ||
+    notes.trim() !== '' ||
+    supplierDocumentType !== '' ||
+    supplierDocumentNumber.trim() !== '' ||
+    pendingAttachmentCount > 0;
+
+  function requestClose() {
+    if (saving) return;
+    if (process.env.NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE === 'true' &&
+        !createdReceipt && purchase && hasUnsavedChanges) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
+  function discardAndClose() {
+    setConfirmDiscard(false);
+    onClose();
+  }
+
   // Keep the diagnostic code in receiptAuthorityError; translate only its presentation.
   const authorityErrorMessage =
     receiptAuthorityError === 'CUTOVER_FROZEN'
@@ -119,7 +147,7 @@ export default function PurchaseReceiptModal({
         variant="secondary"
         className="w-full sm:w-auto"
         disabled={saving}
-        onClick={onClose}
+        onClick={requestClose}
       >
         Cancelar
       </Button>
@@ -137,11 +165,12 @@ export default function PurchaseReceiptModal({
   );
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
       layout={workspaceEnabled ? 'workspace' : 'default'}
       footer={workspaceEnabled ? actions : undefined}
-      onClose={onClose}
+      onClose={requestClose}
       title={
         createdReceipt
           ? 'Recepción registrada correctamente'
@@ -828,5 +857,16 @@ export default function PurchaseReceiptModal({
         </div>
       ) : null}
     </Modal>
+    <ConfirmDialog
+      isOpen={isOpen && confirmDiscard && !saving && !createdReceipt}
+      title="Descartar cambios de la recepción"
+      message="Hay información capturada que todavía no se ha registrado. Si sales, se perderán las cantidades, la trazabilidad, las notas y los archivos seleccionados en vista previa."
+      confirmText="Descartar cambios"
+      cancelText="Continuar captura"
+      confirmVariant="danger"
+      onClose={() => setConfirmDiscard(false)}
+      onConfirm={discardAndClose}
+    />
+    </>
   );
 }
