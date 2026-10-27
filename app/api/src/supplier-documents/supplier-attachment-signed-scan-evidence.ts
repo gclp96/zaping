@@ -10,10 +10,7 @@ import {
  * This module is intentionally not registered in any NestJS controller,
  * Prisma repository, or worker. Only an isolated worker may hold the private key.
  */
-export type ScanEvidenceVerdict =
-  | 'CLEAN_CANDIDATE'
-  | 'MALWARE_DETECTED'
-  | 'SCAN_FAILED';
+export type ScanEvidenceVerdict = 'CLEAN_CANDIDATE' | 'MALWARE_DETECTED' | 'SCAN_FAILED';
 
 export type ScanEvidenceClaims = Readonly<{
   protocol: 'zaping-scan-evidence-v1';
@@ -124,11 +121,7 @@ function timestamp(value: unknown): number | null {
 }
 
 function exactKeys(value: unknown, keys: readonly string[]): boolean {
-  if (
-    value === null ||
-    typeof value !== 'object' ||
-    Array.isArray(value)
-  ) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return false;
   }
   const actual = Object.keys(value).sort();
@@ -144,8 +137,13 @@ function isValidClaims(value: unknown): value is ScanEvidenceClaims {
   const x = value as ScanEvidenceClaims;
   if (
     x.protocol !== 'zaping-scan-evidence-v1' ||
-    ![x.companyId, x.documentId, x.attachmentId, x.reservationId, x.requestNonce]
-      .every((v) => typeof v === 'string' && UUID.test(v)) ||
+    ![
+      x.companyId,
+      x.documentId,
+      x.attachmentId,
+      x.reservationId,
+      x.requestNonce,
+    ].every((v) => typeof v === 'string' && UUID.test(v)) ||
     x.attachmentId !== x.reservationId ||
     x.quarantineKey !==
       `quarantine/${x.companyId}/${x.documentId}/${x.reservationId}` ||
@@ -168,20 +166,12 @@ function isValidClaims(value: unknown): value is ScanEvidenceClaims {
 
   const start = timestamp(x.startedAt);
   const end = timestamp(x.completedAt);
-  if (
-    start === null ||
-    end === null ||
-    end < start ||
-    end - start > 120_000
-  ) {
+  if (start === null || end === null || end < start || end - start > 120_000) {
     return false;
   }
 
   if (x.verdict === 'SCAN_FAILED') {
-    return (
-      typeof x.failureCode === 'string' &&
-      FAILURE_CODES.has(x.failureCode)
-    );
+    return typeof x.failureCode === 'string' && FAILURE_CODES.has(x.failureCode);
   }
   const before = timestamp(x.readinessBeforeAt);
   const after = timestamp(x.readinessAfterAt);
@@ -288,7 +278,12 @@ export function verifyScanEvidence(
   if (
     signature.length !== 64 ||
     signature.toString('base64url') !== e.signature ||
-    !verifyEd25519(null, message(e.keyId, e.claims), trusted.publicKey, signature)
+    !verifyEd25519(
+      null,
+      message(e.keyId, e.claims),
+      trusted.publicKey,
+      signature,
+    )
   ) {
     throw failed();
   }
