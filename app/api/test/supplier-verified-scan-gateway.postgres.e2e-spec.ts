@@ -313,8 +313,10 @@ describePg('B3d5b3c1 isolated verified gateway on PostgreSQL', () => {
         signed(f, job.requestNonce),
       ),
     ).rejects.toThrow();
-    expect(await db.supplierAttachmentVerifiedScanEvidence.count({
-      where: { companyId: f.companyId },
-    })).toBe(0);
+    expect(
+      await db.supplierAttachmentVerifiedScanEvidence.count({
+        where: { companyId: f.companyId },
+      }),
+    ).toBe(0);
   });
 });
