@@ -528,3 +528,71 @@ describe('RR-005 — preview de adjuntos sin persistencia', () => {
     expect(screen.getByRole('button', { name: 'Registrar recepción' })).toBeTruthy();
   });
 });
+
+
+describe('RR-006 — confirmación de descarte', () => {
+  const base = {
+    isOpen: true,
+    purchase: { folio: 'OC-006', supplier: { name: 'Proveedor prueba' } },
+    receiptAuthority: 'PHYSICAL' as const,
+    receiptAuthorityError: '',
+    onRetryAuthority: vi.fn(),
+    items: [createReceiptItem()],
+    notes: '',
+    supplierDocumentType: '',
+    supplierDocumentNumber: '',
+    onSupplierDocumentTypeChange: vi.fn(),
+    onSupplierDocumentNumberChange: vi.fn(),
+    saving: false,
+    error: '',
+    fieldErrors: {},
+    createdReceipt: null,
+    onItemChange: vi.fn(),
+    onNotesChange: vi.fn(),
+    onSubmit: vi.fn(),
+    onViewReceipt: vi.fn(),
+    onViewInventory: vi.fn(),
+  };
+
+  it('sin cambios cierra inmediatamente', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    render(<PurchaseReceiptModal {...base} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('con cantidades editadas solicita confirmar y permite continuar', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    render(<PurchaseReceiptModal {...base} items={[createReceiptItem({ quantityReceived: '3' })]} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar captura' }));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Descartar cambios' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('archivos locales se consideran cambios; durante guardado no permite salir', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    const { rerender } = render(<PurchaseReceiptModal {...base} pendingAttachmentCount={1} onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+    expect(screen.getByRole('dialog', { name: 'Descartar cambios de la recepción' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar captura' }));
+    rerender(<PurchaseReceiptModal {...base} pendingAttachmentCount={1} saving onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar modal' }));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('modo clásico conserva el cierre original', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+    const onClose = vi.fn();
+    render(<PurchaseReceiptModal {...base} notes="observación" onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
