@@ -324,7 +324,7 @@ jobs:
 
   clamav-real-lab:
     name: ClamAV real lab (isolated, no R2)
-    if: (github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness')) || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository)
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke' || github.ref == 'refs/heads/feat/ux-pdoc-01b3d4c-clamav-readiness')) || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d4c-clamav-readiness' && github.event.pull_request.head.repo.full_name == github.repository) || (github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d5b2-scanner-evidence-worker-lab' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -419,6 +419,16 @@ jobs:
           TZ: UTC
           CI: 'true'
         run: npm run test:e2e -- --runInBand test/clamav-readiness-live.qa.e2e-spec.ts
+
+      - name: Verify signed worker pre/post readiness against disposable real ClamAV
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/ux-pdoc-01b3d5b2-scanner-evidence-worker-lab' && github.event.pull_request.head.repo.full_name == github.repository
+        working-directory: app/api
+        env:
+          RUN_CLAMAV_B3D5B2_REAL_LAB: '1'
+          CLAMD_SOCKET: ${{ runner.temp }}/zaping-clamd-socket/clamd.sock
+          TZ: UTC
+          CI: 'true'
+        run: npm run test:e2e -- --runInBand test/clamav-signed-worker-live.qa.e2e-spec.ts
 
       - name: Dispose of laboratory container and socket
         if: always()
