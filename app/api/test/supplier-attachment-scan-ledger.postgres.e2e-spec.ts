@@ -385,4 +385,29 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
     ).rejects.toThrow();
   });
 
+  it('denies ordinary CI-created non-owner roles permission to insert receipts', async () => {
+    // Roles exist solely in disposable GitHub Actions PostgreSQL.
+    await db.$executeRawUnsafe('CREATE ROLE zaping_scan_receipt_api_lab NOLOGIN');
+    await db.$executeRawUnsafe('CREATE ROLE zaping_scan_receipt_worker_lab NOLOGIN');
+    try {
+      const privileges = await db.$queryRawUnsafe<
+        { api_write: boolean; worker_write: boolean; worker_update: boolean }[]
+      >(
+        `SELECT
+          has_table_privilege('zaping_scan_receipt_api_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'INSERT') AS api_write,
+          has_table_privilege('zaping_scan_receipt_worker_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'INSERT') AS worker_write,
+          has_table_privilege('zaping_scan_receipt_worker_lab',
+            '"SupplierAttachmentSignedEvidenceReceipt"', 'UPDATE') AS worker_update`,
+      );
+      expect(privileges).toEqual([
+        { api_write: false, worker_write: false, worker_update: false },
+      ]);
+    } finally {
+      await db.$executeRawUnsafe('DROP ROLE zaping_scan_receipt_worker_lab');
+      await db.$executeRawUnsafe('DROP ROLE zaping_scan_receipt_api_lab');
+    }
+  });
+
 });
