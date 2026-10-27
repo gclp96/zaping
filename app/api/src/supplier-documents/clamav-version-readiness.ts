@@ -31,9 +31,7 @@ export function evaluateClamAvVersion(
     policy.maxDefinitionAgeHours <= 0 ||
     policy.maxDefinitionAgeHours > 168 ||
     policy.allowedEngineMajorMinor.length < 1 ||
-    !policy.allowedEngineMajorMinor.every((item) =>
-      /^\d+\.\d+$/.test(item),
-    ) ||
+    !policy.allowedEngineMajorMinor.every((item) => /^\d+\.\d+$/.test(item)) ||
     !Number.isFinite(evaluatedAt.getTime())
   ) {
     throw new BadRequestException('Política antivirus inválida');
