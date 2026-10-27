@@ -54,7 +54,11 @@ export class SupplierAttachmentUploadReservationsService {
       !['application/pdf', 'image/jpeg'].includes(metadata.contentType) ||
       !metadata.originalName ||
       Buffer.byteLength(metadata.originalName, 'utf8') > 255 ||
-      /[\\/\x00-\x1f\x7f]/u.test(metadata.originalName)
+      /[\\/]/u.test(metadata.originalName) ||
+      Array.from(metadata.originalName).some((char) => {
+        const code = char.codePointAt(0) ?? 0;
+        return code < 32 || code === 127;
+      })
     ) {
       throw new BadRequestException('Metadatos de reserva inválidos');
     }
@@ -143,8 +147,7 @@ export class SupplierAttachmentUploadReservationsService {
         ]);
         const count = existing._count._all + reservations._count._all;
         const bytes =
-          (existing._sum.sizeBytes ?? 0) +
-          (reservations._sum.sizeBytes ?? 0);
+          (existing._sum.sizeBytes ?? 0) + (reservations._sum.sizeBytes ?? 0);
         if (
           count >= SUPPLIER_ATTACHMENT_MAX_PER_DOCUMENT ||
           bytes + metadata.sizeBytes > SUPPLIER_ATTACHMENT_MAX_DOCUMENT_BYTES
@@ -153,22 +156,21 @@ export class SupplierAttachmentUploadReservationsService {
         }
 
         const keys = createR2ObjectKeys(companyId, documentId);
-        const reserved =
-          await tx.supplierAttachmentUploadReservation.create({
-            data: {
-              id: keys.attachmentId,
-              companyId,
-              documentId,
-              createdById: actorId,
-              requestKey: key,
-              quarantineKey: keys.quarantineKey,
-              originalName: metadata.originalName,
-              contentType: metadata.contentType,
-              sizeBytes: metadata.sizeBytes,
-              sha256: metadata.sha256,
-              status: SupplierAttachmentUploadReservationStatus.RESERVED,
-            },
-          });
+        const reserved = await tx.supplierAttachmentUploadReservation.create({
+          data: {
+            id: keys.attachmentId,
+            companyId,
+            documentId,
+            createdById: actorId,
+            requestKey: key,
+            quarantineKey: keys.quarantineKey,
+            originalName: metadata.originalName,
+            contentType: metadata.contentType,
+            sizeBytes: metadata.sizeBytes,
+            sha256: metadata.sha256,
+            status: SupplierAttachmentUploadReservationStatus.RESERVED,
+          },
+        });
         // Never return quarantineKey, object-store credentials or digest to UI.
         return {
           id: reserved.id,
