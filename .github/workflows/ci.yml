@@ -316,3 +316,96 @@ jobs:
 
       - name: Lint web
         run: npm run lint
+
+  clamav-real-lab:
+    name: ClamAV real lab (isolated, no R2)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/ux-pdoc-01b3d4b-clamav-real-smoke'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout synthetic smoke only
+        uses: actions/checkout@v7
+
+      - name: Pull official preloaded ClamAV image
+        run: docker pull clamav/clamav-debian:stable
+
+      - name: Prepare ephemeral shared Unix socket directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/zaping-clamd-socket"
+          chmod 1777 "$RUNNER_TEMP/zaping-clamd-socket"
+
+      - name: Start disposable ClamAV without network access or published ports
+        run: |
+          set -euo pipefail
+          docker run -d \
+            --name zaping-clamd-lab \
+            --network none \
+            --memory 4g \
+            --memory-swap 4g \
+            --pids-limit 256 \
+            --security-opt no-new-privileges \
+            -e CLAMAV_NO_FRESHCLAMD=true \
+            --mount type=bind,source="$RUNNER_TEMP/zaping-clamd-socket",target=/tmp \
+            --mount type=bind,source="$GITHUB_WORKSPACE/scripts/r2/clamav-smoke.sh",target=/opt/zaping/clamav-smoke.sh,readonly \
+            clamav/clamav-debian:stable
+
+      - name: Wait for preloaded-signature clamd socket
+        run: |
+          set -euo pipefail
+          ready=false
+          for attempt in $(seq 1 75); do
+            if docker exec zaping-clamd-lab test -S /tmp/clamd.sock; then
+              ready=true
+              break
+            fi
+            if [ "$(docker inspect -f '{{.State.Running}}' zaping-clamd-lab)" != true ]; then
+              break
+            fi
+            sleep 4
+          done
+          if [ "$ready" != true ]; then
+            echo 'FAIL: isolated ClamAV lab not ready'
+            docker logs --tail 75 zaping-clamd-lab
+            exit 1
+          fi
+
+      - name: Scan clean synthetic PDF and EICAR on real local daemon
+        run: |
+          docker exec \
+            -e CLAMD_SOCKET=/tmp/clamd.sock \
+            -e CLAMAV_DATABASE_DIR=/var/lib/clamav \
+            zaping-clamd-lab \
+            /bin/bash /opt/zaping/clamav-smoke.sh
+
+      - name: Make isolated clamd socket readable by this CI runner
+        run: |
+          set -euo pipefail
+          socket="$RUNNER_TEMP/zaping-clamd-socket/clamd.sock"
+          test -S "$socket"
+          sudo chgrp "$(id -gn)" "$socket"
+          sudo chmod 0660 "$socket"
+
+      - name: Setup Node for real TypeScript INSTREAM integration
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: app/api/package-lock.json
+
+      - name: Install API dependencies for live scanner test
+        working-directory: app/api
+        run: npm ci
+
+      - name: Run real TypeScript INSTREAM integration against disposable clamd
+        working-directory: app/api
+        env:
+          RUN_CLAMAV_REAL_LAB: '1'
+          CLAMD_SOCKET: ${{ runner.temp }}/zaping-clamd-socket/clamd.sock
+          CI: 'true'
+        run: npm run test:e2e -- --runInBand test/clamav-live.qa.e2e-spec.ts
+
+      - name: Dispose of laboratory container and socket
+        if: always()
+        run: |
+          docker rm -f zaping-clamd-lab || true
+          sudo rm -rf "$RUNNER_TEMP/zaping-clamd-socket"
