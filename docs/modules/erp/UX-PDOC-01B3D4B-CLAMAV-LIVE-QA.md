@@ -30,6 +30,23 @@ Archivo `scripts/r2/clamav-live-smoke.mjs`, ejecutado por `.github/workflows/cla
 - No toca los buckets de Cloudflare, ni `zaping_qa`, `zaping_dev`, ni archivos reales. No se crean tokens.
 - Aun con éxito de EICAR, el clamd activo **no queda disponible** para el backend de Zaping fuera de este trabajo de CI.
 
+## Ejecución real comprobada (26/10/2026 local; 27/10 UTC)
+
+GitHub Actions run **40431202414**, job **121949034578**, commit **85e21cdb7727b31e6ae596c3decf155a263e9050**: **SUCCESS**.
+
+Resultados exactos de salida del laboratorio:
+
+- Motor real `ClamAV 1.4.6`, base de firmas `28164`, edad **42.8 h** (por debajo de 72 h).
+- PDF sintético `stream: OK`: PASS.
+- JPEG sintético `stream: OK`: PASS.
+- Archivo estándar EICAR inofensivo: resultado `FOUND`, **no** `OK`: PASS.
+- Socket Unix no disponible: rechazo seguro: PASS.
+- Sin llamadas R2, bases de datos ni documentos reales. Docker network, volumen y contenedor eliminados tras el smoke.
+
+**Hallazgo y corrección:** el primer laboratorio usó `/run/clamav/clamd.sock` y falló aun con el daemon sano. La imagen oficial **Alpine** `clamav/clamav:1.4` usa `/tmp/clamd.sock`; el workflow comparte ahora un volumen temporal en `/tmp` y verifica su configuración. La segunda ejecución real pasó. Este resultado no prueba que la antigua ruta sea válida en otras imágenes Debian o versiones.
+
+Enlace de ejecución: https://github.com/gclp96/zaping/actions/runs/40431202414
+
 ## Interpretación de evidencia
 
 Un resultado verde prueba que la **imagen oficial** puede cargar firmas actualizadas y detectar EICAR con el mismo protocolo `INSTREAM` sobre socket Unix usando el código del laboratorio. **NO** acredita por sí solo que el adaptador TypeScript del PR #154 esté configurado en producción; ese adaptador cuenta con pruebas unitarias aparte. Tampoco garantiza detección universal de malware.
