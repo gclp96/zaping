@@ -191,12 +191,34 @@ export default function PurchaseReceiptModal({
           </div>
         </div>
       ) : purchase ? (
-        <div className="space-y-6">
-          <div className="rounded-lg bg-gray-50 p-4">
+        <div
+          data-testid="receipt-capture-content"
+          className={workspaceEnabled ? 'space-y-5' : 'space-y-6'}
+        >
+          <section
+            data-testid="receipt-purchase-context"
+            aria-label="Datos de la compra origen"
+            className={
+              workspaceEnabled
+                ? 'rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+                : 'rounded-lg bg-gray-50 p-4'
+            }
+          >
+            {workspaceEnabled ? (
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  Compra origen
+                </p>
+                <p className="mt-1 break-words text-lg font-semibold text-text">
+                  {purchase.folio}
+                </p>
+              </div>
+            ) : null}
             <p className="text-sm text-gray-500">Proveedor</p>
-
-            <p className="font-semibold">{purchase.supplier.name}</p>
-          </div>
+            <p className="break-words font-semibold">
+              {purchase.supplier.name}
+            </p>
+          </section>
 
           {!receiptAuthority ? (
             receiptAuthorityError ? (
@@ -220,6 +242,26 @@ export default function PurchaseReceiptModal({
               independientes. Captúralos si el proveedor los informa.
             </p>
           ) : null}
+          <section
+            data-testid="receipt-item-capture-section"
+            aria-label="Partidas pendientes de recibir"
+            className={
+              workspaceEnabled
+                ? 'space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5'
+                : 'space-y-4'
+            }
+          >
+            {workspaceEnabled ? (
+              <div>
+                <h3 className="text-lg font-semibold text-text">
+                  Partidas pendientes
+                </h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  Captura únicamente la cantidad que recibes ahora. Pedido,
+                  recibido y pendiente son datos de consulta.
+                </p>
+              </div>
+            ) : null}
           {items.length === 0 ? (
             <div className="rounded-lg border border-gray-200 p-4">
               <p className="text-sm text-gray-600">
@@ -244,9 +286,19 @@ export default function PurchaseReceiptModal({
 
               <div
                 data-testid="receipt-desktop-items"
-                className="hidden overflow-x-auto rounded-lg border border-gray-200 xl:block"
+                className={
+                  workspaceEnabled
+                    ? 'hidden overflow-x-auto rounded-lg border border-gray-200 lg:block'
+                    : 'hidden overflow-x-auto rounded-lg border border-gray-200 xl:block'
+                }
               >
-                <table className="w-full min-w-[760px] text-sm">
+                <table
+                  className={
+                    workspaceEnabled
+                      ? 'w-full min-w-[940px] text-sm'
+                      : 'w-full min-w-[760px] text-sm'
+                  }
+                >
                   <caption className="sr-only">
                     Líneas pendientes de la recepción de la compra{' '}
                     {purchase.folio}
@@ -461,7 +513,11 @@ export default function PurchaseReceiptModal({
 
               <div
                 data-testid="receipt-mobile-items"
-                className="space-y-4 xl:hidden"
+                className={
+                  workspaceEnabled
+                    ? 'space-y-4 lg:hidden'
+                    : 'space-y-4 xl:hidden'
+                }
               >
                 {items.map((item) => {
                   const itemErrors = fieldErrors[item.purchaseItemId];
@@ -644,6 +700,28 @@ export default function PurchaseReceiptModal({
               </div>
             </>
           )}
+          </section>
+
+          <section
+            data-testid="receipt-supplier-document-section"
+            aria-label="Documento y observaciones de la recepción"
+            className={
+              workspaceEnabled
+                ? 'space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5'
+                : 'space-y-6'
+            }
+          >
+            {workspaceEnabled ? (
+              <div>
+                <h3 className="text-lg font-semibold text-text">
+                  Documento del proveedor y notas
+                </h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  Estos datos describen la recepción; no representan
+                  documentos adjuntos.
+                </p>
+              </div>
+            ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -708,6 +786,7 @@ export default function PurchaseReceiptModal({
               onChange={(event) => onNotesChange(event.target.value)}
             />
           </div>
+          </section>
 
           {error ? (
             <p
