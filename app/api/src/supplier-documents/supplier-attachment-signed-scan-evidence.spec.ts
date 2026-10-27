@@ -1,7 +1,4 @@
-import {
-  generateKeyPairSync,
-  type KeyObject,
-} from 'node:crypto';
+import { generateKeyPairSync, type KeyObject } from 'node:crypto';
 import { ServiceUnavailableException } from '@nestjs/common';
 import {
   signScanEvidence,
@@ -88,9 +85,8 @@ describe('B3d5b1 signed evidence is NOT a release authorization', () => {
 
   it('verifies exact byte/job identity under one pinned Ed25519 public key', () => {
     const envelope = sign();
-    expect(
-      verifyScanEvidence(envelope, expected, policy(), CLOCK),
-    ).toEqual(claims);
+    const verified = verifyScanEvidence(envelope, expected, policy(), CLOCK);
+    expect(verified).toEqual(claims);
     expect(envelope).toHaveProperty('signature');
     expect(envelope.claims.verdict).toBe('CLEAN_CANDIDATE');
   });
@@ -129,9 +125,14 @@ describe('B3d5b1 signed evidence is NOT a release authorization', () => {
         verifyScanEvidence(candidate, expected, policy(), CLOCK),
       ).toThrow(ServiceUnavailableException);
     }
-    expect(() =>
-      verifyScanEvidence(envelope, expected, policy(otherKeys.publicKey), CLOCK),
-    ).toThrow(ServiceUnavailableException);
+    const swappedKey = () =>
+      verifyScanEvidence(
+        envelope,
+        expected,
+        policy(otherKeys.publicKey),
+        CLOCK,
+      );
+    expect(swappedKey).toThrow(ServiceUnavailableException);
   });
 
   it('denies other companies, nonces and attachment hash expectations', () => {
@@ -165,31 +166,32 @@ describe('B3d5b1 signed evidence is NOT a release authorization', () => {
       ...claims,
       databaseBuiltAt: '2026-10-25T00:00:00.000Z',
     });
-    expect(() =>
-      verifyScanEvidence(stale, expected, policy(), CLOCK),
-    ).toThrow(ServiceUnavailableException);
+    const staleEvidence = () =>
+      verifyScanEvidence(stale, expected, policy(), CLOCK);
+    expect(staleEvidence).toThrow(ServiceUnavailableException);
   });
 
   it('rejects unverified clean verdicts and unknown policy pins at signing', () => {
-    expect(() =>
-      sign({ ...claims, bytesVerified: false }),
-    ).toThrow(ServiceUnavailableException);
-    expect(() =>
-      sign({ ...claims, failureCode: 'NOT_A_REAL_CODE' }),
-    ).toThrow(ServiceUnavailableException);
+    const unverifiedBytes = () => sign({ ...claims, bytesVerified: false });
+    expect(unverifiedBytes).toThrow(ServiceUnavailableException);
+    const invalidFailure = () =>
+      sign({ ...claims, failureCode: 'NOT_A_REAL_CODE' });
+    expect(invalidFailure).toThrow(ServiceUnavailableException);
     const envelope = sign();
-    expect(() =>
-      verifyScanEvidence(envelope, expected, {
-        ...policy(),
-        allowedPolicyVersions: new Set(['scanner-v2']),
-      }, CLOCK),
-    ).toThrow(ServiceUnavailableException);
-    expect(() =>
-      verifyScanEvidence(envelope, expected, {
-        ...policy(),
-        allowedEngineVersions: new Set(['1.0.0']),
-      }, CLOCK),
-    ).toThrow(ServiceUnavailableException);
+    const outdatedPolicy = {
+      ...policy(),
+      allowedPolicyVersions: new Set(['scanner-v2']),
+    };
+    const outdatedEngine = {
+      ...policy(),
+      allowedEngineVersions: new Set(['1.0.0']),
+    };
+    const badPolicyEvidence = () =>
+      verifyScanEvidence(envelope, expected, outdatedPolicy, CLOCK);
+    const badEngineEvidence = () =>
+      verifyScanEvidence(envelope, expected, outdatedEngine, CLOCK);
+    expect(badPolicyEvidence).toThrow(ServiceUnavailableException);
+    expect(badEngineEvidence).toThrow(ServiceUnavailableException);
   });
 
   it('can authenticate a failure without ever upgrading it into clean', () => {
