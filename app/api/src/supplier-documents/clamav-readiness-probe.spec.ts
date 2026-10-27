@@ -58,19 +58,22 @@ describe('ClamAV B3d4c readiness gate (unattested)', () => {
   });
 
   it('rejects missing version pin or invalid policy before probing', () => {
-    expect(() =>
-      new ClamAvReadinessProbe('/tmp/clamd.sock', {
-        ...policy,
-        allowedEngineVersions: [],
-      }),
+    const badPolicy = { ...policy, allowedEngineVersions: [] };
+    expect(
+      () => new ClamAvReadinessProbe('/tmp/clamd.sock', badPolicy),
     ).toThrow(BadRequestException);
-    expect(() => new ClamAvReadinessProbe('tcp://localhost:3310', policy))
-      .toThrow(BadRequestException);
+    expect(
+      () => new ClamAvReadinessProbe('tcp://localhost:3310', policy),
+    ).toThrow(BadRequestException);
   });
 
   async function fixture(
     replyFor: (command: string) => string | null,
-  ): Promise<{ socket: string; stop: () => Promise<void>; commands: string[] }> {
+  ): Promise<{
+    socket: string;
+    stop: () => Promise<void>;
+    commands: string[];
+  }> {
     const dir = await mkdtemp(join(tmpdir(), 'zaping-clamd-health-'));
     const socket = join(dir, 'clamd.sock');
     const commands: string[] = [];
@@ -117,8 +120,9 @@ describe('ClamAV B3d4c readiness gate (unattested)', () => {
   it('fails closed when daemon PING is unresponsive or invalid', async () => {
     const f = await fixture(() => null);
     try {
-      await expect(new ClamAvReadinessProbe(f.socket, policy).check(at))
-        .rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(
+        new ClamAvReadinessProbe(f.socket, policy).check(at),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
       expect(f.commands).toEqual(['zPING']);
     } finally {
       await f.stop();
@@ -128,8 +132,9 @@ describe('ClamAV B3d4c readiness gate (unattested)', () => {
   it('fails closed when VERSION does not arrive', async () => {
     const f = await fixture((command) => (command === 'zPING' ? 'PONG' : null));
     try {
-      await expect(new ClamAvReadinessProbe(f.socket, policy).check(at))
-        .rejects.toBeInstanceOf(ServiceUnavailableException);
+      await expect(
+        new ClamAvReadinessProbe(f.socket, policy).check(at),
+      ).rejects.toBeInstanceOf(ServiceUnavailableException);
     } finally {
       await f.stop();
     }
