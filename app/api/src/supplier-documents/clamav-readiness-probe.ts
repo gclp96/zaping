@@ -20,6 +20,8 @@ export type ClamAvReadiness = Readonly<{
 
 export type ClamAvReadinessPolicy = Readonly<{
   policyVersion: string;
+  /** clamd VERSION has no time-zone indicator; deployment must enforce TZ=UTC. */
+  daemonTimeZone: 'UTC';
   allowedEngineVersions: readonly string[];
   maxDatabaseAgeMs: number;
   maxFutureClockSkewMs: number;
@@ -38,6 +40,7 @@ const unavailable = () =>
 function validatePolicy(policy: ClamAvReadinessPolicy): void {
   if (
     !/^[a-z0-9._-]{1,64}$/u.test(policy.policyVersion) ||
+    policy.daemonTimeZone !== 'UTC' ||
     !Array.isArray(policy.allowedEngineVersions) ||
     policy.allowedEngineVersions.length < 1 ||
     policy.allowedEngineVersions.length > 20 ||
