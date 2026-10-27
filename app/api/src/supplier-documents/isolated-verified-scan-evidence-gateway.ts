@@ -127,11 +127,11 @@ export class IsolatedVerifiedScanEvidenceGateway {
           const receipt =
             await tx.supplierAttachmentSignedEvidenceReceipt.create({
               data: {
-              companyId: job.companyId,
-              attemptId: attempt.id,
-              requestNonce: job.requestNonce,
-              signingKeyId: e.keyId,
-              signature: e.signature,
+                companyId: job.companyId,
+                attemptId: attempt.id,
+                requestNonce: job.requestNonce,
+                signingKeyId: e.keyId,
+                signature: e.signature,
                 signedClaims: { ...claims },
               },
             });
@@ -143,9 +143,8 @@ export class IsolatedVerifiedScanEvidenceGateway {
           if (consumed.length !== 1 || consumed[0].ok !== true) {
             throw invalid();
           }
-          const audit =
-            await tx.supplierAttachmentVerifiedScanEvidence.create({
-              data: {
+          const audit = await tx.supplierAttachmentVerifiedScanEvidence.create({
+            data: {
               id: randomUUID(),
               jobId: job.id,
               receiptId: receipt.id,
@@ -155,8 +154,8 @@ export class IsolatedVerifiedScanEvidenceGateway {
               signatureSha256: createHash('sha256')
                 .update(Buffer.from(e.signature, 'base64url'))
                 .digest('hex'),
-              },
-            });
+            },
+          });
           return {
             auditId: audit.id,
             verdict: claims.verdict,
