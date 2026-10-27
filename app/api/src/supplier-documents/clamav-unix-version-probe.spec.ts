@@ -45,10 +45,7 @@ describe('ClamAV local zVERSION readiness transport', () => {
 
   it('probes the local Unix socket with z-framing', async () => {
     const fixture = await fakeVersionServer(
-      Buffer.from(
-        'ClamAV 1.4.3/27840/Mon Oct 26 11:00:00 2026\0',
-        'ascii',
-      ),
+      Buffer.from('ClamAV 1.4.3/27840/Mon Oct 26 11:00:00 2026\0', 'ascii'),
     );
     try {
       const result = await new ClamAvUnixVersionProbe(
@@ -96,7 +93,9 @@ describe('ClamAV local zVERSION readiness transport', () => {
       BadRequestException,
     );
     await expect(
-      new ClamAvUnixVersionProbe('/nonexistent/zaping-clamd.sock').readVersion(),
+      new ClamAvUnixVersionProbe(
+        '/nonexistent/zaping-clamd.sock',
+      ).readVersion(),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });
