@@ -265,6 +265,50 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
     expect(props.onSubmit).toHaveBeenCalledOnce();
   });
 
+  it('RR-004 sitúa el resumen en el lado derecho del workspace sin cambiar las partidas', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    show({
+      items: [
+        createReceiptItem({
+          purchaseItemId: 'item-a',
+          pendingQuantity: 6,
+          quantityReceived: '3',
+        }),
+        createReceiptItem({
+          purchaseItemId: 'item-b',
+          pendingQuantity: 4,
+          quantityReceived: '2',
+        }),
+      ],
+    });
+    const lower = screen.getByTestId('receipt-lower-area');
+    expect(lower.className).toContain('lg:grid-cols-');
+    const summary = within(lower).getByRole('region', {
+      name: 'Resumen de esta recepción',
+    });
+    expect(summary.parentElement?.className).toContain('lg:col-start-2');
+    expect(
+      within(summary).getByTestId('receipt-summary-pending-before').textContent,
+    ).toBe('10');
+    expect(
+      within(summary).getByTestId('receipt-summary-to-receive').textContent,
+    ).toBe('5');
+    expect(
+      within(summary).getByTestId('receipt-summary-pending-after').textContent,
+    ).toBe('5');
+    expect(
+      within(summary).getByRole('status').textContent,
+    ).toContain('2 de 2 partidas');
+    expect(within(lower).queryByRole('button', { name: /adjuntar/i })).toBeNull();
+  });
+
+  it('RR-004 no muestra resumen nuevo con la bandera de workspace OFF', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+    show();
+    expect(screen.queryByTestId('receipt-lower-area')).toBeNull();
+    expect(screen.queryByTestId('receipt-capture-summary')).toBeNull();
+  });
+
   it('RR-003 agrupa partida y documento sin cambiar la captura ni sus callbacks', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
     const onItemChange = vi.fn();
