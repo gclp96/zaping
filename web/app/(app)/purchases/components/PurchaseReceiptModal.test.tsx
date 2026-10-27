@@ -12,7 +12,10 @@ import PurchaseReceiptModal from './PurchaseReceiptModal';
 
 import type { PurchaseReceiptFormItem } from '../types';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+});
 
 function createReceiptItem(
   overrides: Partial<PurchaseReceiptFormItem> = {},
@@ -224,6 +227,44 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
     render(<PurchaseReceiptModal {...props} />);
     return props;
   }
+  it('RR-002 mantiene acciones y validaciones al usar panel ancho', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'true');
+    const props = show();
+    const dialog = screen.getByRole('dialog', {
+      name: 'Registrar recepción · OC-1',
+    });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('workspace');
+    expect(dialog.querySelector('[data-modal-body]')).toBeTruthy();
+    const footer = dialog.querySelector('[data-modal-footer]');
+    expect(footer).toBeTruthy();
+    const submit = screen.getByRole('button', {
+      name: 'Registrar recepción',
+    });
+    expect(footer?.contains(submit)).toBe(true);
+    fireEvent.click(submit);
+    expect(props.onSubmit).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('receipt-desktop-items')).toBeTruthy();
+    expect(screen.getByTestId('receipt-mobile-items')).toBeTruthy();
+  });
+
+  it('RR-002 mantiene modal anterior cuando la bandera está desactivada', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+    const props = show();
+    const dialog = screen.getByRole('dialog', {
+      name: 'Registrar recepción · OC-1',
+    });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('default');
+    expect(dialog.querySelector('[data-modal-footer]')).toBeNull();
+    const submit = screen.getByRole('button', {
+      name: 'Registrar recepción',
+    });
+    expect(dialog.querySelector('[data-modal-body]')?.contains(submit)).toBe(
+      true,
+    );
+    fireEvent.click(submit);
+    expect(props.onSubmit).toHaveBeenCalledOnce();
+  });
+
   it.each(['NONE', 'OPTIONAL', 'REQUIRED'] as const)(
     'PHYSICAL QUANTITY %s ofrece lote y fecha independientes en desktop y móvil',
     (lotTracking) => {
