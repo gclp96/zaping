@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   PrismaClient,
   SupplierAttachmentUploadReservationStatus,
@@ -58,13 +62,20 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
     sha256: 'a'.repeat(64),
   };
 
-  function input(f: Awaited<ReturnType<typeof fixture>>, requestKey = randomUUID()) {
+  function input(
+    f: Awaited<ReturnType<typeof fixture>>,
+    requestKey = randomUUID(),
+  ) {
     return { ...f, requestKey, metadata };
   }
 
   beforeAll(async () => {
     const raw = process.env.DATABASE_URL;
-    if (!raw || process.env.GITHUB_ACTIONS !== 'true' || process.env.CI !== 'true') {
+    if (
+      !raw ||
+      process.env.GITHUB_ACTIONS !== 'true' ||
+      process.env.CI !== 'true'
+    ) {
       throw new Error('B3d2 requires isolated GitHub Actions database');
     }
     const url = new URL(raw);
@@ -99,10 +110,13 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
       'sizeBytes',
       'status',
     ]);
-    expect(result.status).toBe(SupplierAttachmentUploadReservationStatus.RESERVED);
-    const persisted = await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
-      where: { id: result.id },
-    });
+    expect(result.status).toBe(
+      SupplierAttachmentUploadReservationStatus.RESERVED,
+    );
+    const persisted =
+      await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+        where: { id: result.id },
+      });
     expect(persisted.quarantineKey).toBe(
       `quarantine/${f.companyId}/${f.documentId}/${result.id}`,
     );
@@ -114,8 +128,12 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
     const results = await Promise.allSettled(
       Array.from({ length: 12 }, () => service.reserve(input(f))),
     );
-    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(10);
-    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(2);
+    expect(
+      results.filter((result) => result.status === 'fulfilled'),
+    ).toHaveLength(10);
+    expect(
+      results.filter((result) => result.status === 'rejected'),
+    ).toHaveLength(2);
     expect(
       await db.supplierAttachmentUploadReservation.count({
         where: { companyId: f.companyId, documentId: f.documentId },
@@ -173,9 +191,9 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
     await expect(
       service.reserve({ ...input(a), companyId: b.companyId }),
     ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      service.reserve(input(sales)),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.reserve(input(sales))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('enforces immutable ledger: rejects direct UPDATE and DELETE', async () => {
@@ -192,9 +210,12 @@ describePg('B3d2 real PostgreSQL quota and concurrency', () => {
         where: { id: row.id },
       }),
     ).rejects.toThrow();
-    const still = await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
-      where: { id: row.id },
-    });
-    expect(still.status).toBe(SupplierAttachmentUploadReservationStatus.RESERVED);
+    const still =
+      await db.supplierAttachmentUploadReservation.findUniqueOrThrow({
+        where: { id: row.id },
+      });
+    expect(still.status).toBe(
+      SupplierAttachmentUploadReservationStatus.RESERVED,
+    );
   });
 });
