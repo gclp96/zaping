@@ -1,5 +1,6 @@
 import DateInput from '@/app/components/business/DateInput';
 import { CircleCheck } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import Button from '@/app/components/ui/Button';
 import Input from '@/app/components/ui/Input';
@@ -40,6 +41,8 @@ type PurchaseReceiptModalProps = {
   error: string;
   fieldErrors?: PurchaseReceiptFieldErrors;
   createdReceipt: CreatedPurchaseReceipt | null;
+  attachmentPreview?: ReactNode;
+  pendingAttachmentCount?: number;
 
   onClose: () => void;
 
@@ -81,6 +84,8 @@ export default function PurchaseReceiptModal({
   error,
   fieldErrors = {},
   createdReceipt,
+  attachmentPreview,
+  pendingAttachmentCount = 0,
   onClose,
   onItemChange,
   onNotesChange,
@@ -123,8 +128,8 @@ export default function PurchaseReceiptModal({
         className="w-full sm:w-auto"
         loading={saving}
         loadingText="Registrando..."
-        disabled={saving || !receiptAuthority || items.length === 0}
-        onClick={onSubmit}
+        disabled={saving || !receiptAuthority || items.length === 0 || pendingAttachmentCount > 0}
+        onClick={() => { if (pendingAttachmentCount === 0) onSubmit(); }}
       >
         Registrar recepción
       </Button>
@@ -795,12 +800,21 @@ export default function PurchaseReceiptModal({
               data-testid="receipt-lower-area"
               className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]"
             >
+              {attachmentPreview ? (
+                <div className="min-w-0 lg:col-start-1">{attachmentPreview}</div>
+              ) : null}
               <div className="min-w-0 lg:col-start-2">
                 <ReceiptCaptureSummary items={items} />
               </div>
             </div>
           ) : null}
 
+          {!workspaceEnabled ? attachmentPreview : null}
+          {pendingAttachmentCount > 0 ? (
+            <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              Hay {pendingAttachmentCount} archivo(s) seleccionados solo para vista previa. No se guardarán con la recepción. Limpia la selección para registrar sin adjuntos.
+            </p>
+          ) : null}
           {error ? (
             <p
               role="alert"
