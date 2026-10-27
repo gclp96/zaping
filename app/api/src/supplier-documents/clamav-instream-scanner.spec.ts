@@ -103,7 +103,7 @@ describe('ClamAV INSTREAM Unix socket fail-closed contract', () => {
     'stream: size limit exceeded ERROR',
     'stream: WARNING',
     'stream: OK\n',
-    'stream: OK FOUND',
+    'stream: OK ERROR',
     'stream: OK\0stream: OK',
   ])('rejects an unexpected or ambiguous engine reply: %s', async (reply) => {
     const f = await clamdFixture(reply);
@@ -113,6 +113,19 @@ describe('ClamAV INSTREAM Unix socket fail-closed contract', () => {
           Buffer.from('synthetic-placeholder'),
         ),
       ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    } finally {
+      await f.close();
+    }
+  });
+
+  it('never interprets an OK-looking FOUND result as clean', async () => {
+    const f = await clamdFixture('stream: OK FOUND');
+    try {
+      expect(
+        await new ClamAvInstreamScanner(f.socketPath).scan(
+          Buffer.from('synthetic-placeholder'),
+        ),
+      ).toBe('MALWARE_DETECTED');
     } finally {
       await f.close();
     }
