@@ -125,7 +125,7 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
     await db?.$disconnect();
   });
 
-  it('records a byte-bound claim but cannot authorize AVAILABLE or REJECTED', async () => {
+  it('keeps a scan claim untrusted and the attachment pending', async () => {
     const f = await fixture();
     const attempt = await db.supplierAttachmentScanAttempt.create({
       data: observed(f),
@@ -163,7 +163,7 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
     expect(pending.scannedAt).toBeNull();
   });
 
-  it('rejects cross-tenant, mismatched identity, wrong bytes and nonce replay', async () => {
+  it('rejects tenant escapes, wrong bytes and replay', async () => {
     const a = await fixture();
     const b = await fixture();
     const first = await db.supplierAttachmentScanAttempt.create({
@@ -201,7 +201,7 @@ describePg('B3d5a scan ledger on isolated PostgreSQL', () => {
     ).toBe(1);
   });
 
-  it('rejects UPDATE/DELETE, enforces failure code and DB-owned recorded time', async () => {
+  it('enforces append-only and failed scan codes', async () => {
     const f = await fixture();
     await expect(
       db.supplierAttachmentScanAttempt.create({
