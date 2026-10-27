@@ -8,9 +8,9 @@ En `web/app/(app)/purchase-receipts/[id]/page.tsx`, después de "Partidas recibi
 
 El componente usa los estilos y componentes compartidos de Zaping ERP. Incluye:
 
-- Zona de arrastrar/soltar y selector accesible con teclado.
-- Lista local con nombre, tamaño y tipo; opción de quitar.
-- Reglas UX preliminares PDF/JPG/JPEG, hasta 10 MiB por archivo y 5 archivos por vista previa; rechazo de archivos vacíos, extensión/MIME discordantes, duplicados y exceso.
+- Zona de arrastrar/soltar con indicador visual durante el arrastre y selector mediante botón accesible con teclado.
+- Lista local con nombre, tamaño y tipo; opciones para quitar un archivo o **limpiar toda la selección**.
+- Reglas UX preliminares PDF/JPG/JPEG, hasta 10 MiB por archivo y 5 archivos por vista previa; rechazo de archivos vacíos, extensión/MIME discordantes, duplicados (incluso con lista llena) y exceso.
 - Mensajes accesibles de validación y advertencias visibles: **los archivos NO se guardan, suben, analizan ni descargan**.
 - Sin uso de `FileReader`, `Blob`, `URL.createObjectURL`, localStorage, IndexedDB, cookies, fetch, Axios, formularios de envío o endpoint API. Después de seleccionar, React conserva únicamente nombre, tamaño, categoría e ID efímero. Todo se pierde al recargar, cambiar de recepción o desmontar el componente.
 
@@ -32,7 +32,7 @@ Para ocultarla, eliminar la variable o asignar cualquier valor distinto de `true
 
 ## QA y Definition of Done para esta fase
 
-- Componente y validador con pruebas unitarias y UI para selección, drop, límite, errores, duplicados, quitar y ausencia de tráfico.
+- Componente y validador con pruebas unitarias y UI para selección, arrastre con resaltado y recuperación visual, drop, límite, errores, duplicados a máxima capacidad, quitar, limpiar toda la lista y ausencia de tráfico.
 - Página de detalle probada con flag deshabilitado y habilitado.
 - `npm run test`, `npm run typecheck`, `npm run lint` y `npm run build` del frontend; CI backend existente no debe cambiar.
 - PR Draft independiente sin merge automático a `main`.
