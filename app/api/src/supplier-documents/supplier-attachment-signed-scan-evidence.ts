@@ -172,7 +172,9 @@ function isValidClaims(value: unknown): value is ScanEvidenceClaims {
   }
 
   if (x.verdict === 'SCAN_FAILED') {
-    return typeof x.failureCode === 'string' && FAILURE_CODES.has(x.failureCode);
+    return (
+      typeof x.failureCode === 'string' && FAILURE_CODES.has(x.failureCode)
+    );
   }
   const before = timestamp(x.readinessBeforeAt);
   const after = timestamp(x.readinessAfterAt);
