@@ -104,7 +104,7 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     await db?.$disconnect();
   });
 
-  it('only lists attachments after a clean scan', async () => {
+  it('does not list unverified attachments or allow a fabricated clean result', async () => {
     const f = await fixture();
     const metadata = await db.supplierDocumentAttachment.create({
       data: attachment(f),
@@ -112,30 +112,24 @@ describePg('Private supplier attachments on isolated PostgreSQL', () => {
     expect(metadata.status).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
     expect(await service.listAvailable(f.companyId, f.documentId)).toEqual([]);
 
-    await db.supplierDocumentAttachment.update({
-      where: { id: metadata.id },
-      data: {
-        status: SupplierDocumentAttachmentStatus.AVAILABLE,
-        scanEngine: 'ci-fake-scan-only',
-        scannedAt: new Date(),
-      },
-    });
+    // B3d5a security gate: the legacy scanEngine/scannedAt shortcut is closed.
+    await expect(
+      db.supplierDocumentAttachment.update({
+        where: { id: metadata.id },
+        data: {
+          status: SupplierDocumentAttachmentStatus.AVAILABLE,
+          scanEngine: 'ci-fake-scan-only',
+          scannedAt: new Date(),
+        },
+      }),
+    ).rejects.toThrow();
 
-    const listed = await service.listAvailable(f.companyId, f.documentId);
-    expect(listed).toHaveLength(1);
-    expect(listed[0]).toMatchObject({
-      id: metadata.id,
-      originalName: 'evidencia.pdf',
-      contentType: 'application/pdf',
-      sizeBytes: 12,
-    });
-    expect(Object.keys(listed[0]).sort()).toEqual([
-      'contentType',
-      'createdAt',
-      'id',
-      'originalName',
-      'sizeBytes',
-    ]);
+    expect(await service.listAvailable(f.companyId, f.documentId)).toEqual([]);
+    expect(
+      (await db.supplierDocumentAttachment.findUniqueOrThrow({
+        where: { id: metadata.id },
+      })).status,
+    ).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
   });
 
   it('blocks attachments from other tenants', async () => {
