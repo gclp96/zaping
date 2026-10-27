@@ -1189,7 +1189,72 @@ describe('PurchasesPage — recepciones', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     cleanup();
+  });
+
+  it('incluye vista previa en Compras sin guardar documentos silenciosamente', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
+    const user = userEvent.setup();
+
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(screen.getByRole('button', { name: 'Recibir' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Registrar recepción · OC-0001',
+    });
+    expect(
+      within(dialog).getByText('Adjuntos de la recepción'),
+    ).toBeTruthy();
+    expect(
+      within(dialog).getByText(/Comprobantes o fotografías de la orden OC-0001/i),
+    ).toBeTruthy();
+
+    const picker = within(dialog).getByLabelText(
+      'Seleccionar archivos para vista previa local',
+    );
+    fireEvent.change(picker, {
+      target: {
+        files: [new File(['prueba'], 'remision.pdf', {
+          type: 'application/pdf',
+        })],
+      },
+    });
+
+    const submit = within(dialog).getByRole('button', {
+      name: 'Registrar recepción',
+    }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    expect(within(dialog).getByText(/No se guardarán con la recepción/i))
+      .toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled();
+
+    await user.click(
+      within(dialog).getByRole('button', { name: 'Limpiar selección' }),
+    );
+    expect(submit.disabled).toBe(false);
+    expect(within(dialog).getByText(/selección local \(0\/5\)/i))
+      .toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it('mantiene la interfaz nueva oculta por defecto en Compras', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'false');
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await screen.findByText('OC-0001');
+    await user.click(screen.getByRole('button', { name: 'Recibir' }));
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Registrar recepción · OC-0001',
+    });
+    expect(
+      within(dialog).queryByText('Adjuntos de la recepción'),
+    ).toBeNull();
+    expect(
+      (within(dialog).getByRole('button', {
+        name: 'Registrar recepción',
+      }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it.each([
