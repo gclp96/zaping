@@ -30,12 +30,10 @@ describeLive(
     });
 
     it('reads engine and definition metadata from real zVERSION Unix protocol', async () => {
-      const version = await new ClamAvUnixVersionProbe(
-        process.env.CLAMD_SOCKET!,
-      ).readVersion();
-      expect(version).toMatch(
-        /^ClamAV \d+\.\d+\.\d+\/\d+\/.{15,95}$/,
-      );
+      const socketPath = process.env.CLAMD_SOCKET;
+      if (!socketPath) throw new Error('Laboratory Unix socket unavailable');
+      const version = await new ClamAvUnixVersionProbe(socketPath).readVersion();
+      expect(version).toMatch(/^ClamAV \d+\.\d+\.\d+\/\d+\/.{15,95}$/);
     });
 
     it('passes a synthetic clean PDF through the real Node zINSTREAM client', async () => {
