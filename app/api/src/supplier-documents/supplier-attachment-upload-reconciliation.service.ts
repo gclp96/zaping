@@ -47,19 +47,26 @@ export class SupplierAttachmentUploadReconciliationService {
     if (!reservation) {
       throw new NotFoundException('Reserva no encontrada');
     }
-    if (reservation.status === SupplierAttachmentUploadReservationStatus.REGISTERED) {
+    if (
+      reservation.status ===
+      SupplierAttachmentUploadReservationStatus.REGISTERED
+    ) {
       return { id: reservation.id, status: reservation.status };
     }
     if (
-      reservation.status !== SupplierAttachmentUploadReservationStatus.RESERVED &&
+      reservation.status !==
+        SupplierAttachmentUploadReservationStatus.RESERVED &&
       reservation.status !==
         SupplierAttachmentUploadReservationStatus.RECONCILE_REQUIRED
     ) {
       throw new ConflictException('Reserva no conciliable');
     }
-    const expectedKey =
-      'quarantine/' + companyId.toLowerCase() + '/' +
-      documentId.toLowerCase() + '/' + reservationId.toLowerCase();
+    const expectedKey = [
+      'quarantine',
+      companyId.toLowerCase(),
+      documentId.toLowerCase(),
+      reservationId.toLowerCase(),
+    ].join('/');
     requireTenantQuarantineR2Key(reservation.quarantineKey, companyId);
     if (reservation.quarantineKey.toLowerCase() !== expectedKey) {
       throw new ConflictException('Clave de reserva inconsistente');
@@ -95,15 +102,19 @@ export class SupplierAttachmentUploadReconciliationService {
         return { id: reservation.id, status: reservation.status };
       }
       if (
-        reservation.status !== SupplierAttachmentUploadReservationStatus.RESERVED &&
+        reservation.status !==
+          SupplierAttachmentUploadReservationStatus.RESERVED &&
         reservation.status !==
           SupplierAttachmentUploadReservationStatus.RECONCILE_REQUIRED
       ) {
         throw new ConflictException('Reserva no conciliable');
       }
-      const expected =
-        'quarantine/' + companyId.toLowerCase() + '/' +
-        documentId.toLowerCase() + '/' + reservationId.toLowerCase();
+      const expected = [
+        'quarantine',
+        companyId.toLowerCase(),
+        documentId.toLowerCase(),
+        reservationId.toLowerCase(),
+      ].join('/');
       if (reservation.quarantineKey !== expected) {
         throw new ConflictException('Clave de reserva inconsistente');
       }
@@ -171,7 +182,10 @@ export class SupplierAttachmentUploadReconciliationService {
       ) {
         return { id: reservation.id, status: reservation.status };
       }
-      if (reservation.status !== SupplierAttachmentUploadReservationStatus.RESERVED) {
+      if (
+        reservation.status !==
+        SupplierAttachmentUploadReservationStatus.RESERVED
+      ) {
         throw new ConflictException('Reserva no conciliable');
       }
       await tx.supplierAttachmentUploadReservation.update({
