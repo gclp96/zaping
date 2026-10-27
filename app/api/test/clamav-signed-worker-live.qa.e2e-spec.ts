@@ -153,12 +153,7 @@ describeLive('B3d5b2 signed worker real ClamAV lab', () => {
       maxDatabaseAgeMs: 48 * 60 * 60_000,
       maxFutureClockSkewMs: 5_000,
     };
-    const claim = verifyScanEvidence(
-      signed,
-      job,
-      verification,
-      tick + 4000,
-    );
+    const claim = verifyScanEvidence(signed, job, verification, tick + 4000);
     expect(claim.verdict).toBe(expectedVerdict);
     expect(claim.bytesVerified).toBe(true);
     expect(claim.readinessBeforeAt).not.toBeNull();
