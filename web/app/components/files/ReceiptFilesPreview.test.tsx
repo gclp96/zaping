@@ -70,6 +70,42 @@ describe('ReceiptFilesPreview — modo exclusivamente local', () => {
     expect(screen.getByText(/selección local \(0\/5\)/i)).toBeTruthy();
   });
 
+  it('informa al formulario del número de archivos seleccionados', () => {
+    const onSelectionCountChange = vi.fn();
+    render(
+      <ReceiptFilesPreview
+        receiptFolio="OC-0002"
+        mode="registration"
+        onSelectionCountChange={onSelectionCountChange}
+      />,
+    );
+
+    expect(
+      screen.getByText(/No podrás registrar esta recepción/i),
+    ).toBeTruthy();
+    const picker = screen.getByLabelText(
+      'Seleccionar archivos para vista previa local',
+    );
+    fireEvent.change(picker, {
+      target: { files: [makeFile('guia.pdf', 'application/pdf')] },
+    });
+    expect(onSelectionCountChange).toHaveBeenLastCalledWith(1);
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Quitar guia.pdf de la vista previa',
+      }),
+    );
+    expect(onSelectionCountChange).toHaveBeenLastCalledWith(0);
+
+    fireEvent.change(picker, {
+      target: { files: [makeFile('remision.pdf', 'application/pdf')] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar selección' }));
+    expect(onSelectionCountChange).toHaveBeenLastCalledWith(0);
+    expect(onSelectionCountChange).toHaveBeenCalledTimes(4);
+  });
+
   it('resalta la zona al arrastrar y limpia el indicador al salir o soltar', () => {
     render(<ReceiptFilesPreview receiptFolio="REC-DROP" />);
     const zone = screen.getByRole('group', {
