@@ -2258,6 +2258,7 @@ model SupplierAttachmentSignedEvidenceReceipt {
   signedClaims Json @db.JsonB
   recordedAt   DateTime @default(now())
 
+  verification SupplierAttachmentVerifiedScanEvidence?
   attempt SupplierAttachmentScanAttempt @relation(fields: [attemptId, companyId, requestNonce], references: [id, companyId, requestNonce], onDelete: Restrict, onUpdate: Restrict)
 
   @@unique([attemptId, companyId, requestNonce], map: "SASER_attempt_company_nonce_key")
@@ -2287,6 +2288,28 @@ model SupplierAttachmentScanJob {
 
   attachment SupplierDocumentAttachment @relation(fields: [attachmentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
   reservation SupplierAttachmentUploadReservation @relation(fields: [reservationId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Restrict)
+  verification SupplierAttachmentVerifiedScanEvidence?
 
   @@index([companyId, attachmentId, status, expiresAt], map: "SASJ_company_attachment_status_idx")
+}
+
+
+/// B3d5b3c1: verifier-gateway audit marker, NOT authorization for AVAILABLE.
+/// A valid Ed25519 signature is checked in the isolated gateway transaction,
+/// but the database owner can still forge rows. Production DB role separation
+/// and signed scanner provenance are required before using this marker.
+model SupplierAttachmentVerifiedScanEvidence {
+  id              String @id @default(uuid())
+  jobId           String @unique(map: "SAVSE_job_key") @db.Uuid
+  receiptId       String @unique(map: "SAVSE_receipt_key")
+  companyId       String
+  requestNonce    String @unique(map: "SAVSE_nonce_key") @db.Uuid
+  signingKeyId    String @db.VarChar(64)
+  signatureSha256 String @db.VarChar(64)
+  verifiedAt      DateTime @default(now())
+
+  job SupplierAttachmentScanJob @relation(fields: [jobId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  receipt SupplierAttachmentSignedEvidenceReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([companyId, verifiedAt], map: "SAVSE_company_verified_idx")
 }

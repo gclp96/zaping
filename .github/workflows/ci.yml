@@ -133,6 +133,11 @@ jobs:
           RUN_SUPPLIER_SCAN_LEDGER_PG: "1"
         run: npm run test:e2e -- --runInBand test/supplier-attachment-scan-ledger.postgres.e2e-spec.ts
 
+      - name: Verify B3d5b3c1 Ed25519 gateway on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_VERIFIED_GATEWAY_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-verified-scan-gateway.postgres.e2e-spec.ts
+
       - name: Verify B3d5b3b issued one-use scan challenges on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_SCAN_JOBS_PG: "1"
