@@ -29,8 +29,18 @@ export type ClamAvReadinessPolicy = Readonly<{
 
 const MAX_REPLY_BYTES = 512;
 const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ] as const;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
@@ -44,9 +54,7 @@ function validatePolicy(policy: ClamAvReadinessPolicy): void {
     !Array.isArray(policy.allowedEngineVersions) ||
     policy.allowedEngineVersions.length < 1 ||
     policy.allowedEngineVersions.length > 20 ||
-    !policy.allowedEngineVersions.every((v) =>
-      /^\d+\.\d+\.\d+$/u.test(v),
-    ) ||
+    !policy.allowedEngineVersions.every((v) => /^\d+\.\d+\.\d+$/u.test(v)) ||
     !Number.isSafeInteger(policy.maxDatabaseAgeMs) ||
     policy.maxDatabaseAgeMs < 60_000 ||
     policy.maxDatabaseAgeMs > 7 * 24 * 60 * 60 * 1_000 ||
@@ -122,10 +130,7 @@ export function evaluateClamAvVersion(
   }
 
   const ageMs = nowMs - builtMs;
-  if (
-    ageMs > policy.maxDatabaseAgeMs ||
-    ageMs < -policy.maxFutureClockSkewMs
-  ) {
+  if (ageMs > policy.maxDatabaseAgeMs || ageMs < -policy.maxFutureClockSkewMs) {
     throw unavailable();
   }
 
