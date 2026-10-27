@@ -54,7 +54,9 @@ function validatePolicy(policy: ClamAvReadinessPolicy): void {
     !Array.isArray(policy.allowedEngineVersions) ||
     policy.allowedEngineVersions.length < 1 ||
     policy.allowedEngineVersions.length > 20 ||
-    !policy.allowedEngineVersions.every((v) => /^\d+\.\d+\.\d+$/u.test(v)) ||
+    !policy.allowedEngineVersions.every(
+      (v: unknown) => typeof v === 'string' && /^\d+\.\d+\.\d+$/u.test(v),
+    ) ||
     !Number.isSafeInteger(policy.maxDatabaseAgeMs) ||
     policy.maxDatabaseAgeMs < 60_000 ||
     policy.maxDatabaseAgeMs > 7 * 24 * 60 * 60 * 1_000 ||
