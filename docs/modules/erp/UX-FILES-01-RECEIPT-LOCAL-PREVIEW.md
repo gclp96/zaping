@@ -4,7 +4,11 @@
 
 ## Alcance
 
-En `web/app/(app)/purchase-receipts/[id]/page.tsx`, después de "Partidas recibidas", se monta el componente reutilizable `web/app/components/files/ReceiptFilesPreview.tsx` **solo si** la variable `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI` es exactamente `true`.
+El componente reutilizable `web/app/components/files/ReceiptFilesPreview.tsx` se monta **solo si** la variable `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI` es exactamente `true`, tanto:
+- En el formulario **Registrar recepción**, debajo de Notas y antes de confirmar, asociado a la orden de compra seleccionada.
+- En `web/app/(app)/purchase-receipts/[id]/page.tsx`, debajo de "Partidas recibidas", para una recepción ya registrada.
+
+**Seguridad del formulario:** el backend no soporta todavía adjuntar documentos al crear la recepción. Para evitar pérdida silenciosa o la impresión de que se guardaron, **si hay archivos seleccionados solo para vista previa, el botón "Registrar recepción" permanece deshabilitado** y aparece una advertencia para quitar/limpiar la selección. Si no hay archivos, el flujo actual funciona sin cambios. El contador se reinicia al cerrar, reabrir o cambiar de orden de compra. Ningún archivo se añade al payload de la recepción.
 
 El componente usa los estilos y componentes compartidos de Zaping ERP. Incluye:
 
@@ -26,14 +30,15 @@ $env:NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI="true"
 npm run dev
 ```
 
-Luego abrir una recepción existente en `/purchase-receipts/<id>`. La sección se mostrará en esa página solo si la recepción carga correctamente.
+Luego abrir **Registrar recepción** en `/purchase-receipts` y seleccionar una OC elegible para visualizar la sección dentro del formulario. También se muestra en el detalle de una recepción existente (`/purchase-receipts/<id>`). Si el puerto 3000 ya está ocupado y Next.js ofrece 3002, abre el puerto **del proceso nuevo** y detén los servidores duplicados para evitar comparar una versión anterior de la aplicación.
 
 Para ocultarla, eliminar la variable o asignar cualquier valor distinto de `true` y reiniciar Next.js. Las variables `NEXT_PUBLIC_*` se integran en el cliente durante build: este flag **no es** un control de autorización ni un mecanismo seguro para activar uploads. Por defecto permanece oculto.
 
 ## QA y Definition of Done para esta fase
 
 - Componente y validador con pruebas unitarias y UI para selección, arrastre con resaltado y recuperación visual, drop, límite, errores, duplicados a máxima capacidad, quitar, limpiar toda la lista y ausencia de tráfico.
-- Página de detalle probada con flag deshabilitado y habilitado.
+- Página de detalle probada con flag deshabilitado y habilitado. Modal de registro probado con y sin selección temporal; no se permite confirmar si existen archivos sin persistencia.
+- Contador al formulario probado para seleccionar, quitar y limpiar, sin lectura de bytes.
 - `npm run test`, `npm run typecheck`, `npm run lint` y `npm run build` del frontend; CI backend existente no debe cambiar.
 - PR Draft independiente sin merge automático a `main`.
 
