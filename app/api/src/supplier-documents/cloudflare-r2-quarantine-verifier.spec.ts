@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { createR2ObjectKeys } from './cloudflare-r2-object-keys';
 import { CloudflareR2QuarantineVerifier } from './cloudflare-r2-quarantine-verifier';
 
@@ -15,7 +18,8 @@ describe('Quarantine R2 verification boundary', () => {
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const client = new S3Client({
     region: 'auto',
-    endpoint: 'https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com',
+    endpoint:
+      'https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.r2.cloudflarestorage.com',
     credentials: { accessKeyId: 'fake', secretAccessKey: 'fake' },
   });
   const send = jest.spyOn(client, 'send');
@@ -68,8 +72,8 @@ describe('Quarantine R2 verification boundary', () => {
   });
 
   it('rejects invalid bucket at construction', () => {
-    expect(() => new CloudflareR2QuarantineVerifier(client, '../bucket')).toThrow(
-      BadRequestException,
-    );
+    expect(
+      () => new CloudflareR2QuarantineVerifier(client, '../bucket'),
+    ).toThrow(BadRequestException);
   });
 });
