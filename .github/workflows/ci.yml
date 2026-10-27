@@ -123,6 +123,11 @@ jobs:
           RUN_RECEIPT_DOCUMENT_LINKS_PG: "1"
         run: npm run test:e2e -- --runInBand test/receipt-document-links.postgres.e2e-spec.ts
 
+      - name: Verify B3d2 quota reservations and concurrency on ephemeral PostgreSQL
+        env:
+          RUN_SUPPLIER_UPLOAD_RESERVATIONS_PG: "1"
+        run: npm run test:e2e -- --runInBand test/supplier-attachment-upload-reservations.postgres.e2e-spec.ts
+
       - name: Verify supplier attachment metadata and scanner gate on ephemeral PostgreSQL
         env:
           RUN_SUPPLIER_ATTACHMENTS_PG: "1"
