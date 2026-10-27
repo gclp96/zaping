@@ -1,4 +1,7 @@
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { createConnection, type Socket } from 'node:net';
 import { isAbsolute } from 'node:path';
 import { SUPPLIER_ATTACHMENT_MAX_BYTES } from './supplier-document-attachment-validation';
@@ -92,7 +95,9 @@ export class ClamAvInstreamScanner {
         }
       });
       socket.once('connect', () => {
-        void this.sendInstream(socket, bytes).catch(() => finish(unavailable()));
+        void this.sendInstream(socket, bytes).catch(() =>
+          finish(unavailable()),
+        );
       });
     });
   }
