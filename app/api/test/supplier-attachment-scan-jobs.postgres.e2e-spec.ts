@@ -202,10 +202,12 @@ describePg('B3d5b3b DB-issued scanner jobs', () => {
     const f = await fixture();
     const issued = await issue(f.companyId, f.reservationId);
     expect(issued.requestNonce).toMatch(/^[0-9a-f-]{36}$/u);
-    expect(issued.expiresAt.getTime()).toBeGreaterThan(issued.issuedAt.getTime());
-    expect(
-      issued.expiresAt.getTime() - issued.issuedAt.getTime(),
-    ).toBeLessThan(301_000);
+    expect(issued.expiresAt.getTime()).toBeGreaterThan(
+      issued.issuedAt.getTime(),
+    );
+    expect(issued.expiresAt.getTime() - issued.issuedAt.getTime()).toBeLessThan(
+      301_000,
+    );
     const job = await db.supplierAttachmentScanJob.findUniqueOrThrow({
       where: { id: issued.jobId },
     });
@@ -228,8 +230,12 @@ describePg('B3d5b3b DB-issued scanner jobs', () => {
     await expect(
       issue(other.companyId, unregistered.reservationId),
     ).rejects.toThrow();
-    await expect(issue(other.companyId, other.reservationId, 59)).rejects.toThrow();
-    await expect(issue(other.companyId, other.reservationId, 301)).rejects.toThrow();
+    await expect(
+      issue(other.companyId, other.reservationId, 59),
+    ).rejects.toThrow();
+    await expect(
+      issue(other.companyId, other.reservationId, 301),
+    ).rejects.toThrow();
   });
 
   it('serializes competing issuers without duplicate active jobs', async () => {
@@ -292,7 +298,9 @@ describePg('B3d5b3b DB-issued scanner jobs', () => {
     const attachment = await db.supplierDocumentAttachment.findUniqueOrThrow({
       where: { id: f.reservationId },
     });
-    expect(attachment.status).toBe(SupplierDocumentAttachmentStatus.PENDING_SCAN);
+    expect(attachment.status).toBe(
+      SupplierDocumentAttachmentStatus.PENDING_SCAN,
+    );
     await expect(
       db.supplierDocumentAttachment.update({
         where: { id: f.reservationId },
@@ -319,7 +327,7 @@ describePg('B3d5b3b DB-issued scanner jobs', () => {
           ' \'"consume_supplier_attachment_scan_job"(text,uuid)\',' +
           " 'EXECUTE') AS can_consume, " +
           "has_table_privilege('zaping_scan_job_api_lab'," +
-          ' \'"SupplierAttachmentScanJob"\', \'INSERT\') AS can_insert',
+          " '\"SupplierAttachmentScanJob\"', 'INSERT') AS can_insert",
       );
       expect(rights).toEqual([
         { can_issue: false, can_consume: false, can_insert: false },
