@@ -281,6 +281,40 @@ describe('OX-PUR-05 — editor por autoridad en ambos layouts', () => {
       }
     },
   );
+  it('bloquea registrar con archivos solo seleccionados en vista previa', () => {
+    const onSubmit = vi.fn();
+    show({
+      pendingAttachmentCount: 2,
+      attachmentPreview: (
+        <div>Adjuntos de la recepción (vista previa local)</div>
+      ),
+      onSubmit,
+    });
+    expect(
+      screen.getByText('Adjuntos de la recepción (vista previa local)'),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/No se guardarán con la recepción/i),
+    ).toBeTruthy();
+    const register = screen.getByRole('button', {
+      name: 'Registrar recepción',
+    }) as HTMLButtonElement;
+    expect(register.disabled).toBe(true);
+    fireEvent.click(register);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('conserva registro sin adjuntos cuando la lista local está vacía', () => {
+    const onSubmit = vi.fn();
+    show({ pendingAttachmentCount: 0, onSubmit });
+    const register = screen.getByRole('button', {
+      name: 'Registrar recepción',
+    }) as HTMLButtonElement;
+    expect(register.disabled).toBe(false);
+    fireEvent.click(register);
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
   it('mantiene campos y envío bloqueados durante carga o CUTOVER, con reintento explícito', async () => {
     const user = userEvent.setup();
     const props = show({
