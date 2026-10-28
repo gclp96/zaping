@@ -115,6 +115,7 @@ describe('usePurchaseForm', () => {
     expect(result.current.openModal).toBe(false);
     expect(result.current.saving).toBe(false);
     expect(result.current.purchaseToEdit).toBeNull();
+    expect(result.current.hasUnsavedChanges).toBe(false);
 
     expect(result.current.supplierId).toBe('');
     expect(result.current.selectedProductId).toBe('');
@@ -137,6 +138,7 @@ describe('usePurchaseForm', () => {
     expect(result.current.purchaseToEdit).toBeNull();
     expect(result.current.quantity).toBe('1');
     expect(result.current.items).toEqual([]);
+    expect(result.current.hasUnsavedChanges).toBe(false);
   });
 
   it('agrega un producto y calcula los totales', () => {
@@ -175,6 +177,7 @@ describe('usePurchaseForm', () => {
     expect(result.current.subtotal).toBe(300);
     expect(result.current.iva).toBe(48);
     expect(result.current.total).toBe(348);
+    expect(result.current.hasUnsavedChanges).toBe(true);
 
     expect(
       result.current.selectedProductId,
@@ -213,6 +216,53 @@ describe('usePurchaseForm', () => {
     expect(result.current.subtotal).toBe(1000);
     expect(result.current.iva).toBe(160);
     expect(result.current.total).toBe(1160);
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+
+  it('detecta solo cambios reales respecto al borrador original', () => {
+    const { result } = setupHook();
+
+    act(() => result.current.openEditModal(draftPurchase));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.handleItemQuantityChange('product-1', '7'));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    act(() => result.current.handleItemQuantityChange('product-1', '10'));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.handleSupplierChange('supplier-2'));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    act(() => result.current.handleSupplierChange('supplier-1'));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.handleSelectedProductChange('product-2'));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    act(() => result.current.handleSelectedProductChange(''));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.handleFormQuantityChange('4'));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    act(() => result.current.handleFormQuantityChange('1'));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.handleRemoveItem('product-1'));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+
+    act(() => result.current.openEditModal(draftPurchase));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+
+    act(() => result.current.closeCreateModal());
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+
+  it('evita editar compras que no están en DRAFT', () => {
+    const { result } = setupHook();
+    act(() =>
+      result.current.openEditModal({ ...draftPurchase, status: 'CONFIRMED' }),
+    );
+    expect(result.current.openModal).toBe(false);
+    expect(result.current.purchaseToEdit).toBeNull();
+    expect(result.current.hasUnsavedChanges).toBe(false);
   });
 
   it('muestra errores cuando se intenta guardar un formulario vacío', async () => {
