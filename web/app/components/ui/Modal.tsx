@@ -19,6 +19,8 @@ export type ModalProps = {
   description?: ReactNode;
   dismissible?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  layout?: 'default' | 'workspace';
+  footer?: ReactNode;
 };
 
 const focusableSelector = [
@@ -137,6 +139,8 @@ export default function Modal({
   description,
   dismissible = true,
   initialFocusRef,
+  layout = 'default',
+  footer,
 }: ModalProps) {
   const [portalTarget, setPortalTarget] =
     useState<HTMLElement | null>(null);
@@ -326,7 +330,11 @@ export default function Modal({
     <div
       ref={rootRef}
       data-modal-root
-      className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center bg-black/50"
+      className={`fixed inset-0 z-[var(--z-modal)] flex items-center ${
+        layout === 'workspace'
+          ? 'justify-end bg-black/35'
+          : 'justify-center bg-black/50'
+      }`}
     >
       <div
         ref={dialogRef}
@@ -335,7 +343,12 @@ export default function Modal({
         aria-labelledby={titleId}
         aria-describedby={hasDescription ? descriptionId : undefined}
         tabIndex={-1}
-        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-xl"
+        data-modal-layout={layout}
+        className={`flex min-h-0 flex-col overflow-hidden bg-white shadow-xl ${
+          layout === 'workspace'
+            ? 'h-screen h-[100dvh] max-h-[100dvh] w-full rounded-none min-[1440px]:max-w-[1040px] min-[1440px]:w-[65vw]'
+            : 'max-h-[90vh] w-full max-w-4xl rounded-lg'
+        }`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
           <h2
@@ -364,7 +377,24 @@ export default function Modal({
           </p>
         ) : null}
 
-        <div className="overflow-y-auto p-6">{children}</div>
+        <div
+          data-modal-body
+          className={`overflow-y-auto p-6 ${
+            layout === 'workspace'
+              ? 'min-h-0 flex-1 px-4 py-5 sm:px-6'
+              : ''
+          }`}
+        >
+          {children}
+        </div>
+        {footer ? (
+          <div
+            data-modal-footer
+            className="shrink-0 border-t border-border bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6"
+          >
+            {footer}
+          </div>
+        ) : null}
       </div>
     </div>
   );

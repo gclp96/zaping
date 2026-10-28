@@ -85,6 +85,52 @@ describe('Modal', () => {
     expect(screen.getByText('Descripción accesible')).toBeTruthy();
   });
 
+  it('renderiza workspace con cuerpo desplazable y footer fuera del scroll', async () => {
+    render(
+      <Modal
+        isOpen
+        layout="workspace"
+        title="Nueva recepción"
+        onClose={vi.fn()}
+        footer={<button type="button">Registrar recepción</button>}
+      >
+        <input aria-label="Cantidad recibida" />
+      </Modal>,
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Nueva recepción',
+    });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('workspace');
+    expect(dialog.className).toContain('h-[100dvh]');
+    const body = dialog.querySelector('[data-modal-body]');
+    const footer = dialog.querySelector('[data-modal-footer]');
+    expect(body?.className).toContain('overflow-y-auto');
+    expect(body?.contains(screen.getByLabelText('Cantidad recibida'))).toBe(
+      true,
+    );
+    expect(footer?.contains(screen.getByRole('button', {
+      name: 'Registrar recepción',
+    }))).toBe(true);
+    expect(body?.contains(footer)).toBe(false);
+    expect(document.activeElement).toBe(
+      screen.getByLabelText('Cantidad recibida'),
+    );
+  });
+
+  it('conserva modal clásico sin footer separado ni workspace', async () => {
+    render(
+      <Modal isOpen title="Modal clásico" onClose={vi.fn()}>
+        <button type="button">Acción</button>
+      </Modal>,
+    );
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Modal clásico',
+    });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('default');
+    expect(dialog.className).toContain('max-w-4xl');
+    expect(dialog.querySelector('[data-modal-footer]')).toBeNull();
+  });
+
   it('enfoca el primer control de contenido al abrir', async () => {
     render(
       <Modal isOpen title="Modal de foco" onClose={vi.fn()}>
