@@ -18,6 +18,7 @@ type PurchaseFormModalProps = {
   isOpen: boolean;
   editing: boolean;
   saving: boolean;
+  hasUnsavedChanges: boolean;
 
   suppliers: Supplier[];
   products: Product[];
@@ -65,6 +66,7 @@ export default function PurchaseFormModal({
   isOpen,
   editing,
   saving,
+  hasUnsavedChanges,
   suppliers,
   products,
   supplierId,
@@ -89,22 +91,17 @@ export default function PurchaseFormModal({
   onQuantityChange,
   onItemQuantityChange,
 }: PurchaseFormModalProps) {
-  // PUR-UX-02A: presentation-only; editing and submission rules remain unchanged.
+  // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
+  // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
   const workspaceEnabled =
-    process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true' && !editing;
+    process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true';
   const supplierName =
     suppliers.find((supplier) => supplier.id === supplierId)?.name ??
     'Sin seleccionar';
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  // Only current values count as unsaved input. Server-side errors alone do not
-  // trigger the guard; the form remains controlled by usePurchaseForm.
-  const hasUnsavedChanges =
-    supplierId !== '' ||
-    selectedProductId !== '' ||
-    quantity !== '1' ||
-    items.length > 0;
-
+  // usePurchaseForm compares editing values against the original DRAFT;
+  // preloaded products alone must not trigger a discard confirmation.
   function requestClose() {
     if (saving) return;
 
@@ -289,7 +286,9 @@ export default function PurchaseFormModal({
 
           {workspaceEnabled ? (
             <p className="text-sm text-text-muted">
-              Revisa los productos, sus cantidades y costos antes de crear la orden.
+              {editing
+                ? 'Revisa los productos, las cantidades y los costos antes de guardar los cambios.'
+                : 'Revisa los productos, sus cantidades y costos antes de crear la orden.'}
             </p>
           ) : null}
           {items.length === 0 ? (
@@ -483,7 +482,9 @@ export default function PurchaseFormModal({
               <div>
                 <h3 className="font-semibold text-text">Revisión de la orden</h3>
                 <p className="mt-1 text-sm text-text-muted">
-                  Verifica el proveedor y las partidas antes de crear la compra.
+                  {editing
+                    ? 'Verifica el proveedor y las partidas antes de guardar los cambios.'
+                    : 'Verifica el proveedor y las partidas antes de crear la compra.'}
                 </p>
               </div>
               <dl className="space-y-3 text-sm">
@@ -497,8 +498,10 @@ export default function PurchaseFormModal({
                 </div>
               </dl>
               <p className="rounded-lg bg-surface-subtle p-3 text-sm text-text-muted">
-                Crear una compra no registra la entrada de mercancía. El inventario
-                se actualiza posteriormente, al registrar una recepción.
+                {editing
+                  ? 'Guardar los cambios de un borrador no registra la entrada de mercancía.'
+                  : 'Crear una compra no registra la entrada de mercancía.'}{' '}
+                El inventario se actualiza posteriormente, al registrar una recepción.
               </p>
             </section>
           ) : null}
