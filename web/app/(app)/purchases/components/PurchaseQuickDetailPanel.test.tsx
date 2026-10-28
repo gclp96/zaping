@@ -65,6 +65,8 @@ function renderPanel(options: Partial<React.ComponentProps<typeof PurchaseQuickD
       canEdit
       canApprove
       downloadingPurchaseId={null}
+      actionError=""
+      onClearActionError={vi.fn()}
       {...handlers}
       {...options}
     />,
@@ -131,6 +133,44 @@ describe('PUR-UX-01C — detalle contextual verificado', () => {
     expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Aprobar' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Editar' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeTruthy();
+  });
+
+  it('muestra un error de descarga dentro del panel y permite descartarlo', async () => {
+    const clearError = vi.fn();
+    renderPanel({
+      actionError: 'No fue posible descargar el PDF.',
+      onClearActionError: clearError,
+    });
+    await screen.findByText('Catéter médico');
+    const dialog = screen.getByRole('dialog', { name: 'Compra OC-0001' });
+    expect(within(dialog).getByRole('alert').textContent)
+      .toContain('No fue posible descargar el PDF.');
+    await userEvent.setup().click(within(dialog).getByRole('button', { name: 'Cerrar mensaje' }));
+    expect(clearError).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { canEdit: true, canApprove: true, visible: ['Aprobar', 'Editar', 'Cancelar'] },
+    { canEdit: true, canApprove: false, visible: ['Editar'] },
+    { canEdit: false, canApprove: false, visible: [] },
+  ])('limita las acciones DRAFT según permisos $canEdit / $canApprove', async (role) => {
+    const draft = { ...purchase, status: 'DRAFT' as const };
+    vi.mocked(api.get).mockImplementation(async (url) => {
+      if (String(url) === '/purchases/purchase-1') return { data: draft } as never;
+      if (String(url) === '/purchase-receipts/purchase/purchase-1') return { data: [] } as never;
+      throw new Error('Endpoint inesperado');
+    });
+    renderPanel({ canEdit: role.canEdit, canApprove: role.canApprove });
+    await screen.findByText('Catéter médico');
+    for (const action of ['Aprobar', 'Editar', 'Cancelar']) {
+      if (role.visible.includes(action)) {
+        expect(screen.getByRole('button', { name: action })).toBeTruthy();
+      } else {
+        expect(screen.queryByRole('button', { name: action })).toBeNull();
+      }
+    }
+    expect(screen.queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeTruthy();
   });
 
