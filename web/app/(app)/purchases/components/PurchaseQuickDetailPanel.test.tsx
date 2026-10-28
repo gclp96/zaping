@@ -58,6 +58,7 @@ const handlers = {
 function renderPanel(options: Partial<React.ComponentProps<typeof PurchaseQuickDetailPanel>> = {}) {
   return render(
     <PurchaseQuickDetailPanel
+      isOpen
       purchaseId="purchase-1"
       formatDate={() => '26 oct 2026'}
       formatMoney={(amount) => `$${amount.toFixed(2)}`}
