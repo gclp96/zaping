@@ -260,6 +260,7 @@ const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
 const [quickDetailOpen, setQuickDetailOpen] = useState(false);
+const [quickDetailGeneration, setQuickDetailGeneration] = useState(0);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
 const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
@@ -870,7 +871,11 @@ async function loadPageData() {
               aria-label={`Vista rápida de compra ${purchase.folio}`}
               aria-pressed={quickDetailOpen && selectedPurchaseId === purchase.id}
               className="block rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-              onClick={() => { setSelectedPurchaseId(purchase.id); setQuickDetailOpen(true); }}
+              onClick={() => {
+                setSelectedPurchaseId(purchase.id);
+                setQuickDetailGeneration((version) => version + 1);
+                setQuickDetailOpen(true);
+              }}
             >
               Ver resumen
             </button>
@@ -1236,7 +1241,7 @@ async function loadPageData() {
       {/* PUR-UX-01C: read-only contextual detail, behind the workspace flag. */}
       {purchasesWorkspaceEnabled && selectedPurchaseId && !forbidden && !sessionForbidsAccess ? (
         <PurchaseQuickDetailPanel
-          key={selectedPurchaseId}
+          key={`${selectedPurchaseId}-${quickDetailGeneration}`}
           purchaseId={selectedPurchaseId}
           isOpen={quickDetailOpen}
           onClose={() => setQuickDetailOpen(false)}
