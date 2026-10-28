@@ -66,7 +66,6 @@ export default function PurchaseQuickDetailPanel({
   const [reloadVersion, setReloadVersion] = useState(0);
 
   const loadDetail = useCallback(async (isActive: () => boolean) => {
-    setDetail({ status: 'loading' });
     try {
       const result = await api.get<Purchase>(`/purchases/${encodeURIComponent(purchaseId)}`);
       if (!isActive()) return;
@@ -188,7 +187,7 @@ export default function PurchaseQuickDetailPanel({
       ) : detail.status === 'error' ? (
         <div role="alert" className="space-y-3 rounded-xl border border-red-200 bg-red-50 p-4 text-red-800">
           <p>{detail.message}</p>
-          <Button type="button" variant="outline" onClick={() => setReloadVersion((value) => value + 1)}>
+          <Button type="button" variant="outline" onClick={() => { setDetail({ status: 'loading' }); setReloadVersion((value) => value + 1); }}>
             Reintentar
           </Button>
         </div>
@@ -227,7 +226,7 @@ export default function PurchaseQuickDetailPanel({
             {detail.receiptsError ? (
               <div role="alert" className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                 <p>{detail.receiptsError} Las cantidades recibidas y pendientes no están verificadas.</p>
-                <Button type="button" variant="outline" size="sm" onClick={() => setReloadVersion((value) => value + 1)}>
+                <Button type="button" variant="outline" size="sm" onClick={() => { setDetail({ status: 'loading' }); setReloadVersion((value) => value + 1); }}>
                   Reintentar verificación
                 </Button>
               </div>
