@@ -84,6 +84,7 @@ describe('PUR-UX-01C — detalle contextual verificado', () => {
   it('consulta compra y recepciones reales, presenta partidas y conserva acceso al detalle completo', async () => {
     renderPanel();
     expect(await screen.findByRole('heading', { name: 'Compra OC-0001' })).toBeTruthy();
+    expect(screen.getByRole('dialog').getAttribute('data-modal-layout')).toBe('side-panel');
     expect(await screen.findByText('Catéter médico')).toBeTruthy();
     const table = screen.getByRole('table', { name: 'Partidas de la compra OC-0001' });
     const row = within(table).getAllByRole('row')[1];
