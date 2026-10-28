@@ -322,6 +322,7 @@ export default function Purchase360Page() {
     openModal,
     saving,
     purchaseToEdit,
+    hasUnsavedChanges,
     supplierId,
     selectedProductId,
     quantity,
@@ -775,6 +776,7 @@ export default function Purchase360Page() {
         isOpen={openModal}
         editing={purchaseToEdit !== null}
         saving={saving}
+        hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}

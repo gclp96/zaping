@@ -35,6 +35,7 @@ function axiosError(status: number, config?: { url: string }) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   localStorage.clear();
   window.history.pushState(null, "", "/");
 });
@@ -107,6 +108,13 @@ describe("api response interceptor", () => {
 });
 
 describe("api base URL", () => {
+  it("uses NEXT_PUBLIC_API_URL from the actual process environment by default", () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:3003");
+    vi.stubEnv("NODE_ENV", "development");
+
+    expect(resolveApiBaseUrl()).toBe("http://localhost:3003");
+  });
+
   it("uses a configured public API URL", () => {
     expect(
       resolveApiBaseUrl({

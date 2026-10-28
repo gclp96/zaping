@@ -34,7 +34,9 @@ import {
 } from './purchase-date';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
+import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
+import PurchaseQuickDetailPanel from './components/PurchaseQuickDetailPanel';
 import PurchaseFormModal from './components/PurchaseFormModal';
 import { usePurchaseReceipts } from './hooks/usePurchaseReceipts';
 import { getPurchaseReceiptInventoryHref } from '../purchase-receipts/receipt-navigation';
@@ -217,6 +219,9 @@ function comparePurchases(
 }
 
 function PurchasesPageContent() {
+  // PUR-UX-01B: presentation-only flag. Authorization remains server-owned.
+  const purchasesWorkspaceEnabled =
+    process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true';
 
 const router = useRouter();
 const searchParams = useSearchParams();
@@ -253,8 +258,12 @@ const [companyTimezoneState, setCompanyTimezoneState] =
 const [sorting, setSorting] = useState<SortState>(null);
 const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+const [quickDetailOpen, setQuickDetailOpen] = useState(false);
+const [quickDetailGeneration, setQuickDetailGeneration] = useState(0);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
+const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
 const directReceiveRequestId = useRef(0);
 const directReceiveInFlight = useRef(false);
 const authenticatedCompanyTimezone =
@@ -421,6 +430,7 @@ const {
   openModal,
   saving,
   purchaseToEdit,
+  hasUnsavedChanges,
 
   supplierId,
   selectedProductId,
@@ -556,8 +566,14 @@ const {
     }
   }
 
-function handleViewCreatedReceipt(receiptId: string) {
+function closeReceiptWithPreview() {
+  if (receiptSaving) return;
+  setLocalAttachmentCount(0);
   closeReceiptModal();
+}
+
+function handleViewCreatedReceipt(receiptId: string) {
+  closeReceiptWithPreview();
   router.push(`/purchase-receipts/${encodeURIComponent(receiptId)}`);
 }
 
@@ -565,7 +581,7 @@ function handleViewCreatedReceiptInventory(
   receiptId: string,
   receiptFolio: string,
 ) {
-  closeReceiptModal();
+  closeReceiptWithPreview();
   router.push(getPurchaseReceiptInventoryHref(receiptId, receiptFolio));
 }
 
@@ -674,11 +690,15 @@ async function loadPageData() {
       <div
         role="group"
         aria-label="Controles de tabla"
-        className="space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5"
+        className={purchasesWorkspaceEnabled
+          ? 'space-y-4 rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-5'
+          : 'space-y-4 rounded-xl border border-border bg-surface p-4 sm:p-5'}
       >
-        <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6">
+        <div className={purchasesWorkspaceEnabled
+            ? 'grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6'
+            : 'grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-6'}>
           <Input
-            label="Buscar compras"
+            label={purchasesWorkspaceEnabled ? 'Buscar por folio, proveedor o SKU' : 'Buscar compras'}
             type="search"
             value={search}
             placeholder="Folio, proveedor o producto"
@@ -840,12 +860,30 @@ async function loadPageData() {
       minWidth: 110,
       cell: (purchase) => (
         <div className="space-y-2">
-          <Link
-            href={`/purchases/${encodeURIComponent(purchase.id)}`}
-            className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-          >
-            {purchase.folio}
-          </Link>
+          {purchasesWorkspaceEnabled ? (
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={quickDetailOpen && selectedPurchaseId === purchase.id}
+              aria-label={`Abrir detalle de compra ${purchase.folio}`}
+              className="inline-block rounded-sm text-left font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+              onClick={() => {
+                clearActionError();
+                setSelectedPurchaseId(purchase.id);
+                setQuickDetailGeneration((version) => version + 1);
+                setQuickDetailOpen(true);
+              }}
+            >
+              {purchase.folio}
+            </button>
+          ) : (
+            <Link
+              href={`/purchases/${encodeURIComponent(purchase.id)}`}
+              className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+            >
+              {purchase.folio}
+            </Link>
+          )}
           {purchase.status !== 'DRAFT' && purchase.status !== 'CANCELLED' ? (
             <p className="text-xs text-text-muted sm:hidden">
               Recepción: {purchase.receiptProgress.receivedUnits} de{' '}
@@ -1064,11 +1102,15 @@ async function loadPageData() {
   return (
     <>
       {/* Página de compras */}
-      <PageContainer>
-        <div className="rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0">
+      <PageContainer size={purchasesWorkspaceEnabled ? 'wide' : 'default'}>
+        <div className={purchasesWorkspaceEnabled
+          ? 'min-w-0 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6 [&>div]:mb-0'
+          : 'rounded-xl border border-border border-t-4 border-t-blue-600 bg-surface p-5 sm:p-6 [&>div]:mb-0'}>
           <PageHeader
             title="Compras"
-            description="Administra órdenes de compra y da seguimiento a sus recepciones."
+            description={purchasesWorkspaceEnabled
+              ? 'Registra órdenes de compra y da seguimiento a recepciones parciales o completas.'
+              : 'Administra órdenes de compra y da seguimiento a sus recepciones.'}
             action={canEdit ? (
               <Button className="w-full sm:w-auto" onClick={openCreateModal}>
                 <Plus aria-hidden="true" size={18} />
@@ -1078,7 +1120,7 @@ async function loadPageData() {
           />
         </div>
 
-        {actionError && !actionErrorHasDialog ? (
+        {actionError && !actionErrorHasDialog && !quickDetailOpen ? (
           <div
             role="alert"
             className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
@@ -1147,7 +1189,12 @@ async function loadPageData() {
             }
           />
         ) : (
-          <Section>
+          <Section
+            title={purchasesWorkspaceEnabled ? 'Historial de compras' : undefined}
+            description={purchasesWorkspaceEnabled
+              ? 'Consulta las órdenes, su estado y el avance de recepción de mercancía.'
+              : undefined}
+          >
             <p className="text-sm text-text-muted sm:hidden">
               Desliza la tabla para ver el estado y las acciones de cada compra.
             </p>
@@ -1156,6 +1203,9 @@ async function loadPageData() {
               rows={paginatedPurchases}
               columns={purchaseColumns}
               getRowId={(purchase) => purchase.id}
+              getRowClassName={purchasesWorkspaceEnabled
+                ? (purchase) => quickDetailOpen && selectedPurchaseId === purchase.id ? 'bg-blue-50' : ''
+                : undefined}
               sorting={{
                 state: sorting,
                 onChange: setSorting,
@@ -1192,11 +1242,34 @@ async function loadPageData() {
         )}
       </PageContainer>
 
+      {/* PUR-UX-01C: read-only contextual detail, behind the workspace flag. */}
+      {purchasesWorkspaceEnabled && selectedPurchaseId && !forbidden && !sessionForbidsAccess ? (
+        <PurchaseQuickDetailPanel
+          key={`${selectedPurchaseId}-${quickDetailGeneration}`}
+          purchaseId={selectedPurchaseId}
+          isOpen={quickDetailOpen}
+          onClose={() => setQuickDetailOpen(false)}
+          formatDate={formatDate}
+          formatMoney={formatMoney}
+          canEdit={canEdit}
+          canApprove={canApprove}
+          onEdit={openEditModal}
+          onApprove={openApproveDialog}
+          onCancel={openCancelDialog}
+          onReceive={(purchase) => { void handleDirectReceive(purchase); }}
+          onDownloadPdf={(purchase) => { void handleDownloadPdf(purchase); }}
+          downloadingPurchaseId={downloadingPurchaseId}
+          actionError={actionError}
+          onClearActionError={clearActionError}
+        />
+      ) : null}
+
       {/* Crear compra */}
       <PurchaseFormModal
         isOpen={openModal}
         editing={purchaseToEdit !== null}
         saving={saving}
+        hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
@@ -1241,10 +1314,14 @@ async function loadPageData() {
         error={receiptFormError}
         fieldErrors={receiptFieldErrors}
         createdReceipt={createdReceipt}
-        onClose={closeReceiptModal}
+        onClose={closeReceiptWithPreview}
+        pendingAttachmentCount={localAttachmentCount}
+        attachmentPreview={process.env.NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI === 'true' && purchaseToReceive && !createdReceipt ? (
+          <ReceiptFilesPreview key={purchaseToReceive.id} mode="registration" receiptFolio={purchaseToReceive.folio} onSelectionCountChange={setLocalAttachmentCount} />
+        ) : null}
         onItemChange={handleReceiptItemChange}
         onNotesChange={handleReceiptNotesChange}
-        onSubmit={() => void handleCreateReceipt()}
+        onSubmit={() => { if (localAttachmentCount === 0) void handleCreateReceipt(); }}
         onViewReceipt={handleViewCreatedReceipt}
         onViewInventory={handleViewCreatedReceiptInventory}
       />

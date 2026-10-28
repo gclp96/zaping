@@ -29,15 +29,29 @@ vi.mock('@/app/components/ui/Modal', () => ({
     isOpen,
     title,
     children,
+    layout = 'default',
+    footer,
+    dismissible = true,
+    onClose,
   }: {
     isOpen: boolean;
     title: string;
     children: ReactNode;
+    layout?: string;
+    footer?: ReactNode;
+    dismissible?: boolean;
+    onClose: () => void;
   }) =>
     isOpen ? (
-      <div role="dialog">
+      <div role="dialog" aria-label={title} data-modal-layout={layout}>
         <h2>{title}</h2>
-        {children}
+        {dismissible ? (
+          <button type="button" aria-label="Cerrar modal" onClick={onClose}>
+            X
+          </button>
+        ) : null}
+        <div data-modal-body>{children}</div>
+        {footer ? <div data-modal-footer>{footer}</div> : null}
       </div>
     ) : null,
 }));
@@ -78,6 +92,7 @@ function renderModal(
     isOpen: true,
     editing: false,
     saving: false,
+    hasUnsavedChanges: true,
     suppliers: [supplier],
     products: [product],
     supplierId: supplier.id,
@@ -110,6 +125,182 @@ function renderModal(
 describe('PurchaseFormModal', () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
+  });
+
+  it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onSubmit = vi.fn();
+    const onAddProduct = vi.fn();
+    const onClose = vi.fn();
+    renderModal({ onSubmit, onAddProduct, onClose });
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-modal-layout')).toBe('workspace');
+    expect(within(dialog).getByRole('heading', { name: 'Proveedor de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Agregar productos' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Partidas de la compra' })).toBeTruthy();
+
+    const lowerArea = screen.getByTestId('purchase-form-lower-area');
+    expect(lowerArea.className).toContain('lg:grid-cols-');
+    expect(within(lowerArea).getByRole('region', { name: 'Revisión de la orden' })).toBeTruthy();
+    expect(within(lowerArea).getByText('Proveedor médico')).toBeTruthy();
+    expect(within(lowerArea).getByText('Partidas agregadas')).toBeTruthy();
+    expect(within(lowerArea).getByText('$348.00')).toBeTruthy();
+    expect(screen.getByTestId('purchase-form-items-table').className).toContain('md:block');
+    expect(screen.getByTestId('purchase-form-mobile-items').className).toContain('md:hidden');
+
+    const fixedFooter = within(dialog).getByTestId('purchase-form-footer');
+    expect(fixedFooter.closest('[data-modal-footer]')).not.toBeNull();
+    expect(screen.queryAllByTestId('purchase-form-footer')).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar producto' }));
+    fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Crear compra' }));
+    fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Cancelar' }));
+    const warning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(within(warning).getByRole('button', { name: 'Descartar cambios' }));
+    expect(onAddProduct).toHaveBeenCalledOnce();
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { label: 'proveedor elegido', supplierId: supplier.id, selectedProductId: '', quantity: '1', items: [] },
+    { label: 'producto elegido', supplierId: '', selectedProductId: product.id, quantity: '1', items: [] },
+    { label: 'cantidad editada', supplierId: '', selectedProductId: '', quantity: '3', items: [] },
+    { label: 'partidas agregadas', supplierId: '', selectedProductId: '', quantity: '1', items: [item] },
+  ])('confirma descarte con $label y permite volver a la captura', ({ supplierId, selectedProductId, quantity, items }) => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ supplierId, selectedProductId, quantity, items, onClose });
+
+    const editor = screen.getByRole('dialog', { name: 'Nueva compra' });
+    fireEvent.click(within(editor).getByRole('button', { name: 'Cancelar' }));
+    const warning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    expect(within(warning).getByText(/no se ha guardado/)).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(within(warning).getByRole('button', { name: 'Continuar captura' }));
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Nueva compra' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The X and the footer Cancel action share the same guarded close handler.
+    fireEvent.click(within(editor).getByRole('button', { name: 'Cerrar modal' }));
+    const reopenedWarning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    fireEvent.click(within(reopenedWarning).getByRole('button', { name: 'Descartar cambios' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('cierra directamente un formulario nuevo sin cambios', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ supplierId: '', selectedProductId: '', quantity: '1', items: [], hasUnsavedChanges: false, onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('no abre la confirmación durante el guardado', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ saving: true, onClose });
+    expect(screen.queryByRole('button', { name: 'Cerrar modal' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'Cancelar' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('conserva el cierre legado con la bandera apagada incluso al editar', () => {
+    const onClose = vi.fn();
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    const editingView = renderModal({ editing: true, onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+
+    editingView.unmount();
+    renderModal({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('usa el workspace al editar sin cambiar Guardar cambios ni los handlers', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onSubmit = vi.fn();
+    const onItemQuantityChange = vi.fn();
+    renderModal({ editing: true, hasUnsavedChanges: false, onSubmit, onItemQuantityChange });
+    const dialog = screen.getByRole('dialog', { name: 'Editar compra' });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('workspace');
+    expect(within(dialog).getByRole('heading', { name: 'Proveedor de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Agregar productos' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Partidas de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Revisión de la orden' })).toBeTruthy();
+    expect(within(dialog).getAllByText(/antes de guardar los cambios/).length).toBeGreaterThanOrEqual(1);
+    expect(within(dialog).getByText(/Guardar los cambios de un borrador no registra/)).toBeTruthy();
+    const footer = within(dialog).getByTestId('purchase-form-footer');
+    expect(footer.closest('[data-modal-footer]')).not.toBeNull();
+    expect(screen.getAllByTestId('purchase-form-footer')).toHaveLength(1);
+    fireEvent.change(
+      within(screen.getByTestId('purchase-form-mobile-items')).getByRole('spinbutton', { name: 'Cantidad de Producto médico' }),
+      { target: { value: '5' } },
+    );
+    expect(onItemQuantityChange).toHaveBeenCalledWith('product-1', '5');
+    fireEvent.click(within(footer).getByRole('button', { name: 'Guardar cambios' }));
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+
+  it('abre la confirmación solo si el borrador editado tiene cambios', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    const editor = renderModal({ editing: true, hasUnsavedChanges: false, onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+
+    editor.unmount();
+    renderModal({ editing: true, hasUnsavedChanges: true, onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    const warning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    fireEvent.click(within(warning).getByRole('button', { name: 'Continuar captura' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Descartar cambios de la compra' }))
+        .getByRole('button', { name: 'Descartar cambios' }),
+    );
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  it('bloquea el cierre durante guardado de un borrador', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ editing: true, saving: true, hasUnsavedChanges: true, onClose });
+    expect(screen.queryByRole('button', { name: 'Cerrar modal' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'Cancelar' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('conserva el modal legado de creación cuando la bandera está apagada', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    renderModal();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-modal-layout')).toBe('default');
+    expect(within(dialog).getByRole('heading', { name: 'Datos de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Crear compra' })).toBeTruthy();
+    expect(within(dialog).queryByRole('region', { name: 'Revisión de la orden' })).toBeNull();
+  });
+
+  it('no habilita crear con partidas vacías y muestra el error existente en el pie fijo', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({ items: [], itemsError: 'Agrega al menos un producto.' });
+    const footer = screen.getByTestId('purchase-form-footer');
+    expect(within(footer).getByRole('alert').textContent).toContain('Agrega al menos un producto.');
+    expect((within(footer).getByRole('button', { name: 'Crear compra' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('organiza el formulario y mantiene tabla/editor con el mismo handler', () => {

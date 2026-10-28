@@ -1,9 +1,13 @@
 import DateInput from '@/app/components/business/DateInput';
 import { CircleCheck } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
 
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
+
+import ReceiptCaptureSummary from './ReceiptCaptureSummary';
 
 import { hasOptionalReceiptTraceability } from '../receipt-traceability';
 
@@ -38,6 +42,8 @@ type PurchaseReceiptModalProps = {
   error: string;
   fieldErrors?: PurchaseReceiptFieldErrors;
   createdReceipt: CreatedPurchaseReceipt | null;
+  attachmentPreview?: ReactNode;
+  pendingAttachmentCount?: number;
 
   onClose: () => void;
 
@@ -79,6 +85,8 @@ export default function PurchaseReceiptModal({
   error,
   fieldErrors = {},
   createdReceipt,
+  attachmentPreview,
+  pendingAttachmentCount = 0,
   onClose,
   onItemChange,
   onNotesChange,
@@ -86,6 +94,33 @@ export default function PurchaseReceiptModal({
   onViewReceipt,
   onViewInventory,
 }: PurchaseReceiptModalProps) {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const hasUnsavedChanges =
+    items.some((item) =>
+      item.quantityReceived.trim() !== '' ||
+      item.lotNumber.trim() !== '' ||
+      item.expirationDate.trim() !== '',
+    ) ||
+    notes.trim() !== '' ||
+    supplierDocumentType !== '' ||
+    supplierDocumentNumber.trim() !== '' ||
+    pendingAttachmentCount > 0;
+
+  function requestClose() {
+    if (saving) return;
+    if (process.env.NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE === 'true' &&
+        !createdReceipt && purchase && hasUnsavedChanges) {
+      setConfirmDiscard(true);
+      return;
+    }
+    onClose();
+  }
+
+  function discardAndClose() {
+    setConfirmDiscard(false);
+    onClose();
+  }
+
   // Keep the diagnostic code in receiptAuthorityError; translate only its presentation.
   const authorityErrorMessage =
     receiptAuthorityError === 'CUTOVER_FROZEN'
@@ -95,10 +130,47 @@ export default function PurchaseReceiptModal({
     (item) => item.inventoryTracking === 'ASSET',
   );
 
+  const workspaceEnabled =
+    process.env.NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE === 'true' &&
+    !createdReceipt;
+  // RR-002 uses the same validated inputs and callbacks in both entrypoints.
+  // Only presentation changes; the POST and permissions stay untouched.
+  const actions = (
+    <div
+      className={
+        workspaceEnabled
+          ? 'flex flex-col-reverse justify-end gap-3 sm:flex-row'
+          : 'sticky bottom-0 -mx-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4 sm:flex-row'
+      }
+    >
+      <Button
+        variant="secondary"
+        className="w-full sm:w-auto"
+        disabled={saving}
+        onClick={requestClose}
+      >
+        Cancelar
+      </Button>
+      <Button
+        variant="success"
+        className="w-full sm:w-auto"
+        loading={saving}
+        loadingText="Registrando..."
+        disabled={saving || !receiptAuthority || items.length === 0 || pendingAttachmentCount > 0}
+        onClick={() => { if (pendingAttachmentCount === 0) onSubmit(); }}
+      >
+        Registrar recepción
+      </Button>
+    </div>
+  );
+
   return (
+    <>
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      layout={workspaceEnabled ? 'workspace' : 'default'}
+      footer={workspaceEnabled ? actions : undefined}
+      onClose={requestClose}
       title={
         createdReceipt
           ? 'Recepción registrada correctamente'
@@ -155,12 +227,34 @@ export default function PurchaseReceiptModal({
           </div>
         </div>
       ) : purchase ? (
-        <div className="space-y-6">
-          <div className="rounded-lg bg-gray-50 p-4">
+        <div
+          data-testid="receipt-capture-content"
+          className={workspaceEnabled ? 'space-y-5' : 'space-y-6'}
+        >
+          <section
+            data-testid="receipt-purchase-context"
+            aria-label="Datos de la compra origen"
+            className={
+              workspaceEnabled
+                ? 'rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+                : 'rounded-lg bg-gray-50 p-4'
+            }
+          >
+            {workspaceEnabled ? (
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  Compra origen
+                </p>
+                <p className="mt-1 break-words text-lg font-semibold text-text">
+                  {purchase.folio}
+                </p>
+              </div>
+            ) : null}
             <p className="text-sm text-gray-500">Proveedor</p>
-
-            <p className="font-semibold">{purchase.supplier.name}</p>
-          </div>
+            <p className="break-words font-semibold">
+              {purchase.supplier.name}
+            </p>
+          </section>
 
           {!receiptAuthority ? (
             receiptAuthorityError ? (
@@ -184,6 +278,26 @@ export default function PurchaseReceiptModal({
               independientes. Captúralos si el proveedor los informa.
             </p>
           ) : null}
+          <section
+            data-testid="receipt-item-capture-section"
+            aria-label="Partidas pendientes de recibir"
+            className={
+              workspaceEnabled
+                ? 'space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5'
+                : 'space-y-4'
+            }
+          >
+            {workspaceEnabled ? (
+              <div>
+                <h3 className="text-lg font-semibold text-text">
+                  Partidas pendientes
+                </h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  Captura únicamente la cantidad que recibes ahora. Pedido,
+                  recibido y pendiente son datos de consulta.
+                </p>
+              </div>
+            ) : null}
           {items.length === 0 ? (
             <div className="rounded-lg border border-gray-200 p-4">
               <p className="text-sm text-gray-600">
@@ -208,9 +322,19 @@ export default function PurchaseReceiptModal({
 
               <div
                 data-testid="receipt-desktop-items"
-                className="hidden overflow-x-auto rounded-lg border border-gray-200 xl:block"
+                className={
+                  workspaceEnabled
+                    ? 'hidden overflow-x-auto rounded-lg border border-gray-200 lg:block'
+                    : 'hidden overflow-x-auto rounded-lg border border-gray-200 xl:block'
+                }
               >
-                <table className="w-full min-w-[760px] text-sm">
+                <table
+                  className={
+                    workspaceEnabled
+                      ? 'w-full min-w-[940px] text-sm'
+                      : 'w-full min-w-[760px] text-sm'
+                  }
+                >
                   <caption className="sr-only">
                     Líneas pendientes de la recepción de la compra{' '}
                     {purchase.folio}
@@ -425,7 +549,11 @@ export default function PurchaseReceiptModal({
 
               <div
                 data-testid="receipt-mobile-items"
-                className="space-y-4 xl:hidden"
+                className={
+                  workspaceEnabled
+                    ? 'space-y-4 lg:hidden'
+                    : 'space-y-4 xl:hidden'
+                }
               >
                 {items.map((item) => {
                   const itemErrors = fieldErrors[item.purchaseItemId];
@@ -608,6 +736,28 @@ export default function PurchaseReceiptModal({
               </div>
             </>
           )}
+          </section>
+
+          <section
+            data-testid="receipt-supplier-document-section"
+            aria-label="Documento y observaciones de la recepción"
+            className={
+              workspaceEnabled
+                ? 'space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5'
+                : 'space-y-6'
+            }
+          >
+            {workspaceEnabled ? (
+              <div>
+                <h3 className="text-lg font-semibold text-text">
+                  Documento del proveedor y notas
+                </h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  Estos datos describen la recepción; no representan
+                  documentos adjuntos.
+                </p>
+              </div>
+            ) : null}
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -672,7 +822,28 @@ export default function PurchaseReceiptModal({
               onChange={(event) => onNotesChange(event.target.value)}
             />
           </div>
+          </section>
 
+          {workspaceEnabled ? (
+            <div
+              data-testid="receipt-lower-area"
+              className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)]"
+            >
+              {attachmentPreview ? (
+                <div className="min-w-0 lg:col-start-1">{attachmentPreview}</div>
+              ) : null}
+              <div className="min-w-0 lg:col-start-2">
+                <ReceiptCaptureSummary items={items} />
+              </div>
+            </div>
+          ) : null}
+
+          {!workspaceEnabled ? attachmentPreview : null}
+          {pendingAttachmentCount > 0 ? (
+            <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              Hay {pendingAttachmentCount} archivo(s) seleccionados solo para vista previa. No se guardarán con la recepción. Limpia la selección para registrar sin adjuntos.
+            </p>
+          ) : null}
           {error ? (
             <p
               role="alert"
@@ -682,29 +853,20 @@ export default function PurchaseReceiptModal({
             </p>
           ) : null}
 
-          <div className="sticky bottom-0 -mx-6 flex flex-col-reverse justify-end gap-3 border-t border-gray-200 bg-white px-6 py-4 sm:flex-row">
-            <Button
-              variant="secondary"
-              className="w-full sm:w-auto"
-              disabled={saving}
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              variant="success"
-              className="w-full sm:w-auto"
-              loading={saving}
-              loadingText="Registrando..."
-              disabled={saving || !receiptAuthority || items.length === 0}
-              onClick={onSubmit}
-            >
-              Registrar recepción
-            </Button>
-          </div>
+          {!workspaceEnabled ? actions : null}
         </div>
       ) : null}
     </Modal>
+    <ConfirmDialog
+      isOpen={isOpen && confirmDiscard && !saving && !createdReceipt}
+      title="Descartar cambios de la recepción"
+      message="Hay información capturada que todavía no se ha registrado. Si sales, se perderán las cantidades, la trazabilidad, las notas y los archivos seleccionados en vista previa."
+      confirmText="Descartar cambios"
+      cancelText="Continuar captura"
+      confirmVariant="danger"
+      onClose={() => setConfirmDiscard(false)}
+      onConfirm={discardAndClose}
+    />
+    </>
   );
 }

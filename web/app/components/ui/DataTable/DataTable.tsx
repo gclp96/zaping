@@ -45,6 +45,7 @@ export type DataTableProps<T> = {
   rows: readonly T[];
   columns: readonly DataTableColumn<T>[];
   getRowId: (row: T) => string;
+  getRowClassName?: (row: T) => string;
   sorting?: DataTableSorting;
   rowActions?: DataTableRowActions<T>;
   toolbar?: ReactNode;
@@ -81,6 +82,7 @@ export default function DataTable<T>({
   rows,
   columns,
   getRowId,
+  getRowClassName,
   sorting,
   rowActions,
   toolbar,
@@ -203,7 +205,10 @@ export default function DataTable<T>({
                 {rows.map((row) => (
                   <tr
                     key={getRowId(row)}
-                    className="border-t border-border transition-colors hover:bg-surface-subtle"
+                    className={[
+                      'border-t border-border transition-colors hover:bg-surface-subtle',
+                      getRowClassName?.(row),
+                    ].filter(Boolean).join(' ')}
                   >
                     {columns.map((column) => {
                       const align = column.align ?? 'start';

@@ -199,6 +199,33 @@ describe('PurchaseReceiptDetailPage', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     cleanup();
+    vi.unstubAllEnvs();
+  });
+
+  it('oculta Zaping Files cuando la bandera no está habilitada', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'false');
+    render(<PurchaseReceiptDetailPage />);
+
+    await screen.findByRole('heading', {
+      name: 'Recepción REC-20260826-4D1F98E8',
+    });
+    expect(
+      screen.queryByRole('heading', { name: 'Documentos adjuntos' }),
+    ).toBeNull();
+  });
+
+  it('muestra únicamente la vista previa local cuando se habilita', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI', 'true');
+    render(<PurchaseReceiptDetailPage />);
+
+    await screen.findByRole('heading', {
+      name: 'Recepción REC-20260826-4D1F98E8',
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Documentos adjuntos' }),
+    ).toBeTruthy();
+    expect(screen.getByText(/no se guardan ni se envían/i)).toBeTruthy();
+    expect(api.get).toHaveBeenCalledTimes(1);
   });
 
   it('presenta la recepción QUANTITY y su movimiento IN sin inventar equipos', async () => {
