@@ -1,7 +1,10 @@
+import { useState } from 'react';
+
 import ProductSelector from '@/app/components/business/ProductSelector';
 import SupplierSelector from '@/app/components/business/SupplierSelector';
 
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
@@ -92,6 +95,32 @@ export default function PurchaseFormModal({
   const supplierName =
     suppliers.find((supplier) => supplier.id === supplierId)?.name ??
     'Sin seleccionar';
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  // Only current values count as unsaved input. Server-side errors alone do not
+  // trigger the guard; the form remains controlled by usePurchaseForm.
+  const hasUnsavedChanges =
+    supplierId !== '' ||
+    selectedProductId !== '' ||
+    quantity !== '1' ||
+    items.length > 0;
+
+  function requestClose() {
+    if (saving) return;
+
+    if (workspaceEnabled && hasUnsavedChanges) {
+      setConfirmDiscard(true);
+      return;
+    }
+
+    onClose();
+  }
+
+  function discardAndClose() {
+    if (saving) return;
+    setConfirmDiscard(false);
+    onClose();
+  }
 
   const actions = (
     <footer
@@ -113,7 +142,7 @@ export default function PurchaseFormModal({
           variant="outline"
           disabled={saving}
           className="w-full sm:w-auto"
-          onClick={onClose}
+          onClick={requestClose}
         >
           Cancelar
         </Button>
@@ -132,9 +161,11 @@ export default function PurchaseFormModal({
   );
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={requestClose}
+      dismissible={!saving}
       title={editing ? 'Editar compra' : 'Nueva compra'}
       layout={workspaceEnabled ? 'workspace' : 'default'}
       footer={workspaceEnabled ? actions : undefined}
@@ -513,5 +544,16 @@ export default function PurchaseFormModal({
         {!workspaceEnabled ? actions : null}
       </div>
     </Modal>
+    <ConfirmDialog
+      isOpen={isOpen && workspaceEnabled && confirmDiscard && !saving}
+      title="Descartar cambios de la compra"
+      message="Hay información de la compra que todavía no se ha guardado. Si sales, se perderán el proveedor, los productos y las cantidades capturadas."
+      cancelText="Continuar captura"
+      confirmText="Descartar cambios"
+      confirmVariant="danger"
+      onClose={() => setConfirmDiscard(false)}
+      onConfirm={discardAndClose}
+    />
+    </>
   );
 }
