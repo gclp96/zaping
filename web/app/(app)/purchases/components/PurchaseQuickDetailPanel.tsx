@@ -32,6 +32,8 @@ type Props = {
   onReceive: (purchase: Purchase) => void;
   onDownloadPdf: (purchase: Purchase) => void;
   downloadingPurchaseId: string | null;
+  actionError: string;
+  onClearActionError: () => void;
 };
 
 function sumReceived(receipts: PurchaseReceipt[]): Map<string, number> {
@@ -61,6 +63,8 @@ export default function PurchaseQuickDetailPanel({
   onReceive,
   onDownloadPdf,
   downloadingPurchaseId,
+  actionError,
+  onClearActionError,
 }: Props) {
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -206,6 +210,14 @@ export default function PurchaseQuickDetailPanel({
         </div>
       ) : purchase && status ? (
         <div className="space-y-6">
+          {actionError ? (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <p>{actionError}</p>
+              <Button type="button" variant="outline" size="sm" onClick={onClearActionError}>
+                Cerrar mensaje
+              </Button>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm text-text-muted">Registrada: {formatDate(purchase.createdAt)}</p>
