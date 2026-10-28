@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import StatusBadge from '@/app/components/business/StatusBadge';
 import Button from '@/app/components/ui/Button';
@@ -65,52 +65,65 @@ export default function PurchaseQuickDetailPanel({
   const [detail, setDetail] = useState<DetailState>({ status: 'loading' });
   const [reloadVersion, setReloadVersion] = useState(0);
 
-  const loadDetail = useCallback(async (isActive: () => boolean) => {
-    try {
-      const result = await api.get<Purchase>(`/purchases/${encodeURIComponent(purchaseId)}`);
-      if (!isActive()) return;
-
-      // Render the canonical purchase, not a potentially stale list-row snapshot.
-      const purchase = result.data;
-      if (!purchase || purchase.id !== purchaseId) {
-        setDetail({ status: 'error', message: 'No se pudo verificar el detalle de la compra.' });
-        return;
-      }
-
-      try {
-        const receipts = await api.get<PurchaseReceipt[]>(
-          `/purchase-receipts/purchase/${encodeURIComponent(purchaseId)}`,
-        );
-        if (isActive()) {
-          setDetail({ status: 'ready', purchase, receipts: receipts.data, receiptsError: '' });
-        }
-      } catch (error: unknown) {
-        if (isActive()) {
-          setDetail({
-            status: 'ready',
-            purchase,
-            receipts: null,
-            receiptsError: getApiErrorMessage(error, 'No fue posible verificar las recepciones.'),
-          });
-        }
-      }
-    } catch (error: unknown) {
-      if (!isActive()) return;
-      setDetail({
-        status: 'error',
-        message: isForbiddenError(error)
-          ? 'No tienes permiso para consultar esta compra.'
-          : getApiErrorMessage(error, 'No fue posible cargar el detalle de la compra.'),
-      });
-    }
-  }, [purchaseId]);
-
   useEffect(() => {
     if (!isOpen) return;
+
     let active = true;
-    void loadDetail(() => active);
+    // Network completions, not the effect body, update the React view state.
+    void api.get<Purchase>(`/purchases/${encodeURIComponent(purchaseId)}`)
+      .then(async (result) => {
+        if (!active) return;
+
+        const purchase = result.data;
+        if (!purchase || purchase.id !== purchaseId) {
+          setDetail({
+            status: 'error',
+            message: 'No se pudo verificar el detalle de la compra.',
+          });
+          return;
+        }
+
+        try {
+          const receipts = await api.get<PurchaseReceipt[]>(
+            `/purchase-receipts/purchase/${encodeURIComponent(purchaseId)}`,
+          );
+          if (active) {
+            setDetail({
+              status: 'ready',
+              purchase,
+              receipts: receipts.data,
+              receiptsError: '',
+            });
+          }
+        } catch (error: unknown) {
+          if (active) {
+            setDetail({
+              status: 'ready',
+              purchase,
+              receipts: null,
+              receiptsError: getApiErrorMessage(
+                error,
+                'No fue posible verificar las recepciones.',
+              ),
+            });
+          }
+        }
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setDetail({
+          status: 'error',
+          message: isForbiddenError(error)
+            ? 'No tienes permiso para consultar esta compra.'
+            : getApiErrorMessage(
+                error,
+                'No fue posible cargar el detalle de la compra.',
+              ),
+        });
+      });
+
     return () => { active = false; };
-  }, [isOpen, loadDetail, reloadVersion]);
+  }, [isOpen, purchaseId, reloadVersion]);
 
   const receivedByItem = useMemo(
     () => detail.status === 'ready' && detail.receipts
