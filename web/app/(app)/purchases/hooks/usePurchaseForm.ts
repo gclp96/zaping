@@ -61,6 +61,36 @@ export function usePurchaseForm({
   const iva = subtotal * 0.16;
   const total = subtotal + iva;
 
+  // A draft's preloaded supplier and lines are the baseline, not new edits.
+  // The existing hook stays responsible for form state and POST/PATCH payloads.
+  const hasUnsavedChanges = useMemo(() => {
+    if (selectedProductId !== '' || quantity !== '1') {
+      return true;
+    }
+
+    if (!purchaseToEdit) {
+      return supplierId !== '' || items.length > 0;
+    }
+
+    if (
+      supplierId !== purchaseToEdit.supplier.id ||
+      items.length !== purchaseToEdit.items.length
+    ) {
+      return true;
+    }
+
+    return items.some((item, index) => {
+      const originalItem = purchaseToEdit.items[index];
+
+      return (
+        !originalItem ||
+        item.productId !== originalItem.productId ||
+        item.quantity !== String(originalItem.quantity) ||
+        item.unitCost !== originalItem.price
+      );
+    });
+  }, [items, purchaseToEdit, quantity, selectedProductId, supplierId]);
+
   function resetForm() {
     setSupplierId('');
     setSelectedProductId('');
@@ -349,6 +379,7 @@ export function usePurchaseForm({
     openModal,
     saving,
     purchaseToEdit,
+    hasUnsavedChanges,
 
     supplierId,
     selectedProductId,
