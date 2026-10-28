@@ -1,7 +1,10 @@
+import { useState } from 'react';
+
 import ProductSelector from '@/app/components/business/ProductSelector';
 import SupplierSelector from '@/app/components/business/SupplierSelector';
 
 import Button from '@/app/components/ui/Button';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import Input from '@/app/components/ui/Input';
 import Modal from '@/app/components/ui/Modal';
 
@@ -15,6 +18,7 @@ type PurchaseFormModalProps = {
   isOpen: boolean;
   editing: boolean;
   saving: boolean;
+  hasUnsavedChanges: boolean;
 
   suppliers: Supplier[];
   products: Product[];
@@ -62,6 +66,7 @@ export default function PurchaseFormModal({
   isOpen,
   editing,
   saving,
+  hasUnsavedChanges,
   suppliers,
   products,
   supplierId,
@@ -86,23 +91,104 @@ export default function PurchaseFormModal({
   onQuantityChange,
   onItemQuantityChange,
 }: PurchaseFormModalProps) {
+  // PUR-UX-02C: create and DRAFT edit use the same visual workspace.
+  // Edit eligibility and POST/PATCH behavior stay in the purchase hook.
+  const workspaceEnabled =
+    process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true';
+  const supplierName =
+    suppliers.find((supplier) => supplier.id === supplierId)?.name ??
+    'Sin seleccionar';
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  // usePurchaseForm compares editing values against the original DRAFT;
+  // preloaded products alone must not trigger a discard confirmation.
+  function requestClose() {
+    if (saving) return;
+
+    if (workspaceEnabled && hasUnsavedChanges) {
+      setConfirmDiscard(true);
+      return;
+    }
+
+    onClose();
+  }
+
+  function discardAndClose() {
+    if (saving) return;
+    setConfirmDiscard(false);
+    onClose();
+  }
+
+  const actions = (
+    <footer
+      data-testid="purchase-form-footer"
+      className={
+        workspaceEnabled
+          ? 'w-full'
+          : 'sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur'
+      }
+    >
+      {itemsError ? (
+        <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {itemsError}
+        </p>
+      ) : null}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={saving}
+          className="w-full sm:w-auto"
+          onClick={requestClose}
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          loading={saving}
+          loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
+          disabled={saving || !supplierId || items.length === 0}
+          className="w-full sm:min-w-40 sm:w-auto"
+          onClick={onSubmit}
+        >
+          {editing ? 'Guardar cambios' : 'Crear compra'}
+        </Button>
+      </div>
+    </footer>
+  );
+
   return (
+    <>
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={requestClose}
+      dismissible={!saving}
       title={editing ? 'Editar compra' : 'Nueva compra'}
+      layout={workspaceEnabled ? 'workspace' : 'default'}
+      footer={workspaceEnabled ? actions : undefined}
     >
-      <div className="space-y-6 pb-2">
+      <div
+        data-testid="purchase-form-content"
+        className={workspaceEnabled ? 'space-y-5 pb-1' : 'space-y-6 pb-2'}
+      >
         <section
           aria-labelledby="purchase-form-details-heading"
           data-testid="purchase-form-details"
-          className="space-y-4"
+          className={
+            workspaceEnabled
+              ? 'space-y-4 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+              : 'space-y-4'
+          }
         >
           <h3
             id="purchase-form-details-heading"
-            className="text-sm font-semibold uppercase tracking-wide text-gray-500"
+            className={
+              workspaceEnabled
+                ? 'text-sm font-semibold uppercase tracking-wide text-text-muted'
+                : 'text-sm font-semibold uppercase tracking-wide text-gray-500'
+            }
           >
-            Datos de la compra
+            {workspaceEnabled ? 'Proveedor de la compra' : 'Datos de la compra'}
           </h3>
 
           <SupplierSelector
@@ -118,14 +204,18 @@ export default function PurchaseFormModal({
         <section
           aria-labelledby="purchase-form-add-item-heading"
           data-testid="purchase-form-add-item"
-          className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5"
+          className={
+            workspaceEnabled
+              ? 'rounded-xl border border-border bg-white p-4 sm:p-5'
+              : 'rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5'
+          }
         >
           <div className="mb-4">
             <h3
               id="purchase-form-add-item-heading"
               className="font-semibold text-gray-900"
             >
-              Agregar partida
+              {workspaceEnabled ? 'Agregar productos' : 'Agregar partida'}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               Selecciona un producto y define la cantidad inicial.
@@ -174,14 +264,18 @@ export default function PurchaseFormModal({
         <section
           aria-labelledby="purchase-form-items-heading"
           data-testid="purchase-form-items"
-          className="space-y-3"
+          className={
+            workspaceEnabled
+              ? 'space-y-3 rounded-xl border border-border bg-white p-4 sm:p-5'
+              : 'space-y-3'
+          }
         >
           <div className="flex items-baseline justify-between gap-4">
             <h3
               id="purchase-form-items-heading"
               className="font-semibold text-gray-900"
             >
-              Partidas
+              {workspaceEnabled ? 'Partidas de la compra' : 'Partidas'}
             </h3>
             {items.length > 0 ? (
               <span className="text-sm text-gray-500">
@@ -190,6 +284,13 @@ export default function PurchaseFormModal({
             ) : null}
           </div>
 
+          {workspaceEnabled ? (
+            <p className="text-sm text-text-muted">
+              {editing
+                ? 'Revisa los productos, las cantidades y los costos antes de guardar los cambios.'
+                : 'Revisa los productos, sus cantidades y costos antes de crear la orden.'}
+            </p>
+          ) : null}
           {items.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
               Todavía no se han agregado productos. Selecciona un producto
@@ -365,11 +466,54 @@ export default function PurchaseFormModal({
           )}
         </section>
 
-        <section
-          aria-labelledby="purchase-form-summary-heading"
-          data-testid="purchase-form-financial-summary"
-          className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5"
+        <div
+          data-testid="purchase-form-lower-area"
+          className={
+            workspaceEnabled
+              ? 'grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] lg:items-start'
+              : ''
+          }
         >
+          {workspaceEnabled ? (
+            <section
+              aria-label="Revisión de la orden"
+              className="min-w-0 space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5"
+            >
+              <div>
+                <h3 className="font-semibold text-text">Revisión de la orden</h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  {editing
+                    ? 'Verifica el proveedor y las partidas antes de guardar los cambios.'
+                    : 'Verifica el proveedor y las partidas antes de crear la compra.'}
+                </p>
+              </div>
+              <dl className="space-y-3 text-sm">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-text-muted">Proveedor</dt>
+                  <dd className="font-medium text-text">{supplierName}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-text-muted">Partidas agregadas</dt>
+                  <dd className="font-semibold text-text">{items.length}</dd>
+                </div>
+              </dl>
+              <p className="rounded-lg bg-surface-subtle p-3 text-sm text-text-muted">
+                {editing
+                  ? 'Guardar los cambios de un borrador no registra la entrada de mercancía.'
+                  : 'Crear una compra no registra la entrada de mercancía.'}{' '}
+                El inventario se actualiza posteriormente, al registrar una recepción.
+              </p>
+            </section>
+          ) : null}
+          <section
+            aria-labelledby="purchase-form-summary-heading"
+            data-testid="purchase-form-financial-summary"
+            className={
+              workspaceEnabled
+                ? 'min-w-0 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+                : 'rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5'
+            }
+          >
           <h3
             id="purchase-form-summary-heading"
             className="mb-4 font-semibold text-gray-900"
@@ -397,53 +541,22 @@ export default function PurchaseFormModal({
               <dd>{formatMoney(total)}</dd>
             </div>
           </dl>
-        </section>
+          </section>
+        </div>
 
-        <footer
-          data-testid="purchase-form-footer"
-          className="sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur"
-        >
-          {itemsError ? (
-            <p
-              role="alert"
-              className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            >
-              {itemsError}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              className="w-full sm:w-auto"
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              type="button"
-              loading={saving}
-              loadingText={
-                editing
-                  ? 'Guardando cambios...'
-                  : 'Guardando...'
-              }
-              disabled={
-                saving ||
-                !supplierId ||
-                items.length === 0
-              }
-              className="w-full sm:min-w-40 sm:w-auto"
-              onClick={onSubmit}
-            >
-              {editing ? 'Guardar cambios' : 'Crear compra'}
-            </Button>
-          </div>
-        </footer>
+        {!workspaceEnabled ? actions : null}
       </div>
     </Modal>
+    <ConfirmDialog
+      isOpen={isOpen && workspaceEnabled && confirmDiscard && !saving}
+      title="Descartar cambios de la compra"
+      message="Hay información de la compra que todavía no se ha guardado. Si sales, se perderán el proveedor, los productos y las cantidades capturadas."
+      cancelText="Continuar captura"
+      confirmText="Descartar cambios"
+      confirmVariant="danger"
+      onClose={() => setConfirmDiscard(false)}
+      onConfirm={discardAndClose}
+    />
+    </>
   );
 }

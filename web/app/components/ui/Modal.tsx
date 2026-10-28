@@ -19,7 +19,7 @@ export type ModalProps = {
   description?: ReactNode;
   dismissible?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
-  layout?: 'default' | 'workspace';
+  layout?: 'default' | 'workspace' | 'side-panel';
   footer?: ReactNode;
 };
 
@@ -331,7 +331,7 @@ export default function Modal({
       ref={rootRef}
       data-modal-root
       className={`fixed inset-0 z-[var(--z-modal)] flex items-center ${
-        layout === 'workspace'
+        (layout === 'workspace' || layout === 'side-panel')
           ? 'justify-end bg-black/35'
           : 'justify-center bg-black/50'
       }`}
@@ -347,7 +347,9 @@ export default function Modal({
         className={`flex min-h-0 flex-col overflow-hidden bg-white shadow-xl ${
           layout === 'workspace'
             ? 'h-screen h-[100dvh] max-h-[100dvh] w-full rounded-none min-[1440px]:max-w-[1040px] min-[1440px]:w-[65vw]'
-            : 'max-h-[90vh] w-full max-w-4xl rounded-lg'
+            : layout === 'side-panel'
+              ? 'h-screen h-[100dvh] max-h-[100dvh] w-full rounded-none min-[960px]:w-[68vw] min-[960px]:max-w-[920px]'
+              : 'max-h-[90vh] w-full max-w-4xl rounded-lg'
         }`}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
@@ -380,7 +382,7 @@ export default function Modal({
         <div
           data-modal-body
           className={`overflow-y-auto p-6 ${
-            layout === 'workspace'
+            (layout === 'workspace' || layout === 'side-panel')
               ? 'min-h-0 flex-1 px-4 py-5 sm:px-6'
               : ''
           }`}
