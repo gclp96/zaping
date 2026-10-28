@@ -31,16 +31,25 @@ vi.mock('@/app/components/ui/Modal', () => ({
     children,
     layout = 'default',
     footer,
+    dismissible = true,
+    onClose,
   }: {
     isOpen: boolean;
     title: string;
     children: ReactNode;
     layout?: string;
     footer?: ReactNode;
+    dismissible?: boolean;
+    onClose: () => void;
   }) =>
     isOpen ? (
-      <div role="dialog" data-modal-layout={layout}>
+      <div role="dialog" aria-label={title} data-modal-layout={layout}>
         <h2>{title}</h2>
+        {dismissible ? (
+          <button type="button" aria-label="Cerrar modal" onClick={onClose}>
+            X
+          </button>
+        ) : null}
         <div data-modal-body>{children}</div>
         {footer ? <div data-modal-footer>{footer}</div> : null}
       </div>
@@ -146,9 +155,76 @@ describe('PurchaseFormModal', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar producto' }));
     fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Crear compra' }));
     fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Cancelar' }));
+    const warning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(within(warning).getByRole('button', { name: 'Descartar cambios' }));
     expect(onAddProduct).toHaveBeenCalledOnce();
     expect(onSubmit).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { label: 'proveedor elegido', supplierId: supplier.id, selectedProductId: '', quantity: '1', items: [] },
+    { label: 'producto elegido', supplierId: '', selectedProductId: product.id, quantity: '1', items: [] },
+    { label: 'cantidad editada', supplierId: '', selectedProductId: '', quantity: '3', items: [] },
+    { label: 'partidas agregadas', supplierId: '', selectedProductId: '', quantity: '1', items: [item] },
+  ])('confirma descarte con $label y permite volver a la captura', ({ supplierId, selectedProductId, quantity, items }) => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ supplierId, selectedProductId, quantity, items, onClose });
+
+    const editor = screen.getByRole('dialog', { name: 'Nueva compra' });
+    fireEvent.click(within(editor).getByRole('button', { name: 'Cancelar' }));
+    const warning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    expect(within(warning).getByText(/no se ha guardado/)).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.click(within(warning).getByRole('button', { name: 'Continuar captura' }));
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Nueva compra' })).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The X and the footer Cancel action share the same guarded close handler.
+    fireEvent.click(within(editor).getByRole('button', { name: 'Cerrar modal' }));
+    const reopenedWarning = screen.getByRole('dialog', { name: 'Descartar cambios de la compra' });
+    fireEvent.click(within(reopenedWarning).getByRole('button', { name: 'Descartar cambios' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('cierra directamente un formulario nuevo sin cambios', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ supplierId: '', selectedProductId: '', quantity: '1', items: [], onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('no abre la confirmación durante el guardado', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onClose = vi.fn();
+    renderModal({ saving: true, onClose });
+    expect(screen.queryByRole('button', { name: 'Cerrar modal' })).toBeNull();
+    expect((screen.getByRole('button', { name: 'Cancelar' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+  });
+
+  it('no cambia el cierre del modo Editar ni del modo legado con la bandera apagada', () => {
+    const onClose = vi.fn();
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const editingView = renderModal({ editing: true, onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
+
+    editingView.unmount();
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    renderModal({ onClose });
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
   });
 
   it('mantiene Editar compra en el modal legado aunque el workspace esté activado', () => {
