@@ -19,6 +19,7 @@ type DetailState =
   | { status: 'ready'; purchase: Purchase; receipts: PurchaseReceipt[] | null; receiptsError: string };
 
 type Props = {
+  isOpen: boolean;
   purchaseId: string;
   onClose: () => void;
   formatDate: (value: string) => string;
@@ -48,6 +49,7 @@ function sumReceived(receipts: PurchaseReceipt[]): Map<string, number> {
 
 export default function PurchaseQuickDetailPanel({
   purchaseId,
+  isOpen,
   onClose,
   formatDate,
   formatMoney,
@@ -105,10 +107,11 @@ export default function PurchaseQuickDetailPanel({
   }, [purchaseId]);
 
   useEffect(() => {
+    if (!isOpen) return;
     let active = true;
     void loadDetail(() => active);
     return () => { active = false; };
-  }, [loadDetail, reloadVersion]);
+  }, [isOpen, loadDetail, reloadVersion]);
 
   const receivedByItem = useMemo(
     () => detail.status === 'ready' && detail.receipts
@@ -130,7 +133,7 @@ export default function PurchaseQuickDetailPanel({
 
   return (
     <Modal
-      isOpen
+      isOpen={isOpen}
       layout="side-panel"
       title={purchase ? `Compra ${purchase.folio}` : 'Detalle de compra'}
       description="Detalle contextual de la orden seleccionada"
