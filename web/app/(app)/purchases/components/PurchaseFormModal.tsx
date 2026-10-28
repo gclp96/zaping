@@ -89,6 +89,10 @@ export default function PurchaseFormModal({
   // PUR-UX-02A: presentation-only; editing and submission rules remain unchanged.
   const workspaceEnabled =
     process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true' && !editing;
+  const supplierName =
+    suppliers.find((supplier) => supplier.id === supplierId)?.name ??
+    'Sin seleccionar';
+
   const actions = (
     <footer
       data-testid="purchase-form-footer"
@@ -432,11 +436,50 @@ export default function PurchaseFormModal({
           )}
         </section>
 
-        <section
-          aria-labelledby="purchase-form-summary-heading"
-          data-testid="purchase-form-financial-summary"
-          className="rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5"
+        <div
+          data-testid="purchase-form-lower-area"
+          className={
+            workspaceEnabled
+              ? 'grid min-w-0 gap-4 lg:grid-cols-[minmax(0,11fr)_minmax(0,9fr)] lg:items-start'
+              : ''
+          }
         >
+          {workspaceEnabled ? (
+            <section
+              aria-label="Revisión de la orden"
+              className="min-w-0 space-y-4 rounded-xl border border-border bg-white p-4 sm:p-5"
+            >
+              <div>
+                <h3 className="font-semibold text-text">Revisión de la orden</h3>
+                <p className="mt-1 text-sm text-text-muted">
+                  Verifica el proveedor y las partidas antes de crear la compra.
+                </p>
+              </div>
+              <dl className="space-y-3 text-sm">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <dt className="text-text-muted">Proveedor</dt>
+                  <dd className="font-medium text-text">{supplierName}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-text-muted">Partidas agregadas</dt>
+                  <dd className="font-semibold text-text">{items.length}</dd>
+                </div>
+              </dl>
+              <p className="rounded-lg bg-surface-subtle p-3 text-sm text-text-muted">
+                Crear una compra no registra la entrada de mercancía. El inventario
+                se actualiza posteriormente, al registrar una recepción.
+              </p>
+            </section>
+          ) : null}
+          <section
+            aria-labelledby="purchase-form-summary-heading"
+            data-testid="purchase-form-financial-summary"
+            className={
+              workspaceEnabled
+                ? 'min-w-0 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+                : 'rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5'
+            }
+          >
           <h3
             id="purchase-form-summary-heading"
             className="mb-4 font-semibold text-gray-900"
@@ -464,7 +507,8 @@ export default function PurchaseFormModal({
               <dd>{formatMoney(total)}</dd>
             </div>
           </dl>
-        </section>
+          </section>
+        </div>
 
         {!workspaceEnabled ? actions : null}
       </div>
