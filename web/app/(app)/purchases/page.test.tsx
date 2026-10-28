@@ -3137,3 +3137,71 @@ it.each(['desktop', 'mobile'])('PHYSICAL REQUIRED envía fecha sin lote desde %s
 });
 
 });
+
+
+describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
+    configureApiMocks([purchase, partialPurchase]);
+    consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    consoleErrorSpy.mockRestore();
+    clearAuthenticatedSessionCache();
+  });
+
+  it('mantiene el listado clásico cuando la bandera no está activada', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    render(<PurchasesPage />);
+
+    await screen.findByRole('link', { name: 'OC-0001' });
+
+    expect(screen.getByRole('searchbox', { name: 'Buscar compras' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Historial de compras' })).toBeNull();
+    expect(screen.getByText('Administra órdenes de compra y da seguimiento a sus recepciones.')).toBeTruthy();
+  });
+
+  it('muestra la estructura del workspace conservando filtros, enlaces y permisos', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+
+    await screen.findByRole('link', { name: 'OC-0001' });
+
+    expect(screen.getByRole('heading', { name: 'Historial de compras', level: 2 })).toBeTruthy();
+    expect(screen.getByText('Registra órdenes de compra y da seguimiento a recepciones parciales o completas.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href')).toBe('/purchases/purchase-1');
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+
+    const search = screen.getByRole('searchbox', {
+      name: 'Buscar por folio, proveedor o SKU',
+    });
+    await user.type(search, 'RX-200');
+    expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'OC-0002' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'OC-0001' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
+    expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
+    expect(vi.mocked(api.post)).not.toHaveBeenCalled();
+    expect(vi.mocked(api.patch)).not.toHaveBeenCalled();
+  });
+
+  it('conserva las opciones reales de estado sin inventar almacenes del mockup', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await screen.findByRole('link', { name: 'OC-0001' });
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Estado' }), 'PARTIALLY_RECEIVED');
+    expect(screen.getByRole('link', { name: 'OC-0002' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: 'OC-0001' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: 'Almacén destino' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Nueva compra' })).toBeTruthy();
+  });
+});
