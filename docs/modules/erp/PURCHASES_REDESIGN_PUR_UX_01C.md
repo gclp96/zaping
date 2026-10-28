@@ -4,7 +4,7 @@
 
 ## Entrega
 - Acción «Ver resumen» en la fila (mientras se conserva el enlace canónico `/purchases/:id`).
-- Modal `layout="workspace"` reutilizado: panel derecho ≥1440 px, a ancho completo en anchos menores. Focus trap/Escape/retorno de foco y body-scroll pertenecen al componente común; se mantienen sin cambio.
+- Variante aditiva `layout="side-panel"` sobre el modal existente: panel derecho desde 960 px y ancho completo por debajo. Conserva focus trap/Escape/retorno de foco y body-scroll comunes; la instancia permanece montada con `isOpen=false` al cerrar para garantizar restauración de foco.
 - Selección resaltada en DataTable mediante prop opcional `getRowClassName`, sin afectar consumidores existentes.
 - Consulta el recurso concreto `GET /purchases/:id` **al abrir**, no considera el snapshot del listado autoritativo. Si recibe 403/error, oculta los datos y ofrece reintento.
 - Consulta `GET /purchase-receipts/purchase/:id` y deriva recibidos por `purchaseItemId` (misma suma del detalle completo). Si falla, no muestra cantidades inventadas y **deshabilita Registrar recepción** hasta verificar; la recepción existente de todos modos realiza su preflight de historiales y movimientos.
