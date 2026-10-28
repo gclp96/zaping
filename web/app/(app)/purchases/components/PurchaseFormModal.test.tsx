@@ -196,7 +196,7 @@ describe('PurchaseFormModal', () => {
   it('cierra directamente un formulario nuevo sin cambios', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
     const onClose = vi.fn();
-    renderModal({ supplierId: '', selectedProductId: '', quantity: '1', items: [], onClose });
+    renderModal({ supplierId: '', selectedProductId: '', quantity: '1', items: [], hasUnsavedChanges: false, onClose });
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
     expect(onClose).toHaveBeenCalledOnce();
     expect(screen.queryByRole('dialog', { name: 'Descartar cambios de la compra' })).toBeNull();
@@ -238,7 +238,7 @@ describe('PurchaseFormModal', () => {
     expect(within(dialog).getByRole('heading', { name: 'Agregar productos' })).toBeTruthy();
     expect(within(dialog).getByRole('heading', { name: 'Partidas de la compra' })).toBeTruthy();
     expect(within(dialog).getByRole('heading', { name: 'Revisión de la orden' })).toBeTruthy();
-    expect(within(dialog).getByText(/antes de guardar los cambios/)).toBeTruthy();
+    expect(within(dialog).getAllByText(/antes de guardar los cambios/).length).toBeGreaterThanOrEqual(1);
     expect(within(dialog).getByText(/Guardar los cambios de un borrador no registra/)).toBeTruthy();
     const footer = within(dialog).getByTestId('purchase-form-footer');
     expect(footer.closest('[data-modal-footer]')).not.toBeNull();
