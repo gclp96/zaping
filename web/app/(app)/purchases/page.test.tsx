@@ -3205,3 +3205,56 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
     expect(screen.getByRole('button', { name: 'Nueva compra' })).toBeTruthy();
   });
 });
+
+
+describe('PUR-UX-01C — integración del panel contextual desde el listado', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearAuthenticatedSessionCache();
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    configureApiMocks([purchase, partialPurchase]);
+    const previousGet = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, config) => {
+      if (String(url) === '/purchases/purchase-1') {
+        return Promise.resolve({ data: purchase }) as never;
+      }
+      return previousGet(url, config);
+    });
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    consoleErrorSpy.mockRestore();
+    clearAuthenticatedSessionCache();
+  });
+
+  it('abre el panel de compra y restaura el foco y el listado con Escape', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    const openButton = await screen.findByRole('button', { name: 'Vista rápida de compra OC-0001' });
+    await user.click(openButton);
+
+    expect(await screen.findByRole('dialog', { name: 'Compra OC-0001' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Ver detalle completo' }).getAttribute('href'))
+      .toBe('/purchases/purchase-1');
+    expect(openButton.getAttribute('aria-pressed')).toBe('true');
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Compra OC-0001' })).toBeNull());
+    expect(screen.getByRole('link', { name: 'OC-0001' })).toBeTruthy();
+    expect(openButton.getAttribute('aria-pressed')).toBe('false');
+    expect(document.activeElement).toBe(openButton);
+  });
+
+  it('no renderiza controles de vista rápida con el flag desactivado', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    render(<PurchasesPage />);
+    await screen.findByRole('link', { name: 'OC-0001' });
+    expect(screen.queryByRole('button', { name: 'Vista rápida de compra OC-0001' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: /Compra OC-/ })).toBeNull();
+  });
+});
