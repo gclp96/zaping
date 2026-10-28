@@ -36,6 +36,7 @@ import {
 import StatusBadge from '@/app/components/business/StatusBadge';
 import ReceiptFilesPreview from '@/app/components/files/ReceiptFilesPreview';
 import PurchaseReceiptModal from './components/PurchaseReceiptModal';
+import PurchaseQuickDetailPanel from './components/PurchaseQuickDetailPanel';
 import PurchaseFormModal from './components/PurchaseFormModal';
 import { usePurchaseReceipts } from './hooks/usePurchaseReceipts';
 import { getPurchaseReceiptInventoryHref } from '../purchase-receipts/receipt-navigation';
@@ -257,6 +258,7 @@ const [companyTimezoneState, setCompanyTimezoneState] =
 const [sorting, setSorting] = useState<SortState>(null);
 const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
 const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
@@ -861,6 +863,17 @@ async function loadPageData() {
           >
             {purchase.folio}
           </Link>
+          {purchasesWorkspaceEnabled ? (
+            <button
+              type="button"
+              aria-label={`Vista rápida de compra ${purchase.folio}`}
+              aria-pressed={selectedPurchaseId === purchase.id}
+              className="block rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+              onClick={() => setSelectedPurchaseId(purchase.id)}
+            >
+              Ver resumen
+            </button>
+          ) : null}
           {purchase.status !== 'DRAFT' && purchase.status !== 'CANCELLED' ? (
             <p className="text-xs text-text-muted sm:hidden">
               Recepción: {purchase.receiptProgress.receivedUnits} de{' '}
@@ -1180,6 +1193,9 @@ async function loadPageData() {
               rows={paginatedPurchases}
               columns={purchaseColumns}
               getRowId={(purchase) => purchase.id}
+              getRowClassName={purchasesWorkspaceEnabled
+                ? (purchase) => selectedPurchaseId === purchase.id ? 'bg-blue-50' : ''
+                : undefined}
               sorting={{
                 state: sorting,
                 onChange: setSorting,
@@ -1215,6 +1231,25 @@ async function loadPageData() {
           </Section>
         )}
       </PageContainer>
+
+      {/* PUR-UX-01C: read-only contextual detail, behind the workspace flag. */}
+      {purchasesWorkspaceEnabled && selectedPurchaseId && !forbidden && !sessionForbidsAccess ? (
+        <PurchaseQuickDetailPanel
+          key={selectedPurchaseId}
+          purchaseId={selectedPurchaseId}
+          onClose={() => setSelectedPurchaseId(null)}
+          formatDate={formatDate}
+          formatMoney={formatMoney}
+          canEdit={canEdit}
+          canApprove={canApprove}
+          onEdit={openEditModal}
+          onApprove={openApproveDialog}
+          onCancel={openCancelDialog}
+          onReceive={(purchase) => { void handleDirectReceive(purchase); }}
+          onDownloadPdf={(purchase) => { void handleDownloadPdf(purchase); }}
+          downloadingPurchaseId={downloadingPurchaseId}
+        />
+      ) : null}
 
       {/* Crear compra */}
       <PurchaseFormModal
