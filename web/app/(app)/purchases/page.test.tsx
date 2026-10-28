@@ -3303,6 +3303,56 @@ describe('PUR-UX-01C — integración del panel contextual desde el listado', ()
     await waitFor(() => expect(within(dialog).queryByText('No fue posible descargar el PDF.')).toBeNull());
   });
 
+  it.each(['ADMIN', 'MANAGER'] as const)('ofrece aprobar/editar/cancelar un DRAFT en panel para rol %s', async (role) => {
+    clearAuthenticatedSessionCache();
+    configureApiMocks([draftPurchase], { role });
+    const previousGet = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, config) =>
+      String(url) === '/purchases/purchase-1'
+        ? Promise.resolve({ data: draftPurchase }) as never
+        : previousGet(url, config),
+    );
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Compra OC-0001' });
+    await within(dialog).findByText('Producto médico');
+    expect(within(dialog).getByRole('button', { name: 'Aprobar' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Editar' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'Registrar recepción' })).toBeNull();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('no eleva permisos de WAREHOUSE: edición sin aprobar/cancelar DRAFT', async () => {
+    clearAuthenticatedSessionCache();
+    configureApiMocks([draftPurchase], { role: 'WAREHOUSE' });
+    const previousGet = vi.mocked(api.get).getMockImplementation()!;
+    vi.mocked(api.get).mockImplementation((url, config) =>
+      String(url) === '/purchases/purchase-1'
+        ? Promise.resolve({ data: draftPurchase }) as never
+        : previousGet(url, config),
+    );
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Compra OC-0001' });
+    await within(dialog).findByText('Producto médico');
+    expect(within(dialog).getByRole('button', { name: 'Editar' })).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'Aprobar' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Cancelar' })).toBeNull();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('no renderiza listado ni panel para rol SALES', async () => {
+    clearAuthenticatedSessionCache();
+    configureApiMocks([purchase], { role: 'SALES' });
+    render(<PurchasesPage />);
+    expect(await screen.findByRole('heading', { name: 'Sin permisos' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Abrir detalle de compra OC-0001' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: /Compra OC-/ })).toBeNull();
+  });
+
   it('no renderiza controles de vista rápida con el flag desactivado', async () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
     render(<PurchasesPage />);
