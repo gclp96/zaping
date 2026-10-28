@@ -259,6 +259,7 @@ const [sorting, setSorting] = useState<SortState>(null);
 const [pageIndex, setPageIndex] = useState(0);
 const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+const [quickDetailOpen, setQuickDetailOpen] = useState(false);
 const [directReceiveState, setDirectReceiveState] =
   useState<DirectReceiveState>(null);
 const [localAttachmentCount, setLocalAttachmentCount] = useState(0);
@@ -867,9 +868,9 @@ async function loadPageData() {
             <button
               type="button"
               aria-label={`Vista rápida de compra ${purchase.folio}`}
-              aria-pressed={selectedPurchaseId === purchase.id}
+              aria-pressed={quickDetailOpen && selectedPurchaseId === purchase.id}
               className="block rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
-              onClick={() => setSelectedPurchaseId(purchase.id)}
+              onClick={() => { setSelectedPurchaseId(purchase.id); setQuickDetailOpen(true); }}
             >
               Ver resumen
             </button>
@@ -1194,7 +1195,7 @@ async function loadPageData() {
               columns={purchaseColumns}
               getRowId={(purchase) => purchase.id}
               getRowClassName={purchasesWorkspaceEnabled
-                ? (purchase) => selectedPurchaseId === purchase.id ? 'bg-blue-50' : ''
+                ? (purchase) => quickDetailOpen && selectedPurchaseId === purchase.id ? 'bg-blue-50' : ''
                 : undefined}
               sorting={{
                 state: sorting,
@@ -1237,7 +1238,8 @@ async function loadPageData() {
         <PurchaseQuickDetailPanel
           key={selectedPurchaseId}
           purchaseId={selectedPurchaseId}
-          onClose={() => setSelectedPurchaseId(null)}
+          isOpen={quickDetailOpen}
+          onClose={() => setQuickDetailOpen(false)}
           formatDate={formatDate}
           formatMoney={formatMoney}
           canEdit={canEdit}
