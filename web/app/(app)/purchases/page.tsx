@@ -1119,7 +1119,7 @@ async function loadPageData() {
           />
         </div>
 
-        {actionError && !actionErrorHasDialog ? (
+        {actionError && !actionErrorHasDialog && !quickDetailOpen ? (
           <div
             role="alert"
             className="mb-4 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 sm:flex-row sm:items-center sm:justify-between"
