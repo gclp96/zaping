@@ -29,15 +29,20 @@ vi.mock('@/app/components/ui/Modal', () => ({
     isOpen,
     title,
     children,
+    layout = 'default',
+    footer,
   }: {
     isOpen: boolean;
     title: string;
     children: ReactNode;
+    layout?: string;
+    footer?: ReactNode;
   }) =>
     isOpen ? (
-      <div role="dialog">
+      <div role="dialog" data-modal-layout={layout}>
         <h2>{title}</h2>
-        {children}
+        <div data-modal-body>{children}</div>
+        {footer ? <div data-modal-footer>{footer}</div> : null}
       </div>
     ) : null,
 }));
@@ -110,6 +115,71 @@ function renderModal(
 describe('PurchaseFormModal', () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllEnvs();
+  });
+
+  it('habilita el workspace únicamente para Nueva compra y reubica el footer fuera del scroll', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    const onSubmit = vi.fn();
+    const onAddProduct = vi.fn();
+    const onClose = vi.fn();
+    renderModal({ onSubmit, onAddProduct, onClose });
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-modal-layout')).toBe('workspace');
+    expect(within(dialog).getByRole('heading', { name: 'Proveedor de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Agregar productos' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Partidas de la compra' })).toBeTruthy();
+
+    const lowerArea = screen.getByTestId('purchase-form-lower-area');
+    expect(lowerArea.className).toContain('lg:grid-cols-');
+    expect(within(lowerArea).getByRole('region', { name: 'Revisión de la orden' })).toBeTruthy();
+    expect(within(lowerArea).getByText('Proveedor médico')).toBeTruthy();
+    expect(within(lowerArea).getByText('Partidas agregadas')).toBeTruthy();
+    expect(within(lowerArea).getByText('$348.00')).toBeTruthy();
+    expect(screen.getByTestId('purchase-form-items-table').className).toContain('md:block');
+    expect(screen.getByTestId('purchase-form-mobile-items').className).toContain('md:hidden');
+
+    const fixedFooter = within(dialog).getByTestId('purchase-form-footer');
+    expect(fixedFooter.closest('[data-modal-footer]')).not.toBeNull();
+    expect(screen.queryAllByTestId('purchase-form-footer')).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Agregar producto' }));
+    fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Crear compra' }));
+    fireEvent.click(within(fixedFooter).getByRole('button', { name: 'Cancelar' }));
+    expect(onAddProduct).toHaveBeenCalledOnce();
+    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('mantiene Editar compra en el modal legado aunque el workspace esté activado', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({ editing: true });
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-modal-layout')).toBe('default');
+    expect(within(dialog).getByRole('heading', { name: 'Datos de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Agregar partida' })).toBeTruthy();
+    expect(within(dialog).getByRole('heading', { name: 'Partidas' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Guardar cambios' })).toBeTruthy();
+    expect(within(dialog).queryByRole('region', { name: 'Revisión de la orden' })).toBeNull();
+    expect(within(dialog).getByTestId('purchase-form-footer').closest('[data-modal-body]')).not.toBeNull();
+  });
+
+  it('conserva el modal legado de creación cuando la bandera está apagada', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
+    renderModal();
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.getAttribute('data-modal-layout')).toBe('default');
+    expect(within(dialog).getByRole('heading', { name: 'Datos de la compra' })).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Crear compra' })).toBeTruthy();
+    expect(within(dialog).queryByRole('region', { name: 'Revisión de la orden' })).toBeNull();
+  });
+
+  it('no habilita crear con partidas vacías y muestra el error existente en el pie fijo', () => {
+    vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
+    renderModal({ items: [], itemsError: 'Agrega al menos un producto.' });
+    const footer = screen.getByTestId('purchase-form-footer');
+    expect(within(footer).getByRole('alert').textContent).toContain('Agrega al menos un producto.');
+    expect((within(footer).getByRole('button', { name: 'Crear compra' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('organiza el formulario y mantiene tabla/editor con el mismo handler', () => {
