@@ -1,5 +1,20 @@
 Project Board — Zaping
 
+## Cierre de integración — Compras y Recepciones V1 (27-oct-2026)
+
+**Código de rediseño RR-001–RR-007: INTEGRADO EN main** mediante [PR #176](https://github.com/gclp96/zaping/pull/176), merge `83ce41e799f6b8523adf1f176e57477d43388bc6`. La CI del HEAD final `6e08288a81b25ad1f93870d7cf3cb8d2a7f8315f` completó Web, API e Historical upgrade pre-S1: **3/3 PASS** ([run 40612272176](https://github.com/gclp96/zaping/actions/runs/40612272176)). Los PR #167 y #169–#175 se cerraron como superseded para impedir integración duplicada; #168 aparece fusionado por GitHub al incorporar su rama.
+
+- **Compras V1 y Recepciones V1:** flujos comerciales y físicos anteriormente implementados/validados; no se cambian backend, Prisma, transacciones, multiempresa, idempotencia ni mutaciones de inventario en esta integración.
+- **Rediseño de recepción:** código incorporado pero **flags OFF por defecto**. `NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE` y `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI` requieren `true` explícito; el formulario clásico permanece como fallback.
+- **QA manual:** evidencia en PR #174 de responsive, zoom parcial, captura parcial, validaciones visibles, descarte, prototipo de archivos y acceso directo denegado para SALES. No declarar todos los gates de operación, a11y o roles completados; consultar `RECEIPTS_REDESIGN_01_RR007_RELEASE_GATES.md`.
+- **Zaping Files:** prototipo metadata-only, sin lectura/subida de bytes ni persistencia; integración real con Cloudflare R2, antivirus, autorización y auditoría **pendiente por separado**, sin activar.
+- **Siguiente ciclo:** mejora visual de la **página Compras**, inspirada en Recepciones, como iniciativa independiente con contrato UX/QA y sin cambios de dominio ni inventario.
+
+**Distinción:** integración de código completada; **habilitación general de UI rediseñada NO aprobada todavía**. Cierre de Compras/Recepciones V1 no implica liberación de adjuntos reales.
+
+---
+
+
 Producto: Zaping Platform
 Estado: Desarrollo activo
 Fase actual: M-HC1 Healthcare Operations Foundation — HC-NEXT-03C1–C4 COMPLETE / MERGED — PARENT INTEGRATIONS COMPLETE — HC-LOCK-04 FINAL CLOSED / ACCEPTED — HC-NEXT-03C5-A COMPLETE / MERGED — HC-NEXT-03C6-A/C6-B/C6-C/C6-D/C6-E COMPLETE / MERGED — HC-OPS-01A COMPLETE / MERGED — PR #50 — main@bb530e8 — HC-OPS-01A.1 COMPLETE / MERGED — PR #53 — main@54a5d79 — Actual 28-sep-2026 — HC-OPS-01B COMPLETE / MERGED — PR #56 — main@478e0f0 — DoD PASS — DoR COMPLETE — HC-NEXT-03C5-B COMPLETE / DoD PASS / MERGED — B0 COMPLETE / MERGED — PR #57 — main@1be994d — DoD PASS; B1 COMPLETE / MERGED — PR #58 — main@9504cdd — DoD PASS; B2 COMPLETE / MERGED — PR #59 — main@dac9794 — DoD PASS; B3 COMPLETE / VALIDATED / MERGED — PR #60 — main@ad19dcf — CI PASS

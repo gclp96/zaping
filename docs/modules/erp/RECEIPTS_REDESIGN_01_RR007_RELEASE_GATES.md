@@ -1,15 +1,15 @@
 # RR-007 — Release Gate de rediseño de recepciones
 
-**Estado: BLOCKED / sin autorización de liberar**  
-**Referencia de cambios:** PR #168 → #169 → #170 → #171 → #172 → #173 → #174 → #175; integración consolidada Draft #176.  
+**Estado: código INTEGRADO en `main` (PR #176); ACTIVACIÓN GENERAL BLOQUEADA hasta completar gates de rollout**  
+**Referencia de cambios:** PR #168 → #169 → #170 → #171 → #172 → #173 → #174 → #175; integración `main` PR #176, merge `83ce41e`. PR paralela #167 subsumida y cerrada.  
 **Banderas:** `NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE` y `NEXT_PUBLIC_ZAPING_FILES_RECEIPTS_UI`, ambas OFF por defecto.
 
 ## Evidencia verificable (27-oct-2026)
-- Integración de diseño RR-001–RR-007 y corrección de URL API en HEAD de #175; PR de integración #176 a `main` abierto en Draft. Cualquier cambio de HEAD requiere CI nueva.
-- CI del commit `f9c30a5717d5038c8f9fe1e9b3f6831501a643dd`: [run 40563946455](https://github.com/gclp96/zaping/actions/runs/40563946455), Web/API/Historical upgrade pre-S1 **3/3 PASS**. La CI del PR #176 debe verificarse por separado.
+- Integración de diseño RR-001–RR-007 y corrección de URL API en PR #176, fusionado a `main`; el HEAD final `6e08288` incorporó vista previa local en detalle, tests y documentación de #167. Cualquier nuevo cambio requiere CI propia.
+- CI HEAD final `6e08288a81b25ad1f93870d7cf3cb8d2a7f8315f`: [run 40612272176](https://github.com/gclp96/zaping/actions/runs/40612272176), Web/API/Historical upgrade pre-S1 **3/3 PASS**.
 - El navegador QA usó Next.js :3002, NestJS :3003; `GET /health/ready` devolvió HTTP 200 con protocolo `inventory-authority-v1`. Esta evidencia es de entorno local, no de producción.
 - Los resultados de QA manual, capturas y límites se documentaron progresivamente en el hilo de PR #174. No se ejecutó una recepción real ni un cutover.
-- PR #167 de vista previa local continúa Draft y **no** implementa carga real, escaneo o persistencia; sus componentes se solapan con #172 y no deben fusionarse dos veces sin reconciliación.
+- PR #167 quedó cerrado como superseded por #176: incorpora vistas de captura y detalle, tests y contrato de preview local. No implementa carga real, escaneo o persistencia.
 
 ## Matriz de aceptación manual (evidencia parcial, NO release aprobado)
 La evidencia proviene del navegador local con una sesión QA; distinguir **PASS visual / manual reportado**, **PARCIAL** y **PENDIENTE**. La prueba manual no sustituye pruebas de seguridad backend.
@@ -43,10 +43,10 @@ La evidencia proviene del navegador local con una sesión QA; distinguir **PASS 
 6. Tests de errores, borrado, reintentos, huérfanos e idempotencia; recovery y rollback documentados.
 
 ## Procedimiento de cierre
-- Confirmar CI verde **del HEAD final** del PR de integración #176 y todos los controles requeridos.
+- CI verde del HEAD final de #176 **confirmada** (3/3 PASS); mantener habilitación/rollout bloqueado hasta completar los controles manuales faltantes.
 - Capturar screenshots por viewport y resultados del checklist. Registrar defectos como tickets y bloquear release ante severidad alta/crítica.
 - Revisar diferencias de ramas apiladas, incluido solapamiento con PR #167, para evitar duplicar componentes y perder protecciones.
 - Revisar explícitamente permisos, auditoría, a11y y regresiones.
-- Recién con evidencias y aprobación, planificar integración ordenada; no fusionar, desplegar ni activar banderas durante este gate.
+- El código ya está fusionado en `main` con banderas OFF; no desplegar configuraciones que activen los flags ni habilitar adjuntos reales sin cierre documentado del gate.
 
-**Decisión:** REDISEÑO AÚN NO LIBERABLE; la matriz visual principal ya tiene evidencia, pero faltan gates de regresión/seguridad. Los archivos reales permanecen fuera del alcance y desactivados hasta aprobar su pipeline seguro.
+**Decisión:** INTEGRACIÓN DE CÓDIGO COMPLETA / ROLLOUT UI AÚN NO AUTORIZADO. La matriz visual principal tiene evidencia parcial suficiente para revisión, pero faltan gates de regresión/seguridad para activar flags. Los archivos reales permanecen fuera de alcance y desactivados hasta aprobar pipeline seguro.
