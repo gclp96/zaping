@@ -430,6 +430,7 @@ const {
   openModal,
   saving,
   purchaseToEdit,
+  hasUnsavedChanges,
 
   supplierId,
   selectedProductId,
@@ -1268,6 +1269,7 @@ async function loadPageData() {
         isOpen={openModal}
         editing={purchaseToEdit !== null}
         saving={saving}
+        hasUnsavedChanges={hasUnsavedChanges}
         suppliers={suppliers}
         products={products}
         supplierId={supplierId}
