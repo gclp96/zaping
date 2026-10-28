@@ -86,23 +86,77 @@ export default function PurchaseFormModal({
   onQuantityChange,
   onItemQuantityChange,
 }: PurchaseFormModalProps) {
+  // PUR-UX-02A: presentation-only; editing and submission rules remain unchanged.
+  const workspaceEnabled =
+    process.env.NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE === 'true' && !editing;
+  const actions = (
+    <footer
+      data-testid="purchase-form-footer"
+      className={
+        workspaceEnabled
+          ? 'w-full'
+          : 'sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur'
+      }
+    >
+      {itemsError ? (
+        <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {itemsError}
+        </p>
+      ) : null}
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={saving}
+          className="w-full sm:w-auto"
+          onClick={onClose}
+        >
+          Cancelar
+        </Button>
+        <Button
+          type="button"
+          loading={saving}
+          loadingText={editing ? 'Guardando cambios...' : 'Guardando...'}
+          disabled={saving || !supplierId || items.length === 0}
+          className="w-full sm:min-w-40 sm:w-auto"
+          onClick={onSubmit}
+        >
+          {editing ? 'Guardar cambios' : 'Crear compra'}
+        </Button>
+      </div>
+    </footer>
+  );
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={editing ? 'Editar compra' : 'Nueva compra'}
+      layout={workspaceEnabled ? 'workspace' : 'default'}
+      footer={workspaceEnabled ? actions : undefined}
     >
-      <div className="space-y-6 pb-2">
+      <div
+        data-testid="purchase-form-content"
+        className={workspaceEnabled ? 'space-y-5 pb-1' : 'space-y-6 pb-2'}
+      >
         <section
           aria-labelledby="purchase-form-details-heading"
           data-testid="purchase-form-details"
-          className="space-y-4"
+          className={
+            workspaceEnabled
+              ? 'space-y-4 rounded-xl border border-border bg-surface-subtle p-4 sm:p-5'
+              : 'space-y-4'
+          }
         >
           <h3
             id="purchase-form-details-heading"
-            className="text-sm font-semibold uppercase tracking-wide text-gray-500"
+            className={
+              workspaceEnabled
+                ? 'text-sm font-semibold uppercase tracking-wide text-text-muted'
+                : 'text-sm font-semibold uppercase tracking-wide text-gray-500'
+            }
           >
-            Datos de la compra
+            {workspaceEnabled ? 'Proveedor de la compra' : 'Datos de la compra'}
           </h3>
 
           <SupplierSelector
@@ -118,14 +172,18 @@ export default function PurchaseFormModal({
         <section
           aria-labelledby="purchase-form-add-item-heading"
           data-testid="purchase-form-add-item"
-          className="rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5"
+          className={
+            workspaceEnabled
+              ? 'rounded-xl border border-border bg-white p-4 sm:p-5'
+              : 'rounded-lg border border-gray-200 bg-gray-50/60 p-4 sm:p-5'
+          }
         >
           <div className="mb-4">
             <h3
               id="purchase-form-add-item-heading"
               className="font-semibold text-gray-900"
             >
-              Agregar partida
+              {workspaceEnabled ? 'Agregar productos' : 'Agregar partida'}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
               Selecciona un producto y define la cantidad inicial.
@@ -174,14 +232,18 @@ export default function PurchaseFormModal({
         <section
           aria-labelledby="purchase-form-items-heading"
           data-testid="purchase-form-items"
-          className="space-y-3"
+          className={
+            workspaceEnabled
+              ? 'space-y-3 rounded-xl border border-border bg-white p-4 sm:p-5'
+              : 'space-y-3'
+          }
         >
           <div className="flex items-baseline justify-between gap-4">
             <h3
               id="purchase-form-items-heading"
               className="font-semibold text-gray-900"
             >
-              Partidas
+              {workspaceEnabled ? 'Partidas de la compra' : 'Partidas'}
             </h3>
             {items.length > 0 ? (
               <span className="text-sm text-gray-500">
@@ -190,6 +252,11 @@ export default function PurchaseFormModal({
             ) : null}
           </div>
 
+          {workspaceEnabled ? (
+            <p className="text-sm text-text-muted">
+              Revisa los productos, sus cantidades y costos antes de crear la orden.
+            </p>
+          ) : null}
           {items.length === 0 ? (
             <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
               Todavía no se han agregado productos. Selecciona un producto
@@ -399,50 +466,7 @@ export default function PurchaseFormModal({
           </dl>
         </section>
 
-        <footer
-          data-testid="purchase-form-footer"
-          className="sticky bottom-0 z-10 -mx-6 mt-6 border-t border-gray-200 bg-white/95 px-6 pb-2 pt-4 shadow-[0_-4px_12px_rgba(15,23,42,0.08)] backdrop-blur"
-        >
-          {itemsError ? (
-            <p
-              role="alert"
-              className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-            >
-              {itemsError}
-            </p>
-          ) : null}
-
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              className="w-full sm:w-auto"
-              onClick={onClose}
-            >
-              Cancelar
-            </Button>
-
-            <Button
-              type="button"
-              loading={saving}
-              loadingText={
-                editing
-                  ? 'Guardando cambios...'
-                  : 'Guardando...'
-              }
-              disabled={
-                saving ||
-                !supplierId ||
-                items.length === 0
-              }
-              className="w-full sm:min-w-40 sm:w-auto"
-              onClick={onSubmit}
-            >
-              {editing ? 'Guardar cambios' : 'Crear compra'}
-            </Button>
-          </div>
-        </footer>
+        {!workspaceEnabled ? actions : null}
       </div>
     </Modal>
   );
