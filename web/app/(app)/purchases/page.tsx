@@ -859,27 +859,30 @@ async function loadPageData() {
       minWidth: 110,
       cell: (purchase) => (
         <div className="space-y-2">
-          <Link
-            href={`/purchases/${encodeURIComponent(purchase.id)}`}
-            className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
-          >
-            {purchase.folio}
-          </Link>
           {purchasesWorkspaceEnabled ? (
             <button
               type="button"
-              aria-label={`Vista rápida de compra ${purchase.folio}`}
-              aria-pressed={quickDetailOpen && selectedPurchaseId === purchase.id}
-              className="block rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-blue-600"
+              aria-haspopup="dialog"
+              aria-expanded={quickDetailOpen && selectedPurchaseId === purchase.id}
+              aria-label={`Abrir detalle de compra ${purchase.folio}`}
+              className="inline-block rounded-sm text-left font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
               onClick={() => {
+                clearActionError();
                 setSelectedPurchaseId(purchase.id);
                 setQuickDetailGeneration((version) => version + 1);
                 setQuickDetailOpen(true);
               }}
             >
-              Ver resumen
+              {purchase.folio}
             </button>
-          ) : null}
+          ) : (
+            <Link
+              href={`/purchases/${encodeURIComponent(purchase.id)}`}
+              className="inline-block rounded-sm font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 hover:text-blue-900 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-blue-600"
+            >
+              {purchase.folio}
+            </Link>
+          )}
           {purchase.status !== 'DRAFT' && purchase.status !== 'CANCELLED' ? (
             <p className="text-xs text-text-muted sm:hidden">
               Recepción: {purchase.receiptProgress.receivedUnits} de{' '}
@@ -1255,6 +1258,8 @@ async function loadPageData() {
           onReceive={(purchase) => { void handleDirectReceive(purchase); }}
           onDownloadPdf={(purchase) => { void handleDownloadPdf(purchase); }}
           downloadingPurchaseId={downloadingPurchaseId}
+          actionError={actionError}
+          onClearActionError={clearActionError}
         />
       ) : null}
 
