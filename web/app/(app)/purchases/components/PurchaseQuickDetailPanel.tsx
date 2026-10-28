@@ -131,7 +131,7 @@ export default function PurchaseQuickDetailPanel({
   return (
     <Modal
       isOpen
-      layout="workspace"
+      layout="side-panel"
       title={purchase ? `Compra ${purchase.folio}` : 'Detalle de compra'}
       description="Detalle contextual de la orden seleccionada"
       onClose={onClose}
