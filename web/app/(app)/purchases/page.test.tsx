@@ -3167,16 +3167,16 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
     expect(screen.getByText('Administra órdenes de compra y da seguimiento a sus recepciones.')).toBeTruthy();
   });
 
-  it('muestra la estructura del workspace conservando filtros, enlaces y permisos', async () => {
+  it('muestra la estructura del workspace conservando filtros, folios accionables y permisos', async () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
     const user = userEvent.setup();
     render(<PurchasesPage />);
 
-    await screen.findByRole('link', { name: 'OC-0001' });
+    await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
 
     expect(screen.getByRole('heading', { name: 'Historial de compras', level: 2 })).toBeTruthy();
     expect(screen.getByText('Registra órdenes de compra y da seguimiento a recepciones parciales o completas.')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'OC-0001' }).getAttribute('href')).toBe('/purchases/purchase-1');
+    expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0001' }).getAttribute('aria-haspopup')).toBe('dialog');
     expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
 
     const search = screen.getByRole('searchbox', {
@@ -3184,8 +3184,8 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
     });
     await user.type(search, 'RX-200');
     expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'OC-0002' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'OC-0001' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0002' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Abrir detalle de compra OC-0001' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Limpiar filtros' }));
     expect(screen.getByText('2 de 2 órdenes')).toBeTruthy();
     expect(vi.mocked(api.post)).not.toHaveBeenCalled();
@@ -3196,11 +3196,11 @@ describe('PUR-UX-01B — lista visual de Compras con flag reversible', () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'true');
     const user = userEvent.setup();
     render(<PurchasesPage />);
-    await screen.findByRole('link', { name: 'OC-0001' });
+    await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
 
     await user.selectOptions(screen.getByRole('combobox', { name: 'Estado' }), 'PARTIALLY_RECEIVED');
-    expect(screen.getByRole('link', { name: 'OC-0002' })).toBeTruthy();
-    expect(screen.queryByRole('link', { name: 'OC-0001' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0002' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Abrir detalle de compra OC-0001' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: 'Almacén destino' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Nueva compra' })).toBeTruthy();
   });
@@ -3233,28 +3233,81 @@ describe('PUR-UX-01C — integración del panel contextual desde el listado', ()
   it('abre el panel de compra y restaura el foco y el listado con Escape', async () => {
     const user = userEvent.setup();
     render(<PurchasesPage />);
-    const openButton = await screen.findByRole('button', { name: 'Vista rápida de compra OC-0001' });
+    const openButton = await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
     await user.click(openButton);
 
     expect(await screen.findByRole('dialog', { name: 'Compra OC-0001' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Ver detalle completo' }).getAttribute('href'))
       .toBe('/purchases/purchase-1');
-    expect(openButton.getAttribute('aria-pressed')).toBe('true');
+    expect(openButton.getAttribute('aria-expanded')).toBe('true');
     expect(api.post).not.toHaveBeenCalled();
     expect(api.patch).not.toHaveBeenCalled();
 
     await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Compra OC-0001' })).toBeNull());
-    expect(screen.getByRole('link', { name: 'OC-0001' })).toBeTruthy();
-    expect(openButton.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.getByRole('button', { name: 'Abrir detalle de compra OC-0001' })).toBeTruthy();
+    expect(openButton.getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(openButton);
+  });
+
+  it('abre el folio por Enter, conserva los filtros y restaura foco después de cerrar con X', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
+    const search = screen.getByRole('searchbox', { name: 'Buscar por folio, proveedor o SKU' });
+    await user.type(search, 'OC-0001');
+    const folio = screen.getByRole('button', { name: 'Abrir detalle de compra OC-0001' });
+    folio.focus();
+    await user.keyboard('{Enter}');
+    const dialog = await screen.findByRole('dialog', { name: 'Compra OC-0001' });
+    expect(dialog.getAttribute('data-modal-layout')).toBe('side-panel');
+    expect(within(dialog).getByRole('link', { name: 'Ver detalle completo' }).getAttribute('href'))
+      .toBe('/purchases/purchase-1');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cerrar modal' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Compra OC-0001' })).toBeNull());
+    expect(search).toHaveProperty('value', 'OC-0001');
+    expect(screen.getByText('1 de 2 órdenes')).toBeTruthy();
+    expect(document.activeElement).toBe(folio);
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('recarga el detalle al reabrir el mismo folio sin duplicar mutaciones', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    const folio = await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' });
+    await user.click(folio);
+    await screen.findByRole('dialog', { name: 'Compra OC-0001' });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Compra OC-0001' })).toBeNull());
+    await user.click(folio);
+    expect(await screen.findByRole('dialog', { name: 'Compra OC-0001' })).toBeTruthy();
+    await waitFor(() => {
+      const calls = vi.mocked(api.get).mock.calls.filter(([url]) => String(url) === '/purchases/purchase-1');
+      expect(calls).toHaveLength(2);
+    });
+    expect(api.post).not.toHaveBeenCalled();
+    expect(api.patch).not.toHaveBeenCalled();
+  });
+
+  it('muestra el error de descarga PDF dentro del panel y permite cerrarlo', async () => {
+    const user = userEvent.setup();
+    render(<PurchasesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir detalle de compra OC-0001' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Compra OC-0001' });
+    await user.click(within(dialog).getByRole('button', { name: 'Descargar PDF' }));
+    expect(await within(dialog).findByText('No fue posible descargar el PDF.')).toBeTruthy();
+    await user.click(within(dialog).getByRole('button', { name: 'Cerrar mensaje' }));
+    await waitFor(() => expect(within(dialog).queryByText('No fue posible descargar el PDF.')).toBeNull());
   });
 
   it('no renderiza controles de vista rápida con el flag desactivado', async () => {
     vi.stubEnv('NEXT_PUBLIC_ZAPING_PURCHASES_WORKSPACE', 'false');
     render(<PurchasesPage />);
     await screen.findByRole('link', { name: 'OC-0001' });
-    expect(screen.queryByRole('button', { name: 'Vista rápida de compra OC-0001' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Abrir detalle de compra OC-0001' })).toBeNull();
     expect(screen.queryByRole('dialog', { name: /Compra OC-/ })).toBeNull();
   });
 });
