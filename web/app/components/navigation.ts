@@ -19,6 +19,7 @@ import {
 import type { UserRole } from "@/app/auth-session";
 import {
   COMMERCIAL_ROLES,
+  MANAGEMENT_ROLES,
   WAREHOUSE_ROLES,
 } from "@/app/erp-role-access";
 
@@ -93,6 +94,12 @@ export const navigationGroups: NavigationGroup[] = [
         href: "/purchase-receipts",
         icon: PackageCheck,
         visibleForRoles: WAREHOUSE_ROLES,
+      },
+      {
+        label: "Documentos de proveedor",
+        href: "/supplier-documents",
+        icon: FileText,
+        visibleForRoles: MANAGEMENT_ROLES,
       },
     ],
   },

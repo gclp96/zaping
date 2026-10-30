@@ -87,7 +87,8 @@ describe('PurchaseReceiptModal — recepción registrada', () => {
   });
 
   it('mantiene tabla y editor responsive con tracking por partida', async () => {
-    const onItemChange = vi.fn();
+  vi.stubEnv('NEXT_PUBLIC_ZAPING_RECEIPTS_WORKSPACE', 'false');
+  const onItemChange = vi.fn();
 
     render(
       <PurchaseReceiptModal
